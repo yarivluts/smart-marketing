@@ -1,0 +1,17 @@
+{
+  "Metadata": {
+    "title": "GrowthOS",
+    "description": "פלטפורמת אנליטיקת צמיחה רב-תחומית"
+  },
+  "HomePage": {
+    "title": "GrowthOS",
+    "subtitle": "פלטפורמת אנליטיקת צמיחה רב-תחומית. זהו שלד האתחול — התכונות ייכנסו בהתאם לרשימת המשימות בקובץ TASKS.md.",
+    "getStarted": "התחלה",
+    "viewDocs": "צפייה בתיעוד"
+  },
+  "LocaleSwitcher": {
+    "label": "שפה",
+    "en": "אנגלית",
+    "he": "עברית"
+  }
+}
