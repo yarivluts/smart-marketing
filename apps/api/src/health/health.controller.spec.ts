@@ -20,4 +20,11 @@ describe('HealthController', () => {
     expect(health.service).toBe('@growthos/api');
     expect(health.environments).toContain('prod');
   });
+
+  it('reports uptime and a fresh timestamp for uptime-check monitors', () => {
+    const health = controller.getHealth();
+    expect(health.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(new Date(health.timestamp).toISOString()).toBe(health.timestamp);
+    expect(Date.now() - new Date(health.timestamp).getTime()).toBeLessThan(5_000);
+  });
 });

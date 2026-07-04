@@ -9,3 +9,4 @@ export * from './env';
 export * from './result';
 export * from './ids';
 export * from './policy';
+export * from './logger';
