@@ -17,6 +17,66 @@ Template for each entry:
 
 ---
 
+## 2026-07-04 — E1.4 Authz middleware (KAN-24)
+
+- **Last completed:**
+  - Implemented **KAN-24** (authz middleware/decorator + client permission gate hooks), the natural
+    follow-on to KAN-23 (policy engine, merged earlier today):
+    - `apps/api/src/authz/`: `@RequirePermission(permission)` / `@Public()` decorators; `PermissionGuard`
+      wired globally via `APP_GUARD`, evaluating `can()` from `@growthos/shared/policy` against
+      `request.principal` / `request.bindings`. Method-level annotations take precedence over
+      class-level ones (a controller can be `@Public()` by default and still lock one route down, or
+      vice versa). A route with **neither** annotation denies outright at runtime (fail-closed), not
+      just at lint time.
+    - `apps/api/eslint.config.mjs`: a custom `growthos/require-permission-annotation` rule fails the
+      build if any NestJS route handler — `@Get() foo() {}` or the arrow-function class-field style
+      `@Get() foo = () => {}` — lacks the annotation on itself or its controller. This is the "no route
+      reachable without explicit permission annotation" AC.
+    - `HealthController` marked `@Public()` (uptime probes have no principal).
+    - `apps/web/lib/permissions/`: `PermissionProvider` + `usePermission(permission, resource)` run the
+      identical `can()` evaluation client-side, ready to gate UI once KAN-21/KAN-25 supply a real
+      session; until then `principal: null` denies everything, matching the server-side default.
+    - `request.principal`/`request.bindings` have no producer yet — they're populated upstream by auth
+      middleware (KAN-21) and the role-binding lookup (KAN-22/KAN-26). Until those land, every
+      non-public route in the running app denies by construction; this PR only adds the guard/decorator
+      contract, not a fake/dev auth shim.
+  - Self-reviewed the diff via two independent subagent passes (correctness angles + cleanup/altitude/
+    conventions angles) and fixed the real findings before merging: the original
+    `getAllAndOverride`-per-key guard logic let a class-level `@Public()` silently shadow a method-level
+    `@RequirePermission` (and vice versa) — rewrote to resolve handler-level metadata first, with
+    regression tests for both directions; the eslint rule only matched `MethodDefinition` and missed
+    arrow-function class-field route handlers — extended it and manually verified the rule fires on both
+    styles; the API guard and the web hook each redefined their own `{type, id}` principal shape instead
+    of reusing `Principal` from `@growthos/shared` — both now import it directly; removed dead code in
+    the guard's test mock.
+  - `pnpm build && pnpm typecheck && pnpm test && pnpm lint` all green (15 tests in `apps/api` incl. a
+    full e2e boot of a demo Nest app over real HTTP; 4 new tests in `apps/web`; 143 unchanged in
+    `packages/shared`).
+  - Branch `kan-24-authz-middleware`, opened as PR #7, merged into `main` (squash). Remote branch
+    deletion failed with an HTTP 403 from this sandbox's git remote (not a GitHub permissions issue,
+    a proxy/remote restriction) — the branch is merged and dead but not deleted; a human with direct
+    repo access can delete `kan-24-authz-middleware` when convenient, or the next run can retry.
+- **In progress (exact stopping point):** none — KAN-24 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** KAN-20 (observability) is still blocked on a human picking between PR #2/#3/#5 (see
+  below). Skip it and pick the next unblocked sprint-1/2 `todo`: **KAN-21** (Firebase Auth) or
+  **KAN-22** (finish CRUD/cascade tests against the Firestore emulator) — check whether `firebase-tools`
+  or an emulator is available in-run before deferring further (it was not available as of this run: no
+  `firebase` CLI, no `@firebase/*` emulator packages installed). **KAN-25** (org-scoped sessions/switcher
+  UI) depends on KAN-21 existing first. **KAN-26** (hard-isolation/non-enumeration layer) and **KAN-30**
+  (keys admin UI) are natural follow-ons once there's a real principal source to test against.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding; also gates
+    KAN-21/KAN-22's Firestore-emulator ACs.
+  - Optional: delete the merged `kan-24-authz-middleware` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403).
+
+---
+
 ## 2026-07-04 — E0.4 Observability baseline attempt + duplicate-PR cleanup (KAN-20, run 4)
 
 - **Last completed:**
