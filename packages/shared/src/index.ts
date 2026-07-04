@@ -8,3 +8,5 @@
 export * from './env';
 export * from './result';
 export * from './ids';
+export * from './observability/trace-context';
+export * from './observability/logger';

@@ -1,3 +1,7 @@
+// Import first: patches http/express for Sentry/OpenTelemetry before anything
+// else requires them (see instrument.ts).
+import './instrument';
+
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
