@@ -42,7 +42,9 @@ Template for each entry:
   - Wrote `docs/observability.md` (setup, required env vars, how uptime checks plug in once GCP
     exists). `pnpm build && pnpm test && pnpm lint && pnpm typecheck` all green.
   - Marked KAN-20 `in-progress` in TASKS.md (code baseline done; live Sentry project + DSN secrets +
-    GCP Uptime Check still need a human — added to the human-action queue) and opened a PR.
+    GCP Uptime Check still need a human — added to the human-action queue) and opened
+    [PR #3](https://github.com/yarivluts/smart-marketing/pull/3) (branch
+    `feature/kan-20-observability-baseline`).
 - **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
   No admin UI was added: this story is ops/infra configuration (env vars, SDK wiring), not data a
   human manages through the product.
