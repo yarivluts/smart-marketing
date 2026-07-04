@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { HealthController } from './health/health.controller';
 import { HealthService } from './health/health.service';
+import { PermissionGuard } from './authz/permission.guard';
 
 @Module({
   imports: [],
   controllers: [HealthController],
-  providers: [HealthService],
+  providers: [HealthService, { provide: APP_GUARD, useClass: PermissionGuard }],
 })
 export class AppModule {}
