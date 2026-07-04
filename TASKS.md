@@ -28,7 +28,7 @@ blocker is unfinished. See [CLAUDE.md](./CLAUDE.md) for the full working rules.
 | KAN-20 | E0.4 Observability baseline: OpenTelemetry, structured logs, Sentry, uptime checks | 0 | 1 | todo |  |
 | KAN-21 | E1.1 Firebase Auth integration (email + Google SSO) + session handling in Next.js | 0 | 1 | todo |  |
 | KAN-22 | E1.2 firebase-orm models: global User, Organization, Membership (user-org many-to-many), Project, Environment, RoleBinding, ServiceAccount | 0 | 1 | todo |  |
-| KAN-23 | E1.3 Policy engine: permission catalog, role bundles, inheritance org->project->env, deny-by-default | 0 | 1 | todo |  |
+| KAN-23 | E1.3 Policy engine: permission catalog, role bundles, inheritance org->project->env, deny-by-default | 0 | 1 | done | Delivered in `packages/shared/src/policy` (KAN-79 run 2). 138-case table-driven test matrix (role x permission x level). The "unauthorized API call -> 403" half of the AC has no route to test against yet — apps/api only has a health check; wiring the engine into route guards is KAN-24. |
 | KAN-24 | E1.4 authz middleware/decorator for all API routes + client-side permission gate hooks | 0 | 2 | todo |  |
 | KAN-25 | E1.5 UI: org-scoped sessions, org switcher (memberships only), project switcher, env badge, create/invite/join flows | 0 | 1 | todo |  |
 | KAN-26 | E1.6 Hard-isolation & non-enumeration layer: 404-not-403, binding-filtered lists, scoped caches/search/notifications, per-project datasets | 0 | 2 | todo |  |
