@@ -29,7 +29,7 @@ pnpm dev                 # run web (:3000) + api (:3001) in dev
 
 The backlog lives in Jira project **KAN** and is mirrored in [`TASKS.md`](./TASKS.md). Each scheduled
 run reads `PROGRESS.md` + `TASKS.md`, picks the next unblocked story in sprint order, implements it
-with tests, opens a PR, and updates `PROGRESS.md`. A human reviews and merges — **the agent never
-merges to `main`**.
+with tests, opens a PR, **reviews its own diff and fixes the findings**, ensures all checks are green,
+then **merges into `main`** and updates `PROGRESS.md`.
 
 See [`CLAUDE.md`](./CLAUDE.md) for the full engineering rules.

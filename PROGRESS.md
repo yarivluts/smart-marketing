@@ -42,8 +42,9 @@ Template for each entry:
   - **KAN-18** — create GCP/Firebase projects + billing + secrets.
   - Set up the scheduled routine (via `/schedule`) with the prompt:
     > Read PROGRESS.md and TASKS.md. Pick the next unblocked task (sprint order, respect blocked-by).
-    > Implement it fully incl. tests per its AC. Branch + PR. Update PROGRESS.md. If a task exceeds one
-    > run, stop at a clean point and document exactly where.
+    > Implement it fully incl. tests per its AC. Branch + PR. Review your own diff and fix the findings,
+    > ensure lint/typecheck/test/build are green, then merge the PR into main. Update PROGRESS.md. If a
+    > task exceeds one run, stop at a clean point and document exactly where.
 
     Recommended cadence: every 1–2 hours during daytime (e.g. cron `0 8-22/2 * * *`), not more
     frequent, to avoid overlapping runs.

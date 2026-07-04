@@ -27,8 +27,11 @@ scheduled Claude agent. This file is the contract every run follows. Read it fir
 
 ## Git workflow
 
-- Work on a **branch**, open a **PR**. **Never merge to `main` autonomously** — a human reviews and
-  merges.
+- Work on a **branch** and open a **PR** for every task — never commit straight to `main`.
+- Before merging, **review your own diff**: correctness bugs, missing tests, and
+  reuse/simplification/quality issues. Fix everything you find.
+- All checks must be green before merge: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
+- Once the PR is clean and green, **merge it into `main`** and delete the branch.
 - Keep PRs scoped to one task (one KAN story) where possible.
 
 ## Monorepo layout
