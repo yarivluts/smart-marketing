@@ -6,6 +6,9 @@ export interface HealthStatus {
   service: string;
   environment: Environment;
   environments: readonly Environment[];
+  /** Seconds since this process started; a live-but-just-restarted process is
+   * a signal worth surfacing to whatever polls this endpoint as an uptime check. */
+  uptimeSeconds: number;
 }
 
 @Injectable()
@@ -22,6 +25,7 @@ export class HealthService {
       service: '@growthos/api',
       environment,
       environments: ENVIRONMENTS,
+      uptimeSeconds: Math.floor(process.uptime()),
     };
   }
 }

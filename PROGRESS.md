@@ -17,6 +17,51 @@ Template for each entry:
 
 ---
 
+## 2026-07-04 — E0.4 Observability baseline (KAN-20)
+
+- **Last completed:**
+  - `@growthos/shared`: structured JSON logging (`createLogger`, built on pino) and async-local
+    trace id propagation (`generateTraceId` / `runWithTraceId` / `getTraceId`, built on
+    `node:async_hooks`), each with unit tests.
+  - `apps/api`: `@sentry/nestjs` wired via `src/instrument.ts` (imported first in `main.ts`, before
+    any other module, as required for it to patch http/express). `TraceMiddleware` binds one trace
+    id per request, tags the active Sentry scope with it, and echoes it back as `x-trace-id`.
+    `AllExceptionsFilter` (global `@Catch()`, `@SentryExceptionCaptured()`) logs every unhandled
+    exception with structured JSON (including the trace id) and reports it to Sentry — so the same
+    id ties together the log line, the Sentry event, and the client-visible response. `@sentry/nestjs`
+    builds its tracing on OpenTelemetry, so this covers the "OpenTelemetry in api" AC without running
+    a second, competing OpenTelemetry SDK. `/v1/health` now also reports `uptimeSeconds`.
+  - `apps/web`: `@sentry/nextjs` wired through the standard Next.js hooks — `instrumentation.ts`
+    (server + edge) and `instrumentation-client.ts` (browser) — via a shared `sentryOptions()`
+    helper, plus `app/global-error.tsx` to report anything that escapes every other React error
+    boundary. Deliberately skipped `withSentryConfig`/source-map upload (needs a Sentry auth token
+    we don't have yet); runtime error capture doesn't need it.
+  - Verified end-to-end by running the built api locally: hitting a 404 (and a thrown exception in
+    tests) produces the same trace id in the `x-trace-id` response header, the JSON error body, and
+    the structured log line.
+  - Wrote `docs/observability.md` (setup, required env vars, how uptime checks plug in once GCP
+    exists). `pnpm build && pnpm test && pnpm lint && pnpm typecheck` all green.
+  - Marked KAN-20 `in-progress` in TASKS.md (code baseline done; live Sentry project + DSN secrets +
+    GCP Uptime Check still need a human — added to the human-action queue) and opened
+    [PR #3](https://github.com/yarivluts/smart-marketing/pull/3) (branch
+    `feature/kan-20-observability-baseline`).
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+  No admin UI was added: this story is ops/infra configuration (env vars, SDK wiring), not data a
+  human manages through the product.
+- **Blocked + why:** nothing blocking the next code task. The remaining sliver of KAN-20 (an actual
+  Sentry project + a live uptime monitor) needs GCP/Sentry accounts (KAN-18-adjacent), not code.
+- **Next step:** next run picks the next unblocked `todo` in TASKS.md sprint order — e.g. **KAN-21**
+  (Firebase Auth integration) or **KAN-45** (i18n scaffold), skipping `needs-human`/`blocked-by`
+  items.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, week 1).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets.
+  - **KAN-20** — create a Sentry project + set `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN` secrets; once
+    GCP exists, point a GCP Uptime Check at `GET /v1/health`.
+  - Review/merge the KAN-20 PR (this run does not merge to `main`).
+
+---
+
 ## 2026-07-04 — E0.0 Bootstrap (KAN-79)
 
 - **Last completed:**
