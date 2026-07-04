@@ -6,6 +6,9 @@ export interface HealthStatus {
   service: string;
   environment: Environment;
   environments: readonly Environment[];
+  /** Seconds the process has been running; lets uptime monitors detect restarts/crash loops. */
+  uptimeSeconds: number;
+  timestamp: string;
 }
 
 @Injectable()
@@ -22,6 +25,8 @@ export class HealthService {
       service: '@growthos/api',
       environment,
       environments: ENVIRONMENTS,
+      uptimeSeconds: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString(),
     };
   }
 }
