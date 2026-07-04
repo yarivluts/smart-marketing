@@ -17,6 +17,53 @@ Template for each entry:
 
 ---
 
+## 2026-07-04 — E0.4 Observability baseline attempt + duplicate-PR cleanup (KAN-20, run 4)
+
+- **Last completed:**
+  - Started on **KAN-20** (observability baseline): `createLogger()` (pino, structured JSON,
+    redaction) in `@growthos/shared`; `initTelemetry()`/`getActiveTraceId()` (OpenTelemetry
+    `NodeSDK`, http instrumentation, OTLP exporter gated on `OTEL_EXPORTER_OTLP_ENDPOINT`) and
+    `initSentry()`/`captureException()` (gated on `SENTRY_DSN`, tags events with the trace id) in
+    `apps/api/src/instrumentation/`; a global `AllExceptionsFilter` + `AppLoggerService` Nest
+    adapter wired into `main.ts`; `uptimeSeconds`/`timestamp` added to `GET /v1/health`.
+  - Self-reviewed the diff via a subagent and fixed 5 real findings before opening a PR: the
+    exception filter was double-nesting Nest's built-in exception bodies under `message`; the
+    logger crashed on `LOG_LEVEL=""` (`??` doesn't treat empty string as absent); redaction missed
+    top-level secret fields (only matched one level of nesting); `HealthService` reimplemented
+    `isEnvironment()` by hand instead of reusing the shared helper; `main.ts` tagged Sentry with the
+    raw env var while the logger used a validated/defaulted one. All fixed with regression tests;
+    `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green (21 new/updated tests in
+    `apps/api`, 8 in `packages/shared`).
+  - **Discovered mid-run that KAN-20 already had two other independent, unmerged implementations**
+    open as PR #2 and PR #3 — three separate scheduled runs had picked up the same story before any
+    of them merged, all branched off the same pre-merge-policy commit. Opened this work as **PR #5**
+    for visibility/comparison but **deliberately did not merge it** — reconciling which
+    implementation to keep (raw OTel SDK + custom Sentry wiring vs. `@sentry/nestjs` vs. api-only vs.
+    api+web) is a judgment call, not a mechanical next step. Sent a push notification to the repo
+    owner about this; marked **KAN-20 `in-progress`** in `TASKS.md` with a pointer to all three PRs.
+  - While investigating, also found and cleanly resolved two *unambiguous*, unrelated backlog items
+    that had the same problem (PR opened, never merged, under the old policy): rebased, re-verified
+    green (`pnpm lint/typecheck/test/build`), and merged **PR #4 (KAN-23 policy engine)** and
+    **PR #1 (KAN-45 i18n scaffold)** into `main`. Both are now `done` in `TASKS.md`.
+- **In progress (exact stopping point):** KAN-20 is implemented and PR'd (#5) but intentionally
+  unmerged pending reconciliation with PR #2/#3. `main` is otherwise clean and green.
+- **Blocked + why:** KAN-20 merge is blocked on a human (or an explicitly-instructed run) picking
+  one of the three implementations and closing the other two.
+- **Next step:** either (a) a human reviews PR #2/#3/#5 and says which to keep, or (b) the next run
+  is told explicitly to reconcile KAN-20 itself. Until then, skip KAN-20 and pick the next unblocked
+  sprint-1 `todo` — **KAN-21** (Firebase Auth) or **KAN-22** (identity models) are next by table
+  order but likely want the Firestore emulator or a real Firebase project (KAN-18 is still
+  `needs-human`); check emulator availability before deferring further. **KAN-24** (authz
+  middleware) is unblocked now that KAN-23's policy engine is merged.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Consider whether the scheduled-run cadence needs adjusting: three runs independently starting
+    KAN-20 before any merged suggests either overlapping schedules or runs not reliably merging
+    their own PRs before ending (this run found and fixed the latter for KAN-23/KAN-45's PRs).
+
 ## 2026-07-04 — E1.3 Policy engine (KAN-23)
 
 - **Last completed:**
