@@ -3,12 +3,14 @@
  * Every model extends @arbel/firebase-orm's BaseModel; app code must never use
  * the raw Firebase SDK (see CLAUDE.md).
  *
- * Bootstrap seed: the identity / RBAC hierarchy (plan 08 par.1.1). It is fleshed
- * out under KAN-22 and KAN-23.
+ * The identity / RBAC hierarchy (plan 08 par.1.1). Role/permission vocabulary
+ * lives in `@growthos/shared` (policy engine, KAN-23) and is re-exported here
+ * for convenience since every model in this package is typed against it.
  */
 import 'reflect-metadata';
 
-export * from './roles';
+export { ROLES, isRole, SCOPE_LEVELS, isScopeLevel, PRINCIPAL_TYPES } from '@growthos/shared';
+export type { Role, ScopeLevel, PrincipalType } from '@growthos/shared';
 export * from './models/user.model';
 export * from './models/organization.model';
 export * from './models/membership.model';

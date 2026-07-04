@@ -47,7 +47,7 @@ describe('firebase-orm models', () => {
   });
 
   it('validates roles', () => {
-    expect(isRole('owner')).toBe(true);
+    expect(isRole('project_admin')).toBe(true);
     expect(isRole('superuser')).toBe(false);
   });
 });

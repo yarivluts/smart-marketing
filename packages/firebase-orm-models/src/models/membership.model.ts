@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { Role } from '../roles';
+import type { Role } from '@growthos/shared';
 
 /**
  * Links a global user to an organization with a per-org role (many-to-many).

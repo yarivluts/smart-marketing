@@ -17,6 +17,56 @@ Template for each entry:
 
 ---
 
+## 2026-07-04 — E1.3 Policy engine (KAN-23)
+
+- **Last completed:**
+  - Implemented the deny-by-default policy engine at `packages/shared/src/policy/`:
+    permission catalog (`permissions.ts`, 15 scopes incl. `ingest.write`, `billing.manage`,
+    `pii.read` sourced from plan `08 §5.3` / `06 §3` / task-breakdown E1.3), role bundles
+    (`roles.ts`: `platform_admin`, `org_owner`, `org_admin`, `project_admin`, `editor`,
+    `operator`, `viewer`, `ingest_only` per plan `08 §5.2`), scope levels (`scopes.ts`:
+    `platform` -> `org` -> `project` -> `environment`), and the evaluator (`engine.ts`:
+    `can()` / `evaluate()`) that grants a permission only when a binding's role bundle
+    contains it *and* the binding's scope is an ancestor-or-self of the requested resource
+    — i.e. inheritance flows strictly downward, never up or sideways.
+  - `pii.read` is withheld from `project_admin` (separate grant, plan `08 §5.4`) and
+    `billing.manage` is withheld from `org_admin` (only `org_owner` carries it) — both are
+    deliberate, documented interpretations of the plan, not gaps.
+  - Wrote `packages/shared/src/policy/policy.test.ts`: the full (role x permission x level)
+    table-driven allow/deny matrix the AC calls for (138 cases), plus deny-by-default,
+    downward-inheritance, sideways/upward-denial, multi-binding union, and
+    user-vs-service_account principal-isolation cases. 143 tests pass in `packages/shared`
+    overall.
+  - Refactored `packages/firebase-orm-models` to consume this vocabulary instead of its own
+    local `roles.ts` seed (deleted): `MembershipModel` and `RoleBindingModel` now import
+    `Role` / `ScopeLevel` / `PrincipalType` from `@growthos/shared`; the package still
+    re-exports them for convenience. Updated the one stale test (`isRole('owner')` ->
+    `isRole('project_admin')`, the old 4-role seed is gone).
+  - `pnpm build && pnpm test && pnpm typecheck && pnpm lint` all green (155 tests across
+    5 packages).
+  - Branch `kan-23-policy-engine`, PR opened against `main` (not merged — human review
+    required per CLAUDE.md).
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping
+  point. No admin UI was added for this story: nothing here is yet user-manageable (there is
+  no role-binding CRUD surface for a human to operate), so the "admin surface" house rule
+  doesn't apply until KAN-25/KAN-30 build that UI against this engine.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked sprint-1 `todo` is **KAN-20** (observability baseline) or
+  **KAN-45** (i18n scaffold) — both are infra-light. **KAN-21** (Firebase Auth) and
+  **KAN-22** (finish CRUD/cascade tests for the identity models against the Firestore
+  emulator) are also sprint-1 `todo` but likely want a real/emulated Firebase project;
+  check whether the Firestore emulator is available in-run before deferring further.
+  **KAN-24** (authz middleware wiring `can()`/`evaluate()` into API route guards + the
+  `usePermission` client hook) is the natural follow-on to this story once there are
+  protected routes to guard.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD,
+    week 1) — still outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding; this
+    also gates whether KAN-21/KAN-22's Firestore-emulator ACs can be exercised in a headless
+    run.
+  - Review and merge (or request changes on) the KAN-23 PR.
+
 ## 2026-07-04 — E0.0 Bootstrap (KAN-79)
 
 - **Last completed:**

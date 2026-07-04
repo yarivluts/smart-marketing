@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { PrincipalType, Role, ScopeLevel } from '../roles';
+import type { PrincipalType, Role, ScopeLevel } from '@growthos/shared';
 
 /**
  * Grants a role to a principal (user or service account) at a scope level.
