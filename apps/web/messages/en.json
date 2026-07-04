@@ -1,0 +1,17 @@
+{
+  "Metadata": {
+    "title": "GrowthOS",
+    "description": "Multi-vertical growth analytics platform"
+  },
+  "HomePage": {
+    "title": "GrowthOS",
+    "subtitle": "Multi-vertical growth analytics platform. This is the bootstrap scaffold — features land per the backlog in TASKS.md.",
+    "getStarted": "Get started",
+    "viewDocs": "View docs"
+  },
+  "LocaleSwitcher": {
+    "label": "Language",
+    "en": "English",
+    "he": "Hebrew"
+  }
+}

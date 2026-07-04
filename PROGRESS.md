@@ -67,6 +67,47 @@ Template for each entry:
     run.
   - Review and merge (or request changes on) the KAN-23 PR.
 
+## 2026-07-04 — E6.3 i18n scaffold (KAN-45)
+
+- **Last completed:**
+  - **KAN-45 (i18n scaffold)**, done, on branch `kan-45-i18n-scaffold`, PR opened against `main`:
+    - Added `next-intl` to `apps/web` with locale-prefixed routing: `i18n/routing.ts` (locales
+      `en`/`he`, default `en`, `getDirection()` helper), `i18n/navigation.ts`, `i18n/request.ts`,
+      and root `middleware.ts`.
+    - Moved `app/layout.tsx` + `app/page.tsx` under `app/[locale]/` (Next App Router convention for
+      i18n routing); the root layout now sets `<html lang dir>` per-locale (RTL for `he`, LTR for
+      `en`) — this is the "RTL layout toggle" from the AC.
+    - Added `messages/en.json` + `messages/he.json` translation resources (Hebrew text lives only
+      here, never in `.ts`/`.tsx`, per CLAUDE.md) and moved the homepage's copy into them.
+    - Added a `LocaleSwitcher` client component (the user-facing surface to change language) shown
+      on the homepage.
+    - Added an `eslint-plugin-react` `react/jsx-no-literals` rule (errors on raw JSX text children,
+      excluded for `*.test.tsx`) in `apps/web/eslint.config.mjs` — this is the lint rule CLAUDE.md
+      says enforces "no hard-coded UI strings"; it wasn't wired up yet before this change.
+    - Tests: `i18n/routing.test.ts` (locale list + RTL/LTR mapping), `messages/messages.test.ts`
+      (en/he key parity + no-empty-value regression guard), `components/locale-switcher.test.tsx`
+      (renders both locale options, calls the router with the new locale on change). All green via
+      `pnpm test`.
+    - Verified manually: `pnpm build` prerenders `/en` and `/he` static routes; ran `next start` and
+      curled both routes — confirmed `<html lang="en" dir="ltr">` / `<html lang="he" dir="rtl">` and
+      correctly translated body copy.
+  - Full `pnpm build && pnpm test && pnpm lint && pnpm typecheck` green across all 5 packages before
+    opening the PR.
+- **In progress (exact stopping point):** none — KAN-45 is fully delivered, tested, and PR'd.
+- **Blocked + why:** nothing blocking.
+- **Next step:** next run picks the next unblocked sprint-1 `todo` from `TASKS.md` in table order —
+  **KAN-20** (observability baseline) or **KAN-23** (policy engine) are the remaining sprint-1
+  candidates with no practical infra dependency; **KAN-21/KAN-25** are better done after KAN-18
+  (GCP/Firebase project) lands since they need a real Firebase Auth project to integrate against.
+- **Waiting on human:**
+  - Review + merge PR for KAN-45 (never auto-merged per CLAUDE.md).
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    open).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still open; gates KAN-21 and most
+    infra-dependent stories).
+
+---
+
 ## 2026-07-04 — E0.0 Bootstrap (KAN-79)
 
 - **Last completed:**

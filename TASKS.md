@@ -50,7 +50,7 @@ blocker is unfinished. See [CLAUDE.md](./CLAUDE.md) for the full working rules.
 | KAN-42 | E5.3 POST /v1/metrics/query + GET /v1/metrics catalog + Redis result cache | 0 | 3 | todo |  |
 | KAN-43 | E6.1 Apply for Google Ads developer token + Meta app & Marketing API review (LONG LEAD - submit week 1!) | 0 | 1 | needs-human | LONG LEAD - Google Ads dev token + Meta app/Marketing API review must be submitted by a human in week 1. |
 | KAN-44 | E6.2 Audit log service (append-only): every config/key/role/schema change | 0 | 3 | todo |  |
-| KAN-45 | E6.3 i18n scaffold (next-intl), en+he resource files, RTL layout toggle | 0 | 1 | todo |  |
+| KAN-45 | E6.3 i18n scaffold (next-intl), en+he resource files, RTL layout toggle | 0 | 1 | done | Delivered in apps/web: locale-prefixed routing ([locale] segment + middleware), en/he messages, RTL `dir` toggle, LocaleSwitcher UI, and an eslint `react/jsx-no-literals` rule enforcing "no hard-coded UI strings". |
 | KAN-46 | E7.1 plugin.yaml manifest parser + registry storage + install-per-project flow (scope consent) | 1 | 4 | todo |  |
 | KAN-47 | E7.2 Source-plugin runtime: scheduled execution, scoped short-lived creds, cursor persistence, retry/backoff | 1 | 4 | todo |  |
 | KAN-48 | E7.3 Admin UI: plugin gallery, config forms rendered from config_schema, per-plugin health | 1 | 4 | todo |  |
