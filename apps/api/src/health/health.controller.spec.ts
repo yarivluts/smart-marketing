@@ -20,4 +20,14 @@ describe('HealthController', () => {
     expect(health.service).toBe('@growthos/api');
     expect(health.environments).toContain('prod');
   });
+
+  it('reports liveness with a non-negative uptime for uptime checks', () => {
+    const liveness = controller.getLiveness();
+    expect(liveness.status).toBe('ok');
+    expect(liveness.uptimeSeconds).toBeGreaterThanOrEqual(0);
+  });
+
+  it('reports readiness for uptime checks', () => {
+    expect(controller.getReadiness()).toEqual({ status: 'ok' });
+  });
 });

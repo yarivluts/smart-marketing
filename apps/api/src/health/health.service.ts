@@ -8,20 +8,41 @@ export interface HealthStatus {
   environments: readonly Environment[];
 }
 
+export interface LivenessStatus {
+  status: 'ok';
+  uptimeSeconds: number;
+}
+
+export interface ReadinessStatus {
+  status: 'ok';
+}
+
+function resolveEnvironment(): Environment {
+  const configured = process.env.GROWTHOS_ENV;
+  return configured && (ENVIRONMENTS as readonly string[]).includes(configured) ? (configured as Environment) : 'dev';
+}
+
 @Injectable()
 export class HealthService {
   getHealth(): HealthStatus {
-    const configured = process.env.GROWTHOS_ENV;
-    const environment: Environment =
-      configured && (ENVIRONMENTS as readonly string[]).includes(configured)
-        ? (configured as Environment)
-        : 'dev';
-
     return {
       status: 'ok',
       service: '@growthos/api',
-      environment,
+      environment: resolveEnvironment(),
       environments: ENVIRONMENTS,
+    };
+  }
+
+  getLiveness(): LivenessStatus {
+    return {
+      status: 'ok',
+      uptimeSeconds: process.uptime(),
+    };
+  }
+
+  getReadiness(): ReadinessStatus {
+    return {
+      status: 'ok',
     };
   }
 }

@@ -25,7 +25,7 @@ blocker is unfinished. See [CLAUDE.md](./CLAUDE.md) for the full working rules.
 | KAN-17 | E0.1 Monorepo scaffold: apps/web (Next.js+TS+Tailwind+shadcn), apps/api (NestJS), packages/shared, packages/firebase-orm-models | 0 | 1 | done | Delivered by this bootstrap (E0.1 monorepo scaffold). |
 | KAN-18 | E0.2 GCP projects (dev/staging/prod) via Terraform: Firestore, BigQuery, Pub/Sub, Secret Manager, Cloud Run, Redis | 0 | 1 | needs-human | Requires GCP/Firebase account creation, billing, secrets. |
 | KAN-19 | E0.3 CI/CD (GitHub Actions): lint, typecheck, tests, preview deploy per PR, auto-deploy staging | 0 | 1 | in-progress | CI (lint/typecheck/test/build) green via .github/workflows/ci.yml; preview + staging deploy still needs infra. |
-| KAN-20 | E0.4 Observability baseline: OpenTelemetry, structured logs, Sentry, uptime checks | 0 | 1 | todo |  |
+| KAN-20 | E0.4 Observability baseline: OpenTelemetry, structured logs, Sentry, uptime checks | 0 | 1 | done | apps/api: OTel NodeSDK tracing, pino structured logs w/ trace-id correlation, Sentry capture (gated on SENTRY_DSN, not yet set — needs KAN-18), /health/live + /health/ready for uptime checks. |
 | KAN-21 | E1.1 Firebase Auth integration (email + Google SSO) + session handling in Next.js | 0 | 1 | todo |  |
 | KAN-22 | E1.2 firebase-orm models: global User, Organization, Membership (user-org many-to-many), Project, Environment, RoleBinding, ServiceAccount | 0 | 1 | todo |  |
 | KAN-23 | E1.3 Policy engine: permission catalog, role bundles, inheritance org->project->env, deny-by-default | 0 | 1 | todo |  |
