@@ -25,8 +25,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     const status =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
-    const message =
-      exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
     const traceId = getActiveTraceId();
 
     this.logger.error(
@@ -41,12 +39,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
     );
     captureException(exception, { traceId });
 
-    response.status(status).json({
-      statusCode: status,
-      message,
-      traceId,
-      timestamp: new Date().toISOString(),
-      path: request.url,
-    });
+    const extra = { traceId, timestamp: new Date().toISOString(), path: request.url };
+    const exceptionBody = exception instanceof HttpException ? exception.getResponse() : null;
+    const responseBody =
+      typeof exceptionBody === 'object' && exceptionBody !== null
+        ? { ...exceptionBody, ...extra }
+        : { statusCode: status, message: exceptionBody ?? 'Internal server error', ...extra };
+
+    response.status(status).json(responseBody);
   }
 }

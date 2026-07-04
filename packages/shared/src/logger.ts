@@ -12,6 +12,11 @@ export interface CreateLoggerOptions {
 const REDACT_PATHS = [
   'req.headers.authorization',
   'req.headers.cookie',
+  'password',
+  'token',
+  'apiKey',
+  'secret',
+  'dsn',
   '*.password',
   '*.token',
   '*.apiKey',
@@ -30,7 +35,7 @@ export function createLogger(options: CreateLoggerOptions): Logger {
   return pino(
     {
       name: service,
-      level: level ?? process.env.LOG_LEVEL ?? 'info',
+      level: level || process.env.LOG_LEVEL || 'info',
       base: {
         service,
         ...(environment ? { environment } : {}),

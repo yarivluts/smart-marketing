@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, type ArgumentsHost } from '@nestjs/common';
+import { BadRequestException, HttpException, HttpStatus, NotFoundException, type ArgumentsHost } from '@nestjs/common';
 import type { Logger } from '@growthos/shared';
 
 const getActiveTraceId = jest.fn();
@@ -56,6 +56,37 @@ describe('AllExceptionsFilter', () => {
         path: '/v1/health',
       }),
     );
+  });
+
+  it('flattens an object-shaped getResponse() instead of nesting it under message', () => {
+    const logger = mockLogger();
+    const filter = new AllExceptionsFilter(logger as unknown as Logger);
+    const { host, json, status } = mockHost({ method: 'GET', url: '/v1/missing' });
+    const exception = new NotFoundException();
+
+    filter.catch(exception, host);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.NOT_FOUND);
+    expect(json).toHaveBeenCalledWith({
+      ...(exception.getResponse() as Record<string, unknown>),
+      traceId: 'trace-123',
+      timestamp: expect.any(String),
+      path: '/v1/missing',
+    });
+  });
+
+  it('preserves a validation error array from BadRequestException without double-nesting', () => {
+    const logger = mockLogger();
+    const filter = new AllExceptionsFilter(logger as unknown as Logger);
+    const { host, json, status } = mockHost({ method: 'POST', url: '/v1/ingest' });
+    const exception = new BadRequestException(['field is required']);
+
+    filter.catch(exception, host);
+
+    expect(status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
+    const [body] = json.mock.calls[0] as [{ message: unknown; statusCode: number }];
+    expect(body.message).toEqual(['field is required']);
+    expect(body.statusCode).toBe(HttpStatus.BAD_REQUEST);
   });
 
   it('maps a non-HTTP error to a 500 with a generic message', () => {

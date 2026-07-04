@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ENVIRONMENTS, type Environment } from '@growthos/shared';
+import { ENVIRONMENTS, isEnvironment, type Environment } from '@growthos/shared';
 
 export interface HealthStatus {
   status: 'ok';
@@ -15,10 +15,7 @@ export interface HealthStatus {
 export class HealthService {
   getHealth(): HealthStatus {
     const configured = process.env.GROWTHOS_ENV;
-    const environment: Environment =
-      configured && (ENVIRONMENTS as readonly string[]).includes(configured)
-        ? (configured as Environment)
-        : 'dev';
+    const environment: Environment = configured && isEnvironment(configured) ? configured : 'dev';
 
     return {
       status: 'ok',

@@ -69,7 +69,19 @@ describe('createLogger', () => {
     expect(logger.level).toBe('debug');
   });
 
-  it('redacts secret-shaped fields', () => {
+  it('falls back to info when LOG_LEVEL is set but empty, instead of crashing', () => {
+    const previous = process.env.LOG_LEVEL;
+    process.env.LOG_LEVEL = '';
+    try {
+      const logger = createLogger({ service: '@growthos/api' });
+      expect(logger.level).toBe('info');
+    } finally {
+      if (previous === undefined) delete process.env.LOG_LEVEL;
+      else process.env.LOG_LEVEL = previous;
+    }
+  });
+
+  it('redacts secret-shaped fields nested one level deep', () => {
     const { stream, lines } = captureLines();
     const logger = createLogger({ service: '@growthos/api', destination: stream });
     logger.info({ user: { password: 'hunter2', token: 'abc', name: 'ada' } }, 'login');
@@ -79,5 +91,15 @@ describe('createLogger', () => {
     expect(user.password).toBe('[REDACTED]');
     expect(user.token).toBe('[REDACTED]');
     expect(user.name).toBe('ada');
+  });
+
+  it('redacts secret-shaped fields at the top level', () => {
+    const { stream, lines } = captureLines();
+    const logger = createLogger({ service: '@growthos/api', destination: stream });
+    logger.info({ password: 'top-level-secret', name: 'ada' }, 'login');
+
+    const [entry] = lines();
+    expect(entry.password).toBe('[REDACTED]');
+    expect(entry.name).toBe('ada');
   });
 });

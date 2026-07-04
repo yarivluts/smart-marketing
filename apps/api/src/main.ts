@@ -1,19 +1,21 @@
 import 'reflect-metadata';
+import { isEnvironment } from '@growthos/shared';
 import { initSentry, initTelemetry, shutdownTelemetry } from './instrumentation';
+
+const configuredEnv = process.env.GROWTHOS_ENV;
+const environment = configuredEnv && isEnvironment(configuredEnv) ? configuredEnv : 'dev';
 
 // Must run before any other import triggers HTTP/module instrumentation.
 const telemetrySdk = initTelemetry('@growthos/api');
-initSentry({ environment: process.env.GROWTHOS_ENV });
+initSentry({ environment });
 
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { AppLoggerService } from './common/logger.service';
-import { createLogger, isEnvironment } from '@growthos/shared';
+import { createLogger } from '@growthos/shared';
 
 async function bootstrap(): Promise<void> {
-  const configuredEnv = process.env.GROWTHOS_ENV;
-  const environment = configuredEnv && isEnvironment(configuredEnv) ? configuredEnv : 'dev';
   const logger = createLogger({ service: '@growthos/api', environment });
   const nestLogger = new AppLoggerService('@growthos/api', environment, logger);
 
@@ -29,8 +31,14 @@ async function bootstrap(): Promise<void> {
     await shutdownTelemetry(telemetrySdk);
     process.exit(0);
   };
-  process.on('SIGTERM', () => void shutdown());
-  process.on('SIGINT', () => void shutdown());
+  const handleSignal = (): void => {
+    void shutdown().catch((error: unknown) => {
+      logger.error({ err: error }, 'Error during graceful shutdown');
+      process.exit(1);
+    });
+  };
+  process.on('SIGTERM', handleSignal);
+  process.on('SIGINT', handleSignal);
 }
 
 void bootstrap();
