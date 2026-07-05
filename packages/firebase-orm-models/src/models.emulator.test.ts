@@ -72,15 +72,101 @@ describe('firebase-orm models against the Firestore emulator', () => {
     expect(loadedServiceAccount?.is_active).toBe(true);
 
     // Update
+    loadedOrg!.billing_email = 'billing@acme.example.com';
+    await loadedOrg!.save();
+    const reloadedOrg = await OrganizationModel.init(org.id);
+    expect(reloadedOrg?.billing_email).toBe('billing@acme.example.com');
+
     loadedProject!.vertical = 'marketing';
     await loadedProject!.save();
     const reloadedProject = await ProjectModel.init(project.id, { organization_id: org.id });
     expect(reloadedProject?.vertical).toBe('marketing');
 
+    loadedServiceAccount!.is_active = false;
+    await loadedServiceAccount!.save();
+    const reloadedServiceAccount = await ServiceAccountModel.init(serviceAccount.id, {
+      organization_id: org.id,
+      project_id: project.id,
+    });
+    expect(reloadedServiceAccount?.is_active).toBe(false);
+
     // Delete
+    await reloadedServiceAccount!.remove();
+    const afterServiceAccountDelete = await ServiceAccountModel.init(serviceAccount.id, {
+      organization_id: org.id,
+      project_id: project.id,
+    });
+    expect(afterServiceAccountDelete).toBeNull();
+
+    await loadedEnv!.remove();
+    const afterEnvDelete = await EnvironmentModel.init(environment.id, {
+      organization_id: org.id,
+      project_id: project.id,
+    });
+    expect(afterEnvDelete).toBeNull();
+
     await reloadedProject!.remove();
-    const afterDelete = await ProjectModel.init(project.id, { organization_id: org.id });
-    expect(afterDelete).toBeNull();
+    const afterProjectDelete = await ProjectModel.init(project.id, { organization_id: org.id });
+    expect(afterProjectDelete).toBeNull();
+
+    await reloadedOrg!.remove();
+    const afterOrgDelete = await OrganizationModel.init(org.id);
+    expect(afterOrgDelete).toBeNull();
+  });
+
+  it('creates, updates and deletes a membership and a role binding directly', async () => {
+    const org = new OrganizationModel();
+    org.name = 'Direct CRUD Org';
+    await org.save();
+
+    const user = new UserModel();
+    user.email = `${unique('direct')}@example.com`;
+    await user.save();
+
+    const membership = new MembershipModel();
+    membership.user_id = user.id;
+    membership.organization_id = org.id;
+    membership.role = 'viewer';
+    await membership.save();
+
+    const loadedMembership = await MembershipModel.init(membership.id, {
+      organization_id: org.id,
+    });
+    expect(loadedMembership?.role).toBe('viewer');
+
+    loadedMembership!.role = 'editor';
+    await loadedMembership!.save();
+    const reloadedMembership = await MembershipModel.init(membership.id, {
+      organization_id: org.id,
+    });
+    expect(reloadedMembership?.role).toBe('editor');
+
+    const binding = new RoleBindingModel();
+    binding.principal_type = 'user';
+    binding.principal_id = user.id;
+    binding.role = 'editor';
+    binding.scope_level = 'org';
+    binding.scope_id = org.id;
+    binding.setPathParams({ organization_id: org.id });
+    await binding.save();
+
+    const loadedBinding = await RoleBindingModel.init(binding.id, { organization_id: org.id });
+    expect(loadedBinding?.role).toBe('editor');
+
+    loadedBinding!.role = 'viewer';
+    await loadedBinding!.save();
+    const reloadedBinding = await RoleBindingModel.init(binding.id, { organization_id: org.id });
+    expect(reloadedBinding?.role).toBe('viewer');
+
+    await reloadedBinding!.remove();
+    const afterBindingDelete = await RoleBindingModel.init(binding.id, { organization_id: org.id });
+    expect(afterBindingDelete).toBeNull();
+
+    await reloadedMembership!.remove();
+    const afterMembershipDelete = await MembershipModel.init(membership.id, {
+      organization_id: org.id,
+    });
+    expect(afterMembershipDelete).toBeNull();
   });
 
   it('keeps one user active in two orgs with different roles', async () => {
