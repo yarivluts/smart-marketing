@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Button } from '@/components/ui/button';
 import { LocaleSwitcher } from '@/components/locale-switcher';
+import { AccountStatus } from '@/components/auth/account-status';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string }>;
@@ -20,6 +21,7 @@ export default async function HomePage({ params }: PageProps): Promise<React.Rea
         <Button>{t('getStarted')}</Button>
         <Button variant="outline">{t('viewDocs')}</Button>
       </div>
+      <AccountStatus />
     </main>
   );
 }
