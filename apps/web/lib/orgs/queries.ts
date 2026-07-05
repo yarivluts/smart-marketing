@@ -1,14 +1,25 @@
 import 'server-only';
 import {
+  listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
+  listAttachmentsForProject as listAttachmentsForProjectInOrganization,
   listOrgMembersWithProfiles,
+  listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
+  listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
+  listResourceTemplates as listResourceTemplatesInOrganization,
+  listSharedCredentials as listSharedCredentialsInOrganization,
   MembershipModel,
   OrganizationModel,
   UserModel,
   type MembershipStatus,
   type OrgMemberSummary,
+  type OrgPersonModel,
   type ProjectModel,
+  type ResourceAttachmentModel,
+  type ResourceKind,
+  type ResourceTemplateModel,
   type Role,
+  type SharedCredentialModel,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
@@ -20,6 +31,83 @@ export async function listOrgMembers(organizationId: string): Promise<OrgMemberS
 export async function listOrgProjects(organizationId: string): Promise<ProjectModel[]> {
   await ensureFirestoreOrm();
   return listOrgProjectsForOrganization(organizationId);
+}
+
+export async function listSharedCredentials(organizationId: string): Promise<SharedCredentialModel[]> {
+  await ensureFirestoreOrm();
+  return listSharedCredentialsInOrganization(organizationId);
+}
+
+export async function listResourceTemplates(organizationId: string): Promise<ResourceTemplateModel[]> {
+  await ensureFirestoreOrm();
+  return listResourceTemplatesInOrganization(organizationId);
+}
+
+export async function listOrgPeople(organizationId: string): Promise<OrgPersonModel[]> {
+  await ensureFirestoreOrm();
+  return listOrgPeopleInOrganization(organizationId);
+}
+
+export async function listAttachmentsForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<ResourceAttachmentModel[]> {
+  await ensureFirestoreOrm();
+  return listAttachmentsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listActiveAttachmentsForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<ResourceAttachmentModel[]> {
+  await ensureFirestoreOrm();
+  return listActiveAttachmentsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listPendingAttachmentsForOrg(organizationId: string): Promise<ResourceAttachmentModel[]> {
+  await ensureFirestoreOrm();
+  return listPendingAttachmentsForOrgInOrganization(organizationId);
+}
+
+export interface PendingAttachmentDetails {
+  attachmentId: string;
+  projectId: string;
+  projectName: string;
+  resourceKind: ResourceKind;
+  resourceId: string;
+  resourceName: string;
+  scopeSelection: string[];
+}
+
+/** {@link listPendingAttachmentsForOrg}, enriched with project/resource display names for the approval-queue UI. */
+export async function listPendingAttachmentsForOrgWithDetails(
+  organizationId: string,
+): Promise<PendingAttachmentDetails[]> {
+  await ensureFirestoreOrm();
+  const [attachments, projects, credentials, templates, people] = await Promise.all([
+    listPendingAttachmentsForOrgInOrganization(organizationId),
+    listOrgProjectsForOrganization(organizationId),
+    listSharedCredentialsInOrganization(organizationId),
+    listResourceTemplatesInOrganization(organizationId),
+    listOrgPeopleInOrganization(organizationId),
+  ]);
+
+  const projectNameById = new Map(projects.map((project) => [project.id, project.name]));
+  const resourceNameById = new Map<string, string>([
+    ...credentials.map((credential) => [credential.id, credential.name] as const),
+    ...templates.map((template) => [template.id, template.name] as const),
+    ...people.map((person) => [person.id, person.name] as const),
+  ]);
+
+  return attachments.map((attachment) => ({
+    attachmentId: attachment.id,
+    projectId: attachment.project_id,
+    projectName: projectNameById.get(attachment.project_id) ?? attachment.project_id,
+    resourceKind: attachment.resource_kind,
+    resourceId: attachment.resource_id,
+    resourceName: resourceNameById.get(attachment.resource_id) ?? attachment.resource_id,
+    scopeSelection: attachment.scope_selection ?? [],
+  }));
 }
 
 export interface InviteDetails {

@@ -64,7 +64,9 @@
     "projectsHeading": "Projects",
     "newProject": "New project",
     "noProjects": "This organization has no projects yet.",
-    "membersHeading": "Members"
+    "membersHeading": "Members",
+    "resourceLibraryLink": "Resource library",
+    "projectResourcesLink": "Project resources"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -102,5 +104,50 @@
     "verifyEmailError": "Verify your email address before accepting this invite. Check your inbox for the verification link.",
     "emailMismatch": "This invite was sent to {email}, but you're signed in with a different account.",
     "switchAccount": "Sign out and switch account"
+  },
+  "ResourceLibrary": {
+    "title": "Resource library",
+    "nameLabel": "Name",
+    "providerLabel": "Provider",
+    "availableScopesLabel": "Available scopes",
+    "availableScopesPlaceholder": "act_111, act_222",
+    "createCredential": "Add credential",
+    "templateTypeLabel": "Type",
+    "createTemplate": "Add template",
+    "personEmailLabel": "Email",
+    "personTitleLabel": "Title",
+    "personPhotoUrlLabel": "Photo URL",
+    "createPerson": "Add person",
+    "createError": "Something went wrong. Please try again.",
+    "credentialsHeading": "Connection credentials",
+    "noCredentials": "No shared credentials yet.",
+    "credentialSummary": "{name} ({provider}, {scopeCount} available scopes)",
+    "templatesHeading": "Templates",
+    "noTemplates": "No templates yet.",
+    "templateSummary": "{name} ({type}, v{version})",
+    "peopleHeading": "People registry",
+    "noPeople": "No people registered yet.",
+    "pendingRequestsHeading": "Pending attachment requests",
+    "noPendingRequests": "No pending requests.",
+    "pendingRequestSummary": "{projectName} requests {resourceKind} \"{resourceName}\"",
+    "approve": "Approve",
+    "reject": "Reject",
+    "decideError": "Couldn't record that decision. Please try again."
+  },
+  "ProjectResources": {
+    "metaTitle": "Project resources",
+    "title": "Resources for {projectName}",
+    "credentialsHeading": "Connection credentials",
+    "noCredentials": "No shared credentials in this organization yet.",
+    "templatesHeading": "Templates",
+    "noTemplates": "No templates in this organization yet.",
+    "peopleHeading": "People registry",
+    "noPeople": "No people registered in this organization yet.",
+    "statusLabel": "Status: {status}",
+    "scopeSelectionLabel": "Scopes to request (comma-separated)",
+    "requestAttachment": "Request",
+    "requestError": "Couldn't send that request. Please try again.",
+    "detach": "Detach",
+    "detachError": "Couldn't detach this resource. Please try again."
   }
 }

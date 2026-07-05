@@ -60,7 +60,12 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">{membership.organizationName}</h1>
-        <OrgSwitcher memberships={memberships} currentOrgId={orgId} />
+        <div className="flex items-center gap-4">
+          <Link className="text-sm underline" href={`/orgs/${orgId}/resources`}>
+            {t('resourceLibraryLink')}
+          </Link>
+          <OrgSwitcher memberships={memberships} currentOrgId={orgId} />
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">
@@ -83,7 +88,12 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
               currentEnv={currentEnv}
             />
             {currentProjectId ? (
-              <EnvBadge orgId={orgId} projectId={currentProjectId} currentEnv={currentEnv} />
+              <div className="flex items-center gap-4">
+                <EnvBadge orgId={orgId} projectId={currentProjectId} currentEnv={currentEnv} />
+                <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/resources`}>
+                  {t('projectResourcesLink')}
+                </Link>
+              </div>
             ) : null}
           </>
         )}

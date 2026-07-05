@@ -64,7 +64,9 @@
     "projectsHeading": "פרויקטים",
     "newProject": "פרויקט חדש",
     "noProjects": "לארגון זה אין עדיין פרויקטים.",
-    "membersHeading": "חברים"
+    "membersHeading": "חברים",
+    "resourceLibraryLink": "ספריית משאבים",
+    "projectResourcesLink": "משאבי הפרויקט"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -102,5 +104,50 @@
     "verifyEmailError": "יש לאמת את כתובת הדוא\"ל לפני אישור ההזמנה. בדוק את תיבת הדואר הנכנס שלך לקבלת קישור האימות.",
     "emailMismatch": "הזמנה זו נשלחה אל {email}, אך אתה מחובר עם חשבון אחר.",
     "switchAccount": "התנתק והחלף חשבון"
+  },
+  "ResourceLibrary": {
+    "title": "ספריית משאבים",
+    "nameLabel": "שם",
+    "providerLabel": "ספק",
+    "availableScopesLabel": "היקפים זמינים",
+    "availableScopesPlaceholder": "act_111, act_222",
+    "createCredential": "הוספת אישור התחברות",
+    "templateTypeLabel": "סוג",
+    "createTemplate": "הוספת תבנית",
+    "personEmailLabel": "אימייל",
+    "personTitleLabel": "תפקיד",
+    "personPhotoUrlLabel": "קישור לתמונה",
+    "createPerson": "הוספת איש צוות",
+    "createError": "משהו השתבש. נסה שוב.",
+    "credentialsHeading": "אישורי התחברות",
+    "noCredentials": "אין עדיין אישורי התחברות משותפים.",
+    "credentialSummary": "{name} ({provider}, {scopeCount} היקפים זמינים)",
+    "templatesHeading": "תבניות",
+    "noTemplates": "אין עדיין תבניות.",
+    "templateSummary": "{name} ({type}, גרסה {version})",
+    "peopleHeading": "מרשם אנשי צוות",
+    "noPeople": "עדיין לא נרשמו אנשי צוות.",
+    "pendingRequestsHeading": "בקשות צירוף ממתינות",
+    "noPendingRequests": "אין בקשות ממתינות.",
+    "pendingRequestSummary": "{projectName} מבקש/ת {resourceKind} \"{resourceName}\"",
+    "approve": "אישור",
+    "reject": "דחייה",
+    "decideError": "לא ניתן היה לשמור את ההחלטה. נסה שוב."
+  },
+  "ProjectResources": {
+    "metaTitle": "משאבי הפרויקט",
+    "title": "משאבים עבור {projectName}",
+    "credentialsHeading": "אישורי התחברות",
+    "noCredentials": "אין עדיין אישורי התחברות משותפים בארגון זה.",
+    "templatesHeading": "תבניות",
+    "noTemplates": "אין עדיין תבניות בארגון זה.",
+    "peopleHeading": "מרשם אנשי צוות",
+    "noPeople": "עדיין לא נרשמו אנשי צוות בארגון זה.",
+    "statusLabel": "סטטוס: {status}",
+    "scopeSelectionLabel": "היקפים לבקשה (מופרדים בפסיק)",
+    "requestAttachment": "בקשת צירוף",
+    "requestError": "לא ניתן היה לשלוח את הבקשה. נסה שוב.",
+    "detach": "ניתוק",
+    "detachError": "לא ניתן היה לנתק את המשאב. נסה שוב."
   }
 }

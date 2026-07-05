@@ -160,6 +160,21 @@ describe('the PII gate is a separate grant', () => {
   });
 });
 
+describe('resources.manage is withheld from project_admin (KAN-27 Org Resource Library)', () => {
+  it('project_admin cannot create library resources or decide/detach attachments', () => {
+    const bindings = [bindingAt('project_admin', 'project', PROJECT)];
+    expect(can(bindings, USER, 'resources.manage', RESOURCE_BY_LEVEL.project)).toBe(false);
+  });
+
+  it('org_owner, org_admin, and platform_admin all carry resources.manage', () => {
+    expect(can([bindingAt('org_owner', 'org', ORG)], USER, 'resources.manage', RESOURCE_BY_LEVEL.org)).toBe(true);
+    expect(can([bindingAt('org_admin', 'org', ORG)], USER, 'resources.manage', RESOURCE_BY_LEVEL.org)).toBe(true);
+    expect(
+      can([bindingAt('platform_admin', 'platform', 'platform')], USER, 'resources.manage', RESOURCE_BY_LEVEL.org),
+    ).toBe(true);
+  });
+});
+
 describe('multiple bindings union, and are scoped independently', () => {
   it('a viewer-at-org plus operator-at-one-project grants automation only in that project', () => {
     const bindings = [bindingAt('viewer', 'org', ORG), bindingAt('operator', 'project', PROJECT)];
