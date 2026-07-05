@@ -29,8 +29,15 @@ export type OrgPermissionResult = { user: UserModel; error?: undefined } | { use
 /**
  * The `getServerSession -> resolveOrgSessionContext -> findActiveMembership
  * -> can()` sequence every org-scoped mutating route needs before doing
- * anything else: 401 if there's no session at all, 403 if the caller has no
- * active membership in this org or the permission itself is missing.
+ * anything else: 401 if there's no session at all.
+ *
+ * KAN-26 non-enumeration: "org doesn't exist" and "org exists but the caller
+ * has no active membership in it" must be indistinguishable to the caller —
+ * both return 404, never 403, since a 403 would confirm the org's existence
+ * to someone who shouldn't even know it. Once the caller *is* a real,
+ * active member (so the org's existence is already known to them), a
+ * missing permission for the requested action is a normal 403 — that
+ * doesn't leak anything they don't already know.
  */
 export async function requireOrgPermission(
   organizationId: string,
@@ -43,7 +50,10 @@ export async function requireOrgPermission(
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, organizationId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, permission, { orgId: organizationId })) {
+  if (!membership) {
+    return { error: NextResponse.json({ error: 'not_found' }, { status: 404 }) };
+  }
+  if (!can(bindings, { type: 'user', id: user.id }, permission, { orgId: organizationId })) {
     return { error: NextResponse.json({ error: 'forbidden' }, { status: 403 }) };
   }
 
