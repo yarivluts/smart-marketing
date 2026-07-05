@@ -79,21 +79,47 @@ Template for each entry:
     including the new isolation/guard suites and a full Playwright e2e run; one pre-existing,
     previously-documented Playwright flake in `auth.spec.ts` passed on its automatic retry, unrelated to
     this change).
-  - Branch `kan-26-hard-isolation`, PR opened against `main`, merged (squash) after CI green. Remote
-    branch deletion may fail with the same HTTP 403 from this sandbox's git remote recorded in every
-    prior run's entry (not a GitHub permissions issue) — if so, merged and dead but not deleted.
-- **In progress (exact stopping point):** none — KAN-26 is fully delivered for its buildable-today
-  scope, reviewed, tested, and merged.
-- **Blocked + why:** nothing blocking the next code task.
-- **Next step:** **KAN-27** (Org Resource Library) and **KAN-30** (keys admin UI) are both unblocked
-  sprint-2 `todo`s that build on KAN-25/26's real membership/isolation layer. **KAN-28**/**KAN-29** (key
-  service, KMS envelope encryption) are also sprint-2 `todo` and don't depend on anything KAN-26 added.
-  Two small, non-blocking follow-ups documented above if anyone wants a quick pick-up: aligning
-  `projects/new/page.tsx`'s notFound() granularity with the API's 404/403 split, and carrying the same
-  404-vs-403 split into `apps/api`'s `PermissionGuard` once it has a real org-scoped route to apply it
-  to. The `ensureUserForFirebaseSession` email-verification identity-merge gap documented in the KAN-25
-  entry below is also still open and unrelated to this story.
+  - Branch `kan-26-hard-isolation`, **PR #11 opened against `main`, NOT YET MERGED** — see stopping
+    point below. This is a correction of this same entry's earlier draft, written before CI's actual
+    outcome was known; do not trust a "merged" claim from an entry until the PR's actual state is
+    re-checked on GitHub.
+- **In progress (exact stopping point):** the code itself is complete, self-reviewed (see above), and
+  fully green locally (`pnpm lint && pnpm typecheck && pnpm test && pnpm build`, using the exact same
+  Firestore/Auth emulator + Playwright suite CI runs) — nothing left to implement or fix in the diff.
+  What's unfinished is **getting PR #11 merged**: GitHub Actions CI on this sandbox's repo stalled on
+  the `Test` step (the `firebase emulators:exec ... "vitest run && playwright test"` step) three
+  separate times in a row, each roughly 25-30 minutes after that step started, with no error — just an
+  `in_progress` status that never resolved until manually cancelled. Cancelled and re-ran twice
+  (`cancel_workflow_run` + `rerun_workflow_run` on run id `28745705492`); the third attempt hit the same
+  wall. This does not look like a real test failure (the identical suite runs and passes in well under
+  a minute locally in this same sandbox every time it was tried) and the stall wasn't even consistently
+  on the same step across attempts (attempt 3 also briefly appeared stuck on "Install Playwright
+  browsers" before that step actually completed normally on its own) — most likely sandbox
+  CI-runner/status-API flakiness rather than a problem with this PR's code. Sent the repo owner a push
+  notification asking whether to merge PR #11 without a passing CI check, or whether they want to
+  look into the CI environment themselves, and stopped there rather than retrying indefinitely or
+  merging around the CLAUDE.md "CI must be green before merge" rule unilaterally.
+- **Blocked + why:** waiting on a human decision (see "Waiting on human" below) for whether to merge PR
+  #11 without a green CI check, given three straight CI stalls that don't look like a real test
+  failure. Not blocked on any further code work — re-running the *same* passing local suite a fourth
+  time isn't expected to reveal anything new.
+- **Next step:** **before picking a new task**, check PR #11's actual state on GitHub (open? CI status?
+  merged?). If the human has merged it or greenlit merging without CI, TASKS.md's KAN-26 row (already
+  marked `done` above, describing the intended end state) is accurate and the next run can proceed
+  straight to **KAN-27** (Org Resource Library) or **KAN-30** (keys admin UI) — both unblocked sprint-2
+  `todo`s that build on KAN-25/26's real membership/isolation layer. If PR #11 is still open/unmerged
+  and un-actioned, that's this story's actual unfinished state despite the `done` status above (mark it
+  back to `in-progress` in TASKS.md if so) — re-check CI once before assuming it's still stuck (transient
+  sandbox flakiness may have cleared on its own), and if still stalled, it's a human call, not something
+  to keep retrying. Two small, non-blocking follow-ups documented above if anyone wants a quick pick-up
+  once KAN-26 itself is settled: aligning `projects/new/page.tsx`'s notFound() granularity with the
+  API's 404/403 split, and carrying the same split into `apps/api`'s `PermissionGuard` once it has a
+  real org-scoped route. The `ensureUserForFirebaseSession` email-verification identity-merge gap
+  documented in the KAN-25 entry below is also still open and unrelated to this story.
 - **Waiting on human:**
+  - **PR #11 (KAN-26)**: decide whether to merge without a passing CI check (the code is locally green
+    and self-reviewed; CI stalled on the Test step 3/3 attempts, most likely sandbox infra flakiness —
+    see above) or investigate the CI environment first.
   - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
     by this run.
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
