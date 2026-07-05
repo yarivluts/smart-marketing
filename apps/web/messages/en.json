@@ -40,5 +40,63 @@
     "title": "Dashboard",
     "welcome": "Welcome back, {email}",
     "signOut": "Sign out"
+  },
+  "OrgsPage": {
+    "title": "Your organizations",
+    "createOrganization": "Create organization",
+    "empty": "You're not a member of any organization yet.",
+    "roleLabel": "Role: {role}",
+    "pendingInvites": "Pending invites",
+    "open": "Open",
+    "viewInvite": "View invite"
+  },
+  "NewOrgPage": {
+    "title": "Create an organization",
+    "nameLabel": "Organization name",
+    "submit": "Create organization",
+    "genericError": "Something went wrong. Please try again."
+  },
+  "OrgSwitcher": {
+    "label": "Organization"
+  },
+  "OrgDetailPage": {
+    "title": "Organization",
+    "projectsHeading": "Projects",
+    "newProject": "New project",
+    "noProjects": "This organization has no projects yet.",
+    "membersHeading": "Members"
+  },
+  "ProjectSwitcher": {
+    "label": "Project"
+  },
+  "EnvBadge": {
+    "label": "Environment",
+    "dev": "Dev",
+    "staging": "Staging",
+    "prod": "Prod"
+  },
+  "Members": {
+    "roleAndStatus": "{role} ({status})",
+    "inviteEmailLabel": "Email",
+    "inviteRoleLabel": "Role",
+    "invite": "Invite",
+    "inviteError": "Couldn't send that invite. They may already be a member."
+  },
+  "NewProjectPage": {
+    "title": "Create a project",
+    "nameLabel": "Project name",
+    "submit": "Create project",
+    "genericError": "Something went wrong. Please try again."
+  },
+  "Invite": {
+    "title": "Organization invite",
+    "alreadyResolved": "This invite has already been used.",
+    "description": "You've been invited to join {organizationName}. This invite was sent to {email}.",
+    "signInToAccept": "Sign in to accept",
+    "signUpToAccept": "Sign up to accept",
+    "accept": "Accept invite",
+    "acceptError": "Couldn't accept this invite. Please try again.",
+    "emailMismatch": "This invite was sent to {email}, but you're signed in with a different account.",
+    "switchAccount": "Sign out and switch account"
   }
 }

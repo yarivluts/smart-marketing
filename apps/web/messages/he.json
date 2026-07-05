@@ -40,5 +40,63 @@
     "title": "לוח בקרה",
     "welcome": "ברוך שובך, {email}",
     "signOut": "התנתקות"
+  },
+  "OrgsPage": {
+    "title": "הארגונים שלך",
+    "createOrganization": "יצירת ארגון",
+    "empty": "עדיין אינך חבר באף ארגון.",
+    "roleLabel": "תפקיד: {role}",
+    "pendingInvites": "הזמנות ממתינות",
+    "open": "פתיחה",
+    "viewInvite": "צפייה בהזמנה"
+  },
+  "NewOrgPage": {
+    "title": "יצירת ארגון",
+    "nameLabel": "שם הארגון",
+    "submit": "יצירת ארגון",
+    "genericError": "משהו השתבש. נסה שוב."
+  },
+  "OrgSwitcher": {
+    "label": "ארגון"
+  },
+  "OrgDetailPage": {
+    "title": "ארגון",
+    "projectsHeading": "פרויקטים",
+    "newProject": "פרויקט חדש",
+    "noProjects": "לארגון זה אין עדיין פרויקטים.",
+    "membersHeading": "חברים"
+  },
+  "ProjectSwitcher": {
+    "label": "פרויקט"
+  },
+  "EnvBadge": {
+    "label": "סביבה",
+    "dev": "פיתוח",
+    "staging": "בדיקות",
+    "prod": "ייצור"
+  },
+  "Members": {
+    "roleAndStatus": "{role} ({status})",
+    "inviteEmailLabel": "אימייל",
+    "inviteRoleLabel": "תפקיד",
+    "invite": "הזמנה",
+    "inviteError": "לא ניתן היה לשלוח את ההזמנה. ייתכן שהם כבר חברים."
+  },
+  "NewProjectPage": {
+    "title": "יצירת פרויקט",
+    "nameLabel": "שם הפרויקט",
+    "submit": "יצירת פרויקט",
+    "genericError": "משהו השתבש. נסה שוב."
+  },
+  "Invite": {
+    "title": "הזמנה לארגון",
+    "alreadyResolved": "הזמנה זו כבר נוצלה.",
+    "description": "הוזמנת להצטרף אל {organizationName}. ההזמנה נשלחה אל {email}.",
+    "signInToAccept": "התחבר כדי לאשר",
+    "signUpToAccept": "הירשם כדי לאשר",
+    "accept": "אישור הזמנה",
+    "acceptError": "לא ניתן היה לאשר את ההזמנה. נסה שוב.",
+    "emailMismatch": "הזמנה זו נשלחה אל {email}, אך אתה מחובר עם חשבון אחר.",
+    "switchAccount": "התנתק והחלף חשבון"
   }
 }

@@ -8,6 +8,17 @@ const intlMiddleware = createIntlMiddleware(routing);
 // Fail-closed, like the API's PermissionGuard (KAN-24): a locale-prefixed
 // page is protected unless explicitly listed here.
 const PUBLIC_PATHS = new Set(['/', '/login', '/signup']);
+// Invite links (KAN-25's join flow) are shared before the recipient
+// necessarily has an account, so every `/invite/:orgId/:membershipId` must
+// stay reachable pre-auth; the page itself prompts sign-in/sign-up inline.
+const PUBLIC_PATH_PREFIXES = ['/invite/'];
+
+function isPublicPath(pathWithoutLocale: string): boolean {
+  return (
+    PUBLIC_PATHS.has(pathWithoutLocale) ||
+    PUBLIC_PATH_PREFIXES.some((prefix) => pathWithoutLocale.startsWith(prefix))
+  );
+}
 
 export default function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
@@ -26,7 +37,7 @@ export default function middleware(request: NextRequest): NextResponse {
     // get them a real session, with no way back in.
     const hasSession = request.cookies.has(SESSION_COOKIE_NAME);
 
-    if (!PUBLIC_PATHS.has(pathWithoutLocale) && !hasSession) {
+    if (!isPublicPath(pathWithoutLocale) && !hasSession) {
       const loginUrl = new URL(`/${matchedLocale}/login`, request.url);
       // Locale-agnostic (no `/${matchedLocale}` prefix) so the login form can
       // hand it straight to next-intl's locale-prefixing router without
