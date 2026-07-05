@@ -17,6 +17,99 @@ Template for each entry:
 
 ---
 
+## 2026-07-05 — E1.7 Org Resource Library (KAN-27)
+
+- **Last completed:**
+  - Implemented **KAN-27** (Org Resource Library, plan `08-generic-platform.md` §1.2), scoped to
+    what's buildable today: shared connection credentials, templates, and the people registry, all
+    attachable to projects with org-resource-owner approval and immediate detach revocation.
+    - `packages/shared/src/policy`: new `resources.manage` permission — granted to
+      `org_owner`/`org_admin`/`platform_admin` (via the existing `ALL_PERMISSIONS` composition, no
+      manual per-role wiring needed), withheld from `project_admin`, matching the plan's
+      "project-admin initiated + org-resource-owner approved" split (`project_admin` uses the
+      existing `project.manage` to request an attachment instead).
+    - `packages/firebase-orm-models`: four new models — `SharedCredentialModel` (name + provider +
+      `available_scopes`, deliberately **no secret/token field** since real envelope-encrypted
+      storage is KAN-29/KMS, which doesn't exist yet), `ResourceTemplateModel` (versioned, opaque
+      `config` blob), `OrgPersonModel` (`dim_team_member`), and one shared `ResourceAttachmentModel`
+      driving the request/approve/reject/detach lifecycle identically across all three kinds (kept
+      as `detached` rather than deleted, for the per-project usage audit trail the plan calls for).
+      `resource-library.service.ts` validates a credential attachment's requested scope selection is
+      a genuine subset of the credential's `available_scopes`, and records a template attachment's
+      `version` at request time (`resource_version`) so a later org-admin edit to the template
+      doesn't silently reshape an already-approved attachment ("copy-with-link + version pin").
+    - `apps/web`: a new `requireOrgMembership` helper next to `requireOrgPermission`
+      (`lib/orgs/access.ts`) for read routes any active member should hit regardless of role — a
+      `viewer` legitimately holds zero explicit permissions in `ROLE_PERMISSIONS` but should still be
+      able to browse the library to pick something to request; both helpers preserve the KAN-26
+      404-not-403 non-enumeration property, and `route-isolation-guard.test.ts` now recognizes either
+      gate. New routes under `orgs/[orgId]/resources/{credentials,templates,people}`,
+      `orgs/[orgId]/projects/[projectId]/resource-attachments`, and
+      `orgs/[orgId]/resource-attachments/[attachmentId]`. New UI: an org resource-library page
+      (browse + create + approval queue, gated on `resources.manage`) and a per-project resources
+      page (browse + request + detach), linked from the existing org detail page.
+  - **Independent subagent review** before merging (this run's own diff, not picking up unfinished
+    work from a prior run this time). It confirmed cross-org IDOR is well-protected structurally
+    (every new model lives in an `organizations/:organization_id/...` subcollection, so
+    `Model.init(id, {organization_id})` against a foreign id simply can't resolve — the redundant
+    `organization_id !== organizationId` guards in the service layer are defense in depth, not the
+    only thing holding the line) and the 404-vs-403 convention holds throughout. It found, and this
+    run fixed:
+    - `ResourceTemplateModel`'s own doc comment overclaimed "copy-with-link + version pin" behavior
+      that wasn't actually implemented (nothing recorded which version an attachment copied) — added
+      `resource_version` and a regression test proving it survives a later edit to the template.
+    - `OrgPersonModel.photo_url` was a half-wired dead field (modeled, never reachable from any
+      route/form) — wired end-to-end.
+    - Missing a dedicated `resources.manage` policy test (the `pii.read`-gate precedent), a whole-
+      feature-area e2e scenario (the exact gap KAN-25's own review flagged and fixed for its area —
+      added `e2e/resource-library.spec.ts` covering create credential → request scoped attachment →
+      approve → verify the granted slice → detach), and isolation-suite coverage for the decide/detach
+      route — all added.
+    - **Flagged, deliberately not fixed** (pre-existing, not introduced by this story): every
+      `project.manage` check in this repo — including the pre-existing project-creation route from
+      KAN-25 and this story's new request-attachment route — calls `requireOrgPermission(orgId,
+      'project.manage')` without a `projectId`, so the policy engine's `bindingCoversResource` can
+      never match a *project-scoped* `project_admin` binding (only org-scoped bindings satisfy it
+      today). Masked because nothing in this codebase provisions project-scoped bindings yet; real
+      fix needs extending `requireOrgPermission`'s signature to accept a `projectId`, which is bigger
+      than this story and affects every existing `project.manage` call site, not just KAN-27's.
+    - While validating the new e2e spec, also caught (independent of the subagent review) and fixed a
+      real bug: the project-resources page's `generateMetadata` called `t('title')` without the
+      required `projectName` interpolation variable, throwing a next-intl `FORMATTING_ERROR` on every
+      request (rendering still worked via next-intl's dev fallback, but this would be a hard crash or
+      a broken `<title>` in a stricter/production config) — split into a separate non-interpolated
+      `metaTitle` key.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (154
+    tests in `packages/shared`, 31 in `packages/firebase-orm-models` incl. the full request → approve
+    → detach + scope-slicing + version-pin emulator suite, 15 in `apps/api`, 164 web unit/route tests
+    + 11/11 Playwright e2e in `apps/web`).
+  - Branch `kan-27-org-resource-library`, PR #12, merged (squash) into `main` after CI went green.
+    Remote branch deletion failed with the same HTTP 403 from this sandbox's git remote recorded in
+    every prior run's entry (not a GitHub permissions issue) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-27 is fully delivered for its buildable-today
+  scope, independently reviewed, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-28** (key service: mint per project+env, hashed storage, last-used tracking)
+  and **KAN-30** (admin UI: keys page) are natural next sprint-2 `todo`s — KAN-30 depends on KAN-28
+  existing first, so KAN-28 is the more immediately actionable pick. **KAN-29** (KMS envelope
+  encryption / vault module) is also unblocked and is what would let KAN-27's `SharedCredentialModel`
+  actually grow a real secret field — worth doing before or alongside whichever story first needs to
+  store a real OAuth token (KAN-49 Stripe plugin is the first such story, sprint 4). The
+  `project.manage`-without-`projectId` gap documented above is a real but non-urgent latent issue
+  worth fixing whenever project-scoped role bindings are first introduced (no story currently on the
+  board does that yet).
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-27-org-resource-library` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403), and the other still-outstanding merged branches from prior
+    runs noted in earlier entries below.
+
+---
+
 ## 2026-07-05 — KAN-26 merge follow-up: CI stall had cleared, PR #11 merged
 
 - **Last completed:**
