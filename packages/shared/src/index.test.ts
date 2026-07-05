@@ -57,19 +57,42 @@ describe('API_KEY_SCOPES', () => {
   });
 
   it('withholds elevated/administrative permissions from key scopes', () => {
-    for (const elevated of [
+    const withheld = [
       'project.manage',
       'members.manage',
       'billing.manage',
       'resources.manage',
+      'sources.manage',
       'keys.manage',
       'automation.approve',
       'automation.execute',
       'pii.read',
       'plugin.install',
-    ] as const) {
+    ] as const;
+    for (const elevated of withheld) {
       expect(API_KEY_SCOPES).not.toContain(elevated);
     }
+  });
+
+  it('partitions the full permission catalog exactly in two: grantable to a key, or explicitly withheld', () => {
+    const withheld = [
+      'project.manage',
+      'members.manage',
+      'billing.manage',
+      'resources.manage',
+      'sources.manage',
+      'keys.manage',
+      'automation.approve',
+      'automation.execute',
+      'pii.read',
+      'plugin.install',
+    ] as const;
+
+    // Every permission is in exactly one of the two sets — catches a future
+    // Permission added to neither (silently un-grantable to any key) or a
+    // scope drifting into both lists at once.
+    expect(new Set([...API_KEY_SCOPES, ...withheld]).size).toBe(API_KEY_SCOPES.length + withheld.length);
+    expect([...API_KEY_SCOPES, ...withheld].sort()).toEqual([...PERMISSIONS].sort());
   });
 
   it('isApiKeyScope recognises only the curated subset', () => {

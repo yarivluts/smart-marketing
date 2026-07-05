@@ -168,7 +168,7 @@ export interface VerifyApiKeyParams {
  */
 export async function verifyApiKeyForRequest(params: VerifyApiKeyParams): Promise<Result<ApiKeyAuthContext, string>> {
   const hashedSecret = hashSecret(params.rawKey);
-  const matches = await ApiKeyModel.collectionQuery().where('hashed_secret', '==', hashedSecret).get();
+  const matches = await ApiKeyModel.collectionQuery().where('hashed_secret', '==', hashedSecret).limit(1).get();
   const apiKey = matches[0];
 
   if (!apiKey) {

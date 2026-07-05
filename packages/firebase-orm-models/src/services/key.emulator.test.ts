@@ -160,6 +160,16 @@ describe('verifyApiKeyForRequest', () => {
       expect(result.value.scopes).toEqual(['ingest.write', 'metrics.write']);
       expect(result.value.apiKey.last_used_at).toBeTruthy();
     }
+
+    // A multi-scope key must authenticate against *every* scope it carries, not just the first.
+    const secondScopeResult = await verifyApiKeyForRequest({
+      rawKey,
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      requiredScope: 'metrics.write',
+    });
+    expect(secondScopeResult.ok).toBe(true);
   });
 
   it('rejects an unknown/garbage key', async () => {
@@ -292,6 +302,54 @@ describe('revokeApiKey', () => {
     expect(after.ok).toBe(false);
     if (!after.ok) {
       expect(after.error).toMatch(/revoked/i);
+    }
+  });
+
+  it('does not affect a sibling key in the same project when one is revoked', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Sibling Key Org');
+    const keyA = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Key A',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+    const keyB = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Key B',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+
+    await revokeApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      apiKeyId: keyA.apiKey.id,
+      revokedByUserId: owner.id,
+    });
+
+    const keyAResult = await verifyApiKeyForRequest({
+      rawKey: keyA.rawKey,
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      requiredScope: 'ingest.write',
+    });
+    expect(keyAResult.ok).toBe(false);
+
+    const keyBResult = await verifyApiKeyForRequest({
+      rawKey: keyB.rawKey,
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      requiredScope: 'ingest.write',
+    });
+    expect(keyBResult.ok).toBe(true);
+    if (keyBResult.ok) {
+      expect(keyBResult.value.apiKey.id).toBe(keyB.apiKey.id);
     }
   });
 
