@@ -6,7 +6,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "vitest run",
+    "test": "firebase emulators:exec --project demo-growthos-test --only firestore \"vitest run\"",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -17,7 +17,10 @@
   },
   "devDependencies": {
     "@growthos/eslint-config": "workspace:*",
+    "@types/node": "^22.10.2",
     "eslint": "^9.17.0",
+    "firebase": "^11.10.0",
+    "firebase-tools": "^15.22.4",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
   }

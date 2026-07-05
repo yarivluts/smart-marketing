@@ -18,3 +18,4 @@ export * from './models/project.model';
 export * from './models/environment.model';
 export * from './models/role-binding.model';
 export * from './models/service-account.model';
+export * from './services/membership.service';
