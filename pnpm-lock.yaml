@@ -179,6 +179,9 @@ importers:
       '@growthos/eslint-config':
         specifier: workspace:*
         version: link:../eslint-config
+      '@types/node':
+        specifier: ^22.10.2
+        version: 22.20.0
       eslint:
         specifier: ^9.17.0
         version: 9.39.4(jiti@1.21.7)
