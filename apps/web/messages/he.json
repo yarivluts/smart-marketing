@@ -13,5 +13,32 @@
     "label": "שפה",
     "en": "אנגלית",
     "he": "עברית"
+  },
+  "Auth": {
+    "emailLabel": "אימייל",
+    "passwordLabel": "סיסמה",
+    "signIn": "התחברות",
+    "signUp": "הרשמה",
+    "signInWithGoogle": "המשך עם Google",
+    "signInTitle": "התחברות ל-GrowthOS",
+    "signUpTitle": "יצירת חשבון ב-GrowthOS",
+    "needAccount": "אין לך חשבון? הירשם",
+    "haveAccount": "כבר יש לך חשבון? התחבר",
+    "genericError": "משהו השתבש. נסה שוב.",
+    "invalidCredentialsError": "אימייל או סיסמה שגויים.",
+    "emailInUseError": "כבר קיים חשבון עם כתובת אימייל זו.",
+    "weakPasswordError": "בחר סיסמה עם 6 תווים לפחות."
+  },
+  "AccountStatus": {
+    "signedInAs": "מחובר בתור {email}",
+    "goToDashboard": "מעבר ללוח הבקרה",
+    "signOut": "התנתקות",
+    "signIn": "התחברות",
+    "signUp": "הרשמה"
+  },
+  "DashboardPage": {
+    "title": "לוח בקרה",
+    "welcome": "ברוך שובך, {email}",
+    "signOut": "התנתקות"
   }
 }

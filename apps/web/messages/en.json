@@ -13,5 +13,32 @@
     "label": "Language",
     "en": "English",
     "he": "Hebrew"
+  },
+  "Auth": {
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "signInWithGoogle": "Continue with Google",
+    "signInTitle": "Sign in to GrowthOS",
+    "signUpTitle": "Create your GrowthOS account",
+    "needAccount": "Need an account? Sign up",
+    "haveAccount": "Already have an account? Sign in",
+    "genericError": "Something went wrong. Please try again.",
+    "invalidCredentialsError": "Incorrect email or password.",
+    "emailInUseError": "An account with this email already exists.",
+    "weakPasswordError": "Choose a password with at least 6 characters."
+  },
+  "AccountStatus": {
+    "signedInAs": "Signed in as {email}",
+    "goToDashboard": "Go to dashboard",
+    "signOut": "Sign out",
+    "signIn": "Sign in",
+    "signUp": "Sign up"
+  },
+  "DashboardPage": {
+    "title": "Dashboard",
+    "welcome": "Welcome back, {email}",
+    "signOut": "Sign out"
   }
 }
