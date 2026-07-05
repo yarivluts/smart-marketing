@@ -17,6 +17,93 @@ Template for each entry:
 
 ---
 
+## 2026-07-05 — E2.1 Key service (KAN-28)
+
+- **Last completed:**
+  - Implemented **KAN-28** (Key service, plan `12 §1` / `06 §1`, task-breakdown E2.1), scoped to the
+    service layer per its AC ("key auths a request; wrong env/project/scope -> 403; revoke is
+    immediate"):
+    - `packages/firebase-orm-models`: new `ApiKeyModel`
+      (`organizations/:organization_id/projects/:project_id/api_keys`) — persists only a SHA-256
+      `hashed_secret`, never the raw key; `key_prefix` holds a short display-safe slice (the
+      `gos_live_`/`gos_test_` prefix + a few random chars) for a future admin list, the same
+      "copy-once" pattern Stripe/GitHub use for their own tokens. New `key.service.ts`:
+      `mintApiKey` (validates the project/environment belong together, mints a key via
+      `node:crypto randomBytes`, prefixed by `apiKeyModeForEnvironment` — prod -> `gos_live_`,
+      dev/staging -> `gos_test_` — returns the raw key once, never retrievable again),
+      `verifyApiKeyForRequest` (looks up by hash via a Firestore collection-group query, then
+      checks org/project/environment match, not-revoked, and required scope; returns a `Result`
+      rather than throwing so a future guard layer can map every rejection to 403 uniformly;
+      re-reads `revoked_at` on every call so revocation is immediate — no cache to invalidate),
+      `revokeApiKey` (idempotent), `listApiKeysForProject` (an `ApiKeySummary` view that never
+      exposes `hashed_secret`).
+    - `packages/shared`: `apiKeyModeForEnvironment()` (`ids.ts`, next to the pre-existing
+      `API_KEY_PREFIXES`/`apiKeyMode` scaffolding from the KAN-79 bootstrap) and a new
+      `policy/api-key-scopes.ts`: `API_KEY_SCOPES`, a curated least-privilege subset of the full
+      `Permission` catalog appropriate for a machine-held key — withholds
+      `project.manage`/`members.manage`/`billing.manage`/`resources.manage`/`sources.manage`
+      (org/project administration), `keys.manage` (a key must not mint/revoke other keys),
+      `automation.approve`/`automation.execute` (plan 06 §3's "separate, elevated scope" for
+      money-moving actions), `pii.read` (plan 08 §5.4's separate PII gate), and `plugin.install`.
+      Same "least privilege for a non-human principal" reasoning as `INVITABLE_ROLES`.
+  - **Independent subagent review** before merging. It confirmed the collection-group lookup is
+    correct despite the model's two-level dynamic path, revocation has no TOCTOU gap (`save()`
+    never silently clears a concurrently-set `revoked_at`), and the raw key is never logged or
+    persisted anywhere but the one-time mint return value. It found, and this run fixed:
+    - `API_KEY_SCOPES`'s doc comment and test omitted `sources.manage` from the withheld list (it
+      was already correctly excluded, just undocumented) — added, plus a new test asserting
+      `API_KEY_SCOPES` is an exact partition of the full `Permission` catalog (every permission is
+      in exactly one of "grantable to a key" or "withheld"), so a future permission added to
+      neither list — or to both — now fails a test instead of drifting silently.
+    - The hash lookup fetched all matching docs instead of limiting to one — added `.limit(1)`.
+    - Missing test coverage for a multi-scope key authenticating against its *second* scope (only
+      the first was ever checked) and for one key's revocation not affecting a sibling key in the
+      same project — both added to `key.emulator.test.ts`.
+    - **Reviewed and deliberately not applied**: dropping a redundant `.where('project_id', ...)`
+      in `listApiKeysForProject`. Checked against this ORM's type declarations first — `.get()`
+      only exists on a `Query` object entered via `.where()`, not on the bare model instance
+      `initPath()` returns, so removing it would have broken the call, not just left dead weight.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (159
+    tests in `packages/shared`, 45 in `packages/firebase-orm-models` incl. the new key-service
+    emulator suite — mint, multi-scope auth, wrong-project/environment/scope rejection, immediate
+    revoke, sibling-key isolation, hash never leaked via the summary view — 15 in `apps/api`, 164
+    web unit/route tests + 11/11 Playwright e2e in `apps/web`).
+  - Branch `kan-28-key-service`, PR #13. GitHub Actions CI's first attempt stalled on the `Test`
+    step for a couple of minutes with no error (same class of transient runner flake documented in
+    earlier entries below) — cancelled and re-ran once; the second attempt completed clean in
+    under 5 minutes (`Test` 2m42s, `Build` 30s). Verified the PR's `mergeable_state` was `clean`
+    before merging (squash) into `main`. Remote branch deletion failed with the same HTTP 403 from
+    this sandbox's git remote recorded in every prior run's entry (not a GitHub permissions issue;
+    no branch-delete tool exists in the GitHub MCP server either) — merged and dead but not
+    deleted.
+  - **Deliberately out of scope for this story** (same "buildable today" split KAN-23's policy
+    engine used before KAN-24 wired it into routes): no HTTP route/guard calls
+    `verifyApiKeyForRequest` yet (there's no ingest API to protect — that's KAN-32), and no admin
+    UI for creating/listing/revoking keys — that's the dedicated next story, **KAN-30**, which
+    TASKS.md already describes as depending on this one existing first.
+- **In progress (exact stopping point):** none — KAN-28 is fully delivered for its service-layer
+  scope, independently reviewed, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-30** (Admin UI: keys page — create with scope picker, copy-once display,
+  revoke, last-used) is the natural next pick now that KAN-28 supplies the service layer it needs;
+  it should call `mintApiKey`/`listApiKeysForProject`/`revokeApiKey` directly rather than
+  duplicating any of that logic, and the admin surface should gate on the existing `keys.manage`
+  permission (already in the catalog and granted to `org_owner`/`org_admin`/`project_admin`/
+  `platform_admin`). **KAN-29** (KMS envelope encryption / vault module) is also unblocked and
+  independent. **KAN-31** (Schema Registry) is the next sprint-2 `todo` after those if picking
+  something not on the keys/resources track.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-28-key-service` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403, and the GitHub MCP server has no delete-branch tool either),
+    and the other still-outstanding merged branches from prior runs noted in earlier entries below.
+
+---
+
 ## 2026-07-05 — E1.7 Org Resource Library (KAN-27)
 
 - **Last completed:**
