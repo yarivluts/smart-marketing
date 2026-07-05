@@ -69,6 +69,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@growthos/firebase-orm-models':
+        specifier: workspace:*
+        version: link:../../packages/firebase-orm-models
       '@growthos/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -193,6 +196,9 @@ importers:
       '@growthos/shared':
         specifier: workspace:*
         version: link:../shared
+      firebase:
+        specifier: ^11.10.0
+        version: 11.10.0
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -206,9 +212,6 @@ importers:
       eslint:
         specifier: ^9.17.0
         version: 9.39.4(jiti@1.21.7)
-      firebase:
-        specifier: ^11.10.0
-        version: 11.10.0
       firebase-tools:
         specifier: ^15.22.4
         version: 15.22.4(@types/node@22.20.0)

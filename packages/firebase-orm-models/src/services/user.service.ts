@@ -7,6 +7,16 @@ export interface FirebaseSessionProfile {
   photoUrl?: string;
 }
 
+/** Case-insensitive lookup used both by the session bootstrap below and by org invites. */
+export async function findUserByEmail(email: string): Promise<UserModel | null> {
+  const matches = await UserModel.query().where('email', '==', normalizeEmail(email)).get();
+  return matches[0] ?? null;
+}
+
+function normalizeEmail(email: string): string {
+  return email.toLowerCase();
+}
+
 /**
  * Resolves the global `UserModel` row for a signed-in Firebase user, creating
  * it on first sign-in. If a placeholder user was already created by
@@ -18,7 +28,7 @@ export interface FirebaseSessionProfile {
  * `RoleBindingModel.principal_id` after the fact.
  */
 export async function ensureUserForFirebaseSession(profile: FirebaseSessionProfile): Promise<UserModel> {
-  const byFirebaseUid = await UserModel.query().where('firebase_uid', '==', profile.firebaseUid).get();
+  const byFirebaseUid = await UserModel.query().where('firebaseUid', '==', profile.firebaseUid).get();
   if (byFirebaseUid.length > 0) {
     return byFirebaseUid[0];
   }
@@ -33,20 +43,13 @@ export async function ensureUserForFirebaseSession(profile: FirebaseSessionProfi
   }
 
   const user = new UserModel();
-  user.email = profile.email;
+  user.email = normalizeEmail(profile.email);
   user.firebaseUid = profile.firebaseUid;
   user.display_name = profile.displayName;
   user.photo_url = profile.photoUrl;
   user.is_active = true;
   await user.save();
   return user;
-}
-
-/** Case-insensitive lookup used both by the session bootstrap above and by org invites. */
-export async function findUserByEmail(email: string): Promise<UserModel | null> {
-  const normalized = email.toLowerCase();
-  const matches = await UserModel.query().where('email', '==', normalized).get();
-  return matches[0] ?? null;
 }
 
 /**
@@ -56,14 +59,13 @@ export async function findUserByEmail(email: string): Promise<UserModel | null> 
  * `ensureUserForFirebaseSession` links it.
  */
 export async function ensureUserByEmail(email: string): Promise<UserModel> {
-  const normalized = email.toLowerCase();
-  const existing = await findUserByEmail(normalized);
+  const existing = await findUserByEmail(email);
   if (existing) {
     return existing;
   }
 
   const user = new UserModel();
-  user.email = normalized;
+  user.email = normalizeEmail(email);
   user.is_active = true;
   await user.save();
   return user;
