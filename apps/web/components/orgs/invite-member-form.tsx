@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { INVITABLE_ROLES, type InvitableRole } from '@growthos/firebase-orm-models';
+import { INVITABLE_ROLES, type InvitableRole } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

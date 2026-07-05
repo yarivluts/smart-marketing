@@ -1,25 +1,13 @@
+import { INVITABLE_ROLES, isInvitableRole, type InvitableRole } from '@growthos/shared';
 import { MembershipModel } from '../models/membership.model';
 import { RoleBindingModel } from '../models/role-binding.model';
 import { ensureUserByEmail } from './user.service';
 
-/**
- * Roles it makes sense to grant via an org invite. Deliberately excludes
- * `platform_admin` and `org_owner` — those aren't handed out by invite,
- * they're platform-level or earned by creating the org.
- */
-export const INVITABLE_ROLES = [
-  'org_admin',
-  'project_admin',
-  'editor',
-  'operator',
-  'viewer',
-  'ingest_only',
-] as const;
-export type InvitableRole = (typeof INVITABLE_ROLES)[number];
-
-export function isInvitableRole(value: string): value is InvitableRole {
-  return (INVITABLE_ROLES as readonly string[]).includes(value);
-}
+// Re-exported for convenience — `@growthos/shared` is the source of truth
+// (it has no Firebase dependency, so client components can import it
+// directly without pulling the whole ORM into their bundle).
+export { INVITABLE_ROLES, isInvitableRole };
+export type { InvitableRole };
 
 export class MembershipAlreadyExistsError extends Error {
   constructor() {
