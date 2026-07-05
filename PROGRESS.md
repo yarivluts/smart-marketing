@@ -17,6 +17,56 @@ Template for each entry:
 
 ---
 
+## 2026-07-05 — KAN-26 merge follow-up: CI stall had cleared, PR #11 merged
+
+- **Last completed:**
+  - Picked up where the previous run's entry (below) left off: it had implemented KAN-26 in full on
+    PR #11 (`kan-26-hard-isolation`) but stopped short of merging after GitHub Actions CI stalled on
+    the Test step three times in a row, and asked the repo owner whether to merge without a green
+    check. Before acting on that ask, re-checked PR #11's actual state on GitHub per that entry's own
+    "next step" instruction — the stall had cleared on its own: a fourth CI run
+    (`lint · typecheck · test · build`) had completed with `conclusion: success` on the PR's head
+    commit, and `mergeable_state` was `clean`. So the human decision the previous entry was blocked on
+    was moot by the time this run checked; no unilateral "merge without CI" call was needed.
+  - Didn't take the green check at face value: checked out `kan-26-hard-isolation` locally and reran
+    `pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build` from a clean install (not
+    reusing the sandbox's possibly-stale node_modules) — all green (144 tests in `packages/shared`,
+    21 in `packages/firebase-orm-models` incl. the documented gRPC `RESOURCE_EXHAUSTED` flake
+    self-recovering via retry as in every prior run, 15 in `apps/api`, 116 in `apps/web` + 11/11
+    Playwright e2e with the one already-documented `auth.spec.ts` flake passing on its automatic
+    retry). Also independently re-read the diff (`access.ts`'s 404/403 split, `isolation.test.ts`,
+    `route-isolation-guard.test.ts`, `access.test.ts`) and the org-detail page's existing `notFound()`
+    call — confirmed the 404-vs-403 split is applied consistently at every call site (all three
+    mutating routes gate before body parsing; the KAN-25-era org-detail page already matched the new
+    convention) before merging.
+  - Merged PR #11 (squash) into `main`. Remote branch deletion failed with the same HTTP 403 from this
+    sandbox's git remote recorded in every prior run's entry (not a GitHub permissions issue) — merged
+    and dead but not deleted.
+  - Takeaway for future runs: a "CI stalled, needs a human call" entry can go stale by the time the
+    *next* run reads it — always re-check the PR's live state on GitHub before escalating further or
+    re-doing work, per the previous entry's own advice.
+- **In progress (exact stopping point):** none — KAN-26 is now fully delivered, independently
+  re-verified, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-27** (Org Resource Library) or **KAN-30** (keys admin UI) — both unblocked
+  sprint-2 `todo`s that build on KAN-25/26's real membership/isolation layer. **KAN-28**/**KAN-29**
+  (key service, KMS envelope encryption) are also sprint-2 `todo` and independent of KAN-26. Two small
+  non-blocking follow-ups from the KAN-26 entry below remain open if anyone wants a quick pick-up:
+  carrying the 404-vs-403 split into `apps/api`'s `PermissionGuard` once it has a real org-scoped
+  route, and the `ensureUserForFirebaseSession` email-verification identity-merge gap noted in the
+  KAN-25 entry further below.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-26-hard-isolation` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403), and the other still-outstanding merged branches from prior runs
+    noted in earlier entries below.
+
+---
+
 ## 2026-07-05 — E1.6 Hard isolation & non-enumeration layer (KAN-26)
 
 - **Last completed:**
