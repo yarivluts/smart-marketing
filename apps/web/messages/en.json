@@ -80,7 +80,10 @@
     "inviteEmailLabel": "Email",
     "inviteRoleLabel": "Role",
     "invite": "Invite",
-    "inviteError": "Couldn't send that invite. They may already be a member."
+    "inviteError": "Couldn't send that invite. They may already be a member.",
+    "remove": "Remove",
+    "removeError": "Couldn't remove this member. Please try again.",
+    "removeLastOwnerError": "An organization must always have at least one owner."
   },
   "NewProjectPage": {
     "title": "Create a project",
@@ -96,6 +99,7 @@
     "signUpToAccept": "Sign up to accept",
     "accept": "Accept invite",
     "acceptError": "Couldn't accept this invite. Please try again.",
+    "verifyEmailError": "Verify your email address before accepting this invite. Check your inbox for the verification link.",
     "emailMismatch": "This invite was sent to {email}, but you're signed in with a different account.",
     "switchAccount": "Sign out and switch account"
   }

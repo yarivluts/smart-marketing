@@ -29,8 +29,11 @@ export interface OrgSessionContext {
 export async function resolveOrgSessionContext(session: DecodedIdToken): Promise<OrgSessionContext> {
   await ensureFirestoreOrm();
 
-  // Both sign-in methods this app supports (email/password, Google SSO)
-  // always populate a verified email on the Firebase user.
+  // Google SSO always yields a verified email; email/password sign-up does
+  // not (Firebase never verifies it on its own — see auth-context.tsx's
+  // sendEmailVerification call). Callers that grant privileges based on
+  // identity (e.g. accepting an org invite) must check `session.email_verified`
+  // themselves — see EmailNotVerifiedError's doc comment for why.
   const user = await ensureUserForFirebaseSession({
     firebaseUid: session.uid,
     email: session.email as string,

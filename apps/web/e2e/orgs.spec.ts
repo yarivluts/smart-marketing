@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { markEmailVerified } from './test-utils/admin-auth';
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
@@ -11,6 +12,14 @@ async function signUp(page: Page, email: string): Promise<void> {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(PASSWORD);
   await page.getByRole('button', { name: 'Sign up' }).click();
+  await expect(page).toHaveURL(/\/en\/dashboard/);
+}
+
+async function signIn(page: Page, email: string): Promise<void> {
+  await page.goto('/en/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page).toHaveURL(/\/en\/dashboard/);
 }
 
@@ -63,6 +72,14 @@ test.describe('Org-scoped sessions: create + switch + invite/join (KAN-25)', () 
 
     await signUp(page, inviteeEmail);
 
+    // The session cookie minted at sign-up embeds email_verified: false —
+    // simulate the invitee clicking the verification link (markEmailVerified)
+    // and then re-authenticate to mint a fresh, verified session cookie.
+    await markEmailVerified(inviteeEmail);
+    await page.getByRole('button', { name: 'Sign out' }).click();
+    await expect(page).toHaveURL(/\/en\/login/);
+    await signIn(page, inviteeEmail);
+
     await page.goto('/en/orgs');
     await expect(page.getByText('Pending invites')).toBeVisible();
     await expect(page.getByText('Invite E2E Org')).toBeVisible();
@@ -75,7 +92,27 @@ test.describe('Org-scoped sessions: create + switch + invite/join (KAN-25)', () 
 
     // Accepted as `viewer`, which doesn't hold `members.manage` — the invite
     // form must not render for them (server-side permission check, not just
-    // a hidden button: the org page itself omits it).
+    // a hidden button: the org page itself omits it), and neither does the
+    // "Remove" action on the member list (same gate, same admin surface).
     await expect(page.getByLabel('Email')).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Remove' })).not.toBeVisible();
+  });
+
+  test('an owner can revoke a pending invite before it is ever accepted', async ({ page }) => {
+    await signUp(page, uniqueEmail('revoke-owner'));
+    await createOrganization(page, 'Revoke E2E Org');
+
+    const inviteeEmail = uniqueEmail('revoke-invitee');
+    await page.getByLabel('Email').fill(inviteeEmail);
+    await page.getByLabel('Role').selectOption('viewer');
+    await page.getByRole('button', { name: 'Invite' }).click();
+    await expect(page.getByText(inviteeEmail)).toBeVisible();
+
+    await page
+      .getByRole('listitem')
+      .filter({ hasText: inviteeEmail })
+      .getByRole('button', { name: 'Remove' })
+      .click();
+    await expect(page.getByText(inviteeEmail)).not.toBeVisible();
   });
 });

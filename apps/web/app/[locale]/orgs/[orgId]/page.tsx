@@ -91,7 +91,7 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('membersHeading')}</h2>
-        <MembersList members={members} />
+        <MembersList orgId={orgId} members={members} canManageMembers={canManageMembers} />
         {canManageMembers ? <InviteMemberForm orgId={orgId} /> : null}
       </section>
     </main>

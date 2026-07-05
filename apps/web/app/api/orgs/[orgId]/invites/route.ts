@@ -1,10 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { can, isInvitableRole } from '@growthos/shared';
+import { isInvitableRole } from '@growthos/shared';
 import { MembershipAlreadyExistsError } from '@growthos/firebase-orm-models';
-import { getServerSession } from '@/lib/auth/get-server-session';
-import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { inviteMember } from '@/lib/orgs/mutations';
-import { findActiveMembership } from '@/lib/orgs/access';
+import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -14,15 +12,9 @@ interface RouteParams {
 /** Invites someone to an org by email — requires `members.manage` at the org scope. */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId } = await params;
-  const session = await getServerSession();
-  if (!session) {
-    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
-  }
-
-  const { user, memberships, bindings } = await resolveOrgSessionContext(session);
-  const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'members.manage', { orgId })) {
-    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  const { user, error } = await requireOrgPermission(orgId, 'members.manage');
+  if (error) {
+    return error;
   }
 
   const parsed = await parseJsonBody<{ email?: unknown; role?: unknown }>(request);

@@ -5,6 +5,7 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   onAuthStateChanged,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
@@ -76,6 +77,11 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
       loading,
       async signUpWithEmail(email, password) {
         const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+        // Unlike Google SSO, Firebase never marks an email/password account's
+        // email verified on its own — and org invites are only safe to accept
+        // once it is (see EmailNotVerifiedError). Best-effort: a delivery
+        // failure here shouldn't block sign-up itself.
+        await sendEmailVerification(credential.user).catch(() => undefined);
         await establishSessionOrRollBack(credential.user);
       },
       async signInWithEmail(email, password) {

@@ -35,12 +35,27 @@ describe('AcceptInviteButton', () => {
   });
 
   it('shows an inline error when acceptance fails', async () => {
-    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
+    vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({ error: 'already_resolved' }) } as Response);
     renderButton();
 
     fireEvent.click(screen.getByRole('button', { name: 'Accept invite' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't accept this invite. Please try again.");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('shows a verify-your-email message when the account has not confirmed its email yet', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'email_not_verified' }),
+    } as Response);
+    renderButton();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Accept invite' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Verify your email address before accepting this invite. Check your inbox for the verification link.',
+    );
     expect(push).not.toHaveBeenCalled();
   });
 });

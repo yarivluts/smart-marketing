@@ -4,6 +4,7 @@ import {
   acceptInvite,
   createOrganizationWithOwner,
   createProject,
+  EmailNotVerifiedError,
   ensureUserByEmail,
   ensureUserForFirebaseSession,
   findUserByEmail,
@@ -11,12 +12,16 @@ import {
   InviteEmailMismatchError,
   inviteMemberToOrganization,
   InviteNotFoundError,
+  LastOwnerError,
   listMembershipsForUser,
   listMembershipsWithOrganizations,
   listOrgMembersWithProfiles,
   listOrgProjects,
   listRoleBindingsForUser,
   MembershipAlreadyExistsError,
+  MembershipModel,
+  MembershipNotFoundError,
+  removeOrgMember,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -147,6 +152,7 @@ describe('invite -> accept flow', () => {
       organizationId: organization.id,
       membershipId: invitation.id,
       userId: invitee.id,
+      callerEmailVerified: true,
     });
     expect(membership.status).toBe('active');
     expect(roleBinding.role).toBe('viewer');
@@ -196,7 +202,12 @@ describe('invite -> accept flow', () => {
     });
 
     await expect(
-      acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: impostor.id }),
+      acceptInvite({
+        organizationId: organization.id,
+        membershipId: invitation.id,
+        userId: impostor.id,
+        callerEmailVerified: true,
+      }),
     ).rejects.toThrow(InviteEmailMismatchError);
   });
 
@@ -208,7 +219,12 @@ describe('invite -> accept flow', () => {
     const { organization } = await createOrganizationWithOwner({ name: 'Resolved Org', ownerUserId: owner.id });
 
     await expect(
-      acceptInvite({ organizationId: organization.id, membershipId: 'does-not-exist', userId: owner.id }),
+      acceptInvite({
+        organizationId: organization.id,
+        membershipId: 'does-not-exist',
+        userId: owner.id,
+        callerEmailVerified: true,
+      }),
     ).rejects.toThrow(InviteNotFoundError);
 
     const inviteeEmail = uniqueEmail('already-active');
@@ -219,10 +235,175 @@ describe('invite -> accept flow', () => {
       invitedByUserId: owner.id,
     });
     const invitee = await ensureUserByEmail(inviteeEmail);
-    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: invitee.id });
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: invitee.id,
+      callerEmailVerified: true,
+    });
 
     await expect(
-      acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: invitee.id }),
+      acceptInvite({
+        organizationId: organization.id,
+        membershipId: invitation.id,
+        userId: invitee.id,
+        callerEmailVerified: true,
+      }),
     ).rejects.toThrow(InviteAlreadyResolvedError);
+  });
+
+  it('rejects acceptance from a caller whose email is not verified — closes the placeholder-hijack path where an attacker signs up with the invitee\'s email first', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('inviter-unverified'),
+    });
+    const { organization } = await createOrganizationWithOwner({ name: 'Unverified Org', ownerUserId: owner.id });
+
+    const inviteeEmail = uniqueEmail('unverified-invitee');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: inviteeEmail,
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+
+    const invitee = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: inviteeEmail,
+    });
+
+    await expect(
+      acceptInvite({
+        organizationId: organization.id,
+        membershipId: invitation.id,
+        userId: invitee.id,
+        callerEmailVerified: false,
+      }),
+    ).rejects.toThrow(EmailNotVerifiedError);
+
+    const memberships = await listMembershipsWithOrganizations(invitee.id);
+    expect(memberships).toContainEqual(expect.objectContaining({ organizationId: organization.id, status: 'invited' }));
+  });
+});
+
+describe('removeOrgMember', () => {
+  it('revokes a pending invite, cascading away its (nonexistent yet) bindings with no error', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('revoke-owner'),
+    });
+    const { organization } = await createOrganizationWithOwner({ name: 'Revoke Org', ownerUserId: owner.id });
+
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: uniqueEmail('revoked-invitee'),
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+
+    await removeOrgMember(organization.id, invitation.id);
+
+    await expect(
+      acceptInvite({
+        organizationId: organization.id,
+        membershipId: invitation.id,
+        userId: owner.id,
+        callerEmailVerified: true,
+      }),
+    ).rejects.toThrow(InviteNotFoundError);
+  });
+
+  it('removes an active member and their role binding', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('remove-owner'),
+    });
+    const { organization } = await createOrganizationWithOwner({ name: 'Remove Org', ownerUserId: owner.id });
+
+    const memberEmail = uniqueEmail('removed-member');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: memberEmail,
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+    const member = await ensureUserByEmail(memberEmail);
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: member.id,
+      callerEmailVerified: true,
+    });
+
+    await removeOrgMember(organization.id, invitation.id);
+
+    const memberships = await listMembershipsWithOrganizations(member.id);
+    expect(memberships).toHaveLength(0);
+    const bindings = await listRoleBindingsForUser(member.id, [organization.id]);
+    expect(bindings).toHaveLength(0);
+  });
+
+  it('rejects removing a membership that does not exist', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('remove-missing-owner'),
+    });
+    const { organization } = await createOrganizationWithOwner({ name: 'Remove Missing Org', ownerUserId: owner.id });
+
+    await expect(removeOrgMember(organization.id, 'does-not-exist')).rejects.toThrow(MembershipNotFoundError);
+  });
+
+  it('refuses to remove the last active org_owner, leaving the org manageable', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('sole-owner'),
+    });
+    const { organization, membership } = await createOrganizationWithOwner({
+      name: 'Sole Owner Org',
+      ownerUserId: owner.id,
+    });
+
+    await expect(removeOrgMember(organization.id, membership.id)).rejects.toThrow(LastOwnerError);
+
+    const memberships = await listMembershipsWithOrganizations(owner.id);
+    expect(memberships).toContainEqual(expect.objectContaining({ organizationId: organization.id, role: 'org_owner' }));
+  });
+
+  it('allows removing an org_owner as long as another active org_owner remains', async () => {
+    const ownerA = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('co-owner-a'),
+    });
+    const { organization, membership: ownerAMembership } = await createOrganizationWithOwner({
+      name: 'Co-Owned Org',
+      ownerUserId: ownerA.id,
+    });
+
+    const ownerBEmail = uniqueEmail('co-owner-b');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: ownerBEmail,
+      role: 'org_admin',
+      invitedByUserId: ownerA.id,
+    });
+    const ownerB = await ensureUserByEmail(ownerBEmail);
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: ownerB.id,
+      callerEmailVerified: true,
+    });
+
+    // Promote ownerB to org_owner directly at the membership layer (no admin
+    // "change role" surface exists yet — out of scope here) so there are two
+    // active org_owners to exercise the "another owner remains" branch.
+    const promoted = await MembershipModel.init(invitation.id, { organization_id: organization.id });
+    promoted!.role = 'org_owner';
+    await promoted!.save();
+
+    await removeOrgMember(organization.id, ownerAMembership.id);
+
+    const remaining = await listMembershipsWithOrganizations(ownerB.id);
+    expect(remaining).toContainEqual(expect.objectContaining({ organizationId: organization.id, role: 'org_owner' }));
   });
 });

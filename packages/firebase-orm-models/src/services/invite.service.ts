@@ -89,10 +89,29 @@ export class InviteEmailMismatchError extends Error {
   }
 }
 
+/**
+ * Thrown when the caller's identity resolved via an unverified email. Firebase
+ * lets anyone sign up with any email/password before that email is ever
+ * confirmed, and `ensureUserForFirebaseSession` links a session to an
+ * existing (e.g. invite-placeholder) `UserModel` row purely by email match —
+ * so without this gate, an attacker who merely knows a target's email could
+ * sign up with it first, get resolved to the same placeholder identity the
+ * invite was created for, and accept the invite before the real invitee ever
+ * gets the chance. Requiring a verified email closes the privilege-escalation
+ * path: an attacker who doesn't control the inbox can never satisfy it.
+ */
+export class EmailNotVerifiedError extends Error {
+  constructor() {
+    super('Verify your email address before accepting this invite.');
+    this.name = 'EmailNotVerifiedError';
+  }
+}
+
 export interface AcceptInviteParams {
   organizationId: string;
   membershipId: string;
   userId: string;
+  callerEmailVerified: boolean;
 }
 
 export interface AcceptInviteResult {
@@ -123,6 +142,9 @@ export async function acceptInvite(params: AcceptInviteParams): Promise<AcceptIn
   }
   if (membership.user_id !== params.userId) {
     throw new InviteEmailMismatchError();
+  }
+  if (!params.callerEmailVerified) {
+    throw new EmailNotVerifiedError();
   }
 
   membership.status = 'active';

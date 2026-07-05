@@ -14,15 +14,16 @@ export function AcceptInviteButton({ orgId, membershipId }: AcceptInviteButtonPr
   const t = useTranslations('Invite');
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   async function handleClick(): Promise<void> {
-    setError(false);
+    setErrorMessage(null);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/invites/${orgId}/${membershipId}/accept`, { method: 'POST' });
       if (!response.ok) {
-        setError(true);
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setErrorMessage(body?.error === 'email_not_verified' ? t('verifyEmailError') : t('acceptError'));
         return;
       }
       router.push(`/orgs/${orgId}`);
@@ -36,9 +37,9 @@ export function AcceptInviteButton({ orgId, membershipId }: AcceptInviteButtonPr
       <Button onClick={handleClick} disabled={submitting}>
         {t('accept')}
       </Button>
-      {error ? (
+      {errorMessage ? (
         <p role="alert" className="text-sm text-destructive">
-          {t('acceptError')}
+          {errorMessage}
         </p>
       ) : null}
     </div>

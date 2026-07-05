@@ -4,6 +4,7 @@ import {
   createOrganizationWithOwner,
   createProject as createProjectInOrganization,
   inviteMemberToOrganization,
+  removeOrgMember,
   type AcceptInviteResult,
   type CreateOrganizationResult,
   type CreateProjectResult,
@@ -49,9 +50,21 @@ interface AcceptInviteInput {
   organizationId: string;
   membershipId: string;
   userId: string;
+  callerEmailVerified: boolean;
 }
 
 export async function acceptInvite(input: AcceptInviteInput): Promise<AcceptInviteResult> {
   await ensureFirestoreOrm();
   return acceptInviteForOrganization(input);
+}
+
+interface RemoveMemberInput {
+  organizationId: string;
+  membershipId: string;
+}
+
+/** Revokes a pending invite or removes an active member — see `removeOrgMember`'s doc comment. */
+export async function removeMember(input: RemoveMemberInput): Promise<void> {
+  await ensureFirestoreOrm();
+  return removeOrgMember(input.organizationId, input.membershipId);
 }
