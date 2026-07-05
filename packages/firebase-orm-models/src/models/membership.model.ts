@@ -4,9 +4,15 @@ import type { Role } from '@growthos/shared';
 /**
  * `invited`: created by `inviteMemberToOrganization`, not yet usable for
  * access (no role binding exists until accepted). `active`: usable, has a
- * matching role binding. `suspended`: access paused without a full removal.
- * Left unset by pre-KAN-25 callers (e.g. `createOrganizationWithOwner`'s
- * predecessors in KAN-22's tests) — those rows are treated as `active`.
+ * matching role binding. `suspended`: reserved for a future "pause access
+ * without removing the membership" feature — modeled here so the field
+ * exists, but nothing in this codebase writes it yet, and permission checks
+ * (`resolveOrgSessionContext`/`can()`) key entirely off role bindings, not
+ * this status. Whichever story adds a suspend action must also stop
+ * treating a suspended member's bindings as valid, or suspending will have
+ * no actual effect. Left unset by pre-KAN-25 callers (e.g.
+ * `createOrganizationWithOwner`'s predecessors in KAN-22's tests) — those
+ * rows are treated as `active`.
  */
 export const MEMBERSHIP_STATUSES = ['invited', 'active', 'suspended'] as const;
 export type MembershipStatus = (typeof MEMBERSHIP_STATUSES)[number];

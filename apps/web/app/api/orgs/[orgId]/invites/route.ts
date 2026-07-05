@@ -4,6 +4,8 @@ import { MembershipAlreadyExistsError } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { inviteMember } from '@/lib/orgs/mutations';
+import { findActiveMembership } from '@/lib/orgs/access';
+import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
   params: Promise<{ orgId: string }>;
@@ -18,18 +20,16 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
   }
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
-  const membership = memberships.find((entry) => entry.organizationId === orgId && entry.status !== 'invited');
+  const membership = findActiveMembership(memberships, orgId);
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'members.manage', { orgId })) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
-  let body: { email?: unknown; role?: unknown };
-  try {
-    body = (await request.json()) as { email?: unknown; role?: unknown };
-  } catch {
-    return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
+  const parsed = await parseJsonBody<{ email?: unknown; role?: unknown }>(request);
+  if (parsed.error) {
+    return parsed.error;
   }
-  const { email, role } = body;
+  const { email, role } = parsed.body;
   if (typeof email !== 'string' || email.trim().length === 0) {
     return NextResponse.json({ error: 'email_required' }, { status: 400 });
   }

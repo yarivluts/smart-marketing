@@ -29,7 +29,7 @@ describe('InviteMemberForm', () => {
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'friend@example.com' } });
-    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'editor' } });
+    fireEvent.change(screen.getByLabelText('Role'), { target: { value: 'org_admin' } });
     fireEvent.click(screen.getByRole('button', { name: 'Invite' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -37,7 +37,7 @@ describe('InviteMemberForm', () => {
       '/api/orgs/org-1/invites',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ email: 'friend@example.com', role: 'editor' }),
+        body: JSON.stringify({ email: 'friend@example.com', role: 'org_admin' }),
       }),
     );
   });

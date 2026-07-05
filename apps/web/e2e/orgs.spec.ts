@@ -53,7 +53,7 @@ test.describe('Org-scoped sessions: create + switch + invite/join (KAN-25)', () 
 
     const inviteeEmail = uniqueEmail('invitee');
     await page.getByLabel('Email').fill(inviteeEmail);
-    await page.getByLabel('Role').selectOption('editor');
+    await page.getByLabel('Role').selectOption('viewer');
     await page.getByRole('button', { name: 'Invite' }).click();
     await expect(page.getByText(inviteeEmail)).toBeVisible();
 
@@ -73,7 +73,7 @@ test.describe('Org-scoped sessions: create + switch + invite/join (KAN-25)', () 
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}$`));
     await expect(page.getByRole('heading', { name: 'Invite E2E Org' })).toBeVisible();
 
-    // Accepted as `editor`, which doesn't hold `members.manage` — the invite
+    // Accepted as `viewer`, which doesn't hold `members.manage` — the invite
     // form must not render for them (server-side permission check, not just
     // a hidden button: the org page itself omits it).
     await expect(page.getByLabel('Email')).not.toBeVisible();

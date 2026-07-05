@@ -24,6 +24,13 @@ export interface CreateOrganizationResult {
  * this behind — see `packages/shared/src/policy`, which deliberately has no
  * `org.create` permission; anyone signed in may create an org and becomes
  * its owner.
+ *
+ * Writes the org, membership, and role binding as three sequential calls,
+ * not one transaction (the ORM's client-SDK-based API doesn't expose one —
+ * same accepted tradeoff as `removeMembershipCascade`). A failure partway
+ * through leaves a partially-created org (e.g. no owner membership) rather
+ * than rolling back; the caller sees the thrown error rather than silent
+ * bad state, but nothing here retries or repairs it automatically.
  */
 export async function createOrganizationWithOwner(
   params: CreateOrganizationParams,
@@ -65,7 +72,12 @@ export interface CreateProjectResult {
   environments: EnvironmentModel[];
 }
 
-/** Creates a project and provisions its fixed dev/staging/prod environment slices. */
+/**
+ * Creates a project and provisions its fixed dev/staging/prod environment
+ * slices. Same non-atomicity caveat as `createOrganizationWithOwner`: a
+ * failure partway through `Promise.all` below can leave a project with
+ * fewer than 3 environments rather than rolling back.
+ */
 export async function createProject(params: CreateProjectParams): Promise<CreateProjectResult> {
   const project = new ProjectModel();
   project.name = params.name;

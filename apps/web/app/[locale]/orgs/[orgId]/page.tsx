@@ -10,6 +10,7 @@ import { InviteMemberForm } from '@/components/orgs/invite-member-form';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { listOrgMembers, listOrgProjects } from '@/lib/orgs/queries';
+import { findActiveMembership } from '@/lib/orgs/access';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string }>;
@@ -40,7 +41,7 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
   }
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
-  const membership = memberships.find((entry) => entry.organizationId === orgId && entry.status !== 'invited');
+  const membership = findActiveMembership(memberships, orgId);
   if (!membership) {
     notFound();
   }

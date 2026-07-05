@@ -12,7 +12,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
-export interface CreateOrganizationInput {
+interface CreateOrganizationInput {
   name: string;
   ownerUserId: string;
 }
@@ -22,7 +22,7 @@ export async function createOrganization(input: CreateOrganizationInput): Promis
   return createOrganizationWithOwner(input);
 }
 
-export interface CreateProjectInput {
+interface CreateProjectInput {
   organizationId: string;
   name: string;
   vertical?: string;
@@ -33,7 +33,7 @@ export async function createProject(input: CreateProjectInput): Promise<CreatePr
   return createProjectInOrganization(input);
 }
 
-export interface InviteMemberInput {
+interface InviteMemberInput {
   organizationId: string;
   email: string;
   role: InvitableRole;
@@ -45,7 +45,7 @@ export async function inviteMember(input: InviteMemberInput): Promise<Membership
   return inviteMemberToOrganization(input);
 }
 
-export interface AcceptInviteInput {
+interface AcceptInviteInput {
   organizationId: string;
   membershipId: string;
   userId: string;

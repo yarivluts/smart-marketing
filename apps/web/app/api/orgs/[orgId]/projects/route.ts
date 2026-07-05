@@ -3,6 +3,8 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { createProject } from '@/lib/orgs/mutations';
+import { findActiveMembership } from '@/lib/orgs/access';
+import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
   params: Promise<{ orgId: string }>;
@@ -17,17 +19,16 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
   }
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
-  const membership = memberships.find((entry) => entry.organizationId === orgId && entry.status !== 'invited');
+  const membership = findActiveMembership(memberships, orgId);
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId })) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 });
   }
 
-  let name: unknown;
-  try {
-    ({ name } = (await request.json()) as { name?: unknown });
-  } catch {
-    return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
+  const parsed = await parseJsonBody<{ name?: unknown }>(request);
+  if (parsed.error) {
+    return parsed.error;
   }
+  const { name } = parsed.body;
   if (typeof name !== 'string' || name.trim().length === 0) {
     return NextResponse.json({ error: 'name_required' }, { status: 400 });
   }

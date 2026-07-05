@@ -4,6 +4,7 @@ import { can } from '@growthos/shared';
 import { CreateProjectForm } from '@/components/orgs/create-project-form';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
+import { findActiveMembership } from '@/lib/orgs/access';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string }>;
@@ -25,7 +26,7 @@ export default async function NewProjectPage({ params }: PageProps): Promise<Rea
   }
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
-  const membership = memberships.find((entry) => entry.organizationId === orgId && entry.status !== 'invited');
+  const membership = findActiveMembership(memberships, orgId);
   if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId })) {
     notFound();
   }

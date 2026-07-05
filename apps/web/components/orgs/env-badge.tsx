@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { ENVIRONMENTS, type Environment } from '@growthos/shared';
 import { Link } from '@/i18n/navigation';
+import { cn } from '@/lib/utils';
 
 export interface EnvBadgeProps {
   orgId: string;
@@ -27,9 +28,10 @@ export async function EnvBadge({ orgId, projectId, currentEnv }: EnvBadgeProps):
             key={env}
             href={{ pathname: `/orgs/${orgId}`, query: { project: projectId, env } }}
             aria-current={isActive ? 'true' : undefined}
-            className={`rounded-full px-3 py-1 text-xs font-semibold uppercase ${
-              isActive ? ENV_ACTIVE_CLASS[env] : 'bg-muted text-muted-foreground hover:bg-accent'
-            }`}
+            className={cn(
+              'rounded-full px-3 py-1 text-xs font-semibold uppercase',
+              isActive ? ENV_ACTIVE_CLASS[env] : 'bg-muted text-muted-foreground hover:bg-accent',
+            )}
           >
             {t(env)}
           </Link>

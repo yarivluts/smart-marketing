@@ -29,6 +29,15 @@ export interface InviteMemberParams {
  * which `ensureUserForFirebaseSession` (in `user.service.ts`) later links to
  * their real Firebase UID the first time they authenticate with a matching
  * email, so `MembershipModel.user_id` never needs to change at acceptance.
+ *
+ * Like `removeMembershipCascade`, this is a check-then-act read/write with
+ * no transaction (the ORM's client-SDK-based API doesn't expose one): two
+ * genuinely concurrent calls for the same email/org (not the common
+ * double-click case, which the UI already guards against by disabling the
+ * submit button) could both pass the duplicate check before either write
+ * lands, producing two membership rows. Accepted as a known, low-likelihood
+ * gap rather than solved here — the same tradeoff already made for
+ * `removeMembershipCascade`.
  */
 export async function inviteMemberToOrganization(params: InviteMemberParams): Promise<MembershipModel> {
   const invitee = await ensureUserByEmail(params.email);
@@ -91,7 +100,17 @@ export interface AcceptInviteResult {
   roleBinding: RoleBindingModel;
 }
 
-/** Accepts a pending invite: activates the membership and mints the role binding it promised. */
+/**
+ * Accepts a pending invite: activates the membership and mints the role
+ * binding it promised. Same non-atomicity caveat as
+ * `inviteMemberToOrganization` — two genuinely concurrent accept calls for
+ * the same membership could both pass the `status !== 'invited'` check
+ * before either write lands, minting two role bindings for the same grant.
+ * The client already disables the accept button once clicked, so the
+ * realistic trigger is a duplicated network request, not a UI double-click;
+ * `removeMembershipCascade` would still clean up both bindings together if
+ * the membership is ever removed.
+ */
 export async function acceptInvite(params: AcceptInviteParams): Promise<AcceptInviteResult> {
   const membership = await MembershipModel.init(params.membershipId, {
     organization_id: params.organizationId,

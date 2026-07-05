@@ -116,7 +116,7 @@ describe('invite -> accept flow', () => {
     const invitation = await inviteMemberToOrganization({
       organizationId: organization.id,
       email: inviteeEmail,
-      role: 'editor',
+      role: 'viewer',
       invitedByUserId: owner.id,
     });
     expect(invitation.status).toBe('invited');
@@ -126,7 +126,7 @@ describe('invite -> accept flow', () => {
 
     const membersBeforeAccept = await listOrgMembersWithProfiles(organization.id);
     expect(membersBeforeAccept).toContainEqual(
-      expect.objectContaining({ email: inviteeEmail, status: 'invited', role: 'editor' }),
+      expect.objectContaining({ email: inviteeEmail, status: 'invited', role: 'viewer' }),
     );
 
     // The invitee doesn't have their pending invite visible under their own
@@ -149,7 +149,7 @@ describe('invite -> accept flow', () => {
       userId: invitee.id,
     });
     expect(membership.status).toBe('active');
-    expect(roleBinding.role).toBe('editor');
+    expect(roleBinding.role).toBe('viewer');
     expect(roleBinding.scope_id).toBe(organization.id);
 
     const bindings = await listRoleBindingsForUser(invitee.id, [organization.id]);
@@ -157,7 +157,7 @@ describe('invite -> accept flow', () => {
 
     const membershipsAfterAccept = await listMembershipsWithOrganizations(invitee.id);
     expect(membershipsAfterAccept).toContainEqual(
-      expect.objectContaining({ organizationId: organization.id, status: 'active', role: 'editor' }),
+      expect.objectContaining({ organizationId: organization.id, status: 'active', role: 'viewer' }),
     );
   });
 
@@ -172,7 +172,7 @@ describe('invite -> accept flow', () => {
     await inviteMemberToOrganization({ organizationId: organization.id, email, role: 'viewer', invitedByUserId: owner.id });
 
     await expect(
-      inviteMemberToOrganization({ organizationId: organization.id, email, role: 'editor', invitedByUserId: owner.id }),
+      inviteMemberToOrganization({ organizationId: organization.id, email, role: 'org_admin', invitedByUserId: owner.id }),
     ).rejects.toThrow(MembershipAlreadyExistsError);
   });
 

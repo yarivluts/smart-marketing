@@ -59,7 +59,7 @@ describe('resolveOrgSessionContext', () => {
     await inviteMemberToOrganization({
       organizationId: organization.id,
       email: inviteeEmail,
-      role: 'editor',
+      role: 'viewer',
       invitedByUserId: owner.id,
     });
 
