@@ -1,0 +1,133 @@
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextRequest } from 'next/server';
+import type { DecodedIdToken } from 'firebase-admin/auth';
+import { createOrganizationWithOwner, ensureUserForFirebaseSession } from '@growthos/firebase-orm-models';
+import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { POST as createProject } from '@/app/api/orgs/[orgId]/projects/route';
+import { POST as sendInvite } from '@/app/api/orgs/[orgId]/invites/route';
+import { DELETE as removeMember } from '@/app/api/orgs/[orgId]/members/[membershipId]/route';
+
+const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
+vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
+
+beforeAll(async () => {
+  process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8090';
+  process.env.FIREBASE_PROJECT_ID = 'demo-growthos-test';
+  await ensureFirestoreOrm();
+});
+
+beforeEach(() => {
+  getServerSessionMock.mockReset();
+});
+
+function unique(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2)}`;
+}
+
+function uniqueEmail(prefix: string): string {
+  return `${unique(prefix)}@example.com`;
+}
+
+async function sessionFor(firebaseUid: string, email: string): Promise<DecodedIdToken> {
+  await ensureUserForFirebaseSession({ firebaseUid, email });
+  return { uid: firebaseUid, email } as DecodedIdToken;
+}
+
+/**
+ * The core KAN-26 property: a caller must get byte-identical responses
+ * whether they're hitting a real org they simply have no binding on, or a
+ * completely fabricated org id. If the two ever diverge (in status or body),
+ * the response itself becomes an oracle an attacker can use to enumerate
+ * which org ids are real, which defeats the point of returning 404 at all.
+ */
+async function expectIndistinguishable(callReal: () => Promise<Response>, callFake: () => Promise<Response>) {
+  const [realResponse, fakeResponse] = await Promise.all([callReal(), callFake()]);
+  expect(realResponse.status).toBe(404);
+  expect(fakeResponse.status).toBe(404);
+  expect(await realResponse.json()).toEqual(await fakeResponse.json());
+}
+
+const FAKE_ORG_ID = 'does-not-exist-org';
+const FAKE_MEMBERSHIP_ID = 'does-not-exist-membership';
+
+describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeration)', () => {
+  it('POST /api/orgs/[orgId]/projects: org caller cannot see vs. fake org id', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-proj-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (projects)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-proj-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (projects)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const requestFor = (orgId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Leaked Project' }),
+      });
+
+    await expectIndistinguishable(
+      () => createProject(requestFor(orgB.id), { params: Promise.resolve({ orgId: orgB.id }) }),
+      () => createProject(requestFor(FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID }) }),
+    );
+  });
+
+  it('POST /api/orgs/[orgId]/invites: org caller cannot see vs. fake org id', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-invite-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (invites)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-invite-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (invites)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const requestFor = (orgId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/invites`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: uniqueEmail('leaked-invitee'), role: 'viewer' }),
+      });
+
+    await expectIndistinguishable(
+      () => sendInvite(requestFor(orgB.id), { params: Promise.resolve({ orgId: orgB.id }) }),
+      () => sendInvite(requestFor(FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID }) }),
+    );
+  });
+
+  it('DELETE /api/orgs/[orgId]/members/[membershipId]: org caller cannot see vs. fake org id', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-member-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (members)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-member-b-owner') });
+    const { organization: orgB, membership: orgBOwnerMembership } = await createOrganizationWithOwner({
+      name: 'Isolation Org B (members)',
+      ownerUserId: otherOwner.id,
+    });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    await expectIndistinguishable(
+      () =>
+        removeMember(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: orgB.id, membershipId: orgBOwnerMembership.id }),
+        }),
+      () =>
+        removeMember(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, membershipId: FAKE_MEMBERSHIP_ID }),
+        }),
+    );
+  });
+});

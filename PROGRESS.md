@@ -17,6 +17,120 @@ Template for each entry:
 
 ---
 
+## 2026-07-05 — E1.6 Hard isolation & non-enumeration layer (KAN-26)
+
+- **Last completed:**
+  - Implemented **KAN-26** scoped to the surfaces that actually exist today: `apps/web`'s
+    org/project/member/invite routes. Per `docs/plan/08-generic-platform.md` §5.6, the "scoped
+    caches/search/notifications, per-project datasets" bullets in the story title reference systems
+    (Metrics API, warehouse, Redis caches, search indexes) that don't exist yet — those are
+    forward-looking for later epics, not buildable now; confirmed via an Explore-agent survey before
+    starting so the scope decision is grounded in the plan text, not a guess.
+  - `apps/web/lib/orgs/access.ts`'s `requireOrgPermission` used to return one 403 for both "org
+    doesn't exist" and "org exists but caller has no active membership" *and* "caller is a member but
+    lacks the specific permission" — collapsing all three into a single enumeration-revealing status.
+    Split it: **no active membership → 404** (a real org the caller can't see is now indistinguishable
+    from a fake org id), **membership exists but permission denied → 403** (not a leak — the caller
+    already knows the org exists). This is the exact gap the KAN-25 org-detail page's own doc comment
+    flagged as still-open ("the KAN-26 404 not 403 principle applies even before that story builds it
+    out everywhere else").
+  - Updated `apps/web/app/api/orgs/[orgId]/invites/route.test.ts`'s "no membership in the org at all"
+    case, which had pinned the old 403 behavior, to assert 404 instead — this test would otherwise have
+    actively encoded the enumeration bug it's supposed to catch.
+  - Added `apps/web/lib/orgs/access.test.ts` coverage for `requireOrgPermission` itself (401/404/403/
+    success), mocking session resolution so the branch logic is pinned directly, independent of the
+    route-level integration tests.
+  - Added `apps/web/lib/orgs/isolation.test.ts`: a cross-org isolation suite against the real Firestore
+    emulator, the "isolation test suite in CI" AC from `docs/plan/13-task-breakdown.md`'s E1.6 row. For
+    each of `POST /projects`, `POST /invites`, `DELETE /members/[membershipId]`, asserts a caller who's
+    a real member of one org gets a byte-identical 404 response (status + body) whether the target is a
+    second, genuinely-existing org they have no binding on, or a completely fabricated org id — the
+    actual non-enumeration property, not just "both happen to return 404."
+  - Added `apps/web/lib/orgs/route-isolation-guard.test.ts`: this repo has no per-route annotation
+    system for `apps/web` the way `apps/api`'s `@RequirePermission` + `growthos/require-permission-
+    annotation` eslint rule (KAN-24) does, so a custom lint rule wasn't the right tool here. Instead, a
+    filesystem-scanning test walks every `route.ts` under `app/api/orgs` and `app/api/invites` and fails
+    the suite if a file neither calls `requireOrgPermission` nor is in an explicit, justified
+    `EXEMPT_ROUTES` allow-list (org-create — no target to enumerate; org-context — returns only the
+    caller's own data; invite-accept — identity-scoped by design with its own 404 mapping). This is the
+    practical, CI-enforced equivalent of "any new endpoint must register an isolation test to pass
+    review" for a framework with no decorator-based route metadata.
+  - Self-reviewed the diff via an independent subagent before merging. It confirmed the 404/403 split
+    is correct and complete (all three route call sites invoke `requireOrgPermission` before any body
+    parsing, so non-enumeration holds end-to-end) and that `isolation.test.ts`'s assertions are not
+    vacuous (walked the projects-route scenario concretely: org B is a genuinely-created org via
+    `createOrganizationWithOwner` for a different owner, so the caller has zero membership row for it,
+    and both branches hit the same 404 code path before any other check could short-circuit).
+    Two things flagged, both deliberately left as documented follow-ups rather than fixed now:
+    - `apps/web/app/[locale]/orgs/[orgId]/projects/new/page.tsx` still folds "no membership" and
+      "member without `project.manage`" into one `notFound()` — stricter than the API's new split, and
+      now inconsistent with it (an active member lacking the permission gets a page 404 but a route
+      403). Not a regression (the file wasn't touched by this story) and not a security problem (folding
+      to 404 is the *safer* direction), just an inconsistency worth a small follow-up to align the page
+      with the route behavior.
+    - `apps/api/src/authz/permission.guard.ts` still returns a single 403 for both "no binding at all"
+      and "binding exists, wrong permission" — the same enumeration pattern this story just fixed on the
+      web side. Not fixed here because apps/api has no org-scoped routes yet at all (KAN-24 left
+      `request.principal` unpopulated; only the health check exists), so there is nothing to enumerate
+      today — fixing it now would mean guessing at a shape for routes that don't exist. Flagged for
+      whoever builds apps/api's first real org-scoped endpoint to carry the same 404-vs-403 split
+      forward from day one.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green (116 tests in `apps/web`,
+    including the new isolation/guard suites and a full Playwright e2e run; one pre-existing,
+    previously-documented Playwright flake in `auth.spec.ts` passed on its automatic retry, unrelated to
+    this change).
+  - Branch `kan-26-hard-isolation`, **PR #11 opened against `main`, NOT YET MERGED** — see stopping
+    point below. This is a correction of this same entry's earlier draft, written before CI's actual
+    outcome was known; do not trust a "merged" claim from an entry until the PR's actual state is
+    re-checked on GitHub.
+- **In progress (exact stopping point):** the code itself is complete, self-reviewed (see above), and
+  fully green locally (`pnpm lint && pnpm typecheck && pnpm test && pnpm build`, using the exact same
+  Firestore/Auth emulator + Playwright suite CI runs) — nothing left to implement or fix in the diff.
+  What's unfinished is **getting PR #11 merged**: GitHub Actions CI on this sandbox's repo stalled on
+  the `Test` step (the `firebase emulators:exec ... "vitest run && playwright test"` step) three
+  separate times in a row, each roughly 25-30 minutes after that step started, with no error — just an
+  `in_progress` status that never resolved until manually cancelled. Cancelled and re-ran twice
+  (`cancel_workflow_run` + `rerun_workflow_run` on run id `28745705492`); the third attempt hit the same
+  wall. This does not look like a real test failure (the identical suite runs and passes in well under
+  a minute locally in this same sandbox every time it was tried) and the stall wasn't even consistently
+  on the same step across attempts (attempt 3 also briefly appeared stuck on "Install Playwright
+  browsers" before that step actually completed normally on its own) — most likely sandbox
+  CI-runner/status-API flakiness rather than a problem with this PR's code. Sent the repo owner a push
+  notification asking whether to merge PR #11 without a passing CI check, or whether they want to
+  look into the CI environment themselves, and stopped there rather than retrying indefinitely or
+  merging around the CLAUDE.md "CI must be green before merge" rule unilaterally.
+- **Blocked + why:** waiting on a human decision (see "Waiting on human" below) for whether to merge PR
+  #11 without a green CI check, given three straight CI stalls that don't look like a real test
+  failure. Not blocked on any further code work — re-running the *same* passing local suite a fourth
+  time isn't expected to reveal anything new.
+- **Next step:** **before picking a new task**, check PR #11's actual state on GitHub (open? CI status?
+  merged?). If the human has merged it or greenlit merging without CI, TASKS.md's KAN-26 row (already
+  marked `done` above, describing the intended end state) is accurate and the next run can proceed
+  straight to **KAN-27** (Org Resource Library) or **KAN-30** (keys admin UI) — both unblocked sprint-2
+  `todo`s that build on KAN-25/26's real membership/isolation layer. If PR #11 is still open/unmerged
+  and un-actioned, that's this story's actual unfinished state despite the `done` status above (mark it
+  back to `in-progress` in TASKS.md if so) — re-check CI once before assuming it's still stuck (transient
+  sandbox flakiness may have cleared on its own), and if still stalled, it's a human call, not something
+  to keep retrying. Two small, non-blocking follow-ups documented above if anyone wants a quick pick-up
+  once KAN-26 itself is settled: aligning `projects/new/page.tsx`'s notFound() granularity with the
+  API's 404/403 split, and carrying the same split into `apps/api`'s `PermissionGuard` once it has a
+  real org-scoped route. The `ensureUserForFirebaseSession` email-verification identity-merge gap
+  documented in the KAN-25 entry below is also still open and unrelated to this story.
+- **Waiting on human:**
+  - **PR #11 (KAN-26)**: decide whether to merge without a passing CI check (the code is locally green
+    and self-reviewed; CI stalled on the Test step 3/3 attempts, most likely sandbox infra flakiness —
+    see above) or investigate the CI environment first.
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-26-hard-isolation` branch on GitHub if the sandbox's remote 403
+    prevented it (see above), and the other still-outstanding merged branches from prior runs noted in
+    earlier entries below.
+
+---
+
 ## 2026-07-05 — E1.5 Org-scoped sessions, switchers, invite/join (KAN-25)
 
 - **Last completed:**

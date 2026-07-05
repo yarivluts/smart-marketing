@@ -55,12 +55,13 @@ describe('POST /api/orgs/[orgId]/invites', () => {
     expect(response.status).toBe(401);
   });
 
-  it("rejects a caller with no membership in the org at all", async () => {
+  it("rejects a caller with no membership in the org at all with 404, not 403 (KAN-26 non-enumeration)", async () => {
     const session = await sessionFor(unique('uid'), uniqueEmail('outsider'));
     getServerSessionMock.mockResolvedValue(session);
     const { request, params } = inviteRequest('does-not-exist-org', { email: 'a@b.com', role: 'viewer' });
     const response = await POST(request, { params });
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: 'not_found' });
   });
 
   it("rejects a member whose role doesn't hold members.manage (viewer)", async () => {
