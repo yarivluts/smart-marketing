@@ -17,6 +17,95 @@ Template for each entry:
 
 ---
 
+## 2026-07-05 — E1.5 Org-scoped sessions, switchers, invite/join (KAN-25)
+
+- **Last completed:**
+  - Found **KAN-25** already fully implemented, self-reviewed (twice), tested, and CI-green on an
+    open but unmerged PR (#10, branch `kan-25-org-scoped-sessions`) from an earlier run this same
+    day — it had stopped short of merging. This run picked up from there: verified everything
+    locally (`pnpm lint && pnpm typecheck && pnpm test && pnpm build`, all green, including the
+    Firestore/Auth-emulator and Playwright suites), then ran an independent review round on top of
+    the PR's own two self-review rounds before merging.
+  - **Independent review round** (8 parallel finder angles — line-by-line, removed-behavior,
+    cross-file, reuse, simplification, efficiency, altitude, CLAUDE.md conventions — each verified
+    against the actual code, not taken at face value):
+    - **Fixed, real bug:** `acceptInvite` (`packages/firebase-orm-models/src/services/invite.service.ts`)
+      checked invite status (already-accepted) *before* verifying caller identity, so a stranger
+      who merely knew a membership id could learn whether an invite was already resolved (409) vs.
+      just getting a generic "wrong account" (403). Reordered so identity is always checked first.
+    - **Fixed, real gap:** two new client components (`create-project-form.tsx`,
+      `switch-account-button.tsx`) shipped with no unit test, unlike every sibling form/button
+      component in the same PR — added both, matching the existing pattern.
+    - **Fixed, real gap:** the whole project-creation/switching feature area (project switcher, env
+      badge, the projects/new page) had zero test coverage of any kind — org creation/switching and
+      invite/accept got thorough Playwright e2e coverage in the same PR, but project switching got
+      none. Added an e2e scenario covering create-project → project switcher pill → env badge
+      dev/staging/prod switching.
+    - **Fixed, drift-prevention:** `INVITABLE_ROLES` (`packages/shared/src/policy/roles.ts`) is a
+      hand-typed literal array with no test pinning it against `ROLE_SCOPE_LEVELS` — the exact
+      relationship its own doc comment describes as the rule. Added a table-driven regression test
+      so a future role addition can't silently reintroduce the same over-scoped-invite bug the PR's
+      own round-1 review already caught once for `project_admin`.
+    - **Attempted and reverted a bad fix:** one finder flagged `firestore-connection.ts`'s
+      module-level `connected` boolean as unsafe under Next.js dev-server Fast Refresh (HMR) and
+      recommended moving it to `globalThis`. That "fix" actually broke org creation/all org pages
+      outright — Next dev mode compiles each route as a separate webpack bundle with its own
+      isolated module instance of `@arbel/firebase-orm`'s `FirestoreOrmRepository`, so a
+      `globalThis`-shared flag let one bundle's successful connection silently skip *every other
+      bundle's* own real connection setup, throwing "The global Firestore default is undefined!"
+      the moment two different routes were hit in the same run. Caught this before pushing by
+      running the actual e2e suite (all 4 org tests failed identically); reverted the change back
+      to the original module-level `let` (confirmed zero diff against the PR's pre-review version)
+      and moved on. Documents why speculative "safety" fixes for dev-mode-only theoretical issues
+      need to be verified against a real test run, not just reasoned about — this repo's own
+      multi-bundle-per-route Next dev behavior is exactly the kind of thing that breaks
+      module-scoped-singleton assumptions in a non-obvious way.
+    - **Documented, not fixed (deferred as a real but riskier residual gap):** `ensureUserForFirebaseSession`
+      (`packages/firebase-orm-models/src/services/user.service.ts`) links/overwrites an existing
+      placeholder `UserModel` row's `firebaseUid`/`display_name`/`photo_url` purely by email match,
+      with no email-verification check — the verification gate this PR added only guards
+      `acceptInvite`'s actual grant, not the identity-merge step itself, which runs on nearly every
+      authenticated request via `resolveOrgSessionContext`. Net effect: an attacker who signs up
+      with a target's email before the target does gets merged into that email's invite-placeholder
+      identity the moment they load any org page (they still can't accept the invite — that gate
+      holds — but they can see the placeholder's pending invites and plant `display_name`/`photo_url`
+      that the real invitee later inherits). A correct fix means gating the identity-merge itself on
+      `emailVerified`, which has a real risk of orphaning the normal first-sign-in-after-invite flow
+      if done carelessly (several existing tests/e2e scenarios depend on today's linking behavior);
+      left as follow-up rather than rushed. Also deferred as lower-priority/lower-risk: three route
+      handlers calling the full `resolveOrgSessionContext` (with its O(orgCount) parallel reads) just
+      to read `user.id`, when `ensureUserForFirebaseSession` alone would do; a handful of duplicated
+      query-construction snippets and near-identical form-component boilerplate across the new
+      `apps/web/components/orgs/*` files.
+  - Re-ran `pnpm lint && pnpm typecheck && pnpm test && pnpm build` after all review fixes — green
+    (139 tests in `packages/shared`, 21 in `packages/firebase-orm-models`, 107 web unit/route tests +
+    10/10 Playwright e2e in `apps/web`, 15 in `apps/api`).
+  - Pushed the review-fix commit to `kan-25-org-scoped-sessions`, waited for GitHub Actions CI to go
+    green on it, then merged PR #10 (squash) into `main`. Remote branch deletion failed with the
+    same HTTP 403 from this sandbox's git remote recorded in every prior run's entry (not a GitHub
+    permissions issue) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-25 is fully delivered, reviewed, tested, and
+  merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-26** (hard-isolation & non-enumeration layer — 404-not-403, binding-filtered
+  lists, scoped caches/search/notifications) is the natural next sprint-2 story now that KAN-25
+  supplies a real per-org membership/binding source to test isolation against. **KAN-27** (Org
+  Resource Library) and **KAN-30** (keys admin UI) are also now unblocked in principle but KAN-26 is
+  the more natural next pick given it hardens what KAN-25 just built. If picking up KAN-26, note the
+  `ensureUserForFirebaseSession` email-verification gap documented above as a related, not-yet-fixed
+  identity-trust issue worth revisiting in the same area.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-25-org-scoped-sessions` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403), and the other still-outstanding merged branches from
+    prior runs noted in earlier entries below.
+
+---
+
 ## 2026-07-05 — E1.1 Firebase Auth + session handling (KAN-21)
 
 - **Last completed:**
