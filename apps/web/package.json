@@ -6,13 +6,14 @@
     "build": "next build",
     "dev": "next dev -p 3000",
     "start": "next start -p 3000",
-    "test": "firebase emulators:exec --project demo-growthos-test --only auth \"vitest run && playwright test\"",
+    "test": "firebase emulators:exec --project demo-growthos-test --only auth,firestore \"vitest run && playwright test\"",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
     "lint": "eslint \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@growthos/firebase-orm-models": "workspace:*",
     "@growthos/shared": "workspace:*",
     "@radix-ui/react-slot": "^1.1.1",
     "class-variance-authority": "^0.7.1",

@@ -5,12 +5,20 @@ import userEvent from '@testing-library/user-event';
 import type { User } from 'firebase/auth';
 import { AuthProvider, useAuth } from './auth-context';
 
-const { onAuthStateChangedMock, createUserMock, signInMock, signInWithPopupMock, signOutMock } = vi.hoisted(() => ({
+const {
+  onAuthStateChangedMock,
+  createUserMock,
+  signInMock,
+  signInWithPopupMock,
+  signOutMock,
+  sendEmailVerificationMock,
+} = vi.hoisted(() => ({
   onAuthStateChangedMock: vi.fn(),
   createUserMock: vi.fn(),
   signInMock: vi.fn(),
   signInWithPopupMock: vi.fn(),
   signOutMock: vi.fn(),
+  sendEmailVerificationMock: vi.fn(),
 }));
 
 vi.mock('@/lib/firebase/client', () => ({
@@ -23,6 +31,7 @@ vi.mock('firebase/auth', () => ({
   signInWithEmailAndPassword: signInMock,
   signInWithPopup: signInWithPopupMock,
   signOut: signOutMock,
+  sendEmailVerification: sendEmailVerificationMock,
   GoogleAuthProvider: class GoogleAuthProvider {},
 }));
 
@@ -73,6 +82,7 @@ describe('AuthProvider / useAuth', () => {
     signInMock.mockReset();
     signInWithPopupMock.mockReset();
     signOutMock.mockReset();
+    sendEmailVerificationMock.mockReset().mockResolvedValue(undefined);
   });
 
   it('starts loading, then resolves to signed-out once the listener fires', async () => {
@@ -113,6 +123,37 @@ describe('AuthProvider / useAuth', () => {
         expect.objectContaining({ method: 'POST', body: JSON.stringify({ idToken: 'fake-id-token' }) }),
       ),
     );
+  });
+
+  it('sends a verification email on sign-up (required before accepting org invites)', async () => {
+    const user1 = fakeUser();
+    createUserMock.mockResolvedValue({ user: user1 });
+    const user = userEvent.setup();
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await user.click(screen.getByText('sign-up'));
+
+    await waitFor(() => expect(sendEmailVerificationMock).toHaveBeenCalledWith(user1));
+  });
+
+  it('does not block sign-up if sending the verification email fails', async () => {
+    createUserMock.mockResolvedValue({ user: fakeUser() });
+    sendEmailVerificationMock.mockRejectedValue(new Error('quota exceeded'));
+    const user = userEvent.setup();
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await user.click(screen.getByText('sign-up'));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith('/api/auth/session', expect.objectContaining({ method: 'POST' })),
+    );
+    expect(screen.getByTestId('error')).toHaveTextContent('none');
   });
 
   it('syncs the session cookie via POST on email sign-in', async () => {

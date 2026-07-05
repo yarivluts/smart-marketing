@@ -71,3 +71,25 @@ export const ROLE_SCOPE_LEVELS: Readonly<Record<Role, readonly ScopeLevel[]>> = 
 export function roleHasPermission(role: Role, permission: Permission): boolean {
   return ROLE_PERMISSIONS[role].includes(permission);
 }
+
+/**
+ * Roles grantable via an org-level invite (KAN-25). Restricted to roles
+ * whose `ROLE_SCOPE_LEVELS` includes `'org'` — `org_admin` and `viewer` —
+ * because the org invite endpoint always binds the accepted role at `org`
+ * scope (there is no project-picker in the invite flow). Granting e.g.
+ * `project_admin` (typical scope `['project']`, and carrying
+ * `members.manage`/`project.manage`/`keys.manage`) at `org` scope instead
+ * of a specific project would hand the invitee that access across every
+ * project in the org — effectively `org_admin` in a different name. Roles
+ * meant for narrower project/environment scopes (`project_admin`, `editor`,
+ * `operator`, `ingest_only`) need a project-scoped invite flow, which is a
+ * separate, not-yet-built story. `platform_admin`/`org_owner` are excluded
+ * for a different reason — those aren't handed out by invite at all,
+ * they're platform-level or earned by creating the org.
+ */
+export const INVITABLE_ROLES = ['org_admin', 'viewer'] as const;
+export type InvitableRole = (typeof INVITABLE_ROLES)[number];
+
+export function isInvitableRole(value: string): value is InvitableRole {
+  return (INVITABLE_ROLES as readonly string[]).includes(value);
+}

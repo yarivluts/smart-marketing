@@ -4,6 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = 3100;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 const AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+const FIRESTORE_EMULATOR_HOST = '127.0.0.1:8090';
 
 // Some sandboxes pre-install a pinned Chromium revision that may not match
 // this package's @playwright/test version; use it directly instead of
@@ -32,6 +33,7 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST: AUTH_EMULATOR_HOST,
       FIREBASE_AUTH_EMULATOR_HOST: AUTH_EMULATOR_HOST,
+      FIRESTORE_EMULATOR_HOST: FIRESTORE_EMULATOR_HOST,
     },
   },
   projects: [

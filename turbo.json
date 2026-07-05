@@ -9,6 +9,9 @@
     "test": {
       "dependsOn": ["^build"]
     },
+    "@growthos/web#test": {
+      "dependsOn": ["^build", "@growthos/firebase-orm-models#test"]
+    },
     "lint": {},
     "typecheck": {
       "dependsOn": ["^build"]

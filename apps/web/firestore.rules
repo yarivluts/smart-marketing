@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// Emulator-only rules for this app's Firestore-emulator test/dev suite
+// (KAN-25). This project id is always the "demo-growthos-test" emulator
+// project — it is never deployed against a real Firestore database, so open
+// rules are safe here. Mirrors packages/firebase-orm-models/firestore.rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

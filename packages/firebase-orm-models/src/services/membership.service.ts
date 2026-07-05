@@ -25,3 +25,44 @@ export async function removeMembershipCascade(membership: MembershipModel): Prom
   await Promise.all(bindings.map((binding) => binding.remove()));
   await membership.remove();
 }
+
+export class MembershipNotFoundError extends Error {
+  constructor() {
+    super('Membership not found.');
+    this.name = 'MembershipNotFoundError';
+  }
+}
+
+export class LastOwnerError extends Error {
+  constructor() {
+    super('An organization must always have at least one active org_owner.');
+    this.name = 'LastOwnerError';
+  }
+}
+
+/**
+ * The admin-surface counterpart to `inviteMemberToOrganization`/`acceptInvite`
+ * — revokes a pending invite or removes an active member (same operation
+ * either way: {@link removeMembershipCascade} handles both since it just
+ * deletes whatever bindings and membership doc exist). Refuses to remove the
+ * organization's last active `org_owner`, since that would leave the org with
+ * no one able to manage it (no bootstrap/support-override path exists yet).
+ */
+export async function removeOrgMember(organizationId: string, membershipId: string): Promise<void> {
+  const membership = await MembershipModel.init(membershipId, { organization_id: organizationId });
+  if (!membership) {
+    throw new MembershipNotFoundError();
+  }
+
+  if (membership.role === 'org_owner' && (membership.status ?? 'active') === 'active') {
+    const ownerMemberships = await MembershipModel.initPath({ organization_id: organizationId })
+      .where('role', '==', 'org_owner')
+      .get();
+    const activeOwnerCount = ownerMemberships.filter((m) => (m.status ?? 'active') === 'active').length;
+    if (activeOwnerCount <= 1) {
+      throw new LastOwnerError();
+    }
+  }
+
+  await removeMembershipCascade(membership);
+}

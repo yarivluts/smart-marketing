@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { can, evaluate, type PolicyBinding, type ResourceScope } from './engine';
 import { PERMISSIONS, type Permission } from './permissions';
-import { ROLES, ROLE_PERMISSIONS, type Role } from './roles';
+import { INVITABLE_ROLES, ROLES, ROLE_PERMISSIONS, ROLE_SCOPE_LEVELS, type Role } from './roles';
 import { isScopeLevel, SCOPE_LEVELS } from './scopes';
 import { isRole } from './roles';
 import { isPermission } from './permissions';
@@ -41,6 +41,22 @@ describe('permission catalog and role bundles', () => {
     expect(isPermission('metrics.delete')).toBe(false);
     expect(isScopeLevel('project')).toBe(true);
     expect(isScopeLevel('object')).toBe(false);
+  });
+
+  it('never makes a role invitable at org scope unless it is meant to be bound at org scope, and never invites org_owner/platform_admin (KAN-25)', () => {
+    // Pins the rule INVITABLE_ROLES' own doc comment states, so adding a new
+    // role can't silently drift the two out of sync (the exact bug the KAN-25
+    // review caught for `project_admin`, whose typical scope is `project` —
+    // inviting it at org scope would hand out org-wide access under a
+    // narrower-sounding role name).
+    for (const role of ROLES) {
+      const invitable = (INVITABLE_ROLES as readonly Role[]).includes(role);
+      if (role === 'org_owner' || role === 'platform_admin') {
+        expect(invitable).toBe(false);
+        continue;
+      }
+      expect(invitable).toBe(ROLE_SCOPE_LEVELS[role].includes('org'));
+    }
   });
 });
 
