@@ -8,6 +8,7 @@ export const PERMISSIONS = [
   'members.manage',
   'billing.manage',
   'sources.manage',
+  'resources.manage',
   'keys.manage',
   'schema.write',
   'ingest.write',

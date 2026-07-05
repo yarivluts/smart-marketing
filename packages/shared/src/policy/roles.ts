@@ -31,6 +31,13 @@ const ALL_PERMISSIONS: readonly Permission[] = PERMISSIONS;
  * §5.4 ("PII gate") so it is withheld even from `project_admin`;
  * `billing.manage` is withheld from `org_admin` (only `org_owner` holds it),
  * mirroring the Owner/Admin split common to org-billing systems.
+ * `resources.manage` (org resource library — shared credentials, templates,
+ * people registry; plan 08 §1.2) is deliberately withheld from
+ * `project_admin` too: the plan requires attach requests to be
+ * "project-admin initiated + org-resource-owner approved (or org-admin
+ * pushed)", so a project admin gets `project.manage` (enough to *request* an
+ * attachment) but only org-scoped roles get `resources.manage` (create
+ * library resources, approve/reject/detach attachments).
  */
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   platform_admin: ALL_PERMISSIONS,
