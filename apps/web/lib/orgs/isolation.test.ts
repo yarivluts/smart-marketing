@@ -8,6 +8,7 @@ import { POST as sendInvite } from '@/app/api/orgs/[orgId]/invites/route';
 import { DELETE as removeMember } from '@/app/api/orgs/[orgId]/members/[membershipId]/route';
 import { POST as createCredential } from '@/app/api/orgs/[orgId]/resources/credentials/route';
 import { POST as requestAttachment } from '@/app/api/orgs/[orgId]/projects/[projectId]/resource-attachments/route';
+import { DELETE as detachAttachment, PATCH as decideAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -187,6 +188,49 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
       () =>
         requestAttachment(requestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+  });
+
+  it('PATCH/DELETE /api/orgs/[orgId]/resource-attachments/[attachmentId]: org caller cannot see vs. fake org id (KAN-27)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-decide-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (decide)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-decide-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (decide)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const patchFor = (orgId: string, attachmentId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/resource-attachments/${attachmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approve: true }),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        decideAttachment(patchFor(orgB.id, FAKE_MEMBERSHIP_ID), {
+          params: Promise.resolve({ orgId: orgB.id, attachmentId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        decideAttachment(patchFor(FAKE_ORG_ID, FAKE_MEMBERSHIP_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, attachmentId: FAKE_MEMBERSHIP_ID }),
+        }),
+    );
+
+    await expectIndistinguishable(
+      () =>
+        detachAttachment(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: orgB.id, attachmentId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        detachAttachment(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, attachmentId: FAKE_MEMBERSHIP_ID }),
         }),
     );
   });

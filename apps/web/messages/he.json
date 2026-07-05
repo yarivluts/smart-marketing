@@ -116,6 +116,7 @@
     "createTemplate": "הוספת תבנית",
     "personEmailLabel": "אימייל",
     "personTitleLabel": "תפקיד",
+    "personPhotoUrlLabel": "קישור לתמונה",
     "createPerson": "הוספת איש צוות",
     "createError": "משהו השתבש. נסה שוב.",
     "credentialsHeading": "אישורי התחברות",
@@ -134,6 +135,7 @@
     "decideError": "לא ניתן היה לשמור את ההחלטה. נסה שוב."
   },
   "ProjectResources": {
+    "metaTitle": "משאבי הפרויקט",
     "title": "משאבים עבור {projectName}",
     "credentialsHeading": "אישורי התחברות",
     "noCredentials": "אין עדיין אישורי התחברות משותפים בארגון זה.",

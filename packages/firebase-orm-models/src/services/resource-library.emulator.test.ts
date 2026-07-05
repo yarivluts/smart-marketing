@@ -21,6 +21,7 @@ import {
   listSharedCredentials,
   ProjectNotFoundError,
   requestResourceAttachment,
+  ResourceAttachmentModel,
   ResourceNotFoundError,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -252,6 +253,35 @@ describe('resource attachment lifecycle: request -> approve -> detach', () => {
     await expect(detachResource({ organizationId: organization.id, attachmentId: request.id })).rejects.toThrow(
       AttachmentNotApprovedError,
     );
+  });
+
+  it("pins a template attachment to the version current at request time, unaffected by later template edits (KAN-27 \"copy-with-link + version pin\")", async () => {
+    const { owner, organization } = await setupOrgWithOwner('Version Pin Org');
+    const template = await createResourceTemplate({
+      organizationId: organization.id,
+      name: 'Standard SaaS Funnel',
+      type: 'metric_definition',
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Pinned Project' });
+
+    const request = await requestResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'template',
+      resourceId: template.id,
+      requestedByUserId: owner.id,
+    });
+    expect(request.resource_version).toBe(1);
+
+    // Nothing in this codebase bumps a template's version yet (no edit
+    // surface exists) — directly mutate it to simulate a later org-admin
+    // edit and confirm the already-recorded pin doesn't silently follow it.
+    template.version = 2;
+    await template.save();
+
+    const reloaded = await ResourceAttachmentModel.init(request.id, { organization_id: organization.id });
+    expect(reloaded?.resource_version).toBe(1);
   });
 
   it('rejects requesting attachment for a project or resource that does not belong to the org', async () => {

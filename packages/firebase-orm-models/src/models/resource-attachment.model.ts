@@ -57,6 +57,17 @@ export class ResourceAttachmentModel extends BaseModel {
   @Field()
   public scope_selection?: string[];
 
+  /**
+   * For a `template` attachment: the template's `version` at the moment this
+   * request was made, per `ResourceTemplateModel`'s "copy-with-link +
+   * version pin" doc comment — the org can keep bumping the template's own
+   * `version` afterward without silently changing what an already-approved
+   * project is pinned to. Unused for `credential`/`person` attachments
+   * (neither has a version concept).
+   */
+  @Field()
+  public resource_version?: number;
+
   @Field({ is_required: true })
   public requested_by!: string;
 

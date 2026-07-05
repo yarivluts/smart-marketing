@@ -24,13 +24,14 @@ describe('CreatePersonForm', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('submits the name, email, and title, then refreshes', async () => {
+  it('submits the name, email, title, and photo URL, then refreshes', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ personId: 'p1' }) } as Response);
     renderForm();
 
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Jordan Rep' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'jordan@example.com' } });
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Account Manager' } });
+    fireEvent.change(screen.getByLabelText('Photo URL'), { target: { value: 'https://example.com/jordan.png' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add person' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -38,12 +39,17 @@ describe('CreatePersonForm', () => {
       '/api/orgs/org-1/resources/people',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ name: 'Jordan Rep', email: 'jordan@example.com', title: 'Account Manager' }),
+        body: JSON.stringify({
+          name: 'Jordan Rep',
+          email: 'jordan@example.com',
+          title: 'Account Manager',
+          photoUrl: 'https://example.com/jordan.png',
+        }),
       }),
     );
   });
 
-  it('omits blank email/title rather than sending empty strings', async () => {
+  it('omits blank email/title/photoUrl rather than sending empty strings', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ personId: 'p2' }) } as Response);
     renderForm();
 
@@ -54,7 +60,7 @@ describe('CreatePersonForm', () => {
     expect(fetch).toHaveBeenCalledWith(
       '/api/orgs/org-1/resources/people',
       expect.objectContaining({
-        body: JSON.stringify({ name: 'No Extras', email: undefined, title: undefined }),
+        body: JSON.stringify({ name: 'No Extras', email: undefined, title: undefined, photoUrl: undefined }),
       }),
     );
   });

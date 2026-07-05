@@ -195,6 +195,7 @@ export async function requestResourceAttachment(
   attachment.resource_id = params.resourceId;
   attachment.status = 'pending';
   attachment.scope_selection = params.resourceKind === 'credential' ? [...(params.scopeSelection ?? [])] : undefined;
+  attachment.resource_version = params.resourceKind === 'template' ? (resource as ResourceTemplateModel).version : undefined;
   attachment.requested_by = params.requestedByUserId;
   attachment.requested_at = new Date().toISOString();
   attachment.setPathParams({ organization_id: params.organizationId });

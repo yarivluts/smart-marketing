@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
-import type { ResourceAttachmentModel } from '@growthos/firebase-orm-models';
+import type { ResourceAttachmentModel, ResourceKind } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -22,7 +22,7 @@ type PageProps = Readonly<{
 export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'ProjectResources' });
-  return { title: t('title') };
+  return { title: t('metaTitle') };
 }
 
 function findAttachment(
@@ -77,7 +77,7 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
 
   const t = await getTranslations('ProjectResources');
 
-  function renderRow(resourceKind: 'credential' | 'template' | 'person', resourceId: string, label: string, availableScopes?: readonly string[]) {
+  function renderRow(resourceKind: ResourceKind, resourceId: string, label: string, availableScopes?: readonly string[]) {
     const attachment = findAttachment(attachments, resourceId);
     return (
       <li key={resourceId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm">

@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import type { ResourceKind } from '@growthos/firebase-orm-models';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 export interface RequestAttachmentFormProps {
   orgId: string;
   projectId: string;
-  resourceKind: 'credential' | 'template' | 'person';
+  resourceKind: ResourceKind;
   resourceId: string;
   /** Only meaningful for `resourceKind === 'credential'` — the org's full available-scope list, shown as a hint. */
   availableScopes?: readonly string[];

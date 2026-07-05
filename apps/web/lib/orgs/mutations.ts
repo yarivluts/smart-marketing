@@ -113,6 +113,7 @@ interface CreateOrgPersonInput {
   name: string;
   email?: string;
   title?: string;
+  photoUrl?: string;
   createdByUserId: string;
 }
 

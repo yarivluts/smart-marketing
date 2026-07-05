@@ -65,14 +65,34 @@ describe('POST /api/orgs/[orgId]/resources/people', () => {
     const { organization } = await createOrganizationWithOwner({ name: 'Happy People Org', ownerUserId: owner.id });
     getServerSessionMock.mockResolvedValue(ownerSession);
 
-    const { request, params } = peopleRequest(organization.id, { name: 'Jordan Rep', title: 'Account Manager' });
+    const { request, params } = peopleRequest(organization.id, {
+      name: 'Jordan Rep',
+      title: 'Account Manager',
+      photoUrl: 'https://example.com/jordan.png',
+    });
     const response = await POST(request, { params });
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ personId: expect.any(String) });
 
     const listResponse = await GET(peopleRequest(organization.id).request, { params });
     expect(await listResponse.json()).toMatchObject({
-      people: [expect.objectContaining({ name: 'Jordan Rep', title: 'Account Manager' })],
+      people: [
+        expect.objectContaining({
+          name: 'Jordan Rep',
+          title: 'Account Manager',
+          photoUrl: 'https://example.com/jordan.png',
+        }),
+      ],
     });
+  });
+
+  it('rejects a non-string photoUrl', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('person-photo-validation-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Photo Validation Org', ownerUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = peopleRequest(organization.id, { name: 'X', photoUrl: 123 });
+    expect((await POST(request, { params })).status).toBe(400);
   });
 });

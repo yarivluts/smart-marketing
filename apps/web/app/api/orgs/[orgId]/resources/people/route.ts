@@ -18,7 +18,13 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 
   const people = await listOrgPeople(orgId);
   return NextResponse.json({
-    people: people.map((person) => ({ id: person.id, name: person.name, email: person.email, title: person.title })),
+    people: people.map((person) => ({
+      id: person.id,
+      name: person.name,
+      email: person.email,
+      title: person.title,
+      photoUrl: person.photo_url,
+    })),
   });
 }
 
@@ -30,11 +36,11 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return error;
   }
 
-  const parsed = await parseJsonBody<{ name?: unknown; email?: unknown; title?: unknown }>(request);
+  const parsed = await parseJsonBody<{ name?: unknown; email?: unknown; title?: unknown; photoUrl?: unknown }>(request);
   if (parsed.error) {
     return parsed.error;
   }
-  const { name, email, title } = parsed.body;
+  const { name, email, title, photoUrl } = parsed.body;
   if (typeof name !== 'string' || name.trim().length === 0) {
     return NextResponse.json({ error: 'name_required' }, { status: 400 });
   }
@@ -44,12 +50,16 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
   if (title !== undefined && typeof title !== 'string') {
     return NextResponse.json({ error: 'invalid_title' }, { status: 400 });
   }
+  if (photoUrl !== undefined && typeof photoUrl !== 'string') {
+    return NextResponse.json({ error: 'invalid_photo_url' }, { status: 400 });
+  }
 
   const person = await createOrgPerson({
     organizationId: orgId,
     name: name.trim(),
     email,
     title,
+    photoUrl,
     createdByUserId: user.id,
   });
   return NextResponse.json({ personId: person.id }, { status: 201 });

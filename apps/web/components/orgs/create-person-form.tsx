@@ -16,6 +16,7 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [title, setTitle] = useState('');
+  const [photoUrl, setPhotoUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
 
@@ -27,7 +28,12 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
       const response = await fetch(`/api/orgs/${orgId}/resources/people`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email: email || undefined, title: title || undefined }),
+        body: JSON.stringify({
+          name,
+          email: email || undefined,
+          title: title || undefined,
+          photoUrl: photoUrl || undefined,
+        }),
       });
       if (!response.ok) {
         setError(true);
@@ -36,6 +42,7 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
       setName('');
       setEmail('');
       setTitle('');
+      setPhotoUrl('');
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -66,6 +73,12 @@ export function CreatePersonForm({ orgId }: CreatePersonFormProps): React.ReactE
           {t('personTitleLabel')}
         </label>
         <Input id="person-title" value={title} onChange={(event) => setTitle(event.target.value)} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor="person-photo-url">
+          {t('personPhotoUrlLabel')}
+        </label>
+        <Input id="person-photo-url" type="url" value={photoUrl} onChange={(event) => setPhotoUrl(event.target.value)} />
       </div>
       <Button type="submit" disabled={submitting}>
         {t('createPerson')}
