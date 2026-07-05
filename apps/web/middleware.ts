@@ -8,7 +8,6 @@ const intlMiddleware = createIntlMiddleware(routing);
 // Fail-closed, like the API's PermissionGuard (KAN-24): a locale-prefixed
 // page is protected unless explicitly listed here.
 const PUBLIC_PATHS = new Set(['/', '/login', '/signup']);
-const AUTH_ONLY_PATHS = new Set(['/login', '/signup']);
 
 export default function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
@@ -18,16 +17,22 @@ export default function middleware(request: NextRequest): NextResponse {
 
   if (matchedLocale) {
     const pathWithoutLocale = pathname.slice(`/${matchedLocale}`.length) || '/';
+    // Only checks the cookie's *presence* — the Edge runtime this middleware
+    // runs on can't call the Admin SDK to verify it. That's fine for gating
+    // protected routes (a real check follows server-side, e.g.
+    // lib/auth/get-server-session.ts in dashboard/page.tsx), but it must
+    // never be used to redirect *away* from login/signup: a stale or forged
+    // cookie would then bounce a visitor away from the one page that could
+    // get them a real session, with no way back in.
     const hasSession = request.cookies.has(SESSION_COOKIE_NAME);
 
     if (!PUBLIC_PATHS.has(pathWithoutLocale) && !hasSession) {
       const loginUrl = new URL(`/${matchedLocale}/login`, request.url);
-      loginUrl.searchParams.set('from', pathname);
+      // Locale-agnostic (no `/${matchedLocale}` prefix) so the login form can
+      // hand it straight to next-intl's locale-prefixing router without
+      // double-prefixing.
+      loginUrl.searchParams.set('from', pathWithoutLocale);
       return NextResponse.redirect(loginUrl);
-    }
-
-    if (AUTH_ONLY_PATHS.has(pathWithoutLocale) && hasSession) {
-      return NextResponse.redirect(new URL(`/${matchedLocale}`, request.url));
     }
   }
 

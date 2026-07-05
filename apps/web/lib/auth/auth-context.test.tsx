@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -36,14 +37,24 @@ function fakeUser(overrides: Partial<User> = {}): User {
 
 function Probe(): React.ReactElement {
   const { user, loading, signUpWithEmail, signInWithEmail, signInWithGoogle, signOut } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+
+  function run(action: () => Promise<void>): () => void {
+    return () => {
+      setError(null);
+      action().catch((err: unknown) => setError(err instanceof Error ? err.message : String(err)));
+    };
+  }
+
   return (
     <div>
       <span data-testid="loading">{String(loading)}</span>
       <span data-testid="user">{user?.email ?? 'none'}</span>
-      <button onClick={() => void signUpWithEmail('a@b.com', 'password123')}>sign-up</button>
-      <button onClick={() => void signInWithEmail('a@b.com', 'password123')}>sign-in</button>
-      <button onClick={() => void signInWithGoogle()}>google</button>
-      <button onClick={() => void signOut()}>sign-out</button>
+      <span data-testid="error">{error ?? 'none'}</span>
+      <button onClick={run(() => signUpWithEmail('a@b.com', 'password123'))}>sign-up</button>
+      <button onClick={run(() => signInWithEmail('a@b.com', 'password123'))}>sign-in</button>
+      <button onClick={run(() => signInWithGoogle())}>google</button>
+      <button onClick={run(() => signOut())}>sign-out</button>
     </div>
   );
 }
@@ -146,6 +157,40 @@ describe('AuthProvider / useAuth', () => {
 
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith('/api/auth/session', expect.objectContaining({ method: 'DELETE' })),
+    );
+  });
+
+  it('rolls back the client sign-in if establishing the session cookie fails', async () => {
+    createUserMock.mockResolvedValue({ user: fakeUser() });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    signOutMock.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await user.click(screen.getByText('sign-up'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent('Failed to establish a session for the signed-in user.'),
+    );
+    expect(signOutMock).toHaveBeenCalled();
+  });
+
+  it('surfaces (rather than swallows) a failure to clear the session cookie on sign-out', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+    signOutMock.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await user.click(screen.getByText('sign-out'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent('Failed to clear the session cookie.'),
     );
   });
 

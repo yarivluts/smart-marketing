@@ -27,7 +27,7 @@ describe('middleware', () => {
   it('redirects an unauthenticated visitor away from a protected, locale-prefixed route', () => {
     const response = middleware(requestFor('/en/dashboard'));
     expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('https://growthos.test/en/login?from=%2Fen%2Fdashboard');
+    expect(response.headers.get('location')).toBe('https://growthos.test/en/login?from=%2Fdashboard');
   });
 
   it('passes an authenticated visitor through to a protected route', () => {
@@ -43,10 +43,14 @@ describe('middleware', () => {
     expect(response.headers.get('location')).toBeNull();
   });
 
-  it('redirects an already-authenticated visitor away from the login page', () => {
+  it('does NOT redirect away from login just because a session cookie is present', () => {
+    // Deliberate: middleware can't verify the cookie (Edge runtime), so
+    // redirecting away from login on presence alone would lock out anyone
+    // whose cookie is stale or forged. login/page.tsx does the real,
+    // verified redirect instead (see login-page.server-session.test.tsx).
+    intlMiddlewareMock.mockReturnValue(NextResponse.next());
     const response = middleware(requestFor('/en/login', { cookie: `${SESSION_COOKIE_NAME}=abc` }));
-    expect(response.status).toBe(307);
-    expect(response.headers.get('location')).toBe('https://growthos.test/en');
+    expect(response.headers.get('location')).toBeNull();
   });
 
   it('lets an unauthenticated visitor reach the public home page', () => {

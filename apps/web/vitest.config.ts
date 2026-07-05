@@ -7,7 +7,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./', import.meta.url)),
-      'server-only': fileURLToPath(new URL('./test-utils/server-only-stub.ts', import.meta.url)),
+      'server-only': fileURLToPath(new URL('./test-utils/next-boundary-stub.ts', import.meta.url)),
+      'client-only': fileURLToPath(new URL('./test-utils/next-boundary-stub.ts', import.meta.url)),
     },
   },
   test: {

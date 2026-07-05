@@ -25,7 +25,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function syncSessionCookie(user: User | null): Promise<void> {
   if (!user) {
-    await fetch('/api/auth/session', { method: 'DELETE' });
+    const response = await fetch('/api/auth/session', { method: 'DELETE' });
+    if (!response.ok) {
+      throw new Error('Failed to clear the session cookie.');
+    }
     return;
   }
   const idToken = await user.getIdToken();
@@ -36,6 +39,22 @@ async function syncSessionCookie(user: User | null): Promise<void> {
   });
   if (!response.ok) {
     throw new Error('Failed to establish a session for the signed-in user.');
+  }
+}
+
+/**
+ * Signs the user back out client-side if the server-side session cookie
+ * couldn't be established, so Firebase's client auth state never says
+ * "signed in" while the server has no matching session — which would
+ * otherwise strand the user in a loop where the middleware keeps gating
+ * protected routes despite the client believing it's authenticated.
+ */
+async function establishSessionOrRollBack(user: User): Promise<void> {
+  try {
+    await syncSessionCookie(user);
+  } catch (error) {
+    await firebaseSignOut(getFirebaseAuth()).catch(() => undefined);
+    throw error;
   }
 }
 
@@ -57,15 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
       loading,
       async signUpWithEmail(email, password) {
         const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
-        await syncSessionCookie(credential.user);
+        await establishSessionOrRollBack(credential.user);
       },
       async signInWithEmail(email, password) {
         const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
-        await syncSessionCookie(credential.user);
+        await establishSessionOrRollBack(credential.user);
       },
       async signInWithGoogle() {
         const credential = await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
-        await syncSessionCookie(credential.user);
+        await establishSessionOrRollBack(credential.user);
       },
       async signOut() {
         await firebaseSignOut(getFirebaseAuth());

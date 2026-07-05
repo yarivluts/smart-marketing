@@ -22,9 +22,20 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'id_token_required' }, { status: 400 });
   }
 
+  const adminAuth = getAdminAuth();
+
+  // Verification failure means the token itself is bad (expired, tampered,
+  // wrong project) — the caller's fault, 401. A failure minting the session
+  // cookie from an already-verified token points at our own infra (Admin SDK
+  // misconfiguration, transient upstream error), not the caller's, so it's
+  // kept as a distinct 500 rather than folded into the same "invalid" bucket.
   try {
-    const adminAuth = getAdminAuth();
     await adminAuth.verifyIdToken(idToken);
+  } catch {
+    return NextResponse.json({ error: 'invalid_id_token' }, { status: 401 });
+  }
+
+  try {
     const sessionCookie = await adminAuth.createSessionCookie(idToken, {
       expiresIn: SESSION_EXPIRES_IN_MS,
     });
@@ -39,7 +50,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
     return response;
   } catch {
-    return NextResponse.json({ error: 'invalid_id_token' }, { status: 401 });
+    return NextResponse.json({ error: 'session_creation_failed' }, { status: 500 });
   }
 }
 

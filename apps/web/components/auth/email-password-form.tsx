@@ -2,9 +2,11 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
+import { useSearchParams } from 'next/navigation';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { authErrorMessageKey, type AuthErrorMessageKey } from '@/lib/auth/auth-error';
+import { resolveRedirectTarget } from '@/lib/auth/redirect-target';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -16,11 +18,16 @@ export interface EmailPasswordFormProps {
 export function EmailPasswordForm({ mode }: EmailPasswordFormProps): React.ReactElement {
   const t = useTranslations('Auth');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errorKey, setErrorKey] = useState<AuthErrorMessageKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function redirectAfterAuth(): void {
+    router.push(resolveRedirectTarget(searchParams.get('from')));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -32,7 +39,7 @@ export function EmailPasswordForm({ mode }: EmailPasswordFormProps): React.React
       } else {
         await signInWithEmail(email, password);
       }
-      router.push('/dashboard');
+      redirectAfterAuth();
     } catch (error) {
       setErrorKey(authErrorMessageKey(error));
       setSubmitting(false);
@@ -44,7 +51,7 @@ export function EmailPasswordForm({ mode }: EmailPasswordFormProps): React.React
     setSubmitting(true);
     try {
       await signInWithGoogle();
-      router.push('/dashboard');
+      redirectAfterAuth();
     } catch (error) {
       setErrorKey(authErrorMessageKey(error));
       setSubmitting(false);

@@ -1,3 +1,4 @@
+import 'client-only';
 import { type FirebaseApp, getApps, initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 
@@ -26,9 +27,11 @@ function getFirebaseApp(): FirebaseApp {
 }
 
 /**
- * Lazily creates (and memoizes) the client-side Firebase Auth instance.
- * Never called at module scope — only from browser event handlers/effects —
- * so server rendering never needs real Firebase project credentials.
+ * Lazily creates (and memoizes) the client-side Firebase Auth instance. The
+ * `client-only` import above makes accidentally importing this from a Server
+ * Component a build-time error, since the module-scope singletons below
+ * would otherwise be shared across unrelated requests in a warm server
+ * instance.
  */
 export function getFirebaseAuth(): Auth {
   if (!auth) {
