@@ -137,11 +137,15 @@ export async function acceptInvite(params: AcceptInviteParams): Promise<AcceptIn
   if (!membership) {
     throw new InviteNotFoundError();
   }
-  if (membership.status !== 'invited') {
-    throw new InviteAlreadyResolvedError();
-  }
+  // Identity is checked before the invite's own state (status, verification)
+  // so that a caller who was never the invitee learns nothing about whether
+  // the invite has already been accepted — they always get the same
+  // "wrong account" error regardless of the invite's actual state.
   if (membership.user_id !== params.userId) {
     throw new InviteEmailMismatchError();
+  }
+  if (membership.status !== 'invited') {
+    throw new InviteAlreadyResolvedError();
   }
   if (!params.callerEmailVerified) {
     throw new EmailNotVerifiedError();

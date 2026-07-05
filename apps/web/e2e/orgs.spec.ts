@@ -98,6 +98,39 @@ test.describe('Org-scoped sessions: create + switch + invite/join (KAN-25)', () 
     await expect(page.getByRole('button', { name: 'Remove' })).not.toBeVisible();
   });
 
+  test('an owner creates a project and switches between it and its dev/staging/prod environments', async ({
+    page,
+  }) => {
+    await signUp(page, uniqueEmail('project-owner'));
+    const orgId = await createOrganization(page, 'Project E2E Org');
+
+    await expect(page.getByText('This organization has no projects yet.')).toBeVisible();
+    await page.getByRole('link', { name: 'New project' }).click();
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/new$`));
+
+    await page.getByLabel('Project name').fill('Growth Product');
+    await page.getByRole('button', { name: 'Create project' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}\\?project=`));
+    // The new project is the only one, so its switcher pill is selected and
+    // its dev/staging/prod env badge defaults to "dev".
+    await expect(page.getByRole('link', { name: 'Growth Product' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('group', { name: 'Environment' }).getByRole('link', { name: 'Dev' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+
+    await page.getByRole('group', { name: 'Environment' }).getByRole('link', { name: 'Staging' }).click();
+    await expect(page).toHaveURL(/env=staging/);
+    await expect(
+      page.getByRole('group', { name: 'Environment' }).getByRole('link', { name: 'Staging' }),
+    ).toHaveAttribute('aria-current', 'true');
+    await expect(page.getByRole('group', { name: 'Environment' }).getByRole('link', { name: 'Dev' })).not.toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+  });
+
   test('an owner can revoke a pending invite before it is ever accepted', async ({ page }) => {
     await signUp(page, uniqueEmail('revoke-owner'));
     await createOrganization(page, 'Revoke E2E Org');
