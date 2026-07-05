@@ -17,6 +17,109 @@ Template for each entry:
 
 ---
 
+## 2026-07-05 — E1.1 Firebase Auth + session handling (KAN-21)
+
+- **Last completed:**
+  - Implemented **KAN-21** (Firebase Auth: email + Google SSO + session handling in Next.js) in
+    `apps/web`:
+    - `lib/firebase/client.ts` (lazy client Auth singleton, `client-only`-guarded, connects to the
+      Auth emulator via `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST`) and `lib/firebase/admin.ts`
+      (lazy `firebase-admin` Auth singleton, `server-only`-guarded, falls back to unauthenticated
+      emulator-only mode when no service-account env vars are set — production creds are pending
+      KAN-18).
+    - `lib/auth/auth-context.tsx`: `AuthProvider`/`useAuth` — email/password sign-up/sign-in,
+      Google SSO (`signInWithPopup`), sign-out; syncs an httpOnly session cookie via
+      `app/api/auth/session/route.ts` (POST verifies the ID token + mints a session cookie via
+      `firebase-admin`'s `createSessionCookie`; DELETE clears it). Rolls the client back to
+      signed-out if the session-cookie POST fails, so Firebase client state and the server cookie
+      can't diverge.
+    - `middleware.ts`: fail-closed route gating (mirrors KAN-24's `PermissionGuard` philosophy) —
+      checks only the session cookie's *presence* (Edge runtime can't run the Admin SDK), composed
+      with next-intl's locale middleware. Real cryptographic verification
+      (`verifySessionCookie`) happens per-request in `lib/auth/get-server-session.ts`, called from
+      `/dashboard`, `/login`, and `/signup` — the middleware/page split is the deliberate "fast
+      presence pre-filter + real verification at the render/data boundary" pattern, documented in
+      both files.
+    - `/login`, `/signup`, `/dashboard` pages + shared `EmailPasswordForm`; `AppProviders` wires the
+      authenticated principal (`{type: 'user', id: firebaseUid}`) into the existing KAN-24
+      `PermissionProvider` in the root layout (bindings still `[]` — no role-binding lookup wired
+      into the web app yet, pending KAN-22/26 integration; deny-by-default holds).
+    - All new strings via `next-intl` (`Auth`/`AccountStatus`/`DashboardPage` namespaces, en+he).
+    - Emulator-backed tests mirroring the KAN-22 pattern: `apps/web/firebase.json` adds the Auth
+      emulator; `pnpm test` wraps `vitest run && playwright test` in
+      `firebase emulators:exec --only auth`. 55 vitest tests (incl. the session route against a
+      *real* minted ID token from the emulator's REST API) + a 6-scenario Playwright E2E suite
+      driving a real `next dev` server + real Chromium through sign-up → dashboard → sign-out,
+      sign-in, wrong-password error, and two regression cases (below).
+  - **Self-reviewed via two independent subagent passes** (correctness; reuse/quality) before
+    opening the PR. Quality pass found nothing worth changing. Correctness pass found and all now
+    fixed:
+    - A **real lockout bug**, caught by the review process's own added tests: middleware originally
+      redirected away from `/login`/`/signup` whenever a session cookie was merely *present*
+      (couldn't verify it — Edge runtime). A forged or stale cookie would satisfy that check and
+      permanently bounce a visitor away from the only page that could get them a real session, with
+      no way back in. Fixed by moving "redirect away if already authenticated" out of middleware
+      entirely and into `login`/`signup` pages' own `getServerSession()` check (real, verified);
+      middleware now only ever gates *into* protected routes, never *away from* login/signup.
+      Regression-tested at both the middleware-unit level and via a real Playwright scenario
+      (forged cookie → stays on `/login`; genuinely authenticated visit to `/login` → redirected to
+      `/dashboard`).
+    - `/dashboard` had no real server-side session verification at all — only middleware's
+      presence check. Added `lib/auth/get-server-session.ts` (`verifySessionCookie`) and wired it
+      into the page; verified against a real `next build && next start` that a forged cookie is now
+      rejected.
+    - Sign-up/in succeeding in Firebase but the session-cookie POST failing left the client in a
+      half-signed-in state (Firebase said authenticated, server had no cookie) — now rolls back via
+      `firebaseSignOut` on that failure path.
+    - A failed session-cookie DELETE on sign-out was silently swallowed — now throws, matching the
+      POST branch's error handling.
+    - The session route folded a bad ID token and a server-side cookie-minting failure into the
+      same 401 — split into 401 (bad token, caller's fault) vs. 500 (our infra).
+    - The middleware's `?from=` redirect param was dead code (always redirected to `/dashboard`
+      regardless) — wired up via `resolveRedirectTarget()` with an explicit open-redirect guard
+      (rejects protocol-relative/absolute targets).
+    - `lib/firebase/client.ts` had no `client-only` guard (unlike `admin.ts`'s `server-only`) —
+      added, to fail the build if it's ever imported into server code (its module-scope singletons
+      would otherwise leak across unrelated requests in a warm server instance).
+  - **CI also broke once, independent of the above**: `apps/web`'s Auth emulator and
+    `packages/firebase-orm-models`' Firestore emulator each run via a separate
+    `firebase emulators:exec`, and turbo runs independent packages' `test` tasks in parallel.
+    Neither `firebase.json` pinned the `hub`/`logging` emulator ports, so both defaulted to
+    4400/4500 and collided when both suites started at once in CI — passed locally by timing luck,
+    failed in CI's first run. Fixed by pinning `apps/web`'s hub/logging to distinct ports
+    (4460/4560); reran the full suite with a cleared turbo cache locally to confirm before pushing
+    again.
+  - `.github/workflows/ci.yml`: added an "Install Playwright browsers" step
+    (`playwright install --with-deps chromium`) before the test step.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green locally and in CI.
+  - Branch `kan-21-firebase-auth`, PR #9, merged into `main` (squash). Remote branch deletion
+    failed with an HTTP 403 from this sandbox's git remote (same known proxy/remote restriction as
+    prior runs, not a GitHub permissions issue) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-21 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-25** (E1.5 — org-scoped sessions, org switcher, project switcher, env badge,
+  create/invite/join flows) depends on KAN-21 and is now unblocked — natural next sprint-1 `todo`.
+  It will need a real principal → membership/role-binding lookup, which doesn't exist yet in
+  `apps/web` (KAN-21 deliberately left `bindings: []`); building that lookup (likely via
+  `@growthos/firebase-orm-models`'s `Membership`/`RoleBinding` models, already CRUD-tested per
+  KAN-22) is probably the first sub-step of KAN-25 itself. **KAN-26** (hard-isolation layer) and
+  **KAN-30** (keys admin UI) remain natural follow-ons once there's a real binding-lookup source.
+  Note for whoever picks up apps/api next: `request.principal` there is still unpopulated — KAN-21
+  only covered the Next.js side per its AC; verifying the Firebase session server-to-server for
+  apps/api is separate follow-on work, not automatically covered by this story.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding; also gates
+    real (non-emulator) Firebase Auth credentials for KAN-21's production path.
+  - Optional: delete the merged `kan-21-firebase-auth` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403), and the still-outstanding `kan-22-firestore-emulator-tests`
+    branch from the previous run.
+
+---
+
 ## 2026-07-05 — E1.2 Firestore-emulator CRUD/cascade tests (KAN-22)
 
 - **Last completed:**
