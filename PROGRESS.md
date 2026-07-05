@@ -17,6 +17,91 @@ Template for each entry:
 
 ---
 
+## 2026-07-05 — E1.2 Firestore-emulator CRUD/cascade tests (KAN-22)
+
+- **Last completed:**
+  - Implemented **KAN-22**'s missing AC on top of the identity/RBAC models scaffolded in the
+    KAN-79 bootstrap run (`packages/firebase-orm-models/src/models/`): "CRUD via
+    Firestore-emulator tests; one user active in 2 orgs with different roles; removing a
+    membership cascades all of that user's bindings in the org."
+  - **A real local Firestore emulator is now available in-run** (Java 21 + `firebase-tools` both
+    work headlessly here — earlier runs had recorded this as unavailable, which is now stale).
+    Wired it into this package's own `pnpm test`: `firebase.json` + `firestore.rules` (open rules,
+    since the project id is always the `demo-growthos-test` emulator-only project, never deployed)
+    + `firebase`/`firebase-tools` devDependencies; `firebase emulators:exec` starts the emulator,
+    runs vitest against it, and tears it down every `pnpm test`.
+  - `src/test-utils/emulator.ts`: `connectToFirestoreEmulator()` wires the ORM's global connection
+    to the emulator, with a retrying warm-up read before tests run (see flake note below).
+  - `src/services/membership.service.ts`: `removeMembershipCascade(membership)` — deletes every
+    `RoleBindingModel` doc for that user within the org (across all scope levels, since they share
+    one `organizations/{org}/role_bindings` subcollection), then the membership itself. Documented
+    as safe-to-retry rather than transactional (the ORM's client-SDK API has no batch/transaction
+    primitive; a partial failure leaves the membership in place since it's deleted last, and
+    re-calling re-reads current state so it can't double-delete or orphan anything).
+  - `src/models.emulator.test.ts` (4 tests against the real emulator): full create/read/update/
+    delete lifecycle across Organization, Project, Environment, and ServiceAccount; one user active
+    in two orgs with different roles; explicit create/update/delete for Membership and RoleBinding
+    directly; the cascade scenario (org- and project-scoped bindings removed on membership removal,
+    while another user's binding in the same org survives).
+  - **Known flake, mitigated, not root-caused:** the Firestore Node client SDK's "full" (non-lite)
+    build opens a persistent gRPC watch stream even for one-shot reads/writes against the local
+    emulator, and that stream intermittently corrupts (`RESOURCE_EXHAUSTED: Received message larger
+    than max`) — reproduced repeatedly both in this sandbox and in real GitHub Actions runs,
+    independent of this repo's code. Investigated and ruled out: proxy env vars (unset didn't fix
+    it on a real CI runner with no proxy at all); `NODE_OPTIONS=--conditions=react-native` (Node's
+    `node` export condition always wins over `react-native` since it's declared first and can't be
+    excluded); aliasing `firebase/firestore` to the REST-only `lite` build (this *did* eliminate the
+    flake, but silently broke read-back correctness — `@arbel/firebase-orm`'s internal import only
+    picks up the alias when the package is forced through vite's SSR pipeline via
+    `test.server.deps.inline`, and even then the ORM's assumptions about the Firestore instance
+    shape aren't fully lite-compatible; too risky for a foundational data-access package). Landed on
+    three defensive layers instead: a connection warm-up retry, generous `testTimeout`/`hookTimeout`
+    (30s), and vitest's built-in `retry: 3`. Empirically this got local stress-test runs to
+    ~93-100% pass rate (occasional single-test flakes still happen, costing time via the SDK's own
+    backoff, but haven't yet exhausted all retries in CI). The PR's own CI run passed clean on the
+    second attempt after also fixing a real, unrelated bug (below).
+  - **Real bug fixed along the way:** GitHub Actions' `ubuntu-latest` runner's default `java` on
+    `PATH` is older than 21, and `firebase-tools`' emulator now hard-requires Java 21+. Added a
+    `Setup Java` step (`actions/setup-java@v4`, Temurin 21) to `.github/workflows/ci.yml` before
+    `pnpm install` — this was a genuine CI gap, not related to the flake above.
+  - Self-reviewed the diff via an independent subagent before merging; it confirmed the cascade
+    logic is scope-safe (verified against the ORM's own `getPathList`/query source) and flagged two
+    real, now-fixed gaps: the CRUD test only exercised full lifecycle on `ProjectModel` (Organization/
+    Environment/ServiceAccount were create+read only, and Membership/RoleBinding had no direct CRUD
+    test outside the cascade scenario) — broadened to full CRUD on every model plus a dedicated
+    Membership/RoleBinding test; and the cascade function's non-atomicity wasn't documented — added
+    the retry-safety rationale above.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green locally and in CI (8 tests in
+    `packages/firebase-orm-models`, all other packages unchanged).
+  - Branch `kan-22-firestore-emulator-tests`, PR #8, merged into `main` (squash). Remote branch
+    deletion failed with an HTTP 403 from this sandbox's git remote (same known proxy/remote
+    restriction recorded in the 2026-07-04 KAN-24 entry, not a GitHub permissions issue) — merged
+    and dead but not deleted; a human with direct repo access can delete it, or a future run can
+    retry.
+- **In progress (exact stopping point):** none — KAN-22 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** with the Firestore emulator confirmed available, **KAN-21** (Firebase Auth:
+  email + Google SSO + session handling in Next.js) is now the natural next sprint-1 `todo` — the
+  Firebase Auth emulator should also be reachable the same way (same `firebase-tools`, same Java),
+  and Google SSO can be exercised against the Auth emulator's fake-IDP flow without needing real
+  Google OAuth credentials. **KAN-25** (org-scoped sessions/switcher UI) depends on KAN-21. If a
+  future run hits the gRPC/emulator flake described above again and it's gotten worse (not better),
+  worth revisiting: pinning an older Firestore emulator JAR version, or investigating whether a
+  newer `firebase` SDK major version (12.x, vs. the `^11.0.0` peer range `@arbel/firebase-orm`
+  currently declares) has resolved it upstream — neither was attempted this run given the risk/
+  effort tradeoff.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-22-firestore-emulator-tests` branch on GitHub (this sandbox's
+    git remote rejected the delete with a 403), and the still-outstanding `kan-24-authz-middleware`
+    branch from the previous run.
+
+---
+
 ## 2026-07-04 — E1.4 Authz middleware (KAN-24)
 
 - **Last completed:**
