@@ -17,6 +17,119 @@ Template for each entry:
 
 ---
 
+## 2026-07-06 — E3.1 Schema Registry (KAN-31)
+
+- **Last completed:**
+  - Implemented **KAN-31** (E3.1 Schema Registry, plan `13 §E3`/`08 §1`, AC: "register v1 -> evolve
+    to v2 -> both queryable; breaking change rejected"), the natural next pick — sprint-2, no
+    unfinished blockers, next in line after KAN-28/29/30.
+    - `packages/firebase-orm-models`: new `SchemaDefModel`
+      (`organizations/:organization_id/projects/:project_id/schema_defs`) — one document *per
+      version* of an entity/event/measure schema family (identified by `(project_id, kind, name)`),
+      with typed fields (`string`/`number`/`boolean`/`timestamp`/`object`/`array`), each carrying
+      `is_required`/`is_pii`/`is_identity_key` flags. The model field is named `field_defs`, not
+      `fields` — `@arbel/firebase-orm`'s `@Field` decorator stores its own per-class field metadata
+      on a `fields` property of the model's prototype, so a model field actually named `fields`
+      collides with it (surfaced as a confusing "Cannot read properties of undefined" at
+      class-decoration time the first time this was tried).
+    - New `schema-registry.service.ts`: `registerSchemaDefinition` (v1), `evolveSchemaDefinition`
+      (v{n+1}, previous version kept as `status: 'superseded'` — never mutated or deleted, so both
+      stay independently queryable, same "immutable version history" reasoning as
+      `ResourceTemplateModel`'s version-pin). Non-breaking-evolution rule (`findBreakingChanges`):
+      removing an existing field, changing its type, tightening optional->required, or dropping
+      `is_identity_key` are all rejected with the specific violation(s); a brand-new field is only
+      allowed if optional (a new required field would invalidate payloads already shaped for the
+      previous version). `listSchemaDefinitionsForProject` (admin browse) /
+      `listSchemaDefinitionVersions` / `getActiveSchemaDefinition` (the shape a future KAN-32 ingest
+      validator would consume) round out the read side.
+    - `apps/web`: a project-scoped Schema Registry page (`orgs/:orgId/projects/:projectId/schema-defs`),
+      gated on the existing `schema.write` permission (already in the catalog, granted to
+      `platform_admin`/`org_owner`/`org_admin`/`project_admin`) — register a new schema with a field
+      builder (name/type/required/PII/identity-key checkboxes), see every version of every family in
+      a table, and evolve a family via a form prefilled from its latest version's fields. New routes
+      `GET/POST .../schema-defs` and `POST .../schema-defs/evolve`. Full en/he translations; schema
+      kind/field-type values render as raw technical strings (untranslated), matching the existing
+      `CREDENTIAL_PROVIDERS` precedent in `create-credential-form.tsx`.
+    - Tests: Firestore-emulator coverage for register/evolve/list (every breaking-change rule
+      individually, the "both versions queryable" AC, cross-project isolation), route tests,
+      component tests, a KAN-26 non-enumeration isolation scenario for all three new routes, and an
+      e2e spec (`e2e/schema-registry.spec.ts`) driving register -> evolve -> breaking-change-rejected
+      through a real browser. Two real UI bugs caught only by that e2e run (not by lint/typecheck,
+      which stayed green through both): a `getByLabel('Name')` Playwright locator ambiguity from
+      substring matching against the "Field name" input (fixed with `exact: true`), and — the more
+      substantive one — `EvolveSchemaDefForm` staying mounted with stale local state after a
+      successful evolve, because `router.refresh()` alone doesn't unmount a client component at the
+      same key/position in its parent's list; a second "Evolve" click was reusing the still-open,
+      stale form instead of a fresh one. Fixed by adding an explicit `onClose` callback the form calls
+      after a successful submit (merged with the existing cancel callback, since both do the same
+      "hide this form" thing).
+  - **Independent 8-angle review** (line-by-line, removed-behavior, cross-file, reuse,
+    simplification, efficiency, altitude, CLAUDE.md conventions; each ran on the full diff and its
+    own dedicated fan-out) before merging. Findings corroborated by 3-4 angles each, all fixed:
+    - `evolveSchemaDefinition` was missing the empty-name validation `registerSchemaDefinition`
+      enforced (an empty name would silently 404 as "not found" instead of 400 "invalid") — both now
+      share one validation path (`validateSchemaDefRequest`) and one version-document constructor
+      (`buildSchemaDefVersion`), closing the drift and cutting ~20 duplicated lines.
+    - The page's `groupIntoFamilies` re-implemented the `SchemaFieldDef` -> view mapping the API
+      routes' `toSchemaDefView` already centralizes — now reuses it; `schema-def-view.ts`'s types
+      tightened from loose `string` to the real `SchemaDefKind`/`SchemaDefStatus`/`SchemaFieldType`
+      unions.
+    - A few sequential independent Firestore reads (`listOrgProjects` + `listSchemaDefinitionsForProject`
+      in the GET route and the page) now run via `Promise.all`; the existence/latest-version lookups
+      in register/evolve now use targeted `.limit(1)` queries instead of fetching and sorting the full
+      version history.
+    - The register/evolve routes' duplicated kind/name/fields request-parsing block was extracted
+      into one shared `parseSchemaDefRequestBody` helper.
+    - Added isolation-test coverage for the GET list and evolve routes (previously only the register
+      route had a KAN-26 non-enumeration regression test).
+    - **Documented, not fixed**: neither `registerSchemaDefinition` nor `evolveSchemaDefinition` is
+      transactional — two concurrent calls for the same schema family can each pass their respective
+      read-then-write check (existence / breaking-change) before either writes, producing two
+      documents both claiming to be the current version. A real fix needs a Firestore transaction,
+      which this package's own convention (`firestore-connection.ts`'s doc comment: "the only place
+      in the codebase that touches the raw firebase/app/firebase/firestore client SDK directly")
+      reserves to that one file — bigger than this story; flagged in both functions' doc comments as
+      a known, deliberately-deferred gap for whoever next touches this service (plausibly KAN-32,
+      which needs a consistent single-active-version read anyway).
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (74
+    tests in `packages/firebase-orm-models` incl. the new schema-registry emulator suite, 15 in
+    `apps/api`, 223 web unit/route tests + 13/13 Playwright e2e in `apps/web` incl. the new
+    `e2e/schema-registry.spec.ts`). The documented gRPC `RESOURCE_EXHAUSTED` Firestore-emulator flake
+    hit twice during this run (once locally in an unrelated suite, once in CI in
+    `org-membership-flows.emulator.test.ts` — not touched by this diff) and self-recovered on retry
+    both times, same as every prior run's entry.
+  - Branch `kan-31-schema-registry`, PR #17. First CI attempt failed on exactly that
+    `RESOURCE_EXHAUSTED` flake in an unrelated pre-existing test; re-ran via `rerun_failed_jobs`, the
+    second attempt completed clean (`mergeable_state: clean`). Merged (squash) into `main`. Remote
+    branch deletion failed with the same HTTP 403 from this sandbox's git remote recorded in every
+    prior run's entry (not a GitHub permissions issue; no branch-delete tool exists in the GitHub MCP
+    server either) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-31 is fully delivered, independently reviewed,
+  tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-32** (`POST /v1/ingest/(events|entities|measures)`: batch validation,
+  idempotency, 202 + `batch_id`, per-record results) is the natural next sprint-2 pick — it's the
+  first real consumer of KAN-28's `verifyApiKeyForRequest` (no route calls it yet) and this story's
+  `getActiveSchemaDefinition`/`SchemaFieldDef` shape (validate an incoming record's fields against the
+  active schema version). Two things worth carrying into that story: (1) the concurrent-evolve/register
+  race documented above — KAN-32 will want a single, consistent "the active version" read, so it's a
+  natural place to either accept the same eventual-consistency tradeoff explicitly or finally add the
+  transaction; (2) `getActiveSchemaDefinition`'s current shape (returns the whole `SchemaDefModel`) is
+  probably fine as-is for a validator to consume directly. **KAN-35** (Admin UI: ingest health) and
+  **KAN-33/34** (pipeline, quarantine/DLQ/rate-limiting) are sprint-2/3 and downstream of KAN-32.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-31-schema-registry` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403), and the other still-outstanding merged branches from prior runs
+    noted in earlier entries below (`kan-29-vault-kms-envelope-encryption`, `kan-29-kms-vault-module`,
+    and further back).
+
+---
+
 ## 2026-07-06 — E2.2 KMS envelope encryption vault module (KAN-29)
 
 - **Last completed:**
