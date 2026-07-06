@@ -146,28 +146,9 @@ export interface VerifyApiKeyParams {
   requiredScope: ApiKeyScope;
 }
 
-/**
- * Authenticates and authorizes an incoming request's bearer key against the
- * project/environment/scope it's claimed for (KAN-28 AC: "key auths a
- * request; wrong env/project/scope -> 403; revoke is immediate"). Returns a
- * `Result` rather than throwing so a route/guard layer (KAN-32's ingest API
- * is the first real consumer) can map every rejection uniformly to 403
- * without a try/catch per failure mode.
- *
- * The raw key carries no org/project/environment info of its own — it's
- * looked up purely by its hash (a Firestore collection-group query across
- * every project's `api_keys`, same pattern as `listMembershipsForUser`) and
- * only *then* checked against what the caller expected. This also means a
- * key minted for one org can never accidentally authenticate a request
- * against a different org's project, even if a project/environment id
- * collided (Firestore ids don't, but the check costs nothing and matches
- * KAN-26's hard-isolation posture).
- *
- * Revocation is immediate because there is no caching layer here: every call
- * re-reads the key's current `revoked_at` from Firestore.
- */
-export async function verifyApiKeyForRequest(params: VerifyApiKeyParams): Promise<Result<ApiKeyAuthContext, string>> {
-  const hashedSecret = hashSecret(params.rawKey);
+/** Looks a key up purely by its hash (a Firestore collection-group query across every project's `api_keys`, same pattern as `listMembershipsForUser`) and rejects it outright if revoked — the part shared by every bearer-key entry point, whether or not the caller already knows which org/project/environment to expect. */
+async function findLiveApiKeyByRawKey(rawKey: string): Promise<Result<ApiKeyModel, string>> {
+  const hashedSecret = hashSecret(rawKey);
   const matches = await ApiKeyModel.collectionQuery().where('hashed_secret', '==', hashedSecret).limit(1).get();
   const apiKey = matches[0];
 
@@ -177,6 +158,46 @@ export async function verifyApiKeyForRequest(params: VerifyApiKeyParams): Promis
   if (apiKey.revoked_at) {
     return err('This API key has been revoked.');
   }
+  return ok(apiKey);
+}
+
+function toApiKeyAuthContext(apiKey: ApiKeyModel): ApiKeyAuthContext {
+  return {
+    apiKey,
+    organizationId: apiKey.organization_id,
+    projectId: apiKey.project_id,
+    environmentId: apiKey.environment_id,
+    scopes: apiKey.scopes,
+  };
+}
+
+/**
+ * Authenticates and authorizes an incoming request's bearer key against the
+ * project/environment/scope it's claimed for (KAN-28 AC: "key auths a
+ * request; wrong env/project/scope -> 403; revoke is immediate"). Returns a
+ * `Result` rather than throwing so a route/guard layer can map every
+ * rejection uniformly to 403 without a try/catch per failure mode.
+ *
+ * The raw key carries no org/project/environment info of its own — it's
+ * looked up purely by its hash and only *then* checked against what the
+ * caller expected. This also means a key minted for one org can never
+ * accidentally authenticate a request against a different org's project,
+ * even if a project/environment id collided (Firestore ids don't, but the
+ * check costs nothing and matches KAN-26's hard-isolation posture).
+ *
+ * Revocation is immediate because there is no caching layer here: every call
+ * re-reads the key's current `revoked_at` from Firestore.
+ *
+ * For a caller with no pre-known org/project/environment to check against
+ * (e.g. KAN-32's flat `/v1/ingest/*` routes), see `authenticateApiKey`.
+ */
+export async function verifyApiKeyForRequest(params: VerifyApiKeyParams): Promise<Result<ApiKeyAuthContext, string>> {
+  const found = await findLiveApiKeyByRawKey(params.rawKey);
+  if (!found.ok) {
+    return found;
+  }
+  const apiKey = found.value;
+
   if (apiKey.organization_id !== params.organizationId || apiKey.project_id !== params.projectId) {
     return err('This API key is not valid for the requested project.');
   }
@@ -190,13 +211,50 @@ export async function verifyApiKeyForRequest(params: VerifyApiKeyParams): Promis
   apiKey.last_used_at = new Date().toISOString();
   await apiKey.save();
 
-  return ok({
-    apiKey,
-    organizationId: apiKey.organization_id,
-    projectId: apiKey.project_id,
-    environmentId: apiKey.environment_id,
-    scopes: apiKey.scopes,
-  });
+  return ok(toApiKeyAuthContext(apiKey));
+}
+
+export type ApiKeyAuthFailureReason = 'invalid_key' | 'insufficient_scope';
+
+export interface ApiKeyAuthFailure {
+  reason: ApiKeyAuthFailureReason;
+  message: string;
+}
+
+/**
+ * Authenticates a bare bearer key with no pre-known org/project/environment
+ * to check it against — for machine-facing endpoints whose URL is flat
+ * (KAN-32's `/v1/ingest/*`, per plan `12 §2`'s sketch) rather than nested
+ * under `/orgs/:orgId/projects/:projectId/...`. Unlike
+ * `verifyApiKeyForRequest`, there's nothing to cross-check the key's own
+ * org/project/environment against — the key itself is the sole source of
+ * truth for which project a flat-path request is scoped to, which is safe
+ * because it's still looked up purely by its unique hash.
+ *
+ * Returns a `reason` (not just a message) so a guard can map
+ * `insufficient_scope` to 403 and everything else (no such key, or revoked)
+ * to 401 — the same 401-vs-403 split `PermissionGuard` already applies to
+ * human/service principals (no principal -> 401; principal lacks permission
+ * -> 403).
+ */
+export async function authenticateApiKey(
+  rawKey: string,
+  requiredScope: ApiKeyScope,
+): Promise<Result<ApiKeyAuthContext, ApiKeyAuthFailure>> {
+  const found = await findLiveApiKeyByRawKey(rawKey);
+  if (!found.ok) {
+    return err({ reason: 'invalid_key', message: found.error });
+  }
+  const apiKey = found.value;
+
+  if (!apiKey.scopes.includes(requiredScope)) {
+    return err({ reason: 'insufficient_scope', message: 'This API key does not carry the required scope.' });
+  }
+
+  apiKey.last_used_at = new Date().toISOString();
+  await apiKey.save();
+
+  return ok(toApiKeyAuthContext(apiKey));
 }
 
 export interface RevokeApiKeyParams {
