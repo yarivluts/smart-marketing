@@ -48,13 +48,13 @@ export class LocalKmsProvider implements KmsProvider {
     return createHmac('sha256', masterKey).update(tenantId).digest();
   }
 
-  async wrapDataKey(tenantId: string, dataKey: Buffer): Promise<WrappedDataKey> {
+  async wrapDataKey(tenantId: string, dataKey: Buffer, aad?: Buffer): Promise<WrappedDataKey> {
     const kek = this.kekFor(tenantId, this.currentKeyVersion);
-    return { ...seal(dataKey, kek), keyVersion: this.currentKeyVersion };
+    return { ...seal(dataKey, kek, aad), keyVersion: this.currentKeyVersion };
   }
 
-  async unwrapDataKey(tenantId: string, wrapped: WrappedDataKey): Promise<Buffer> {
+  async unwrapDataKey(tenantId: string, wrapped: WrappedDataKey, aad?: Buffer): Promise<Buffer> {
     const kek = this.kekFor(tenantId, wrapped.keyVersion);
-    return open(wrapped, kek);
+    return open(wrapped, kek, aad);
   }
 }

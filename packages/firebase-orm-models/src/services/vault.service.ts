@@ -16,6 +16,18 @@ async function loadVaultSecret(organizationId: string, vaultSecretId: string): P
   return secret;
 }
 
+/**
+ * Associated data binding a seal/wrap to exactly this owning record, so a
+ * ciphertext or wrapped data key copied from one `VaultSecretModel` doc onto
+ * another (a different owner within the same org) fails to decrypt instead
+ * of silently succeeding — a substitution attack GCM's auth tag alone
+ * wouldn't catch, since both docs would otherwise share the same per-tenant
+ * KEK.
+ */
+function ownerAad(organizationId: string, ownerType: string, ownerId: string): Buffer {
+  return Buffer.from(`${organizationId}:${ownerType}:${ownerId}`, 'utf8');
+}
+
 export interface EncryptSecretParams {
   organizationId: string;
   ownerType: string;
@@ -39,9 +51,10 @@ export interface EncryptSecretParams {
  */
 export async function encryptSecret(params: EncryptSecretParams): Promise<VaultSecretModel> {
   const kmsProvider = params.kmsProvider ?? createKmsProviderFromEnv();
+  const aad = ownerAad(params.organizationId, params.ownerType, params.ownerId);
   const dataKey = generateDataKey();
-  const sealedSecret = seal(Buffer.from(params.plaintext, 'utf8'), dataKey);
-  const wrappedDataKey = await kmsProvider.wrapDataKey(params.organizationId, dataKey);
+  const sealedSecret = seal(Buffer.from(params.plaintext, 'utf8'), dataKey, aad);
+  const wrappedDataKey = await kmsProvider.wrapDataKey(params.organizationId, dataKey, aad);
 
   const secret = new VaultSecretModel();
   secret.organization_id = params.organizationId;
@@ -65,8 +78,9 @@ export interface DecryptSecretParams {
 export async function decryptSecret(params: DecryptSecretParams): Promise<string> {
   const secret = await loadVaultSecret(params.organizationId, params.vaultSecretId);
   const kmsProvider = params.kmsProvider ?? createKmsProviderFromEnv();
-  const dataKey = await kmsProvider.unwrapDataKey(params.organizationId, secret.wrapped_data_key);
-  return open(secret.sealed_secret, dataKey).toString('utf8');
+  const aad = ownerAad(secret.organization_id, secret.owner_type, secret.owner_id);
+  const dataKey = await kmsProvider.unwrapDataKey(params.organizationId, secret.wrapped_data_key, aad);
+  return open(secret.sealed_secret, dataKey, aad).toString('utf8');
 }
 
 export interface RotateVaultSecretParams {
@@ -82,12 +96,20 @@ export interface RotateVaultSecretParams {
  * encryption: rotating the org's KEK doesn't require re-encrypting every
  * secret it protects, only the (tiny) wrapped data keys — `sealed_secret` is
  * left completely untouched by a rotation.
+ *
+ * No optimistic-concurrency check (same "last write wins" pattern as
+ * `key.service.ts`'s `revokeApiKey`): two concurrent rotations both unwrap
+ * the same data key and re-wrap it validly under the current version, so
+ * whichever `save()` lands last just leaves an equally-valid
+ * `wrapped_data_key`/`rotated_at` pair — never a corrupted or unrecoverable
+ * one.
  */
 export async function rotateVaultSecret(params: RotateVaultSecretParams): Promise<VaultSecretModel> {
   const secret = await loadVaultSecret(params.organizationId, params.vaultSecretId);
   const kmsProvider = params.kmsProvider ?? createKmsProviderFromEnv();
-  const dataKey = await kmsProvider.unwrapDataKey(params.organizationId, secret.wrapped_data_key);
-  secret.wrapped_data_key = await kmsProvider.wrapDataKey(params.organizationId, dataKey);
+  const aad = ownerAad(secret.organization_id, secret.owner_type, secret.owner_id);
+  const dataKey = await kmsProvider.unwrapDataKey(params.organizationId, secret.wrapped_data_key, aad);
+  secret.wrapped_data_key = await kmsProvider.wrapDataKey(params.organizationId, dataKey, aad);
   secret.rotated_at = new Date().toISOString();
   await secret.save();
   return secret;

@@ -101,6 +101,57 @@ describe('encryptSecret / decryptSecret', () => {
     ).rejects.toBeInstanceOf(VaultSecretNotFoundError);
   });
 
+  it('persists owner_type/owner_id and round-trips them through Firestore', async () => {
+    const { owner, organization } = await setupOrg('Owner Fields Org');
+
+    const secret = await encryptSecret({
+      organizationId: organization.id,
+      ownerType: 'shared_credential',
+      ownerId: 'cred_456',
+      plaintext: 'owner-fields-secret',
+      createdByUserId: owner.id,
+    });
+
+    const reloaded = await encryptSecret({
+      organizationId: organization.id,
+      ownerType: 'shared_credential',
+      ownerId: 'cred_789',
+      plaintext: 'another-secret',
+      createdByUserId: owner.id,
+    });
+
+    expect(secret.owner_type).toBe('shared_credential');
+    expect(secret.owner_id).toBe('cred_456');
+    expect(reloaded.owner_id).toBe('cred_789');
+  });
+
+  it('rejects decrypting a secret whose sealed payload/wrapped key was copied onto a different owner within the same org (substitution attack)', async () => {
+    const { owner, organization } = await setupOrg('Substitution Org');
+    const secretA = await encryptSecret({
+      organizationId: organization.id,
+      ownerType: 'shared_credential',
+      ownerId: 'cred_a',
+      plaintext: 'secret-a',
+      createdByUserId: owner.id,
+    });
+    const secretB = await encryptSecret({
+      organizationId: organization.id,
+      ownerType: 'shared_credential',
+      ownerId: 'cred_b',
+      plaintext: 'secret-b',
+      createdByUserId: owner.id,
+    });
+
+    const firestore = getFirestore(getApp(APP_NAME));
+    // Paste secret A's ciphertext/wrapped key onto secret B's document, keeping B's own owner_id.
+    await updateDoc(doc(firestore, 'organizations', organization.id, 'vault_secrets', secretB.id), {
+      sealed_secret: secretA.sealed_secret,
+      wrapped_data_key: secretA.wrapped_data_key,
+    });
+
+    await expect(decryptSecret({ organizationId: organization.id, vaultSecretId: secretB.id })).rejects.toThrow();
+  });
+
   it('fails closed if the stored ciphertext is tampered with', async () => {
     const { owner, organization } = await setupOrg('Tamper Org');
     const secret = await encryptSecret({

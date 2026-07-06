@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createKmsProviderFromEnv } from './create-kms-provider';
+import { createKmsProviderFromEnv, InvalidVaultMasterKeysError, MissingVaultConfigError } from './create-kms-provider';
 import { generateDataKey, open, seal } from './envelope';
 import { LocalKmsProvider, UnknownKeyVersionError } from './local-kms-provider';
 
@@ -39,6 +39,24 @@ describe('seal/open', () => {
 
     expect(() => open({ ...sealed, ciphertext: tamperedByte.toString('base64') }, key)).toThrow();
   });
+
+  it('round-trips empty-string and multibyte-unicode plaintext', () => {
+    const key = generateDataKey();
+
+    expect(open(seal(Buffer.from('', 'utf8'), key), key).toString('utf8')).toBe('');
+    const unicode = '日本語🔥emoji-and-秘密';
+    expect(open(seal(Buffer.from(unicode, 'utf8'), key), key).toString('utf8')).toBe(unicode);
+  });
+
+  it('binds associated data: a sealed payload fails to open under a different aad, even with the right key', () => {
+    const key = generateDataKey();
+    const plaintext = Buffer.from('super-secret-oauth-token', 'utf8');
+    const sealed = seal(plaintext, key, Buffer.from('owner-a', 'utf8'));
+
+    expect(open(sealed, key, Buffer.from('owner-a', 'utf8')).toString('utf8')).toBe('super-secret-oauth-token');
+    expect(() => open(sealed, key, Buffer.from('owner-b', 'utf8'))).toThrow();
+    expect(() => open(sealed, key)).toThrow();
+  });
 });
 
 describe('LocalKmsProvider', () => {
@@ -65,6 +83,18 @@ describe('LocalKmsProvider', () => {
     const wrapped = await provider.wrapDataKey('org_a', dataKey);
 
     await expect(provider.unwrapDataKey('org_b', wrapped)).rejects.toThrow();
+  });
+
+  it('binds wrapDataKey/unwrapDataKey to the given aad, so a wrapped key cannot be reused under a different aad', async () => {
+    const provider = new LocalKmsProvider({
+      masterKeys: { v1: generateDataKey().toString('base64') },
+      currentKeyVersion: 'v1',
+    });
+    const dataKey = generateDataKey();
+    const wrapped = await provider.wrapDataKey('org_a', dataKey, Buffer.from('secret-1', 'utf8'));
+
+    expect((await provider.unwrapDataKey('org_a', wrapped, Buffer.from('secret-1', 'utf8'))).equals(dataKey)).toBe(true);
+    await expect(provider.unwrapDataKey('org_a', wrapped, Buffer.from('secret-2', 'utf8'))).rejects.toThrow();
   });
 
   it('rejects construction with a currentKeyVersion missing from masterKeys', () => {
@@ -111,5 +141,23 @@ describe('createKmsProviderFromEnv', () => {
   it('falls back to a deterministic insecure dev key when unset', () => {
     const provider = createKmsProviderFromEnv({} as NodeJS.ProcessEnv);
     expect(provider.currentKeyVersion).toBe('dev-insecure');
+  });
+
+  it('refuses to silently use the dev key when only one of the two env vars is set', () => {
+    expect(() =>
+      createKmsProviderFromEnv({ VAULT_MASTER_KEYS_JSON: '{}' } as NodeJS.ProcessEnv),
+    ).toThrow(MissingVaultConfigError);
+    expect(() =>
+      createKmsProviderFromEnv({ VAULT_MASTER_KEY_VERSION: 'v1' } as NodeJS.ProcessEnv),
+    ).toThrow(MissingVaultConfigError);
+  });
+
+  it('throws a descriptive error for malformed VAULT_MASTER_KEYS_JSON', () => {
+    expect(() =>
+      createKmsProviderFromEnv({
+        VAULT_MASTER_KEYS_JSON: 'not-json',
+        VAULT_MASTER_KEY_VERSION: 'v1',
+      } as NodeJS.ProcessEnv),
+    ).toThrow(InvalidVaultMasterKeysError);
   });
 });

@@ -17,6 +17,7 @@ export interface WrappedDataKey extends SealedPayload {
 export interface KmsProvider {
   /** The key version any new `wrapDataKey` call will use. */
   readonly currentKeyVersion: string;
-  wrapDataKey(tenantId: string, dataKey: Buffer): Promise<WrappedDataKey>;
-  unwrapDataKey(tenantId: string, wrapped: WrappedDataKey): Promise<Buffer>;
+  /** `aad`, when given, binds the wrapping to a specific owning record (see `envelope.ts`'s `seal`) — `unwrapDataKey` must be called with the exact same `aad`. */
+  wrapDataKey(tenantId: string, dataKey: Buffer, aad?: Buffer): Promise<WrappedDataKey>;
+  unwrapDataKey(tenantId: string, wrapped: WrappedDataKey, aad?: Buffer): Promise<Buffer>;
 }

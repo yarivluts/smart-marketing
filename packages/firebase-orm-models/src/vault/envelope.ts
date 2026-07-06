@@ -21,10 +21,20 @@ export function generateDataKey(): Buffer {
   return randomBytes(DATA_KEY_BYTES);
 }
 
-/** Encrypts `plaintext` under `key` with a fresh random nonce — safe to call repeatedly with the same key. */
-export function seal(plaintext: Buffer, key: Buffer): SealedPayload {
+/**
+ * Encrypts `plaintext` under `key` with a fresh random nonce — safe to call
+ * repeatedly with the same key. `aad` (associated data, e.g. the owning
+ * record's id) is authenticated but not encrypted: `open()` fails unless
+ * given the exact same `aad`, which stops a ciphertext lifted from one
+ * document and pasted into another (a different `aad`) from ever decrypting,
+ * even though both share the same underlying key.
+ */
+export function seal(plaintext: Buffer, key: Buffer, aad?: Buffer): SealedPayload {
   const iv = randomBytes(IV_BYTES);
   const cipher = createCipheriv(AES_ALGORITHM, key, iv);
+  if (aad) {
+    cipher.setAAD(aad);
+  }
   const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   return {
     ciphertext: ciphertext.toString('base64'),
@@ -33,9 +43,12 @@ export function seal(plaintext: Buffer, key: Buffer): SealedPayload {
   };
 }
 
-/** Reverses `seal`. Throws if `key` is wrong or `sealed` was tampered with (GCM authentication failure). */
-export function open(sealed: SealedPayload, key: Buffer): Buffer {
+/** Reverses `seal`. Throws if `key`/`aad` is wrong or `sealed` was tampered with (GCM authentication failure). */
+export function open(sealed: SealedPayload, key: Buffer, aad?: Buffer): Buffer {
   const decipher = createDecipheriv(AES_ALGORITHM, key, Buffer.from(sealed.iv, 'base64'));
+  if (aad) {
+    decipher.setAAD(aad);
+  }
   decipher.setAuthTag(Buffer.from(sealed.authTag, 'base64'));
   return Buffer.concat([decipher.update(Buffer.from(sealed.ciphertext, 'base64')), decipher.final()]);
 }
