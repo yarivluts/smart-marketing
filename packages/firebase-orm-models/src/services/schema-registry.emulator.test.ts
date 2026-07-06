@@ -195,6 +195,20 @@ describe('evolveSchemaDefinition', () => {
     ).rejects.toThrow(SchemaDefNotFoundError);
   });
 
+  it('rejects an empty/whitespace name the same way registerSchemaDefinition does', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Evolve Empty Name Org');
+    await expect(
+      evolveSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name: '   ',
+        fields: orderFieldsV1,
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidSchemaDefinitionError);
+  });
+
   it('rejects removing a field, changing a field type, tightening optional->required, and dropping an identity key', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Schema Breaking Org');
     await registerSchemaDefinition({

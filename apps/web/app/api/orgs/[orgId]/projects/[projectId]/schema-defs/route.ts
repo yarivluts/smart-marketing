@@ -1,10 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { DuplicateSchemaDefinitionError, InvalidSchemaDefinitionError, isSchemaDefKind, ProjectNotFoundError } from '@growthos/firebase-orm-models';
+import { DuplicateSchemaDefinitionError, InvalidSchemaDefinitionError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { registerSchemaDefinition } from '@/lib/orgs/mutations';
 import { listOrgProjects, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
 import { requireOrgPermission } from '@/lib/orgs/access';
-import { parseJsonBody } from '@/lib/http/parse-json-body';
-import { parseSchemaFieldsBody } from '@/lib/orgs/parse-schema-fields';
+import { parseSchemaDefRequestBody } from '@/lib/orgs/parse-schema-fields';
 import { toSchemaDefView } from '@/lib/orgs/schema-def-view';
 
 interface RouteParams {
@@ -26,12 +25,11 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
     return error;
   }
 
-  const projects = await listOrgProjects(orgId);
+  const [projects, schemaDefs] = await Promise.all([listOrgProjects(orgId), listSchemaDefinitionsForProject(orgId, projectId)]);
   if (!projects.some((project) => project.id === projectId)) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
-  const schemaDefs = await listSchemaDefinitionsForProject(orgId, projectId);
   return NextResponse.json({ schemaDefs: schemaDefs.map(toSchemaDefView) });
 }
 
@@ -43,29 +41,18 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return error;
   }
 
-  const parsed = await parseJsonBody<{ kind?: unknown; name?: unknown; fields?: unknown }>(request);
+  const parsed = await parseSchemaDefRequestBody(request);
   if (parsed.error) {
     return parsed.error;
-  }
-  const { kind, name, fields: rawFields } = parsed.body;
-  if (typeof kind !== 'string' || !isSchemaDefKind(kind)) {
-    return NextResponse.json({ error: 'invalid_kind' }, { status: 400 });
-  }
-  if (typeof name !== 'string' || name.trim().length === 0) {
-    return NextResponse.json({ error: 'name_required' }, { status: 400 });
-  }
-  const parsedFields = parseSchemaFieldsBody(rawFields);
-  if (parsedFields.error) {
-    return parsedFields.error;
   }
 
   try {
     const schemaDef = await registerSchemaDefinition({
       organizationId: orgId,
       projectId,
-      kind,
-      name: name.trim(),
-      fields: parsedFields.fields,
+      kind: parsed.kind,
+      name: parsed.name,
+      fields: parsed.fields,
       createdByUserId: user.id,
     });
     return NextResponse.json({ schemaDef: toSchemaDefView(schemaDef) }, { status: 201 });

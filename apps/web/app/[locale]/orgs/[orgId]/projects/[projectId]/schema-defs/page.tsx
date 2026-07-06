@@ -1,11 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
-import type { SchemaDefModel } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
+import { toSchemaDefView, type SchemaDefView } from '@/lib/orgs/schema-def-view';
 import { RegisterSchemaDefForm } from '@/components/orgs/register-schema-def-form';
 import { SchemaFamilyCard, type SchemaVersionView } from '@/components/orgs/schema-family-card';
 
@@ -25,26 +25,16 @@ interface SchemaFamily {
   versions: SchemaVersionView[];
 }
 
-function groupIntoFamilies(schemaDefs: readonly SchemaDefModel[]): SchemaFamily[] {
+// Client components only ever receive plain serializable data (never an
+// `@arbel/firebase-orm` model instance) — reuses the same field mapping the
+// API routes use (`toSchemaDefView`) rather than a second, independently
+// maintained copy of it.
+function groupIntoFamilies(views: readonly SchemaDefView[]): SchemaFamily[] {
   const familiesByKey = new Map<string, SchemaFamily>();
-  for (const schemaDef of schemaDefs) {
-    const key = `${schemaDef.kind}:${schemaDef.name}`;
-    const family = familiesByKey.get(key) ?? { kind: schemaDef.kind, name: schemaDef.name, versions: [] };
-    family.versions.push({
-      id: schemaDef.id,
-      version: schemaDef.version,
-      status: schemaDef.status,
-      // Client components only ever receive plain serializable data (never an
-      // `@arbel/firebase-orm` model instance) — same reasoning as mapping
-      // `EnvironmentModel[]` to `{id, name}[]` for `CreateApiKeyForm` (KAN-30).
-      fields: schemaDef.field_defs.map((field) => ({
-        name: field.name,
-        type: field.type,
-        isRequired: field.is_required,
-        isPii: field.is_pii,
-        isIdentityKey: field.is_identity_key,
-      })),
-    });
+  for (const view of views) {
+    const key = `${view.kind}:${view.name}`;
+    const family = familiesByKey.get(key) ?? { kind: view.kind, name: view.name, versions: [] };
+    family.versions.push({ id: view.id, version: view.version, status: view.status, fields: view.fields });
     familiesByKey.set(key, family);
   }
   return [...familiesByKey.values()].sort((a, b) => a.kind.localeCompare(b.kind) || a.name.localeCompare(b.name));
@@ -74,14 +64,16 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const projects = await listOrgProjects(orgId);
+  const [projects, schemaDefs] = await Promise.all([
+    listOrgProjects(orgId),
+    listSchemaDefinitionsForProject(orgId, projectId),
+  ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
     notFound();
   }
 
-  const schemaDefs = await listSchemaDefinitionsForProject(orgId, projectId);
-  const families = groupIntoFamilies(schemaDefs);
+  const families = groupIntoFamilies(schemaDefs.map(toSchemaDefView));
 
   const t = await getTranslations('SchemaRegistry');
 

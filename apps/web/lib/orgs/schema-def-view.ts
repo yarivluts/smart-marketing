@@ -1,8 +1,8 @@
-import type { SchemaDefModel } from '@growthos/firebase-orm-models';
+import type { SchemaDefKind, SchemaDefModel, SchemaDefStatus, SchemaFieldType } from '@growthos/firebase-orm-models';
 
 export interface SchemaDefFieldView {
   name: string;
-  type: string;
+  type: SchemaFieldType;
   isRequired: boolean;
   isPii: boolean;
   isIdentityKey: boolean;
@@ -10,10 +10,10 @@ export interface SchemaDefFieldView {
 
 export interface SchemaDefView {
   id: string;
-  kind: string;
+  kind: SchemaDefKind;
   name: string;
   version: number;
-  status: string;
+  status: SchemaDefStatus;
   fields: SchemaDefFieldView[];
   createdBy: string;
   createdAt: string;

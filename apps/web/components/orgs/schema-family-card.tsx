@@ -81,8 +81,7 @@ export function SchemaFamilyCard({ orgId, projectId, kind, name, versions }: Sch
           kind={kind}
           name={name}
           initialFields={latest.fields}
-          onCancel={() => setEvolving(false)}
-          onSuccess={() => setEvolving(false)}
+          onClose={() => setEvolving(false)}
         />
       ) : null}
     </li>

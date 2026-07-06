@@ -103,6 +103,37 @@ async function listVersions(
   return versions.sort((a, b) => a.version - b.version);
 }
 
+/** Cheap existence check for `registerSchemaDefinition` — a `.limit(1)` query instead of fetching every version just to check `.length > 0`. */
+async function schemaFamilyHasAnyVersion(
+  organizationId: string,
+  projectId: string,
+  kind: SchemaDefKind,
+  name: string,
+): Promise<boolean> {
+  const matches = await SchemaDefModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('kind', '==', kind)
+    .where('name', '==', name)
+    .limit(1)
+    .get();
+  return matches.length > 0;
+}
+
+/** The one `active` version of a schema family, queried directly instead of fetching the full version history just to find it. Shared by `evolveSchemaDefinition` and `getActiveSchemaDefinition`. */
+async function findActiveVersion(
+  organizationId: string,
+  projectId: string,
+  kind: SchemaDefKind,
+  name: string,
+): Promise<SchemaDefModel | undefined> {
+  const matches = await SchemaDefModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('kind', '==', kind)
+    .where('name', '==', name)
+    .where('status', '==', 'active')
+    .limit(1)
+    .get();
+  return matches[0];
+}
+
 /**
  * Non-breaking evolution rule (KAN-31 AC: "breaking change rejected"). Every
  * field present in the previous version must still exist in the next one,
@@ -143,6 +174,58 @@ function findBreakingChanges(previous: readonly SchemaFieldDef[], next: readonly
   return violations;
 }
 
+interface SchemaDefRequest {
+  organizationId: string;
+  projectId: string;
+  kind: string;
+  name: string;
+  fields: readonly SchemaFieldInput[];
+}
+
+/** Shared kind/name/fields validation for register and evolve — keeps the two entry points from silently drifting (evolve previously skipped the empty-name check register enforced). */
+async function validateSchemaDefRequest(
+  request: SchemaDefRequest,
+): Promise<{ kind: SchemaDefKind; name: string; fields: SchemaFieldDef[] }> {
+  await requireProjectInOrg(request.organizationId, request.projectId);
+
+  if (!isSchemaDefKind(request.kind)) {
+    throw new InvalidSchemaDefinitionError([`Unknown schema kind "${request.kind}".`]);
+  }
+  const name = request.name.trim();
+  if (name.length === 0) {
+    throw new InvalidSchemaDefinitionError(['A schema must have a non-empty name.']);
+  }
+  const fields = validateFields(request.fields);
+
+  return { kind: request.kind, name, fields };
+}
+
+interface BuildSchemaDefVersionParams {
+  organizationId: string;
+  projectId: string;
+  kind: SchemaDefKind;
+  name: string;
+  version: number;
+  fields: SchemaFieldDef[];
+  createdByUserId: string;
+}
+
+/** Constructs one `active` version document — shared by register (v1) and evolve (v{n+1}) so a future field addition can't land on only one of the two paths. */
+function buildSchemaDefVersion(params: BuildSchemaDefVersionParams): SchemaDefModel {
+  const schemaDef = new SchemaDefModel();
+  schemaDef.organization_id = params.organizationId;
+  schemaDef.project_id = params.projectId;
+  schemaDef.kind = params.kind;
+  schemaDef.name = params.name;
+  schemaDef.version = params.version;
+  schemaDef.status = 'active';
+  schemaDef.field_defs = params.fields;
+  schemaDef.created_by = params.createdByUserId;
+  schemaDef.created_at = new Date().toISOString();
+  schemaDef.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  return schemaDef;
+}
+
 export interface RegisterSchemaDefinitionParams {
   organizationId: string;
   projectId: string;
@@ -152,35 +235,34 @@ export interface RegisterSchemaDefinitionParams {
   createdByUserId: string;
 }
 
-/** Registers the first version (v1) of a new entity/event/measure schema in a project (KAN-31 AC: "register v1"). */
+/**
+ * Registers the first version (v1) of a new entity/event/measure schema in a
+ * project (KAN-31 AC: "register v1"). Not transactional: two concurrent
+ * registrations for the same (kind, name) can both pass the existence check
+ * before either writes, producing two "v1 active" documents for one family.
+ * This package's own convention (see `firestore-connection.ts`'s doc
+ * comment) reserves raw Firestore SDK access — which a transaction would
+ * require — to that one file, so a proper fix is a bigger change than this
+ * story; flagged here as a known, deliberately-deferred gap rather than
+ * papered over.
+ */
 export async function registerSchemaDefinition(params: RegisterSchemaDefinitionParams): Promise<SchemaDefModel> {
-  await requireProjectInOrg(params.organizationId, params.projectId);
+  const { kind, name, fields } = await validateSchemaDefRequest(params);
 
-  if (!isSchemaDefKind(params.kind)) {
-    throw new InvalidSchemaDefinitionError([`Unknown schema kind "${params.kind}".`]);
-  }
-  const name = params.name.trim();
-  if (name.length === 0) {
-    throw new InvalidSchemaDefinitionError(['A schema must have a non-empty name.']);
-  }
-  const fields = validateFields(params.fields);
-
-  const existing = await listVersions(params.organizationId, params.projectId, params.kind, name);
-  if (existing.length > 0) {
+  const alreadyExists = await schemaFamilyHasAnyVersion(params.organizationId, params.projectId, kind, name);
+  if (alreadyExists) {
     throw new DuplicateSchemaDefinitionError();
   }
 
-  const schemaDef = new SchemaDefModel();
-  schemaDef.organization_id = params.organizationId;
-  schemaDef.project_id = params.projectId;
-  schemaDef.kind = params.kind;
-  schemaDef.name = name;
-  schemaDef.version = 1;
-  schemaDef.status = 'active';
-  schemaDef.field_defs = fields;
-  schemaDef.created_by = params.createdByUserId;
-  schemaDef.created_at = new Date().toISOString();
-  schemaDef.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  const schemaDef = buildSchemaDefVersion({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    kind,
+    name,
+    version: 1,
+    fields,
+    createdByUserId: params.createdByUserId,
+  });
   await schemaDef.save();
   return schemaDef;
 }
@@ -202,18 +284,17 @@ export interface EvolveSchemaDefinitionParams {
  * remain independently queryable, the same "immutable version history"
  * reasoning as `ResourceTemplateModel`'s version-pin, just applied to every
  * version instead of only the latest.
+ *
+ * Not transactional, for the same reason documented on
+ * `registerSchemaDefinition`: two concurrent evolutions of the same family
+ * can both read the same "previous" active version, both pass the
+ * breaking-change check, and both write a document claiming the next
+ * version number — a known, deliberately-deferred gap.
  */
 export async function evolveSchemaDefinition(params: EvolveSchemaDefinitionParams): Promise<SchemaDefModel> {
-  await requireProjectInOrg(params.organizationId, params.projectId);
+  const { kind, name, fields } = await validateSchemaDefRequest(params);
 
-  if (!isSchemaDefKind(params.kind)) {
-    throw new InvalidSchemaDefinitionError([`Unknown schema kind "${params.kind}".`]);
-  }
-  const name = params.name.trim();
-  const fields = validateFields(params.fields);
-
-  const versions = await listVersions(params.organizationId, params.projectId, params.kind, name);
-  const previous = versions.at(-1);
+  const previous = await findActiveVersion(params.organizationId, params.projectId, kind, name);
   if (!previous) {
     throw new SchemaDefNotFoundError();
   }
@@ -224,20 +305,17 @@ export async function evolveSchemaDefinition(params: EvolveSchemaDefinitionParam
   }
 
   previous.status = 'superseded';
-  await previous.save();
+  const next = buildSchemaDefVersion({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    kind,
+    name,
+    version: previous.version + 1,
+    fields,
+    createdByUserId: params.createdByUserId,
+  });
 
-  const next = new SchemaDefModel();
-  next.organization_id = params.organizationId;
-  next.project_id = params.projectId;
-  next.kind = params.kind;
-  next.name = name;
-  next.version = previous.version + 1;
-  next.status = 'active';
-  next.field_defs = fields;
-  next.created_by = params.createdByUserId;
-  next.created_at = new Date().toISOString();
-  next.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
-  await next.save();
+  await Promise.all([previous.save(), next.save()]);
   return next;
 }
 
@@ -254,7 +332,13 @@ export async function listSchemaDefinitionsForProject(
   );
 }
 
-/** Every version of one schema family (kind+name), oldest first — used by an evolve form to prefill the latest version's fields. */
+/**
+ * The full version history of one schema family (kind+name), oldest first.
+ * Not currently called by any route or page — `apps/web`'s evolve form
+ * instead prefills from the project-wide list it already fetched
+ * (`listSchemaDefinitionsForProject`) — exposed for a future per-family
+ * version-history view.
+ */
 export async function listSchemaDefinitionVersions(
   organizationId: string,
   projectId: string,
@@ -271,6 +355,6 @@ export async function getActiveSchemaDefinition(
   kind: SchemaDefKind,
   name: string,
 ): Promise<SchemaDefModel | null> {
-  const versions = await listVersions(organizationId, projectId, kind, name);
-  return versions.find((version) => version.status === 'active') ?? null;
+  const active = await findActiveVersion(organizationId, projectId, kind, name);
+  return active ?? null;
 }

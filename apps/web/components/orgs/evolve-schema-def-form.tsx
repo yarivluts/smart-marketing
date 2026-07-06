@@ -12,8 +12,8 @@ export interface EvolveSchemaDefFormProps {
   kind: string;
   name: string;
   initialFields: SchemaFieldRow[];
-  onCancel: () => void;
-  onSuccess: () => void;
+  /** Called both on cancel and after a successful evolve — in both cases the parent hides this form the same way (see the `router.refresh()` comment below for why success needs it too). */
+  onClose: () => void;
 }
 
 /** Registers the next version of an already-registered schema, prefilled from its latest version's fields (KAN-31 AC: "evolve to v2 -> both queryable; breaking change rejected"). */
@@ -23,8 +23,7 @@ export function EvolveSchemaDefForm({
   kind,
   name,
   initialFields,
-  onCancel,
-  onSuccess,
+  onClose,
 }: EvolveSchemaDefFormProps): React.ReactElement {
   const t = useTranslations('SchemaRegistry');
   const router = useRouter();
@@ -57,7 +56,7 @@ export function EvolveSchemaDefForm({
       // the new active one — closing it forces a fresh prefill next time
       // "Evolve" is opened.
       router.refresh();
-      onSuccess();
+      onClose();
     } finally {
       setSubmitting(false);
     }
@@ -76,7 +75,7 @@ export function EvolveSchemaDefForm({
         <Button type="submit" disabled={submitting || fields.length === 0}>
           {t('evolveSubmit')}
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" variant="outline" onClick={onClose}>
           {t('cancel')}
         </Button>
       </div>

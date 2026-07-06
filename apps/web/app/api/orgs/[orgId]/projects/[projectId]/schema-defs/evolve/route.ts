@@ -2,14 +2,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 import {
   BreakingSchemaChangeError,
   InvalidSchemaDefinitionError,
-  isSchemaDefKind,
   ProjectNotFoundError,
   SchemaDefNotFoundError,
 } from '@growthos/firebase-orm-models';
 import { evolveSchemaDefinition } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
-import { parseJsonBody } from '@/lib/http/parse-json-body';
-import { parseSchemaFieldsBody } from '@/lib/orgs/parse-schema-fields';
+import { parseSchemaDefRequestBody } from '@/lib/orgs/parse-schema-fields';
 import { toSchemaDefView } from '@/lib/orgs/schema-def-view';
 
 interface RouteParams {
@@ -30,29 +28,18 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return error;
   }
 
-  const parsed = await parseJsonBody<{ kind?: unknown; name?: unknown; fields?: unknown }>(request);
+  const parsed = await parseSchemaDefRequestBody(request);
   if (parsed.error) {
     return parsed.error;
-  }
-  const { kind, name, fields: rawFields } = parsed.body;
-  if (typeof kind !== 'string' || !isSchemaDefKind(kind)) {
-    return NextResponse.json({ error: 'invalid_kind' }, { status: 400 });
-  }
-  if (typeof name !== 'string' || name.trim().length === 0) {
-    return NextResponse.json({ error: 'name_required' }, { status: 400 });
-  }
-  const parsedFields = parseSchemaFieldsBody(rawFields);
-  if (parsedFields.error) {
-    return parsedFields.error;
   }
 
   try {
     const schemaDef = await evolveSchemaDefinition({
       organizationId: orgId,
       projectId,
-      kind,
-      name: name.trim(),
-      fields: parsedFields.fields,
+      kind: parsed.kind,
+      name: parsed.name,
+      fields: parsed.fields,
       createdByUserId: user.id,
     });
     return NextResponse.json({ schemaDef: toSchemaDefView(schemaDef) }, { status: 201 });

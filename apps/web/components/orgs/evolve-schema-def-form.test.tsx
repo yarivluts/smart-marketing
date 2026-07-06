@@ -5,8 +5,7 @@ import { EvolveSchemaDefForm } from './evolve-schema-def-form';
 import messages from '../../messages/en.json';
 
 const refresh = vi.fn();
-const onCancel = vi.fn();
-const onSuccess = vi.fn();
+const onClose = vi.fn();
 
 vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ refresh }),
@@ -25,8 +24,7 @@ function renderForm(): void {
         kind="event"
         name="order_completed"
         initialFields={INITIAL_FIELDS}
-        onCancel={onCancel}
-        onSuccess={onSuccess}
+        onClose={onClose}
       />
     </NextIntlClientProvider>,
   );
@@ -35,8 +33,7 @@ function renderForm(): void {
 describe('EvolveSchemaDefForm', () => {
   beforeEach(() => {
     refresh.mockClear();
-    onCancel.mockClear();
-    onSuccess.mockClear();
+    onClose.mockClear();
     vi.stubGlobal('fetch', vi.fn());
   });
 
@@ -70,7 +67,7 @@ describe('EvolveSchemaDefForm', () => {
       ),
     );
     expect(refresh).toHaveBeenCalled();
-    expect(onSuccess).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('shows the breaking-change violations returned by the API', async () => {
@@ -86,12 +83,12 @@ describe('EvolveSchemaDefForm', () => {
       'This change would break existing consumers: Field "order_id" was removed.',
     );
     expect(refresh).not.toHaveBeenCalled();
-    expect(onSuccess).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
-  it('calls onCancel when Cancel is clicked', () => {
+  it('calls onClose when Cancel is clicked', () => {
     renderForm();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onCancel).toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalled();
   });
 });

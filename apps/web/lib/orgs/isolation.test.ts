@@ -11,7 +11,8 @@ import { POST as requestAttachment } from '@/app/api/orgs/[orgId]/projects/[proj
 import { DELETE as detachAttachment, PATCH as decideAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/route';
 import { GET as listApiKeys, POST as mintApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/route';
 import { DELETE as revokeApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]/route';
-import { POST as registerSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/route';
+import { GET as listSchemaDefs, POST as registerSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/route';
+import { POST as evolveSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/evolve/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -320,6 +321,42 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         }),
       () =>
         registerSchemaDef(requestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+
+    const getRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/schema-defs`);
+
+    await expectIndistinguishable(
+      () =>
+        listSchemaDefs(getRequestFor(orgB.id, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }),
+        }),
+      () =>
+        listSchemaDefs(getRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+
+    const evolveRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/schema-defs/evolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'event',
+          name: 'leaked_event',
+          fields: [{ name: 'id', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
+        }),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        evolveSchemaDef(evolveRequestFor(orgB.id, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }),
+        }),
+      () =>
+        evolveSchemaDef(evolveRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
         }),
     );
