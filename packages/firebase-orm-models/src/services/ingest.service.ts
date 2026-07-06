@@ -64,8 +64,25 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+/** Canonical JSON: keys sorted at every nesting level (not just the top one), so two dimension payloads that differ only in key order hash identically for measure dedup below. */
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.fromEntries(Object.keys(record).sort().map((key) => [key, canonicalize(record[key])]));
+  }
+  return value;
+}
+
 function sortedJson(record: Record<string, unknown>): string {
-  return JSON.stringify(Object.fromEntries(Object.keys(record).sort().map((key) => [key, record[key]])));
+  return JSON.stringify(canonicalize(record));
+}
+
+/** A non-empty string once trimmed, or `undefined` — the one check every envelope field below needs, so a whitespace-only value is treated the same as a missing one everywhere (both the "is it present" check and the fallback-id decision agree). */
+function requireNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 }
 
 /**
@@ -73,52 +90,49 @@ function sortedJson(record: Record<string, unknown>): string {
  * should validate against, and the field map to check — per plan `12
  * §2.1`/`§2.2`'s three sketches: an event's schema name is its own `event`
  * field; an entity batch's schema name is the batch-level `type`; a measure's
- * schema name is its own `measure` field. Measures carry no client-supplied
- * id in the plan's sketch, so a deterministic key derived from
- * `measure|ts|dimensions` stands in — re-sending the same aggregate is then
- * idempotent the same way a real client id would make it.
+ * schema name is its own `measure` field.
  */
 function prepareRecord(input: IngestBatchInput, record: unknown, index: number): PreparedRecord {
   const reasons: string[] = [];
   const r = asRecord(record);
 
   if (input.kind === 'event') {
-    const eventId = r.event_id;
-    const eventName = r.event;
-    if (typeof eventId !== 'string' || eventId.trim().length === 0) reasons.push('missing_field:event_id');
-    if (typeof eventName !== 'string' || eventName.trim().length === 0) reasons.push('missing_field:event');
-    if (typeof r.ts !== 'string' || r.ts.trim().length === 0) reasons.push('missing_field:ts');
+    const eventId = requireNonEmptyString(r.event_id);
+    const eventName = requireNonEmptyString(r.event);
+    if (!eventId) reasons.push('missing_field:event_id');
+    if (!eventName) reasons.push('missing_field:event');
+    if (!requireNonEmptyString(r.ts)) reasons.push('missing_field:ts');
     return {
-      clientId: typeof eventId === 'string' && eventId.length > 0 ? eventId : `event#${index}`,
-      schemaName: typeof eventName === 'string' ? eventName : '',
+      clientId: eventId ?? `event#${index}`,
+      schemaName: eventName ?? '',
       fieldsToValidate: asRecord(r.properties),
       envelopeReasons: reasons,
     };
   }
 
   if (input.kind === 'entity') {
-    const id = r.id;
-    if (typeof id !== 'string' || id.trim().length === 0) reasons.push('missing_field:id');
+    const id = requireNonEmptyString(r.id);
+    if (!id) reasons.push('missing_field:id');
     return {
-      clientId: typeof id === 'string' && id.length > 0 ? id : `entity#${index}`,
+      clientId: id ?? `entity#${index}`,
       schemaName: input.type,
       fieldsToValidate: asRecord(r.attributes),
       envelopeReasons: reasons,
     };
   }
 
-  const measureName = r.measure;
-  if (typeof measureName !== 'string' || measureName.trim().length === 0) reasons.push('missing_field:measure');
-  if (typeof r.ts !== 'string' || r.ts.trim().length === 0) reasons.push('missing_field:ts');
+  const measureName = requireNonEmptyString(r.measure);
+  const ts = requireNonEmptyString(r.ts);
+  if (!measureName) reasons.push('missing_field:measure');
+  if (!ts) reasons.push('missing_field:ts');
   if (typeof r.value !== 'number' || Number.isNaN(r.value)) reasons.push('missing_field:value');
   const dimensions = asRecord(r.dimensions);
-  const clientId =
-    typeof measureName === 'string' && measureName.length > 0 && typeof r.ts === 'string' && r.ts.length > 0
-      ? `${measureName}|${r.ts}|${sortedJson(dimensions)}`
-      : `measure#${index}`;
   return {
-    clientId,
-    schemaName: typeof measureName === 'string' ? measureName : '',
+    // Measures carry no client-supplied id in the plan's sketch, so their
+    // own natural key (name+ts+dimensions) stands in — re-sending the same
+    // aggregate is then idempotent the same way a real client id would make it.
+    clientId: measureName && ts ? `${measureName}|${ts}|${sortedJson(dimensions)}` : `measure#${index}`,
+    schemaName: measureName ?? '',
     fieldsToValidate: dimensions,
     envelopeReasons: reasons,
   };
@@ -157,12 +171,25 @@ function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: reado
   return reasons;
 }
 
-function dedupKeyId(environmentId: string, kind: SchemaDefKind, clientId: string): string {
-  return createHash('sha256').update(`${environmentId}:${kind}:${clientId}`).digest('hex');
+/**
+ * Includes `schemaName` (not just `kind`) in the hash: for entities in
+ * particular, a client-supplied `id` is only guaranteed unique *within* one
+ * `type` (the same way two SQL tables can both have a row `id: 123`), so
+ * dedup must be scoped per schema family, not just per kind — otherwise a
+ * `product` and a `customer` sharing id `123` in the same environment would
+ * wrongly dedupe against each other.
+ */
+function dedupKeyId(environmentId: string, kind: SchemaDefKind, schemaName: string, clientId: string): string {
+  return createHash('sha256').update(`${environmentId}:${kind}:${schemaName}:${clientId}`).digest('hex');
 }
 
-function tally(results: readonly IngestRecordResult[], status: IngestRecordStatus): number {
-  return results.filter((result) => result.status === status).length;
+/** Every count the batch summary needs, in one pass over `results` rather than one `.filter()` per status. */
+function tallyByStatus(results: readonly IngestRecordResult[]): Record<IngestRecordStatus, number> {
+  const counts: Record<IngestRecordStatus, number> = { accepted: 0, quarantined: 0, duplicate: 0 };
+  for (const result of results) {
+    counts[result.status] += 1;
+  }
+  return counts;
 }
 
 /**
@@ -189,15 +216,38 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
     throw new IngestBatchTooLargeError(MAX_INGEST_BATCH_SIZE);
   }
 
-  const prepared = records.map((record, index) => prepareRecord(params.input, record, index));
-  const dedupIds = prepared.map((record) => dedupKeyId(params.environmentId, params.input.kind, record.clientId));
+  // One record per input record, its dedup id computed alongside it — kept as
+  // a single array of objects (rather than several arrays sharing an index)
+  // so a future edit that filters/reorders records can't silently desync a
+  // record from its own dedup id or existing-claim lookup.
+  const prepared = records.map((record, index) => {
+    const p = prepareRecord(params.input, record, index);
+    return { ...p, dedupId: dedupKeyId(params.environmentId, params.input.kind, p.schemaName, p.clientId) };
+  });
+
   const existingClaims = await Promise.all(
-    dedupIds.map((dedupId) =>
-      IngestDedupKeyModel.init(dedupId, { organization_id: params.organizationId, project_id: params.projectId }),
+    prepared.map((record) =>
+      IngestDedupKeyModel.init(record.dedupId, { organization_id: params.organizationId, project_id: params.projectId }),
+    ),
+  );
+  const preparedWithClaims = prepared.map((record, index) => ({ ...record, existingClaim: existingClaims[index] }));
+
+  // Prefetch every distinct schema this batch actually needs, in parallel,
+  // rather than one `await` per record inside the loop below — a batch
+  // touching k distinct event/entity/measure names now costs one round of k
+  // concurrent reads instead of up to k sequential ones.
+  const schemaNames = Array.from(
+    new Set(preparedWithClaims.filter((record) => record.envelopeReasons.length === 0).map((record) => record.schemaName)),
+  );
+  const schemaDefsByName = new Map(
+    await Promise.all(
+      schemaNames.map(
+        async (name) =>
+          [name, await getActiveSchemaDefinition(params.organizationId, params.projectId, params.input.kind, name)] as const,
+      ),
     ),
   );
 
-  const schemaCache = new Map<string, Awaited<ReturnType<typeof getActiveSchemaDefinition>>>();
   const recordResults: IngestRecordResult[] = [];
   const acceptedClaims: { dedupId: string; clientId: string }[] = [];
   // Two records in the *same* batch sharing a client id must also dedupe
@@ -206,25 +256,17 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   // has been saved yet at read time.
   const acceptedInThisBatch = new Set<string>();
 
-  for (let i = 0; i < prepared.length; i++) {
-    const record = prepared[i];
-
+  for (const record of preparedWithClaims) {
     if (record.envelopeReasons.length > 0) {
       recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons: record.envelopeReasons });
       continue;
     }
-    if (existingClaims[i] || acceptedInThisBatch.has(dedupIds[i])) {
+    if (record.existingClaim || acceptedInThisBatch.has(record.dedupId)) {
       recordResults.push({ client_id: record.clientId, status: 'duplicate' });
       continue;
     }
 
-    if (!schemaCache.has(record.schemaName)) {
-      schemaCache.set(
-        record.schemaName,
-        await getActiveSchemaDefinition(params.organizationId, params.projectId, params.input.kind, record.schemaName),
-      );
-    }
-    const schemaDef = schemaCache.get(record.schemaName) ?? null;
+    const schemaDef = schemaDefsByName.get(record.schemaName) ?? null;
     if (!schemaDef) {
       recordResults.push({
         client_id: record.clientId,
@@ -239,27 +281,35 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
     } else {
       recordResults.push({ client_id: record.clientId, status: 'accepted' });
-      acceptedClaims.push({ dedupId: dedupIds[i], clientId: record.clientId });
-      acceptedInThisBatch.add(dedupIds[i]);
+      acceptedClaims.push({ dedupId: record.dedupId, clientId: record.clientId });
+      acceptedInThisBatch.add(record.dedupId);
     }
   }
 
+  const counts = tallyByStatus(recordResults);
   const batch = new IngestBatchModel();
   batch.organization_id = params.organizationId;
   batch.project_id = params.projectId;
   batch.environment_id = params.environmentId;
   batch.kind = params.input.kind;
   batch.total_count = recordResults.length;
-  batch.accepted_count = tally(recordResults, 'accepted');
-  batch.quarantined_count = tally(recordResults, 'quarantined');
-  batch.duplicate_count = tally(recordResults, 'duplicate');
+  batch.accepted_count = counts.accepted;
+  batch.quarantined_count = counts.quarantined;
+  batch.duplicate_count = counts.duplicate;
   batch.record_results = recordResults;
   batch.created_at = new Date().toISOString();
   batch.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await batch.save();
 
+  // Claim each accepted record's dedup key independently and best-effort,
+  // after the batch itself is already durable and its summary computed
+  // above: a write failure here only means a later duplicate of that one
+  // record might slip through unnoticed, the same kind of eventual-
+  // consistency tradeoff this function already accepts for two concurrent
+  // batches racing on the same client id — not a reason to turn an
+  // otherwise-successful ingest into a 500 for the caller.
   await Promise.all(
-    acceptedClaims.map(({ dedupId, clientId }) => {
+    acceptedClaims.map(async ({ dedupId, clientId }) => {
       const claim = new IngestDedupKeyModel();
       claim.organization_id = params.organizationId;
       claim.project_id = params.projectId;
@@ -269,7 +319,11 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       claim.batch_id = batch.id;
       claim.created_at = batch.created_at;
       claim.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
-      return claim.save(dedupId);
+      try {
+        await claim.save(dedupId);
+      } catch {
+        // Best-effort — see the comment above this call.
+      }
     }),
   );
 

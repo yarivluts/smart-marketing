@@ -318,6 +318,123 @@ describe('ingestBatch — measures', () => {
     expect(first.accepted).toBe(1);
     expect(second.duplicates).toBe(1);
   });
+
+  it('does not dedupe the same natural key across two measures with different nested dimension key orders', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Nested Dimensions Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'measure',
+      name: 'ad_spend',
+      fields: [{ name: 'campaign', type: 'object', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    const first = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: {
+        kind: 'measure',
+        records: [
+          {
+            measure: 'ad_spend',
+            ts: '2026-07-02',
+            dimensions: { campaign: { id: 'c1', name: 'Spring' } },
+            value: 100,
+          },
+        ],
+      },
+    });
+    // Same dimensions, nested object key order reversed — must still hash to
+    // the same canonical dedup key.
+    const second = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: {
+        kind: 'measure',
+        records: [
+          {
+            measure: 'ad_spend',
+            ts: '2026-07-02',
+            dimensions: { campaign: { name: 'Spring', id: 'c1' } },
+            value: 100,
+          },
+        ],
+      },
+    });
+
+    expect(first.accepted).toBe(1);
+    expect(second.duplicates).toBe(1);
+  });
+});
+
+describe('ingestBatch — cross-kind/type dedup isolation', () => {
+  it('does not dedupe two different entity types sharing the same natural id', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Entity Type Isolation Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'product',
+      fields: [{ name: 'note', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'customer',
+      fields: [{ name: 'note', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    const products = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'entity', type: 'product', records: [{ id: '123' }] },
+    });
+    const customers = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'entity', type: 'customer', records: [{ id: '123' }] },
+    });
+
+    expect(products.accepted).toBe(1);
+    expect(customers.accepted).toBe(1);
+  });
+});
+
+describe('ingestBatch — whitespace-only ids', () => {
+  it('quarantines a whitespace-only event_id and reports its fallback id, not the literal whitespace', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Whitespace Id Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'signup',
+      fields: [{ name: 'note', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    const summary = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: '   ', event: 'signup', ts: '2026-07-03T10:15:00Z' }] },
+    });
+
+    expect(summary.quarantined).toBe(1);
+    const batch = await getIngestBatch(organization.id, project.id, prodEnvironment.id, summary.batchId);
+    expect(batch?.record_results[0]).toEqual({
+      client_id: 'event#0',
+      status: 'quarantined',
+      reasons: ['missing_field:event_id'],
+    });
+  });
 });
 
 describe('getIngestBatch', () => {
