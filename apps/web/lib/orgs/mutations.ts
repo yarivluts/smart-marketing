@@ -16,11 +16,14 @@ import {
   removeOrgMember,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
+  rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
+  setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   type AcceptInviteResult,
   type CreateOrganizationResult,
   type CreateProjectResult,
   type CredentialProvider,
   type InvitableRole,
+  type KmsProvider,
   type MembershipModel,
   type OrgPersonModel,
   type ResourceAttachmentModel,
@@ -98,6 +101,31 @@ interface CreateSharedCredentialInput {
 export async function createSharedCredential(input: CreateSharedCredentialInput): Promise<SharedCredentialModel> {
   await ensureFirestoreOrm();
   return createSharedCredentialInOrganization(input);
+}
+
+interface SetSharedCredentialSecretInput {
+  organizationId: string;
+  credentialId: string;
+  secret: string;
+  kms: KmsProvider;
+}
+
+export async function setSharedCredentialSecret(input: SetSharedCredentialSecretInput): Promise<SharedCredentialModel> {
+  await ensureFirestoreOrm();
+  return setSharedCredentialSecretInOrganization(input);
+}
+
+interface RotateSharedCredentialSecretKeyInput {
+  organizationId: string;
+  credentialId: string;
+  kms: KmsProvider;
+}
+
+export async function rotateSharedCredentialSecretKey(
+  input: RotateSharedCredentialSecretKeyInput,
+): Promise<SharedCredentialModel> {
+  await ensureFirestoreOrm();
+  return rotateSharedCredentialSecretKeyInOrganization(input);
 }
 
 interface CreateResourceTemplateInput {

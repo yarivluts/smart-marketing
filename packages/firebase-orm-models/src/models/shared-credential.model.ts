@@ -1,4 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
+import type { SecretEnvelope } from '../vault';
 
 /**
  * Providers a shared credential can represent. Kept intentionally small and
@@ -16,12 +17,12 @@ export function isCredentialProvider(value: string): value is CredentialProvider
 /**
  * An org-level connection credential in the Org Resource Library (plan 08
  * §1.2), e.g. one Google Ads MCC or Meta Business Manager login serving
- * several projects. Deliberately holds no secret/token material: real
- * envelope-encrypted secret storage is KAN-29 (KMS vault module), which does
- * not exist yet, so this model only tracks the credential's identity and the
- * org-level slice of sub-accounts it can grant (`available_scopes`) — the
- * part of KAN-27 that's buildable without KMS. Wiring an actual OAuth token
- * into this model is a follow-up once KAN-29 lands.
+ * several projects. Tracks the credential's identity and the org-level
+ * slice of sub-accounts it can grant (`available_scopes`), plus — once set
+ * via `vault.service.ts`'s `setSharedCredentialSecret` (KAN-29) — the
+ * envelope-encrypted secret material itself (`encrypted_secret`). Only
+ * ciphertext and a wrapped data-key ever land here; the raw secret never
+ * does, and is never re-derivable without the org's KMS-wrapped key.
  */
 @Model({
   reference_path: 'organizations/:organization_id/shared_credentials',
@@ -48,4 +49,8 @@ export class SharedCredentialModel extends BaseModel {
 
   @Field({ is_required: true })
   public created_by!: string;
+
+  /** Envelope-encrypted secret (OAuth token, API key, etc.) — see the class doc comment. Absent until `setSharedCredentialSecret` is called. */
+  @Field()
+  public encrypted_secret?: SecretEnvelope;
 }

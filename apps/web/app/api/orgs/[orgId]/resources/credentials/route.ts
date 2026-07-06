@@ -24,11 +24,12 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
       name: credential.name,
       provider: credential.provider,
       availableScopes: credential.available_scopes ?? [],
+      hasSecret: Boolean(credential.encrypted_secret),
     })),
   });
 }
 
-/** Registers a new org-level shared credential — requires `resources.manage`. See `SharedCredentialModel` for why no secret is stored here yet. */
+/** Registers a new org-level shared credential's identity — requires `resources.manage`. Its secret (if any) is set separately via the `[credentialId]/secret` route. */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId } = await params;
   const { user, error } = await requireOrgPermission(orgId, 'resources.manage');
