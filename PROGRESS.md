@@ -17,6 +17,71 @@ Template for each entry:
 
 ---
 
+## 2026-07-06 — E2.2 KMS envelope encryption vault module (KAN-29)
+
+- **Last completed:**
+  - Implemented **KAN-29** (E2.2 KMS envelope encryption for OAuth tokens/secrets — vault module;
+    plan `13 §E2`, AC "Secrets unreadable in Firestore dump; rotation test passes"), the natural
+    next pick after KAN-30 now that all sprint-2 predecessors were done.
+    - `packages/firebase-orm-models/src/vault/`: a provider-agnostic envelope-encryption module.
+      Each secret gets a fresh random data-encryption-key (DEK, AES-256-GCM); the DEK is wrapped by
+      a `KmsProvider`. `LocalKmsProvider` (the implementation available today) derives a per-tenant
+      subkey via HKDF from a versioned key ring read from `GROWTHOS_VAULT_KEYS` — the same
+      "buildable today" stand-in KAN-28 used for its own key hashing, until KAN-18 provisions the
+      real GCP project a `GcpKmsProvider` would talk to. Both the KMS-wrap and the envelope's own
+      AES-GCM cipher bind to an org+credential id via additional authenticated data (a shared
+      `aes-gcm.ts` primitive), so cross-tenant/cross-credential decryption fails closed rather than
+      relying only on application code. Rotation (`rotateSecretEnvelopeKey`) only re-wraps the DEK,
+      never re-encrypts the secret ciphertext.
+    - `packages/firebase-orm-models`: `SharedCredentialModel` (KAN-27) gains an `encrypted_secret`
+      field; new `vault.service.ts` provides `setSharedCredentialSecret` /
+      `revealSharedCredentialSecret` / `rotateSharedCredentialSecretKey` — closing the "wiring an
+      actual OAuth token in is a follow-up once KAN-29 lands" note left on that model.
+    - `apps/web`: a write-only "set/update secret" form + a "rotate key" button on the org resource
+      library page (never returns the decrypted value, same shape as a password field), both gated
+      on `resources.manage`. New routes `PUT .../credentials/[credentialId]/secret` and
+      `POST .../credentials/[credentialId]/secret/rotate`. New `GROWTHOS_VAULT_KEYS` env var
+      documented in `apps/web/.env.example`. Full en/he translations.
+    - Tests: pure-unit crypto tests (round-trip, tamper detection, cross-tenant failure, key
+      rotation incl. full old-key retirement, env-var validation), a Firestore-emulator test doing
+      a **raw document read** to prove only ciphertext is ever stored (the literal AC), and
+      route/component tests for the new admin-UI surface.
+    - Self-review (8 finder angles: line-by-line, removed-behavior, cross-file, reuse,
+      simplification, efficiency, altitude, CLAUDE.md conventions) found and fixed: no AAD binding
+      on the envelope's own cipher (fixed, and extracted a shared `aesGcmSeal`/`aesGcmOpen`
+      primitive instead of two independent AES-GCM implementations in `envelope.ts` and
+      `local-kms-provider.ts`); `GROWTHOS_VAULT_KEYS`'s `currentKeyId` wasn't validated against its
+      own `keys` map (fixed — was surfacing as an uncaught error instead of a clean 500); a
+      redundant Firestore write on a no-op key rotation (fixed); and — flagged independently by two
+      review angles — no admin surface existed for `rotateSharedCredentialSecretKey`, a CLAUDE.md
+      "everything user-manageable gets an admin surface" violation (fixed by adding the rotate
+      route + UI button above). Several other candidate findings (KmsProvider/WrappedDek interface
+      "unjustified" since only one implementation exists, `tenantId` naming, `dek.fill(0)`
+      best-effort zeroing, `apps/web/lib/vault/kms-provider.ts` re-parsing env per request) were
+      reviewed and deliberately left as-is — reasoning is in the PR discussion, not repeated here.
+  - Merged as PR #16, `main` fast-forwarded locally to confirm.
+  - **Found and closed a duplicate**: PR #14 (`kan-29-kms-vault-module`), an independent,
+    already-complete implementation of this same story from an earlier run today, was left open
+    and unmerged with `TASKS.md` never updated to reflect it — so this run picked the same "todo"
+    story unaware it existed. Closed #14 as superseded by #16 once this run's version merged (same
+    "the KAN-20 problem": an earlier run's finished-but-unmerged branch that never got reconciled).
+    **Both stale branches (`kan-29-vault-kms-envelope-encryption`, `kan-29-kms-vault-module`) could
+    not be deleted** — `git push --delete` returned an HTTP 403 from the git proxy in this
+    environment, and no branch-delete GitHub MCP tool was available this run. They're harmless
+    (unreferenced by any open PR) but a human or a future run with working branch-delete access
+    should clean them up.
+- **In progress (exact stopping point):** none — task fully delivered, merged, and documented.
+- **Blocked + why:** n/a.
+- **Next step:** pick the next unblocked sprint-2/3 `todo` story (e.g. KAN-31 Schema Registry or
+  KAN-32 ingest API — both sprint 2/3, no unfinished blockers). Also worth a stale-branch sweep
+  across the repo (KAN-20 already has 3 unreconciled branches; this run added 2 more undeletable
+  ones) — a human with branch-delete access, or a future run that finds one, should prune
+  `kan-29-vault-kms-envelope-encryption` and `kan-29-kms-vault-module`.
+- **Waiting on human:** deleting the two stale branches above (git-proxy permissions blocked it
+  from this run); everything else in the `Human-action queue` in TASKS.md is unchanged.
+
+---
+
 ## 2026-07-06 — E2.3 Admin UI: keys page (KAN-30)
 
 - **Last completed:**
