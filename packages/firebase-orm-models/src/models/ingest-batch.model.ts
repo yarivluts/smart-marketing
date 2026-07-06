@@ -29,9 +29,10 @@ export interface IngestRecordResult {
  * naming collision risk here (that only applies to the literal name
  * `fields`, per `SchemaDefModel`'s `field_defs`).
  *
- * This is validation bookkeeping only: accepted records aren't yet landed
- * anywhere durable for querying (that's the ingest pipeline, KAN-33) — this
- * story's job is validate + dedupe + report, per its own AC.
+ * This is validation bookkeeping, not the accepted record's own durable home:
+ * `record_results` stores each record's outcome, not its payload. The payload
+ * itself lands in `PipelineMessageModel`/`RawRecordModel` (KAN-33's pipeline),
+ * keyed by this batch's own id.
  */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/ingest_batches',

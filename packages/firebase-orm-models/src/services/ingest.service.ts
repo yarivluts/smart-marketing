@@ -7,6 +7,7 @@ import {
 import { IngestDedupKeyModel } from '../models/ingest-dedup-key.model';
 import type { SchemaDefKind, SchemaFieldDef, SchemaFieldType } from '../models/schema-def.model';
 import { getActiveSchemaDefinition } from './schema-registry.service';
+import { drainPendingPipelineMessages, enqueueAcceptedRecordsForPipeline } from './pipeline.service';
 
 export class EmptyIngestBatchError extends Error {
   constructor() {
@@ -222,7 +223,15 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   // record from its own dedup id or existing-claim lookup.
   const prepared = records.map((record, index) => {
     const p = prepareRecord(params.input, record, index);
-    return { ...p, dedupId: dedupKeyId(params.environmentId, params.input.kind, p.schemaName, p.clientId) };
+    return {
+      ...p,
+      dedupId: dedupKeyId(params.environmentId, params.input.kind, p.schemaName, p.clientId),
+      // The whole raw record as submitted, not just the fields validated against the schema
+      // (`fieldsToValidate`) — an accepted record's pipeline/warehouse payload (KAN-33, below) is the
+      // full envelope (e.g. an event's `event_id`/`ts` alongside its `properties`), not just the part
+      // schema validation cared about.
+      rawRecord: asRecord(record),
+    };
   });
 
   const existingClaims = await Promise.all(
@@ -249,7 +258,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   );
 
   const recordResults: IngestRecordResult[] = [];
-  const acceptedClaims: { dedupId: string; clientId: string }[] = [];
+  const acceptedClaims: { dedupId: string; clientId: string; schemaName: string; payload: Record<string, unknown> }[] = [];
   // Two records in the *same* batch sharing a client id must also dedupe
   // against each other, not only against a claim already persisted by an
   // earlier batch — `existingClaims` alone can't catch that since neither
@@ -281,7 +290,12 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
     } else {
       recordResults.push({ client_id: record.clientId, status: 'accepted' });
-      acceptedClaims.push({ dedupId: record.dedupId, clientId: record.clientId });
+      acceptedClaims.push({
+        dedupId: record.dedupId,
+        clientId: record.clientId,
+        schemaName: record.schemaName,
+        payload: record.rawRecord,
+      });
       acceptedInThisBatch.add(record.dedupId);
     }
   }
@@ -326,6 +340,31 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       }
     }),
   );
+
+  // KAN-33: publish every accepted record to the pipeline (Pub/Sub-stand-in outbox) and land it in
+  // the warehouse raw-table stand-in. Best-effort for the same reason as the dedup-key claims just
+  // above — a transient pipeline failure must not turn an otherwise-successful 202 into a 500; a
+  // record whose landing fails is marked `failed` inside `drainPendingPipelineMessages` for KAN-34's
+  // future replay/DLQ to pick up, not surfaced to this caller.
+  if (acceptedClaims.length > 0) {
+    try {
+      await enqueueAcceptedRecordsForPipeline({
+        organizationId: params.organizationId,
+        projectId: params.projectId,
+        environmentId: params.environmentId,
+        batchId: batch.id,
+        kind: params.input.kind,
+        records: acceptedClaims.map(({ clientId, schemaName, payload }) => ({ clientId, schemaName, payload })),
+      });
+      await drainPendingPipelineMessages({
+        organizationId: params.organizationId,
+        projectId: params.projectId,
+        environmentId: params.environmentId,
+      });
+    } catch {
+      // Best-effort — see the comment above this block.
+    }
+  }
 
   return {
     batchId: batch.id,

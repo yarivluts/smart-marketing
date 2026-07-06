@@ -8,6 +8,7 @@ import {
   getIngestBatch,
   IngestBatchTooLargeError,
   ingestBatch,
+  listRawRecordsForBatch,
   registerSchemaDefinition,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -434,6 +435,79 @@ describe('ingestBatch — whitespace-only ids', () => {
       status: 'quarantined',
       reasons: ['missing_field:event_id'],
     });
+  });
+});
+
+describe('ingestBatch — KAN-33 pipeline landing', () => {
+  it('lands an accepted event as a raw record carrying its full payload, well within the 60s AC', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Pipeline Landing Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'order_completed',
+      fields: [{ name: 'net', type: 'number', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    const startedAt = Date.now();
+    const summary = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: {
+        kind: 'event',
+        records: [
+          { event_id: 'ord_9001-evt', event: 'order_completed', ts: '2026-07-06T10:15:00Z', properties: { net: 42 } },
+        ],
+      },
+    });
+    const elapsedMs = Date.now() - startedAt;
+
+    expect(elapsedMs).toBeLessThan(60_000);
+    const rawRecords = await listRawRecordsForBatch(organization.id, project.id, summary.batchId);
+    expect(rawRecords).toHaveLength(1);
+    expect(rawRecords[0].client_id).toBe('ord_9001-evt');
+    expect(rawRecords[0].schema_name).toBe('order_completed');
+    expect(rawRecords[0].environment_id).toBe(prodEnvironment.id);
+    expect(rawRecords[0].payload).toEqual({
+      event_id: 'ord_9001-evt',
+      event: 'order_completed',
+      ts: '2026-07-06T10:15:00Z',
+      properties: { net: 42 },
+    });
+  });
+
+  it('never lands a quarantined or duplicate record as a raw record', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('No Land Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'signup',
+      fields: [{ name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    const summary = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: {
+        kind: 'event',
+        records: [
+          { event_id: 'e-bad', event: 'signup', ts: '2026-07-06T10:15:00Z' }, // quarantined: missing plan
+          { event_id: 'e-good', event: 'signup', ts: '2026-07-06T10:15:00Z', properties: { plan: 'pro' } },
+          { event_id: 'e-good', event: 'signup', ts: '2026-07-06T10:16:00Z', properties: { plan: 'pro' } }, // duplicate
+        ],
+      },
+    });
+
+    expect(summary.accepted).toBe(1);
+    expect(summary.quarantined).toBe(1);
+    expect(summary.duplicates).toBe(1);
+    const rawRecords = await listRawRecordsForBatch(organization.id, project.id, summary.batchId);
+    expect(rawRecords.map((r) => r.client_id)).toEqual(['e-good']);
   });
 });
 
