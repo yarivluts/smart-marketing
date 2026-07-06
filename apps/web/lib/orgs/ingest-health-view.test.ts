@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { computeIngestHealthSummary, DEFAULT_QUARANTINE_BROWSER_LIMIT, type IngestBatchView } from './ingest-health-view';
+import {
+  computeIngestHealthSummary,
+  DEFAULT_QUARANTINE_BROWSER_LIMIT,
+  formatMinutesAgo,
+  formatThroughput,
+  type IngestBatchView,
+} from './ingest-health-view';
 
 const NOW = Date.parse('2026-07-06T12:00:00Z');
 
@@ -25,7 +31,7 @@ describe('computeIngestHealthSummary', () => {
     expect(summary.quarantinedRecordsTruncated).toBe(false);
   });
 
-  it('sums counts and computes an error rate across accepted/quarantined/duplicate', () => {
+  it('sums accepted/quarantined/duplicate counts', () => {
     const batches = [
       batch({
         id: 'b1',
@@ -40,7 +46,26 @@ describe('computeIngestHealthSummary', () => {
     const summary = computeIngestHealthSummary(batches, NOW);
     expect(summary.overall.totalRecords).toBe(4);
     expect(summary.overall.acceptedCount).toBe(2);
-    expect(summary.overall.errorRatePercent).toBe(50);
+    expect(summary.overall.quarantinedCount).toBe(1);
+    expect(summary.overall.duplicateCount).toBe(1);
+  });
+
+  it('computes error rate from quarantined records only, excluding benign duplicates', () => {
+    // A batch that's 100% duplicate (e.g. a client retry storm after a
+    // timeout) is not a data-quality error and must not read as "100% error
+    // rate" — only genuine validation failures (quarantined) count.
+    const allDuplicates = batch({ id: 'b1', createdAt: '2026-07-06T11:58:00Z', totalCount: 4, duplicateCount: 4 });
+    expect(computeIngestHealthSummary([allDuplicates], NOW).overall.errorRatePercent).toBe(0);
+
+    const mixed = batch({
+      id: 'b2',
+      createdAt: '2026-07-06T11:58:00Z',
+      totalCount: 4,
+      acceptedCount: 2,
+      quarantinedCount: 1,
+      duplicateCount: 1,
+    });
+    expect(computeIngestHealthSummary([mixed], NOW).overall.errorRatePercent).toBe(25);
   });
 
   it('reports 0% error rate when total records is 0, not NaN/Infinity', () => {
@@ -84,7 +109,7 @@ describe('computeIngestHealthSummary', () => {
     expect(summary.byKind.map((k) => k.kind)).toEqual(['event', 'measure']);
   });
 
-  it('flattens quarantined records across batches, tagging each with its batch id and kind', () => {
+  it('flattens quarantined records across batches, tagging each with its batch id, record index, and kind', () => {
     const batches = [
       batch({
         id: 'b1',
@@ -101,9 +126,34 @@ describe('computeIngestHealthSummary', () => {
     ];
     const summary = computeIngestHealthSummary(batches, NOW);
     expect(summary.quarantinedRecords).toEqual([
-      { batchId: 'b1', kind: 'event', environmentId: 'env-prod', clientId: 'e1', reasons: ['missing_required_field:plan'], createdAt: '2026-07-06T11:00:00Z' },
-      { batchId: 'b1', kind: 'event', environmentId: 'env-prod', clientId: 'e3', reasons: ['unregistered_field:foo'], createdAt: '2026-07-06T11:00:00Z' },
+      { batchId: 'b1', recordIndex: 0, kind: 'event', environmentId: 'env-prod', clientId: 'e1', reasons: ['missing_required_field:plan'], createdAt: '2026-07-06T11:00:00Z' },
+      { batchId: 'b1', recordIndex: 2, kind: 'event', environmentId: 'env-prod', clientId: 'e3', reasons: ['unregistered_field:foo'], createdAt: '2026-07-06T11:00:00Z' },
     ]);
+  });
+
+  it('gives two quarantined records that share a client id (before any dedup check runs) distinct record indexes', () => {
+    // A batch can legitimately quarantine two records with the same
+    // client-supplied id — e.g. two "signup" events with event_id "e1" both
+    // missing the same required field. Both must survive with distinct
+    // identities so a React list key built from (batchId, recordIndex)
+    // never collides and silently drops one.
+    const batches = [
+      batch({
+        id: 'b1',
+        createdAt: '2026-07-06T11:00:00Z',
+        totalCount: 2,
+        quarantinedCount: 2,
+        recordResults: [
+          { client_id: 'e1', status: 'quarantined', reasons: ['missing_field:ts'] },
+          { client_id: 'e1', status: 'quarantined', reasons: ['missing_field:ts'] },
+        ],
+      }),
+    ];
+    const summary = computeIngestHealthSummary(batches, NOW);
+    expect(summary.quarantinedRecords).toHaveLength(2);
+    expect(summary.quarantinedRecords.map((r) => r.recordIndex)).toEqual([0, 1]);
+    const keys = summary.quarantinedRecords.map((r) => `${r.batchId}:${r.recordIndex}`);
+    expect(new Set(keys).size).toBe(2);
   });
 
   it('truncates the quarantine browser at the given limit and flags the truncation', () => {
@@ -131,5 +181,30 @@ describe('computeIngestHealthSummary', () => {
 
   it('defaults the quarantine browser limit to DEFAULT_QUARANTINE_BROWSER_LIMIT', () => {
     expect(DEFAULT_QUARANTINE_BROWSER_LIMIT).toBeGreaterThan(0);
+  });
+});
+
+describe('formatMinutesAgo', () => {
+  it('shows "<1" for sub-minute freshness', () => {
+    expect(formatMinutesAgo(0.4)).toBe('<1');
+  });
+
+  it('rounds whole minutes', () => {
+    expect(formatMinutesAgo(4.6)).toBe('5');
+    expect(formatMinutesAgo(1)).toBe('1');
+  });
+});
+
+describe('formatThroughput', () => {
+  it('shows one decimal place below 10/min', () => {
+    expect(formatThroughput(3.14159)).toBe('3.1');
+  });
+
+  it('shows a rounded whole number at or above 10/min', () => {
+    expect(formatThroughput(12.4)).toBe('12');
+  });
+
+  it('takes the whole-number branch for a value that rounds up to exactly 10, not "10.0"', () => {
+    expect(formatThroughput(9.96)).toBe('10');
   });
 });

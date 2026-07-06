@@ -46,10 +46,25 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     // avoid an ambiguous match across both.
     const overallRow = page.getByRole('listitem').filter({ hasText: 'Overall' });
     await expect(overallRow).toContainText('4 records · 2 accepted · 1 quarantined · 1 duplicate');
-    await expect(overallRow).toContainText('50.0% error rate');
+    // Error rate counts quarantined records only (1/4), not the benign
+    // duplicate — a retry storm must not read as a validation problem.
+    await expect(overallRow).toContainText('25.0% error rate');
 
     await expect(page.getByText('ord-3 (Events, Prod)')).toBeVisible();
     await expect(page.getByText('Reasons: missing_required_field:amount')).toBeVisible();
     await expect(page.getByText("Replay isn't available yet")).toBeVisible();
+  });
+
+  test('shows the empty state for a project with no ingest batches yet', async ({ page }) => {
+    await signUp(page, uniqueEmail('ingest-health-empty-owner'));
+    const orgId = await createOrganization(page, 'Ingest Health Empty E2E Org');
+
+    await page.getByRole('link', { name: 'New project' }).click();
+    await page.getByLabel('Project name').fill('Client Alpha');
+    await page.getByRole('button', { name: 'Create project' }).click();
+
+    await page.getByRole('link', { name: 'Ingest health' }).click();
+    await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
+    await expect(page.getByText('No quarantined records among the batches shown above.')).toBeVisible();
   });
 });

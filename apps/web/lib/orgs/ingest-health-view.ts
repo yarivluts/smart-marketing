@@ -40,7 +40,13 @@ export interface IngestHealthRollup {
   acceptedCount: number;
   quarantinedCount: number;
   duplicateCount: number;
-  /** `(quarantined + duplicate) / total`, as a 0-100 percentage. */
+  /**
+   * `quarantined / total`, as a 0-100 percentage — validation failures only.
+   * Deliberately excludes `duplicateCount`: a duplicate is a benign,
+   * expected idempotent-retry outcome (see `IngestRecordResult`'s own doc
+   * comment), not a data-quality problem, so folding it into "error rate"
+   * would make a harmless client retry storm read as an ingestion outage.
+   */
   errorRatePercent: number;
   latestBatchAt: string | null;
   /** Minutes since `latestBatchAt`, or `null` if this bucket has no batches at all. */
@@ -58,6 +64,14 @@ export interface IngestHealthRollup {
 
 export interface QuarantinedRecordView {
   batchId: string;
+  /**
+   * This record's index within its batch's `record_results` — two distinct
+   * records in the same batch can share the same `clientId` (e.g. two
+   * records with the same client-supplied id both missing the same required
+   * field are each quarantined independently, before any dedup check runs),
+   * so `clientId` alone isn't a safe React list key.
+   */
+  recordIndex: number;
   kind: SchemaDefKind;
   environmentId: string;
   clientId: string;
@@ -109,7 +123,7 @@ function rollupKind(kind: SchemaDefKind | 'overall', batches: readonly IngestBat
     earliestMs = Math.min(earliestMs, createdMs);
   }
 
-  const errorRatePercent = totalRecords === 0 ? 0 : ((quarantinedCount + duplicateCount) / totalRecords) * 100;
+  const errorRatePercent = totalRecords === 0 ? 0 : (quarantinedCount / totalRecords) * 100;
   const windowMinutes = Math.max((nowMs - earliestMs) / 60_000, MIN_THROUGHPUT_WINDOW_MINUTES);
   const throughputPerMinute = totalRecords / windowMinutes;
   const freshnessMinutes = Math.max(0, (nowMs - latestMs) / 60_000);
@@ -156,17 +170,18 @@ export function computeIngestHealthSummary(
   // flattening preserves that order without re-sorting here.
   const allQuarantined: QuarantinedRecordView[] = [];
   for (const batch of batches) {
-    for (const record of batch.recordResults) {
-      if (record.status !== 'quarantined') continue;
+    batch.recordResults.forEach((record, recordIndex) => {
+      if (record.status !== 'quarantined') return;
       allQuarantined.push({
         batchId: batch.id,
+        recordIndex,
         kind: batch.kind,
         environmentId: batch.environmentId,
         clientId: record.client_id,
         reasons: record.reasons ?? [],
         createdAt: batch.createdAt,
       });
-    }
+    });
   }
 
   return {
@@ -176,4 +191,21 @@ export function computeIngestHealthSummary(
     quarantinedRecordsTruncated: allQuarantined.length > quarantineLimit,
     batchesConsidered: batches.length,
   };
+}
+
+/** `"<1"` below a minute, otherwise the rounded whole-minute count — used for the "last batch N min ago" display. */
+export function formatMinutesAgo(minutes: number): string {
+  if (minutes < 1) return '<1';
+  return Math.round(minutes).toString();
+}
+
+/**
+ * One decimal place below 10/min, a rounded whole number at or above it.
+ * Rounds first so a value like 9.96 (which would print "10.0" under a raw
+ * `>= 10` check on the unrounded number) consistently takes the whole-number
+ * branch instead of straddling the threshold.
+ */
+export function formatThroughput(perMinute: number): string {
+  const rounded = Math.round(perMinute * 10) / 10;
+  return rounded >= 10 ? Math.round(rounded).toString() : rounded.toFixed(1);
 }

@@ -5,7 +5,13 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listEnvironmentsForProject, listOrgProjects, listRecentIngestBatchesForProject } from '@/lib/orgs/queries';
-import { computeIngestHealthSummary, toIngestBatchView, type IngestHealthRollup } from '@/lib/orgs/ingest-health-view';
+import {
+  computeIngestHealthSummary,
+  formatMinutesAgo,
+  formatThroughput,
+  toIngestBatchView,
+  type IngestHealthRollup,
+} from '@/lib/orgs/ingest-health-view';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -15,15 +21,6 @@ export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'IngestHealth' });
   return { title: t('metaTitle') };
-}
-
-function formatMinutesAgo(minutes: number): string {
-  if (minutes < 1) return '<1';
-  return Math.round(minutes).toString();
-}
-
-function formatThroughput(perMinute: number): string {
-  return perMinute >= 10 ? Math.round(perMinute).toString() : perMinute.toFixed(1);
 }
 
 /**
@@ -64,11 +61,11 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
     notFound();
   }
 
-  const environmentNameById = new Map(environments.map((environment) => [environment.id, environment.name]));
   const summary = computeIngestHealthSummary(batches.map(toIngestBatchView), Date.now());
 
   const t = await getTranslations('IngestHealth');
   const tEnv = await getTranslations('EnvBadge');
+  const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
 
   function renderRollup(rollup: IngestHealthRollup, key: string) {
     return (
@@ -118,24 +115,21 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
           <p className="text-muted-foreground">{t('noQuarantinedRecords')}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {summary.quarantinedRecords.map((record) => {
-              const environmentName = environmentNameById.get(record.environmentId);
-              return (
-                <li
-                  key={`${record.batchId}:${record.clientId}`}
-                  className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm"
-                >
-                  <span className="font-medium">
-                    {t('quarantinedRecordSummary', {
-                      clientId: record.clientId,
-                      kind: t(record.kind),
-                      environment: environmentName ? tEnv(environmentName) : record.environmentId,
-                    })}
-                  </span>
-                  <span className="text-muted-foreground">{t('reasonsLabel', { reasons: record.reasons.join(', ') })}</span>
-                </li>
-              );
-            })}
+            {summary.quarantinedRecords.map((record) => (
+              <li
+                key={`${record.batchId}:${record.recordIndex}`}
+                className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm"
+              >
+                <span className="font-medium">
+                  {t('quarantinedRecordSummary', {
+                    clientId: record.clientId,
+                    kind: t(record.kind),
+                    environment: environmentDisplayNameById.get(record.environmentId) ?? record.environmentId,
+                  })}
+                </span>
+                <span className="text-muted-foreground">{t('reasonsLabel', { reasons: record.reasons.join(', ') })}</span>
+              </li>
+            ))}
           </ul>
         )}
         {summary.quarantinedRecordsTruncated ? <p className="text-xs text-muted-foreground">{t('quarantineTruncatedNote')}</p> : null}

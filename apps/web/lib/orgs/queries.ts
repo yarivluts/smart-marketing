@@ -101,9 +101,10 @@ export async function listSchemaDefinitionsForProject(
 export async function listRecentIngestBatchesForProject(
   organizationId: string,
   projectId: string,
+  limit?: number,
 ): Promise<IngestBatchModel[]> {
   await ensureFirestoreOrm();
-  return listRecentIngestBatchesForProjectInOrganization(organizationId, projectId);
+  return listRecentIngestBatchesForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export interface PendingAttachmentDetails {
