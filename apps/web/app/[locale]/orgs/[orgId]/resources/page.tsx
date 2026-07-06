@@ -14,6 +14,7 @@ import { CreateCredentialForm } from '@/components/orgs/create-credential-form';
 import { CreateTemplateForm } from '@/components/orgs/create-template-form';
 import { CreatePersonForm } from '@/components/orgs/create-person-form';
 import { PendingAttachmentRequests } from '@/components/orgs/pending-attachment-requests';
+import { SetCredentialSecretForm } from '@/components/orgs/set-credential-secret-form';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string }>;
@@ -70,12 +71,19 @@ export default async function ResourceLibraryPage({ params }: PageProps): Promis
         ) : (
           <ul className="flex flex-col gap-2">
             {credentials.map((credential) => (
-              <li key={credential.id} className="rounded-md border border-input px-3 py-2 text-sm">
+              <li key={credential.id} className="flex flex-col gap-2 rounded-md border border-input px-3 py-2 text-sm">
                 {t('credentialSummary', {
                   name: credential.name,
                   provider: credential.provider,
                   scopeCount: credential.available_scopes?.length ?? 0,
                 })}
+                {canManageResources ? (
+                  <SetCredentialSecretForm
+                    orgId={orgId}
+                    credentialId={credential.id}
+                    hasSecret={Boolean(credential.encrypted_secret)}
+                  />
+                ) : null}
               </li>
             ))}
           </ul>

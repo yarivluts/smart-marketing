@@ -42,3 +42,5 @@ export * from './services/organization.service';
 export * from './services/invite.service';
 export * from './services/resource-library.service';
 export * from './services/key.service';
+export * from './services/vault.service';
+export * from './vault';
