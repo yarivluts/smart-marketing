@@ -17,6 +17,107 @@ Template for each entry:
 
 ---
 
+## 2026-07-06 — E2.3 Admin UI: keys page (KAN-30)
+
+- **Last completed:**
+  - Implemented **KAN-30** (Admin UI: keys page — create with scope picker, copy-once display,
+    revoke, last-used; plan `12 §1`/`13 §E2`), the natural next pick now that KAN-28 supplies the
+    service layer it needs.
+    - `apps/web`: new `orgs/:orgId/projects/:projectId/keys` page — mint a key scoped to one
+      environment with a least-privilege scope checkbox picker over `API_KEY_SCOPES`, list every
+      key ever minted (active or revoked) with its display-safe `key_prefix` and last-used time,
+      and revoke one immediately. Unlike KAN-27's resource library (any active member can browse),
+      the **whole feature — page and both new API routes — is gated on `keys.manage`**: a key's
+      scope list and usage metadata are sensitive enough that only roles trusted to manage keys
+      should see them at all, matching the story's own "Admin UI" framing.
+      New routes `orgs/[orgId]/projects/[projectId]/keys` (GET list/POST mint) and
+      `.../keys/[apiKeyId]` (DELETE revoke). New components: `CreateApiKeyForm` (name + environment
+      select + scope checkboxes), `MintedApiKeyDisplay` (the "copy this key now — it won't be
+      shown again" one-time secret view, with a copy-to-clipboard button), `RevokeApiKeyButton`.
+      Wired into the org detail page (a new "API keys" link, gated the same way). New `ApiKeys`
+      translation namespace, en + he.
+    - `packages/firebase-orm-models`: new `listEnvironmentsForProject` query
+      (`organization.service.ts`) — nothing previously re-listed a project's fixed dev/staging/prod
+      environments by id; needed to resolve `environmentId` for the create-key picker.
+    - **Deliberately out of scope**, matching the plan's own "audit entries written" AC bullet: no
+      audit-log entries are written for mint/revoke, since the audit log service (**KAN-44**)
+      doesn't exist yet — same "buildable today" split KAN-23/KAN-27 used for their own
+      not-yet-built dependencies.
+  - **Two real bugs caught and fixed during implementation, before the diff settled** (found by
+    actually running the e2e suite against a real `next dev` build, not just typecheck/lint, which
+    both stayed green through both bugs):
+    - `CreateApiKeyForm` (a client component) originally imported `API_KEY_SCOPES`/`ApiKeyScope`
+      from `@growthos/firebase-orm-models`, which transitively re-exports `key.service.ts` — and
+      that module's `node:crypto` usage doesn't exist in a browser bundle, so webpack failed the
+      client build (`UnhandledSchemeError: Reading from "node:crypto"`) the moment the page was
+      actually hit. Fixed by importing from `@growthos/shared` directly instead, the same thing
+      `invite-member-form.tsx` already does for `INVITABLE_ROLES` — client components must only
+      ever pull scope/role vocabulary from the pure `@growthos/shared` package, never from
+      `@growthos/firebase-orm-models`, whose index also drags in server-only service code.
+    - The keys page passed `EnvironmentModel[]` (an `@arbel/firebase-orm` class instance array)
+      directly as a prop from the server page into the `CreateApiKeyForm` client component. Class
+      instances aren't serializable across the React Server Components boundary, and this crashed
+      at runtime with `RangeError: Maximum call stack size exceeded` (an "Application error" page)
+      the first time the keys page was actually rendered in a browser — invisible to `tsc`/`eslint`
+      since nothing type-checks RSC serializability. Fixed by mapping to a plain `{id, name}[]`
+      before passing it down, the same reason `ProjectSwitcher` stays an `async` **server**
+      component instead of ever forwarding a `ProjectModel[]` across a client boundary. Takeaway for
+      future stories: any new "pass an org/project/environment list into a client form" pattern
+      needs its data mapped to plain objects first, and a real e2e run (not just lint/typecheck) is
+      what actually catches this class of bug.
+  - **Independent 5-angle review** (3 correctness angles + cleanup/reuse/efficiency +
+    altitude/CLAUDE.md-conventions) before opening the PR. It confirmed the copy-once secret display
+    is architecturally sound (the raw key lives only in transient client state, is never persisted,
+    and dismissing it is final — `listApiKeysForProject` never returns it) and that permission gating
+    is consistent across the page and both routes. It found, and this run fixed:
+    - `GET .../keys` validated `keys.manage` on the org but never that `projectId` actually belonged
+      to it, so a project id from a different org silently returned `200 { apiKeys: [] }` instead of
+      the `404` its own sibling `POST` (via `mintApiKey`'s `ProjectNotFoundError`) and `DELETE` (via
+      `revokeApiKey`'s `ApiKeyNotFoundError`) return for the same input — two independent finder
+      angles converged on this same inconsistency. Fixed by adding the same `listOrgProjects`-based
+      existence check the page itself already used, plus a regression test.
+    - **Reviewed and deliberately not changed**, each matching an existing codebase precedent rather
+      than a gap introduced by this story: scope identifiers (`ingest.write`, etc.) render
+      untranslated as technical values, same as `CREDENTIAL_PROVIDERS` values in
+      `create-credential-form.tsx`; revoke fires immediately with no confirm dialog, same as
+      `DetachAttachmentButton`/`RemoveMemberButton`; the new `listApiKeysForProject`/
+      `listEnvironmentsForProject` wrappers in `queries.ts` have no dedicated unit test, same as
+      every other thin delegating wrapper in that file (only `getInviteDetails`, which has real
+      logic, gets one); the new `isolation.test.ts` scenario only exercises the fake-org-id
+      enumeration boundary, same shape as every other scenario in that file — real cross-org key
+      isolation is already covered at the service layer by KAN-28's own
+      `key.emulator.test.ts` ("rejects a key presented against the wrong project").
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (46
+    tests in `packages/firebase-orm-models` incl. the new `listEnvironmentsForProject` coverage, 159
+    in `packages/shared`, 15 in `apps/api`, 184 web unit/route tests + 12/12 Playwright e2e in
+    `apps/web` incl. the new `e2e/keys.spec.ts` covering the full mint → copy → dismiss → revoke
+    lifecycle). One transient run of the documented gRPC `RESOURCE_EXHAUSTED` Firestore-emulator
+    flake self-recovered on retry, same as every prior run's entry.
+  - Branch `kan-30-keys-admin-ui`, PR #15, CI green (`lint · typecheck · test · build`,
+    `mergeable_state: clean`), merged (squash) into `main`. Remote branch deletion failed with the
+    same HTTP 403 from this sandbox's git remote recorded in every prior run's entry (not a GitHub
+    permissions issue) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-30 is fully delivered, independently reviewed,
+  tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-29** (KMS envelope encryption / vault module) is the natural next pick — it's
+  what would let KAN-27's `SharedCredentialModel` actually grow a real secret field, worth doing
+  before or alongside whichever story first needs to store a real OAuth token (KAN-49 Stripe plugin,
+  sprint 4). **KAN-31** (Schema Registry) is the next sprint-2 `todo` after that if picking something
+  not on the keys/resources/vault track. The `project.manage`-without-`projectId` gap documented in
+  the KAN-27 entry below remains open and unrelated to this story.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-30-keys-admin-ui` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403, and the GitHub MCP server has no delete-branch tool either), and
+    the other still-outstanding merged branches from prior runs noted in earlier entries below.
+
+---
+
 ## 2026-07-05 — E2.1 Key service (KAN-28)
 
 - **Last completed:**
