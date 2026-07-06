@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   ApiKeyNotFoundError,
+  authenticateApiKey,
   createOrganizationWithOwner,
   createProject,
   EnvironmentNotFoundError,
@@ -15,7 +16,7 @@ import {
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
-/** Emulator-backed tests for KAN-28's key service: mint, auth, and immediate revoke. */
+/** Emulator-backed tests for KAN-28's key service (mint, auth, immediate revoke) and KAN-32's flat-path `authenticateApiKey`. */
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('key-service-tests');
@@ -259,6 +260,75 @@ describe('verifyApiKeyForRequest', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toMatch(/scope/i);
+    }
+  });
+});
+
+describe('authenticateApiKey', () => {
+  it('resolves org/project/environment from the key alone, with no caller-declared scope to check', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Flat Path Org');
+    const { rawKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Ingest key',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+
+    const result = await authenticateApiKey(rawKey, 'ingest.write');
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.organizationId).toBe(organization.id);
+      expect(result.value.projectId).toBe(project.id);
+      expect(result.value.environmentId).toBe(prodEnvironment.id);
+      expect(result.value.apiKey.last_used_at).toBeTruthy();
+    }
+  });
+
+  it('maps an unknown key to the invalid_key reason', async () => {
+    const result = await authenticateApiKey('gos_live_not-a-real-key', 'ingest.write');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.reason).toBe('invalid_key');
+    }
+  });
+
+  it('maps a revoked key to the invalid_key reason', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Flat Path Revoke Org');
+    const { apiKey, rawKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Soon revoked',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+    await revokeApiKey({ organizationId: organization.id, projectId: project.id, apiKeyId: apiKey.id, revokedByUserId: owner.id });
+
+    const result = await authenticateApiKey(rawKey, 'ingest.write');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.reason).toBe('invalid_key');
+    }
+  });
+
+  it('maps a live key lacking the required scope to the insufficient_scope reason', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Flat Path Scope Org');
+    const { rawKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Metrics-only key',
+      scopes: ['metrics.write'],
+      createdByUserId: owner.id,
+    });
+
+    const result = await authenticateApiKey(rawKey, 'ingest.write');
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.reason).toBe('insufficient_scope');
     }
   });
 });
