@@ -1,6 +1,8 @@
 import 'server-only';
 import {
   acceptInvite as acceptInviteForOrganization,
+  type ApiKeyModel,
+  type ApiKeyScope,
   createOrganizationWithOwner,
   createOrgPerson as createOrgPersonInOrganization,
   createProject as createProjectInOrganization,
@@ -9,8 +11,11 @@ import {
   decideResourceAttachment as decideResourceAttachmentInOrganization,
   detachResource as detachResourceInOrganization,
   inviteMemberToOrganization,
+  mintApiKey as mintApiKeyInOrganization,
+  type MintApiKeyResult,
   removeOrgMember,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
+  revokeApiKey as revokeApiKeyInOrganization,
   type AcceptInviteResult,
   type CreateOrganizationResult,
   type CreateProjectResult,
@@ -160,4 +165,30 @@ interface DetachResourceInput {
 export async function detachResource(input: DetachResourceInput): Promise<ResourceAttachmentModel> {
   await ensureFirestoreOrm();
   return detachResourceInOrganization(input);
+}
+
+interface MintApiKeyInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  name: string;
+  scopes: readonly ApiKeyScope[];
+  createdByUserId: string;
+}
+
+export async function mintApiKey(input: MintApiKeyInput): Promise<MintApiKeyResult> {
+  await ensureFirestoreOrm();
+  return mintApiKeyInOrganization(input);
+}
+
+interface RevokeApiKeyInput {
+  organizationId: string;
+  projectId: string;
+  apiKeyId: string;
+  revokedByUserId: string;
+}
+
+export async function revokeApiKey(input: RevokeApiKeyInput): Promise<ApiKeyModel> {
+  await ensureFirestoreOrm();
+  return revokeApiKeyInOrganization(input);
 }
