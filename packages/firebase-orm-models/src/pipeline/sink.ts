@@ -1,33 +1,24 @@
 import { RawRecordModel } from '../models/raw-record.model';
-import type { SchemaDefKind } from '../models/schema-def.model';
-
-export interface WarehouseRawRow {
-  organizationId: string;
-  projectId: string;
-  environmentId: string;
-  batchId: string;
-  kind: SchemaDefKind;
-  schemaName: string;
-  clientId: string;
-  payload: Record<string, unknown>;
-}
+import type { PipelineRecordEnvelope } from './record';
 
 /**
  * The "land a record in the warehouse" boundary (KAN-33, plan `13 §E3.3`). Stands in for a real
  * partitioned BigQuery raw table until KAN-18/KAN-37 provision one — a `BigQueryWarehouseSink`
  * streaming-inserting into `org/project/env/date`-partitioned tables is a drop-in swap behind this
- * same interface.
+ * same interface. Kept as an interface (unlike `transport.ts`'s plain `publishPipelineMessage`
+ * function) because it's genuinely substituted today — `pipeline.emulator.test.ts` injects a failing
+ * sink to test the per-message failure path.
  *
  * `id` is the source `PipelineMessageModel`'s own id, so a caller landing the same message twice
  * (a transient retry, or a future KAN-34 replay) overwrites the same row instead of duplicating it —
  * "at least once delivery, idempotent consumer".
  */
 export interface WarehouseSink {
-  insertRawRecord(row: WarehouseRawRow, id: string): Promise<void>;
+  insertRawRecord(row: PipelineRecordEnvelope, id: string): Promise<void>;
 }
 
 export class FirestoreWarehouseSink implements WarehouseSink {
-  async insertRawRecord(row: WarehouseRawRow, id: string): Promise<void> {
+  async insertRawRecord(row: PipelineRecordEnvelope, id: string): Promise<void> {
     const record = new RawRecordModel();
     record.organization_id = row.organizationId;
     record.project_id = row.projectId;

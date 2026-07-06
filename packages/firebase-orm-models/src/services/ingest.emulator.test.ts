@@ -5,6 +5,7 @@ import {
   createProject,
   EmptyIngestBatchError,
   ensureUserForFirebaseSession,
+  enqueueAcceptedRecordsForPipeline,
   getIngestBatch,
   IngestBatchTooLargeError,
   ingestBatch,
@@ -508,6 +509,46 @@ describe('ingestBatch — KAN-33 pipeline landing', () => {
     expect(summary.duplicates).toBe(1);
     const rawRecords = await listRawRecordsForBatch(organization.id, project.id, summary.batchId);
     expect(rawRecords.map((r) => r.client_id)).toEqual(['e-good']);
+  });
+
+  it("only lands this batch's own accepted records, never an unrelated batch's message still queued in the same environment", async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Scoped Landing Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'order_completed',
+      fields: [{ name: 'net', type: 'number', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    // Simulates a stray message left `queued` by some earlier, unrelated batch/failed drain in the
+    // same org/project/environment — ingestBatch's own pipeline landing must not sweep it up as a
+    // side effect of an unrelated later request.
+    const strayBatchId = 'stray-batch';
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId: strayBatchId,
+      kind: 'event',
+      records: [{ clientId: 'stray-evt', schemaName: 'order_completed', payload: {} }],
+    });
+
+    const summary = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: {
+        kind: 'event',
+        records: [{ event_id: 'own-evt', event: 'order_completed', ts: '2026-07-06T10:15:00Z', properties: { net: 1 } }],
+      },
+    });
+
+    const ownRawRecords = await listRawRecordsForBatch(organization.id, project.id, summary.batchId);
+    expect(ownRawRecords.map((r) => r.client_id)).toEqual(['own-evt']);
+    const strayRawRecords = await listRawRecordsForBatch(organization.id, project.id, strayBatchId);
+    expect(strayRawRecords).toHaveLength(0);
   });
 });
 

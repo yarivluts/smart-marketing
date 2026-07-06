@@ -7,8 +7,9 @@ import {
   ensureUserForFirebaseSession,
   enqueueAcceptedRecordsForPipeline,
   FirestoreWarehouseSink,
+  landPipelineMessages,
   listRawRecordsForBatch,
-  type WarehouseRawRow,
+  type PipelineRecordEnvelope,
   type WarehouseSink,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -128,7 +129,7 @@ describe('enqueueAcceptedRecordsForPipeline + drainPendingPipelineMessages', () 
 
     const realSink = new FirestoreWarehouseSink();
     const flakySink: WarehouseSink = {
-      insertRawRecord: async (row: WarehouseRawRow, id: string) => {
+      insertRawRecord: async (row: PipelineRecordEnvelope, id: string) => {
         if (row.clientId === 'evt-bad') {
           throw new Error('simulated warehouse outage');
         }
@@ -191,5 +192,42 @@ describe('enqueueAcceptedRecordsForPipeline + drainPendingPipelineMessages', () 
 
     expect(firstDrain).toEqual({ delivered: 2, failed: 0 });
     expect(secondDrain).toEqual({ delivered: 1, failed: 0 });
+  });
+});
+
+describe('landPipelineMessages', () => {
+  it('lands exactly the given messages, ignoring other queued messages left in the same environment', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Scoped Landing Org');
+
+    // A stray message left `queued` by some other batch/caller in the same org/project/environment —
+    // `landPipelineMessages` must not touch it; only `drainPendingPipelineMessages` (a separate,
+    // explicit backlog sweep) does.
+    const strayBatchId = unique('stray-batch');
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId: strayBatchId,
+      kind: 'event',
+      records: [{ clientId: 'stray-evt', schemaName: 'order_completed', payload: {} }],
+    });
+
+    const ownBatchId = unique('own-batch');
+    const ownMessages = await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId: ownBatchId,
+      kind: 'event',
+      records: [{ clientId: 'own-evt', schemaName: 'order_completed', payload: {} }],
+    });
+
+    const result = await landPipelineMessages(ownMessages);
+
+    expect(result).toEqual({ delivered: 1, failed: 0 });
+    const ownRawRecords = await listRawRecordsForBatch(organization.id, project.id, ownBatchId);
+    expect(ownRawRecords.map((r) => r.client_id)).toEqual(['own-evt']);
+    const strayRawRecords = await listRawRecordsForBatch(organization.id, project.id, strayBatchId);
+    expect(strayRawRecords).toHaveLength(0);
   });
 });
