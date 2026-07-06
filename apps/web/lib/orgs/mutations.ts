@@ -10,9 +10,11 @@ import {
   createSharedCredential as createSharedCredentialInOrganization,
   decideResourceAttachment as decideResourceAttachmentInOrganization,
   detachResource as detachResourceInOrganization,
+  evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   inviteMemberToOrganization,
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
+  registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
@@ -30,6 +32,8 @@ import {
   type ResourceKind,
   type ResourceTemplateModel,
   type ResourceTemplateType,
+  type SchemaDefModel,
+  type SchemaFieldInput,
   type SharedCredentialModel,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -219,4 +223,32 @@ interface RevokeApiKeyInput {
 export async function revokeApiKey(input: RevokeApiKeyInput): Promise<ApiKeyModel> {
   await ensureFirestoreOrm();
   return revokeApiKeyInOrganization(input);
+}
+
+interface RegisterSchemaDefinitionInput {
+  organizationId: string;
+  projectId: string;
+  kind: string;
+  name: string;
+  fields: readonly SchemaFieldInput[];
+  createdByUserId: string;
+}
+
+export async function registerSchemaDefinition(input: RegisterSchemaDefinitionInput): Promise<SchemaDefModel> {
+  await ensureFirestoreOrm();
+  return registerSchemaDefinitionInOrganization(input);
+}
+
+interface EvolveSchemaDefinitionInput {
+  organizationId: string;
+  projectId: string;
+  kind: string;
+  name: string;
+  fields: readonly SchemaFieldInput[];
+  createdByUserId: string;
+}
+
+export async function evolveSchemaDefinition(input: EvolveSchemaDefinitionInput): Promise<SchemaDefModel> {
+  await ensureFirestoreOrm();
+  return evolveSchemaDefinitionInOrganization(input);
 }

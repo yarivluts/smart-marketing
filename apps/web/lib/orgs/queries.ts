@@ -11,6 +11,7 @@ import {
   listOrgProjects as listOrgProjectsForOrganization,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
   listResourceTemplates as listResourceTemplatesInOrganization,
+  listSchemaDefinitionsForProject as listSchemaDefinitionsForProjectInOrganization,
   listSharedCredentials as listSharedCredentialsInOrganization,
   MembershipModel,
   OrganizationModel,
@@ -23,6 +24,7 @@ import {
   type ResourceKind,
   type ResourceTemplateModel,
   type Role,
+  type SchemaDefModel,
   type SharedCredentialModel,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -84,6 +86,14 @@ export async function listEnvironmentsForProject(
 export async function listApiKeysForProject(organizationId: string, projectId: string): Promise<ApiKeySummary[]> {
   await ensureFirestoreOrm();
   return listApiKeysForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listSchemaDefinitionsForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<SchemaDefModel[]> {
+  await ensureFirestoreOrm();
+  return listSchemaDefinitionsForProjectInOrganization(organizationId, projectId);
 }
 
 export interface PendingAttachmentDetails {
