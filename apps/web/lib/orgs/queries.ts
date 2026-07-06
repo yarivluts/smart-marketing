@@ -10,12 +10,14 @@ import {
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
+  listRecentIngestBatchesForProject as listRecentIngestBatchesForProjectInOrganization,
   listResourceTemplates as listResourceTemplatesInOrganization,
   listSchemaDefinitionsForProject as listSchemaDefinitionsForProjectInOrganization,
   listSharedCredentials as listSharedCredentialsInOrganization,
   MembershipModel,
   OrganizationModel,
   UserModel,
+  type IngestBatchModel,
   type MembershipStatus,
   type OrgMemberSummary,
   type OrgPersonModel,
@@ -94,6 +96,14 @@ export async function listSchemaDefinitionsForProject(
 ): Promise<SchemaDefModel[]> {
   await ensureFirestoreOrm();
   return listSchemaDefinitionsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listRecentIngestBatchesForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<IngestBatchModel[]> {
+  await ensureFirestoreOrm();
+  return listRecentIngestBatchesForProjectInOrganization(organizationId, projectId);
 }
 
 export interface PendingAttachmentDetails {

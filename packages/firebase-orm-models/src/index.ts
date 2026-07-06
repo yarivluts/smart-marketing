@@ -52,4 +52,5 @@ export * from './services/schema-registry.service';
 export * from './services/ingest.service';
 export * from './services/pipeline.service';
 export * from './pipeline';
+export * from './services/ingest-health.service';
 export * from './vault';
