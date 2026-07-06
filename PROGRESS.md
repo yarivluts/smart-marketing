@@ -17,6 +17,140 @@ Template for each entry:
 
 ---
 
+## 2026-07-06 — E3.2 Ingest API (KAN-32)
+
+- **Last completed:**
+  - Implemented **KAN-32** (`POST /v1/ingest/(events|entities|measures)`: batch validation,
+    idempotency, `202 + batch_id`, per-record results; plan `13 §E3.2`/`12 §2`), the natural next
+    sprint-2 pick — first real consumer of KAN-28's key service and KAN-31's Schema Registry.
+    - `packages/firebase-orm-models`: new `IngestBatchModel` (one document per batch,
+      `organizations/:organization_id/projects/:project_id/ingest_batches`, per-record results
+      embedded as `record_results`) and `IngestDedupKeyModel` (a SHA-256 hash of
+      `environment_id:kind:schema_name:client_id` used *as the document id*, so a duplicate check
+      is a single point read, not a query — the shape the AC's "1k events/s sustained" load-test
+      needs). New `ingest.service.ts`: `ingestBatch` validates each record's fields against
+      `getActiveSchemaDefinition` (KAN-31) — missing required fields, type mismatches, and fields
+      not declared on the schema all quarantine just that one record (plan `08 §2`: "unknown
+      fields are quarantined, not dropped"), never failing the whole batch. Idempotency key is the
+      client-supplied `event_id`/`id`; measures carry no client id in the plan's own sketch, so a
+      deterministic key derived from `measure|ts|canonicalized-dimensions` stands in.
+      `getIngestBatch` is the `GET /v1/ingest/batches/{batch_id}` read side, scoped to the caller's
+      own org/project/environment (a batch from a sibling project/environment returns `null`, same
+      404-not-403 posture as every other cross-tenant lookup here).
+    - `key.service.ts` (KAN-28) gains `authenticateApiKey(rawKey, requiredScope)` alongside the
+      existing `verifyApiKeyForRequest`: the plan's ingest routes are flat (`/v1/ingest/events`, no
+      org/project/environment in the URL — matching its own "curl a custom event" phase-0 demo), so
+      there's no path segment to check a key's claimed scope *against*. The new function resolves
+      org/project/environment straight from the key's own hash lookup instead, refactored to share
+      `findLiveApiKeyByRawKey`/`toApiKeyAuthContext` with the existing function rather than
+      duplicating the hash-lookup-and-revoked-check logic.
+    - `apps/api`: first real feature module in this NestJS app. `IngestController`
+      (`POST .../ingest/(events|entities|measures)`, `GET .../ingest/batches/:batchId`), gated by a
+      new `ApiKeyAuthGuard` + `@RequireApiKeyScope('ingest.write')` — a bearer-key guard,
+      deliberately separate from the human/service-account `PermissionGuard` (an API key has no
+      `Principal`/`PolicyBinding` to check), mirroring `PermissionGuard`'s own 401-vs-403 split: no
+      usable credential at all (missing header, unknown/revoked key) is 401; a live key missing the
+      required scope is 403. Every ingest route is `@Public()` (satisfying `PermissionGuard`'s
+      deny-by-default check and the `growthos/require-permission-annotation` lint rule) and gated
+      instead by the new guard via `@UseGuards`.
+    - `apps/api` now runs its own test suite against a **real Firestore emulator** (new
+      `apps/api/firebase.json`/`firestore.rules`, port 8100 — distinct from `packages/firebase-orm-
+      models`'s 8080 and `apps/web`'s 8090; `turbo.json` gained `@growthos/api#test`'s own
+      `dependsOn: [..., "@growthos/firebase-orm-models#test"]` entry serializing it after that
+      package's own emulator run, same reasoning as the existing `@growthos/web#test` entry) rather
+      than mocking `@growthos/firebase-orm-models` — a real `INestApplication` + real HTTP + real
+      emulator e2e suite (`ingest.controller.e2e.spec.ts`), since this repo's own history is full of
+      auth/wiring bugs that only a real e2e run (not lint/typecheck/mocked-unit-tests) catches.
+      `apps/api/package.json` gained a real dependency on `@growthos/firebase-orm-models` (it only
+      had `@growthos/shared` before) and a `firebase-tools` devDependency for the emulator CLI.
+  - **Independent 4-angle review** (line-by-line, removed-behavior, cross-file, cleanup/altitude/
+    conventions combined) before opening the PR. Found and fixed:
+    - `dedupKeyId` hashed only `(environment, kind, client_id)`, omitting the record's own schema
+      name — so two different entity types (or event names) sharing the same client-supplied id in
+      one environment would wrongly dedupe against each other (e.g. a `product` and a `customer`
+      both using natural id `123`). Now hashes `(environment, kind, schema_name, client_id)`.
+    - The measure dedup key's `sortedJson` canonicalized only the dimensions map's top-level keys,
+      so a nested dimension object (e.g. `{campaign: {id, name}}`) could hash differently across two
+      semantically-identical resends that merely reordered the nested keys, silently dodging dedup.
+      `canonicalize` now sorts recursively at every nesting level.
+    - A whitespace-only client id (e.g. `event_id: "   "`) passed the fallback-id's `.length > 0`
+      check even though the presence check (`.trim().length > 0`) had already quarantined the
+      record, so the per-record result reported the literal whitespace string instead of the
+      deterministic `#index` fallback. Unified both checks behind one `requireNonEmptyString` helper.
+    - Schema-definition lookups ran one `await` per record inside the main loop instead of being
+      prefetched in parallel for every distinct schema name a batch actually touches — fixed for the
+      load-test-AC'd hot path (a batch spanning *k* distinct names now costs one round of *k*
+      concurrent reads, not up to *k* sequential ones).
+    - Dedup-key claim writes (the accepted records' idempotency-key persistence, run *after* the
+      batch document is already durable) are now best-effort per record (caught, not propagated) —
+      a transient write failure there no longer turns an otherwise-successful `202` into an
+      unhandled `500`; it only means a later duplicate of that one record might slip through
+      unnoticed, the same kind of eventual-consistency tradeoff already accepted for the
+      known/documented concurrent-accept race (same class as KAN-31's non-transactional
+      active-version read).
+    - Consolidated three index-aligned parallel arrays (`prepared`/`dedupIds`/`existingClaims`) into
+      one array of per-record objects, removing a latent desync risk for future edits.
+    - Regression tests added for all of the above (entity-type cross-collision, nested-dimension
+      canonicalization, whitespace-only id fallback) in the emulator suite.
+    - **Reviewed and deliberately left as-is**: wrapping `apps/api`'s test script in a real Firestore
+      emulator (rather than mocking) is a first for this app but matches `apps/web`'s own precedent
+      exactly and is provisioned identically in CI (Java + cached emulator jars already set up); a
+      couple of very small (3-line) hashing/plain-object-check helpers duplicated once each between
+      `key.service.ts`/`ingest.service.ts` and `ingest.service.ts`/`ingest-request.ts` weren't worth
+      introducing new shared-module abstractions for in this diff.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (159
+    tests in `packages/shared`, 91 in `packages/firebase-orm-models` incl. the new
+    `ingest.emulator.test.ts` (16 tests) and 4 new `authenticateApiKey` tests, 29 in `apps/api` incl.
+    the new `api-key-auth.guard.spec.ts` and `ingest.controller.e2e.spec.ts`, 223 web unit/route
+    tests + 13/13 Playwright e2e in `apps/web`). One transient run of the documented gRPC
+    `RESOURCE_EXHAUSTED` Firestore-emulator flake (in an unrelated, pre-existing test) self-recovered
+    on retry, same as every prior run's entry.
+  - **Found and closed a duplicate**: an independent run today had already opened **PR #18** for
+    this exact story under the identical branch name `kan-32-ingest-api` — a `git push` rejection
+    (not a merge conflict on `main`; the branch itself already existed with different commits) is
+    what surfaced it, the same "KAN-20 problem" this file has documented before. Compared the two
+    implementations directly before deciding rather than assuming mine was better by default: #18's
+    own dedup check (`wasAlreadyAccepted`) had the *identical* cross-schema-name collision bug listed
+    above, unfixed; it nested `organizationId`/`projectId`/`environmentId` into the URL rather than
+    the plan's literal flat `/v1/ingest/events` contract (a real product/API-contract concern, not
+    just style — the plan's own phase-0 demo is "curl a custom event" with just a key, no ids to
+    look up first); and its `apps/api` tests mocked `@growthos/firebase-orm-models` rather than
+    exercising a real emulator end-to-end. Its one genuine advantage — persisting each record's full
+    raw payload — is arguably out of this story's scope (that's KAN-33's "accepted records → Pub/Sub
+    → BigQuery raw tables" job). Renamed my branch to `kan-32-ingest-api-flat-url`, opened PR #19
+    referencing this comparison, closed #18 with an explanatory comment, matching the KAN-29 entry's
+    established reconciliation precedent (closing its own duplicate PR #14).
+  - Branch `kan-32-ingest-api-flat-url`, PR #19. CI green (`lint · typecheck · test · build`,
+    `mergeable_state: clean`) on the first attempt — no stall/flake this run. Merged (squash) into
+    `main`. Remote branch deletion failed with the same HTTP 403 from this sandbox's git remote
+    recorded in every prior run's entry (not a GitHub permissions issue) — merged and dead but not
+    deleted.
+- **In progress (exact stopping point):** none — KAN-32 is fully delivered, independently reviewed,
+  tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-33** (pipeline: accepted records → Pub/Sub → BigQuery raw tables) is the
+  natural next pick — it's the direct downstream consumer of this story's `ingestBatch`/
+  `IngestBatchModel` and is what would let an "accepted" record actually land somewhere queryable
+  (right now KAN-32's `record_results` only ever stores validation status, not the raw payload —
+  worth keeping in mind when KAN-33 is designed: either persist the raw payload somewhere durable
+  before/as part of publishing to Pub/Sub, or accept that pre-KAN-33 "accepted" submissions are
+  unrecoverable once this story's batch documents are the only record of them). **KAN-35** (Admin
+  UI: ingest health) and **KAN-34** (quarantine/DLQ/rate-limiting) are also sprint-2/3 and downstream
+  of this story. The real "1k events/s" load test from this story's own AC still needs actual
+  staging infra (KAN-18, `needs-human`) to run against — not something a future run can satisfy
+  without that.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-32-ingest-api-flat-url` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403), and the other still-outstanding merged branches from
+    prior runs noted in earlier entries below.
+
+---
+
 ## 2026-07-06 — E3.1 Schema Registry (KAN-31)
 
 - **Last completed:**
