@@ -67,7 +67,8 @@
     "membersHeading": "Members",
     "resourceLibraryLink": "Resource library",
     "projectResourcesLink": "Project resources",
-    "projectKeysLink": "API keys"
+    "projectKeysLink": "API keys",
+    "projectSchemaRegistryLink": "Schema registry"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -180,5 +181,42 @@
     "done": "Done",
     "revoke": "Revoke",
     "revokeError": "Couldn't revoke this key. Please try again."
+  },
+  "SchemaRegistry": {
+    "metaTitle": "Schema registry",
+    "title": "Schema registry for {projectName}",
+    "registeredHeading": "Registered schemas",
+    "noSchemas": "No schemas registered for this project yet.",
+    "familyHeading": "{kind}: {name}",
+    "versionStatusLabel": "v{version} — {status}",
+    "activeLabel": "Active",
+    "supersededLabel": "Superseded",
+    "fieldNameHeader": "Field",
+    "fieldTypeHeader": "Type",
+    "fieldRequiredHeader": "Required",
+    "fieldPiiHeader": "PII",
+    "fieldIdentityKeyHeader": "Identity key",
+    "yes": "Yes",
+    "no": "No",
+    "evolve": "Evolve",
+    "cancel": "Cancel",
+    "registerHeading": "Register a new schema",
+    "kindLabel": "Kind",
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g. order_completed",
+    "fieldsLabel": "Fields",
+    "fieldNamePlaceholder": "Field name",
+    "requiredLabel": "Required",
+    "piiLabel": "PII",
+    "identityKeyLabel": "Identity key",
+    "addField": "Add field",
+    "removeField": "Remove",
+    "register": "Register schema",
+    "registerError": "Something went wrong. Please try again.",
+    "duplicateSchemaError": "A schema with this kind and name is already registered in this project.",
+    "evolveHeading": "Evolve {kind} \"{name}\" to a new version",
+    "evolveSubmit": "Evolve schema",
+    "evolveError": "Something went wrong. Please try again.",
+    "breakingChangeError": "This change would break existing consumers: {violations}"
   }
 }

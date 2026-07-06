@@ -67,7 +67,8 @@
     "membersHeading": "חברים",
     "resourceLibraryLink": "ספריית משאבים",
     "projectResourcesLink": "משאבי הפרויקט",
-    "projectKeysLink": "מפתחות API"
+    "projectKeysLink": "מפתחות API",
+    "projectSchemaRegistryLink": "מרשם סכימות"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -180,5 +181,42 @@
     "done": "סיום",
     "revoke": "ביטול",
     "revokeError": "לא ניתן היה לבטל את המפתח. נסה שוב."
+  },
+  "SchemaRegistry": {
+    "metaTitle": "מרשם סכימות",
+    "title": "מרשם סכימות עבור {projectName}",
+    "registeredHeading": "סכימות רשומות",
+    "noSchemas": "עדיין לא נרשמו סכימות עבור פרויקט זה.",
+    "familyHeading": "{kind}: {name}",
+    "versionStatusLabel": "גרסה {version} — {status}",
+    "activeLabel": "פעילה",
+    "supersededLabel": "הוחלפה",
+    "fieldNameHeader": "שדה",
+    "fieldTypeHeader": "סוג",
+    "fieldRequiredHeader": "חובה",
+    "fieldPiiHeader": "מידע מזהה",
+    "fieldIdentityKeyHeader": "מפתח זהות",
+    "yes": "כן",
+    "no": "לא",
+    "evolve": "פיתוח גרסה",
+    "cancel": "ביטול",
+    "registerHeading": "רישום סכימה חדשה",
+    "kindLabel": "סוג",
+    "nameLabel": "שם",
+    "namePlaceholder": "למשל order_completed",
+    "fieldsLabel": "שדות",
+    "fieldNamePlaceholder": "שם השדה",
+    "requiredLabel": "חובה",
+    "piiLabel": "מידע מזהה",
+    "identityKeyLabel": "מפתח זהות",
+    "addField": "הוספת שדה",
+    "removeField": "הסרה",
+    "register": "רישום סכימה",
+    "registerError": "משהו השתבש. נסה שוב.",
+    "duplicateSchemaError": "סכימה עם סוג ושם אלה כבר רשומה בפרויקט זה.",
+    "evolveHeading": "פיתוח {kind} \"{name}\" לגרסה חדשה",
+    "evolveSubmit": "פיתוח סכימה",
+    "evolveError": "משהו השתבש. נסה שוב.",
+    "breakingChangeError": "השינוי הזה היה שובר צרכנים קיימים: {violations}"
   }
 }
