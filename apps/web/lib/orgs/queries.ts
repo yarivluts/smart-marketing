@@ -1,7 +1,11 @@
 import 'server-only';
 import {
+  type ApiKeySummary,
+  type EnvironmentModel,
   listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
+  listApiKeysForProject as listApiKeysForProjectInOrganization,
   listAttachmentsForProject as listAttachmentsForProjectInOrganization,
+  listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listOrgMembersWithProfiles,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
@@ -67,6 +71,19 @@ export async function listActiveAttachmentsForProject(
 export async function listPendingAttachmentsForOrg(organizationId: string): Promise<ResourceAttachmentModel[]> {
   await ensureFirestoreOrm();
   return listPendingAttachmentsForOrgInOrganization(organizationId);
+}
+
+export async function listEnvironmentsForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<EnvironmentModel[]> {
+  await ensureFirestoreOrm();
+  return listEnvironmentsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listApiKeysForProject(organizationId: string, projectId: string): Promise<ApiKeySummary[]> {
+  await ensureFirestoreOrm();
+  return listApiKeysForProjectInOrganization(organizationId, projectId);
 }
 
 export interface PendingAttachmentDetails {

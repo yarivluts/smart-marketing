@@ -13,6 +13,7 @@ import {
   inviteMemberToOrganization,
   InviteNotFoundError,
   LastOwnerError,
+  listEnvironmentsForProject,
   listMembershipsForUser,
   listMembershipsWithOrganizations,
   listOrgMembersWithProfiles,
@@ -106,6 +107,21 @@ describe('createProject', () => {
 
     const projects = await listOrgProjects(organization.id);
     expect(projects.map((p) => p.id)).toContain(project.id);
+  });
+});
+
+describe('listEnvironmentsForProject', () => {
+  it('lists the dev/staging/prod environments provisioned for a project', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('env-list-owner'),
+    });
+    const { organization } = await createOrganizationWithOwner({ name: 'Env List Org', ownerUserId: owner.id });
+    const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
+
+    const listed = await listEnvironmentsForProject(organization.id, project.id);
+    expect(listed.map((environment) => environment.id).sort()).toEqual(environments.map((e) => e.id).sort());
+    expect(listed.map((environment) => environment.name).sort()).toEqual(['dev', 'prod', 'staging']);
   });
 });
 

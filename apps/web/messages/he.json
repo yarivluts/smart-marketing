@@ -66,7 +66,8 @@
     "noProjects": "לארגון זה אין עדיין פרויקטים.",
     "membersHeading": "חברים",
     "resourceLibraryLink": "ספריית משאבים",
-    "projectResourcesLink": "משאבי הפרויקט"
+    "projectResourcesLink": "משאבי הפרויקט",
+    "projectKeysLink": "מפתחות API"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -149,5 +150,27 @@
     "requestError": "לא ניתן היה לשלוח את הבקשה. נסה שוב.",
     "detach": "ניתוק",
     "detachError": "לא ניתן היה לנתק את המשאב. נסה שוב."
+  },
+  "ApiKeys": {
+    "metaTitle": "מפתחות API",
+    "title": "מפתחות API עבור {projectName}",
+    "existingKeysHeading": "מפתחות קיימים",
+    "noKeys": "עדיין לא נוצרו מפתחות עבור פרויקט זה.",
+    "revokedLabel": "בוטל",
+    "neverUsedLabel": "מעולם לא נעשה בו שימוש",
+    "lastUsedLabel": "שימוש אחרון {lastUsedAt}",
+    "createKeyHeading": "יצירת מפתח חדש",
+    "noEnvironments": "לפרויקט זה אין עדיין סביבות.",
+    "nameLabel": "שם",
+    "environmentLabel": "סביבה",
+    "scopesLabel": "היקפי הרשאה",
+    "createKey": "יצירת מפתח",
+    "createError": "משהו השתבש. נסה שוב.",
+    "secretShownOnceWarning": "העתק את המפתח כעת — הוא לא יוצג שוב.",
+    "copySecret": "העתקה",
+    "copied": "הועתק",
+    "done": "סיום",
+    "revoke": "ביטול",
+    "revokeError": "לא ניתן היה לבטל את המפתח. נסה שוב."
   }
 }

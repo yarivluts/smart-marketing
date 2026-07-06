@@ -53,6 +53,7 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
   const principal = { type: 'user' as const, id: user.id };
   const canManageMembers = can(bindings, principal, 'members.manage', { orgId });
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
+  const canManageKeys = can(bindings, principal, 'keys.manage', { orgId });
 
   const t = await getTranslations('OrgDetailPage');
 
@@ -93,6 +94,11 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
                 <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/resources`}>
                   {t('projectResourcesLink')}
                 </Link>
+                {canManageKeys ? (
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/keys`}>
+                    {t('projectKeysLink')}
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </>

@@ -66,7 +66,8 @@
     "noProjects": "This organization has no projects yet.",
     "membersHeading": "Members",
     "resourceLibraryLink": "Resource library",
-    "projectResourcesLink": "Project resources"
+    "projectResourcesLink": "Project resources",
+    "projectKeysLink": "API keys"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -149,5 +150,27 @@
     "requestError": "Couldn't send that request. Please try again.",
     "detach": "Detach",
     "detachError": "Couldn't detach this resource. Please try again."
+  },
+  "ApiKeys": {
+    "metaTitle": "API keys",
+    "title": "API keys for {projectName}",
+    "existingKeysHeading": "Existing keys",
+    "noKeys": "No keys minted for this project yet.",
+    "revokedLabel": "Revoked",
+    "neverUsedLabel": "Never used",
+    "lastUsedLabel": "Last used {lastUsedAt}",
+    "createKeyHeading": "Mint a new key",
+    "noEnvironments": "This project has no environments yet.",
+    "nameLabel": "Name",
+    "environmentLabel": "Environment",
+    "scopesLabel": "Scopes",
+    "createKey": "Create key",
+    "createError": "Something went wrong. Please try again.",
+    "secretShownOnceWarning": "Copy this key now — it won't be shown again.",
+    "copySecret": "Copy",
+    "copied": "Copied",
+    "done": "Done",
+    "revoke": "Revoke",
+    "revokeError": "Couldn't revoke this key. Please try again."
   }
 }

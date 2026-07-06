@@ -190,3 +190,13 @@ export async function listOrgProjects(organizationId: string): Promise<ProjectMo
     .where('organization_id', '==', organizationId)
     .get();
 }
+
+/** The fixed dev/staging/prod environments provisioned for one project (KAN-30's key-creation environment picker). */
+export async function listEnvironmentsForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<EnvironmentModel[]> {
+  return EnvironmentModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('project_id', '==', projectId)
+    .get();
+}
