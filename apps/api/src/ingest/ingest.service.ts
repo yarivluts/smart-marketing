@@ -14,7 +14,12 @@ export class IngestService {
     return ingestBatch(params);
   }
 
-  getIngestBatch(organizationId: string, projectId: string, batchId: string): Promise<IngestBatchDetail> {
-    return getIngestBatch(organizationId, projectId, batchId);
+  getIngestBatch(
+    organizationId: string,
+    projectId: string,
+    environmentId: string,
+    batchId: string,
+  ): Promise<IngestBatchDetail> {
+    return getIngestBatch(organizationId, projectId, environmentId, batchId);
   }
 }

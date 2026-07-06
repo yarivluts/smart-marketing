@@ -48,7 +48,9 @@ describe('IngestController', () => {
       projectId: 'p1',
       environmentId: 'e1',
       kind: 'event',
-      records: [{ clientRecordId: 'e-1', name: 'signup', data: {} }],
+      records: [
+        { clientRecordId: 'e-1', name: 'signup', data: {}, raw: { event_id: 'e-1', event: 'signup', properties: {} } },
+      ],
     });
   });
 
@@ -66,7 +68,17 @@ describe('IngestController', () => {
     await controller.ingestEntities(params, { type: 'product', records: [{ id: 'sku_1', attributes: {} }] });
 
     expect(ingestService.ingestBatch).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'entity', records: [{ clientRecordId: 'sku_1', name: 'product', data: {} }] }),
+      expect.objectContaining({
+        kind: 'entity',
+        records: [
+          {
+            clientRecordId: 'sku_1',
+            name: 'product',
+            data: {},
+            raw: { id: 'sku_1', attributes: {}, type: 'product' },
+          },
+        ],
+      }),
     );
   });
 
@@ -133,6 +145,7 @@ describe('IngestController', () => {
       created_at: '2026-07-06T00:00:00.000Z',
       records: [{ client_record_id: 'e-1', name: 'signup', status: 'accepted', reasons: [] }],
     });
+    expect(ingestService.getIngestBatch).toHaveBeenCalledWith('o1', 'p1', 'e1', 'b1');
   });
 
   it('maps IngestBatchNotFoundError to 404', async () => {

@@ -76,7 +76,12 @@ export class IngestController {
   @Get('batches/:batchId')
   async getBatch(@Param() params: IngestPathParams & { batchId: string }) {
     try {
-      const detail = await this.ingestService.getIngestBatch(params.organizationId, params.projectId, params.batchId);
+      const detail = await this.ingestService.getIngestBatch(
+        params.organizationId,
+        params.projectId,
+        params.environmentId,
+        params.batchId,
+      );
       return {
         batch_id: detail.batchId,
         kind: detail.kind,

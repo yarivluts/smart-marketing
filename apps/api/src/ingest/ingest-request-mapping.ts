@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import type { IngestRecordInput } from '@growthos/firebase-orm-models';
+import { MAX_INGEST_BATCH_SIZE, type IngestRecordInput } from '@growthos/firebase-orm-models';
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -22,17 +22,33 @@ function dataObject(value: unknown, field: string): Record<string, unknown> {
   return value;
 }
 
+/** Rejects an oversized batch before doing any per-record parsing work, not just in the service layer after the fact. */
+function requireBatchWithinSizeLimit(records: unknown[]): void {
+  if (records.length > MAX_INGEST_BATCH_SIZE) {
+    throw new BadRequestException(`A batch may contain at most ${MAX_INGEST_BATCH_SIZE} records.`);
+  }
+}
+
+// Bounds the cost of `stableStringify` on a maliciously deep `dimensions`
+// object — well below JS's real call-stack limit, so this throws a clean,
+// cheap error instead of paying for the recursion first and then crashing
+// with an uncaught RangeError (which would surface as a bare 500).
+const MAX_STABLE_STRINGIFY_DEPTH = 20;
+
 /** Deterministic JSON serialization (sorted object keys) so the same measure tuple always derives the same idempotency key. */
-function stableStringify(value: unknown): string {
+function stableStringify(value: unknown, depth = 0): string {
+  if (depth > MAX_STABLE_STRINGIFY_DEPTH) {
+    throw new BadRequestException('"dimensions" is nested too deeply.');
+  }
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value);
   }
   if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(',')}]`;
+    return `[${value.map((entry) => stableStringify(entry, depth + 1)).join(',')}]`;
   }
   const record = value as Record<string, unknown>;
   const keys = Object.keys(record).sort();
-  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`).join(',')}}`;
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${stableStringify(record[key], depth + 1)}`).join(',')}}`;
 }
 
 /** `POST /v1/.../ingest/events` body: `{ batch: [{ event_id, event, ts, identities?, context?, properties? }] }`. */
@@ -40,6 +56,7 @@ export function parseEventsBody(body: unknown): IngestRecordInput[] {
   if (!isPlainObject(body) || !Array.isArray(body.batch)) {
     throw new BadRequestException('Body must be an object with a "batch" array.');
   }
+  requireBatchWithinSizeLimit(body.batch);
   return body.batch.map((rawRecord) => {
     if (!isPlainObject(rawRecord)) {
       throw new BadRequestException('Every entry in "batch" must be an object.');
@@ -48,6 +65,7 @@ export function parseEventsBody(body: unknown): IngestRecordInput[] {
       clientRecordId: requireNonEmptyString(rawRecord.event_id, 'event_id'),
       name: requireNonEmptyString(rawRecord.event, 'event'),
       data: dataObject(rawRecord.properties, 'properties'),
+      raw: rawRecord,
     };
   });
 }
@@ -57,6 +75,7 @@ export function parseEntitiesBody(body: unknown): IngestRecordInput[] {
   if (!isPlainObject(body) || !Array.isArray(body.records)) {
     throw new BadRequestException('Body must be an object with a "records" array.');
   }
+  requireBatchWithinSizeLimit(body.records);
   const type = requireNonEmptyString(body.type, 'type');
   return body.records.map((rawRecord) => {
     if (!isPlainObject(rawRecord)) {
@@ -66,6 +85,7 @@ export function parseEntitiesBody(body: unknown): IngestRecordInput[] {
       clientRecordId: requireNonEmptyString(rawRecord.id, 'id'),
       name: type,
       data: dataObject(rawRecord.attributes, 'attributes'),
+      raw: { ...rawRecord, type },
     };
   });
 }
@@ -81,6 +101,7 @@ export function parseMeasuresBody(body: unknown): IngestRecordInput[] {
   if (!isPlainObject(body) || !Array.isArray(body.records)) {
     throw new BadRequestException('Body must be an object with a "records" array.');
   }
+  requireBatchWithinSizeLimit(body.records);
   return body.records.map((rawRecord) => {
     if (!isPlainObject(rawRecord)) {
       throw new BadRequestException('Every entry in "records" must be an object.');
@@ -92,6 +113,7 @@ export function parseMeasuresBody(body: unknown): IngestRecordInput[] {
       clientRecordId: stableStringify({ measure, ts, dimensions }),
       name: measure,
       data: dimensions,
+      raw: rawRecord,
     };
   });
 }

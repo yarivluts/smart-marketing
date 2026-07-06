@@ -37,6 +37,14 @@ export interface IngestRecordInput {
   name: string;
   /** The fields to validate against the active schema's `field_defs` (an event's `properties`, an entity's `attributes`, a measure's `dimensions`). */
   data: Record<string, unknown>;
+  /**
+   * The complete record exactly as submitted (e.g. an event's `ts`/
+   * `identities`/`context`/`properties`, or a measure's `value`/`currency`
+   * alongside its `dimensions`) — persisted verbatim so nothing is silently
+   * dropped, even though only `data` is schema-validated. `data` is
+   * typically a sub-object of `raw`, not a separate value.
+   */
+  raw: Record<string, unknown>;
 }
 
 export interface IngestBatchParams {
@@ -98,7 +106,24 @@ function validateRecordData(data: Record<string, unknown>, fieldDefs: readonly S
   return reasons;
 }
 
-/** Whether `clientRecordId` was already successfully ingested before (in an earlier batch). A record that was only ever `quarantined` was never actually accepted, so resubmitting it after a fix is not a duplicate. */
+/**
+ * Whether `clientRecordId` was already successfully ingested before (in an
+ * earlier batch). A record that was only ever `quarantined` was never
+ * actually accepted, so resubmitting it after a fix is not a duplicate.
+ *
+ * Not transactional: this is a plain read, and `ingestBatch` only writes
+ * *after* every record in the batch has been checked. Two concurrent
+ * requests submitting the same `client_record_id` at nearly the same time
+ * can both read "not yet accepted" and both go on to write an `accepted`
+ * record — the same class of read-then-write race
+ * `schema-registry.service.ts` documents (and defers) for
+ * `registerSchemaDefinition`/`evolveSchemaDefinition`, for the same reason:
+ * a real fix needs a Firestore transaction, which this package's
+ * convention (`firestore-connection.ts`) reserves to one file. Deliberately
+ * deferred rather than papered over; a client that retries the exact same
+ * batch back-to-back is the realistic trigger, not a sustained attack
+ * surface.
+ */
 async function wasAlreadyAccepted(
   organizationId: string,
   projectId: string,
@@ -147,18 +172,48 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
     }
   }
 
+  const trimmed = params.records.map((record) => ({
+    clientRecordId: record.clientRecordId.trim(),
+    name: record.name.trim(),
+    data: record.data,
+    raw: record.raw,
+  }));
+
+  // First occurrence of each client id within the batch "wins" and gets a
+  // cross-batch duplicate check; every later occurrence is an intra-batch
+  // duplicate regardless of what the first occurrence's outcome turns out
+  // to be (stricter than the cross-batch rule below, which only treats an
+  // `accepted` prior record as a duplicate — a batch simply shouldn't repeat
+  // the same client id at all).
+  const firstOccurrenceIndex = new Map<string, number>();
+  trimmed.forEach((record, index) => {
+    if (!firstOccurrenceIndex.has(record.clientRecordId)) {
+      firstOccurrenceIndex.set(record.clientRecordId, index);
+    }
+  });
+
+  // One concurrent existence check per *unique* client id, not one
+  // sequential check per record — keeps this proportional to the batch's
+  // distinct ids rather than serializing on Firestore round-trips per
+  // record (the "1k events/s" AC).
+  const uniqueIds = [...firstOccurrenceIndex.keys()];
+  const alreadyAcceptedResults = await Promise.all(
+    uniqueIds.map((clientRecordId) =>
+      wasAlreadyAccepted(params.organizationId, params.projectId, params.environmentId, params.kind, clientRecordId),
+    ),
+  );
+  const alreadyAcceptedIds = new Set(uniqueIds.filter((_, index) => alreadyAcceptedResults[index]));
+
   const schemaCache = new Map<string, SchemaDefModel | null>();
-  const seenInBatch = new Set<string>();
   const results: IngestRecordResult[] = [];
   let accepted = 0;
   let quarantined = 0;
   let duplicate = 0;
 
-  for (const record of params.records) {
-    const clientRecordId = record.clientRecordId.trim();
-    const name = record.name.trim();
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const { clientRecordId, name } = trimmed[index]!;
 
-    if (seenInBatch.has(clientRecordId)) {
+    if (firstOccurrenceIndex.get(clientRecordId) !== index) {
       duplicate += 1;
       results.push({
         clientRecordId,
@@ -169,8 +224,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       continue;
     }
 
-    if (await wasAlreadyAccepted(params.organizationId, params.projectId, params.environmentId, params.kind, clientRecordId)) {
-      seenInBatch.add(clientRecordId);
+    if (alreadyAcceptedIds.has(clientRecordId)) {
       duplicate += 1;
       results.push({
         clientRecordId,
@@ -180,7 +234,6 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       });
       continue;
     }
-    seenInBatch.add(clientRecordId);
 
     let schemaDef = schemaCache.get(name);
     if (schemaDef === undefined) {
@@ -189,7 +242,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
     }
 
     const reasons: string[] = schemaDef
-      ? validateRecordData(record.data, schemaDef.field_defs)
+      ? validateRecordData(trimmed[index]!.data, schemaDef.field_defs)
       : [`No active schema registered for ${params.kind} "${name}".`];
     const status: IngestRecordStatus = reasons.length > 0 ? 'quarantined' : 'accepted';
     if (status === 'accepted') {
@@ -226,7 +279,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       record.client_record_id = result.clientRecordId;
       record.status = result.status;
       record.reasons = [...result.reasons];
-      record.payload = params.records[index]!.data;
+      record.payload = params.records[index]!.raw;
       record.created_at = now;
       record.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
       return record.save();
@@ -258,14 +311,26 @@ export interface IngestBatchDetail {
   records: readonly IngestRecordResult[];
 }
 
-/** Per-record validation results for one batch (KAN-32 AC: "per-record results endpoint"). */
+/**
+ * Per-record validation results for one batch (KAN-32 AC: "per-record
+ * results endpoint"). Also checks `environmentId` — the same key can be
+ * scoped to one environment only, so a batch from a different environment
+ * in the same org/project must 404 exactly like a batch from a different
+ * org/project would, not leak across environments.
+ */
 export async function getIngestBatch(
   organizationId: string,
   projectId: string,
+  environmentId: string,
   batchId: string,
 ): Promise<IngestBatchDetail> {
   const batch = await IngestBatchModel.init(batchId, { organization_id: organizationId, project_id: projectId });
-  if (!batch || batch.organization_id !== organizationId || batch.project_id !== projectId) {
+  if (
+    !batch ||
+    batch.organization_id !== organizationId ||
+    batch.project_id !== projectId ||
+    batch.environment_id !== environmentId
+  ) {
     throw new IngestBatchNotFoundError();
   }
 
