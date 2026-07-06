@@ -24,6 +24,8 @@ export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetC
   const [secret, setSecret] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
+  const [rotating, setRotating] = useState(false);
+  const [rotateError, setRotateError] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -46,6 +48,23 @@ export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetC
     }
   }
 
+  async function handleRotate(): Promise<void> {
+    setRotateError(false);
+    setRotating(true);
+    try {
+      const response = await fetch(`/api/orgs/${orgId}/resources/credentials/${credentialId}/secret/rotate`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        setRotateError(true);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setRotating(false);
+    }
+  }
+
   return (
     <form className="flex flex-wrap items-end gap-3" onSubmit={handleSubmit} noValidate>
       <span className="text-xs text-muted-foreground">{hasSecret ? t('secretSet') : t('secretNotSet')}</span>
@@ -64,9 +83,19 @@ export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetC
       <Button type="submit" disabled={submitting || secret.trim().length === 0}>
         {hasSecret ? t('updateSecret') : t('setSecret')}
       </Button>
+      {hasSecret ? (
+        <Button type="button" variant="outline" disabled={rotating} onClick={handleRotate}>
+          {t('rotateSecretKey')}
+        </Button>
+      ) : null}
       {error ? (
         <p role="alert" className="w-full text-sm text-destructive">
           {t('setSecretError')}
+        </p>
+      ) : null}
+      {rotateError ? (
+        <p role="alert" className="w-full text-sm text-destructive">
+          {t('rotateSecretKeyError')}
         </p>
       ) : null}
     </form>

@@ -24,6 +24,17 @@ async function requireSharedCredentialInOrg(organizationId: string, credentialId
   return credential;
 }
 
+/**
+ * The envelope's tenant-binding id: organization *and* credential, not just
+ * the organization. Binding to the specific credential (not only its org)
+ * means a bug that fed one credential's `encrypted_secret` into
+ * `decryptSecret`/`rotateSecretEnvelopeKey` under a *different* credential's
+ * id in the same org fails closed instead of silently succeeding.
+ */
+function credentialBindingId(organizationId: string, credentialId: string): string {
+  return `${organizationId}:${credentialId}`;
+}
+
 export interface SetSharedCredentialSecretParams {
   organizationId: string;
   credentialId: string;
@@ -33,14 +44,19 @@ export interface SetSharedCredentialSecretParams {
 
 /**
  * Envelope-encrypts `secret` and stores it on the credential (KAN-29). The
- * organization id is the tenant boundary the KMS wrap is bound to — see
- * `envelope.ts` — so this same ciphertext can never be decrypted under a
- * different organization's context, even by a bug that passed the wrong
- * `organizationId` elsewhere.
+ * organization+credential id is the binding the KMS wrap and the envelope's
+ * own AES-GCM auth tag are both bound to — see `envelope.ts` — so this same
+ * ciphertext can never be decrypted under a different organization, or even
+ * a different credential in the same organization, by a bug that passed the
+ * wrong id elsewhere.
  */
 export async function setSharedCredentialSecret(params: SetSharedCredentialSecretParams): Promise<SharedCredentialModel> {
   const credential = await requireSharedCredentialInOrg(params.organizationId, params.credentialId);
-  credential.encrypted_secret = await encryptSecret(params.secret, params.organizationId, params.kms);
+  credential.encrypted_secret = await encryptSecret(
+    params.secret,
+    credentialBindingId(params.organizationId, params.credentialId),
+    params.kms,
+  );
   await credential.save();
   return credential;
 }
@@ -57,7 +73,7 @@ export async function revealSharedCredentialSecret(params: RevealSharedCredentia
   if (!credential.encrypted_secret) {
     throw new CredentialSecretNotSetError();
   }
-  return decryptSecret(credential.encrypted_secret, params.organizationId, params.kms);
+  return decryptSecret(credential.encrypted_secret, credentialBindingId(params.organizationId, params.credentialId), params.kms);
 }
 
 export interface RotateSharedCredentialSecretKeyParams {
@@ -66,7 +82,7 @@ export interface RotateSharedCredentialSecretKeyParams {
   kms: KmsProvider;
 }
 
-/** Re-wraps a credential's stored secret under the KMS provider's current key (KAN-29 "rotation test passes" AC). A no-op if it's already current. */
+/** Re-wraps a credential's stored secret under the KMS provider's current key (KAN-29 "rotation test passes" AC). A no-op — including no Firestore write — if it's already current. */
 export async function rotateSharedCredentialSecretKey(
   params: RotateSharedCredentialSecretKeyParams,
 ): Promise<SharedCredentialModel> {
@@ -74,7 +90,14 @@ export async function rotateSharedCredentialSecretKey(
   if (!credential.encrypted_secret) {
     throw new CredentialSecretNotSetError();
   }
-  credential.encrypted_secret = await rotateSecretEnvelopeKey(credential.encrypted_secret, params.organizationId, params.kms);
-  await credential.save();
+  const rotated = await rotateSecretEnvelopeKey(
+    credential.encrypted_secret,
+    credentialBindingId(params.organizationId, params.credentialId),
+    params.kms,
+  );
+  if (rotated !== credential.encrypted_secret) {
+    credential.encrypted_secret = rotated;
+    await credential.save();
+  }
   return credential;
 }

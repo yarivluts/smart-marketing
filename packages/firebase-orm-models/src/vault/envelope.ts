@@ -1,8 +1,8 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
+import { aesGcmOpen, aesGcmSeal } from './aes-gcm';
 import type { KmsProvider } from './kms-provider';
 
 const DEK_BYTES = 32;
-const GCM_IV_BYTES = 12;
 
 /**
  * A secret, envelope-encrypted at rest (KAN-29). Only `ciphertext` and
@@ -22,36 +22,39 @@ export interface SecretEnvelope {
 
 /**
  * Encrypts `plaintext` under a fresh random data-encryption-key (DEK), then
- * wraps that DEK with the KMS provider's current key. `tenantId` (an
- * organization id) both derives the KMS wrapping key and is never itself
- * stored — decrypting with a different tenant id always fails, which is
- * what makes cross-tenant decryption structurally impossible rather than
- * merely disallowed by application code.
+ * wraps that DEK with the KMS provider's current key. `tenantId` (callers
+ * bind this to an organization id, or an organization+record id compound for
+ * finer-grained isolation) both derives the KMS wrapping key *and* is bound
+ * into this envelope's own AES-GCM auth tag as additional authenticated
+ * data — decrypting with a different `tenantId` always fails, whether the
+ * mismatch happens at the KMS-unwrap step or here, which is what makes
+ * cross-tenant decryption structurally impossible rather than merely
+ * disallowed by application code.
  */
 export async function encryptSecret(plaintext: string, tenantId: string, kms: KmsProvider): Promise<SecretEnvelope> {
   const dek = randomBytes(DEK_BYTES);
-  const iv = randomBytes(GCM_IV_BYTES);
-  const cipher = createCipheriv('aes-256-gcm', dek, iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
+  const sealed = aesGcmSeal(dek, Buffer.from(tenantId, 'utf8'), Buffer.from(plaintext, 'utf8'));
   const wrapped = await kms.wrapDek(dek, tenantId);
   dek.fill(0);
 
   return {
     keyId: wrapped.keyId,
     wrappedDek: wrapped.ciphertext,
-    iv: iv.toString('base64'),
-    authTag: authTag.toString('base64'),
-    ciphertext: ciphertext.toString('base64'),
+    iv: sealed.iv.toString('base64'),
+    authTag: sealed.authTag.toString('base64'),
+    ciphertext: sealed.ciphertext.toString('base64'),
   };
 }
 
 /** Reverses {@link encryptSecret}. Throws if `tenantId` doesn't match the one the envelope was encrypted under, or if the ciphertext/auth tag has been tampered with. */
 export async function decryptSecret(envelope: SecretEnvelope, tenantId: string, kms: KmsProvider): Promise<string> {
   const dek = await kms.unwrapDek({ keyId: envelope.keyId, ciphertext: envelope.wrappedDek }, tenantId);
-  const decipher = createDecipheriv('aes-256-gcm', dek, Buffer.from(envelope.iv, 'base64'));
-  decipher.setAuthTag(Buffer.from(envelope.authTag, 'base64'));
-  const plaintext = Buffer.concat([decipher.update(Buffer.from(envelope.ciphertext, 'base64')), decipher.final()]);
+  const plaintext = aesGcmOpen(dek, Buffer.from(tenantId, 'utf8'), {
+    iv: Buffer.from(envelope.iv, 'base64'),
+    authTag: Buffer.from(envelope.authTag, 'base64'),
+    ciphertext: Buffer.from(envelope.ciphertext, 'base64'),
+  });
+  dek.fill(0);
   return plaintext.toString('utf8');
 }
 

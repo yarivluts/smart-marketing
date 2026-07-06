@@ -129,6 +129,8 @@
     "setSecret": "הגדרת סוד",
     "updateSecret": "עדכון סוד",
     "setSecretError": "לא ניתן היה לשמור את הסוד. נסה שוב.",
+    "rotateSecretKey": "רענון מפתח",
+    "rotateSecretKeyError": "לא ניתן היה לרענן את מפתח הסוד. נסה שוב.",
     "templatesHeading": "תבניות",
     "noTemplates": "אין עדיין תבניות.",
     "templateSummary": "{name} ({type}, גרסה {version})",

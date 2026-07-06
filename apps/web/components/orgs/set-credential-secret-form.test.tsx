@@ -67,4 +67,29 @@ describe('SetCredentialSecretForm', () => {
     fireEvent.change(screen.getByLabelText('Secret'), { target: { value: 'x' } });
     expect(screen.getByRole('button', { name: 'Set secret' })).not.toBeDisabled();
   });
+
+  it('has no "Rotate key" button before a secret is set', () => {
+    renderForm(false);
+    expect(screen.queryByRole('button', { name: 'Rotate key' })).not.toBeInTheDocument();
+  });
+
+  it('POSTs a rotation request and refreshes on success once a secret is set', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ status: 'rotated' }) } as Response);
+    renderForm(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rotate key' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/resources/credentials/cred-1/secret/rotate', { method: 'POST' });
+  });
+
+  it('shows an inline error when rotation fails', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
+    renderForm(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Rotate key' }));
+
+    expect(await screen.findByText("Couldn't rotate this secret's key. Please try again.")).toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });

@@ -129,6 +129,8 @@
     "setSecret": "Set secret",
     "updateSecret": "Update secret",
     "setSecretError": "Couldn't save that secret. Please try again.",
+    "rotateSecretKey": "Rotate key",
+    "rotateSecretKeyError": "Couldn't rotate this secret's key. Please try again.",
     "templatesHeading": "Templates",
     "noTemplates": "No templates yet.",
     "templateSummary": "{name} ({type}, v{version})",

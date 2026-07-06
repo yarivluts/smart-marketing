@@ -1,9 +1,8 @@
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
+import { hkdfSync, randomBytes } from 'node:crypto';
+import { AES_GCM_AUTH_TAG_BYTES, AES_GCM_IV_BYTES, aesGcmOpen, aesGcmSeal } from './aes-gcm';
 import type { KmsProvider, WrappedDek } from './kms-provider';
 
 const KEK_BYTES = 32;
-const GCM_IV_BYTES = 12;
-const GCM_AUTH_TAG_BYTES = 16;
 
 export class UnknownKmsKeyError extends Error {
   constructor(keyId: string) {
@@ -73,6 +72,9 @@ export function loadLocalKmsKeyRingFromEnv(env: NodeJS.ProcessEnv = process.env)
     }
     keyRing[keyId] = key;
   }
+  if (!keyRing[currentKeyId]) {
+    throw new VaultNotConfiguredError(`GROWTHOS_VAULT_KEYS.currentKeyId "${currentKeyId}" is not present in "keys"`);
+  }
 
   return { keyRing, currentKeyId };
 }
@@ -118,18 +120,16 @@ function tenantSubkey(kek: Buffer, tenantId: string): Buffer {
 }
 
 function seal(kek: Buffer, tenantId: string, plaintext: Buffer): string {
-  const iv = randomBytes(GCM_IV_BYTES);
-  const cipher = createCipheriv('aes-256-gcm', tenantSubkey(kek, tenantId), iv);
-  const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
-  return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString('base64');
+  const aad = Buffer.from(tenantId, 'utf8');
+  const { iv, authTag, ciphertext } = aesGcmSeal(tenantSubkey(kek, tenantId), aad, plaintext);
+  return Buffer.concat([iv, authTag, ciphertext]).toString('base64');
 }
 
 function open(kek: Buffer, tenantId: string, sealed: string): Buffer {
   const raw = Buffer.from(sealed, 'base64');
-  const iv = raw.subarray(0, GCM_IV_BYTES);
-  const authTag = raw.subarray(GCM_IV_BYTES, GCM_IV_BYTES + GCM_AUTH_TAG_BYTES);
-  const ciphertext = raw.subarray(GCM_IV_BYTES + GCM_AUTH_TAG_BYTES);
-  const decipher = createDecipheriv('aes-256-gcm', tenantSubkey(kek, tenantId), iv);
-  decipher.setAuthTag(authTag);
-  return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  const iv = raw.subarray(0, AES_GCM_IV_BYTES);
+  const authTag = raw.subarray(AES_GCM_IV_BYTES, AES_GCM_IV_BYTES + AES_GCM_AUTH_TAG_BYTES);
+  const ciphertext = raw.subarray(AES_GCM_IV_BYTES + AES_GCM_AUTH_TAG_BYTES);
+  const aad = Buffer.from(tenantId, 'utf8');
+  return aesGcmOpen(tenantSubkey(kek, tenantId), aad, { iv, authTag, ciphertext });
 }

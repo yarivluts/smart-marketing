@@ -16,6 +16,7 @@ import {
   removeOrgMember,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
+  rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   type AcceptInviteResult,
   type CreateOrganizationResult,
@@ -112,6 +113,19 @@ interface SetSharedCredentialSecretInput {
 export async function setSharedCredentialSecret(input: SetSharedCredentialSecretInput): Promise<SharedCredentialModel> {
   await ensureFirestoreOrm();
   return setSharedCredentialSecretInOrganization(input);
+}
+
+interface RotateSharedCredentialSecretKeyInput {
+  organizationId: string;
+  credentialId: string;
+  kms: KmsProvider;
+}
+
+export async function rotateSharedCredentialSecretKey(
+  input: RotateSharedCredentialSecretKeyInput,
+): Promise<SharedCredentialModel> {
+  await ensureFirestoreOrm();
+  return rotateSharedCredentialSecretKeyInOrganization(input);
 }
 
 interface CreateResourceTemplateInput {
