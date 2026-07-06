@@ -17,6 +17,105 @@ Template for each entry:
 
 ---
 
+## 2026-07-06 — E2.2 KMS envelope encryption vault module (KAN-29)
+
+- **Last completed:**
+  - Implemented **KAN-29** (KMS envelope encryption for OAuth tokens/secrets, plan `01 §architecture`/
+    `06 §4`, AC: "Secrets unreadable in Firestore dump; rotation test passes"), the natural follow-on
+    to KAN-28's key service, scoped to the vault module itself (no admin UI, no `SharedCredentialModel`
+    secret field yet — see "deliberately out of scope" below).
+    - `packages/firebase-orm-models/src/vault/`: envelope-encryption primitives — `envelope.ts`
+      (AES-256-GCM `seal`/`open`, with GCM associated-data support), `kms-provider.ts` (the
+      `KmsProvider` interface: `wrapDataKey`/`unwrapDataKey` per tenant), `local-kms-provider.ts` (a
+      dev/CI `KmsProvider` deriving a per-tenant KEK via `HMAC-SHA256(masterKey, tenantId)`),
+      `create-kms-provider.ts` (`createKmsProviderFromEnv()`, gated on `VAULT_MASTER_KEYS_JSON`/
+      `VAULT_MASTER_KEY_VERSION`). Real GCP Cloud KMS is deliberately deferred until KAN-18 provisions
+      an actual GCP project — unlike Firestore/Auth, there's no faithful local emulator for Cloud KMS
+      to verify a real implementation against yet, so shipping an untested "real" GCP path now would
+      violate this codebase's "verify before shipping" norm; `createKmsProviderFromEnv` is the one
+      call site that would need to change to add one later.
+    - `VaultSecretModel` (`organizations/:organization_id/vault_secrets`) stores only ciphertext + a
+      KMS-wrapped data key, never plaintext or an unwrapped key. `vault.service.ts`:
+      `encryptSecret`/`decryptSecret`/`rotateVaultSecret` — each secret gets a fresh random 256-bit
+      data key (DEK) that encrypts the plaintext; the DEK itself is wrapped by the org's KEK.
+      Rotation re-wraps only the (tiny) DEK, never the encrypted payload — the operational point of
+      envelope encryption.
+  - **Independent subagent review** before opening the PR found two real gaps, both fixed with
+    regression tests before merge was attempted:
+    - No associated-data (AAD) binding on seal/wrap — a ciphertext/wrapped-key pair copied from one
+      `VaultSecretModel` doc onto a different owner in the same org would have decrypted cleanly
+      (GCM's auth tag alone doesn't catch this since both docs share the same per-tenant KEK). Fixed:
+      every seal/wrap is now bound via GCM AAD to `organization_id:owner_type:owner_id`; added a
+      substitution-attack regression test (copy secret A's ciphertext/wrapped-key onto secret B's doc,
+      assert decrypt now fails).
+    - `createKmsProviderFromEnv` silently fell back to a fixed, insecure dev master key whenever
+      *either* `VAULT_MASTER_KEYS_JSON` or `VAULT_MASTER_KEY_VERSION` was unset — including a
+      plausible partial/half-rolled-out misconfiguration in a real deployment, which would fail open
+      rather than closed. Fixed: only falls back when *both* are unset; throws
+      `MissingVaultConfigError`/`InvalidVaultMasterKeysError` otherwise, with regression tests for
+      both new error paths.
+    - Also added test coverage the review flagged as missing: `owner_type`/`owner_id` round-tripping
+      through Firestore, and empty-string/multibyte-unicode plaintext.
+  - **Real bug caught by the full-monorepo test run, fixed before the review above**: the vault crypto
+    primitives originally lived in `packages/shared` (reasoning: pure, dependency-free helpers belong
+    in the cross-cutting package, mirroring `apiKeyModeForEnvironment`). But `packages/shared`'s
+    barrel is imported by client-side React code (`lib/permissions/permission-context.tsx`'s
+    `usePermission` hook), and `node:crypto` broke the Next.js webpack client bundle
+    (`UnhandledSchemeError: Reading from "node:crypto" is not handled by plugins`) — caught by running
+    the full `pnpm test` across the monorepo, not just the touched packages, which is exactly why that
+    full run matters even when a change looks package-local. Moved every vault file into
+    `packages/firebase-orm-models` (server-only, same package KAN-28's key service already uses
+    `node:crypto` in) and reverted `packages/shared`'s `package.json`/barrel back to their pre-change
+    state; confirmed via a clean `pnpm build` across all packages afterward.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (69 tests
+    in `packages/firebase-orm-models` incl. 15 unit + 9 emulator vault tests, 159 in `packages/shared`,
+    15 in `apps/api`, 164 web unit/route tests + 11/11 Playwright e2e in `apps/web`, with the two
+    already-documented Playwright flakes — `auth.spec.ts` sign-up, `orgs.spec.ts` project creation —
+    passing on their automatic retry, unrelated to this change).
+  - **Deliberately out of scope for this story** (same "buildable today" split KAN-28's own service-only
+    scope used): no admin UI (nothing in this codebase captures a real OAuth token yet to feed one —
+    that's KAN-46/47/49 territory) and no secret field wired into KAN-27's `SharedCredentialModel` —
+    its own doc comment only promises this as a follow-up *once KAN-29 exists*, not as part of it;
+    wiring a real secret field in now, with no OAuth flow to populate it, would be speculative.
+  - Branch `kan-29-kms-vault-module`, **PR #14 opened against `main`, NOT YET MERGED** — see stopping
+    point below.
+- **In progress (exact stopping point):** the code itself is complete, independently reviewed (with
+  both real findings fixed and regression-tested), and fully green locally (`pnpm lint && pnpm
+  typecheck && pnpm test && pnpm build`, full monorepo, not just the touched package). PR #14 is
+  pushed and open. What's unfinished is **verifying CI and merging**: partway through this run, the
+  GitHub MCP server (`mcp__github__*` tools) started failing every call with "requires
+  re-authorization (token expired)" — confirmed not transient by retrying `pull_request_read` three
+  times a few minutes apart. This session is non-interactive and cannot run the OAuth re-authorization
+  flow itself. Sent the repo owner a push notification explaining the blocker and stopped there rather
+  than merging blind (no way to confirm CI is actually green without the GitHub API) or retrying
+  indefinitely.
+- **Blocked + why:** GitHub MCP server needs re-authorization (token expired) — a human must
+  re-authorize it (via `claude mcp` / `/mcp` in an interactive session, or the relevant connector
+  settings) before CI status can be checked and PR #14 merged. Not blocked on any further code work —
+  the implementation itself is done, reviewed, and locally verified green.
+- **Next step:** once the GitHub MCP server is re-authorized, a future run (or the repo owner) should:
+  check PR #14's CI status (`get_status`/`get_check_runs`), and if green, merge (squash) into `main`,
+  delete the branch, and confirm this PROGRESS.md entry's "not yet merged" note gets superseded by a
+  merge-confirmation entry. If CI failed for a real reason (not the known transient runner stalls
+  documented in earlier entries), diagnose and fix before merging. After KAN-29 lands, natural next
+  picks are **KAN-30** (admin UI: keys page — independent of KAN-29, already unblocked since KAN-28)
+  or **KAN-31** (Schema Registry, next sprint-2 `todo`). Wiring a real secret field into KAN-27's
+  `SharedCredentialModel` via this vault module is a good candidate for whichever story first captures
+  an actual OAuth token (KAN-49, sprint 4, is the first one currently on the board).
+- **Waiting on human:**
+  - **Re-authorize the GitHub MCP server** (`mcp__github__*` tools) — currently blocking PR #14
+    (KAN-29) from being verified/merged. This is new this run; not present in any prior entry.
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged branches from prior runs' entries below once a human has direct repo
+    access (this sandbox's git remote has repeatedly rejected branch-delete with an HTTP 403, and the
+    GitHub MCP server has no delete-branch tool either).
+
+---
+
 ## 2026-07-05 — E2.1 Key service (KAN-28)
 
 - **Last completed:**
