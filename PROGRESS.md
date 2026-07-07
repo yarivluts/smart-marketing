@@ -17,6 +17,100 @@ Template for each entry:
 
 ---
 
+## 2026-07-07 — E5.1 Metric definition format (KAN-40)
+
+- **Last completed:**
+  - Implemented **KAN-40** (plan `04 §2`/`13 §Epic E5`, AC: "Invalid definition rejected with a clear
+    error"), a sprint-3 `todo` picked over KAN-37 (dbt staging models — still blocked on a warehouse
+    stand-in decision) and KAN-39 (cost guardrails — needs real BigQuery); KAN-40 needed neither, only
+    Firestore, the same "buildable today" reasoning KAN-31's schema registry used.
+    - `packages/firebase-orm-models`: new `MetricDefModel`
+      (`organizations/:organization_id/projects/:project_id/metric_defs`) — one document per version of
+      a metric family (identified by `(project_id, name)`, unlike `SchemaDefModel` which also keys on
+      `kind`), storing either an `aggregation` (function/table/column/filters) or a `formula` (an
+      arithmetic expression over other metrics' names), plus `dimensions` it can be broken down by.
+      New `metric-registry.service.ts`: `registerMetricDefinition` (v1) / `evolveMetricDefinition`
+      (v{n+1}, previous kept `status: 'superseded'`, never mutated) mirror KAN-31's versioning pattern
+      exactly, so historical dashboards can later pin a version (plan `04 §7`). Validation rejects: an
+      invalid metric name (must match schema-name-like `^[a-z][a-z0-9_]*$`), an unknown aggregation
+      function, a missing required column (every function except `count`), an unknown filter operator,
+      malformed formula syntax (only metric-name characters + `+ - * / ( )` allowed, parens balanced), a
+      formula with no metric references, a formula referencing itself, a formula referencing a metric
+      that was never registered, and — the one genuinely novel piece of logic this story needed beyond
+      the schema-registry mirror — a **transitive circular-dependency check** across evolutions: if
+      metric A's formula references B, then evolving B to reference A is rejected even though B's own
+      evolution only checks that A currently exists and is active (a naive "does the direct reference
+      exist" check misses this, since the graph was acyclic when A was created and only becomes cyclic
+      later when B changes).
+    - `apps/web`: a project-scoped `orgs/:orgId/projects/:projectId/metric-defs` page — register a new
+      metric (aggregation or formula, with a dimensions field and a filter-row builder for aggregations)
+      and evolve an existing family via a form prefilled from its latest version — gated on the
+      **already-existing** `metrics.write` permission (granted to `platform_admin`/`org_owner`/
+      `org_admin`/`project_admin`/`editor` since KAN-23's policy-catalog freeze; no catalog change
+      needed this run). New `GET/POST .../metric-defs` and `POST .../metric-defs/evolve` routes. Full
+      en/he translations; no hard-coded strings. Audit logging wired into both register/evolve
+      (`metric_def.register`/`metric_def.evolve`), the same "config change" surface KAN-44's audit log
+      already covers for schema register/evolve.
+    - Tests: a new package-level emulator suite (`metric-registry.emulator.test.ts`, 15 tests) covering
+      every validation rule individually, the version-evolution/supersede behavior, cross-project
+      isolation, and — deliberately, since it's the one nontrivial piece of logic — a regression test
+      that specifically builds the "A references B, then B is evolved to reference A" scenario and
+      confirms the second evolution is rejected as circular. New `apps/web` route tests (register +
+      evolve, incl. a "rejects a missing name/invalid definition/unknown function" 400 case and a
+      duplicate-name 409 case), component tests for both forms, a KAN-26 non-enumeration isolation
+      scenario in `isolation.test.ts`, and an e2e spec (`e2e/metric-defs.spec.ts`) driving register an
+      aggregation -> evolve its dimensions -> register a formula referencing it -> an invalid formula
+      (referencing an unregistered metric) rejected, through a real browser.
+  - **Self-review** before opening the PR found and fixed:
+    - The first version of the audit-log wiring passed `aggregation`/`formula` straight through to
+      `recordAuditLogEntry`'s `before`/`after` payload, including as `undefined` for whichever one didn't
+      apply to a given definition kind. Firestore's `setDoc` rejects any field whose value is literally
+      `undefined`, so **every** `recordAuditLogEntry` call for this feature was silently throwing and
+      getting swallowed by its own best-effort `try/catch` — audit logging never actually worked, and
+      nothing but the emulator test's own stderr output surfaced it (lint/typecheck stayed green through
+      it). Fixed with a shared `auditSnapshot()` helper that omits unset fields; added a regression test
+      asserting a real audit entry lands in `listAuditLogEntriesForOrg` for both register and evolve.
+    - Removed an unused `isMetricDefStatus` type-guard export that had no call site anywhere in the diff
+      (the KAN-31 `SchemaDefModel` precedent this story mirrors doesn't even have an equivalent).
+  - `pnpm lint && pnpm typecheck && pnpm build` all green. `pnpm test`: 151 tests in
+    `packages/firebase-orm-models` (incl. 15 new in `metric-registry.emulator.test.ts`), 167 in
+    `packages/shared` (untouched), 35 in `apps/api` (untouched), 269 web unit/route tests (up from 253 —
+    incl. new route/component tests and the new isolation scenario), 16/16 Playwright e2e (incl. the new
+    `metric-defs.spec.ts`). One self-recovering Playwright retry on `auth.spec.ts`'s sign-up flow during
+    local verification — the same long-documented sandbox sign-up flake every prior entry has hit, not a
+    regression (my own new e2e spec passed clean on its first attempt both times it ran).
+  - Branch `kan-40-metric-definition-format`, PR #25. First CI attempt failed on the documented gRPC
+    `RESOURCE_EXHAUSTED` Firestore-emulator flake, this time in `models.emulator.test.ts` (unrelated,
+    pre-existing, not touched by this diff) — confirmed by reading the actual job log rather than
+    assuming flake, since this story's own new `metric-registry.emulator.test.ts` suite had passed
+    cleanly earlier in that same run. Re-ran via `rerun_failed_jobs`; second attempt went green
+    (`mergeable_state: clean`). Merged (squash) into `main`. Remote branch deletion failed with the same
+    HTTP 403 from this sandbox's git remote recorded in every prior run's entry (not a GitHub
+    permissions issue; no branch-delete tool exists in the GitHub MCP server either) — merged and dead
+    but not deleted.
+- **In progress (exact stopping point):** none — KAN-40 is fully delivered, independently reviewed,
+  tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-41** (compiler: metric definition + query request -> BigQuery SQL) is the natural
+  next pick — it's the direct consumer of this story's `getActiveMetricDefinition`/`MetricDefModel`
+  shape, though it needs a decision on what "compile to SQL" means without a real warehouse yet (same
+  buildable-today tension KAN-37 keeps hitting; KAN-41's AC is "golden-file SQL tests for 10
+  representative queries", which is actually achievable without a live warehouse — the tests just assert
+  on the generated SQL string, not on executing it — so KAN-41 may be more tractable than KAN-37 despite
+  the surface-level similarity). **KAN-38** (orchestration) and **KAN-39** (cost guardrails, needs real
+  BigQuery) are also sprint-3 `todo`s; KAN-37 (dbt) remains the most infra-blocked of the four.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-40-metric-definition-format` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403), and the other still-outstanding merged branches from prior
+    runs noted in earlier entries below.
+
+---
+
 ## 2026-07-07 — E6.2 Audit log service (KAN-44)
 
 - **Last completed:**
