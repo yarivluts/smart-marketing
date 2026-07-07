@@ -65,24 +65,30 @@ Template for each entry:
     `firebase-orm-models` suite and one self-recovering Playwright sign-up-flow retry during the `apps/web`
     suite — both the same long-documented, pre-existing sandbox flakes every prior entry has hit.
   - Updated PR #27's own branch/PR in place with this fix rather than opening a second, competing PR.
-- **In progress (exact stopping point):** none — KAN-42 (via PR #27, plus this run's compiler hardening
-  on top) is fully delivered, independently reviewed, tested, and ready to merge.
-- **Blocked + why:** nothing blocking; CI needs to run on the updated PR #27 and go green before merge.
-- **Next step:** confirm PR #27's CI is green with this run's added commit, merge (squash) into `main`,
-  delete the branch if the git remote allows it this time. After that, the remaining sprint-3 `todo`s are
-  **KAN-37** (dbt — still needs a buildable-today warehouse stand-in decision), **KAN-38**
-  (orchestration), and **KAN-39** (cost guardrails, needs real BigQuery); all three independent of each
-  other and of this story. Worth a note for whoever eventually wires a real `WarehouseQueryExecutor` in
-  (KAN-18/KAN-37-gated): nothing in `apps/api` should need to change, per that interface's own doc
-  comment.
+    CI (`lint · typecheck · test · build`) went green on the updated head commit, `mergeable_state:
+    clean`, merged (squash) into `main`. Remote branch deletion failed with the same HTTP 403 from this
+    sandbox's git remote recorded in every prior run's entry (not a GitHub permissions issue; no
+    branch-delete tool exists in the GitHub MCP server either) — merged and dead but not deleted; the
+    local branch was force-deleted (`-D`, since a squash merge doesn't fast-forward-merge cleanly) after
+    confirming its content matched the merged `main` exactly.
+- **In progress (exact stopping point):** none — KAN-42 (via PR #27, plus this run's compiler-level
+  security hardening on top) is fully delivered, independently reviewed, CI-verified, and merged into
+  `main`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the remaining sprint-3 `todo`s are **KAN-37** (dbt — still needs a buildable-today
+  warehouse stand-in decision), **KAN-38** (orchestration), and **KAN-39** (cost guardrails, needs real
+  BigQuery); all three independent of each other and of this story. Worth a note for whoever eventually
+  wires a real `WarehouseQueryExecutor` in (KAN-18/KAN-37-gated): nothing in `apps/api` should need to
+  change, per that interface's own doc comment.
 - **Waiting on human:**
   - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
     by this run.
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
-  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this run's
-    own branch is also ready to prune.
+  - Optional: delete the merged `kan-42-metrics-query-api` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403), and the other still-outstanding merged branches from prior runs
+    noted in earlier entries below.
 
 ---
 
