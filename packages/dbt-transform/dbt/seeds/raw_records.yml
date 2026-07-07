@@ -1,0 +1,35 @@
+version: 2
+
+seeds:
+  - name: raw_records
+    description: >
+      Fixture "test dataset" standing in for a real export of KAN-33's
+      Firestore `raw_records` collection (itself a stand-in for a partitioned
+      BigQuery raw table until KAN-18 provisions one) — enough rows across two
+      projects/environments and all three schema kinds to build and test the
+      staging/core layers against.
+    columns:
+      - name: organization_id
+        tests:
+          - not_null
+      - name: project_id
+        tests:
+          - not_null
+      - name: environment_id
+        tests:
+          - not_null
+      - name: kind
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['entity', 'event', 'measure']
+      - name: schema_name
+        tests:
+          - not_null
+      - name: client_id
+        tests:
+          - not_null
+      - name: landed_at
+        tests:
+          - not_null

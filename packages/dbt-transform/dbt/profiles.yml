@@ -1,0 +1,17 @@
+# Buildable-today warehouse stand-in (same posture as the rest of this
+# codebase's provider-agnostic seams — LocalKmsProvider, InMemoryTokenBucketRateLimiter,
+# NotConfiguredWarehouseQueryExecutor): dbt-duckdb runs this project against a local,
+# file-based DuckDB database seeded from a fixture "test dataset" (seeds/raw_records.csv),
+# so `dbt build` is real and green in CI without a live BigQuery project.
+#
+# Once KAN-18 provisions a real GCP project and KAN-33's Firestore raw_records stand-in
+# is replaced by an actual partitioned BigQuery table, add a `prod` output here (type:
+# bigquery) pointed at it — nothing else in this project (models/tests/seeds) needs to
+# change, since dbt compiles the same SQL against either adapter.
+growthos_transform:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: 'target/growthos_transform.duckdb'
+      threads: 4

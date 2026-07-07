@@ -1,0 +1,13 @@
+organization_id,project_id,environment_id,partition_date,batch_id,kind,schema_name,client_id,payload,landed_at
+org_1,proj_1,env_prod,2026-01-05,batch_001,entity,customer,cust_1,"{""email"": ""a@example.com"", ""plan"": ""starter"", ""geo"": ""US""}",2026-01-05 10:00:05
+org_1,proj_1,env_prod,2026-01-20,batch_009,entity,customer,cust_1,"{""email"": ""a@example.com"", ""plan"": ""growth"", ""geo"": ""US""}",2026-01-20 14:12:00
+org_1,proj_1,env_prod,2026-01-06,batch_002,entity,customer,cust_2,"{""email"": ""b@example.com"", ""plan"": ""starter"", ""geo"": ""CA""}",2026-01-06 09:00:00
+org_1,proj_1,env_prod,2026-01-05,batch_001,event,funnel_event,cust_1,"{""event_name"": ""signup"", ""ts"": ""2026-01-05T10:00:00Z""}",2026-01-05 10:00:05
+org_1,proj_1,env_prod,2026-01-06,batch_003,event,funnel_event,cust_1,"{""event_name"": ""activated"", ""ts"": ""2026-01-06T09:30:00Z""}",2026-01-06 09:30:04
+org_1,proj_1,env_prod,2026-01-07,batch_004,event,funnel_event,cust_2,"{""event_name"": ""signup"", ""ts"": ""2026-01-07T12:00:00Z""}",2026-01-07 12:00:03
+org_1,proj_1,env_prod,2026-01-05,batch_005,measure,ad_spend,google:brand:2026-01-05,"{""channel"": ""google"", ""campaign"": ""brand"", ""value"": 123.45, ""currency"": ""USD"", ""date"": ""2026-01-05""}",2026-01-05 23:59:00
+org_1,proj_1,env_prod,2026-01-05,batch_005,measure,ad_spend,meta:prospecting:2026-01-05,"{""channel"": ""meta"", ""campaign"": ""prospecting"", ""value"": 88.10, ""currency"": ""USD"", ""date"": ""2026-01-05""}",2026-01-05 23:59:00
+org_1,proj_1,env_prod,2026-01-06,batch_006,measure,ad_spend,google:brand:2026-01-06,"{""channel"": ""google"", ""campaign"": ""brand"", ""value"": 140.00, ""currency"": ""USD"", ""date"": ""2026-01-06""}",2026-01-06 23:59:00
+org_2,proj_9,env_prod,2026-02-01,batch_101,entity,customer,cust_9,"{""email"": ""c@example.com"", ""plan"": ""starter"", ""geo"": ""UK""}",2026-02-01 08:00:00
+org_2,proj_9,env_prod,2026-02-01,batch_101,event,funnel_event,cust_9,"{""event_name"": ""signup"", ""ts"": ""2026-02-01T08:00:00Z""}",2026-02-01 08:00:02
+org_2,proj_9,env_prod,2026-02-01,batch_102,measure,ad_spend,meta:launch:2026-02-01,"{""channel"": ""meta"", ""campaign"": ""launch"", ""value"": 50.00, ""currency"": ""USD"", ""date"": ""2026-02-01""}",2026-02-01 23:59:00
