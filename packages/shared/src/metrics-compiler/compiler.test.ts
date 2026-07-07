@@ -138,4 +138,15 @@ describe('compileMetricQuery — error handling', () => {
       MetricCompilerError,
     );
   });
+
+  it('rejects a filter operator outside the known vocabulary instead of splicing it into SQL (KAN-42: a query request is now externally reachable, not just a hand-built catalog)', () => {
+    const catalog = buildTestCatalog();
+    const request = {
+      metrics: ['ad_spend'],
+      filters: [{ field: 'channel', operator: '1=1; --', value: 'google' }],
+      time: { start: '2026-01-01', end: '2026-01-01', grain: 'day' },
+      // deliberately bypassing the TS union to simulate untrusted input a caller other than `apps/api`'s own HTTP boundary check might pass straight through
+    } as unknown as Parameters<typeof compileMetricQuery>[1];
+    expect(() => compileMetricQuery(catalog, request)).toThrow(MetricCompilerError);
+  });
 });

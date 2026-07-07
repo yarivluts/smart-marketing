@@ -2,6 +2,7 @@ import { assertSafeIdentifier, quoteIdentifier } from './identifiers';
 import { collectIdentifiers, parseFormula, type FormulaAstNode } from './formula-parser';
 import { bucketExpression, computeCompareWindow, type TimeWindow } from './time';
 import {
+  METRIC_FILTER_OPERATORS,
   MetricCompilerError,
   type CompilerAggregationDef,
   type CompilerFilter,
@@ -66,7 +67,22 @@ function buildAggregateExpr(agg: CompilerAggregationDef): string {
   return `${agg.function.toUpperCase()}(${columnSql})`;
 }
 
+/**
+ * `field` and `value` are already safe (an identifier check, and a bind
+ * `@param` respectively) — `operator` is the one piece of a filter that gets
+ * spliced into the SQL text directly (`${columnSql} ${filter.operator}
+ * @${paramName}`), so it must be checked against the known vocabulary too,
+ * not just trusted from `CompilerFilter`'s TS type. `apps/api`'s
+ * `metrics-request.ts` (KAN-42) already rejects an unknown `op` at the HTTP
+ * boundary, but this compiler is also a plain, importable function any
+ * future caller (a hand-built catalog, the AI Analyst's `query_metric`
+ * tool, ...) could invoke without going through that boundary — defense in
+ * depth belongs here too, not only at one caller's edge.
+ */
 function emitFilterClause(filter: CompilerFilter, paramName: string, params: Record<string, CompilerParamValue>): string {
+  if (!METRIC_FILTER_OPERATORS.includes(filter.operator)) {
+    throw new MetricCompilerError(`Unknown filter operator "${filter.operator}" on "${filter.field}".`);
+  }
   const columnSql = quoteIdentifier(assertSafeIdentifier(filter.field, 'filter field'));
   if (filter.operator === 'in') {
     params[paramName] = filter.value
