@@ -112,14 +112,15 @@ Template for each entry:
     repeated Next-dev-server + Chromium + Firestore/Auth-emulator launches in one session, not a
     regression — consistent with this file's own long-documented "gRPC RESOURCE_EXHAUSTED" /
     "Playwright sign-up flake" flake category, just an unusually pronounced instance of it today.
-  - Branch `kan-44-audit-log-service`, opening PR next.
-- **In progress (exact stopping point):** implementation, self-review, and full local
-  lint/typecheck/test/build are complete and green; opening the PR and merging (pending CI) is the only
-  remaining step for this story.
-- **Blocked + why:** nothing blocking; CI needs to run and go green before merge.
-- **Next step:** confirm PR CI is green, merge (squash) into `main`, delete the branch if the git remote
-  allows it this time (every prior run this sandbox's remote has rejected branch deletion with an HTTP
-  403). After that, the natural next picks are **KAN-37** (dbt staging models — still needs a
+  - Branch `kan-44-audit-log-service`, PR #24. CI green (`lint · typecheck · test · build`),
+    `mergeable_state: clean`, merged (squash) into `main` on the first attempt — no stall/flake, no
+    duplicate PR found this run. Remote branch deletion failed with the same HTTP 403 from this
+    sandbox's git remote recorded in every prior run's entry (not a GitHub permissions issue; no
+    branch-delete tool exists in the GitHub MCP server either) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-44 is fully delivered, independently reviewed,
+  tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the natural next picks are **KAN-37** (dbt staging models — still needs a
   buildable-today warehouse stand-in decision, e.g. dbt-duckdb over an exported snapshot, since there's
   no real BigQuery project yet) and the two audit-log follow-ups this run deliberately deferred: wiring
   `recordAuditLogEntry` into KAN-29's vault secret set/rotate and KAN-27's resource-attachment
@@ -132,8 +133,9 @@ Template for each entry:
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
-  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this run's
-    own branch is also ready to prune.
+  - Optional: delete the merged `kan-44-audit-log-service` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403), and the other still-outstanding merged branches from prior runs
+    noted in earlier entries below.
 
 ---
 
