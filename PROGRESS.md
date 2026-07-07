@@ -17,6 +17,71 @@ Template for each entry:
 
 ---
 
+## 2026-07-07 — Reconciled two stale unmerged PRs (KAN-33, KAN-35); fixed apps/api's missing emulator-flake tolerance
+
+- **Last completed:**
+  - Read PROGRESS.md/TASKS.md per the usual start-of-run routine. TASKS.md still listed **KAN-33**
+    and **KAN-35** as the natural next picks, but both already had complete, self-reviewed, green-CI
+    PRs open from an earlier, same-day run that never merged them or updated these files — the same
+    "KAN-20 problem" this file has documented repeatedly (an unfinished run's work going unreconciled).
+    Rather than redo the work, verified and merged both rather than re-implementing from scratch.
+  - **PR #21 (KAN-33, `kan-33-ingest-pipeline`)**: independently re-read the whole diff (pipeline
+    outbox/sink models, `pipeline.service.ts`'s publish/land/drain split, the per-batch-scoped landing
+    fix its own self-review already found) and reran `pnpm lint && pnpm typecheck && pnpm test &&
+    pnpm build` from a clean local checkout rather than trusting the recorded CI result — all green
+    (100 tests in `packages/firebase-orm-models` incl. the new pipeline suite, one self-recovering
+    gRPC `RESOURCE_EXHAUSTED` retry, same documented flake as every prior entry). Found nothing to
+    fix beyond what the PR's own review already caught. Merged (squash) into `main`.
+  - **PR #20 (KAN-35, `kan-35-ingest-health-admin-ui`)**: this branch predated KAN-33's merge, so its
+    diff against the now-updated `main` showed KAN-33's pipeline files as *deleted* — merging as-is
+    would have reverted KAN-33. Rebased the branch onto `main` locally; the only conflict was
+    `packages/firebase-orm-models/src/index.ts`'s barrel export list (both stories appended a line at
+    the same spot), resolved by keeping both new exports. Force-pushed the rebased branch to update
+    the PR in place rather than opening a new one.
+  - Reran the full check suite on the rebased branch — **CI then failed** on `apps/api`'s
+    `ingest.controller.e2e.spec.ts` (`Exceeded timeout of 5000 ms`) on two specs exercising the full
+    `ingestBatch` flow. Root cause: `packages/firebase-orm-models`'s and `apps/web`'s own
+    `vitest.config.ts` already carry an explicit 30s `testTimeout` + automatic retries specifically
+    for the documented Firestore-emulator gRPC `RESOURCE_EXHAUSTED` flake (a backoff/retry cycle that
+    can stall a request for tens of seconds) — but `apps/api`'s `jest.config.js` had neither. That gap
+    was latent until now: KAN-33 added a couple more sequential emulator writes to `ingestBatch`'s own
+    request path (publish + land the pipeline message), pushing the two e2e specs that exercise it
+    close enough to Jest's 5s default that a hit of the same pre-existing flake now failed the test
+    outright instead of self-recovering. Fixed by adding `apps/api/src/jest.setup.ts`
+    (`jest.retryTimes(3, ...)`) and `testTimeout: 30_000` in `jest.config.js`, matching the vitest
+    suites' own reasoning verbatim. Verified locally (`apps/api`'s 29 tests green), pushed, CI went
+    green on the next run, merged (squash) into `main`.
+  - Both branches' remote deletion failed with the same HTTP 403 from this sandbox's git remote
+    recorded in every prior run's entry (not a GitHub permissions issue) — merged and dead but not
+    deleted.
+- **In progress (exact stopping point):** none — both KAN-33 and KAN-35 are now fully delivered,
+  independently re-verified (not just trusted from their original PRs), and merged. The apps/api jest
+  timeout/retry fix is a real, durable gap-closure, not a workaround scoped to this PR only — any
+  future apps/api emulator-backed spec now inherits the same 30s/retry tolerance.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-34** (quarantine + DLQ + replay API; per-key rate limiting, Redis token bucket)
+  is the next sprint-3 `todo` — it's what would let KAN-35's quarantine browser grow the replay button
+  its own PR deliberately left out (now unblocked on the payload side by KAN-33's `RawRecordModel`,
+  though a *quarantined* record still has no raw-payload store — KAN-34 would need to decide whether
+  quarantined records also get a durable store, or only accepted ones). **KAN-44** (audit log service)
+  and **KAN-37** (dbt staging models) are also sprint-3 `todo`s and independent. Worth a repo-wide
+  sweep at some point for any other emulator-backed jest/vitest suite missing the timeout/retry
+  tolerance this run added to `apps/api` — `apps/api` only had one spec file hitting a real emulator
+  before this, so it was the only gap, but a future new emulator-backed jest suite in `apps/api` would
+  need to remember `setupFilesAfterEnv` already covers it (nothing to do), whereas a *new package* with
+  its own jest config would need the same setup copied in.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-33-ingest-pipeline` and `kan-35-ingest-health-admin-ui` branches
+    on GitHub (this sandbox's git remote rejected both deletes with a 403), and the other
+    still-outstanding merged branches from prior runs noted in earlier entries below.
+
+---
+
 ## 2026-07-06 — E3.3 Ingest pipeline (KAN-33)
 
 - **Last completed:**
