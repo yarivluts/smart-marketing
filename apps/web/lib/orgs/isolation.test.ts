@@ -13,6 +13,7 @@ import { GET as listApiKeys, POST as mintApiKey } from '@/app/api/orgs/[orgId]/p
 import { DELETE as revokeApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]/route';
 import { GET as listSchemaDefs, POST as registerSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/route';
 import { POST as evolveSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/evolve/route';
+import { GET as listAuditLog } from '@/app/api/orgs/[orgId]/audit-log/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -359,6 +360,27 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         evolveSchemaDef(evolveRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
         }),
+    );
+  });
+
+  it('GET /api/orgs/[orgId]/audit-log: org caller cannot see vs. fake org id (KAN-44)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-audit-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (audit-log)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-audit-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (audit-log)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const requestFor = (orgId: string) => new NextRequest(`https://growthos.test/api/orgs/${orgId}/audit-log`);
+
+    await expectIndistinguishable(
+      () => listAuditLog(requestFor(orgB.id), { params: Promise.resolve({ orgId: orgB.id }) }),
+      () => listAuditLog(requestFor(FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID }) }),
     );
   });
 });

@@ -66,6 +66,7 @@
     "noProjects": "This organization has no projects yet.",
     "membersHeading": "Members",
     "resourceLibraryLink": "Resource library",
+    "auditLogLink": "Audit log",
     "projectResourcesLink": "Project resources",
     "projectKeysLink": "API keys",
     "projectSchemaRegistryLink": "Schema registry",
@@ -250,5 +251,14 @@
     "retryFailedDeliveries": "Retry failed deliveries",
     "retryFailedDeliveriesError": "Couldn't retry failed deliveries. Please try again.",
     "retryFailedDeliveriesResult": "{delivered} delivered, {failed} still failing"
+  },
+  "AuditLog": {
+    "metaTitle": "Audit log",
+    "title": "Audit log",
+    "chainValid": "Chain verified — {count} entries, no tampering detected.",
+    "chainInvalid": "Integrity check failed at entry {entryId}. This log may have been tampered with.",
+    "noEntries": "No audited changes recorded for this organization yet.",
+    "actorLine": "{actorType} {actorId} · {action}",
+    "listCapNote": "Showing the {count} most recent entries."
   }
 }

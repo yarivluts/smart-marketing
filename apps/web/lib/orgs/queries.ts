@@ -5,6 +5,7 @@ import {
   listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
   listApiKeysForProject as listApiKeysForProjectInOrganization,
   listAttachmentsForProject as listAttachmentsForProjectInOrganization,
+  listAuditLogEntriesForOrg as listAuditLogEntriesForOrgInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
   listOrgMembersWithProfiles,
@@ -19,6 +20,9 @@ import {
   MembershipModel,
   OrganizationModel,
   UserModel,
+  verifyAuditLogChainForOrg as verifyAuditLogChainForOrgInOrganization,
+  type AuditLogChainVerification,
+  type AuditLogEntryModel,
   type IngestBatchModel,
   type MembershipStatus,
   type OrgMemberSummary,
@@ -127,6 +131,16 @@ export async function listFailedPipelineMessagesForProject(
 ): Promise<PipelineMessageModel[]> {
   await ensureFirestoreOrm();
   return listFailedPipelineMessagesForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listAuditLogEntriesForOrg(organizationId: string, limit?: number): Promise<AuditLogEntryModel[]> {
+  await ensureFirestoreOrm();
+  return listAuditLogEntriesForOrgInOrganization(organizationId, limit);
+}
+
+export async function verifyAuditLogChainForOrg(organizationId: string): Promise<AuditLogChainVerification> {
+  await ensureFirestoreOrm();
+  return verifyAuditLogChainForOrgInOrganization(organizationId);
 }
 
 export interface PendingAttachmentDetails {

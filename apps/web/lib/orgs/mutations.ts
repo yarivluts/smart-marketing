@@ -90,12 +90,13 @@ export async function acceptInvite(input: AcceptInviteInput): Promise<AcceptInvi
 interface RemoveMemberInput {
   organizationId: string;
   membershipId: string;
+  performedByUserId: string;
 }
 
 /** Revokes a pending invite or removes an active member — see `removeOrgMember`'s doc comment. */
 export async function removeMember(input: RemoveMemberInput): Promise<void> {
   await ensureFirestoreOrm();
-  return removeOrgMember(input.organizationId, input.membershipId);
+  return removeOrgMember(input.organizationId, input.membershipId, input.performedByUserId);
 }
 
 interface CreateSharedCredentialInput {
@@ -261,21 +262,34 @@ interface ReplayQuarantinedRecordInput {
   organizationId: string;
   projectId: string;
   quarantinedRecordId: string;
+  performedByUserId: string;
 }
 
 export async function replayQuarantinedRecord(input: ReplayQuarantinedRecordInput): Promise<ReplayQuarantinedRecordResult> {
   await ensureFirestoreOrm();
-  return replayQuarantinedRecordInOrganization(input.organizationId, input.projectId, input.quarantinedRecordId);
+  return replayQuarantinedRecordInOrganization(
+    input.organizationId,
+    input.projectId,
+    input.quarantinedRecordId,
+    input.performedByUserId,
+  );
 }
 
 interface ReplayFailedPipelineMessagesInput {
   organizationId: string;
   projectId: string;
+  performedByUserId: string;
 }
 
 export async function replayFailedPipelineMessagesForProject(
   input: ReplayFailedPipelineMessagesInput,
 ): Promise<DrainPipelineResult> {
   await ensureFirestoreOrm();
-  return replayFailedPipelineMessagesForProjectInOrganization(input.organizationId, input.projectId);
+  return replayFailedPipelineMessagesForProjectInOrganization(
+    input.organizationId,
+    input.projectId,
+    undefined,
+    undefined,
+    input.performedByUserId,
+  );
 }

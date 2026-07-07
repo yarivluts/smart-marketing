@@ -12,11 +12,15 @@ interface RouteParams {
  */
 export async function POST(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { user, error } = await requireOrgPermission(orgId, 'ingest.write');
   if (error) {
     return error;
   }
 
-  const result = await replayFailedPipelineMessagesForProject({ organizationId: orgId, projectId });
+  const result = await replayFailedPipelineMessagesForProject({
+    organizationId: orgId,
+    projectId,
+    performedByUserId: user.id,
+  });
   return NextResponse.json(result);
 }

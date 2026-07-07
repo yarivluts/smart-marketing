@@ -66,6 +66,7 @@
     "noProjects": "לארגון זה אין עדיין פרויקטים.",
     "membersHeading": "חברים",
     "resourceLibraryLink": "ספריית משאבים",
+    "auditLogLink": "יומן ביקורת",
     "projectResourcesLink": "משאבי הפרויקט",
     "projectKeysLink": "מפתחות API",
     "projectSchemaRegistryLink": "מרשם סכימות",
@@ -250,5 +251,14 @@
     "retryFailedDeliveries": "נסה שוב מסירות שנכשלו",
     "retryFailedDeliveriesError": "לא ניתן היה לנסות שוב את המסירות שנכשלו. נסה שוב.",
     "retryFailedDeliveriesResult": "{delivered} נמסרו, {failed} עדיין נכשלות"
+  },
+  "AuditLog": {
+    "metaTitle": "יומן ביקורת",
+    "title": "יומן ביקורת",
+    "chainValid": "השרשרת אומתה — {count} רשומות, לא זוהה שיבוש.",
+    "chainInvalid": "בדיקת התקינות נכשלה ברשומה {entryId}. ייתכן שהיומן הזה שובש.",
+    "noEntries": "עדיין לא נרשמו שינויים מבוקרים עבור ארגון זה.",
+    "actorLine": "{actorType} {actorId} · {action}",
+    "listCapNote": "מוצגות {count} הרשומות האחרונות."
   }
 }

@@ -12,8 +12,10 @@ import { type Permission } from './permissions';
  * other keys), `automation.approve`/`automation.execute` (plan 06 §3:
  * "automation execution rights are a separate, elevated scope" — money-
  * moving actions need a human role, not a bearer token), `pii.read`
- * (plan 08 §5.4's separate PII gate), and `plugin.install` (an install is an
- * admin action). What's left is the machine-appropriate surface: pushing
+ * (plan 08 §5.4's separate PII gate), `plugin.install` (an install is an
+ * admin action), and `audit.read` (KAN-44 — a key reading its own org's
+ * change history is an admin/operator concern, not something a leaked
+ * ingest key should expose). What's left is the machine-appropriate surface: pushing
  * data in, writing schemas/metrics/dashboards, exporting, and using AI
  * tooling. `index.test.ts` pins this as a full partition of `PERMISSIONS` —
  * every permission is either here or in that withheld list, never neither
