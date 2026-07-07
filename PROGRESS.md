@@ -17,6 +17,128 @@ Template for each entry:
 
 ---
 
+## 2026-07-07 — E3.4 Quarantine + DLQ + replay API; per-key rate limiting (KAN-34)
+
+- **Last completed:**
+  - Implemented **KAN-34** (plan `13 §E3.4`, AC: "Invalid records land in quarantine with reason;
+    replay after schema fix succeeds"), the natural next sprint-3 pick per the prior run's own
+    "Next step" — the direct consumer of KAN-33's `failed`-status `PipelineMessageModel`s (a dead end
+    with no replay path) and of the raw-payload gap KAN-32/33's entries both flagged for quarantined
+    records.
+    - `packages/firebase-orm-models`: new `QuarantinedRecordModel`
+      (`organizations/:organization_id/projects/:project_id/quarantined_records`) — the durable home a
+      quarantined record never had before this story; `IngestBatchModel.record_results` only ever
+      stored validation status (`status`/`reasons`), never the payload, so there was nothing to
+      resubmit. `ingest.service.ts`'s `ingestBatch` now writes one of these, best-effort (same
+      tradeoff as its dedup-key claims and pipeline publish — a write failure here never turns an
+      otherwise-successful 202 into a 500), for every quarantined record — envelope failures and
+      schema-validation failures alike. Refactored `prepareRecord`'s envelope checks into an exported
+      `checkRecordEnvelope(kind, raw)` and exported `validateAgainstSchema`/`dedupKeyId` so the new
+      replay path reuses the identical validation/hashing logic rather than duplicating it.
+    - New `quarantine.service.ts`: `listQuarantinedRecordsForProject` (newest-first, `status ===
+      'quarantined'` only) and `replayQuarantinedRecord` — re-runs `checkRecordEnvelope` +
+      `validateAgainstSchema` against the record's persisted raw payload and the **current** active
+      schema (which may have evolved since the record was first quarantined). On success: claims the
+      record's dedup slot (same `dedupKeyId` hash a normal accepted resend would claim), publishes and
+      lands it into the pipeline exactly like `ingestBatch` would, marks the record `replayed`, and
+      returns `accepted`. If another accepted record already claimed the same slot in the meantime
+      (a race between a corrected resend and a late replay), it resolves as `duplicate` instead —
+      matching `ingestBatch`'s own "duplicate is benign" posture. If validation still fails, the record
+      stays `quarantined` with its `reasons` refreshed, replayable again later. The original
+      `IngestBatchModel`'s own `record_results` is never retroactively mutated — replay history lives
+      on the quarantine record itself, keeping batch documents an immutable point-in-time record.
+    - `pipeline.service.ts` gains the pipeline's own DLQ replay: `listFailedPipelineMessagesForProject`
+      / `replayFailedPipelineMessagesForProject` — `landMessage`'s `failed`/`failure_reason` shape
+      already existed (KAN-33), but nothing ever revisited a message once it landed there;
+      `drainPendingPipelineMessages` only ever swept `queued` messages. These reuse the same private
+      `landMessages` helper, project-scoped (not per-environment, matching `listRecentIngestBatchesForProject`'s
+      "fold every environment into one admin view" convention) since there's no per-environment
+      admin surface for this.
+    - New `rate-limit/` module: a provider-agnostic `RateLimiter` interface + `InMemoryTokenBucketRateLimiter`
+      — this repo has no Redis dependency, docker-compose service, or emulator anywhere yet (confirmed via a
+      repo-wide search before building this), so a real Redis-backed limiter isn't buildable today; this
+      stands in until KAN-18 provisions one, the same "buildable today, swap the provider later" split
+      `vault/local-kms-provider.ts` used for KMS before KAN-18. Default: 10 req/s sustained, bursts to 600
+      (headroom above the "1k events/s" ingest AC since one request can carry up to `MAX_INGEST_BATCH_SIZE`
+      records). `apps/api`'s `ApiKeyAuthGuard` now calls `this.rateLimiter.consume(apiKey.id)` after
+      authentication/scope checks succeed (so an invalid-key brute force never spends or exhausts a real
+      key's budget), returning `429` + a manually-set `Retry-After` header on exhaustion. Wired via a
+      `API_KEY_RATE_LIMITER` DI token registered in `IngestModule` (so a future bearer-key-guarded route
+      shares the same limiter instance) with an `@Optional()` constructor fallback to the shared
+      `defaultApiKeyRateLimiter` singleton for direct/non-DI construction.
+    - `apps/web`: the KAN-35 ingest-health page's quarantine browser now reads from
+      `listQuarantinedRecordsForProject` directly instead of deriving from batches'
+      `record_results` — this gives each quarantined record a real, stable id (the old view was keyed by
+      `(batchId, recordIndex)`, which a replay action has nothing to reference) — with a new **Replay**
+      button per record (`ReplayQuarantinedRecordButton`) showing the outcome inline. New **Pipeline
+      delivery failures** section lists `listFailedPipelineMessagesForProject` with a **Retry failed
+      deliveries** button (`RetryFailedPipelineMessagesButton`) calling
+      `replayFailedPipelineMessagesForProject`. Two new Next.js API routes
+      (`.../quarantined-records/[id]/replay`, `.../ingest-health/replay-failed-pipeline-messages`), both
+      gated on `ingest.write` (same permission the page itself requires) — matching the plan's own "dead
+      letter queue with replay from the admin console" framing rather than exposing replay through
+      `apps/api`'s bearer-key ingest routes.
+  - **Self-review** (read through the full diff for correctness bugs, missing tests, and
+    reuse/simplification issues before opening the PR) found and fixed:
+    - A lint error (`prodEnvironment` destructured but unused) in a new pipeline DLQ emulator test.
+    - Two test-authoring bugs caught only by actually running the emulator suite, not by
+      lint/typecheck: `registerSchemaDefinition` requires at least one field (a test passed `fields:
+      []`), and a "replay resolves as duplicate" test's race scenario was wrong — a record originally
+      quarantined for a *missing required field* can never independently re-validate on replay (its own
+      persisted payload still lacks that field), so the race has to be built around an
+      *unregistered-field* quarantine instead (fixable by evolving the schema to register the field,
+      independent of whether a corrected resend also raced in first).
+    - A rate-limiter unit test's own expected-value arithmetic was wrong (expected the bucket to read
+      `0` after a long idle refill + one spend, when capacity-capped refill + one spend actually leaves
+      `capacity - 1`).
+    - Missing test coverage for `ApiKeyAuthGuard`'s `@Optional()` constructor fallback to
+      `defaultApiKeyRateLimiter` when constructed without an explicit rate limiter (every other test in
+      the file, after the rewrite for KAN-34, injected one explicitly) — added.
+    - **Reviewed and deliberately left as-is**: replaying an already-`replayed` record a second time is
+      unguarded against explicitly, but is provably safe — its dedup slot is already claimed by its own
+      first successful replay, so a second call's dedup check always resolves `duplicate`, never
+      resurrecting the record back to `quarantined`; the UI can't trigger this path anyway since a
+      replayed record no longer appears in `listQuarantinedRecordsForProject`'s `status === 'quarantined'`
+      filter. Also left as-is: no admin surface for tuning a key's rate-limit capacity/refill rate —
+      the AC doesn't call for one, and there's no per-key override field to manage yet (a single shared
+      default is used everywhere), so CLAUDE.md's "everything user-manageable gets an admin surface"
+      rule doesn't yet have anything to attach to here.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (123 tests
+    in `packages/firebase-orm-models` incl. the new `quarantine.emulator.test.ts` (9 tests) and 3 new
+    DLQ tests in `pipeline.emulator.test.ts`, 35 in `apps/api` incl. 6 new rate-limiting tests, 242 web
+    unit/route tests incl. new component tests for both admin buttons + updated `ingest-health-view`
+    tests, 15/15 Playwright e2e in `apps/web` incl. updated/extended `ingest-health.spec.ts`). One
+    transient flaky Playwright retry (`auth.spec.ts`'s sign-up flow, unrelated to this diff) on the
+    first full run self-recovered on retry; a from-scratch rerun afterward had zero flakes.
+  - Branch `kan-34-quarantine-dlq-rate-limit`, PR #23. CI green (`lint · typecheck · test · build`),
+    `mergeable_state: clean`, merged (squash) into `main` on the first attempt — no stall/flake, no
+    duplicate PR found this run. Remote branch deletion failed with the same HTTP 403 from this
+    sandbox's git remote recorded in every prior run's entry (not a GitHub permissions issue; no
+    branch-delete tool exists in the GitHub MCP server either) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-34 is fully delivered, independently reviewed,
+  tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-37** (dbt project: staging models over raw ingest, canonical entities/events/
+  measures core tables, dbt tests) and **KAN-44** (audit log service) are both sprint-3 `todo`s and
+  independent of each other and of this story — either is a reasonable next pick. KAN-35's own
+  ingest-health page could also eventually show the pipeline-delivery-failures section this run added
+  per-project rather than needing a human to know to look; no further action needed there for now.
+  Worth noting for whoever picks up KAN-44 (audit log): this story's replay actions (quarantine replay,
+  pipeline DLQ retry) are exactly the kind of "config/key/role/schema change" KAN-44's audit log is
+  meant to capture once it exists — neither was wired to write an audit entry, the same "buildable
+  today" deferral KAN-30/31 already used for their own not-yet-built dependency.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-34-quarantine-dlq-rate-limit` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403, and the GitHub MCP server has no delete-branch tool either),
+    and the other still-outstanding merged branches from prior runs noted in earlier entries below.
+
+---
+
 ## 2026-07-07 — Reconciled two stale unmerged PRs (KAN-33, KAN-35); fixed apps/api's missing emulator-flake tolerance
 
 - **Last completed:**
