@@ -246,6 +246,8 @@
     "tablePlaceholder": "למשל fact_ad_spend",
     "columnLabel": "עמודה",
     "columnPlaceholder": "למשל reporting_spend",
+    "timeColumnLabel": "עמודת זמן",
+    "timeColumnPlaceholder": "למשל date",
     "filtersLabel": "מסננים",
     "filterFieldPlaceholder": "שדה",
     "filterOperatorLabel": "אופרטור",

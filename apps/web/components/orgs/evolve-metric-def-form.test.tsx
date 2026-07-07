@@ -16,6 +16,7 @@ const INITIAL_STATE: MetricDefinitionFormState = {
   ...blankMetricDefinitionFormState(),
   table: 'fact_ad_spend',
   column: 'reporting_spend',
+  timeColumn: 'date',
   dimensions: 'channel',
 };
 
@@ -55,7 +56,7 @@ describe('EvolveMetricDefForm', () => {
             name: 'ad_spend',
             definition: {
               kind: 'aggregation',
-              aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [] },
+              aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] },
             },
             dimensions: ['channel', 'campaign'],
           }),

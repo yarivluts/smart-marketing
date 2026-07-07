@@ -380,7 +380,7 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
 
     const leakedBody = {
       name: 'leaked_metric',
-      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'spend', filters: [] } },
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'spend', timeColumn: 'date', filters: [] } },
       dimensions: [],
     };
 

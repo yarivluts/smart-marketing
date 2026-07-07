@@ -53,7 +53,7 @@ function request(orgId: string, projectId: string, path: 'metric-defs' | 'metric
 
 const adSpendV1 = {
   name: 'ad_spend',
-  definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [] } },
+  definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
   dimensions: ['channel'],
 };
 
@@ -88,7 +88,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/metric-defs/evolve', () =>
       name: 'ad_spend',
       definition: {
         kind: 'aggregation',
-        aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [{ field: 'platform', operator: '!=', value: 'test' }] },
+        aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [{ field: 'platform', operator: '!=', value: 'test' }] },
       },
       dimensions: ['channel', 'campaign'],
     });

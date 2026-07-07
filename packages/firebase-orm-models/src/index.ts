@@ -53,6 +53,7 @@ export * from './services/key.service';
 export * from './services/vault.service';
 export * from './services/schema-registry.service';
 export * from './services/metric-registry.service';
+export * from './services/metrics-compiler.service';
 export * from './services/ingest.service';
 export * from './services/pipeline.service';
 export * from './services/quarantine.service';

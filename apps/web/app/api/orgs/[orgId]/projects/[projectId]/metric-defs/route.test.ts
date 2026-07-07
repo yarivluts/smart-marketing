@@ -61,7 +61,7 @@ function metricDefsRequest(
 }
 
 const adSpendDefinition = {
-  definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [] } },
+  definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
   dimensions: ['channel'],
 };
 
@@ -144,7 +144,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/metric-defs', () => {
 
     const badFunction = metricDefsRequest(organization.id, project.id, {
       name: 'x',
-      definition: { kind: 'aggregation', aggregation: { function: 'median', table: 'fact_ad_spend', column: 'spend', filters: [] } },
+      definition: { kind: 'aggregation', aggregation: { function: 'median', table: 'fact_ad_spend', column: 'spend', timeColumn: 'date', filters: [] } },
       dimensions: [],
     });
     expect((await POST(badFunction.request, { params: badFunction.params })).status).toBe(400);

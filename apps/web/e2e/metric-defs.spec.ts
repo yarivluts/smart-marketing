@@ -39,9 +39,12 @@ test.describe('Metric catalog: register an aggregation and a formula metric, inv
     await expect(page.getByText('No metrics registered for this project yet.')).toBeVisible();
 
     // Register v1: an aggregation metric summing ad spend.
+    // "Column" is matched with `exact: true` — Playwright's default label
+    // matching is substring-based, and "Time column" would otherwise also match.
     await page.getByLabel('Name').fill('ad_spend');
     await page.getByLabel('Table').fill('fact_ad_spend');
-    await page.getByLabel('Column').fill('reporting_spend');
+    await page.getByLabel('Column', { exact: true }).fill('reporting_spend');
+    await page.getByLabel('Time column').fill('date');
     await page.getByRole('button', { name: 'Register metric' }).click();
 
     await expect(page.getByText('ad_spend', { exact: true })).toBeVisible();

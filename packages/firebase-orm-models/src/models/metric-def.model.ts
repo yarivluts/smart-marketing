@@ -48,6 +48,8 @@ export interface MetricAggregationDef {
   table: string;
   /** Required for every function except `count` (a plain row count needs no column). */
   column?: string;
+  /** The table's own date/timestamp column (plan `04 §1`'s tables don't share one name — `fact_ad_spend.date`, `fact_funnel_event.ts`, ...) — the compiler (KAN-41) buckets by this column for a query's requested time grain. */
+  timeColumn: string;
   filters: MetricFilterDef[];
 }
 
