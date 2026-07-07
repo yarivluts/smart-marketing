@@ -17,6 +17,176 @@ Template for each entry:
 
 ---
 
+## 2026-07-07 — Reconciled a duplicate KAN-42 implementation; hardened the compiler against an unvalidated filter operator
+
+- **Last completed:**
+  - Read PROGRESS.md/TASKS.md per the usual start-of-run routine and independently implemented **KAN-42**
+    end to end (a `MetricsController` returning compiled SQL rather than executing it, since there's no
+    live BigQuery, plus an `InMemoryResultCache` stand-in) — all local checks green, ready to push. On
+    `git push`, discovered the remote already had a `kan-42-metrics-query-api` branch with an **open PR
+    #27** from a parallel same-day run, complete with its own independent implementation and a
+    "PR pending" PROGRESS.md entry (the entry directly below this one) — the same "duplicate work from a
+    parallel run" situation this file has documented before for KAN-20 and KAN-33/35.
+  - Compared both implementations in full rather than blindly force-pushing mine over theirs. PR #27's
+    is the stronger design and was adopted in place of my own:
+    - It actually attempts *execution* via a `WarehouseQueryExecutor` seam (defaulting to a
+      `NotConfiguredWarehouseQueryExecutor` that throws a typed `WarehouseNotConfiguredError` -> `503`),
+      matching the plan's `series` response shape and giving callers a clear, typed signal for "not
+      configured yet" — my own version silently changed the response contract to expose compiled SQL
+      instead of `series`, a less faithful match to plan `12 §3`.
+    - It additionally implements `GET /v1/metrics/{name}` (definition + formula lineage via `dependsOn`),
+      accepts the plan's own `metric: string|string[]` singular-or-array sugar, and validates
+      grain/compare/filter-operator against the compiler's own const arrays at the HTTP boundary with a
+      dedicated `metrics-request.spec.ts` unit suite — all beyond what my own version covered.
+    - Its cache key is a sha256 hash of org+project+definitionRefs+params (my version used a custom
+      stable-stringify serializer) — functionally equivalent, marginally simpler.
+    - My own branch was reset to match `origin/kan-42-metrics-query-api` (PR #27) exactly rather than
+      merging/cherry-picking piecemeal, to avoid producing a Frankenstein diff neither run's own tests
+      were written against.
+  - **One real, valuable gap survived the comparison**: PR #27 never touches
+    `packages/shared/src/metrics-compiler/compiler.ts`. Its own `metrics-request.ts` *does* validate a
+    filter's `op` against `METRIC_FILTER_OPERATORS` at the HTTP boundary (confirmed by reading it — this
+    already blocks the exploit through the one live HTTP caller today), but the compiler function itself
+    — `emitFilterClause` — still splices `filter.operator` directly into SQL text
+    (`` `${columnSql} ${filter.operator} @${paramName}` ``) with **no runtime check** of its own, unlike
+    `field` (`assertSafeIdentifier`) and `value` (a bind `@param`). This was latent and harmless while
+    the compiler's only callers were golden-file tests and a Firestore-validated registry (KAN-41), but
+    is a real defense-in-depth gap now that `compileMetricQuery` is a plain, directly-importable function
+    a *future* caller (the AI Analyst's `query_metric` tool, a hand-built catalog, a second HTTP surface)
+    could invoke without ever going through `metrics-request.ts`'s own boundary check. Fixed by
+    validating `filter.operator` against `METRIC_FILTER_OPERATORS` inside `emitFilterClause` itself,
+    throwing `MetricCompilerError` (which `MetricsController` already maps to `400`) instead of compiling
+    it. Added a regression test in `compiler.test.ts` (a hand-built request with
+    `operator: '1=1; --'`, bypassing the TS union the same way untrusted JSON would).
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green on the reconciled branch (182
+    tests in `packages/shared`, up from 181 — the new operator regression test; 173 in
+    `packages/firebase-orm-models`; 57 in `apps/api`; 269 web unit/route tests + 16/16 Playwright e2e,
+    unrelated to this diff). One self-recovering Firestore-emulator `RESOURCE_EXHAUSTED` retry during the
+    `firebase-orm-models` suite and one self-recovering Playwright sign-up-flow retry during the `apps/web`
+    suite — both the same long-documented, pre-existing sandbox flakes every prior entry has hit.
+  - Updated PR #27's own branch/PR in place with this fix rather than opening a second, competing PR.
+- **In progress (exact stopping point):** none — KAN-42 (via PR #27, plus this run's compiler hardening
+  on top) is fully delivered, independently reviewed, tested, and ready to merge.
+- **Blocked + why:** nothing blocking; CI needs to run on the updated PR #27 and go green before merge.
+- **Next step:** confirm PR #27's CI is green with this run's added commit, merge (squash) into `main`,
+  delete the branch if the git remote allows it this time. After that, the remaining sprint-3 `todo`s are
+  **KAN-37** (dbt — still needs a buildable-today warehouse stand-in decision), **KAN-38**
+  (orchestration), and **KAN-39** (cost guardrails, needs real BigQuery); all three independent of each
+  other and of this story. Worth a note for whoever eventually wires a real `WarehouseQueryExecutor` in
+  (KAN-18/KAN-37-gated): nothing in `apps/api` should need to change, per that interface's own doc
+  comment.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this run's
+    own branch is also ready to prune.
+
+---
+
+## 2026-07-07 — E5.3 Metrics query API: POST /v1/metrics/query + GET /v1/metrics catalog + result cache (KAN-42)
+
+- **Last completed:**
+  - Implemented **KAN-42** (plan `13 §E5.3`/`12 §3`, AC: "`POST /v1/metrics/query` + `GET /v1/metrics`
+    catalog + Redis result cache keyed by def-version+params"), the story the prior run's own "Next step"
+    flagged as the direct, natural next pick — it's the HTTP route KAN-41's `compileMetricQueryForProject`
+    was built as the integration point for.
+    - `packages/firebase-orm-models/src/warehouse/` (new): a provider-agnostic `WarehouseQueryExecutor`
+      interface (`execute(compiled) -> WarehouseRow[]`) — the actual-BigQuery-execution seam. Its only
+      implementation today, `NotConfiguredWarehouseQueryExecutor` (the default), throws a typed
+      `WarehouseNotConfiguredError` rather than returning an empty result set, so a caller can tell "no
+      warehouse yet" apart from "the query legitimately matched nothing". Unlike the pipeline's raw-record
+      Firestore stand-in (KAN-33), there's no meaningful Firestore stand-in to execute a compiled query
+      against here: a metric's `aggregation` declares a warehouse table/column (e.g.
+      `fact_ad_spend.reporting_spend`) with no corresponding Firestore collection — the actually-landed
+      data lives in `RawRecordModel` as opaque per-record JSON, not in the typed fact tables the compiler
+      assumes. Real execution needs both KAN-18 (a BigQuery project) and KAN-37 (dbt building those fact
+      tables from raw records); this is the buildable-today seam that unblocks both once they exist,
+      documented as a deliberate scope cut rather than attempted with a fake in-memory SQL engine.
+    - Also new: a `MetricQueryResultCache` interface + `InMemoryMetricQueryResultCache` — a provider-
+      agnostic, in-process stand-in for the AC's "Redis result cache", the same "buildable today, swap the
+      provider later" split `rate-limit/` (KAN-34) used for a token bucket until KAN-18 provisions real
+      Redis. TTL-based (default 60s), with an injectable clock for deterministic unit tests.
+    - New `metrics-query.service.ts`: `queryMetrics()` compiles via `compileMetricQueryForProject`, checks
+      the cache, executes + caches on a miss. Cache key is a sha256 of `organizationId`+`projectId`+
+      `definitionRefs` (`metric:<name>@v<version>` per dependency) +compiled params — **not** the compiled
+      SQL text itself (two requests compiling to differently-formatted SQL for the same
+      definitions+params would otherwise miss each other's entry for no semantic reason). Versioning every
+      ref means a metric evolving to a new version naturally misses old cache entries instead of needing
+      explicit invalidation. Also new: `listMetricsCatalogForProject` (`GET /v1/metrics` — active-version-
+      only, unlike KAN-40's admin `listMetricDefinitionsForProject` which browses full history) and
+      `getMetricCatalogDetail` (`GET /v1/metrics/{name}` — definition + `dependsOn`, a formula's direct
+      metric references via the compiler's own `parseFormula`/`collectIdentifiers`, reused rather than
+      re-implemented).
+    - `apps/api`: new `MetricsController` (`POST /metrics/query`, `GET /metrics`, `GET /metrics/:name`),
+      authenticated the same way as `IngestController` — a bearer API key via `ApiKeyAuthGuard`, not a
+      human role binding. **Reuses the existing `metrics.write` API key scope for the whole surface**
+      (defining *and* querying) rather than adding a new `metrics.read` permission: the plan's own
+      permission catalog (`08 §5.3`) lists only `metrics.write`, with no read-specific variant for metrics
+      or dashboards anywhere in the catalog — adding one would be a real, invasive policy-catalog change
+      (new role-bundle grants, a `roles.ts` doc-comment update, the 138+-case table-driven permission
+      matrix, `API_KEY_SCOPES`'s own "full partition of `PERMISSIONS`" pinning test) for a distinction the
+      plan itself doesn't draw. `queryMetrics`'s `MetricCompilerError`/`MetricNotRegisteredError` ->
+      400, `ProjectNotFoundError` -> 404, `WarehouseNotConfiguredError` -> 503 (the real, correct response
+      in every environment today — there's no BigQuery project yet). New `metrics-request.ts` parses the
+      plan's own JSON shape (`metric: string|string[]`, `dimensions`, `filters: [{field,op,value}]`,
+      `time: {start,end,grain,compare}`), reconciling the plan's `op` field name with the compiler's own
+      `operator` vocabulary and validating grain/compare/operator against the compiler's own const arrays
+      before the request ever reaches the compiler. No new admin UI: nothing this story adds is
+      human-manageable (the executor/cache are internal machinery), the same "AC doesn't call for one"
+      posture KAN-34's rate limiter used for its own un-tunable capacity.
+  - **Self-review** before opening the PR found and fixed one real cross-tenant bug:
+    - `buildResultCacheKey` originally hashed only `definitionRefs`+params, omitting
+      `organizationId`/`projectId`. Since `definitionRefs` is just `metric:<name>@v<version>` and metric
+      names are only unique *within* a project, two different projects each registering their own metric
+      named e.g. `ad_spend` at version 1 would compile to the *identical* cache key on an identical
+      request — one project could read back another project's cached result through the shared in-process
+      cache instance, the exact cross-tenant leak KAN-26's isolation work is otherwise careful to prevent
+      everywhere else in this codebase. Fixed by folding `organizationId`/`projectId` into the cache key;
+      added a regression test proving two projects with a same-named, same-version metric get back their
+      own (different) cached series, not each other's.
+    - Also added an e2e case for the one compiler-thrown-error path the initial diff hadn't exercised at
+      the HTTP layer (`MetricCompilerError` for an unsupported dimension breakdown -> 400), to prove the
+      `instanceof` check across the `@growthos/shared` package boundary actually works at runtime, not
+      just in isolated unit tests.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green (173 tests in
+    `packages/firebase-orm-models`, up from 156 — 10 new in `metrics-query.emulator.test.ts` (incl. the
+    cache-isolation regression test added during self-review) + 5 new `warehouse/result-cache.test.ts` +
+    2 new `warehouse/query-executor.test.ts`; 57 in `apps/api`, up from 35 — 11 new
+    `metrics-request.spec.ts` unit tests + 11 new `metrics.controller.e2e.spec.ts` e2e cases; web
+    unrelated to this diff, reran as part of the standard full check: 269 unit/route tests + 16/16
+    Playwright e2e). One `schema-registry.spec.ts` e2e failure (plus the long-documented, self-recovering
+    `auth.spec.ts` sign-up flake) on the first full run — confirmed unrelated (this diff touches nothing
+    under `apps/web`, `git diff --stat` against it is empty) and reproduced clean, zero retries, on an
+    immediate rerun of the whole `apps/web` suite; the same category of sandbox UI-timing flake every
+    prior entry has documented for this repeated-dev-server-launch sandbox.
+  - Branch `kan-42-metrics-query-api`, PR pending at time of writing — see the PR link in the branch's own
+    history for CI status; this entry is written before the final merge step so a follow-up run can
+    confirm and finish if this run stops first.
+- **In progress (exact stopping point):** KAN-42 implementation, self-review, and local
+  lint/typecheck/test/build are complete and green; opening the PR and merging (pending CI) is the only
+  remaining step for this story.
+- **Blocked + why:** nothing blocking; CI needs to run and go green before merge.
+- **Next step:** confirm PR CI is green, merge (squash) into `main`, delete the branch if the git remote
+  allows it this time (every prior run this sandbox's remote has rejected branch deletion with an HTTP
+  403). After that, **KAN-38** (orchestration: scheduled runs, freshness metadata written back) and
+  **KAN-39** (cost guardrails, needs real BigQuery) are the remaining sprint-3 `todo`s; **KAN-37** (dbt)
+  remains the most infra-blocked — and this story's own `WarehouseQueryExecutor` seam is now a second
+  concrete reason dbt's mart layer matters: real query execution needs both a BigQuery project (KAN-18)
+  *and* dbt-built fact tables (KAN-37) to have anything to run the compiled SQL against.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged by
+    this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this run's
+    own branch is also ready to prune.
+
+---
+
 ## 2026-07-07 — E5.2 Compiler: metric definition + query request -> BigQuery SQL (KAN-41)
 
 - **Last completed:**
