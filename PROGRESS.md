@@ -17,6 +17,125 @@ Template for each entry:
 
 ---
 
+## 2026-07-07 — E5.2 Compiler: metric definition + query request -> BigQuery SQL (KAN-41)
+
+- **Last completed:**
+  - Implemented **KAN-41** (plan `04 §2`/`13 §E5.2`, AC: "Golden-file SQL tests for 10 representative
+    queries"), the story the prior run's own "Next step" flagged as the most tractable sprint-3 pick —
+    unlike KAN-37 (dbt, still needs a warehouse stand-in decision) and KAN-39 (cost guardrails, needs
+    real BigQuery), a SQL-string compiler needs no live warehouse to test against; the AC only asks for
+    golden-file SQL, not execution.
+    - `packages/shared/src/metrics-compiler` (new): a **pure, Firestore-free** `compileMetricQuery(catalog,
+      request)` — deliberately independent of `@growthos/firebase-orm-models`'s `MetricDefModel` (its own
+      `CompilerMetricDefinition`/`MetricCatalog` types mirror that shape structurally) so it's usable by
+      any future caller (KAN-42's query API, the AI Analyst's `query_metric` tool) and testable without an
+      emulator. Buckets by the requested time grain via `DATE_TRUNC(DATE(col), DAY/WEEK/MONTH/QUARTER/YEAR)`;
+      breaks down by requested dimensions (validated against each requested metric's own declared
+      `dimensions` list); when `time.compare` (`previous_period`/`previous_year`) is set, computes the
+      prior window in JS and `UNION ALL`s it alongside `current`, tagged by a `period` column. Formulas
+      are **parsed into a small arithmetic AST** (`formula-parser.ts`, precedence-climbing recursive
+      descent) rather than string-substituted, specifically so `/` compiles to `SAFE_DIVIDE(...)` instead
+      of a literal `/` — a real BigQuery runtime error on any bucket where the denominator (e.g. `cac`'s
+      `new_paying`) is 0, which a naive substitution would ship straight into every dashboard query.
+      Nested formulas (formula referencing another formula) are inlined recursively, not materialized —
+      only leaf aggregations get their own CTE, joined via `FULL JOIN ... USING (bucket_date, ...dims)`.
+      Filter values and time-range boundaries are bound `@param`s (an `in` filter becomes
+      `IN UNNEST(@param)` against a comma-split array), never inlined literals; every table/column/
+      dimension/filter-field identifier is defensively re-validated (`assertSafeIdentifier`) and
+      backtick-quoted before being spliced into SQL, independent of whatever the registry already checked
+      at write time. **Known, documented simplification**: dimension/filter field names are compiled as if
+      they were literal columns on the aggregation's own table (no join-graph model yet — plan `04 §1`'s
+      raw fact/dim split would need one for e.g. `channel` to resolve through `dim_channel`); this assumes
+      a denormalized mart layer, deferred as real join-aware compilation until dbt (KAN-37) exists to build
+      that mart.
+      - 10 golden-file fixtures (`__fixtures__/*.sql` + matching `*.params.json`) per the AC's own count:
+        simple aggregation (day grain), dimensioned aggregation (week), base + query-level filter (month),
+        single-level formula with and without a dimension breakdown, a **3-level-deep** formula
+        (`ltv_to_cac` -> `ltv` -> `arpa`/`gross_margin`/`revenue_churn_rate`, plus `cac` -> `ad_spend`/
+        `new_paying`) proving nested-formula inlining compiles correctly, both compare periods
+        (`previous_period`'s same-length-preceding-window math and `previous_year`'s calendar-year
+        shift), a multi-metric request (two plain aggregations in one query), and `count()`/`IN UNNEST`.
+        Generated once by actually running the compiler (not hand-derived) and checked in as the golden
+        baseline, then locked in by the real test suite reading them back and asserting equality — the
+        literal "golden-file SQL tests" the AC asks for, not inline template-string snapshots.
+    - `packages/firebase-orm-models`: new `metrics-compiler.service.ts`'s `compileMetricQueryForProject` —
+      the Firestore integration point. Resolves a project's registered metric definitions (KAN-40) via
+      `getActiveMetricDefinition`, **recursively** following formula references (including through nested
+      formulas, via a BFS over successive rounds of `Promise.all`-batched fetches) until every leaf
+      aggregation is fetched; missing names are accumulated across the *whole* walk into one
+      `MetricNotRegisteredError` rather than throwing on the first one a query happens to touch. Returns
+      `definitionRefs` (`metric:<name>@v<version>` per dependency, requested or transitively referenced) —
+      the plan `12 §3` `definition_ref` response shape, generalized from one metric to every dependency a
+      multi-metric/formula query can have.
+    - **`MetricAggregationDef` (KAN-40) gains a required `timeColumn`** — plan `04 §1`'s canonical fact
+      tables don't share one time-column name (`fact_ad_spend.date` vs. `fact_funnel_event.ts` vs.
+      `dim_subscription.started_at`), so the compiler needs to know which column to bucket by per
+      aggregation; there was no field for this before KAN-41 needed one. Plumbed through
+      `metric-registry.service.ts`'s validation (non-empty, same posture as `table`), the metric-defs admin
+      form (new "Time column" input on the aggregation editor, prefilled on evolve), and en/he
+      translations — the same "extend an already-shipped admin surface for a new required field" pattern
+      KAN-44 used for `removeOrgMember`/`replayQuarantinedRecord`'s new actor param. All 9 existing
+      aggregation fixtures across `metric-registry.emulator.test.ts` and `apps/web`'s route/component
+      tests/e2e spec updated; one new registry-validation test (`rejects ... a whitespace-only time
+      column`) added.
+  - **Self-review** before opening the PR found and fixed:
+    - `resolveCatalog`'s BFS filtered a formula's referenced names against `resolved`/`missing`
+      **mid-batch** (inside the same `for` loop iterating that round's fetch results) instead of after the
+      whole round was merged — two metrics fetched in the *same* round that reference each other (e.g. a
+      query requesting both a formula and the metric it directly references) could see the referenced
+      name not yet marked `resolved` when checked, queuing a redundant duplicate fetch next round. Not a
+      correctness bug (idempotent overwrite), but a real wasted-read inefficiency on the hot path. Fixed
+      by deferring the resolved/missing filter until after the batch's `for` loop fully merges.
+    - Local emulator/unit test runs all passed, but the **first full `pnpm --filter @growthos/web test`
+      run** (vitest + a real Firestore/Auth emulator + Playwright) caught something none of the earlier,
+      narrower runs did: the new e2e spec's `page.getByLabel('Column')` call started resolving to *two*
+      elements once the new "Time column" field existed, because Playwright's default `getByLabel`
+      matching is case-insensitive **substring** matching (`'Time column'` contains `'Column'`), unlike
+      Testing Library's `getByLabelText` (exact by default), which is why the equivalent component-test
+      assertion never caught it. Fixed with `getByLabel('Column', { exact: true })`; left a comment so a
+      future field addition doesn't reintroduce the same collision. The other two e2e failures in that
+      same run (`resource-library.spec.ts`'s approve-flow timing, `auth.spec.ts`'s sign-up flake) are the
+      long-documented, pre-existing sandbox flakes every prior entry has recorded — confirmed unrelated
+      (neither test touches metric-defs) and both passed clean on the next full run.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (181 tests in
+    `packages/shared`, up from 167 — 14 new: 10 golden-file + 4 error-handling; 156 in
+    `packages/firebase-orm-models`, up from 151 — 5 new `metrics-compiler.emulator.test.ts` + 1 new
+    time-column-validation test in `metric-registry.emulator.test.ts`; 35 in `apps/api`, untouched; 269 web
+    unit/route/component tests, up from 253 — updated aggregation fixtures across the metric-defs
+    route/component tests + a new "Time column" field assertion in `register-metric-def-form.test.tsx`;
+    16/16 Playwright e2e, incl. the fixed `metric-defs.spec.ts`). One self-recovering `models.emulator.test.ts`
+    gRPC `RESOURCE_EXHAUSTED` retry during the `firebase-orm-models` suite — the same documented
+    pre-existing emulator flake every prior entry has hit, unrelated file, clean on immediate rerun.
+  - Branch `kan-41-metric-compiler`, PR #26. CI green (`lint · typecheck · test · build`),
+    `mergeable_state: clean`, merged (squash) into `main` on the first attempt — no stall/flake, no
+    duplicate PR found this run. Remote branch deletion failed with the same HTTP 403 from this sandbox's
+    git remote recorded in every prior run's entry (not a GitHub permissions issue; no branch-delete tool
+    exists in the GitHub MCP server either) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-41 is fully delivered, independently reviewed,
+  tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-42** (`POST /v1/metrics/query` + `GET /v1/metrics` catalog + Redis result cache) is
+  the direct, natural next pick — it's the HTTP route this story's own `compileMetricQueryForProject`
+  was built as the integration point for; the "Redis result cache" half needs the same
+  provider-agnostic-stand-in treatment `rate-limit/` used for a token bucket (KAN-34) until KAN-18
+  provisions real Redis. **KAN-38** (orchestration) and **KAN-39** (cost guardrails, needs real
+  BigQuery) are also sprint-3 `todo`s; **KAN-37** (dbt) remains the most infra-blocked of the three,
+  though this run's own compiler now gives a first concrete reason dbt's mart layer matters beyond
+  "canonical tables exist": the compiler's own documented dimension/filter simplification (treats
+  dimension names as literal columns on the aggregation's table, no join graph) is exactly the gap a
+  real dbt-built mart would close.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-41-metric-compiler` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403), and the other still-outstanding merged branches from prior runs
+    noted in earlier entries below.
+
+---
+
 ## 2026-07-07 — E5.1 Metric definition format (KAN-40)
 
 - **Last completed:**
