@@ -68,7 +68,8 @@
     "resourceLibraryLink": "Resource library",
     "projectResourcesLink": "Project resources",
     "projectKeysLink": "API keys",
-    "projectSchemaRegistryLink": "Schema registry"
+    "projectSchemaRegistryLink": "Schema registry",
+    "projectIngestHealthLink": "Ingest health"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -218,5 +219,26 @@
     "evolveSubmit": "Evolve schema",
     "evolveError": "Something went wrong. Please try again.",
     "breakingChangeError": "This change would break existing consumers: {violations}"
+  },
+  "IngestHealth": {
+    "metaTitle": "Ingest health",
+    "title": "Ingest health for {projectName}",
+    "summaryHeading": "Summary",
+    "overallHeading": "Overall",
+    "entity": "Entities",
+    "event": "Events",
+    "measure": "Measures",
+    "noBatches": "No ingest batches for this project yet.",
+    "countsLine": "{total} records · {accepted} accepted · {quarantined} quarantined · {duplicate} duplicate",
+    "rateLine": "{percent}% error rate · {perMinute} records/min",
+    "freshnessLabel": "Last batch {minutes} min ago",
+    "neverIngestedLabel": "No batches ingested yet",
+    "batchCapNote": "Based on the {count} most recent ingest batches.",
+    "quarantineHeading": "Quarantined records",
+    "replayUnavailableNote": "Replay isn't available yet — raw payloads aren't retained until the ingest pipeline (KAN-33/34) lands.",
+    "noQuarantinedRecords": "No quarantined records among the batches shown above.",
+    "quarantinedRecordSummary": "{clientId} ({kind}, {environment})",
+    "reasonsLabel": "Reasons: {reasons}",
+    "quarantineTruncatedNote": "More quarantined records exist than are shown here."
   }
 }

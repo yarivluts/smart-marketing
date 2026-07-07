@@ -68,7 +68,8 @@
     "resourceLibraryLink": "ספריית משאבים",
     "projectResourcesLink": "משאבי הפרויקט",
     "projectKeysLink": "מפתחות API",
-    "projectSchemaRegistryLink": "מרשם סכימות"
+    "projectSchemaRegistryLink": "מרשם סכימות",
+    "projectIngestHealthLink": "תקינות הזרמת הנתונים"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -218,5 +219,26 @@
     "evolveSubmit": "פיתוח סכימה",
     "evolveError": "משהו השתבש. נסה שוב.",
     "breakingChangeError": "השינוי הזה היה שובר צרכנים קיימים: {violations}"
+  },
+  "IngestHealth": {
+    "metaTitle": "תקינות הזרמת הנתונים",
+    "title": "תקינות הזרמת הנתונים עבור {projectName}",
+    "summaryHeading": "סיכום",
+    "overallHeading": "סה\"כ",
+    "entity": "ישויות",
+    "event": "אירועים",
+    "measure": "מדדים",
+    "noBatches": "עדיין לא הוזרמו קבוצות נתונים עבור פרויקט זה.",
+    "countsLine": "{total} רשומות · {accepted} התקבלו · {quarantined} בהסגר · {duplicate} כפולות",
+    "rateLine": "{percent}% שיעור שגיאות · {perMinute} רשומות לדקה",
+    "freshnessLabel": "הקבוצה האחרונה לפני {minutes} דקות",
+    "neverIngestedLabel": "עדיין לא הוזרמו קבוצות נתונים",
+    "batchCapNote": "מבוסס על {count} קבוצות ההזרמה האחרונות.",
+    "quarantineHeading": "רשומות בהסגר",
+    "replayUnavailableNote": "שידור חוזר עדיין אינו זמין — התוכן הגולמי אינו נשמר עד להשלמת צינור ההזרמה (KAN-33/34).",
+    "noQuarantinedRecords": "אין רשומות בהסגר בין הקבוצות המוצגות למעלה.",
+    "quarantinedRecordSummary": "{clientId} ({kind}, {environment})",
+    "reasonsLabel": "סיבות: {reasons}",
+    "quarantineTruncatedNote": "קיימות רשומות בהסגר נוספות שאינן מוצגות כאן."
   }
 }
