@@ -17,6 +17,115 @@ Template for each entry:
 
 ---
 
+## 2026-07-06 — E3.3 Ingest pipeline (KAN-33)
+
+- **Last completed:**
+  - Implemented **KAN-33** (pipeline: accepted records -> Pub/Sub -> BigQuery raw tables, partitioned
+    by `org/project/env/date`; plan `13 §E3.3`, AC "event visible in BQ < 60s after 202"), the natural
+    next pick — sprint-3, direct downstream consumer of KAN-32's `ingestBatch`, and closes the gap
+    that entry itself flagged: accepted records weren't yet landed anywhere durable, only their
+    validation outcome.
+    - `packages/firebase-orm-models`: new `PipelineMessageModel`
+      (`organizations/:organization_id/projects/:project_id/pipeline_messages`) — a durable outbox
+      standing in for a real Pub/Sub topic per project (plan `08`: "native Pub/Sub/Kafka topic per
+      project") until KAN-18 provisions one. New `RawRecordModel`
+      (`.../raw_records`) — a partitioned-BigQuery-raw-table stand-in, `partition_date` (derived from
+      landing time) standing in for the column a real table would partition on; keyed by its source
+      `PipelineMessageModel`'s own id so re-landing the same message (a retry, or a future KAN-34
+      replay) is an idempotent overwrite, not a duplicate row.
+    - New `pipeline/` module: `transport.ts`'s `publishPipelineMessage()` (a plain function — no
+      interface, since nothing substitutes an alternative implementation today) writes a `queued`
+      message; `sink.ts`'s `WarehouseSink` interface + `FirestoreWarehouseSink` (kept as an interface,
+      unlike the transport, because tests do substitute it) lands one into `RawRecordModel`.
+    - New `pipeline.service.ts`: `enqueueAcceptedRecordsForPipeline` (publishes every accepted record,
+      per-record failure isolated via `Promise.allSettled` — one record's publish failure doesn't
+      block its batch-mates), `landPipelineMessages` (lands a given set of messages in parallel — the
+      "Pub/Sub subscriber -> BigQuery insert" hop, scoped to exactly the messages just published),
+      and `drainPendingPipelineMessages` (a separate, explicitly environment-wide catch-up sweep over
+      anything still `queued`, for a future scheduled worker/KAN-38, not called from the ingest path).
+    - `ingest.service.ts`'s `ingestBatch` now publishes every accepted record's full raw payload (not
+      just the schema-validated subset) right after its existing dedup-key-claim writes, then lands
+      exactly those messages — best-effort, wrapped the same way as the dedup-key claims just above it,
+      so a transient pipeline failure never turns an otherwise-successful 202 into a 500. A record
+      whose landing fails is marked `failed` for KAN-34's future replay/DLQ to pick up.
+  - **Independent 8-angle review** (3 correctness angles + cross-file + reuse + simplification +
+      efficiency + altitude + CLAUDE.md conventions, each its own dedicated fan-out) before merging.
+      Six of the eight angles converged on the same root issue and it dominated the fix round:
+    - `ingestBatch` originally awaited an *unscoped* `drainPendingPipelineMessages` call after
+      publishing — querying and landing the **entire environment's** queued backlog on every single
+      ingest request, not just the batch's own newly-published records. Under concurrent ingest
+      traffic (the story's own "1k events/s" context) this meant every request's latency scaled with
+      total system-wide queue depth rather than its own batch size, concurrent requests raced over
+      landing the same stray messages, and a slow/failed drain in one request silently left messages
+      for an *unrelated* caller to sweep up later. Fixed by having `enqueueAcceptedRecordsForPipeline`
+      return the messages it just created and adding `landPipelineMessages` to land exactly those, in
+      parallel; `drainPendingPipelineMessages` still exists (renamed-in-role, not removed) as an
+      explicit, differently-used catch-up sweep for later. Added a regression test (in both
+      `pipeline.emulator.test.ts` and end-to-end via `ingest.emulator.test.ts`) proving a stray queued
+      message left by an unrelated batch in the same environment is never touched by another batch's
+      own landing.
+    - `enqueueAcceptedRecordsForPipeline` used a single `Promise.all` (all-or-nothing: one record's
+      publish failure aborted publishing for every other record in the same batch, unlike the
+      dedup-key-claim loop immediately above it in `ingestBatch`, which isolates failures per record).
+      Switched to `Promise.allSettled`, keeping only the fulfilled messages.
+    - `drainPendingPipelineMessages`'s per-message landing ran in a sequential `for` loop (up to 500
+      independent writes, one at a time) instead of in parallel: parallelized via a shared
+      `landMessages` helper.
+    - A message's final status-save call sat outside the `try/catch` guarding the sink write, so if
+      *that* write itself failed after a successful landing, the exception propagated and aborted
+      every other message still queued in the same drain call. Wrapped in its own best-effort
+      try/catch — a failed status write just leaves the message re-drainable later (idempotent by id).
+    - `transport.ts`'s `PipelinePublishInput` and `sink.ts`'s `WarehouseRawRow` were byte-for-byte
+      identical interfaces declared twice; consolidated into one `PipelineRecordEnvelope` in a new
+      `pipeline/record.ts`.
+    - `PipelineTransport` interface + `FirestoreOutboxTransport` class + `defaultPipelineTransport`
+      singleton were unjustified indirection — unlike `WarehouseSink` (genuinely substituted by a
+      test), nothing ever substituted an alternative transport. Removed in favor of a plain
+      `publishPipelineMessage()` function; add the interface back only once a real second
+      implementation (a `GcpPubSubTransport`) is actually being written.
+    - `ingest.service.ts` recomputed `asRecord(record)` a second time outside `prepareRecord`, which
+      had already computed the identical value internally as `r`; `prepareRecord` now returns it
+      (`raw`) instead of the caller redoing the work.
+    - `IngestBatchModel`'s doc comment overclaimed a landed raw record is "keyed by this batch's own
+      id" — it's actually keyed by its own `PipelineMessageModel`'s id and only *queryable* back to
+      the batch via a `batch_id` field. Corrected.
+    - **Reviewed and deliberately left as-is**: the missing Firestore composite index
+      (`environment_id`, `status`, `enqueued_at`) `drainPendingPipelineMessages`'s query would need on
+      a real (non-emulator) project — flagged by the review, but this repo provisions no
+      `firestore.indexes.json` for *any* multi-field query yet (a KAN-18 infra concern, not unique to
+      this diff); documented in the function's own doc comment instead. Also left as-is: this diff's
+      own emulator test file duplicating the `unique`/`uniqueEmail`/`setupProject` helpers already
+      copy-pasted across six other emulator test files — a pre-existing repo-wide convention, not a
+      regression introduced here, and out of scope for this story to unwind unilaterally.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green after every fix round (100
+    tests in `packages/firebase-orm-models` incl. the new `pipeline.emulator.test.ts` (7 tests) and 2
+    new KAN-33 tests in `ingest.emulator.test.ts`, 159 in `packages/shared`, 29 in `apps/api`, 223 web
+    unit/route tests + 13/13 Playwright e2e in `apps/web`). No emulator flake this run.
+  - Branch `kan-33-ingest-pipeline`, PR pending at time of writing this entry — see the PR link in the
+    branch's own history for CI status; this entry is written before the final merge step so a
+    follow-up run can confirm and finish if this run stops first.
+- **In progress (exact stopping point):** KAN-33 implementation, review, and local
+  lint/typecheck/test/build are complete and green; opening the PR and merging (pending CI) is the
+  only remaining step for this story.
+- **Blocked + why:** nothing blocking; CI needs to run and go green before merge.
+- **Next step:** confirm PR CI is green, merge (squash) into `main`, delete the branch if the git
+  remote allows it this time (every prior run this sandbox's remote has rejected branch deletion with
+  an HTTP 403). After that, **KAN-34** (quarantine + DLQ + replay API, per-key rate limiting) is the
+  natural next pick — it's the direct consumer of this story's `failed`-status `PipelineMessageModel`s
+  (currently a dead end with no replay path) and of KAN-32's quarantined ingest records. **KAN-35**
+  (Admin UI: ingest health, quarantine browser + replay button) is downstream of both KAN-33 and
+  KAN-34 and should probably follow once there's something for it to show/replay.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this
+    run's own branch is also ready to prune.
+
+---
+
 ## 2026-07-06 — E3.2 Ingest API (KAN-32)
 
 - **Last completed:**
