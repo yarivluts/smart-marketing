@@ -155,7 +155,7 @@ describe('replayQuarantinedRecord', () => {
       createdByUserId: owner.id,
     });
 
-    const result = await replayQuarantinedRecord(organization.id, project.id, quarantined.id);
+    const result = await replayQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id);
     expect(result).toEqual({ outcome: 'accepted' });
 
     const [updated] = await listQuarantinedRecordsForProject(organization.id, project.id);
@@ -200,7 +200,7 @@ describe('replayQuarantinedRecord', () => {
     const [quarantined] = await listQuarantinedRecordsForProject(organization.id, project.id);
     expect(quarantined.reasons).toEqual(['missing_required_field:plan']);
 
-    const result = await replayQuarantinedRecord(organization.id, project.id, quarantined.id);
+    const result = await replayQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id);
     expect(result).toEqual({ outcome: 'still_quarantined', reasons: ['missing_required_field:plan'] });
 
     const [stillThere] = await listQuarantinedRecordsForProject(organization.id, project.id);
@@ -258,7 +258,7 @@ describe('replayQuarantinedRecord', () => {
       createdByUserId: owner.id,
     });
 
-    const result = await replayQuarantinedRecord(organization.id, project.id, quarantined.id);
+    const result = await replayQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id);
     expect(result).toEqual({ outcome: 'duplicate' });
   });
 
@@ -281,16 +281,16 @@ describe('replayQuarantinedRecord', () => {
     });
     const [quarantined] = await listQuarantinedRecordsForProject(organization.id, project.id);
 
-    await expect(replayQuarantinedRecord(other.organization.id, other.project.id, quarantined.id)).rejects.toBeInstanceOf(
-      QuarantinedRecordNotFoundError,
-    );
+    await expect(
+      replayQuarantinedRecord(other.organization.id, other.project.id, quarantined.id, other.owner.id),
+    ).rejects.toBeInstanceOf(QuarantinedRecordNotFoundError);
   });
 
   it('throws QuarantinedRecordNotFoundError for an unknown id', async () => {
-    const { organization, project } = await setupProject('Unknown Id Org');
-    await expect(replayQuarantinedRecord(organization.id, project.id, 'does-not-exist')).rejects.toBeInstanceOf(
-      QuarantinedRecordNotFoundError,
-    );
+    const { owner, organization, project } = await setupProject('Unknown Id Org');
+    await expect(
+      replayQuarantinedRecord(organization.id, project.id, 'does-not-exist', owner.id),
+    ).rejects.toBeInstanceOf(QuarantinedRecordNotFoundError);
   });
 });
 
@@ -328,7 +328,7 @@ describe('getIngestBatch after replay', () => {
       ],
       createdByUserId: owner.id,
     });
-    await replayQuarantinedRecord(organization.id, project.id, quarantined.id);
+    await replayQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id);
 
     const batch = await getIngestBatch(organization.id, project.id, prodEnvironment.id, original.batchId);
     expect(batch?.record_results).toEqual([

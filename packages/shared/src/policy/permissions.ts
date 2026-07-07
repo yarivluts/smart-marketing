@@ -20,6 +20,7 @@ export const PERMISSIONS = [
   'pii.read',
   'ai.use',
   'plugin.install',
+  'audit.read',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

@@ -68,6 +68,7 @@ describe('API_KEY_SCOPES', () => {
       'automation.execute',
       'pii.read',
       'plugin.install',
+      'audit.read',
     ] as const;
     for (const elevated of withheld) {
       expect(API_KEY_SCOPES).not.toContain(elevated);
@@ -86,6 +87,7 @@ describe('API_KEY_SCOPES', () => {
       'automation.execute',
       'pii.read',
       'plugin.install',
+      'audit.read',
     ] as const;
 
     // Every permission is in exactly one of the two sets — catches a future

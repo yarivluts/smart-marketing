@@ -1,5 +1,6 @@
 import { MembershipModel } from '../models/membership.model';
 import { RoleBindingModel } from '../models/role-binding.model';
+import { recordAuditLogEntry } from './audit-log.service';
 
 /**
  * Removes a membership and every role binding it granted within that org, in
@@ -48,7 +49,11 @@ export class LastOwnerError extends Error {
  * organization's last active `org_owner`, since that would leave the org with
  * no one able to manage it (no bootstrap/support-override path exists yet).
  */
-export async function removeOrgMember(organizationId: string, membershipId: string): Promise<void> {
+export async function removeOrgMember(
+  organizationId: string,
+  membershipId: string,
+  performedByUserId: string,
+): Promise<void> {
   const membership = await MembershipModel.init(membershipId, { organization_id: organizationId });
   if (!membership) {
     throw new MembershipNotFoundError();
@@ -64,5 +69,25 @@ export async function removeOrgMember(organizationId: string, membershipId: stri
     }
   }
 
+  const removedUserId = membership.user_id;
+  const removedRole = membership.role;
+  const wasActive = (membership.status ?? 'active') === 'active';
   await removeMembershipCascade(membership);
+
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      actorType: 'user',
+      actorId: performedByUserId,
+      action: wasActive ? 'membership.removed' : 'membership.invite_revoked',
+      targetType: 'membership',
+      targetId: membershipId,
+      summary: wasActive
+        ? `Removed member (role "${removedRole}")`
+        : `Revoked pending invite (role "${removedRole}")`,
+      before: { userId: removedUserId, role: removedRole },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful removal into a failure for the caller.
+  }
 }

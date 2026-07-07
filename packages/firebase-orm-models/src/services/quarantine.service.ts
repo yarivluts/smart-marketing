@@ -3,6 +3,7 @@ import { QuarantinedRecordModel } from '../models/quarantined-record.model';
 import { checkRecordEnvelope, dedupKeyId, validateAgainstSchema } from './ingest.service';
 import { getActiveSchemaDefinition } from './schema-registry.service';
 import { enqueueAcceptedRecordsForPipeline, landPipelineMessages } from './pipeline.service';
+import { recordAuditLogEntry } from './audit-log.service';
 
 export class QuarantinedRecordNotFoundError extends Error {
   constructor() {
@@ -60,6 +61,7 @@ export async function replayQuarantinedRecord(
   organizationId: string,
   projectId: string,
   quarantinedRecordId: string,
+  performedByUserId: string,
 ): Promise<ReplayQuarantinedRecordResult> {
   const record = await QuarantinedRecordModel.init(quarantinedRecordId, {
     organization_id: organizationId,
@@ -81,6 +83,7 @@ export async function replayQuarantinedRecord(
   if (reasons.length > 0) {
     record.reasons = reasons;
     await record.save();
+    await recordReplayAudit(organizationId, projectId, record, performedByUserId, 'still_quarantined', reasons);
     return { outcome: 'still_quarantined', reasons };
   }
 
@@ -93,6 +96,7 @@ export async function replayQuarantinedRecord(
     record.status = 'replayed';
     record.replayed_at = new Date().toISOString();
     await record.save();
+    await recordReplayAudit(organizationId, projectId, record, performedByUserId, 'duplicate');
     return { outcome: 'duplicate' };
   }
 
@@ -130,5 +134,33 @@ export async function replayQuarantinedRecord(
   record.status = 'replayed';
   record.replayed_at = new Date().toISOString();
   await record.save();
+  await recordReplayAudit(organizationId, projectId, record, performedByUserId, 'accepted');
   return { outcome: 'accepted' };
+}
+
+/** Best-effort audit entry for one replay attempt — see `recordAuditLogEntry`'s own doc comment for why a failure here is swallowed rather than propagated. */
+async function recordReplayAudit(
+  organizationId: string,
+  projectId: string,
+  record: QuarantinedRecordModel,
+  performedByUserId: string,
+  outcome: ReplayQuarantinedRecordOutcome,
+  reasons?: string[],
+): Promise<void> {
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      projectId,
+      environmentId: record.environment_id,
+      actorType: 'user',
+      actorId: performedByUserId,
+      action: 'quarantined_record.replay',
+      targetType: 'quarantined_record',
+      targetId: record.id,
+      summary: `Replayed quarantined record "${record.client_id}" (${record.kind}:${record.schema_name}) -> ${outcome}`,
+      after: reasons ? { outcome, reasons } : { outcome },
+    });
+  } catch {
+    // Best-effort — see the comment on `recordAuditLogEntry`.
+  }
 }

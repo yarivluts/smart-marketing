@@ -14,13 +14,13 @@ interface RouteParams {
  */
 export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, membershipId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'members.manage');
+  const { user, error } = await requireOrgPermission(orgId, 'members.manage');
   if (error) {
     return error;
   }
 
   try {
-    await removeMember({ organizationId: orgId, membershipId });
+    await removeMember({ organizationId: orgId, membershipId, performedByUserId: user.id });
     return NextResponse.json({ status: 'ok' });
   } catch (err) {
     if (err instanceof MembershipNotFoundError) {

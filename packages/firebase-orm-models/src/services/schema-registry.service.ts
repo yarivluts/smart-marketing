@@ -7,6 +7,7 @@ import {
   type SchemaFieldDef,
 } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
+import { recordAuditLogEntry } from './audit-log.service';
 
 export class InvalidSchemaDefinitionError extends Error {
   constructor(public readonly reasons: readonly string[]) {
@@ -264,6 +265,23 @@ export async function registerSchemaDefinition(params: RegisterSchemaDefinitionP
     createdByUserId: params.createdByUserId,
   });
   await schemaDef.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.createdByUserId,
+      action: 'schema_def.register',
+      targetType: 'schema_def',
+      targetId: schemaDef.id,
+      summary: `Registered schema "${schemaDef.kind}:${schemaDef.name}" v${schemaDef.version}`,
+      after: { fieldDefs: schemaDef.field_defs },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful registration into a failure for the caller.
+  }
+
   return schemaDef;
 }
 
@@ -316,6 +334,24 @@ export async function evolveSchemaDefinition(params: EvolveSchemaDefinitionParam
   });
 
   await Promise.all([previous.save(), next.save()]);
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.createdByUserId,
+      action: 'schema_def.evolve',
+      targetType: 'schema_def',
+      targetId: next.id,
+      summary: `Evolved schema "${next.kind}:${next.name}" to v${next.version}`,
+      before: { fieldDefs: previous.field_defs, version: previous.version },
+      after: { fieldDefs: next.field_defs, version: next.version },
+    });
+  } catch {
+    // Best-effort — see the comment in registerSchemaDefinition above.
+  }
+
   return next;
 }
 

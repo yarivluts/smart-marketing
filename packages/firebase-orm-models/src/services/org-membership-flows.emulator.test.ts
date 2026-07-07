@@ -317,7 +317,7 @@ describe('removeOrgMember', () => {
       invitedByUserId: owner.id,
     });
 
-    await removeOrgMember(organization.id, invitation.id);
+    await removeOrgMember(organization.id, invitation.id, owner.id);
 
     await expect(
       acceptInvite({
@@ -351,7 +351,7 @@ describe('removeOrgMember', () => {
       callerEmailVerified: true,
     });
 
-    await removeOrgMember(organization.id, invitation.id);
+    await removeOrgMember(organization.id, invitation.id, owner.id);
 
     const memberships = await listMembershipsWithOrganizations(member.id);
     expect(memberships).toHaveLength(0);
@@ -366,7 +366,7 @@ describe('removeOrgMember', () => {
     });
     const { organization } = await createOrganizationWithOwner({ name: 'Remove Missing Org', ownerUserId: owner.id });
 
-    await expect(removeOrgMember(organization.id, 'does-not-exist')).rejects.toThrow(MembershipNotFoundError);
+    await expect(removeOrgMember(organization.id, 'does-not-exist', owner.id)).rejects.toThrow(MembershipNotFoundError);
   });
 
   it('refuses to remove the last active org_owner, leaving the org manageable', async () => {
@@ -379,7 +379,7 @@ describe('removeOrgMember', () => {
       ownerUserId: owner.id,
     });
 
-    await expect(removeOrgMember(organization.id, membership.id)).rejects.toThrow(LastOwnerError);
+    await expect(removeOrgMember(organization.id, membership.id, owner.id)).rejects.toThrow(LastOwnerError);
 
     const memberships = await listMembershipsWithOrganizations(owner.id);
     expect(memberships).toContainEqual(expect.objectContaining({ organizationId: organization.id, role: 'org_owner' }));
@@ -417,7 +417,7 @@ describe('removeOrgMember', () => {
     promoted!.role = 'org_owner';
     await promoted!.save();
 
-    await removeOrgMember(organization.id, ownerAMembership.id);
+    await removeOrgMember(organization.id, ownerAMembership.id, ownerA.id);
 
     const remaining = await listMembershipsWithOrganizations(ownerB.id);
     expect(remaining).toContainEqual(expect.objectContaining({ organizationId: organization.id, role: 'org_owner' }));

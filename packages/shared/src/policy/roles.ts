@@ -37,7 +37,10 @@ const ALL_PERMISSIONS: readonly Permission[] = PERMISSIONS;
  * "project-admin initiated + org-resource-owner approved (or org-admin
  * pushed)", so a project admin gets `project.manage` (enough to *request* an
  * attachment) but only org-scoped roles get `resources.manage` (create
- * library resources, approve/reject/detach attachments).
+ * library resources, approve/reject/detach attachments). `audit.read` (KAN-44
+ * — the org-wide audit log) is likewise withheld from `project_admin`: plan
+ * `06 §1` frames the audit log as an org-admin console surface, not a
+ * per-project one, and an org's audit trail spans every project under it.
  */
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   platform_admin: ALL_PERMISSIONS,

@@ -17,6 +17,126 @@ Template for each entry:
 
 ---
 
+## 2026-07-07 — E6.2 Audit log service (KAN-44)
+
+- **Last completed:**
+  - Implemented **KAN-44** (plan `13 §E6.2`, AC: "Tamper-evident; visible in admin UI (basic list)"), one
+    of the two independent sprint-3 `todo`s the prior run's own "Next step" flagged (the other,
+    KAN-37 dbt staging models, needs a real warehouse target this repo has no buildable-today stand-in
+    for yet — audit log has no such infra dependency, so it was the more tractable pick this run).
+    - `packages/firebase-orm-models`: new `AuditLogEntryModel`
+      (`organizations/:organization_id/audit_log_entries`) — org-scoped rather than project-scoped,
+      since an org's audit trail spans org-level changes (membership/role grants) and every project
+      under it (keys, schema defs) alike; `project_id`/`environment_id` recorded per entry when the
+      action was scoped narrower than the org. "Tamper-evident" is a literal, verifiable property here,
+      not just a doc-comment claim: every entry carries `prev_entry_hash`/`entry_hash`, an append-only
+      sha256 hash chain per org (`audit-log.service.ts`'s `recordAuditLogEntry` reads the org's current
+      newest entry and links onto it; `entry_hash` commits to the entry's own content *and* that link).
+      `verifyAuditLogChainForOrg` recomputes every entry's hash and chain link, oldest first, and
+      reports the first entry where either check fails, distinguishing `hash_mismatch` (an
+      already-written entry's content was edited after the fact) from `chain_break` (a link doesn't
+      point at what actually precedes it — real tampering, or a benign concurrent-append fork; the
+      function's own doc comment is explicit it can't tell the two apart by itself). `listAuditLogEntriesForOrg`
+      is the newest-first read side the admin UI's "basic list" AC needs.
+    - Wired `recordAuditLogEntry` (best-effort, wrapped in try/catch — audit logging must never turn an
+      otherwise-successful admin action into a failure for the caller, the same tradeoff every other
+      secondary side-effect write in this codebase already accepts) into the "key/role/schema" surfaces
+      that existed at pick time: `key.service.ts`'s `mintApiKey`/`revokeApiKey`, `schema-registry.service.ts`'s
+      `registerSchemaDefinition`/`evolveSchemaDefinition`, `invite.service.ts`'s `acceptInvite` (the
+      actual role-grant moment), `membership.service.ts`'s `removeOrgMember` (covers both "revoke a
+      pending invite" and "remove an active member" — it already handled both), `quarantine.service.ts`'s
+      `replayQuarantinedRecord`, and `pipeline.service.ts`'s `replayFailedPipelineMessagesForProject` —
+      the last two explicitly called out in the KAN-34 entry below as "exactly the kind of change KAN-44's
+      audit log is meant to capture once it exists." `removeOrgMember`/`replayQuarantinedRecord` gained a
+      new required `performedByUserId` parameter (both had none before); `replayFailedPipelineMessagesForProject`
+      gained an optional trailing one (a future scheduled-worker caller with no human actor can omit it —
+      no entry is recorded in that case rather than recording a synthetic "system" actor for a real human
+      action's own admin-triggered path). Every call site's own existing tests (and 4 emulator test files'
+      pre-existing calls to the now-longer signatures) updated to pass a real actor id.
+    - `packages/shared`: new `audit.read` permission — granted to `platform_admin`/`org_owner`/`org_admin`
+      (automatically, via their `ALL_PERMISSIONS`-based bundles) but withheld from `project_admin` (plan
+      `06 §1` frames the audit log as an org-admin console surface, not a per-project one) and from every
+      API key scope (`API_KEY_SCOPES`) — a leaked ingest key reading an org's full change history would be
+      a real information-disclosure risk. `index.test.ts`'s "full partition of `PERMISSIONS`" test updated
+      to list it as withheld from keys.
+    - `apps/web`: a project-independent `orgs/:orgId/audit-log` page — newest-first entry list (actor,
+      action, target, summary, timestamp) plus a chain-integrity banner (`verifyAuditLogChainForOrg`'s
+      result rendered as "chain verified" or a tampering warning naming the first broken entry) — gated on
+      `audit.read`, linked from the org detail page next to the existing Resource Library link. New
+      `GET orgs/:orgId/audit-log` route (list-only; there's no POST — every entry is written internally by
+      the service that performed the audited action, never directly by a caller of this route). Full en/he
+      translations; no hard-coded strings.
+    - Tests: a new package-level emulator suite (`audit-log.emulator.test.ts`) covering the hash chain
+      (first entry links onto `''`, second onto the first's hash), org-scoped listing (cross-org
+      isolation), `verifyAuditLogChainForOrg`'s valid/hash_mismatch/chain_break outcomes (the
+      chain_break case deliberately forges a *self-consistent* entry — same content, same recomputed
+      hash, wrong link — since naively corrupting `prev_entry_hash` alone actually produces a
+      `hash_mismatch`, because `entry_hash` is computed *over* `prev_entry_hash`; a naive test would have
+      been testing the wrong branch), and the wiring into every call site above (each produces the
+      expected action/actor/target). New `apps/web` route test (`audit-log/route.test.ts`: 401/404/403/
+      empty-200/entry-surfaced-with-valid-chain) and a KAN-26 non-enumeration isolation scenario in
+      `isolation.test.ts`.
+  - **Self-review** before opening the PR found and fixed:
+    - The first version of the `chain_break` regression test forged only `prev_entry_hash` on a
+      reloaded entry, leaving its old `entry_hash` in place — this actually exercises `hash_mismatch`
+      (entry_hash no longer matches a recomputation that now includes the forged prev-hash), not
+      `chain_break`, since the two failure modes share the same recomputation step and `hash_mismatch`
+      is checked first. Fixed by also recomputing and setting a self-consistent `entry_hash` for the
+      forged content, which only then genuinely exercises the link-mismatch branch. Exported
+      `buildHashableContent`/`computeEntryHash` from `audit-log.service.ts` (not re-exported via this
+      package's `index.ts`, so still invisible to `apps/api`/`apps/web`) purely so the test could
+      construct this scenario without duplicating the hashing logic.
+    - **Reviewed and deliberately left as-is / deferred**: `vault.service.ts`'s `setSharedCredentialSecret`/
+      `rotateSharedCredentialSecretKey` (KAN-29) and `resource-library.service.ts`'s attach/approve/
+      reject/detach flow (KAN-27) are both "config changes" the plan's AC would also cover, but neither
+      carries a `performedByUserId`-shaped actor param today; wiring them in is a natural, small
+      follow-up (same shape as this run's `removeOrgMember`/`replayQuarantinedRecord` changes) but adding
+      two more new-required-parameter signature changes and their own emulator-test updates was cut from
+      this run's scope to keep the diff reviewable. Org/project *creation* (`createOrganizationWithOwner`/
+      `createProject`) also isn't wired — arguably "config changes" too, but there's no existing org to
+      scope the first entry's audit trail to until the org itself exists, so this would need its own
+      design (log to the newly-created org's own trail, immediately after creation) rather than reusing
+      the pattern this run used everywhere else.
+  - `pnpm lint && pnpm typecheck` clean; `pnpm build` green (new `/orgs/[orgId]/audit-log` page and API
+    route both compile into the production build). `pnpm test`: 136 tests in `packages/firebase-orm-models`
+    (incl. 13 new in `audit-log.emulator.test.ts`), 167 in `packages/shared` (up from 138 — the
+    `audit.read` permission adds one row per role to the existing table-driven matrix), 35 in `apps/api`
+    (untouched by this diff, reran as part of the standard full check), 253 web unit/route tests (incl.
+    5 new in `audit-log/route.test.ts`) — all green. The Playwright e2e run was unusually flaky this
+    session specifically (5 different, unrelated specs — `auth`, `keys`, `orgs`, `resource-library`,
+    `schema-registry` — each failed once on a UI-interaction timeout and passed on Playwright's own
+    retry, landing the overall `pnpm test` exit code at 0): traced this down before trusting it as
+    "just flake" — reproduced `resource-library.spec.ts` failing in isolation with `--retries=0` against
+    a from-scratch worktree of `main` with none of this diff's changes applied, at a step (initial
+    sign-up) this diff never touches, confirming it's this sandbox's own resource contention under
+    repeated Next-dev-server + Chromium + Firestore/Auth-emulator launches in one session, not a
+    regression — consistent with this file's own long-documented "gRPC RESOURCE_EXHAUSTED" /
+    "Playwright sign-up flake" flake category, just an unusually pronounced instance of it today.
+  - Branch `kan-44-audit-log-service`, opening PR next.
+- **In progress (exact stopping point):** implementation, self-review, and full local
+  lint/typecheck/test/build are complete and green; opening the PR and merging (pending CI) is the only
+  remaining step for this story.
+- **Blocked + why:** nothing blocking; CI needs to run and go green before merge.
+- **Next step:** confirm PR CI is green, merge (squash) into `main`, delete the branch if the git remote
+  allows it this time (every prior run this sandbox's remote has rejected branch deletion with an HTTP
+  403). After that, the natural next picks are **KAN-37** (dbt staging models — still needs a
+  buildable-today warehouse stand-in decision, e.g. dbt-duckdb over an exported snapshot, since there's
+  no real BigQuery project yet) and the two audit-log follow-ups this run deliberately deferred: wiring
+  `recordAuditLogEntry` into KAN-29's vault secret set/rotate and KAN-27's resource-attachment
+  approve/reject/detach flow (both need a small `performedByUserId`-shaped signature change, the same
+  pattern this run used for `removeOrgMember`/`replayQuarantinedRecord`). KAN-38 (orchestration),
+  KAN-39 (cost guardrails), KAN-40 (metric definition format) are also sprint-3 `todo`s and independent.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this run's
+    own branch is also ready to prune.
+
+---
+
 ## 2026-07-07 — E3.4 Quarantine + DLQ + replay API; per-key rate limiting (KAN-34)
 
 - **Last completed:**

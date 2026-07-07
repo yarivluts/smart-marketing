@@ -3,6 +3,7 @@ import { RawRecordModel } from '../models/raw-record.model';
 import type { SchemaDefKind } from '../models/schema-def.model';
 import { publishPipelineMessage } from '../pipeline/transport';
 import { defaultWarehouseSink, type WarehouseSink } from '../pipeline/sink';
+import { recordAuditLogEntry } from './audit-log.service';
 
 /** Bounds one `drainPendingPipelineMessages` call — same load-bounding reasoning as `MAX_INGEST_BATCH_SIZE`. */
 export const MAX_PIPELINE_DRAIN_BATCH_SIZE = 500;
@@ -201,7 +202,28 @@ export async function replayFailedPipelineMessagesForProject(
   projectId: string,
   limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
   sink?: WarehouseSink,
+  performedByUserId?: string,
 ): Promise<DrainPipelineResult> {
   const failed = await listFailedPipelineMessagesForProject(organizationId, projectId, limit);
-  return landMessages(failed, sink ?? defaultWarehouseSink);
+  const result = await landMessages(failed, sink ?? defaultWarehouseSink);
+
+  if (performedByUserId) {
+    try {
+      await recordAuditLogEntry({
+        organizationId,
+        projectId,
+        actorType: 'user',
+        actorId: performedByUserId,
+        action: 'pipeline_message.replay',
+        targetType: 'project',
+        targetId: projectId,
+        summary: `Retried ${failed.length} failed pipeline message(s): ${result.delivered} delivered, ${result.failed} still failing`,
+        after: { attempted: failed.length, delivered: result.delivered, failed: result.failed },
+      });
+    } catch {
+      // Best-effort — see the comment on `recordAuditLogEntry`.
+    }
+  }
+
+  return result;
 }

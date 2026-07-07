@@ -14,13 +14,18 @@ interface RouteParams {
  */
 export async function POST(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, quarantinedRecordId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { user, error } = await requireOrgPermission(orgId, 'ingest.write');
   if (error) {
     return error;
   }
 
   try {
-    const result = await replayQuarantinedRecord({ organizationId: orgId, projectId, quarantinedRecordId });
+    const result = await replayQuarantinedRecord({
+      organizationId: orgId,
+      projectId,
+      quarantinedRecordId,
+      performedByUserId: user.id,
+    });
     return NextResponse.json(result);
   } catch (err) {
     if (err instanceof QuarantinedRecordNotFoundError) {

@@ -12,6 +12,7 @@ import { ApiKeyModel } from '../models/api-key.model';
 import { EnvironmentModel } from '../models/environment.model';
 import { ProjectModel } from '../models/project.model';
 import { ProjectNotFoundError } from './resource-library.service';
+import { recordAuditLogEntry } from './audit-log.service';
 
 export class EnvironmentNotFoundError extends Error {
   constructor() {
@@ -126,6 +127,23 @@ export async function mintApiKey(params: MintApiKeyParams): Promise<MintApiKeyRe
   apiKey.created_by = params.createdByUserId;
   apiKey.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await apiKey.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: params.environmentId,
+      actorType: 'user',
+      actorId: params.createdByUserId,
+      action: 'api_key.mint',
+      targetType: 'api_key',
+      targetId: apiKey.id,
+      summary: `Minted API key "${apiKey.name}" (${apiKey.key_prefix}…)`,
+      after: { name: apiKey.name, environmentId: apiKey.environment_id, scopes: apiKey.scopes },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful mint into a failure for the caller.
+  }
 
   return { apiKey, rawKey };
 }
@@ -275,6 +293,23 @@ export async function revokeApiKey(params: RevokeApiKeyParams): Promise<ApiKeyMo
   apiKey.revoked_at = new Date().toISOString();
   apiKey.revoked_by = params.revokedByUserId;
   await apiKey.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: apiKey.environment_id,
+      actorType: 'user',
+      actorId: params.revokedByUserId,
+      action: 'api_key.revoke',
+      targetType: 'api_key',
+      targetId: apiKey.id,
+      summary: `Revoked API key "${apiKey.name}" (${apiKey.key_prefix}…)`,
+    });
+  } catch {
+    // Best-effort — see the comment in mintApiKey above.
+  }
+
   return apiKey;
 }
 

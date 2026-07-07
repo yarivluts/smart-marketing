@@ -2,6 +2,7 @@ import { INVITABLE_ROLES, isInvitableRole, type InvitableRole } from '@growthos/
 import { MembershipModel } from '../models/membership.model';
 import { RoleBindingModel } from '../models/role-binding.model';
 import { ensureUserByEmail } from './user.service';
+import { recordAuditLogEntry } from './audit-log.service';
 
 // Re-exported for convenience — `@growthos/shared` is the source of truth
 // (it has no Firebase dependency, so client components can import it
@@ -163,6 +164,21 @@ export async function acceptInvite(params: AcceptInviteParams): Promise<AcceptIn
   roleBinding.scope_id = params.organizationId;
   roleBinding.setPathParams({ organization_id: params.organizationId });
   await roleBinding.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.userId,
+      action: 'membership.role_granted',
+      targetType: 'membership',
+      targetId: membership.id,
+      summary: `Accepted invite and granted role "${membership.role}"`,
+      after: { role: membership.role },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful invite acceptance into a failure for the caller.
+  }
 
   return { membership, roleBinding };
 }

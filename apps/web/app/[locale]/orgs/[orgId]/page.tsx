@@ -56,6 +56,7 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
   const canManageKeys = can(bindings, principal, 'keys.manage', { orgId });
   const canManageSchemas = can(bindings, principal, 'schema.write', { orgId });
   const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
+  const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
 
   const t = await getTranslations('OrgDetailPage');
 
@@ -67,6 +68,11 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
           <Link className="text-sm underline" href={`/orgs/${orgId}/resources`}>
             {t('resourceLibraryLink')}
           </Link>
+          {canViewAuditLog ? (
+            <Link className="text-sm underline" href={`/orgs/${orgId}/audit-log`}>
+              {t('auditLogLink')}
+            </Link>
+          ) : null}
           <OrgSwitcher memberships={memberships} currentOrgId={orgId} />
         </div>
       </div>
