@@ -1,0 +1,10 @@
+{
+  "name": "@growthos/dbt-transform",
+  "version": "0.0.0",
+  "private": true,
+  "description": "dbt project: staging models over raw ingest, canonical entities/events/measures core tables (KAN-37).",
+  "scripts": {
+    "build": "node scripts/run-dbt.mjs build",
+    "test": "node scripts/run-dbt.mjs test"
+  }
+}

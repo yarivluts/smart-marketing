@@ -179,6 +179,8 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@22.20.0)(jsdom@25.0.1)
 
+  packages/dbt-transform: {}
+
   packages/eslint-config:
     dependencies:
       '@eslint/js':

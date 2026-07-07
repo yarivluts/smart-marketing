@@ -1,0 +1,43 @@
+version: 2
+
+models:
+  - name: entities
+    description: >
+      Canonical entity current-state table (plan `04 §1`'s `dim_*` tables,
+      generalized): latest-landed payload per (project, schema, entity id).
+    columns:
+      - name: entity_key
+        description: Composite (project_id, schema_name, entity_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: entity_id
+        tests:
+          - not_null
+      - name: last_seen_at
+        tests:
+          - not_null
+
+  - name: events
+    description: >
+      Canonical event fact table (plan `04 §1`'s `fact_funnel_event`,
+      generalized): append-only, one row per landed event.
+    columns:
+      - name: event_id
+        tests:
+          - not_null
+          - unique
+      - name: occurred_at
+        tests:
+          - not_null
+
+  - name: measures
+    description: >
+      Canonical measure fact table (plan `04 §1`'s `fact_ad_spend`-shaped
+      tables, generalized): append-only, one row per landed pre-aggregated
+      measure.
+    columns:
+      - name: measure_id
+        tests:
+          - not_null
+          - unique

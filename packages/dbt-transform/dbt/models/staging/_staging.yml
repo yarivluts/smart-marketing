@@ -1,0 +1,61 @@
+version: 2
+
+models:
+  - name: stg_raw_records
+    description: >
+      Typed, unfiltered view over the raw ingest export (every landed record,
+      any kind).
+    columns:
+      - name: raw_record_key
+        description: Deterministic surrogate key for one landed record.
+        tests:
+          - not_null
+          - unique
+      - name: organization_id
+        tests:
+          - not_null
+      - name: project_id
+        tests:
+          - not_null
+      - name: environment_id
+        tests:
+          - not_null
+      - name: kind
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['entity', 'event', 'measure']
+      - name: schema_name
+        tests:
+          - not_null
+      - name: client_id
+        tests:
+          - not_null
+
+  - name: stg_entities
+    description: Raw records filtered to kind = 'entity'.
+    columns:
+      - name: raw_record_key
+        tests:
+          - not_null
+          - unique
+
+  - name: stg_events
+    description: Raw records filtered to kind = 'event', with a resolved `occurred_at`.
+    columns:
+      - name: raw_record_key
+        tests:
+          - not_null
+          - unique
+      - name: occurred_at
+        tests:
+          - not_null
+
+  - name: stg_measures
+    description: Raw records filtered to kind = 'measure', with a resolved numeric value/date.
+    columns:
+      - name: raw_record_key
+        tests:
+          - not_null
+          - unique

@@ -44,6 +44,8 @@ packages/
   shared/                cross-cutting TS types + helpers
   firebase-orm-models/   the ONLY sanctioned Firestore access layer
   eslint-config/         shared flat ESLint config
+  dbt-transform/         dbt project: staging + canonical entities/events/measures core tables,
+                         run against DuckDB (buildable-today stand-in) until KAN-18 provisions BigQuery
 docs/plan/  the 15 GrowthOS plan documents (product + architecture spec)
 ```
 

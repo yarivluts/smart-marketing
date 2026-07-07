@@ -35,6 +35,11 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -43,6 +48,12 @@ jobs:
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
+
+      - name: Cache dbt-transform virtualenv
+        uses: actions/cache@v4
+        with:
+          path: packages/dbt-transform/.venv
+          key: dbt-transform-venv-${{ runner.os }}-${{ hashFiles('packages/dbt-transform/requirements.txt') }}
 
       - name: Install Playwright browsers
         run: pnpm --filter @growthos/web exec playwright install --with-deps chromium

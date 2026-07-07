@@ -1,0 +1,41 @@
+name: 'growthos_transform'
+version: '1.0.0'
+config-version: 2
+
+profile: 'growthos_transform'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+macro-paths: ["macros"]
+analysis-paths: ["analyses"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+seeds:
+  growthos_transform:
+    +schema: seed
+    raw_records:
+      +column_types:
+        organization_id: VARCHAR
+        project_id: VARCHAR
+        environment_id: VARCHAR
+        partition_date: DATE
+        batch_id: VARCHAR
+        kind: VARCHAR
+        schema_name: VARCHAR
+        client_id: VARCHAR
+        payload: JSON
+        landed_at: TIMESTAMP
+
+models:
+  growthos_transform:
+    staging:
+      +materialized: view
+      +schema: staging
+    core:
+      +materialized: table
+      +schema: core
