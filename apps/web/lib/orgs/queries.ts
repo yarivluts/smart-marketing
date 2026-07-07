@@ -8,6 +8,7 @@ import {
   listAuditLogEntriesForOrg as listAuditLogEntriesForOrgInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
+  listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
   listOrgMembersWithProfiles,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
@@ -25,6 +26,7 @@ import {
   type AuditLogEntryModel,
   type IngestBatchModel,
   type MembershipStatus,
+  type MetricDefModel,
   type OrgMemberSummary,
   type OrgPersonModel,
   type PipelineMessageModel,
@@ -104,6 +106,14 @@ export async function listSchemaDefinitionsForProject(
 ): Promise<SchemaDefModel[]> {
   await ensureFirestoreOrm();
   return listSchemaDefinitionsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listMetricDefinitionsForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<MetricDefModel[]> {
+  await ensureFirestoreOrm();
+  return listMetricDefinitionsForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listRecentIngestBatchesForProject(
