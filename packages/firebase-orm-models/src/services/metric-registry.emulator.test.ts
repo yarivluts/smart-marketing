@@ -41,7 +41,7 @@ async function setupOrgWithProject(orgName: string) {
 
 const adSpendDefinition: MetricDefinitionInput = {
   kind: 'aggregation',
-  aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [] },
+  aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] },
 };
 
 const signupsDefinition: MetricDefinitionInput = {
@@ -50,6 +50,7 @@ const signupsDefinition: MetricDefinitionInput = {
     function: 'count_distinct',
     table: 'fact_funnel_event',
     column: 'customer_id',
+    timeColumn: 'ts',
     filters: [{ field: 'step', operator: '=', value: 'signup' }],
   },
 };
@@ -69,7 +70,7 @@ describe('registerMetricDefinition', () => {
     expect(metricDef.version).toBe(1);
     expect(metricDef.status).toBe('active');
     expect(metricDef.definition_kind).toBe('aggregation');
-    expect(metricDef.aggregation).toEqual({ function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [] });
+    expect(metricDef.aggregation).toEqual({ function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] });
     expect(metricDef.dimensions).toEqual(['channel', 'campaign']);
   });
 
@@ -161,7 +162,7 @@ describe('registerMetricDefinition', () => {
         organizationId: organization.id,
         projectId: project.id,
         name: 'bad_function',
-        definition: { kind: 'aggregation', aggregation: { function: 'median', table: 'fact_ad_spend', column: 'spend', filters: [] } },
+        definition: { kind: 'aggregation', aggregation: { function: 'median', table: 'fact_ad_spend', column: 'spend', timeColumn: 'date', filters: [] } },
         dimensions: [],
         createdByUserId: owner.id,
       }),
@@ -172,7 +173,7 @@ describe('registerMetricDefinition', () => {
         organizationId: organization.id,
         projectId: project.id,
         name: 'missing_column',
-        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', filters: [] } },
+        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', timeColumn: 'date', filters: [] } },
         dimensions: [],
         createdByUserId: owner.id,
       }),
@@ -185,8 +186,19 @@ describe('registerMetricDefinition', () => {
         name: 'bad_filter',
         definition: {
           kind: 'aggregation',
-          aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'spend', filters: [{ field: 'step', operator: 'contains', value: 'x' }] },
+          aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'spend', timeColumn: 'date', filters: [{ field: 'step', operator: 'contains', value: 'x' }] },
         },
+        dimensions: [],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidMetricDefinitionError);
+
+    await expect(
+      registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'missing_time_column',
+        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'spend', timeColumn: '  ', filters: [] } },
         dimensions: [],
         createdByUserId: owner.id,
       }),
@@ -315,7 +327,7 @@ describe('evolveMetricDefinition', () => {
 
     const v2Definition: MetricDefinitionInput = {
       kind: 'aggregation',
-      aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [{ field: 'platform', operator: '!=', value: 'test' }] },
+      aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [{ field: 'platform', operator: '!=', value: 'test' }] },
     };
     const v2 = await evolveMetricDefinition({
       organizationId: organization.id,
@@ -455,7 +467,7 @@ describe('audit log wiring', () => {
       organizationId: organization.id,
       projectId: project.id,
       name: 'ad_spend',
-      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [{ field: 'platform', operator: '!=', value: 'test' }] } },
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [{ field: 'platform', operator: '!=', value: 'test' }] } },
       dimensions: [],
       createdByUserId: owner.id,
     });

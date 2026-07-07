@@ -246,6 +246,8 @@
     "tablePlaceholder": "e.g. fact_ad_spend",
     "columnLabel": "Column",
     "columnPlaceholder": "e.g. reporting_spend",
+    "timeColumnLabel": "Time column",
+    "timeColumnPlaceholder": "e.g. date",
     "filtersLabel": "Filters",
     "filterFieldPlaceholder": "Field",
     "filterOperatorLabel": "Operator",

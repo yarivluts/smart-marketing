@@ -25,7 +25,7 @@ function parseDefinitionBody(value: unknown): MetricDefinitionInput | undefined 
       return undefined;
     }
     const aggRecord = aggregation as Record<string, unknown>;
-    if (typeof aggRecord.function !== 'string' || typeof aggRecord.table !== 'string') {
+    if (typeof aggRecord.function !== 'string' || typeof aggRecord.table !== 'string' || typeof aggRecord.timeColumn !== 'string') {
       return undefined;
     }
     const rawFilters = aggRecord.filters;
@@ -52,6 +52,7 @@ function parseDefinitionBody(value: unknown): MetricDefinitionInput | undefined 
         function: aggRecord.function,
         table: aggRecord.table,
         ...(typeof aggRecord.column === 'string' ? { column: aggRecord.column } : {}),
+        timeColumn: aggRecord.timeColumn,
         filters,
       },
     };

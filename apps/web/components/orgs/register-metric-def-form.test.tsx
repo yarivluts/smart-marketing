@@ -34,6 +34,7 @@ describe('RegisterMetricDefForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'ad_spend' } });
     fireEvent.change(screen.getByLabelText('Table'), { target: { value: 'fact_ad_spend' } });
     fireEvent.change(screen.getByLabelText('Column'), { target: { value: 'reporting_spend' } });
+    fireEvent.change(screen.getByLabelText('Time column'), { target: { value: 'date' } });
     fireEvent.change(screen.getByLabelText('Dimensions (comma-separated)'), { target: { value: 'channel, campaign' } });
     fireEvent.click(screen.getByRole('button', { name: 'Register metric' }));
 
@@ -46,7 +47,7 @@ describe('RegisterMetricDefForm', () => {
             name: 'ad_spend',
             definition: {
               kind: 'aggregation',
-              aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', filters: [] },
+              aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] },
             },
             dimensions: ['channel', 'campaign'],
           }),

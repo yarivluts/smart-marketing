@@ -29,6 +29,7 @@ export interface MetricDefinitionFormState {
   aggFunction: MetricAggFunctionRow;
   table: string;
   column: string;
+  timeColumn: string;
   filters: MetricFilterRow[];
   formula: string;
   /** Raw comma-separated input — split into an array only at submit time. */
@@ -36,12 +37,15 @@ export interface MetricDefinitionFormState {
 }
 
 export function blankMetricDefinitionFormState(): MetricDefinitionFormState {
-  return { kind: 'aggregation', aggFunction: 'sum', table: '', column: '', filters: [], formula: '', dimensions: '' };
+  return { kind: 'aggregation', aggFunction: 'sum', table: '', column: '', timeColumn: '', filters: [], formula: '', dimensions: '' };
 }
 
 export interface MetricDefinitionRequestBody {
   definition:
-    | { kind: 'aggregation'; aggregation: { function: string; table: string; column?: string; filters: { field: string; operator: string; value: string }[] } }
+    | {
+        kind: 'aggregation';
+        aggregation: { function: string; table: string; column?: string; timeColumn: string; filters: { field: string; operator: string; value: string }[] };
+      }
     | { kind: 'formula'; formula: string };
   dimensions: string[];
 }
@@ -64,6 +68,7 @@ export function metricDefinitionFormStateToRequestBody(state: MetricDefinitionFo
         function: state.aggFunction,
         table: state.table,
         ...(state.column.trim() ? { column: state.column.trim() } : {}),
+        timeColumn: state.timeColumn,
         filters: state.filters.map((filter) => ({ field: filter.field, operator: filter.operator, value: filter.value })),
       },
     },
@@ -81,7 +86,7 @@ export interface MetricVersionView {
   version: number;
   status: 'active' | 'superseded';
   definitionKind: MetricDefinitionKindRow;
-  aggregation: { function: MetricAggFunctionRow; table: string; column?: string; filters: MetricFilterRow[] } | null;
+  aggregation: { function: MetricAggFunctionRow; table: string; column?: string; timeColumn: string; filters: MetricFilterRow[] } | null;
   formula: string | null;
   dimensions: string[];
 }
@@ -93,6 +98,7 @@ export function metricVersionToFormState(version: MetricVersionView): MetricDefi
     aggFunction: version.aggregation?.function ?? 'sum',
     table: version.aggregation?.table ?? '',
     column: version.aggregation?.column ?? '',
+    timeColumn: version.aggregation?.timeColumn ?? '',
     filters: version.aggregation?.filters ?? [],
     formula: version.formula ?? '',
     dimensions: version.dimensions.join(', '),
@@ -165,6 +171,15 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
                 placeholder={t('columnPlaceholder')}
                 value={state.column}
                 onChange={(event) => onChange({ ...state, column: event.target.value })}
+              />
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="metric-def-time-column">
+              {t('timeColumnLabel')}
+              <Input
+                id="metric-def-time-column"
+                placeholder={t('timeColumnPlaceholder')}
+                value={state.timeColumn}
+                onChange={(event) => onChange({ ...state, timeColumn: event.target.value })}
               />
             </label>
           </div>

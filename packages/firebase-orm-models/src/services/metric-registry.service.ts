@@ -74,6 +74,7 @@ export interface MetricAggregationInput {
   function: string;
   table: string;
   column?: string;
+  timeColumn: string;
   filters: readonly MetricFilterInput[];
 }
 
@@ -119,12 +120,16 @@ function validateAggregation(input: MetricAggregationInput, reasons: string[]): 
   if (input.function !== 'count' && (!column || column.length === 0)) {
     reasons.push(`Aggregation function "${input.function}" requires a column.`);
   }
+  const timeColumn = input.timeColumn.trim();
+  if (timeColumn.length === 0) {
+    reasons.push('An aggregation must declare a non-empty time column to bucket by.');
+  }
   const filters = validateFilters(input.filters, reasons);
 
   if (reasons.length > reasonsBefore) {
     return undefined;
   }
-  return { function: input.function, table, ...(column ? { column } : {}), filters };
+  return { function: input.function, table, ...(column ? { column } : {}), timeColumn, filters };
 }
 
 interface ValidatedDefinition {
