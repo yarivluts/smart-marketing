@@ -6,10 +6,12 @@ import {
   listApiKeysForProject as listApiKeysForProjectInOrganization,
   listAttachmentsForProject as listAttachmentsForProjectInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
+  listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
   listOrgMembersWithProfiles,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
+  listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
   listRecentIngestBatchesForProject as listRecentIngestBatchesForProjectInOrganization,
   listResourceTemplates as listResourceTemplatesInOrganization,
   listSchemaDefinitionsForProject as listSchemaDefinitionsForProjectInOrganization,
@@ -21,7 +23,9 @@ import {
   type MembershipStatus,
   type OrgMemberSummary,
   type OrgPersonModel,
+  type PipelineMessageModel,
   type ProjectModel,
+  type QuarantinedRecordModel,
   type ResourceAttachmentModel,
   type ResourceKind,
   type ResourceTemplateModel,
@@ -105,6 +109,24 @@ export async function listRecentIngestBatchesForProject(
 ): Promise<IngestBatchModel[]> {
   await ensureFirestoreOrm();
   return listRecentIngestBatchesForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listQuarantinedRecordsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<QuarantinedRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listQuarantinedRecordsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listFailedPipelineMessagesForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<PipelineMessageModel[]> {
+  await ensureFirestoreOrm();
+  return listFailedPipelineMessagesForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export interface PendingAttachmentDetails {

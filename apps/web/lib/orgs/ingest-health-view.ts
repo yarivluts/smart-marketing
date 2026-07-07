@@ -1,4 +1,9 @@
-import { SCHEMA_DEF_KINDS, type IngestBatchModel, type IngestRecordResult, type SchemaDefKind } from '@growthos/firebase-orm-models';
+import {
+  SCHEMA_DEF_KINDS,
+  type IngestBatchModel,
+  type QuarantinedRecordModel,
+  type SchemaDefKind,
+} from '@growthos/firebase-orm-models';
 
 /**
  * A plain, serializable projection of one `IngestBatchModel` (KAN-35). Client
@@ -14,7 +19,6 @@ export interface IngestBatchView {
   acceptedCount: number;
   quarantinedCount: number;
   duplicateCount: number;
-  recordResults: IngestRecordResult[];
   createdAt: string;
 }
 
@@ -27,7 +31,6 @@ export function toIngestBatchView(batch: IngestBatchModel): IngestBatchView {
     acceptedCount: batch.accepted_count,
     quarantinedCount: batch.quarantined_count,
     duplicateCount: batch.duplicate_count,
-    recordResults: batch.record_results,
     createdAt: batch.created_at,
   };
 }
@@ -62,34 +65,13 @@ export interface IngestHealthRollup {
   throughputPerMinute: number;
 }
 
-export interface QuarantinedRecordView {
-  batchId: string;
-  /**
-   * This record's index within its batch's `record_results` — two distinct
-   * records in the same batch can share the same `clientId` (e.g. two
-   * records with the same client-supplied id both missing the same required
-   * field are each quarantined independently, before any dedup check runs),
-   * so `clientId` alone isn't a safe React list key.
-   */
-  recordIndex: number;
-  kind: SchemaDefKind;
-  environmentId: string;
-  clientId: string;
-  reasons: string[];
-  createdAt: string;
-}
-
 export interface IngestHealthSummary {
   overall: IngestHealthRollup;
   byKind: IngestHealthRollup[];
-  quarantinedRecords: QuarantinedRecordView[];
-  /** True if more quarantined records exist among the considered batches than `quarantinedRecords` shows. */
-  quarantinedRecordsTruncated: boolean;
   batchesConsidered: number;
 }
 
 const MIN_THROUGHPUT_WINDOW_MINUTES = 1;
-export const DEFAULT_QUARANTINE_BROWSER_LIMIT = 100;
 
 function rollupKind(kind: SchemaDefKind | 'overall', batches: readonly IngestBatchView[], nowMs: number): IngestHealthRollup {
   if (batches.length === 0) {
@@ -143,18 +125,18 @@ function rollupKind(kind: SchemaDefKind | 'overall', batches: readonly IngestBat
 }
 
 /**
- * Throughput/error-rate/freshness rollup + a quarantine browser (KAN-35),
- * computed over the batches a caller already fetched (see
- * `listRecentIngestBatchesForProject`'s own documented cap) rather than any
- * new aggregation infra — there isn't any yet. A pure function of its inputs
- * (including `nowMs`, passed in rather than read from `Date.now()`) so it's
- * testable with fixed fixtures.
+ * Throughput/error-rate/freshness rollup (KAN-35), computed over the batches
+ * a caller already fetched (see `listRecentIngestBatchesForProject`'s own
+ * documented cap) rather than any new aggregation infra — there isn't any
+ * yet. A pure function of its inputs (including `nowMs`, passed in rather
+ * than read from `Date.now()`) so it's testable with fixed fixtures.
+ *
+ * The quarantine browser used to be derived from these same batches'
+ * `record_results` — since KAN-34 gave quarantined records their own durable,
+ * stably-identified store (`QuarantinedRecordModel`), that's now a separate
+ * fetch/view (see {@link toQuarantinedRecordView}), not part of this rollup.
  */
-export function computeIngestHealthSummary(
-  batches: readonly IngestBatchView[],
-  nowMs: number,
-  quarantineLimit: number = DEFAULT_QUARANTINE_BROWSER_LIMIT,
-): IngestHealthSummary {
+export function computeIngestHealthSummary(batches: readonly IngestBatchView[], nowMs: number): IngestHealthSummary {
   const byKindBatches = new Map<SchemaDefKind, IngestBatchView[]>();
   for (const batch of batches) {
     const list = byKindBatches.get(batch.kind) ?? [];
@@ -166,30 +148,39 @@ export function computeIngestHealthSummary(
     rollupKind(kind, byKindBatches.get(kind) ?? [], nowMs),
   );
 
-  // Batches already arrive newest-first (the query's own `orderBy`), so
-  // flattening preserves that order without re-sorting here.
-  const allQuarantined: QuarantinedRecordView[] = [];
-  for (const batch of batches) {
-    batch.recordResults.forEach((record, recordIndex) => {
-      if (record.status !== 'quarantined') return;
-      allQuarantined.push({
-        batchId: batch.id,
-        recordIndex,
-        kind: batch.kind,
-        environmentId: batch.environmentId,
-        clientId: record.client_id,
-        reasons: record.reasons ?? [],
-        createdAt: batch.createdAt,
-      });
-    });
-  }
-
   return {
     overall: rollupKind('overall', batches, nowMs),
     byKind,
-    quarantinedRecords: allQuarantined.slice(0, quarantineLimit),
-    quarantinedRecordsTruncated: allQuarantined.length > quarantineLimit,
     batchesConsidered: batches.length,
+  };
+}
+
+/**
+ * A plain, serializable projection of one `QuarantinedRecordModel` (KAN-34) —
+ * unlike the old batch-derived view, `id` is this record's own stable
+ * document id, so a replay action has something durable to reference (two
+ * quarantined records sharing the same `clientId` no longer need a
+ * `(batchId, recordIndex)` composite key to stay distinguishable).
+ */
+export interface QuarantinedRecordView {
+  id: string;
+  batchId: string;
+  kind: SchemaDefKind;
+  environmentId: string;
+  clientId: string;
+  reasons: string[];
+  createdAt: string;
+}
+
+export function toQuarantinedRecordView(record: QuarantinedRecordModel): QuarantinedRecordView {
+  return {
+    id: record.id,
+    batchId: record.batch_id,
+    kind: record.kind,
+    environmentId: record.environment_id,
+    clientId: record.client_id,
+    reasons: record.reasons,
+    createdAt: record.created_at,
   };
 }
 

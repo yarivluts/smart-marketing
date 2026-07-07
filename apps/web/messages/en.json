@@ -235,10 +235,20 @@
     "neverIngestedLabel": "No batches ingested yet",
     "batchCapNote": "Based on the {count} most recent ingest batches.",
     "quarantineHeading": "Quarantined records",
-    "replayUnavailableNote": "Replay isn't available yet — raw payloads aren't retained until the ingest pipeline (KAN-33/34) lands.",
-    "noQuarantinedRecords": "No quarantined records among the batches shown above.",
+    "noQuarantinedRecords": "No quarantined records for this project.",
     "quarantinedRecordSummary": "{clientId} ({kind}, {environment})",
     "reasonsLabel": "Reasons: {reasons}",
-    "quarantineTruncatedNote": "More quarantined records exist than are shown here."
+    "quarantineCapNote": "Showing the {count} most recent quarantined records.",
+    "replayButtonLabel": "Replay",
+    "replayError": "Couldn't replay this record. Please try again.",
+    "replayOutcomeAccepted": "Accepted",
+    "replayOutcomeDuplicate": "Already accepted elsewhere (duplicate)",
+    "replayOutcomeStillQuarantined": "Still quarantined: {reasons}",
+    "pipelineFailuresHeading": "Pipeline delivery failures",
+    "noPipelineFailures": "No failed pipeline deliveries.",
+    "pipelineFailureSummary": "{clientId} ({kind}, {environment}): {reason}",
+    "retryFailedDeliveries": "Retry failed deliveries",
+    "retryFailedDeliveriesError": "Couldn't retry failed deliveries. Please try again.",
+    "retryFailedDeliveriesResult": "{delivered} delivered, {failed} still failing"
   }
 }

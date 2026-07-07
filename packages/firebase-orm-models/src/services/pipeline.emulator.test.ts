@@ -8,7 +8,9 @@ import {
   enqueueAcceptedRecordsForPipeline,
   FirestoreWarehouseSink,
   landPipelineMessages,
+  listFailedPipelineMessagesForProject,
   listRawRecordsForBatch,
+  replayFailedPipelineMessagesForProject,
   type PipelineRecordEnvelope,
   type WarehouseSink,
 } from '../index';
@@ -229,5 +231,104 @@ describe('landPipelineMessages', () => {
     expect(ownRawRecords.map((r) => r.client_id)).toEqual(['own-evt']);
     const strayRawRecords = await listRawRecordsForBatch(organization.id, project.id, strayBatchId);
     expect(strayRawRecords).toHaveLength(0);
+  });
+});
+
+describe('KAN-34 pipeline DLQ: listFailedPipelineMessagesForProject + replayFailedPipelineMessagesForProject', () => {
+  function flakySinkFailingFor(clientId: string): WarehouseSink {
+    const realSink = new FirestoreWarehouseSink();
+    return {
+      insertRawRecord: async (row: PipelineRecordEnvelope, id: string) => {
+        if (row.clientId === clientId) {
+          throw new Error('simulated warehouse outage');
+        }
+        await realSink.insertRawRecord(row, id);
+      },
+    };
+  }
+
+  it('lists a failed message across environments for one project and clears it once a replay lands successfully', async () => {
+    const { organization, project, devEnvironment } = await setupProject('DLQ Replay Org');
+    const batchId = unique('batch');
+
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      batchId,
+      kind: 'event',
+      records: [{ clientId: 'evt-flaky', schemaName: 'order_completed', payload: { net: 1 } }],
+    });
+    const firstAttempt = await drainPendingPipelineMessages({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      sink: flakySinkFailingFor('evt-flaky'),
+    });
+    expect(firstAttempt).toEqual({ delivered: 0, failed: 1 });
+
+    const failed = await listFailedPipelineMessagesForProject(organization.id, project.id);
+    expect(failed.map((m) => m.client_id)).toEqual(['evt-flaky']);
+    expect(failed[0].failure_reason).toBe('simulated warehouse outage');
+
+    // Retry with a healthy sink (KAN-34 AC: DLQ + replay) — the same message, no longer flaky, lands.
+    const replay = await replayFailedPipelineMessagesForProject(organization.id, project.id);
+    expect(replay).toEqual({ delivered: 1, failed: 0 });
+
+    const rawRecords = await listRawRecordsForBatch(organization.id, project.id, batchId);
+    expect(rawRecords.map((r) => r.client_id)).toEqual(['evt-flaky']);
+    expect(await listFailedPipelineMessagesForProject(organization.id, project.id)).toHaveLength(0);
+  });
+
+  it('leaves a message failed with its reason refreshed when a replay attempt fails again', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('DLQ Still Failing Org');
+    const batchId = unique('batch');
+
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId,
+      kind: 'event',
+      records: [{ clientId: 'evt-still-bad', schemaName: 'order_completed', payload: {} }],
+    });
+    await drainPendingPipelineMessages({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      sink: flakySinkFailingFor('evt-still-bad'),
+    });
+
+    const replay = await replayFailedPipelineMessagesForProject(
+      organization.id,
+      project.id,
+      undefined,
+      flakySinkFailingFor('evt-still-bad'),
+    );
+    expect(replay).toEqual({ delivered: 0, failed: 1 });
+    expect(await listFailedPipelineMessagesForProject(organization.id, project.id)).toHaveLength(1);
+  });
+
+  it('does not surface a failed message from a sibling project', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('DLQ Isolation Org A');
+    const other = await setupProject('DLQ Isolation Org B');
+    const batchId = unique('batch');
+
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId,
+      kind: 'event',
+      records: [{ clientId: 'evt-bad', schemaName: 'order_completed', payload: {} }],
+    });
+    await drainPendingPipelineMessages({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      sink: flakySinkFailingFor('evt-bad'),
+    });
+
+    expect(await listFailedPipelineMessagesForProject(other.organization.id, other.project.id)).toHaveLength(0);
   });
 });
