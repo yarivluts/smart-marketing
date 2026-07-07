@@ -11,10 +11,12 @@ import {
   decideResourceAttachment as decideResourceAttachmentInOrganization,
   type DrainPipelineResult,
   detachResource as detachResourceInOrganization,
+  evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   inviteMemberToOrganization,
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
+  registerMetricDefinition as registerMetricDefinitionInOrganization,
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
   replayFailedPipelineMessagesForProject as replayFailedPipelineMessagesForProjectInOrganization,
@@ -31,6 +33,8 @@ import {
   type InvitableRole,
   type KmsProvider,
   type MembershipModel,
+  type MetricDefinitionInput,
+  type MetricDefModel,
   type OrgPersonModel,
   type ResourceAttachmentModel,
   type ResourceKind,
@@ -256,6 +260,34 @@ interface EvolveSchemaDefinitionInput {
 export async function evolveSchemaDefinition(input: EvolveSchemaDefinitionInput): Promise<SchemaDefModel> {
   await ensureFirestoreOrm();
   return evolveSchemaDefinitionInOrganization(input);
+}
+
+interface RegisterMetricDefinitionInput {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  definition: MetricDefinitionInput;
+  dimensions: readonly string[];
+  createdByUserId: string;
+}
+
+export async function registerMetricDefinition(input: RegisterMetricDefinitionInput): Promise<MetricDefModel> {
+  await ensureFirestoreOrm();
+  return registerMetricDefinitionInOrganization(input);
+}
+
+interface EvolveMetricDefinitionInput {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  definition: MetricDefinitionInput;
+  dimensions: readonly string[];
+  createdByUserId: string;
+}
+
+export async function evolveMetricDefinition(input: EvolveMetricDefinitionInput): Promise<MetricDefModel> {
+  await ensureFirestoreOrm();
+  return evolveMetricDefinitionInOrganization(input);
 }
 
 interface ReplayQuarantinedRecordInput {

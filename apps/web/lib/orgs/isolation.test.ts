@@ -13,6 +13,8 @@ import { GET as listApiKeys, POST as mintApiKey } from '@/app/api/orgs/[orgId]/p
 import { DELETE as revokeApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]/route';
 import { GET as listSchemaDefs, POST as registerSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/route';
 import { POST as evolveSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/evolve/route';
+import { GET as listMetricDefs, POST as registerMetricDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/metric-defs/route';
+import { POST as evolveMetricDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/metric-defs/evolve/route';
 import { GET as listAuditLog } from '@/app/api/orgs/[orgId]/audit-log/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
@@ -358,6 +360,76 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         }),
       () =>
         evolveSchemaDef(evolveRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+  });
+
+  it('POST /api/orgs/[orgId]/projects/[projectId]/metric-defs: org caller cannot see vs. fake org id (KAN-40)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-metric-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (metric-defs)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-metric-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (metric-defs)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const leakedBody = {
+      name: 'leaked_metric',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'spend', filters: [] } },
+      dimensions: [],
+    };
+
+    const requestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/metric-defs`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leakedBody),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        registerMetricDef(requestFor(orgB.id, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }),
+        }),
+      () =>
+        registerMetricDef(requestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+
+    const getRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/metric-defs`);
+
+    await expectIndistinguishable(
+      () =>
+        listMetricDefs(getRequestFor(orgB.id, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }),
+        }),
+      () =>
+        listMetricDefs(getRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+
+    const evolveRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/metric-defs/evolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(leakedBody),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        evolveMetricDef(evolveRequestFor(orgB.id, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }),
+        }),
+      () =>
+        evolveMetricDef(evolveRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
         }),
     );

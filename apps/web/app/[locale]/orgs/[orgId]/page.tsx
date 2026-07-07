@@ -55,6 +55,7 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
   const canManageKeys = can(bindings, principal, 'keys.manage', { orgId });
   const canManageSchemas = can(bindings, principal, 'schema.write', { orgId });
+  const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId });
   const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
   const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
 
@@ -110,6 +111,11 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
                 {canManageSchemas ? (
                   <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/schema-defs`}>
                     {t('projectSchemaRegistryLink')}
+                  </Link>
+                ) : null}
+                {canManageMetrics ? (
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/metric-defs`}>
+                    {t('projectMetricRegistryLink')}
                   </Link>
                 ) : null}
                 {canViewIngestHealth ? (
