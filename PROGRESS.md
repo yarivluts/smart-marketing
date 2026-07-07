@@ -101,28 +101,39 @@ Template for each entry:
     tests in `packages/firebase-orm-models` incl. the new `pipeline.emulator.test.ts` (7 tests) and 2
     new KAN-33 tests in `ingest.emulator.test.ts`, 159 in `packages/shared`, 29 in `apps/api`, 223 web
     unit/route tests + 13/13 Playwright e2e in `apps/web`). No emulator flake this run.
-  - Branch `kan-33-ingest-pipeline`, PR pending at time of writing this entry — see the PR link in the
-    branch's own history for CI status; this entry is written before the final merge step so a
-    follow-up run can confirm and finish if this run stops first.
-- **In progress (exact stopping point):** KAN-33 implementation, review, and local
-  lint/typecheck/test/build are complete and green; opening the PR and merging (pending CI) is the
-  only remaining step for this story.
-- **Blocked + why:** nothing blocking; CI needs to run and go green before merge.
-- **Next step:** confirm PR CI is green, merge (squash) into `main`, delete the branch if the git
-  remote allows it this time (every prior run this sandbox's remote has rejected branch deletion with
-  an HTTP 403). After that, **KAN-34** (quarantine + DLQ + replay API, per-key rate limiting) is the
-  natural next pick — it's the direct consumer of this story's `failed`-status `PipelineMessageModel`s
-  (currently a dead end with no replay path) and of KAN-32's quarantined ingest records. **KAN-35**
-  (Admin UI: ingest health, quarantine browser + replay button) is downstream of both KAN-33 and
-  KAN-34 and should probably follow once there's something for it to show/replay.
+  - Branch `kan-33-ingest-pipeline`, PR #21. CI (`lint · typecheck · test · build`) green
+    (`conclusion: success`) on the first attempt — no stall/flake this run. Merged by the repo owner
+    directly while this run was watching the PR. `main` fast-forwarded locally to confirm. Remote
+    branch deletion failed with the same HTTP 403 from this sandbox's git remote recorded in every
+    prior run's entry (not a GitHub permissions issue) — merged and dead but not deleted; the local
+    branch was deleted.
+  - **Found, not reconciled (not this story's to fix)**: an independent run had already opened **PR
+    #20** (`kan-35-ingest-health-admin-ui`) for **KAN-35** — before this story existed, per its own
+    description ("Replay is deliberately not built... called out as a KAN-33/34 dependency"). It reads
+    `IngestBatchModel` directly (a `listRecentIngestBatchesForProject` rollup), never touches this
+    story's new `PipelineMessageModel`/`RawRecordModel`, and shares no changed files with this PR, so
+    there's no merge conflict to resolve — but whoever picks up KAN-35 properly (after KAN-34) should
+    know PR #20 predates the pipeline/quarantine infra its own description says it depends on, and
+    decide whether to build on it or start fresh.
+- **In progress (exact stopping point):** none — KAN-33 is fully delivered, independently reviewed,
+  tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-34** (quarantine + DLQ + replay API, per-key rate limiting) is the natural next
+  pick — it's the direct consumer of this story's `failed`-status `PipelineMessageModel`s (currently a
+  dead end with no replay path) and of KAN-32's quarantined ingest records. **KAN-35** (Admin UI:
+  ingest health, quarantine browser + replay button) already has an unmerged PR (#20, see above) but is
+  downstream of both KAN-33 and KAN-34 — worth reconciling PR #20 against real KAN-34 quarantine/replay
+  data once that story lands, rather than merging it standalone first.
 - **Waiting on human:**
   - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
     unchanged by this run.
+  - Decide whether to merge PR #20 (KAN-35) as-is now, or wait for KAN-34 first — new this run.
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
-  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this
-    run's own branch is also ready to prune.
+  - Optional: delete the merged `kan-33-ingest-pipeline` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403), and the other still-outstanding merged branches from prior runs
+    noted in earlier entries below.
 
 ---
 
