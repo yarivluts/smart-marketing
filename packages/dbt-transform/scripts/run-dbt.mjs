@@ -12,7 +12,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,13 +51,13 @@ function isAlreadyProvisioned() {
 
 function provisionVenv() {
   console.log('[dbt-transform] provisioning a local Python venv with dbt-core + dbt-duckdb...');
-  const pythonBin = existsSync('/usr/bin/python3') ? 'python3' : 'python';
   if (!existsSync(venvPython)) {
-    run(pythonBin, ['-m', 'venv', venvDir]);
+    // Resolved via PATH, not a hardcoded location — Debian/Ubuntu (incl. this
+    // repo's CI image) ships `python3` but not always a plain `python` alias.
+    run('python3', ['-m', 'venv', venvDir]);
   }
   run(venvPython, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'pip']);
   run(venvPython, ['-m', 'pip', 'install', '--quiet', '-r', requirementsPath]);
-  mkdirSync(venvDir, { recursive: true });
   writeFileSync(provisionedMarkerPath, requirementsHash());
 }
 

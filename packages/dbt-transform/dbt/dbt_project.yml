@@ -7,13 +7,10 @@ profile: 'growthos_transform'
 model-paths: ["models"]
 seed-paths: ["seeds"]
 test-paths: ["tests"]
-macro-paths: ["macros"]
-analysis-paths: ["analyses"]
 
 target-path: "target"
 clean-targets:
   - "target"
-  - "dbt_packages"
 
 seeds:
   growthos_transform:
