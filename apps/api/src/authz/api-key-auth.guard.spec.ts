@@ -139,6 +139,25 @@ describe('ApiKeyAuthGuard', () => {
       };
     }
 
+    it('falls back to the shared defaultApiKeyRateLimiter when constructed without one (e.g. no DI provider registered)', async () => {
+      mockAuthenticateApiKey.mockResolvedValue({ ok: true, value: authContextFor(`key-${Math.random()}`) });
+      const reflector = {
+        get: (key: string, target: symbol) => (target === HANDLER ? ({ [API_KEY_SCOPE_KEY]: 'ingest.write' } as Record<string, unknown>)[key] : undefined),
+      } as unknown as Reflector;
+      const guard = new ApiKeyAuthGuard(reflector);
+      const request: ApiKeyAuthenticatedRequest = { headers: { authorization: 'Bearer gos_live_ok' } };
+      const context = {
+        getHandler: () => HANDLER,
+        getClass: () => CLASS,
+        switchToHttp: () => ({
+          getRequest: () => request,
+          getResponse: () => ({ setHeader: jest.fn() }) as unknown as HeaderSettableResponse,
+        }),
+      } as unknown as ExecutionContext;
+
+      await expect(guard.canActivate(context)).resolves.toBe(true);
+    });
+
     it('rejects (429) once the bucket is exhausted and sets a Retry-After header', async () => {
       mockAuthenticateApiKey.mockResolvedValue({ ok: true, value: authContextFor('key-1') });
       const rateLimiter = new InMemoryTokenBucketRateLimiter({ capacity: 1, refillPerSecond: 1 });
