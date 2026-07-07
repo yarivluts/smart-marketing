@@ -5,6 +5,7 @@ import {
   type IngestRecordStatus,
 } from '../models/ingest-batch.model';
 import { IngestDedupKeyModel } from '../models/ingest-dedup-key.model';
+import { QuarantinedRecordModel } from '../models/quarantined-record.model';
 import type { SchemaDefKind, SchemaFieldDef, SchemaFieldType } from '../models/schema-def.model';
 import { getActiveSchemaDefinition } from './schema-registry.service';
 import { enqueueAcceptedRecordsForPipeline, landPipelineMessages } from './pipeline.service';
@@ -67,6 +68,46 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
 }
 
+/** A non-empty string once trimmed, or `undefined` — the one check every envelope field below needs, so a whitespace-only value is treated the same as a missing one everywhere (both the "is it present" check and the fallback-id decision agree). */
+function requireNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+export interface RecordEnvelopeCheck {
+  /** The field map to validate against the schema — an event's `properties`, an entity's `attributes`, a measure's `dimensions`. */
+  fieldsToValidate: Record<string, unknown>;
+  envelopeReasons: string[];
+}
+
+/**
+ * The envelope-level checks (required top-level fields like an event's `event_id`/`event`/`ts`) a raw
+ * record must pass before its `fieldsToValidate` are even checked against a schema. Factored out of
+ * `prepareRecord` so `quarantine.service.ts`'s replay path — which already knows a stored quarantined
+ * record's `kind` from `QuarantinedRecordModel`, not a fresh `IngestBatchInput` — can re-run exactly the
+ * same envelope logic against the persisted raw payload without re-deriving `clientId`/`schemaName`.
+ */
+export function checkRecordEnvelope(kind: SchemaDefKind, raw: Record<string, unknown>): RecordEnvelopeCheck {
+  if (kind === 'event') {
+    const reasons: string[] = [];
+    if (!requireNonEmptyString(raw.event_id)) reasons.push('missing_field:event_id');
+    if (!requireNonEmptyString(raw.event)) reasons.push('missing_field:event');
+    if (!requireNonEmptyString(raw.ts)) reasons.push('missing_field:ts');
+    return { fieldsToValidate: asRecord(raw.properties), envelopeReasons: reasons };
+  }
+
+  if (kind === 'entity') {
+    const reasons: string[] = [];
+    if (!requireNonEmptyString(raw.id)) reasons.push('missing_field:id');
+    return { fieldsToValidate: asRecord(raw.attributes), envelopeReasons: reasons };
+  }
+
+  const reasons: string[] = [];
+  if (!requireNonEmptyString(raw.measure)) reasons.push('missing_field:measure');
+  if (!requireNonEmptyString(raw.ts)) reasons.push('missing_field:ts');
+  if (typeof raw.value !== 'number' || Number.isNaN(raw.value)) reasons.push('missing_field:value');
+  return { fieldsToValidate: asRecord(raw.dimensions), envelopeReasons: reasons };
+}
+
 /** Canonical JSON: keys sorted at every nesting level (not just the top one), so two dimension payloads that differ only in key order hash identically for measure dedup below. */
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) {
@@ -83,63 +124,51 @@ function sortedJson(record: Record<string, unknown>): string {
   return JSON.stringify(canonicalize(record));
 }
 
-/** A non-empty string once trimmed, or `undefined` — the one check every envelope field below needs, so a whitespace-only value is treated the same as a missing one everywhere (both the "is it present" check and the fallback-id decision agree). */
-function requireNonEmptyString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
-}
-
 /**
  * Turns one raw record into its client-facing id, the schema family it
  * should validate against, and the field map to check — per plan `12
  * §2.1`/`§2.2`'s three sketches: an event's schema name is its own `event`
  * field; an entity batch's schema name is the batch-level `type`; a measure's
- * schema name is its own `measure` field.
+ * schema name is its own `measure` field. Envelope validation itself is
+ * shared with the replay path via {@link checkRecordEnvelope}.
  */
 function prepareRecord(input: IngestBatchInput, record: unknown, index: number): PreparedRecord {
-  const reasons: string[] = [];
   const r = asRecord(record);
+  const { fieldsToValidate, envelopeReasons } = checkRecordEnvelope(input.kind, r);
 
   if (input.kind === 'event') {
     const eventId = requireNonEmptyString(r.event_id);
     const eventName = requireNonEmptyString(r.event);
-    if (!eventId) reasons.push('missing_field:event_id');
-    if (!eventName) reasons.push('missing_field:event');
-    if (!requireNonEmptyString(r.ts)) reasons.push('missing_field:ts');
     return {
       clientId: eventId ?? `event#${index}`,
       schemaName: eventName ?? '',
-      fieldsToValidate: asRecord(r.properties),
-      envelopeReasons: reasons,
+      fieldsToValidate,
+      envelopeReasons,
       raw: r,
     };
   }
 
   if (input.kind === 'entity') {
     const id = requireNonEmptyString(r.id);
-    if (!id) reasons.push('missing_field:id');
     return {
       clientId: id ?? `entity#${index}`,
       schemaName: input.type,
-      fieldsToValidate: asRecord(r.attributes),
-      envelopeReasons: reasons,
+      fieldsToValidate,
+      envelopeReasons,
       raw: r,
     };
   }
 
   const measureName = requireNonEmptyString(r.measure);
   const ts = requireNonEmptyString(r.ts);
-  if (!measureName) reasons.push('missing_field:measure');
-  if (!ts) reasons.push('missing_field:ts');
-  if (typeof r.value !== 'number' || Number.isNaN(r.value)) reasons.push('missing_field:value');
-  const dimensions = asRecord(r.dimensions);
   return {
     // Measures carry no client-supplied id in the plan's sketch, so their
     // own natural key (name+ts+dimensions) stands in — re-sending the same
     // aggregate is then idempotent the same way a real client id would make it.
-    clientId: measureName && ts ? `${measureName}|${ts}|${sortedJson(dimensions)}` : `measure#${index}`,
+    clientId: measureName && ts ? `${measureName}|${ts}|${sortedJson(fieldsToValidate)}` : `measure#${index}`,
     schemaName: measureName ?? '',
-    fieldsToValidate: dimensions,
-    envelopeReasons: reasons,
+    fieldsToValidate,
+    envelopeReasons,
     raw: r,
   };
 }
@@ -153,8 +182,13 @@ const FIELD_TYPE_VALIDATORS: Record<SchemaFieldType, (value: unknown) => boolean
   array: (value) => Array.isArray(value),
 };
 
-/** Reject-list validation against a schema's registered fields: every required field must be present and correctly typed; any field not declared on the schema is quarantined rather than silently dropped (plan `08 §2`). */
-function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: readonly SchemaFieldDef[]): string[] {
+/**
+ * Reject-list validation against a schema's registered fields: every required field must be present
+ * and correctly typed; any field not declared on the schema is quarantined rather than silently
+ * dropped (plan `08 §2`). Exported so `quarantine.service.ts`'s replay path can re-run the identical
+ * check against the current (possibly since-evolved) active schema, rather than duplicating it.
+ */
+export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: readonly SchemaFieldDef[]): string[] {
   const reasons: string[] = [];
   const declared = new Set(fieldDefs.map((field) => field.name));
 
@@ -183,9 +217,10 @@ function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: reado
  * `type` (the same way two SQL tables can both have a row `id: 123`), so
  * dedup must be scoped per schema family, not just per kind — otherwise a
  * `product` and a `customer` sharing id `123` in the same environment would
- * wrongly dedupe against each other.
+ * wrongly dedupe against each other. Exported so `quarantine.service.ts`'s replay path claims the
+ * exact same dedup slot an originally-accepted resend of this client id would have claimed.
  */
-function dedupKeyId(environmentId: string, kind: SchemaDefKind, schemaName: string, clientId: string): string {
+export function dedupKeyId(environmentId: string, kind: SchemaDefKind, schemaName: string, clientId: string): string {
   return createHash('sha256').update(`${environmentId}:${kind}:${schemaName}:${clientId}`).digest('hex');
 }
 
@@ -256,6 +291,9 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
 
   const recordResults: IngestRecordResult[] = [];
   const acceptedClaims: { dedupId: string; clientId: string; schemaName: string; payload: Record<string, unknown> }[] = [];
+  // Every quarantined record's raw payload (KAN-34), persisted best-effort after the batch itself is
+  // durable — see the comment on the `QuarantinedRecordModel` writes below.
+  const quarantinedToPersist: { clientId: string; schemaName: string; payload: Record<string, unknown>; reasons: string[] }[] = [];
   // Two records in the *same* batch sharing a client id must also dedupe
   // against each other, not only against a claim already persisted by an
   // earlier batch — `existingClaims` alone can't catch that since neither
@@ -265,6 +303,12 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   for (const record of preparedWithClaims) {
     if (record.envelopeReasons.length > 0) {
       recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons: record.envelopeReasons });
+      quarantinedToPersist.push({
+        clientId: record.clientId,
+        schemaName: record.schemaName,
+        payload: record.raw,
+        reasons: record.envelopeReasons,
+      });
       continue;
     }
     if (record.existingClaim || acceptedInThisBatch.has(record.dedupId)) {
@@ -274,17 +318,16 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
 
     const schemaDef = schemaDefsByName.get(record.schemaName) ?? null;
     if (!schemaDef) {
-      recordResults.push({
-        client_id: record.clientId,
-        status: 'quarantined',
-        reasons: [`schema_not_registered:${record.schemaName}`],
-      });
+      const reasons = [`schema_not_registered:${record.schemaName}`];
+      recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
+      quarantinedToPersist.push({ clientId: record.clientId, schemaName: record.schemaName, payload: record.raw, reasons });
       continue;
     }
 
     const reasons = validateAgainstSchema(record.fieldsToValidate, schemaDef.field_defs);
     if (reasons.length > 0) {
       recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
+      quarantinedToPersist.push({ clientId: record.clientId, schemaName: record.schemaName, payload: record.raw, reasons });
     } else {
       recordResults.push({ client_id: record.clientId, status: 'accepted' });
       acceptedClaims.push({
@@ -311,6 +354,34 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   batch.created_at = new Date().toISOString();
   batch.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await batch.save();
+
+  // KAN-34: persist every quarantined record's raw payload durably so it has something to replay once
+  // its schema is fixed — `record_results` above only ever stores the validation outcome, not the
+  // payload. Best-effort and independent per record, the same tradeoff as the dedup-key claims and
+  // pipeline publish just below: a write failure here only means that one record has no durable
+  // quarantine entry to replay later, never a reason to turn an otherwise-successful 202 into a 500.
+  await Promise.all(
+    quarantinedToPersist.map(async ({ clientId, schemaName, payload, reasons }) => {
+      const quarantined = new QuarantinedRecordModel();
+      quarantined.organization_id = params.organizationId;
+      quarantined.project_id = params.projectId;
+      quarantined.environment_id = params.environmentId;
+      quarantined.batch_id = batch.id;
+      quarantined.kind = params.input.kind;
+      quarantined.schema_name = schemaName;
+      quarantined.client_id = clientId;
+      quarantined.payload = payload;
+      quarantined.reasons = reasons;
+      quarantined.status = 'quarantined';
+      quarantined.created_at = batch.created_at;
+      quarantined.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+      try {
+        await quarantined.save();
+      } catch {
+        // Best-effort — see the comment above this call.
+      }
+    }),
+  );
 
   // Claim each accepted record's dedup key independently and best-effort,
   // after the batch itself is already durable and its summary computed

@@ -171,3 +171,37 @@ export async function listRawRecordsForBatch(
     .where('batch_id', '==', batchId)
     .get();
 }
+
+/**
+ * The pipeline's dead-letter queue (KAN-34): every message a `landMessage` attempt has given up on,
+ * across every environment in a project — same "fold every environment into one admin view" posture as
+ * `listRecentIngestBatchesForProject`/`listApiKeysForProject`. Newest first.
+ */
+export async function listFailedPipelineMessagesForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
+): Promise<PipelineMessageModel[]> {
+  return PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .query()
+    .where('status', '==', 'failed')
+    .orderBy('enqueued_at', 'desc')
+    .limit(Math.min(limit, MAX_PIPELINE_DRAIN_BATCH_SIZE))
+    .get();
+}
+
+/**
+ * Retries every currently-failed pipeline message in a project (KAN-34 AC: DLQ + replay) — re-runs the
+ * exact same landing attempt `landPipelineMessages` made originally. A message that fails again simply
+ * stays `failed` with its `failure_reason` refreshed, available for a later replay; nothing here is
+ * lost or dropped on a repeat failure.
+ */
+export async function replayFailedPipelineMessagesForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
+  sink?: WarehouseSink,
+): Promise<DrainPipelineResult> {
+  const failed = await listFailedPipelineMessagesForProject(organizationId, projectId, limit);
+  return landMessages(failed, sink ?? defaultWarehouseSink);
+}

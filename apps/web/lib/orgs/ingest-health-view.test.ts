@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  computeIngestHealthSummary,
-  DEFAULT_QUARANTINE_BROWSER_LIMIT,
-  formatMinutesAgo,
-  formatThroughput,
-  type IngestBatchView,
-} from './ingest-health-view';
+import { computeIngestHealthSummary, formatMinutesAgo, formatThroughput, type IngestBatchView } from './ingest-health-view';
 
 const NOW = Date.parse('2026-07-06T12:00:00Z');
 
@@ -17,7 +11,6 @@ function batch(overrides: Partial<IngestBatchView> & Pick<IngestBatchView, 'id' 
     acceptedCount: 0,
     quarantinedCount: 0,
     duplicateCount: 0,
-    recordResults: [],
     ...overrides,
   };
 }
@@ -27,8 +20,7 @@ describe('computeIngestHealthSummary', () => {
     const summary = computeIngestHealthSummary([], NOW);
     expect(summary.overall).toMatchObject({ batchCount: 0, totalRecords: 0, errorRatePercent: 0, latestBatchAt: null, freshnessMinutes: null });
     expect(summary.byKind).toEqual([]);
-    expect(summary.quarantinedRecords).toEqual([]);
-    expect(summary.quarantinedRecordsTruncated).toBe(false);
+    expect(summary.batchesConsidered).toBe(0);
   });
 
   it('sums accepted/quarantined/duplicate counts', () => {
@@ -107,80 +99,6 @@ describe('computeIngestHealthSummary', () => {
     ];
     const summary = computeIngestHealthSummary(batches, NOW);
     expect(summary.byKind.map((k) => k.kind)).toEqual(['event', 'measure']);
-  });
-
-  it('flattens quarantined records across batches, tagging each with its batch id, record index, and kind', () => {
-    const batches = [
-      batch({
-        id: 'b1',
-        createdAt: '2026-07-06T11:00:00Z',
-        kind: 'event',
-        totalCount: 2,
-        quarantinedCount: 2,
-        recordResults: [
-          { client_id: 'e1', status: 'quarantined', reasons: ['missing_required_field:plan'] },
-          { client_id: 'e2', status: 'accepted' },
-          { client_id: 'e3', status: 'quarantined', reasons: ['unregistered_field:foo'] },
-        ],
-      }),
-    ];
-    const summary = computeIngestHealthSummary(batches, NOW);
-    expect(summary.quarantinedRecords).toEqual([
-      { batchId: 'b1', recordIndex: 0, kind: 'event', environmentId: 'env-prod', clientId: 'e1', reasons: ['missing_required_field:plan'], createdAt: '2026-07-06T11:00:00Z' },
-      { batchId: 'b1', recordIndex: 2, kind: 'event', environmentId: 'env-prod', clientId: 'e3', reasons: ['unregistered_field:foo'], createdAt: '2026-07-06T11:00:00Z' },
-    ]);
-  });
-
-  it('gives two quarantined records that share a client id (before any dedup check runs) distinct record indexes', () => {
-    // A batch can legitimately quarantine two records with the same
-    // client-supplied id — e.g. two "signup" events with event_id "e1" both
-    // missing the same required field. Both must survive with distinct
-    // identities so a React list key built from (batchId, recordIndex)
-    // never collides and silently drops one.
-    const batches = [
-      batch({
-        id: 'b1',
-        createdAt: '2026-07-06T11:00:00Z',
-        totalCount: 2,
-        quarantinedCount: 2,
-        recordResults: [
-          { client_id: 'e1', status: 'quarantined', reasons: ['missing_field:ts'] },
-          { client_id: 'e1', status: 'quarantined', reasons: ['missing_field:ts'] },
-        ],
-      }),
-    ];
-    const summary = computeIngestHealthSummary(batches, NOW);
-    expect(summary.quarantinedRecords).toHaveLength(2);
-    expect(summary.quarantinedRecords.map((r) => r.recordIndex)).toEqual([0, 1]);
-    const keys = summary.quarantinedRecords.map((r) => `${r.batchId}:${r.recordIndex}`);
-    expect(new Set(keys).size).toBe(2);
-  });
-
-  it('truncates the quarantine browser at the given limit and flags the truncation', () => {
-    const quarantined = Array.from({ length: 5 }, (_, i) => ({ client_id: `e${i}`, status: 'quarantined' as const, reasons: [] }));
-    const batches = [batch({ id: 'b1', createdAt: '2026-07-06T11:00:00Z', totalCount: 5, quarantinedCount: 5, recordResults: quarantined })];
-
-    const summary = computeIngestHealthSummary(batches, NOW, 3);
-    expect(summary.quarantinedRecords).toHaveLength(3);
-    expect(summary.quarantinedRecordsTruncated).toBe(true);
-  });
-
-  it('does not flag truncation when quarantined records fit exactly within the limit', () => {
-    const batches = [
-      batch({
-        id: 'b1',
-        createdAt: '2026-07-06T11:00:00Z',
-        totalCount: 1,
-        quarantinedCount: 1,
-        recordResults: [{ client_id: 'e1', status: 'quarantined', reasons: [] }],
-      }),
-    ];
-    const summary = computeIngestHealthSummary(batches, NOW, 1);
-    expect(summary.quarantinedRecordsTruncated).toBe(false);
-  });
-
-  it('defaults the quarantine browser limit to DEFAULT_QUARANTINE_BROWSER_LIMIT', () => {
-    expect(DEFAULT_QUARANTINE_BROWSER_LIMIT).toBeGreaterThan(0);
   });
 });
 

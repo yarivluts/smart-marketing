@@ -52,7 +52,11 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     await expect(page.getByText('ord-3 (Events, Prod)')).toBeVisible();
     await expect(page.getByText('Reasons: missing_required_field:amount')).toBeVisible();
-    await expect(page.getByText("Replay isn't available yet")).toBeVisible();
+
+    // Replaying without first fixing the schema (KAN-34) leaves the record quarantined, with its
+    // reasons re-surfaced inline rather than silently no-op'ing.
+    await page.getByRole('button', { name: 'Replay' }).click();
+    await expect(page.getByText('Still quarantined: missing_required_field:amount')).toBeVisible();
   });
 
   test('shows the empty state for a project with no ingest batches yet', async ({ page }) => {
@@ -65,6 +69,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     await page.getByRole('link', { name: 'Ingest health' }).click();
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
-    await expect(page.getByText('No quarantined records among the batches shown above.')).toBeVisible();
+    await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
+    await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();
   });
 });

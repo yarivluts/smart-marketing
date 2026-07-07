@@ -9,6 +9,7 @@ import {
   createResourceTemplate as createResourceTemplateInOrganization,
   createSharedCredential as createSharedCredentialInOrganization,
   decideResourceAttachment as decideResourceAttachmentInOrganization,
+  type DrainPipelineResult,
   detachResource as detachResourceInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   inviteMemberToOrganization,
@@ -16,6 +17,9 @@ import {
   type MintApiKeyResult,
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
+  replayFailedPipelineMessagesForProject as replayFailedPipelineMessagesForProjectInOrganization,
+  replayQuarantinedRecord as replayQuarantinedRecordInOrganization,
+  type ReplayQuarantinedRecordResult,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
   rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
@@ -251,4 +255,27 @@ interface EvolveSchemaDefinitionInput {
 export async function evolveSchemaDefinition(input: EvolveSchemaDefinitionInput): Promise<SchemaDefModel> {
   await ensureFirestoreOrm();
   return evolveSchemaDefinitionInOrganization(input);
+}
+
+interface ReplayQuarantinedRecordInput {
+  organizationId: string;
+  projectId: string;
+  quarantinedRecordId: string;
+}
+
+export async function replayQuarantinedRecord(input: ReplayQuarantinedRecordInput): Promise<ReplayQuarantinedRecordResult> {
+  await ensureFirestoreOrm();
+  return replayQuarantinedRecordInOrganization(input.organizationId, input.projectId, input.quarantinedRecordId);
+}
+
+interface ReplayFailedPipelineMessagesInput {
+  organizationId: string;
+  projectId: string;
+}
+
+export async function replayFailedPipelineMessagesForProject(
+  input: ReplayFailedPipelineMessagesInput,
+): Promise<DrainPipelineResult> {
+  await ensureFirestoreOrm();
+  return replayFailedPipelineMessagesForProjectInOrganization(input.organizationId, input.projectId);
 }
