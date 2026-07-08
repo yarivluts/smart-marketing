@@ -13,6 +13,7 @@ import {
 } from '@/lib/orgs/queries';
 import {
   hasActiveInstall,
+  pluginInstallHealth,
   pluginTypeForInstall,
   sourceRunStatusLabelKey,
   toPluginInstallView,
@@ -20,6 +21,7 @@ import {
   toSourcePluginRunView,
 } from '@/lib/orgs/plugin-view';
 import { InstallPluginForm } from '@/components/orgs/install-plugin-form';
+import { PluginHealthSummary } from '@/components/orgs/plugin-health-summary';
 import { PluginInstallList } from '@/components/orgs/plugin-install-list';
 import { TriggerSourcePluginRunButton } from '@/components/orgs/trigger-source-plugin-run-button';
 
@@ -34,11 +36,13 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's installed plugins (KAN-46, plan `08 §4`): install a manifest
- * version registered in the org's registry (a scope-consent screen), and
- * enable/disable/uninstall existing installs. Gated on `plugin.install`,
- * the same permission the org-level registry page (`.../orgs/:orgId/plugins`)
- * uses.
+ * A project's installed plugins (KAN-46, plan `08 §4`): browse a gallery of
+ * installable plugins and install one (a config form rendered from its
+ * `config_schema`, behind a scope-consent screen — KAN-48, plan `13 §E7.3`),
+ * enable/disable/uninstall existing installs, and — for an active
+ * `source`-type install — see its runtime health-at-a-glance plus full run
+ * history (KAN-47/KAN-48). Gated on `plugin.install`, the same permission
+ * the org-level registry page (`.../orgs/:orgId/plugins`) uses.
  */
 export default async function ProjectPluginsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -112,48 +116,52 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
           <h2 className="text-lg font-semibold">{t('sourceRuntimeHeading')}</h2>
           {activeSourceInstalls.map((install) => {
             const runs = sourceRunsByInstallId.get(install.id) ?? [];
+            const health = pluginInstallHealth(install, 'source', runs);
             return (
               <div key={install.id} className="flex flex-col gap-3 rounded-md border border-input px-3 py-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="font-medium">{t('installLine', { pluginId: install.pluginId, version: install.version })}</span>
                   <TriggerSourcePluginRunButton orgId={orgId} projectId={projectId} installId={install.id} environments={environmentOptions} />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <h3 className="text-sm font-medium text-muted-foreground">{t('sourceRunHistoryHeading')}</h3>
-                  {runs.length === 0 ? (
-                    <p className="text-muted-foreground">{t('sourceRunNoRuns')}</p>
-                  ) : (
-                    <ul className="flex flex-col gap-2">
-                      {runs.map((run) => (
-                        <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-xs">
-                          <span className="font-medium">
-                            {t('sourceRunSummary', { status: t(sourceRunStatusLabelKey(run.status)), startedAt: run.startedAt })}
-                          </span>
-                          <span className="text-muted-foreground">{t('sourceRunAttemptsLine', { attempts: run.attempts })}</span>
-                          <span className="text-muted-foreground">
-                            {t('sourceRunCursorLine', {
-                              before: run.cursorBefore ?? t('sourceRunCursorFromScratch'),
-                              after: run.cursorAfter ?? t('sourceRunCursorFromScratch'),
-                            })}
-                          </span>
-                          {run.recordsFetched !== null ? (
+                <PluginHealthSummary health={health} />
+                <details className="flex flex-col gap-2">
+                  <summary className="cursor-pointer text-sm font-medium text-muted-foreground">{t('sourceRunHistoryHeading')}</summary>
+                  <div className="pt-2">
+                    {runs.length === 0 ? (
+                      <p className="text-muted-foreground">{t('sourceRunNoRuns')}</p>
+                    ) : (
+                      <ul className="flex flex-col gap-2">
+                        {runs.map((run) => (
+                          <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-xs">
+                            <span className="font-medium">
+                              {t('sourceRunSummary', { status: t(sourceRunStatusLabelKey(run.status)), startedAt: run.startedAt })}
+                            </span>
+                            <span className="text-muted-foreground">{t('sourceRunAttemptsLine', { attempts: run.attempts })}</span>
                             <span className="text-muted-foreground">
-                              {t('sourceRunCountsLine', {
-                                fetched: run.recordsFetched,
-                                accepted: run.recordsAccepted ?? 0,
-                                quarantined: run.recordsQuarantined ?? 0,
-                                duplicate: run.recordsDuplicate ?? 0,
+                              {t('sourceRunCursorLine', {
+                                before: run.cursorBefore ?? t('sourceRunCursorFromScratch'),
+                                after: run.cursorAfter ?? t('sourceRunCursorFromScratch'),
                               })}
                             </span>
-                          ) : null}
-                          {run.errorMessage ? (
-                            <span className="text-destructive">{t('sourceRunErrorLine', { message: run.errorMessage })}</span>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                            {run.recordsFetched !== null ? (
+                              <span className="text-muted-foreground">
+                                {t('sourceRunCountsLine', {
+                                  fetched: run.recordsFetched,
+                                  accepted: run.recordsAccepted ?? 0,
+                                  quarantined: run.recordsQuarantined ?? 0,
+                                  duplicate: run.recordsDuplicate ?? 0,
+                                })}
+                              </span>
+                            ) : null}
+                            {run.errorMessage ? (
+                              <span className="text-destructive">{t('sourceRunErrorLine', { message: run.errorMessage })}</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </details>
               </div>
             );
           })}

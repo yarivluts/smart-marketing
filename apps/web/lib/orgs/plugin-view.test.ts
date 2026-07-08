@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   groupManifestsByPluginId,
   hasActiveInstall,
+  pluginInstallHealth,
+  pluginInstallHealthLabelKey,
   pluginTypeForInstall,
   sourceRunStatusLabelKey,
   toPluginInstallView,
@@ -9,6 +11,7 @@ import {
   toSourcePluginRunView,
   type PluginInstallView,
   type PluginManifestView,
+  type PluginSourceRunView,
 } from './plugin-view';
 import type { PluginInstallModel, PluginManifestModel, PluginSourceRunModel } from '@growthos/firebase-orm-models';
 
@@ -210,5 +213,85 @@ describe('sourceRunStatusLabelKey', () => {
     expect(sourceRunStatusLabelKey('running')).toBe('sourceRunStatusRunning');
     expect(sourceRunStatusLabelKey('succeeded')).toBe('sourceRunStatusSucceeded');
     expect(sourceRunStatusLabelKey('failed')).toBe('sourceRunStatusFailed');
+  });
+});
+
+function sourceRunView(overrides: Partial<PluginSourceRunView> & Pick<PluginSourceRunView, 'id' | 'status'>): PluginSourceRunView {
+  return {
+    startedAt: '2026-01-01T00:00:00.000Z',
+    finishedAt: null,
+    attempts: 1,
+    cursorBefore: null,
+    cursorAfter: null,
+    recordKind: null,
+    recordsFetched: null,
+    recordsAccepted: null,
+    recordsQuarantined: null,
+    recordsDuplicate: null,
+    errorMessage: null,
+    ...overrides,
+  };
+}
+
+describe('pluginInstallHealth', () => {
+  it('is healthy when the most recent (first, newest-first) run succeeded', () => {
+    const runs = [
+      sourceRunView({ id: 'r2', status: 'succeeded', startedAt: '2026-01-02T00:00:00.000Z', finishedAt: '2026-01-02T00:05:00.000Z' }),
+      sourceRunView({ id: 'r1', status: 'failed', startedAt: '2026-01-01T00:00:00.000Z' }),
+    ];
+    const health = pluginInstallHealth({ status: 'installed' }, 'source', runs);
+    expect(health.status).toBe('healthy');
+    expect(health.latestRun?.id).toBe('r2');
+    expect(health.lastSucceededAt).toBe('2026-01-02T00:05:00.000Z');
+  });
+
+  it('falls back to the succeeded run\'s startedAt when it has no finishedAt', () => {
+    const runs = [sourceRunView({ id: 'r1', status: 'succeeded', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: null })];
+    const health = pluginInstallHealth({ status: 'installed' }, 'source', runs);
+    expect(health.lastSucceededAt).toBe('2026-01-01T00:00:00.000Z');
+  });
+
+  it('is degraded when the most recent run failed, but still reports an earlier success', () => {
+    const runs = [
+      sourceRunView({ id: 'r2', status: 'failed', startedAt: '2026-01-02T00:00:00.000Z' }),
+      sourceRunView({ id: 'r1', status: 'succeeded', startedAt: '2026-01-01T00:00:00.000Z', finishedAt: '2026-01-01T00:05:00.000Z' }),
+    ];
+    const health = pluginInstallHealth({ status: 'installed' }, 'source', runs);
+    expect(health.status).toBe('degraded');
+    expect(health.latestRun?.id).toBe('r2');
+    expect(health.lastSucceededAt).toBe('2026-01-01T00:05:00.000Z');
+  });
+
+  it('is running when the most recent run is still in flight', () => {
+    const runs = [sourceRunView({ id: 'r1', status: 'running' })];
+    const health = pluginInstallHealth({ status: 'installed' }, 'source', runs);
+    expect(health.status).toBe('running');
+  });
+
+  it('is neverRun for a source-type install with no run history yet', () => {
+    const health = pluginInstallHealth({ status: 'installed' }, 'source', []);
+    expect(health).toEqual({ status: 'neverRun', latestRun: null, lastSucceededAt: null });
+  });
+
+  it("falls back to the install's own status for a non-source plugin type, ignoring any runs passed in", () => {
+    const runs = [sourceRunView({ id: 'r1', status: 'failed' })];
+    expect(pluginInstallHealth({ status: 'installed' }, 'action', runs)).toEqual({ status: 'installed', latestRun: null, lastSucceededAt: null });
+    expect(pluginInstallHealth({ status: 'disabled' }, 'mapping', [])).toEqual({ status: 'disabled', latestRun: null, lastSucceededAt: null });
+  });
+
+  it("falls back to the install's own status when the manifest type couldn't be resolved", () => {
+    expect(pluginInstallHealth({ status: 'installed' }, undefined, [])).toEqual({ status: 'installed', latestRun: null, lastSucceededAt: null });
+  });
+});
+
+describe('pluginInstallHealthLabelKey', () => {
+  it('maps every health status to a translation key, reusing existing status/run-status keys where they already fit', () => {
+    expect(pluginInstallHealthLabelKey('healthy')).toBe('healthHealthy');
+    expect(pluginInstallHealthLabelKey('degraded')).toBe('healthDegraded');
+    expect(pluginInstallHealthLabelKey('neverRun')).toBe('healthNeverRun');
+    expect(pluginInstallHealthLabelKey('running')).toBe('sourceRunStatusRunning');
+    expect(pluginInstallHealthLabelKey('installed')).toBe('statusInstalled');
+    expect(pluginInstallHealthLabelKey('disabled')).toBe('statusDisabled');
+    expect(pluginInstallHealthLabelKey('uninstalled')).toBe('statusUninstalled');
   });
 });

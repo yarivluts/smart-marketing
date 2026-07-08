@@ -156,3 +156,72 @@ export function sourceRunStatusLabelKey(
 ): 'sourceRunStatusRunning' | 'sourceRunStatusSucceeded' | 'sourceRunStatusFailed' {
   return SOURCE_RUN_STATUS_LABEL_KEYS[status];
 }
+
+/**
+ * Per-plugin health-at-a-glance (KAN-48, plan `13 §E7.3`). A `source`-type
+ * install has a real runtime (KAN-47) to derive health from — `healthy` if
+ * its most recent run succeeded, `degraded` if it failed, `running` if one
+ * is currently in flight, `neverRun` if it has no run history yet. Every
+ * other plugin type has no runtime at all, so fabricating a healthy/degraded
+ * reading for it would be dishonest — its "health" is simply its own
+ * lifecycle `status` (`installed`/`disabled`/`uninstalled`).
+ */
+export type PluginInstallHealthStatus = 'healthy' | 'degraded' | 'neverRun' | 'running' | PluginInstallStatus;
+
+export interface PluginInstallHealth {
+  status: PluginInstallHealthStatus;
+  /** The most recent run this health reading was derived from — only set for a `source`-type install with at least one run. */
+  latestRun: PluginSourceRunView | null;
+  /** When the most recent *succeeded* run finished (falling back to when it started, for the rare case a finish timestamp is missing) — `null` if there isn't one, or the install isn't a `source`-type plugin. */
+  lastSucceededAt: string | null;
+}
+
+/**
+ * `runs` must already be ordered newest-first (the same ordering
+ * `listSourcePluginRunsForInstall` returns), since this reads `runs[0]` as
+ * "the most recent run" rather than re-sorting.
+ */
+export function pluginInstallHealth(
+  install: Pick<PluginInstallView, 'status'>,
+  type: PluginType | undefined,
+  runs: readonly PluginSourceRunView[],
+): PluginInstallHealth {
+  if (type !== 'source') {
+    return { status: install.status, latestRun: null, lastSucceededAt: null };
+  }
+
+  const latestRun = runs[0] ?? null;
+  const lastSucceededRun = runs.find((run) => run.status === 'succeeded') ?? null;
+  const status: PluginInstallHealthStatus =
+    latestRun === null ? 'neverRun' : latestRun.status === 'succeeded' ? 'healthy' : latestRun.status === 'failed' ? 'degraded' : 'running';
+
+  return {
+    status,
+    latestRun,
+    lastSucceededAt: lastSucceededRun ? (lastSucceededRun.finishedAt ?? lastSucceededRun.startedAt) : null,
+  };
+}
+
+type PluginInstallHealthLabelKey =
+  | 'healthHealthy'
+  | 'healthDegraded'
+  | 'healthNeverRun'
+  | 'sourceRunStatusRunning'
+  | 'statusInstalled'
+  | 'statusDisabled'
+  | 'statusUninstalled';
+
+const HEALTH_STATUS_LABEL_KEYS: Record<PluginInstallHealthStatus, PluginInstallHealthLabelKey> = {
+  healthy: 'healthHealthy',
+  degraded: 'healthDegraded',
+  neverRun: 'healthNeverRun',
+  running: 'sourceRunStatusRunning',
+  installed: 'statusInstalled',
+  disabled: 'statusDisabled',
+  uninstalled: 'statusUninstalled',
+};
+
+/** Reuses the existing `statusInstalled`/`statusDisabled`/`statusUninstalled`/`sourceRunStatusRunning` keys for the states they already cover 1:1, rather than duplicating translation strings. */
+export function pluginInstallHealthLabelKey(status: PluginInstallHealthStatus): PluginInstallHealthLabelKey {
+  return HEALTH_STATUS_LABEL_KEYS[status];
+}
