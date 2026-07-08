@@ -1,0 +1,14 @@
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/coverage
+**/test-results
+**/playwright-report
+**/.venv
+**/dbt/target
+.git
+.github
+*.log
+**/*.tsbuildinfo
+.claude
