@@ -58,6 +58,7 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
   const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId });
   const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
   const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
+  const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
 
   const t = await getTranslations('OrgDetailPage');
 
@@ -72,6 +73,11 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
           {canViewAuditLog ? (
             <Link className="text-sm underline" href={`/orgs/${orgId}/audit-log`}>
               {t('auditLogLink')}
+            </Link>
+          ) : null}
+          {canManagePlugins ? (
+            <Link className="text-sm underline" href={`/orgs/${orgId}/plugins`}>
+              {t('pluginRegistryLink')}
             </Link>
           ) : null}
           <OrgSwitcher memberships={memberships} currentOrgId={orgId} />
@@ -126,6 +132,11 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
                 {canManageProjects ? (
                   <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/cost-guardrails`}>
                     {t('projectCostGuardrailsLink')}
+                  </Link>
+                ) : null}
+                {canManagePlugins ? (
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/plugins`}>
+                    {t('projectPluginsLink')}
                   </Link>
                 ) : null}
               </div>

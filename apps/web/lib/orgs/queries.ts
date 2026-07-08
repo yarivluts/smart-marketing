@@ -19,6 +19,8 @@ import {
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
+  listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
+  listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
   listQueryCostLogEntriesForProject as listQueryCostLogEntriesForProjectInOrganization,
   listRecentIngestBatchesForProject as listRecentIngestBatchesForProjectInOrganization,
@@ -38,6 +40,8 @@ import {
   type OrgMemberSummary,
   type OrgPersonModel,
   type PipelineMessageModel,
+  type PluginInstallModel,
+  type PluginManifestModel,
   type ProjectCostQuota,
   type ProjectModel,
   type ProjectQueryQuotaStatus,
@@ -210,6 +214,19 @@ export async function listQueryCostLogEntriesForProject(
 ): Promise<QueryCostLogEntryModel[]> {
   await ensureFirestoreOrm();
   return listQueryCostLogEntriesForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listPluginManifestsForOrg(organizationId: string): Promise<PluginManifestModel[]> {
+  await ensureFirestoreOrm();
+  return listPluginManifestsForOrgInOrganization(organizationId);
+}
+
+export async function listPluginInstallsForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<PluginInstallModel[]> {
+  await ensureFirestoreOrm();
+  return listPluginInstallsForProjectInOrganization(organizationId, projectId);
 }
 
 export interface PendingAttachmentDetails {

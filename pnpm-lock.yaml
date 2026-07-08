@@ -234,6 +234,10 @@ importers:
         version: 2.1.9(@types/node@22.20.0)(jsdom@25.0.1)
 
   packages/shared:
+    dependencies:
+      yaml:
+        specifier: ^2.6.1
+        version: 2.9.0
     devDependencies:
       '@growthos/eslint-config':
         specifier: workspace:*

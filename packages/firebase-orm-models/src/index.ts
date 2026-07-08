@@ -21,8 +21,29 @@ export {
   API_KEY_PREFIXES,
   apiKeyMode,
   apiKeyModeForEnvironment,
+  PLUGIN_TYPES,
+  isPluginType,
+  PLUGIN_SCOPES,
+  isPluginScope,
+  PLUGIN_CONFIG_FIELD_TYPES,
+  isPluginConfigFieldType,
+  PluginManifestValidationError,
 } from '@growthos/shared';
-export type { Role, ScopeLevel, PrincipalType, Environment, ApiKeyScope, ApiKeyMode } from '@growthos/shared';
+export type {
+  Role,
+  ScopeLevel,
+  PrincipalType,
+  Environment,
+  ApiKeyScope,
+  ApiKeyMode,
+  PluginType,
+  PluginScope,
+  PluginConfigFieldType,
+  PluginConfigFieldSchema,
+  PluginManifest,
+  PluginManifestRegisters,
+  PluginManifestEndpoints,
+} from '@growthos/shared';
 export * from './models/user.model';
 export * from './models/organization.model';
 export * from './models/membership.model';
@@ -47,6 +68,8 @@ export * from './models/orchestration-run.model';
 export * from './models/project-cost-quota.model';
 export * from './models/query-cost-log-entry.model';
 export * from './models/tracking-alert.model';
+export * from './models/plugin-manifest.model';
+export * from './models/plugin-install.model';
 export * from './firestore-connection';
 export * from './services/membership.service';
 export * from './services/user.service';
@@ -66,6 +89,7 @@ export * from './services/audit-log.service';
 export * from './services/orchestration.service';
 export * from './services/cost-guardrail.service';
 export * from './services/tracking-alert.service';
+export * from './services/plugin-registry.service';
 export * from './pipeline';
 export * from './services/ingest-health.service';
 export * from './vault';
