@@ -401,6 +401,22 @@
     "disableButton": "Disable",
     "enableButton": "Enable",
     "uninstallButton": "Uninstall",
-    "actionError": "Couldn't complete that action. Please try again."
+    "actionError": "Couldn't complete that action. Please try again.",
+    "sourceRuntimeHeading": "Source runtime",
+    "sourceRunEnvironmentLabel": "Environment",
+    "sourceRunButton": "Run now",
+    "sourceRunError": "Couldn't trigger a sync run. Please try again.",
+    "sourceRunNoEnvironments": "No environments exist for this project yet.",
+    "sourceRunHistoryHeading": "Run history",
+    "sourceRunNoRuns": "No sync runs yet.",
+    "sourceRunSummary": "{status} · started {startedAt}",
+    "sourceRunCursorLine": "Cursor: {before} → {after}",
+    "sourceRunCountsLine": "{fetched} fetched · {accepted} accepted · {quarantined} quarantined · {duplicate} duplicate",
+    "sourceRunAttemptsLine": "{attempts, plural, one {# attempt} other {# attempts}}",
+    "sourceRunErrorLine": "Error: {message}",
+    "sourceRunStatusRunning": "Running",
+    "sourceRunStatusSucceeded": "Succeeded",
+    "sourceRunStatusFailed": "Failed",
+    "sourceRunCursorFromScratch": "from scratch"
   }
 }
