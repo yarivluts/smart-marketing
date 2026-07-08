@@ -10,6 +10,7 @@ import {
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
   listOrgMembersWithProfiles,
+  listOrchestrationRunsForProject as listOrchestrationRunsForProjectInOrganization,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
@@ -27,6 +28,7 @@ import {
   type IngestBatchModel,
   type MembershipStatus,
   type MetricDefModel,
+  type OrchestrationRunModel,
   type OrgMemberSummary,
   type OrgPersonModel,
   type PipelineMessageModel,
@@ -146,6 +148,15 @@ export async function listFailedPipelineMessagesForProject(
 export async function listAuditLogEntriesForOrg(organizationId: string, limit?: number): Promise<AuditLogEntryModel[]> {
   await ensureFirestoreOrm();
   return listAuditLogEntriesForOrgInOrganization(organizationId, limit);
+}
+
+export async function listOrchestrationRunsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<OrchestrationRunModel[]> {
+  await ensureFirestoreOrm();
+  return listOrchestrationRunsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export async function verifyAuditLogChainForOrg(organizationId: string): Promise<AuditLogChainVerification> {

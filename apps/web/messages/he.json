@@ -294,7 +294,21 @@
     "pipelineFailureSummary": "{clientId} ({kind}, {environment}): {reason}",
     "retryFailedDeliveries": "נסה שוב מסירות שנכשלו",
     "retryFailedDeliveriesError": "לא ניתן היה לנסות שוב את המסירות שנכשלו. נסה שוב.",
-    "retryFailedDeliveriesResult": "{delivered} נמסרו, {failed} עדיין נכשלות"
+    "retryFailedDeliveriesResult": "{delivered} נמסרו, {failed} עדיין נכשלות",
+    "orchestrationHeading": "תזמור",
+    "orchestrationTriggerButton": "הרץ עכשיו",
+    "orchestrationTriggerError": "לא ניתן היה להריץ תהליך תזמור. נסה שוב.",
+    "orchestrationFreshnessHeading": "עדכניות נוכחית",
+    "orchestrationFreshnessRow": "{table}: {count} שורות · נחתו לאחרונה {freshness}",
+    "orchestrationNeverLanded": "מעולם לא",
+    "orchestrationNoFreshnessYet": "עדיין אין הרצת תזמור מוצלחת.",
+    "orchestrationHistoryHeading": "היסטוריית הרצות",
+    "orchestrationNoRuns": "אין הרצות תזמור עבור פרויקט זה עדיין.",
+    "orchestrationRunSummary": "{status} · החל {startedAt}",
+    "orchestrationRunError": "שגיאה: {message}",
+    "orchestrationRunStatusRunning": "פועל",
+    "orchestrationRunStatusSucceeded": "הצליח",
+    "orchestrationRunStatusFailed": "נכשל"
   },
   "AuditLog": {
     "metaTitle": "יומן ביקורת",

@@ -7,6 +7,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import {
   listEnvironmentsForProject,
   listFailedPipelineMessagesForProject,
+  listOrchestrationRunsForProject,
   listOrgProjects,
   listQuarantinedRecordsForProject,
   listRecentIngestBatchesForProject,
@@ -19,8 +20,16 @@ import {
   toQuarantinedRecordView,
   type IngestHealthRollup,
 } from '@/lib/orgs/ingest-health-view';
+import {
+  deriveCurrentFreshness,
+  freshnessTableLabelKey,
+  runStatusLabelKey,
+  toOrchestrationRunView,
+  type OrchestrationRunView,
+} from '@/lib/orgs/orchestration-view';
 import { ReplayQuarantinedRecordButton } from '@/components/orgs/replay-quarantined-record-button';
 import { RetryFailedPipelineMessagesButton } from '@/components/orgs/retry-failed-pipeline-messages-button';
+import { TriggerOrchestrationRunButton } from '@/components/orgs/trigger-orchestration-run-button';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -56,12 +65,13 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
     notFound();
   }
 
-  const [projects, batches, environments, quarantinedRecords, failedPipelineMessages] = await Promise.all([
+  const [projects, batches, environments, quarantinedRecords, failedPipelineMessages, orchestrationRuns] = await Promise.all([
     listOrgProjects(orgId),
     listRecentIngestBatchesForProject(orgId, projectId),
     listEnvironmentsForProject(orgId, projectId),
     listQuarantinedRecordsForProject(orgId, projectId),
     listFailedPipelineMessagesForProject(orgId, projectId),
+    listOrchestrationRunsForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -70,6 +80,8 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
 
   const summary = computeIngestHealthSummary(batches.map(toIngestBatchView), Date.now());
   const quarantinedViews = quarantinedRecords.map(toQuarantinedRecordView);
+  const orchestrationRunViews = orchestrationRuns.map(toOrchestrationRunView);
+  const currentFreshness = deriveCurrentFreshness(orchestrationRunViews);
 
   const t = await getTranslations('IngestHealth');
   const tEnv = await getTranslations('EnvBadge');
@@ -169,6 +181,52 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">{t('orchestrationHeading')}</h2>
+          <TriggerOrchestrationRunButton orgId={orgId} projectId={projectId} />
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">{t('orchestrationFreshnessHeading')}</h3>
+          {currentFreshness?.freshness ? (
+            <ul className="flex flex-col gap-1">
+              {currentFreshness.freshness.map((entry) => (
+                <li key={entry.table} className="text-sm text-muted-foreground">
+                  {t('orchestrationFreshnessRow', {
+                    table: t(freshnessTableLabelKey(entry.table)),
+                    count: entry.rowCount,
+                    freshness: entry.latestRecordAt ?? t('orchestrationNeverLanded'),
+                  })}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-muted-foreground">{t('orchestrationNoFreshnessYet')}</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">{t('orchestrationHistoryHeading')}</h3>
+          {orchestrationRunViews.length === 0 ? (
+            <p className="text-muted-foreground">{t('orchestrationNoRuns')}</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {orchestrationRunViews.map((run: OrchestrationRunView) => (
+                <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
+                  <span className="font-medium">
+                    {t('orchestrationRunSummary', { status: t(runStatusLabelKey(run.status)), startedAt: run.startedAt })}
+                  </span>
+                  {run.errorMessage ? (
+                    <span className="text-xs text-destructive">{t('orchestrationRunError', { message: run.errorMessage })}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
     </main>
   );
