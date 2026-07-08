@@ -3,6 +3,7 @@ import {
   acceptInvite as acceptInviteForOrganization,
   type ApiKeyModel,
   type ApiKeyScope,
+  checkTrackingAlertsForProject as checkTrackingAlertsForProjectInOrganization,
   createOrganizationWithOwner,
   createOrgPerson as createOrgPersonInOrganization,
   createProject as createProjectInOrganization,
@@ -47,6 +48,7 @@ import {
   type SchemaDefModel,
   type SchemaFieldInput,
   type SharedCredentialModel,
+  type TrackingAlertCheckResult,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
@@ -356,4 +358,19 @@ interface SetProjectCostQuotaInput {
 export async function setProjectCostQuota(input: SetProjectCostQuotaInput): Promise<ProjectCostQuotaModel> {
   await ensureFirestoreOrm();
   return setProjectCostQuotaInOrganization(input);
+}
+
+interface CheckTrackingAlertsInput {
+  organizationId: string;
+  projectId: string;
+  triggeredByUserId: string;
+}
+
+export async function checkTrackingAlertsForProject(input: CheckTrackingAlertsInput): Promise<TrackingAlertCheckResult> {
+  await ensureFirestoreOrm();
+  return checkTrackingAlertsForProjectInOrganization({
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    triggeredByUserId: input.triggeredByUserId,
+  });
 }

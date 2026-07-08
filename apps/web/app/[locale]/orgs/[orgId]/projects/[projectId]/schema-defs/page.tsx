@@ -4,10 +4,18 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
+import {
+  getEventVolumeOverviewForProject,
+  listOrgProjects,
+  listSchemaDefinitionsForProject,
+  listTrackingAlertsForProject,
+} from '@/lib/orgs/queries';
 import { toSchemaDefView, type SchemaDefView } from '@/lib/orgs/schema-def-view';
+import { toTrackingAlertView, trackingAlertStatusLabelKey } from '@/lib/orgs/tracking-alert-view';
 import { RegisterSchemaDefForm } from '@/components/orgs/register-schema-def-form';
 import { SchemaFamilyCard, type SchemaVersionView } from '@/components/orgs/schema-family-card';
+import { CheckTrackingAlertsButton } from '@/components/orgs/check-tracking-alerts-button';
+import { EventVolumeSparkline } from '@/components/orgs/event-volume-sparkline';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -64,16 +72,23 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [projects, schemaDefs] = await Promise.all([
+  const [projects, schemaDefs, trackingAlerts] = await Promise.all([
     listOrgProjects(orgId),
     listSchemaDefinitionsForProject(orgId, projectId),
+    listTrackingAlertsForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
     notFound();
   }
 
+  // Reuses the schema-defs list just fetched above rather than a second, redundant
+  // Firestore read of the same collection (same `precomputedQuota`-style pass-through
+  // pattern the cost-guardrails page uses for its own equivalent duplicate fetch).
+  const eventVolumeOverview = await getEventVolumeOverviewForProject(orgId, projectId, { precomputedSchemaDefs: schemaDefs });
+
   const families = groupIntoFamilies(schemaDefs.map(toSchemaDefView));
+  const trackingAlertViews = trackingAlerts.map(toTrackingAlertView);
 
   const t = await getTranslations('SchemaRegistry');
 
@@ -99,6 +114,49 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">{t('eventVolumeHeading')}</h2>
+          <CheckTrackingAlertsButton orgId={orgId} projectId={projectId} />
+        </div>
+
+        {eventVolumeOverview.length === 0 ? (
+          <p className="text-muted-foreground">{t('noEventSchemas')}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {eventVolumeOverview.map((entry) => (
+              <li key={entry.schemaName} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">{entry.schemaName}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {entry.lastSeenAt === null ? t('eventNeverSeen') : t('eventLastSeen', { lastSeenAt: entry.lastSeenAt })}
+                  </span>
+                </div>
+                <EventVolumeSparkline dailyCounts={entry.dailyCounts} />
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">{t('trackingAlertsHeading')}</h3>
+          {trackingAlertViews.length === 0 ? (
+            <p className="text-muted-foreground">{t('noTrackingAlerts')}</p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {trackingAlertViews.map((alert) => (
+                <li key={alert.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
+                  <span className="font-medium">
+                    {t('trackingAlertSummary', { schemaName: alert.schemaName, status: t(trackingAlertStatusLabelKey(alert.status)) })}
+                  </span>
+                  <span className="text-xs text-muted-foreground">{t('trackingAlertLastSeen', { lastSeenAt: alert.lastSeenAt })}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
 
       <section className="flex flex-col gap-3">

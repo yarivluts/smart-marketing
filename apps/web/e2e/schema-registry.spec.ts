@@ -74,5 +74,16 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     // Rejected — still only two versions, v2 still the active one.
     await expect(page.getByText('v2 — Active')).toBeVisible();
     await expect(page.getByText('v3 — Active')).toHaveCount(0);
+
+    // KAN-36: the registered event schema shows up in the volume/tracking-alerts
+    // section, honestly reporting "never received a record" since this test never
+    // ingests any real data — and a manual "Check now" leaves it that way (nothing
+    // to have "broken" yet).
+    await expect(page.getByText('order_completed', { exact: true })).toBeVisible();
+    await expect(page.getByText('Never received a record.')).toBeVisible();
+    await expect(page.getByText('No tracking alerts for this project yet.')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Check now' }).click();
+    await expect(page.getByText('No tracking alerts for this project yet.')).toBeVisible();
   });
 });

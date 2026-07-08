@@ -221,7 +221,21 @@
     "evolveHeading": "Evolve {kind} \"{name}\" to a new version",
     "evolveSubmit": "Evolve schema",
     "evolveError": "Something went wrong. Please try again.",
-    "breakingChangeError": "This change would break existing consumers: {violations}"
+    "breakingChangeError": "This change would break existing consumers: {violations}",
+    "eventVolumeHeading": "Event volume & tracking alerts",
+    "noEventSchemas": "No active event schemas registered for this project yet.",
+    "eventNeverSeen": "Never received a record.",
+    "eventLastSeen": "Last seen {lastSeenAt}",
+    "eventVolumeSparklineLabel": "{total} events over the trailing 7 days",
+    "eventVolumeSparklineBarTitle": "{date}: {count}",
+    "trackingAlertsHeading": "Tracking alerts",
+    "noTrackingAlerts": "No tracking alerts for this project yet.",
+    "trackingAlertSummary": "{schemaName} — {status}",
+    "trackingAlertLastSeen": "Last seen {lastSeenAt}",
+    "trackingAlertStatusActive": "Active — silent for over an hour",
+    "trackingAlertStatusResolved": "Resolved",
+    "trackingAlertCheckButton": "Check now",
+    "trackingAlertCheckError": "Something went wrong. Please try again."
   },
   "MetricRegistry": {
     "metaTitle": "Metric catalog",
