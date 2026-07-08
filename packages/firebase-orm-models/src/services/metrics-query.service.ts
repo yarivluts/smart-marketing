@@ -59,6 +59,26 @@ export interface MetricQueryResult {
 }
 
 /**
+ * Best-effort cost-log write — swallows a Firestore failure rather than
+ * letting it mask `queryMetrics`'s own outcome (a successful result, a
+ * `ProjectQueryQuotaExceededError`, or a `WarehouseNotConfiguredError`), the
+ * same "logging is a side effect, never the primary failure" posture
+ * `recordOrchestrationRunAudit` already established for audit entries.
+ */
+async function logCostAttempt(
+  organizationId: string,
+  projectId: string,
+  outcome: Parameters<typeof recordQueryCostLogEntry>[0]['outcome'],
+  definitionRefs: Record<string, string>,
+): Promise<void> {
+  try {
+    await recordQueryCostLogEntry({ organizationId, projectId, outcome, definitionRefs });
+  } catch {
+    // Best-effort — see this function's own doc comment.
+  }
+}
+
+/**
  * `POST /v1/metrics/query`'s integration point (KAN-42, plan `13 §E5.3`):
  * resolves + compiles the request via KAN-41's `compileMetricQueryForProject`,
  * serves a cached result when one exists for the same definition
@@ -68,13 +88,17 @@ export interface MetricQueryResult {
  * (`ProjectNotFoundError`, `MetricNotRegisteredError`, `MetricCompilerError`)
  * for an invalid request, `ProjectQueryQuotaExceededError` once the project
  * has spent its daily quota of real (non-cache-hit) query attempts, and
- * `WarehouseNotConfiguredError` (from the default executor) once the request
- * clears both checks but there's no real warehouse to run it against yet.
+ * whatever the executor itself throws (typically `WarehouseNotConfiguredError`
+ * from the default executor) once the request clears both checks.
  *
  * A cache hit is neither logged nor counted against the quota — it incurs no
  * real (or would-be) warehouse cost, so KAN-39's cost log only ever records
  * an entry for a call that actually reached (or was turned away right before)
- * a {@link WarehouseQueryExecutor}.
+ * a {@link WarehouseQueryExecutor}. Every other outcome — a successful
+ * execution, `WarehouseNotConfiguredError`, or any other error the executor
+ * throws — is logged as `'executed'`: it cleared the guardrail and reached
+ * the executor, which is what the quota counts against, regardless of
+ * whether the executor itself then succeeded or failed.
  */
 export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQueryResult> {
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
@@ -95,34 +119,18 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
 
   const quota = await checkProjectQueryQuota(params.organizationId, params.projectId);
   if (!quota.allowed) {
-    await recordQueryCostLogEntry({
-      organizationId: params.organizationId,
-      projectId: params.projectId,
-      outcome: 'blocked_quota_exceeded',
-      definitionRefs: compiled.definitionRefs,
-    });
+    await logCostAttempt(params.organizationId, params.projectId, 'blocked_quota_exceeded', compiled.definitionRefs);
     throw new ProjectQueryQuotaExceededError(quota.limit);
   }
 
   try {
     const series = await executor.execute(compiled);
     cache.set(cacheKey, series, cacheTtlSeconds);
-    await recordQueryCostLogEntry({
-      organizationId: params.organizationId,
-      projectId: params.projectId,
-      outcome: 'executed',
-      definitionRefs: compiled.definitionRefs,
-    });
+    await logCostAttempt(params.organizationId, params.projectId, 'executed', compiled.definitionRefs);
     return { series, definitionRefs: compiled.definitionRefs, cacheHit: false };
   } catch (error) {
-    if (error instanceof WarehouseNotConfiguredError) {
-      await recordQueryCostLogEntry({
-        organizationId: params.organizationId,
-        projectId: params.projectId,
-        outcome: 'warehouse_not_configured',
-        definitionRefs: compiled.definitionRefs,
-      });
-    }
+    const outcome = error instanceof WarehouseNotConfiguredError ? 'warehouse_not_configured' : 'executed';
+    await logCostAttempt(params.organizationId, params.projectId, outcome, compiled.definitionRefs);
     throw error;
   }
 }

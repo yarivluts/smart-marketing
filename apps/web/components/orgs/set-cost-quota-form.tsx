@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatLabels, parseLabelsInput } from '@/lib/orgs/cost-guardrail-view';
+import { labelsToLines, parseLabelsInput } from '@/lib/orgs/cost-guardrail-view';
 
 export interface SetCostQuotaFormProps {
   orgId: string;
@@ -19,7 +19,7 @@ export function SetCostQuotaForm({ orgId, projectId, dailyQueryLimit, labels }: 
   const t = useTranslations('CostGuardrails');
   const router = useRouter();
   const [limitInput, setLimitInput] = useState(String(dailyQueryLimit));
-  const [labelsInput, setLabelsInput] = useState(formatLabels(labels).replaceAll(', ', '\n'));
+  const [labelsInput, setLabelsInput] = useState(labelsToLines(labels));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

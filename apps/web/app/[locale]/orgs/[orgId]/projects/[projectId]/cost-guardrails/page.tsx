@@ -43,16 +43,18 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [projects, quota, quotaStatus, logEntries] = await Promise.all([
+  const [projects, quota, logEntries] = await Promise.all([
     listOrgProjects(orgId),
     getProjectCostQuota(orgId, projectId),
-    checkProjectQueryQuota(orgId, projectId),
     listQueryCostLogEntriesForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
     notFound();
   }
+
+  // Passes the quota already fetched above so this doesn't re-read the same ProjectCostQuotaModel doc a second time.
+  const quotaStatus = await checkProjectQueryQuota(orgId, projectId, quota);
 
   const quotaView = toProjectCostQuotaView(quota);
   const logViews = logEntries.map(toQueryCostLogEntryView);

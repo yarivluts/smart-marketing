@@ -159,21 +159,41 @@ export interface ProjectQueryQuotaStatus {
  * How many of today's (UTC calendar day) cost-log entries count as a real
  * attempt against the quota — every outcome except `blocked_quota_exceeded`,
  * since a blocked attempt never got anywhere near a real (or would-be)
- * warehouse call. Reads back all of today's entries and filters in code
- * rather than an equality Firestore filter on `outcome`, since combining that
- * with the `executed_at` range filter used here would need a composite
- * index this buildable-today deployment doesn't provision.
+ * warehouse call. Filters `outcome` in code rather than as an equality
+ * Firestore filter, since combining that with the `executed_at` range filter
+ * used here would need a composite index this buildable-today deployment
+ * doesn't provision.
+ *
+ * Bounded to `dailyQueryLimit + 1` documents (ordered oldest-first, the same
+ * field the range filter is on, so no composite index needed for the order
+ * either) rather than reading the whole day's log: once a project has spent
+ * its quota, every further call for the rest of the day only ever adds
+ * `blocked_quota_exceeded` entries, which never move `attemptedToday` — so
+ * the non-blocked entries this function actually cares about can never
+ * exceed `dailyQueryLimit` of them, and they're always the day's earliest
+ * entries (blocking only starts once the limit is already reached). Reading
+ * one past the limit is enough to distinguish "at capacity" from "one under"
+ * without the read cost scaling with how many times an over-quota project
+ * got blocked afterward — otherwise this guardrail would itself become an
+ * unbounded-cost driver on a busy, over-quota project.
+ *
+ * `precomputedQuota` lets a caller that already fetched {@link getProjectCostQuota}
+ * for its own purposes (e.g. the cost-guardrails admin page, which shows both
+ * the quota config and today's usage) skip a second identical read.
  */
 export async function checkProjectQueryQuota(
   organizationId: string,
   projectId: string,
   now: Date = new Date(),
+  precomputedQuota?: ProjectCostQuota,
 ): Promise<ProjectQueryQuotaStatus> {
-  const quota = await getProjectCostQuota(organizationId, projectId);
+  const quota = precomputedQuota ?? (await getProjectCostQuota(organizationId, projectId));
   const startOfDayIso = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
   const entriesToday = await QueryCostLogEntryModel.initPath({ organization_id: organizationId, project_id: projectId })
     .query()
     .where('executed_at', '>=', startOfDayIso)
+    .orderBy('executed_at', 'asc')
+    .limit(quota.dailyQueryLimit + 1)
     .get();
   const attemptedToday = entriesToday.filter((entry) => entry.outcome !== 'blocked_quota_exceeded').length;
 

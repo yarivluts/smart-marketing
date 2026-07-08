@@ -54,6 +54,21 @@ export function formatLabels(labels: Record<string, string>): string {
 }
 
 /**
+ * One `key=value` label per line — the quota form's textarea input format.
+ * Deliberately separate from {@link formatLabels} (which joins with `, ` for
+ * the page's inline display): a label value may itself legitimately contain
+ * the substring `, ` (labels are free-form, per `ProjectCostQuotaModel`'s own
+ * doc comment), so building the textarea's initial value by string-replacing
+ * `formatLabels`'s `, ` separator with a newline would corrupt any such
+ * value instead of only splitting between entries.
+ */
+export function labelsToLines(labels: Record<string, string>): string {
+  return Object.entries(labels)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('\n');
+}
+
+/**
  * Parses the quota form's free-form `key=value` per-line labels input into a
  * record, skipping blank lines. Malformed lines (no `=`) are dropped rather
  * than rejected — labels are purely descriptive metadata (see

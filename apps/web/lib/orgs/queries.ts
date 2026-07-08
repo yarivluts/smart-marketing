@@ -175,9 +175,14 @@ export async function getProjectCostQuota(organizationId: string, projectId: str
   return getProjectCostQuotaInOrganization(organizationId, projectId);
 }
 
-export async function checkProjectQueryQuota(organizationId: string, projectId: string): Promise<ProjectQueryQuotaStatus> {
+/** `precomputedQuota` skips a redundant re-fetch of the same quota config for a caller (e.g. the cost-guardrails page) that already loaded it via `getProjectCostQuota`. */
+export async function checkProjectQueryQuota(
+  organizationId: string,
+  projectId: string,
+  precomputedQuota?: ProjectCostQuota,
+): Promise<ProjectQueryQuotaStatus> {
   await ensureFirestoreOrm();
-  return checkProjectQueryQuotaInOrganization(organizationId, projectId);
+  return checkProjectQueryQuotaInOrganization(organizationId, projectId, undefined, precomputedQuota);
 }
 
 export async function listQueryCostLogEntriesForProject(

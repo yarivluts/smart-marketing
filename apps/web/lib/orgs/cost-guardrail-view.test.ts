@@ -1,15 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { formatLabels, outcomeLabelKey, parseLabelsInput, toProjectCostQuotaView, toQueryCostLogEntryView } from './cost-guardrail-view';
+import { formatLabels, labelsToLines, outcomeLabelKey, parseLabelsInput, toProjectCostQuotaView, toQueryCostLogEntryView } from './cost-guardrail-view';
 
 describe('formatLabels / parseLabelsInput', () => {
   it('formats an empty label set as an empty string', () => {
     expect(formatLabels({})).toBe('');
-  });
-
-  it('round-trips a label set through format -> parse (one key=value per line)', () => {
-    const labels = { team: 'growth', tier: 'internal' };
-    const formatted = formatLabels(labels).replaceAll(', ', '\n');
-    expect(parseLabelsInput(formatted)).toEqual(labels);
   });
 
   it('skips blank lines and lines with no "="', () => {
@@ -22,6 +16,26 @@ describe('formatLabels / parseLabelsInput', () => {
 
   it('drops a line with no key before "="', () => {
     expect(parseLabelsInput('=growth')).toEqual({});
+  });
+});
+
+describe('labelsToLines', () => {
+  it('formats an empty label set as an empty string', () => {
+    expect(labelsToLines({})).toBe('');
+  });
+
+  it('round-trips a label set through labelsToLines -> parseLabelsInput', () => {
+    const labels = { team: 'growth', tier: 'internal' };
+    expect(parseLabelsInput(labelsToLines(labels))).toEqual(labels);
+  });
+
+  it('round-trips a label value that itself contains the literal ", " substring, unlike going through formatLabels + a naive ", " -> "\\n" replace', () => {
+    const labels = { note: 'staging, temp' };
+    expect(parseLabelsInput(labelsToLines(labels))).toEqual(labels);
+    // The bug this regression-tests: formatLabels joins entries with ", ", so
+    // naively replacing ", " with "\n" (as the form used to do) would also
+    // split *inside* this value instead of only between entries.
+    expect(formatLabels(labels).replaceAll(', ', '\n')).not.toBe(labelsToLines(labels));
   });
 });
 
