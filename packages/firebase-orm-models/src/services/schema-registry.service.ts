@@ -384,6 +384,18 @@ export async function listSchemaDefinitionVersions(
   return listVersions(organizationId, projectId, kind, name);
 }
 
+/**
+ * Every distinct schema `name` with an `active` version for one `kind` —
+ * e.g. every event schema currently in force, for a per-event volume/alerting
+ * surface (KAN-36). Derived from an already-fetched `listSchemaDefinitionsForProject`
+ * result rather than issuing a second Firestore query, the same "derive
+ * view-side from data already fetched" posture `deriveCurrentFreshness`
+ * (KAN-38) uses.
+ */
+export function activeSchemaNamesForKind(defs: readonly SchemaDefModel[], kind: SchemaDefKind): string[] {
+  return [...new Set(defs.filter((def) => def.kind === kind && def.status === 'active').map((def) => def.name))].sort();
+}
+
 /** The current `active` version of one schema family, or `null` if it's never been registered — the shape a future ingest validator (KAN-32) would consume. */
 export async function getActiveSchemaDefinition(
   organizationId: string,

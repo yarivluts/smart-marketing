@@ -221,7 +221,21 @@
     "evolveHeading": "פיתוח {kind} \"{name}\" לגרסה חדשה",
     "evolveSubmit": "פיתוח סכימה",
     "evolveError": "משהו השתבש. נסה שוב.",
-    "breakingChangeError": "השינוי הזה היה שובר צרכנים קיימים: {violations}"
+    "breakingChangeError": "השינוי הזה היה שובר צרכנים קיימים: {violations}",
+    "eventVolumeHeading": "נפח אירועים והתראות מעקב",
+    "noEventSchemas": "עדיין לא נרשמו סכימות אירועים פעילות עבור פרויקט זה.",
+    "eventNeverSeen": "מעולם לא התקבלה רשומה.",
+    "eventLastSeen": "נראה לאחרונה ב-{lastSeenAt}",
+    "eventVolumeSparklineLabel": "{total} אירועים ב-7 הימים האחרונים",
+    "eventVolumeSparklineBarTitle": "{date}: {count}",
+    "trackingAlertsHeading": "התראות מעקב",
+    "noTrackingAlerts": "עדיין אין התראות מעקב עבור פרויקט זה.",
+    "trackingAlertSummary": "{schemaName} — {status}",
+    "trackingAlertLastSeen": "נראה לאחרונה ב-{lastSeenAt}",
+    "trackingAlertStatusActive": "פעילה — שקטה למעלה משעה",
+    "trackingAlertStatusResolved": "נפתרה",
+    "trackingAlertCheckButton": "בדוק עכשיו",
+    "trackingAlertCheckError": "משהו השתבש. נסה שוב."
   },
   "MetricRegistry": {
     "metaTitle": "קטלוג מדדים",

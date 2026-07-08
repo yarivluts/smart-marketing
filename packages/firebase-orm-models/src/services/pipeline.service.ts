@@ -174,6 +174,55 @@ export async function listRawRecordsForBatch(
 }
 
 /**
+ * The single most recently landed raw record for one schema (KAN-36's
+ * "has this event ever flowed, and if so when did we last see it" building
+ * block). No lower bound on `landed_at` — this deliberately looks arbitrarily
+ * far back so a genuinely silent event is still found, not just missed
+ * because it fell outside some recent window. Two equality filters
+ * (`kind`, `schema_name`) plus an `orderBy` on a third (`landed_at`) needs a
+ * composite index in real (non-emulator) Firestore, the same documented
+ * requirement `drainPendingPipelineMessages`'s own query already carries.
+ */
+export async function getMostRecentRawRecordForSchema(
+  organizationId: string,
+  projectId: string,
+  kind: SchemaDefKind,
+  schemaName: string,
+): Promise<RawRecordModel | null> {
+  const matches = await RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('kind', '==', kind)
+    .where('schema_name', '==', schemaName)
+    .orderBy('landed_at', 'desc')
+    .limit(1)
+    .get();
+  return matches[0] ?? null;
+}
+
+/**
+ * Every raw record landed for one schema since a given timestamp, oldest
+ * first, bounded to `limit` — the per-event volume/sparkline building block
+ * (KAN-36). Same composite-index caveat as {@link getMostRecentRawRecordForSchema};
+ * the range filter shares `orderBy`'s own field (`landed_at`), so only the
+ * two equality prefixes (`kind`, `schema_name`) need it.
+ */
+export async function listRawRecordsForSchemaSince(
+  organizationId: string,
+  projectId: string,
+  kind: SchemaDefKind,
+  schemaName: string,
+  sinceIso: string,
+  limit: number,
+): Promise<RawRecordModel[]> {
+  return RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('kind', '==', kind)
+    .where('schema_name', '==', schemaName)
+    .where('landed_at', '>=', sinceIso)
+    .orderBy('landed_at', 'asc')
+    .limit(limit)
+    .get();
+}
+
+/**
  * The pipeline's dead-letter queue (KAN-34): every message a `landMessage` attempt has given up on,
  * across every environment in a project — same "fold every environment into one admin view" posture as
  * `listRecentIngestBatchesForProject`/`listApiKeysForProject`. Newest first.

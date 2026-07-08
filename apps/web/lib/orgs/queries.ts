@@ -1,9 +1,12 @@
 import 'server-only';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
+  getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getProjectCostQuota as getProjectCostQuotaInOrganization,
+  listTrackingAlertsForProject as listTrackingAlertsForProjectInOrganization,
   type ApiKeySummary,
   type EnvironmentModel,
+  type EventVolumeOverviewEntry,
   listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
   listApiKeysForProject as listApiKeysForProjectInOrganization,
   listAttachmentsForProject as listAttachmentsForProjectInOrganization,
@@ -46,6 +49,7 @@ import {
   type Role,
   type SchemaDefModel,
   type SharedCredentialModel,
+  type TrackingAlertModel,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
@@ -183,6 +187,19 @@ export async function checkProjectQueryQuota(
 ): Promise<ProjectQueryQuotaStatus> {
   await ensureFirestoreOrm();
   return checkProjectQueryQuotaInOrganization(organizationId, projectId, undefined, precomputedQuota);
+}
+
+export async function getEventVolumeOverviewForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<EventVolumeOverviewEntry[]> {
+  await ensureFirestoreOrm();
+  return getEventVolumeOverviewForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
+  await ensureFirestoreOrm();
+  return listTrackingAlertsForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listQueryCostLogEntriesForProject(
