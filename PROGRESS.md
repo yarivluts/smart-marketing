@@ -17,6 +17,62 @@ Template for each entry:
 
 ---
 
+## 2026-07-08 — KAN-46 reconciliation: independent re-verification + merge of PR #32
+
+- **Last completed:**
+  - Started this run the normal way (read `PROGRESS.md`/`TASKS.md`, picked the next unblocked `todo` in
+    sprint order — **KAN-46**, the first sprint-4 story), then found a parallel same-day session had
+    already implemented it end to end: PR #32 (`kan-46-plugin-manifest-registry`), CI green, plus a
+    `PROGRESS.md`/`TASKS.md` entry (immediately below this one) already pushed straight to `main` at
+    13:09 UTC — before the PR itself had actually been merged. Rather than duplicate the implementation
+    (the same "reconcile, don't re-implement" posture this file's KAN-42/KAN-20/KAN-33 entries already
+    established for parallel-run collisions), independently reviewed PR #32's diff in full instead:
+    `parsePluginManifest`, `plugin-registry.service.ts` (scope-consent-must-match-exactly, config
+    validation, 404-not-403 project isolation, best-effort audit logging), both models, all seven API
+    routes' permission gating (`plugin.install`, consistent with every other project-scoped route's
+    `requireOrgPermission` usage in this codebase), the two admin pages, and en/he translation
+    completeness (verified programmatically — zero missing/extra keys either direction). Found no
+    correctness bugs beyond what PR #32's own self-review had already caught and fixed.
+  - Re-ran the full local verification suite from a clean `pnpm install` rather than trusting CI alone:
+    `pnpm lint` and `pnpm typecheck` green; `pnpm build` green (5/5 packages). `pnpm test`: 190 in
+    `packages/shared`, 42/42 dbt tests, 241 in `packages/firebase-orm-models` (the 22 new plugin-registry
+    cases included), 58 in `apps/api`, and `apps/web`'s full `vitest run && playwright test` chain —
+    confirmed green by re-running the previously-failed/flaky specs (`plugins.spec.ts` plus
+    `auth.spec.ts`/`orgs.spec.ts`/`resource-library.spec.ts`/`schema-registry.spec.ts`) in isolation
+    against fresh emulators: `plugins.spec.ts` passed clean, 2 unrelated specs needed Playwright's own
+    retry to pass — the same long-documented, pre-existing "resource contention under repeated dev-server
+    launches" flake category every prior entry in this file has recorded, not a regression from this
+    diff.
+  - Hit and fixed two purely local-sandbox environment issues along the way (neither a code problem, both
+    specific to this run's own container): a stale `packages/dbt-transform/.venv` from an earlier
+    interrupted provision attempt was causing `pip` to fail through this sandbox's TLS-intercepting proxy
+    with a misleading self-signed-cert error — deleting the stale `.venv` and letting it re-provision
+    fixed it (the venv itself, not `PIP_CERT`, was the actual problem); and the Firestore emulator JAR
+    downloader flaked the same documented way prior entries record — worked around by `curl`-fetching the
+    138MB jar directly (confirming, again, it's `firebase-tools`' own downloader flaking, not a real
+    network block) and pre-placing it in `~/.cache/firebase/emulators/`.
+  - Merged PR #32 (squash) into `main` via the GitHub API — `mergeable_state: clean`, no unresolved review
+    comments. Remote branch deletion failed with the same HTTP 403 this sandbox's git remote has rejected
+    every prior run's delete attempt with; local branch deleted after confirming `main` fast-forwarded to
+    include it cleanly.
+- **In progress (exact stopping point):** none — KAN-46 is merged into `main`, independently
+  re-verified end to end by this run (not just re-reading the other session's own self-review). The
+  `PROGRESS.md`/`TASKS.md` entry immediately below this one (from the session that opened PR #32) already
+  accurately documents the implementation itself; this entry exists to record that a second, independent
+  session verified and performed the actual merge, and to flag its own "merged" claim was written
+  slightly ahead of the real merge landing.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** same as the entry below — **KAN-47** (E7.2 source-plugin runtime) is the natural next
+  pick, a direct extension of this story's manifest/install machinery.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+
+---
+
 ## 2026-07-08 — E7.1 Plugin framework v1: plugin.yaml manifest parser + registry storage + install-per-project flow (KAN-46)
 
 - **Last completed:**
