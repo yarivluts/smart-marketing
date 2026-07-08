@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { groupManifestsByPluginId, hasActiveInstall, toPluginInstallView, toPluginManifestView, type PluginInstallView, type PluginManifestView } from './plugin-view';
-import type { PluginInstallModel, PluginManifestModel } from '@growthos/firebase-orm-models';
+import {
+  groupManifestsByPluginId,
+  hasActiveInstall,
+  pluginTypeForInstall,
+  sourceRunStatusLabelKey,
+  toPluginInstallView,
+  toPluginManifestView,
+  toSourcePluginRunView,
+  type PluginInstallView,
+  type PluginManifestView,
+} from './plugin-view';
+import type { PluginInstallModel, PluginManifestModel, PluginSourceRunModel } from '@growthos/firebase-orm-models';
 
 function manifest(overrides: Partial<PluginManifestModel> & Pick<PluginManifestModel, 'id' | 'plugin_id' | 'version'>): PluginManifestModel {
   return {
@@ -103,5 +113,102 @@ describe('hasActiveInstall', () => {
 
   it('is false for a plugin id with no install at all', () => {
     expect(hasActiveInstall(installs, 'com.example.does-not-exist')).toBe(false);
+  });
+});
+
+describe('pluginTypeForInstall', () => {
+  const manifests: PluginManifestView[] = [
+    toPluginManifestView(manifest({ id: 'm1', plugin_id: 'com.example.shopify-pack', version: '1.0.0', type: 'source' })),
+    toPluginManifestView(manifest({ id: 'm2', plugin_id: 'com.example.shopify-pack', version: '2.0.0', type: 'source' })),
+    toPluginManifestView(manifest({ id: 'm3', plugin_id: 'com.example.stripe-pack', version: '1.0.0', type: 'action' })),
+  ];
+
+  it("resolves an install's manifest type by matching plugin id and version", () => {
+    const view = toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.stripe-pack', status: 'installed', version: '1.0.0' }));
+    expect(pluginTypeForInstall(view, manifests)).toBe('action');
+  });
+
+  it('matches the exact pinned version, not just the newest one for that plugin id', () => {
+    const view = toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.shopify-pack', status: 'installed', version: '1.0.0' }));
+    expect(pluginTypeForInstall(view, manifests)).toBe('source');
+  });
+
+  it('is undefined when no manifest matches', () => {
+    const view = toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.does-not-exist', status: 'installed', version: '9.9.9' }));
+    expect(pluginTypeForInstall(view, manifests)).toBeUndefined();
+  });
+});
+
+function sourceRun(overrides: Partial<PluginSourceRunModel> & Pick<PluginSourceRunModel, 'id' | 'status'>): PluginSourceRunModel {
+  return {
+    organization_id: 'org-1',
+    project_id: 'project-1',
+    plugin_install_id: 'install-1',
+    environment_id: 'env-1',
+    trigger: 'manual',
+    started_at: '2026-01-01T00:00:00.000Z',
+    attempts: 1,
+    cursor_before: null,
+    ...overrides,
+  } as PluginSourceRunModel;
+}
+
+describe('toSourcePluginRunView', () => {
+  it('maps missing optional fields to null, not undefined', () => {
+    const view = toSourcePluginRunView(sourceRun({ id: 'r1', status: 'running' }));
+    expect(view.finishedAt).toBeNull();
+    expect(view.cursorAfter).toBeNull();
+    expect(view.recordKind).toBeNull();
+    expect(view.recordsFetched).toBeNull();
+    expect(view.recordsAccepted).toBeNull();
+    expect(view.recordsQuarantined).toBeNull();
+    expect(view.recordsDuplicate).toBeNull();
+    expect(view.errorMessage).toBeNull();
+  });
+
+  it('maps a succeeded run through in full', () => {
+    const view = toSourcePluginRunView(
+      sourceRun({
+        id: 'r1',
+        status: 'succeeded',
+        finished_at: '2026-01-01T00:05:00.000Z',
+        attempts: 2,
+        cursor_before: '3',
+        cursor_after: '6',
+        record_kind: 'event',
+        records_fetched: 3,
+        records_accepted: 2,
+        records_quarantined: 1,
+        records_duplicate: 0,
+      }),
+    );
+    expect(view).toEqual({
+      id: 'r1',
+      status: 'succeeded',
+      startedAt: '2026-01-01T00:00:00.000Z',
+      finishedAt: '2026-01-01T00:05:00.000Z',
+      attempts: 2,
+      cursorBefore: '3',
+      cursorAfter: '6',
+      recordKind: 'event',
+      recordsFetched: 3,
+      recordsAccepted: 2,
+      recordsQuarantined: 1,
+      recordsDuplicate: 0,
+      errorMessage: null,
+    });
+  });
+
+  it('carries an error message through for a failed run', () => {
+    const view = toSourcePluginRunView(sourceRun({ id: 'r1', status: 'failed', error_message: 'boom' }));
+    expect(view.errorMessage).toBe('boom');
+  });
+});
+
+describe('sourceRunStatusLabelKey', () => {
+  it('maps every status to its own translation key', () => {
+    expect(sourceRunStatusLabelKey('running')).toBe('sourceRunStatusRunning');
+    expect(sourceRunStatusLabelKey('succeeded')).toBe('sourceRunStatusSucceeded');
+    expect(sourceRunStatusLabelKey('failed')).toBe('sourceRunStatusFailed');
   });
 });

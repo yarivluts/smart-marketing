@@ -401,6 +401,22 @@
     "disableButton": "השבת",
     "enableButton": "הפעל",
     "uninstallButton": "הסר",
-    "actionError": "לא ניתן היה להשלים את הפעולה. נסה שוב."
+    "actionError": "לא ניתן היה להשלים את הפעולה. נסה שוב.",
+    "sourceRuntimeHeading": "הרצת תוסף מקור",
+    "sourceRunEnvironmentLabel": "סביבה",
+    "sourceRunButton": "הרץ עכשיו",
+    "sourceRunError": "לא ניתן היה להפעיל ריצת סנכרון. נסה שוב.",
+    "sourceRunNoEnvironments": "עדיין אין סביבות בפרויקט זה.",
+    "sourceRunHistoryHeading": "היסטוריית ריצות",
+    "sourceRunNoRuns": "עדיין אין ריצות סנכרון.",
+    "sourceRunSummary": "{status} · התחיל {startedAt}",
+    "sourceRunCursorLine": "סמן: {before} ← {after}",
+    "sourceRunCountsLine": "{fetched} נאספו · {accepted} התקבלו · {quarantined} הוסגרו · {duplicate} כפולים",
+    "sourceRunAttemptsLine": "{attempts, plural, one {ניסיון #} other {# ניסיונות}}",
+    "sourceRunErrorLine": "שגיאה: {message}",
+    "sourceRunStatusRunning": "רץ",
+    "sourceRunStatusSucceeded": "הצליח",
+    "sourceRunStatusFailed": "נכשל",
+    "sourceRunCursorFromScratch": "מההתחלה"
   }
 }

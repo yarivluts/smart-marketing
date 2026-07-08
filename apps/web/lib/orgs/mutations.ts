@@ -23,6 +23,7 @@ import {
   type OrchestrationRunModel,
   type PluginInstallModel,
   type PluginManifestModel,
+  type PluginSourceRunModel,
   registerMetricDefinition as registerMetricDefinitionInOrganization,
   registerPluginManifest as registerPluginManifestInOrganization,
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
@@ -36,6 +37,7 @@ import {
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   triggerOrchestrationRun as triggerOrchestrationRunInOrganization,
+  triggerSourcePluginRun as triggerSourcePluginRunInOrganization,
   uninstallPlugin as uninstallPluginInOrganization,
   type AcceptInviteResult,
   type CreateOrganizationResult,
@@ -428,4 +430,17 @@ export async function enablePlugin(input: PluginInstallLifecycleInput): Promise<
 export async function uninstallPlugin(input: PluginInstallLifecycleInput): Promise<PluginInstallModel> {
   await ensureFirestoreOrm();
   return uninstallPluginInOrganization(input);
+}
+
+interface TriggerSourcePluginRunInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  installId: string;
+  triggeredByUserId: string;
+}
+
+export async function triggerSourcePluginRun(input: TriggerSourcePluginRunInput): Promise<PluginSourceRunModel> {
+  await ensureFirestoreOrm();
+  return triggerSourcePluginRunInOrganization(input);
 }

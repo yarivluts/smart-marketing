@@ -22,6 +22,7 @@ import {
   listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
+  listSourcePluginRunsForInstall as listSourcePluginRunsForInstallInOrganization,
   listQueryCostLogEntriesForProject as listQueryCostLogEntriesForProjectInOrganization,
   listRecentIngestBatchesForProject as listRecentIngestBatchesForProjectInOrganization,
   listResourceTemplates as listResourceTemplatesInOrganization,
@@ -42,6 +43,7 @@ import {
   type PipelineMessageModel,
   type PluginInstallModel,
   type PluginManifestModel,
+  type PluginSourceRunModel,
   type ProjectCostQuota,
   type ProjectModel,
   type ProjectQueryQuotaStatus,
@@ -227,6 +229,16 @@ export async function listPluginInstallsForProject(
 ): Promise<PluginInstallModel[]> {
   await ensureFirestoreOrm();
   return listPluginInstallsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listSourcePluginRunsForInstall(
+  organizationId: string,
+  projectId: string,
+  installId: string,
+  limit?: number,
+): Promise<PluginSourceRunModel[]> {
+  await ensureFirestoreOrm();
+  return listSourcePluginRunsForInstallInOrganization(organizationId, projectId, installId, limit);
 }
 
 export interface PendingAttachmentDetails {

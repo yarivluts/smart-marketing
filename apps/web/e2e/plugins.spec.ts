@@ -66,8 +66,18 @@ test.describe('Plugins: register a manifest, install it into a project, disable/
     await page.getByLabel(/shop_domain/).fill('my-shop.myshopify.com');
     await page.getByRole('button', { name: 'Install plugin' }).click();
 
-    await expect(page.getByText('com.example.shopify-pack · v1.0.0')).toBeVisible();
+    // Scoped to the installs list item specifically — the "Source runtime" section below repeats
+    // the same "pluginId · version" line as its own per-install heading.
+    await expect(page.getByRole('listitem').getByText('com.example.shopify-pack · v1.0.0')).toBeVisible();
     await expect(page.getByText('Installed', { exact: true })).toBeVisible();
+
+    // KAN-47: the install is a `source`-type manifest, so a "Source runtime" section with a
+    // run-now button + run history should now be visible for it.
+    await expect(page.getByRole('heading', { name: 'Source runtime' })).toBeVisible();
+    await expect(page.getByText('No sync runs yet.')).toBeVisible();
+    await page.getByRole('button', { name: 'Run now' }).click();
+    await expect(page.getByText(/Succeeded · started/)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('3 fetched · 0 accepted · 3 quarantined · 0 duplicate')).toBeVisible();
 
     await page.getByRole('button', { name: 'Disable' }).click();
     await expect(page.getByText('Disabled', { exact: true })).toBeVisible();

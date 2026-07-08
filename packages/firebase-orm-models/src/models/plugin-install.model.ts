@@ -64,4 +64,20 @@ export class PluginInstallModel extends BaseModel {
 
   @Field()
   public uninstalled_at?: string;
+
+  /**
+   * The source-plugin runtime's (KAN-47) persisted sync cursor — `undefined`
+   * until this install's first sync attempt has ever completed. Kept on the
+   * install itself (one cursor per install, mutated in place across its own
+   * lifecycle) rather than a separate collection: a cursor is inherently
+   * this install's own current position, the same "the record is the
+   * result" posture the install's own status fields already use, and it's
+   * exactly what must "survive restart" (plan `13 §E7.2`'s AC) — reading it
+   * back is just reading this same document again.
+   */
+  @Field()
+  public source_cursor?: string;
+
+  @Field()
+  public source_last_synced_at?: string;
 }
