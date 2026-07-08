@@ -17,6 +17,100 @@ Template for each entry:
 
 ---
 
+## 2026-07-08 — E7.3 Admin UI polish: plugin gallery, config forms rendered from config_schema, per-plugin health (KAN-48)
+
+- **Last completed:**
+  - Implemented **KAN-48** (plan `13 §E7.3`, AC: "Non-engineer installs and configures a plugin
+    end-to-end") — the natural next pick after KAN-47 (that entry's own "Next step"), a direct UX
+    upgrade of the project Plugins page KAN-46/47 shipped minimally. Read `docs/plan/08-generic-platform.md
+    §4` and `12-api-reference.md §5` (the plugin manifest spec, `config_schema: ... # rendered as
+    install form`) first, plus both KAN-46's and KAN-47's own doc-comment notes flagging exactly what
+    they deferred to this story.
+    - `apps/web/components/orgs/install-plugin-form.tsx`: replaced the raw `pluginId@version`
+      `<select>` dropdown with a browsable card gallery (`groupManifestsByPluginId`, one card per
+      plugin id) showing `displayName`/`type`/`scopes`/`registers` — a version picker only appears
+      when a plugin has more than one registered version. Config fields now render a real typed
+      widget per `config_schema` entry: a `boolean` field is a real `<input type="checkbox">` bound
+      to an actual boolean (previously a text input expecting the literal string `"true"`/`"false"`),
+      string/number fields keep typed inputs, and every required field gets an inline `(required)`
+      marker plus a submit-time inline validation message instead of a bare `*`.
+    - `apps/web/lib/orgs/plugin-view.ts`: new pure view-mapper `pluginInstallHealth` (+
+      `pluginInstallHealthLabelKey`, mirroring `sourceRunStatusLabelKey`'s existing pattern) — for a
+      `source`-type install, derives healthy/degraded/running/never-run from
+      `listSourcePluginRunsForInstall`'s existing newest-first run history; for any other plugin type
+      (no runtime to derive health from), health is simply the install's own lifecycle status
+      (`installed`/`disabled`/`uninstalled`) rather than a fabricated run-based reading.
+    - New `apps/web/components/orgs/plugin-health-summary.tsx`: renders that health reading as a
+      small badge (+ last-succeeded-at, when there is one) above the existing (KAN-47) run-history
+      list on the project Plugins page's "Source runtime" section — the run-history list itself is
+      unchanged functionality, just now collapsed into a `<details>` element so the health summary is
+      what an admin sees first.
+    - Full en/he translations for every new string (`galleryLabel`/`galleryTypeLine`/
+      `galleryScopesLine`/`galleryRegistersLine`/`selectVersionLabel`/`configFieldRequiredMarker`/
+      `configFieldRequiredError`/`healthHeading`/`healthHealthy`/`healthDegraded`/`healthNeverRun`/
+      `healthLastSucceededLine`); removed the two now-unused keys the old dropdown used
+      (`selectPluginLabel`/`pluginOptionLabel`) rather than leaving stale translation surface behind.
+    - Tests: 9 new `pluginInstallHealth`/`pluginInstallHealthLabelKey` cases in `plugin-view.test.ts`
+      (healthy/degraded/running/never-run/non-source-status-passthrough/unresolved-type-fallback),
+      4 new `PluginHealthSummary` component cases, and `install-plugin-form.test.tsx` rewritten for
+      the gallery (card rendering, plugin switching, boolean-checkbox binding, inline required-field
+      validation) — plus an extension of `plugins.spec.ts` driving the gallery card, the boolean
+      checkbox, the inline required-field error, and the health summary ("Never run" → "Run now" →
+      "Healthy") through a live browser.
+  - **A real test bug found and fixed while writing the gallery tests** (not a self-review
+    afterthought — it surfaced immediately as a spurious failure on first full-suite run): a test
+    called `render()` twice within the same `it` block to assert the version-picker's presence/absence
+    across two different manifest lists, but `@testing-library/react`'s `render()` doesn't unmount a
+    prior render within the same test — both instances stayed mounted simultaneously, so the second
+    assertion (`not.toBeInTheDocument()`) found the *first* render's leftover `<select>`. Fixed by
+    splitting into two separate `it` blocks (each gets its own automatic cleanup between tests), and
+    confirmed fixed by re-running the exact case that had failed before the fix.
+  - Self-review (8-angle pass) found no other correctness bugs; confirmed no stale references to the
+    two removed translation keys or the removed `manifestKey`/dropdown helper remained anywhere in the
+    codebase, and that en/he still expose the exact same key set (`messages.test.ts` — 2/2 — confirms
+    this programmatically, not just by manual diff).
+  - `pnpm lint && pnpm typecheck && pnpm build` all green. `pnpm test`: 190 in `packages/shared`, 270
+    in `packages/firebase-orm-models`, 58 in `apps/api`, 383 web unit/route/component tests (up from
+    364 — 19 new: 9 `pluginInstallHealth`/label-key cases + 4 `PluginHealthSummary` + 6 net new/changed
+    `install-plugin-form.test.tsx` cases), full Playwright e2e suite green (18 specs — 13 passed
+    outright, 5 flaky-then-passed-on-retry: `auth.spec.ts`, `metric-defs.spec.ts`, `plugins.spec.ts`,
+    `resource-library.spec.ts`, `schema-registry.spec.ts` — the same long-documented, pre-existing
+    "resource contention under repeated dev-server + Chromium + Firestore/Auth-emulator launches in
+    one session" flake every prior entry in this file has recorded, not a regression from this diff:
+    the extended `plugins.spec.ts` itself passed clean on its retry, driving register → gallery card
+    (type/scopes/registers visible) → select → boolean checkbox → submit-without-required-field (inline
+    error, no install) → fill required field → install → "Never run" health → expand run history → Run
+    now → "Healthy" health + last-succeeded-at → disable/enable/uninstall, all through a live browser).
+    Also hit and worked around two purely local-sandbox environment issues, neither a code problem:
+    the Firestore emulator JAR downloader flaked the same documented way prior entries record (worked
+    around by `curl`-fetching the 138MB jar directly, verified against its own published md5/size, and
+    pre-placing it in `~/.cache/firebase/emulators/`); and a leftover Firestore emulator process from
+    an earlier killed `pnpm test` attempt held port 8090 across a relaunch, causing one spurious
+    "port taken" failure — fixed by killing the stale process before relaunching.
+  - Branch `kan-48-plugin-gallery`, PR #34. CI (`lint · typecheck · test · build`) green,
+    `mergeable_state: clean`, no review comments, merged (squash) into `main`. Remote branch deletion
+    failed with the same HTTP 403 from this sandbox's git remote recorded in every prior run's entry;
+    local branch deleted after confirming `main` fast-forwarded to include it cleanly.
+- **In progress (exact stopping point):** none — KAN-48 is fully delivered, tested (a real
+  `render()`-without-unmount test bug found and fixed, not just a lint pass), CI-verified, and merged
+  into `main`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the remaining sprint-4 `todo` is **KAN-60** (E11.2 dashboard framework: board model,
+  grid drag-drop, tile types, metric picker, date range + compare, global filters) — the next
+  unblocked pick in sprint order once KAN-48 is done. It's a substantially bigger, more novel surface
+  than the plugin-framework stories (no existing board/tile/grid machinery to extend), so budget
+  accordingly; read `docs/plan/13-task-breakdown.md`'s own E11.2 line and `docs/plan/10-product-ux.md
+  §2.2` ("Dashboard & tile system" — grid layout, tile types, metric picker, freshness badges) before
+  starting.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+
+---
+
 ## 2026-07-08 — E7.2 Source-plugin runtime: scheduled execution, scoped creds, cursor persistence, retry/backoff (KAN-47)
 
 - **Last completed:**
