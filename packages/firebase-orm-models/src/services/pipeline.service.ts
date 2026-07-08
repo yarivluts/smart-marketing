@@ -199,11 +199,16 @@ export async function getMostRecentRawRecordForSchema(
 }
 
 /**
- * Every raw record landed for one schema since a given timestamp, oldest
+ * Every raw record landed for one schema since a given timestamp, newest
  * first, bounded to `limit` — the per-event volume/sparkline building block
- * (KAN-36). Same composite-index caveat as {@link getMostRecentRawRecordForSchema};
- * the range filter shares `orderBy`'s own field (`landed_at`), so only the
- * two equality prefixes (`kind`, `schema_name`) need it.
+ * (KAN-36). Newest-first (not oldest-first) so that a schema landing more
+ * than `limit` records within the window still gets truncated to its most
+ * recent ones — the ones a sparkline and a "last seen" reading actually care
+ * about — rather than silently keeping the stalest end of the window and
+ * making a busy, healthy event look quiet. Same composite-index caveat as
+ * {@link getMostRecentRawRecordForSchema}; the range filter shares
+ * `orderBy`'s own field (`landed_at`), so only the two equality prefixes
+ * (`kind`, `schema_name`) need it.
  */
 export async function listRawRecordsForSchemaSince(
   organizationId: string,
@@ -217,7 +222,7 @@ export async function listRawRecordsForSchemaSince(
     .where('kind', '==', kind)
     .where('schema_name', '==', schemaName)
     .where('landed_at', '>=', sinceIso)
-    .orderBy('landed_at', 'asc')
+    .orderBy('landed_at', 'desc')
     .limit(limit)
     .get();
 }

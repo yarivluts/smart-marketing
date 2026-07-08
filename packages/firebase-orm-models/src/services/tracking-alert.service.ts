@@ -1,4 +1,5 @@
 import { ProjectModel } from '../models/project.model';
+import type { SchemaDefModel } from '../models/schema-def.model';
 import { TrackingAlertModel } from '../models/tracking-alert.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
@@ -76,15 +77,17 @@ function utcDateKey(iso: string): string {
   return iso.slice(0, 10);
 }
 
-/** Every UTC calendar date from `windowStart` to `now`, inclusive, oldest first — the sparkline's fixed x-axis regardless of which days actually have data. */
-function dailyBucketKeys(windowStartMs: number, nowMs: number): string[] {
+function startOfUtcDayMs(ms: number): number {
+  const date = new Date(ms);
+  date.setUTCHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+/** Exactly `windowDays` UTC calendar dates ending on today (inclusive), oldest first — the sparkline's fixed x-axis regardless of which days actually have data. */
+function dailyBucketKeys(windowStartOfDayMs: number, windowDays: number): string[] {
   const keys: string[] = [];
-  const startOfWindow = new Date(windowStartMs);
-  startOfWindow.setUTCHours(0, 0, 0, 0);
-  const startOfToday = new Date(nowMs);
-  startOfToday.setUTCHours(0, 0, 0, 0);
-  for (let dayMs = startOfWindow.getTime(); dayMs <= startOfToday.getTime(); dayMs += 24 * 60 * 60 * 1000) {
-    keys.push(utcDateKey(new Date(dayMs).toISOString()));
+  for (let i = 0; i < windowDays; i++) {
+    keys.push(utcDateKey(new Date(windowStartOfDayMs + i * 24 * 60 * 60 * 1000).toISOString()));
   }
   return keys;
 }
@@ -96,13 +99,14 @@ async function computeEventVolumeEntry(
   nowMs: number,
   windowDays: number,
 ): Promise<EventVolumeOverviewEntry> {
-  const windowStartMs = nowMs - windowDays * 24 * 60 * 60 * 1000;
+  // A trailing `windowDays`-day window ending on today, e.g. windowDays=7 covers today and the 6 days before it.
+  const windowStartOfDayMs = startOfUtcDayMs(nowMs) - (windowDays - 1) * 24 * 60 * 60 * 1000;
   const records = await listRawRecordsForSchemaSince(
     organizationId,
     projectId,
     'event',
     schemaName,
-    new Date(windowStartMs).toISOString(),
+    new Date(windowStartOfDayMs).toISOString(),
     MAX_EVENT_VOLUME_RECORDS_PER_SCHEMA,
   );
 
@@ -111,9 +115,10 @@ async function computeEventVolumeEntry(
     const day = utcDateKey(record.landed_at);
     countByDay.set(day, (countByDay.get(day) ?? 0) + 1);
   }
-  const dailyCounts = dailyBucketKeys(windowStartMs, nowMs).map((date) => ({ date, count: countByDay.get(date) ?? 0 }));
+  const dailyCounts = dailyBucketKeys(windowStartOfDayMs, windowDays).map((date) => ({ date, count: countByDay.get(date) ?? 0 }));
 
-  let lastSeenAt = records.length > 0 ? records[records.length - 1].landed_at : null;
+  // `records` is newest-first (see listRawRecordsForSchemaSince) so its first element — not last — is the most recent.
+  let lastSeenAt = records.length > 0 ? records[0].landed_at : null;
   if (lastSeenAt === null) {
     // Nothing landed within the window — check further back before concluding this event has never flowed at all.
     const mostRecentEver = await getMostRecentRawRecordForSchema(organizationId, projectId, 'event', schemaName);
@@ -130,17 +135,24 @@ async function computeEventVolumeEntry(
  * Purely a read: computed fresh on every call from bounded Firestore queries,
  * nothing persisted, the same "recompute view-side, don't store a rollup"
  * posture `computeIngestHealthSummary` (KAN-35) already uses.
+ *
+ * `precomputedSchemaDefs` lets a caller that already fetched
+ * `listSchemaDefinitionsForProject` for the same render (e.g. the schema
+ * registry page, which lists every schema family alongside this overview)
+ * skip a redundant re-fetch of the same collection — the same
+ * `precomputedQuota` pass-through pattern `checkProjectQueryQuota` (KAN-39)
+ * already established for its own equivalent duplicate-fetch.
  */
 export async function getEventVolumeOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { now?: number; windowDays?: number },
+  options?: { now?: number; windowDays?: number; precomputedSchemaDefs?: SchemaDefModel[] },
 ): Promise<EventVolumeOverviewEntry[]> {
   await requireProjectInOrg(organizationId, projectId);
   const now = options?.now ?? Date.now();
   const windowDays = options?.windowDays ?? DEFAULT_EVENT_VOLUME_WINDOW_DAYS;
 
-  const schemaDefs = await listSchemaDefinitionsForProject(organizationId, projectId);
+  const schemaDefs = options?.precomputedSchemaDefs ?? (await listSchemaDefinitionsForProject(organizationId, projectId));
   const eventNames = activeSchemaNamesForKind(schemaDefs, 'event');
 
   return Promise.all(eventNames.map((schemaName) => computeEventVolumeEntry(organizationId, projectId, schemaName, now, windowDays)));
@@ -255,6 +267,18 @@ export interface CheckTrackingAlertsParams {
  * silent); an event that's flowing again resolves its own open episode. An
  * event that's never landed a single record is left alone — there's nothing
  * to have "broken" yet.
+ *
+ * Not transactional, the same deliberately-deferred gap
+ * `registerSchemaDefinition`'s own doc comment documents for its own
+ * existence check: two concurrent checks for the same project can both read
+ * "no active alert" for a schema before either writes, and both create their
+ * own `active` episode for it. A duplicate stays independently updatable
+ * (the newer of the two just never gets picked up by a later check's
+ * `activeAlertByName` map, since a `Map` only keeps one entry per
+ * `schema_name`) rather than silently vanishing, so it's a visible nuisance
+ * (an orphaned, unresolvable alert row) rather than a lost signal — flagged
+ * here as known and out of scope for the same "no raw Firestore SDK access
+ * outside `firestore-connection.ts`" reason a transaction would require.
  */
 export async function checkTrackingAlertsForProject(params: CheckTrackingAlertsParams): Promise<TrackingAlertCheckResult> {
   await requireProjectInOrg(params.organizationId, params.projectId);

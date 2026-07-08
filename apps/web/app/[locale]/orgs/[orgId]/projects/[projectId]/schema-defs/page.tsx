@@ -72,16 +72,20 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [projects, schemaDefs, eventVolumeOverview, trackingAlerts] = await Promise.all([
+  const [projects, schemaDefs, trackingAlerts] = await Promise.all([
     listOrgProjects(orgId),
     listSchemaDefinitionsForProject(orgId, projectId),
-    getEventVolumeOverviewForProject(orgId, projectId),
     listTrackingAlertsForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
     notFound();
   }
+
+  // Reuses the schema-defs list just fetched above rather than a second, redundant
+  // Firestore read of the same collection (same `precomputedQuota`-style pass-through
+  // pattern the cost-guardrails page uses for its own equivalent duplicate fetch).
+  const eventVolumeOverview = await getEventVolumeOverviewForProject(orgId, projectId, { precomputedSchemaDefs: schemaDefs });
 
   const families = groupIntoFamilies(schemaDefs.map(toSchemaDefView));
   const trackingAlertViews = trackingAlerts.map(toTrackingAlertView);

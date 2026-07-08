@@ -246,9 +246,26 @@ describe('getEventVolumeOverviewForProject', () => {
     const entry = overview.find((candidate) => candidate.schemaName === 'order_completed');
     expect(entry).toBeDefined();
     expect(entry?.lastSeenAt).toBe(TEN_MINUTES_AGO);
-    expect(entry?.dailyCounts).toHaveLength(8);
+    expect(entry?.dailyCounts).toHaveLength(7);
     const todayKey = new Date(NOW).toISOString().slice(0, 10);
     expect(entry?.dailyCounts.find((bucket) => bucket.date === todayKey)?.count).toBe(2);
+  });
+
+  it('reports the most recent lastSeenAt and does not lose recent days when a schema lands more records than the per-event cap', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Event Volume Busy Org');
+    await registerEventSchema(organization.id, project.id, 'page_view', owner.id);
+    // Land 3 old records (would fill an oldest-first cap) plus 1 fresh one — the fresh one must still surface as lastSeenAt.
+    const threeDaysAgo = new Date(NOW - 3 * 24 * 60 * 60 * 1000).toISOString();
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId, schemaName: 'page_view', landedAt: threeDaysAgo });
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId, schemaName: 'page_view', landedAt: threeDaysAgo });
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId, schemaName: 'page_view', landedAt: TEN_MINUTES_AGO });
+
+    const overview = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7 });
+
+    const entry = overview.find((candidate) => candidate.schemaName === 'page_view');
+    expect(entry?.lastSeenAt).toBe(TEN_MINUTES_AGO);
+    const todayKey = new Date(NOW).toISOString().slice(0, 10);
+    expect(entry?.dailyCounts.find((bucket) => bucket.date === todayKey)?.count).toBe(1);
   });
 
   it('falls back to a point lookup for lastSeenAt when nothing landed within the window', async () => {

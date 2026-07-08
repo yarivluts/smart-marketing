@@ -192,9 +192,10 @@ export async function checkProjectQueryQuota(
 export async function getEventVolumeOverviewForProject(
   organizationId: string,
   projectId: string,
+  options?: { precomputedSchemaDefs?: SchemaDefModel[] },
 ): Promise<EventVolumeOverviewEntry[]> {
   await ensureFirestoreOrm();
-  return getEventVolumeOverviewForProjectInOrganization(organizationId, projectId);
+  return getEventVolumeOverviewForProjectInOrganization(organizationId, projectId, options);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
