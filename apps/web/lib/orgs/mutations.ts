@@ -10,15 +10,21 @@ import {
   createResourceTemplate as createResourceTemplateInOrganization,
   createSharedCredential as createSharedCredentialInOrganization,
   decideResourceAttachment as decideResourceAttachmentInOrganization,
+  disablePlugin as disablePluginInOrganization,
   type DrainPipelineResult,
   detachResource as detachResourceInOrganization,
+  enablePlugin as enablePluginInOrganization,
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
+  installPlugin as installPluginInOrganization,
   inviteMemberToOrganization,
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
   type OrchestrationRunModel,
+  type PluginInstallModel,
+  type PluginManifestModel,
   registerMetricDefinition as registerMetricDefinitionInOrganization,
+  registerPluginManifest as registerPluginManifestInOrganization,
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
   replayFailedPipelineMessagesForProject as replayFailedPipelineMessagesForProjectInOrganization,
@@ -30,6 +36,7 @@ import {
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   triggerOrchestrationRun as triggerOrchestrationRunInOrganization,
+  uninstallPlugin as uninstallPluginInOrganization,
   type AcceptInviteResult,
   type CreateOrganizationResult,
   type CreateProjectResult,
@@ -373,4 +380,52 @@ export async function checkTrackingAlertsForProject(input: CheckTrackingAlertsIn
     projectId: input.projectId,
     triggeredByUserId: input.triggeredByUserId,
   });
+}
+
+interface RegisterPluginManifestInput {
+  organizationId: string;
+  manifestYaml: string;
+  registeredByUserId: string;
+}
+
+export async function registerPluginManifest(input: RegisterPluginManifestInput): Promise<PluginManifestModel> {
+  await ensureFirestoreOrm();
+  return registerPluginManifestInOrganization(input);
+}
+
+interface InstallPluginInput {
+  organizationId: string;
+  projectId: string;
+  pluginId: string;
+  version: string;
+  consentedScopes: readonly string[];
+  config: Record<string, unknown>;
+  installedByUserId: string;
+}
+
+export async function installPlugin(input: InstallPluginInput): Promise<PluginInstallModel> {
+  await ensureFirestoreOrm();
+  return installPluginInOrganization(input);
+}
+
+interface PluginInstallLifecycleInput {
+  organizationId: string;
+  projectId: string;
+  installId: string;
+  performedByUserId: string;
+}
+
+export async function disablePlugin(input: PluginInstallLifecycleInput): Promise<PluginInstallModel> {
+  await ensureFirestoreOrm();
+  return disablePluginInOrganization(input);
+}
+
+export async function enablePlugin(input: PluginInstallLifecycleInput): Promise<PluginInstallModel> {
+  await ensureFirestoreOrm();
+  return enablePluginInOrganization(input);
+}
+
+export async function uninstallPlugin(input: PluginInstallLifecycleInput): Promise<PluginInstallModel> {
+  await ensureFirestoreOrm();
+  return uninstallPluginInOrganization(input);
 }

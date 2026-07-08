@@ -67,12 +67,14 @@
     "membersHeading": "חברים",
     "resourceLibraryLink": "ספריית משאבים",
     "auditLogLink": "יומן ביקורת",
+    "pluginRegistryLink": "מרשם תוספים",
     "projectResourcesLink": "משאבי הפרויקט",
     "projectKeysLink": "מפתחות API",
     "projectSchemaRegistryLink": "מרשם סכימות",
     "projectIngestHealthLink": "תקינות הזרמת הנתונים",
     "projectMetricRegistryLink": "קטלוג מדדים",
-    "projectCostGuardrailsLink": "בקרות עלות"
+    "projectCostGuardrailsLink": "בקרות עלות",
+    "projectPluginsLink": "תוספים"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -359,5 +361,46 @@
     "noEntries": "עדיין לא נרשמו שינויים מבוקרים עבור ארגון זה.",
     "actorLine": "{actorType} {actorId} · {action}",
     "listCapNote": "מוצגות {count} הרשומות האחרונות."
+  },
+  "PluginRegistry": {
+    "metaTitle": "מרשם תוספים",
+    "title": "מרשם תוספים",
+    "registerHeading": "רישום מניפסט",
+    "manifestYamlLabel": "plugin.yaml",
+    "manifestYamlPlaceholder": "id: com.example.shopify-pack\nversion: 1.0.0\ntype: source\ndisplay_name: Shopify Commerce Pack\nscopes: [ingest:write, schema:write]",
+    "manifestYamlHint": "הדבק מניפסט plugin.yaml. הוא ינותח ויאומת לפני שייווסף למרשם.",
+    "registerButton": "רשום מניפסט",
+    "duplicateManifestError": "מזהה התוסף והגרסה הזו כבר רשומים. פרסם גרסה חדשה במקום זאת.",
+    "registerError": "לא ניתן היה לרשום את המניפסט. נסה שוב.",
+    "registeredHeading": "תוספים רשומים",
+    "noManifests": "עדיין לא נרשמו מניפסטים של תוספים בארגון זה.",
+    "versionLine": "גרסה {version} · {type}",
+    "scopesLine": "היקפים: {scopes}"
+  },
+  "ProjectPlugins": {
+    "metaTitle": "תוספים",
+    "title": "תוספים עבור {projectName}",
+    "installHeading": "התקנת תוסף",
+    "selectPluginLabel": "תוסף",
+    "pluginOptionLabel": "{displayName} (גרסה {version})",
+    "scopesHeading": "תוסף זה מבקש את ההיקפים הבאים",
+    "consentCheckboxLabel": "בדקתי ואני מאשר את ההיקפים הללו",
+    "consentRequiredError": "עליך לאשר את ההיקפים המבוקשים לפני ההתקנה.",
+    "configHeading": "הגדרות",
+    "installButton": "התקן תוסף",
+    "alreadyInstalledError": "תוסף זה כבר מותקן בפרויקט זה. הסר אותו תחילה כדי להתקין גרסה אחרת.",
+    "installError": "לא ניתן היה להתקין את התוסף. נסה שוב.",
+    "noManifestsToInstall": "עדיין לא נרשמו מניפסטים של תוספים בארגון זה. רשום אחד ממרשם התוספים של הארגון תחילה.",
+    "allManifestsInstalled": "כל התוספים הרשומים כבר מותקנים בפרויקט זה. הסר אחד כדי להתקין גרסה אחרת.",
+    "installsHeading": "תוספים מותקנים",
+    "noInstalls": "עדיין לא הותקנו תוספים בפרויקט זה.",
+    "installLine": "{pluginId} · גרסה {version}",
+    "statusInstalled": "מותקן",
+    "statusDisabled": "מושבת",
+    "statusUninstalled": "הוסר",
+    "disableButton": "השבת",
+    "enableButton": "הפעל",
+    "uninstallButton": "הסר",
+    "actionError": "לא ניתן היה להשלים את הפעולה. נסה שוב."
   }
 }

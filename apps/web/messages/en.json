@@ -67,12 +67,14 @@
     "membersHeading": "Members",
     "resourceLibraryLink": "Resource library",
     "auditLogLink": "Audit log",
+    "pluginRegistryLink": "Plugin registry",
     "projectResourcesLink": "Project resources",
     "projectKeysLink": "API keys",
     "projectSchemaRegistryLink": "Schema registry",
     "projectIngestHealthLink": "Ingest health",
     "projectMetricRegistryLink": "Metric catalog",
-    "projectCostGuardrailsLink": "Cost guardrails"
+    "projectCostGuardrailsLink": "Cost guardrails",
+    "projectPluginsLink": "Plugins"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -359,5 +361,46 @@
     "noEntries": "No audited changes recorded for this organization yet.",
     "actorLine": "{actorType} {actorId} · {action}",
     "listCapNote": "Showing the {count} most recent entries."
+  },
+  "PluginRegistry": {
+    "metaTitle": "Plugin registry",
+    "title": "Plugin registry",
+    "registerHeading": "Register a manifest",
+    "manifestYamlLabel": "plugin.yaml",
+    "manifestYamlPlaceholder": "id: com.example.shopify-pack\nversion: 1.0.0\ntype: source\ndisplay_name: Shopify Commerce Pack\nscopes: [ingest:write, schema:write]",
+    "manifestYamlHint": "Paste a plugin.yaml manifest. It's parsed and validated before being added to the registry.",
+    "registerButton": "Register manifest",
+    "duplicateManifestError": "This plugin id and version is already registered. Publish a new version instead.",
+    "registerError": "Couldn't register the manifest. Please try again.",
+    "registeredHeading": "Registered plugins",
+    "noManifests": "No plugin manifests have been registered in this organization yet.",
+    "versionLine": "v{version} · {type}",
+    "scopesLine": "Scopes: {scopes}"
+  },
+  "ProjectPlugins": {
+    "metaTitle": "Plugins",
+    "title": "Plugins for {projectName}",
+    "installHeading": "Install a plugin",
+    "selectPluginLabel": "Plugin",
+    "pluginOptionLabel": "{displayName} (v{version})",
+    "scopesHeading": "This plugin requests the following scopes",
+    "consentCheckboxLabel": "I've reviewed and approve these scopes",
+    "consentRequiredError": "You must approve the requested scopes before installing.",
+    "configHeading": "Configuration",
+    "installButton": "Install plugin",
+    "alreadyInstalledError": "This plugin is already installed in this project. Uninstall it first to install a different version.",
+    "installError": "Couldn't install the plugin. Please try again.",
+    "noManifestsToInstall": "No plugin manifests are registered in this organization yet. Register one from the org's plugin registry first.",
+    "allManifestsInstalled": "Every registered plugin is already installed in this project. Uninstall one to install a different version.",
+    "installsHeading": "Installed plugins",
+    "noInstalls": "No plugins have been installed in this project yet.",
+    "installLine": "{pluginId} · v{version}",
+    "statusInstalled": "Installed",
+    "statusDisabled": "Disabled",
+    "statusUninstalled": "Uninstalled",
+    "disableButton": "Disable",
+    "enableButton": "Enable",
+    "uninstallButton": "Uninstall",
+    "actionError": "Couldn't complete that action. Please try again."
   }
 }
