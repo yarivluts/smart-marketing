@@ -16,6 +16,7 @@ import {
   inviteMemberToOrganization,
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
+  type OrchestrationRunModel,
   registerMetricDefinition as registerMetricDefinitionInOrganization,
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
@@ -26,6 +27,7 @@ import {
   revokeApiKey as revokeApiKeyInOrganization,
   rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
+  triggerOrchestrationRun as triggerOrchestrationRunInOrganization,
   type AcceptInviteResult,
   type CreateOrganizationResult,
   type CreateProjectResult,
@@ -324,4 +326,19 @@ export async function replayFailedPipelineMessagesForProject(
     undefined,
     input.performedByUserId,
   );
+}
+
+interface TriggerOrchestrationRunInput {
+  organizationId: string;
+  projectId: string;
+  triggeredByUserId: string;
+}
+
+export async function triggerOrchestrationRun(input: TriggerOrchestrationRunInput): Promise<OrchestrationRunModel> {
+  await ensureFirestoreOrm();
+  return triggerOrchestrationRunInOrganization({
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    triggeredByUserId: input.triggeredByUserId,
+  });
 }

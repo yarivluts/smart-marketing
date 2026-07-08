@@ -201,6 +201,9 @@ importers:
       '@arbel/firebase-orm':
         specifier: ^1.9.97
         version: 1.9.97(atob@2.1.2)(axios@1.18.1)(blob@0.0.5)(btoa@1.2.1)(firebase-admin@13.10.0)(firebase@11.10.0)(moment@2.30.1)(qs@6.15.3)(ws@8.21.0)(xhr2@0.2.1)
+      '@growthos/dbt-transform':
+        specifier: workspace:*
+        version: link:../dbt-transform
       '@growthos/shared':
         specifier: workspace:*
         version: link:../shared

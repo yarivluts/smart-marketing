@@ -294,7 +294,21 @@
     "pipelineFailureSummary": "{clientId} ({kind}, {environment}): {reason}",
     "retryFailedDeliveries": "Retry failed deliveries",
     "retryFailedDeliveriesError": "Couldn't retry failed deliveries. Please try again.",
-    "retryFailedDeliveriesResult": "{delivered} delivered, {failed} still failing"
+    "retryFailedDeliveriesResult": "{delivered} delivered, {failed} still failing",
+    "orchestrationHeading": "Orchestration",
+    "orchestrationTriggerButton": "Run now",
+    "orchestrationTriggerError": "Couldn't trigger an orchestration run. Please try again.",
+    "orchestrationFreshnessHeading": "Current freshness",
+    "orchestrationFreshnessRow": "{table}: {count} rows · last landed {freshness}",
+    "orchestrationNeverLanded": "never",
+    "orchestrationNoFreshnessYet": "No successful orchestration run yet.",
+    "orchestrationHistoryHeading": "Run history",
+    "orchestrationNoRuns": "No orchestration runs for this project yet.",
+    "orchestrationRunSummary": "{status} · started {startedAt}",
+    "orchestrationRunError": "Error: {message}",
+    "orchestrationRunStatusRunning": "Running",
+    "orchestrationRunStatusSucceeded": "Succeeded",
+    "orchestrationRunStatusFailed": "Failed"
   },
   "AuditLog": {
     "metaTitle": "Audit log",

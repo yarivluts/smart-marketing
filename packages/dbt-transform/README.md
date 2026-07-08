@@ -45,3 +45,20 @@ Both scripts self-provision a local Python virtualenv (`.venv/`, git-ignored)
 with the pinned `dbt-core`/`dbt-duckdb` versions from `requirements.txt` on
 first run — no separate CI setup step needed, the same posture `pnpm test`
 already has for the Firestore emulator (KAN-22) and Playwright browsers.
+Provisioning itself lives in `scripts/dbt-env.mjs`, shared by both entry
+points above and by `scripts/run-orchestration.mjs` below.
+
+## Orchestrating a run for one project (KAN-38)
+
+`scripts/run-orchestration.mjs <organizationId> <projectId> <outputJsonPath>`
+is this package's own "run once, freshness metadata written back" entry
+point — it re-runs `dbt build` and then reads the resulting `core` tables
+back (via `scripts/read_freshness.py`, using the `duckdb` Python package
+`dbt-duckdb` already pulls in), filtered to the given project, for row
+counts + latest timestamps. It's invoked as a subprocess by
+`@growthos/firebase-orm-models`'s `LocalDbtOrchestrationExecutor`
+(`src/orchestration/local-dbt-executor.ts`) — the Firestore-backed
+`OrchestrationRunModel`/`triggerOrchestrationRun` seam a project's admin
+"Run now" button calls — never run directly by a human. See that package's
+own `orchestration/executor.ts` doc comment for why a real Dagster/Cloud
+Workflows scheduler is deferred until KAN-18 provisions somewhere to run one.

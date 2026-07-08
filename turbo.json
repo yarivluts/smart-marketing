@@ -15,6 +15,9 @@
     "@growthos/api#test": {
       "dependsOn": ["^build", "@growthos/firebase-orm-models#test"]
     },
+    "@growthos/firebase-orm-models#test": {
+      "dependsOn": ["^build", "@growthos/dbt-transform#test"]
+    },
     "@growthos/dbt-transform#build": {
       "outputs": ["dbt/target/**"]
     },

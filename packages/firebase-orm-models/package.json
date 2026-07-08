@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@arbel/firebase-orm": "^1.9.97",
+    "@growthos/dbt-transform": "workspace:*",
     "@growthos/shared": "workspace:*",
     "firebase": "^11.10.0",
     "reflect-metadata": "^0.2.2"
