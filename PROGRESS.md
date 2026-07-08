@@ -17,6 +17,111 @@ Template for each entry:
 
 ---
 
+## 2026-07-08 — E3.6 Per-event volume sparklines + "tracking broke" alerts (KAN-36)
+
+- **Last completed:**
+  - Implemented **KAN-36** (plan `13 §E3.6` / `14` gap 7, AC: "Dropping an event type to zero fires an
+    alert within an hour") — the last remaining sprint-1..3 `todo` in `TASKS.md`; every other KAN-17..45
+    story was already `done`/`needs-human`/`in-progress`-pending-a-human by the start of this run, so
+    this was the natural next pick before Phase-1 (sprint-4+) work begins. Resolved the sprint/phase
+    ambiguity every prior run's own "Next step" flagged (`TASKS.md` lists it `Phase 1, Sprint -` while
+    `docs/plan/13-task-breakdown.md` positions it inside Epic E3, itself Phase 0) by reading
+    `docs/plan/14-gap-analysis.md` gap 7 directly: "Lands in: `06 §1`, `08 §3.1`, Phase 1 (cheap — reuses
+    the anomaly engine)" — an explicit, twice-stated Phase-1 placement, plus a second explicit statement
+    ("in Schema Registry admin") of *which* admin page the feature belongs on, resolving the other open
+    question (extend `ingest-health` per KAN-38's pattern, or `schema-defs` where event names live) in
+    favor of `schema-defs`. No "anomaly engine" actually exists in this codebase yet (confirmed by an
+    `alert`/`anomaly` grep turning up zero hits beyond unrelated ARIA `role="alert"` markup) — this story
+    is the first alert/anomaly concept introduced, built from scratch rather than "reused."
+    - `packages/firebase-orm-models`: new `TrackingAlertModel`
+      (`organizations/:organization_id/projects/:project_id/tracking_alerts`) — one document per silence
+      episode, updated in place across its own lifecycle (`active` → `resolved`), the same
+      "one document, updated across its own lifecycle" posture `OrchestrationRunModel` (KAN-38) already
+      established, rather than a fresh document per check. New `tracking-alert.service.ts`:
+      `checkTrackingAlertsForProject` — a manually-triggerable "check now", KAN-38's buildable-today
+      "no real cron yet" pattern applied to this story's own AC (a real hourly scheduled check deferred
+      to KAN-18). For every active event schema: silent ≥ 1 hour fires (first time) or refreshes (still
+      silent) an episode; flowing again resolves it; never-landed-a-record is left alone (nothing has
+      "broken" yet). `getEventVolumeOverviewForProject` computes a 7-day daily-bucketed sparkline plus
+      each event's last-seen timestamp, purely from bounded `RawRecordModel` reads — nothing persisted,
+      the same "recompute view-side, don't store a rollup" posture `computeIngestHealthSummary` (KAN-35)
+      uses. New `getMostRecentRawRecordForSchema`/`listRawRecordsForSchemaSince` query helpers in
+      `pipeline.service.ts`, and `activeSchemaNamesForKind` in `schema-registry.service.ts`.
+    - `apps/web`: extends the Schema Registry admin page (`schema-defs`) with a new "Event volume &
+      tracking alerts" section — per-event sparklines (a small inline bar chart, plain divs — no charting
+      library exists in this codebase yet and a 7-bar sparkline doesn't need one), a tracking-alerts list,
+      and a "Check now" button — gated on the page's existing `schema.write` permission (no new permission
+      added; matches every prior story's "reuse, don't add" posture). New `POST
+      .../schema-defs/check-tracking-alerts` route. Full en/he translations, no hard-coded strings.
+    - Tests: `tracking-alert.emulator.test.ts` (16 tests: fire/still-active/resolve/never-seen,
+      cross-org isolation, audit-logging with/without an actor and with/without a state change, the
+      volume-overview sparkline/last-seen/empty/isolation cases) + 4 new `apps/web` unit/component tests
+      (`check-tracking-alerts-button.test.tsx`, `event-volume-sparkline.test.tsx`).
+  - **Self-review** (8-angle: line-by-line, removed-behavior, cross-file, reuse, simplification,
+    efficiency, altitude, CLAUDE.md conventions — 4 parallel finder passes, each candidate reasoned about
+    independently) found and fixed real issues before merging:
+    - **A real correctness bug**: `listRawRecordsForSchemaSince`'s range query ordered `landed_at`
+      **ascending** with a bounded cap — for an event landing more records than the cap within the 7-day
+      window, that returns the window's **oldest** records, not its newest. `computeEventVolumeEntry`
+      then read the *last* element as "most recent," which was actually the oldest-of-the-truncated-set —
+      a busy, perfectly healthy event would show a stale `lastSeenAt` and a sparkline missing its most
+      recent days, the exact opposite of what a "tracking broke" feature exists to reassure about. (Alert
+      *firing* itself was unaffected — `evaluateEventForAlert` uses a separate, unbounded
+      `getMostRecentRawRecordForSchema` query.) Fixed by ordering `listRawRecordsForSchemaSince`
+      **descending** instead, so a truncated result keeps the newest records; added a regression test
+      landing more records than a small window would tolerate and asserting the fresh one still surfaces.
+    - **An off-by-one**: `dailyBucketKeys`'s inclusive day-range loop produced `windowDays + 1` buckets
+      (8 for `windowDays: 7`), contradicting its own "one bucket per day in the window" doc comment — the
+      original test had simply asserted the (wrong) 8-bucket length rather than catching it. Fixed to
+      produce exactly `windowDays` buckets ending today; test updated to assert 7.
+    - **An efficiency issue**: the schema-defs page and `getEventVolumeOverviewForProject` each
+      independently fetched `listSchemaDefinitionsForProject` for the same render — the identical
+      duplicate-fetch anti-pattern KAN-39's own self-review found and fixed (via a `precomputedQuota`
+      pass-through) one story earlier, reintroduced here. Fixed with an analogous
+      `precomputedSchemaDefs` option, threaded from the page's own already-fetched list.
+    - **A test-coverage gap**: `tracking-alert-view.ts` (the model→view mapper + status-label-key lookup)
+      shipped with no unit test, unlike its closest sibling. Added `tracking-alert-view.test.ts`.
+    - **Documented, not fixed**: `checkTrackingAlertsForProject` is not transactional — two concurrent
+      checks for the same project can both read "no active alert" for a newly-silent schema and each
+      create their own episode. Flagged with a doc comment citing the same "no raw Firestore SDK access
+      outside `firestore-connection.ts`" reason `registerSchemaDefinition`'s own equivalent gap is
+      already documented as out of scope for, rather than silently left unexplained.
+  - `pnpm lint && pnpm typecheck && pnpm build` all green. `pnpm test`: 182 tests in `packages/shared`
+    (untouched), 42 dbt tests (untouched), 219 in `packages/firebase-orm-models` (up from 203 — 16 new in
+    `tracking-alert.emulator.test.ts`), 301 web unit/route/component tests (up from 298 — 3 new in
+    `tracking-alert-view.test.ts` plus the 4 button/sparkline tests already counted pre-fix), 17/17
+    Playwright e2e specs green (the extended `schema-registry.spec.ts` included) — confirmed clean twice,
+    once before and once after the self-review fixes. One CI run on the PR hit the long-documented,
+    pre-existing `models.emulator.test.ts` `RESOURCE_EXHAUSTED`/30s-timeout flake (unrelated file, not
+    touched by this diff); a re-run of just the failed job went green.
+  - Branch `kan-36-tracking-alerts`, PR #31. CI (`lint · typecheck · test · build`) green on the re-run,
+    `mergeable_state: clean`, merged (squash) into `main`. Remote branch deletion failed with the same
+    HTTP 403 from this sandbox's git remote recorded in every prior run's entry; local branch deleted
+    after confirming `main` fast-forwarded to include it cleanly.
+- **In progress (exact stopping point):** none — KAN-36 is fully delivered, independently reviewed
+  (with two real bugs and one efficiency issue found and fixed, not just a lint pass), CI-verified, and
+  merged into `main`. This closes out every sprint-1..3 story in `TASKS.md` — KAN-17 through KAN-45 (minus
+  the three `needs-human`/human-pending ones below) are now all `done`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** Phase 1 (sprint 4+) work starts next. Sprint-4 `todo`s in `TASKS.md`, in listed order:
+  **KAN-46** (E7.1 plugin.yaml manifest parser + registry storage + install-per-project flow), KAN-47
+  (E7.2 source-plugin runtime), KAN-48 (E7.3 plugin admin UI), KAN-49 (E8.1 Stripe plugin), KAN-60 (E11.2
+  dashboard framework). KAN-46 is the natural pick — KAN-47/48 both depend on a plugin manifest/registry
+  existing first, and KAN-49 is a concrete plugin implementation that needs the framework KAN-46/47 build.
+  Worth reading `docs/plan/08-generic-platform.md §4` and `12-api-reference.md §5` (the plugin
+  framework spec) before starting, since this is a materially bigger/newer subsystem than anything in
+  Phase 0.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this run's
+    own branch is also ready to prune.
+
+---
+
 ## 2026-07-08 — E4.3 Cost guardrails: per-project BQ quotas/labels, query cost logging (KAN-39)
 
 - **Last completed:**
