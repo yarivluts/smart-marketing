@@ -3,8 +3,9 @@ import { collectIdentifiers, parseFormula, type CompilerParamValue, type MetricQ
 import type { MetricAggregationDef, MetricDefinitionKind } from '../models/metric-def.model';
 import { compileMetricQueryForProject } from './metrics-compiler.service';
 import { getActiveMetricDefinition, listMetricDefinitionsForProject } from './metric-registry.service';
+import { checkProjectQueryQuota, recordQueryCostLogEntry, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { defaultMetricQueryResultCache, type MetricQueryResultCache } from '../warehouse/result-cache';
-import { defaultWarehouseQueryExecutor, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 
 /** Default TTL for a cached query result — the plan gives no specific number, so this picks a value short enough that a metric evolving mid-day doesn't stay stale for long, while still absorbing the AC's own "p95 < 1.5s on cached" repeat-request burst (e.g. a dashboard's several tiles re-querying the same window seconds apart). */
 export const DEFAULT_METRIC_QUERY_CACHE_TTL_SECONDS = 60;
@@ -61,12 +62,19 @@ export interface MetricQueryResult {
  * `POST /v1/metrics/query`'s integration point (KAN-42, plan `13 §E5.3`):
  * resolves + compiles the request via KAN-41's `compileMetricQueryForProject`,
  * serves a cached result when one exists for the same definition
- * versions+params, otherwise executes the compiled SQL via a
- * {@link WarehouseQueryExecutor} and caches the result. Throws whatever
- * `compileMetricQueryForProject` throws (`ProjectNotFoundError`,
- * `MetricNotRegisteredError`, `MetricCompilerError`) for an invalid request,
- * and `WarehouseNotConfiguredError` (from the default executor) once the
- * request is valid but there's no real warehouse to run it against yet.
+ * versions+params, otherwise checks the project's KAN-39 cost-guardrail quota
+ * before executing the compiled SQL via a {@link WarehouseQueryExecutor} and
+ * caching the result. Throws whatever `compileMetricQueryForProject` throws
+ * (`ProjectNotFoundError`, `MetricNotRegisteredError`, `MetricCompilerError`)
+ * for an invalid request, `ProjectQueryQuotaExceededError` once the project
+ * has spent its daily quota of real (non-cache-hit) query attempts, and
+ * `WarehouseNotConfiguredError` (from the default executor) once the request
+ * clears both checks but there's no real warehouse to run it against yet.
+ *
+ * A cache hit is neither logged nor counted against the quota — it incurs no
+ * real (or would-be) warehouse cost, so KAN-39's cost log only ever records
+ * an entry for a call that actually reached (or was turned away right before)
+ * a {@link WarehouseQueryExecutor}.
  */
 export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQueryResult> {
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
@@ -85,9 +93,38 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     return { series: cached, definitionRefs: compiled.definitionRefs, cacheHit: true };
   }
 
-  const series = await executor.execute(compiled);
-  cache.set(cacheKey, series, cacheTtlSeconds);
-  return { series, definitionRefs: compiled.definitionRefs, cacheHit: false };
+  const quota = await checkProjectQueryQuota(params.organizationId, params.projectId);
+  if (!quota.allowed) {
+    await recordQueryCostLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      outcome: 'blocked_quota_exceeded',
+      definitionRefs: compiled.definitionRefs,
+    });
+    throw new ProjectQueryQuotaExceededError(quota.limit);
+  }
+
+  try {
+    const series = await executor.execute(compiled);
+    cache.set(cacheKey, series, cacheTtlSeconds);
+    await recordQueryCostLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      outcome: 'executed',
+      definitionRefs: compiled.definitionRefs,
+    });
+    return { series, definitionRefs: compiled.definitionRefs, cacheHit: false };
+  } catch (error) {
+    if (error instanceof WarehouseNotConfiguredError) {
+      await recordQueryCostLogEntry({
+        organizationId: params.organizationId,
+        projectId: params.projectId,
+        outcome: 'warehouse_not_configured',
+        definitionRefs: compiled.definitionRefs,
+      });
+    }
+    throw error;
+  }
 }
 
 /** One project's registered metric, as `GET /v1/metrics`'s catalog lists it. */

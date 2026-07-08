@@ -26,6 +26,7 @@ import {
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
   rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
+  setProjectCostQuota as setProjectCostQuotaInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   triggerOrchestrationRun as triggerOrchestrationRunInOrganization,
   type AcceptInviteResult,
@@ -38,6 +39,7 @@ import {
   type MetricDefinitionInput,
   type MetricDefModel,
   type OrgPersonModel,
+  type ProjectCostQuotaModel,
   type ResourceAttachmentModel,
   type ResourceKind,
   type ResourceTemplateModel,
@@ -341,4 +343,17 @@ export async function triggerOrchestrationRun(input: TriggerOrchestrationRunInpu
     projectId: input.projectId,
     triggeredByUserId: input.triggeredByUserId,
   });
+}
+
+interface SetProjectCostQuotaInput {
+  organizationId: string;
+  projectId: string;
+  dailyQueryLimit: number;
+  labels: Record<string, string>;
+  setByUserId: string;
+}
+
+export async function setProjectCostQuota(input: SetProjectCostQuotaInput): Promise<ProjectCostQuotaModel> {
+  await ensureFirestoreOrm();
+  return setProjectCostQuotaInOrganization(input);
 }

@@ -9,6 +9,7 @@ import {
   evolveMetricDefinition,
   mintApiKey,
   registerMetricDefinition,
+  setProjectCostQuota,
 } from '@growthos/firebase-orm-models';
 import { AppModule } from '../app.module';
 
@@ -239,5 +240,33 @@ describe('MetricsController (e2e)', () => {
     const { rawKey } = await setupProjectWithKey('Detail Missing Org');
     const res = await fetch(`${baseUrl}/v1/metrics/does_not_exist`, { headers: { Authorization: `Bearer ${rawKey}` } });
     expect(res.status).toBe(404);
+  });
+
+  it('returns (429) once the project has spent its KAN-39 daily query quota', async () => {
+    const { organization, project, owner, rawKey } = await setupProjectWithKey('Quota Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+
+    // First attempt clears the quota check but 503s (no real warehouse) — that attempt still counts.
+    const first = await fetch(`${baseUrl}/v1/metrics/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${rawKey}` },
+      body: JSON.stringify(VALID_QUERY_BODY),
+    });
+    expect(first.status).toBe(503);
+
+    const second = await fetch(`${baseUrl}/v1/metrics/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${rawKey}` },
+      body: JSON.stringify(VALID_QUERY_BODY),
+    });
+    expect(second.status).toBe(429);
   });
 });

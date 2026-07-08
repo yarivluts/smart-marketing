@@ -1,5 +1,7 @@
 import 'server-only';
 import {
+  checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
+  getProjectCostQuota as getProjectCostQuotaInOrganization,
   type ApiKeySummary,
   type EnvironmentModel,
   listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
@@ -15,6 +17,7 @@ import {
   listOrgProjects as listOrgProjectsForOrganization,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
+  listQueryCostLogEntriesForProject as listQueryCostLogEntriesForProjectInOrganization,
   listRecentIngestBatchesForProject as listRecentIngestBatchesForProjectInOrganization,
   listResourceTemplates as listResourceTemplatesInOrganization,
   listSchemaDefinitionsForProject as listSchemaDefinitionsForProjectInOrganization,
@@ -32,8 +35,11 @@ import {
   type OrgMemberSummary,
   type OrgPersonModel,
   type PipelineMessageModel,
+  type ProjectCostQuota,
   type ProjectModel,
+  type ProjectQueryQuotaStatus,
   type QuarantinedRecordModel,
+  type QueryCostLogEntryModel,
   type ResourceAttachmentModel,
   type ResourceKind,
   type ResourceTemplateModel,
@@ -162,6 +168,25 @@ export async function listOrchestrationRunsForProject(
 export async function verifyAuditLogChainForOrg(organizationId: string): Promise<AuditLogChainVerification> {
   await ensureFirestoreOrm();
   return verifyAuditLogChainForOrgInOrganization(organizationId);
+}
+
+export async function getProjectCostQuota(organizationId: string, projectId: string): Promise<ProjectCostQuota> {
+  await ensureFirestoreOrm();
+  return getProjectCostQuotaInOrganization(organizationId, projectId);
+}
+
+export async function checkProjectQueryQuota(organizationId: string, projectId: string): Promise<ProjectQueryQuotaStatus> {
+  await ensureFirestoreOrm();
+  return checkProjectQueryQuotaInOrganization(organizationId, projectId);
+}
+
+export async function listQueryCostLogEntriesForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<QueryCostLogEntryModel[]> {
+  await ensureFirestoreOrm();
+  return listQueryCostLogEntriesForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export interface PendingAttachmentDetails {
