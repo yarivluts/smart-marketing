@@ -17,6 +17,100 @@ Template for each entry:
 
 ---
 
+## 2026-07-08 — E7.2 Source-plugin runtime: scheduled execution, scoped creds, cursor persistence, retry/backoff (KAN-47)
+
+- **Last completed:**
+  - Implemented **KAN-47** (plan `13 §E7.2`, AC: "A toy source plugin syncs incrementally and survives
+    restart") — the natural next pick after KAN-46 (this run's own "Next step", and the entry below's),
+    a direct extension of that story's manifest/install machinery. Read `docs/plan/08-generic-platform.md
+    §4`'s "Runtime" bullet (isolated workloads, scoped/short-lived credentials) and `13-task-breakdown.md`'s
+    own AC line first, plus KAN-38's `OrchestrationRunModel`/`OrchestrationExecutor` pattern as the closest
+    existing precedent (a run-record + executor seam) before starting.
+    - `packages/firebase-orm-models`: new `PluginSourceRunModel`
+      (`organizations/:organization_id/projects/:project_id/plugin_source_runs`) — one document per sync
+      run (status/trigger/attempts/before-after cursor/record counts/error), the same "write `running` up
+      front, update on settle" posture `OrchestrationRunModel` already established. `PluginInstallModel`
+      gained `source_cursor`/`source_last_synced_at` — the persisted cursor lives on the install itself
+      (one cursor per install, mutated in place), so "survives restart" is just re-reading the same
+      document on the next trigger, no separate collection needed.
+    - New `plugin-runtime/` module: `mintPluginRuntimeCredential` (a scoped, short-lived per-run
+      credential — buildable-today stand-in for a real sandboxed-workload credential issuer until KAN-18,
+      same posture `LocalKmsProvider`/KAN-29 already established for its own seam), `runWithRetryBackoff`
+      (exponential backoff with an injectable sleep so tests don't wait out real delays), the
+      `SourcePluginExecutor` interface, and `ToyCounterSourcePluginExecutor` (a deterministic toy plugin
+      whose own cursor is its emitted-event counter — proves "syncs incrementally and survives restart"
+      without needing any real external API to page through).
+    - New `plugin-runtime.service.ts`: `triggerSourcePluginRun` — resolves the install (must be currently
+      `installed`) + its manifest (must be `source`-typed), mints a credential, reads the persisted cursor,
+      runs the executor with retry/backoff, and — for any records produced — hands them to the existing
+      `ingestBatch` (the exact same validation/dedup/quarantine path a pushed Ingest API record goes
+      through; a source plugin is just another way records arrive, not a separate landing pipeline). The
+      install's cursor only advances once **both** the sync and the landing succeed, so a mid-run crash or
+      a downstream `ingestBatch` failure leaves it untouched and the next trigger safely re-syncs the same
+      window (a resend is idempotent via `ingestBatch`'s own client-id dedup). `listSourcePluginRunsForInstall`
+      is the run-history read side.
+    - `apps/web`: extends the KAN-46 project Plugins page with a new "Source runtime" section (environment
+      picker + "Run now" button + run history: status/attempts/cursor/fetched-accepted-quarantined-duplicate
+      counts/error) for active `source`-type installs only — gated on the existing `plugin.install`
+      permission (reused, no new permission). New `POST .../plugins/[installId]/run` route. Full en/he
+      translations, no hard-coded strings.
+    - Tests: `retry.test.ts` (8 cases, pure unit), `toy-counter-executor.test.ts` (5 cases, pure unit),
+      `plugin-runtime.emulator.test.ts` (16 cases: end-to-end toy sync + landing, cursor persistence across
+      two runs simulating a restart, quarantine-without-failing-the-run, retry-then-succeed,
+      exhausted-retries-leaves-cursor-untouched, ingestBatch-failure-leaves-cursor-untouched,
+      disabled/uninstalled/non-source-type rejections, cross-org/project/environment isolation,
+      scoped-credential-per-run, audit logging, run-history ordering/isolation), plus `apps/web` route
+      tests for the new run route, a component test for the new button, view-mapper tests, and an
+      extension of the existing `plugins.spec.ts` e2e spec driving register -> install -> **run now -> see
+      it succeed** -> disable -> enable -> uninstall through a live browser.
+  - **A real bug found and fixed while writing the emulator tests** (not a self-review afterthought — it
+    surfaced immediately as every "from scratch" test assertion silently failed to persist): the original
+    `PluginSourceRunModel.cursor_before` field was marked `is_required: true`, but its own legitimate value
+    for a first-ever sync is `null` — `@arbel/firebase-orm`'s `verifyRequiredFields()` treats `null` the
+    same as "missing" for a required field, logs a `console.error`, and **silently skips the entire
+    `save()` call** (returns early without writing) rather than throwing. This meant every "from scratch"
+    run's very first `run.save()` (and, since `cursor_before` never changes across a run's own lifecycle,
+    every subsequent `save()` on that same run too) never actually reached Firestore — the in-memory
+    object returned to the caller looked correct, but `listSourcePluginRunsForInstall` couldn't find it.
+    Fixed by marking `cursor_before` `is_required: false` (documented why in the model's own doc comment,
+    since `null` is this field's own honest value, not a bug) — confirmed fixed by re-running the exact
+    ordering test that had failed before the fix.
+  - `pnpm lint && pnpm typecheck && pnpm build` all green. `pnpm test`: 270 tests in
+    `packages/firebase-orm-models` (up from 241 — 29 new: 8 + 5 pure-unit + 16 emulator), 364 web
+    unit/route/component tests (up from 339 — 25 new), full Playwright e2e suite green (the extended
+    `plugins.spec.ts` included — verified live: register -> install -> the new "Source runtime" section
+    appears -> Run now -> "Succeeded" with the correct "3 fetched · 0 accepted · 3 quarantined · 0
+    duplicate" honest quarantine outcome, since no schema is registered for the toy plugin's own event name
+    in that spec -> disable/enable/uninstall still work). Two unrelated specs — `orgs.spec.ts` (org
+    switcher) and `resource-library.spec.ts` (attach/detach) — hit the same long-documented, pre-existing
+    "resource contention under repeated dev-server + Chromium + Firestore/Auth-emulator launches in one
+    session" flake every prior entry in this file has recorded; confirmed genuinely pre-existing and
+    unrelated by re-running both in isolation (both self-recovered on retry) and confirming neither file is
+    touched by this diff (`git diff --stat` against both is empty).
+  - Branch `kan-47-source-plugin-runtime`, PR #33. CI (`lint · typecheck · test · build`) green (~10 min),
+    `mergeable_state: clean`, no review comments, merged (squash) into `main`. Remote branch deletion failed
+    with the same HTTP 403 from this sandbox's git remote recorded in every prior run's entry; local branch
+    deleted after confirming `main` fast-forwarded to include it cleanly.
+- **In progress (exact stopping point):** none — KAN-47 is fully delivered, independently tested (a real
+  ORM-required-field bug found and fixed along the way, not just a lint pass), CI-verified, and merged into
+  `main`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the remaining sprint-4 `todo`s are **KAN-48** (E7.3 admin UI: plugin gallery, config forms
+  rendered from `config_schema`, per-plugin health) and **KAN-60** (E11.2 dashboard framework). KAN-48 is
+  the natural next pick — it's a direct extension of this story's own runtime (surfacing per-plugin health
+  from the run history `listSourcePluginRunsForInstall` already reads, plus a more polished install/gallery
+  UI than KAN-46's minimal forms) and now has real run/health state to show. Worth noting the current
+  "Source runtime" section this run added to the Plugins page is intentionally minimal (a single run-history
+  list, no health rollup/dashboard) — KAN-48 is where that gets polished, not a gap to re-open here.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+
+---
+
 ## 2026-07-08 — KAN-46 reconciliation: independent re-verification + merge of PR #32
 
 - **Last completed:**
