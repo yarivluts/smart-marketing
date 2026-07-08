@@ -8,8 +8,11 @@ import {
   getMetricCatalogDetail,
   InMemoryMetricQueryResultCache,
   listMetricsCatalogForProject,
+  listQueryCostLogEntriesForProject,
+  ProjectQueryQuotaExceededError,
   queryMetrics,
   registerMetricDefinition,
+  setProjectCostQuota,
   WarehouseNotConfiguredError,
   type WarehouseQueryExecutor,
   type WarehouseRow,
@@ -176,6 +179,96 @@ describe('queryMetrics', () => {
         cache: new InMemoryMetricQueryResultCache(),
       }),
     ).rejects.toThrow(WarehouseNotConfiguredError);
+
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].outcome).toBe('warehouse_not_configured');
+  });
+
+  it('logs an "executed" cost entry once a query actually reaches the executor (KAN-39)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Cost Log Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-01-01', ad_spend: 100 }]);
+
+    await queryMetrics({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].outcome).toBe('executed');
+    expect(entries[0].definition_refs).toEqual({ ad_spend: 'metric:ad_spend@v1' });
+    expect(entries[0].estimated_cost_usd).toBeNull();
+  });
+
+  it('does not log or count a cache hit against the quota (KAN-39)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Cost Log Cache Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-01-01', ad_spend: 100 }]);
+    const cache = new InMemoryMetricQueryResultCache();
+    const request = { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' as const } };
+
+    await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache });
+    await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache });
+
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries).toHaveLength(1);
+  });
+
+  it('throws ProjectQueryQuotaExceededError once the project has spent its daily quota (KAN-39)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Cost Log Quota Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-01-01', ad_spend: 100 }]);
+    const cache = new InMemoryMetricQueryResultCache();
+
+    // Two distinct time windows so the second call is a genuine cache miss, not served from cache.
+    await queryMetrics({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      executor,
+      cache,
+    });
+
+    await expect(
+      queryMetrics({
+        organizationId: organization.id,
+        projectId: project.id,
+        request: { metrics: ['ad_spend'], time: { start: '2026-02-01', end: '2026-02-07', grain: 'day' } },
+        executor,
+        cache,
+      }),
+    ).rejects.toThrow(ProjectQueryQuotaExceededError);
+
+    expect(executor.callCount).toBe(1);
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries.map((entry) => entry.outcome).sort()).toEqual(['blocked_quota_exceeded', 'executed']);
   });
 });
 

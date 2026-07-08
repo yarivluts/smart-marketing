@@ -1,9 +1,23 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Req, ServiceUnavailableException, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Post,
+  Req,
+  ServiceUnavailableException,
+  UseGuards,
+} from '@nestjs/common';
 import {
   getMetricCatalogDetail,
   listMetricsCatalogForProject,
   MetricNotRegisteredError,
   ProjectNotFoundError,
+  ProjectQueryQuotaExceededError,
   queryMetrics,
   WarehouseNotConfiguredError,
 } from '@growthos/firebase-orm-models';
@@ -52,6 +66,9 @@ export class MetricsController {
       }
       if (error instanceof WarehouseNotConfiguredError) {
         throw new ServiceUnavailableException(error.message);
+      }
+      if (error instanceof ProjectQueryQuotaExceededError) {
+        throw new HttpException(error.message, HttpStatus.TOO_MANY_REQUESTS);
       }
       throw error;
     }

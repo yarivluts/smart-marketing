@@ -3,8 +3,9 @@ import { collectIdentifiers, parseFormula, type CompilerParamValue, type MetricQ
 import type { MetricAggregationDef, MetricDefinitionKind } from '../models/metric-def.model';
 import { compileMetricQueryForProject } from './metrics-compiler.service';
 import { getActiveMetricDefinition, listMetricDefinitionsForProject } from './metric-registry.service';
+import { checkProjectQueryQuota, recordQueryCostLogEntry, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { defaultMetricQueryResultCache, type MetricQueryResultCache } from '../warehouse/result-cache';
-import { defaultWarehouseQueryExecutor, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 
 /** Default TTL for a cached query result — the plan gives no specific number, so this picks a value short enough that a metric evolving mid-day doesn't stay stale for long, while still absorbing the AC's own "p95 < 1.5s on cached" repeat-request burst (e.g. a dashboard's several tiles re-querying the same window seconds apart). */
 export const DEFAULT_METRIC_QUERY_CACHE_TTL_SECONDS = 60;
@@ -58,15 +59,46 @@ export interface MetricQueryResult {
 }
 
 /**
+ * Best-effort cost-log write — swallows a Firestore failure rather than
+ * letting it mask `queryMetrics`'s own outcome (a successful result, a
+ * `ProjectQueryQuotaExceededError`, or a `WarehouseNotConfiguredError`), the
+ * same "logging is a side effect, never the primary failure" posture
+ * `recordOrchestrationRunAudit` already established for audit entries.
+ */
+async function logCostAttempt(
+  organizationId: string,
+  projectId: string,
+  outcome: Parameters<typeof recordQueryCostLogEntry>[0]['outcome'],
+  definitionRefs: Record<string, string>,
+): Promise<void> {
+  try {
+    await recordQueryCostLogEntry({ organizationId, projectId, outcome, definitionRefs });
+  } catch {
+    // Best-effort — see this function's own doc comment.
+  }
+}
+
+/**
  * `POST /v1/metrics/query`'s integration point (KAN-42, plan `13 §E5.3`):
  * resolves + compiles the request via KAN-41's `compileMetricQueryForProject`,
  * serves a cached result when one exists for the same definition
- * versions+params, otherwise executes the compiled SQL via a
- * {@link WarehouseQueryExecutor} and caches the result. Throws whatever
- * `compileMetricQueryForProject` throws (`ProjectNotFoundError`,
- * `MetricNotRegisteredError`, `MetricCompilerError`) for an invalid request,
- * and `WarehouseNotConfiguredError` (from the default executor) once the
- * request is valid but there's no real warehouse to run it against yet.
+ * versions+params, otherwise checks the project's KAN-39 cost-guardrail quota
+ * before executing the compiled SQL via a {@link WarehouseQueryExecutor} and
+ * caching the result. Throws whatever `compileMetricQueryForProject` throws
+ * (`ProjectNotFoundError`, `MetricNotRegisteredError`, `MetricCompilerError`)
+ * for an invalid request, `ProjectQueryQuotaExceededError` once the project
+ * has spent its daily quota of real (non-cache-hit) query attempts, and
+ * whatever the executor itself throws (typically `WarehouseNotConfiguredError`
+ * from the default executor) once the request clears both checks.
+ *
+ * A cache hit is neither logged nor counted against the quota — it incurs no
+ * real (or would-be) warehouse cost, so KAN-39's cost log only ever records
+ * an entry for a call that actually reached (or was turned away right before)
+ * a {@link WarehouseQueryExecutor}. Every other outcome — a successful
+ * execution, `WarehouseNotConfiguredError`, or any other error the executor
+ * throws — is logged as `'executed'`: it cleared the guardrail and reached
+ * the executor, which is what the quota counts against, regardless of
+ * whether the executor itself then succeeded or failed.
  */
 export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQueryResult> {
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
@@ -85,9 +117,22 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     return { series: cached, definitionRefs: compiled.definitionRefs, cacheHit: true };
   }
 
-  const series = await executor.execute(compiled);
-  cache.set(cacheKey, series, cacheTtlSeconds);
-  return { series, definitionRefs: compiled.definitionRefs, cacheHit: false };
+  const quota = await checkProjectQueryQuota(params.organizationId, params.projectId);
+  if (!quota.allowed) {
+    await logCostAttempt(params.organizationId, params.projectId, 'blocked_quota_exceeded', compiled.definitionRefs);
+    throw new ProjectQueryQuotaExceededError(quota.limit);
+  }
+
+  try {
+    const series = await executor.execute(compiled);
+    cache.set(cacheKey, series, cacheTtlSeconds);
+    await logCostAttempt(params.organizationId, params.projectId, 'executed', compiled.definitionRefs);
+    return { series, definitionRefs: compiled.definitionRefs, cacheHit: false };
+  } catch (error) {
+    const outcome = error instanceof WarehouseNotConfiguredError ? 'warehouse_not_configured' : 'executed';
+    await logCostAttempt(params.organizationId, params.projectId, outcome, compiled.definitionRefs);
+    throw error;
+  }
 }
 
 /** One project's registered metric, as `GET /v1/metrics`'s catalog lists it. */

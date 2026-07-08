@@ -71,7 +71,8 @@
     "projectKeysLink": "מפתחות API",
     "projectSchemaRegistryLink": "מרשם סכימות",
     "projectIngestHealthLink": "תקינות הזרמת הנתונים",
-    "projectMetricRegistryLink": "קטלוג מדדים"
+    "projectMetricRegistryLink": "קטלוג מדדים",
+    "projectCostGuardrailsLink": "בקרות עלות"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -309,6 +310,32 @@
     "orchestrationRunStatusRunning": "פועל",
     "orchestrationRunStatusSucceeded": "הצליח",
     "orchestrationRunStatusFailed": "נכשל"
+  },
+  "CostGuardrails": {
+    "metaTitle": "בקרות עלות",
+    "title": "בקרות עלות עבור {projectName}",
+    "usageHeading": "השימוש היום",
+    "usageLine": "{attempted} מתוך {limit} ניסיונות שאילתה נוצלו היום · נותרו {remaining}",
+    "labelsCurrent": "תוויות: {labels}",
+    "noLabels": "אין",
+    "defaultQuotaNote": "עדיין לא הוגדרה מכסה מפורשת לפרויקט זה — חלה מכסת ברירת המחדל.",
+    "setQuotaHeading": "הגדרת מכסה",
+    "dailyLimitLabel": "מכסת שאילתות יומית",
+    "labelsLabel": "תוויות",
+    "labelsPlaceholder": "team=growth",
+    "labelsHint": "תווית אחת בפורמט key=value בכל שורה — מתייגת עבודת BigQuery אמיתית לצורך ייחוס עלות ברגע שתהיה כזו.",
+    "invalidLimitError": "מכסת השאילתות היומית חייבת להיות מספר שלם חיובי.",
+    "setQuotaError": "לא ניתן היה להגדיר את המכסה. נסה שוב.",
+    "setQuotaButton": "שמור מכסה",
+    "logHeading": "יומן עלות שאילתות",
+    "noLogEntries": "עדיין לא נרשמו שאילתות מדדים עבור פרויקט זה.",
+    "logEntrySummary": "{outcome} · {executedAt}",
+    "logEntryDefinitions": "מדדים: {definitions}",
+    "logEntryNoDefinitions": "לא נרשמו הגדרות מדדים עבור ניסיון זה.",
+    "logCapNote": "מוצגות {count} רשומות יומן העלות האחרונות.",
+    "outcomeExecuted": "בוצע",
+    "outcomeBlockedQuotaExceeded": "נחסם — חריגה ממכסה",
+    "outcomeWarehouseNotConfigured": "בוצע (עדיין לא הוגדר מחסן נתונים)"
   },
   "AuditLog": {
     "metaTitle": "יומן ביקורת",

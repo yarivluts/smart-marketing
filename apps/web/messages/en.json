@@ -71,7 +71,8 @@
     "projectKeysLink": "API keys",
     "projectSchemaRegistryLink": "Schema registry",
     "projectIngestHealthLink": "Ingest health",
-    "projectMetricRegistryLink": "Metric catalog"
+    "projectMetricRegistryLink": "Metric catalog",
+    "projectCostGuardrailsLink": "Cost guardrails"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -309,6 +310,32 @@
     "orchestrationRunStatusRunning": "Running",
     "orchestrationRunStatusSucceeded": "Succeeded",
     "orchestrationRunStatusFailed": "Failed"
+  },
+  "CostGuardrails": {
+    "metaTitle": "Cost guardrails",
+    "title": "Cost guardrails for {projectName}",
+    "usageHeading": "Today's usage",
+    "usageLine": "{attempted} of {limit} query attempts used today · {remaining} remaining",
+    "labelsCurrent": "Labels: {labels}",
+    "noLabels": "none",
+    "defaultQuotaNote": "No quota has been explicitly set for this project yet — the default limit applies.",
+    "setQuotaHeading": "Set quota",
+    "dailyLimitLabel": "Daily query limit",
+    "labelsLabel": "Labels",
+    "labelsPlaceholder": "team=growth",
+    "labelsHint": "One key=value label per line — tags a real BigQuery job for cost attribution once one exists.",
+    "invalidLimitError": "Daily query limit must be a positive whole number.",
+    "setQuotaError": "Couldn't set the quota. Please try again.",
+    "setQuotaButton": "Save quota",
+    "logHeading": "Query cost log",
+    "noLogEntries": "No metric queries logged for this project yet.",
+    "logEntrySummary": "{outcome} · {executedAt}",
+    "logEntryDefinitions": "Metrics: {definitions}",
+    "logEntryNoDefinitions": "No metric definitions recorded for this attempt.",
+    "logCapNote": "Showing the {count} most recent query cost log entries.",
+    "outcomeExecuted": "Executed",
+    "outcomeBlockedQuotaExceeded": "Blocked — quota exceeded",
+    "outcomeWarehouseNotConfigured": "Executed (no warehouse configured yet)"
   },
   "AuditLog": {
     "metaTitle": "Audit log",
