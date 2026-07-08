@@ -17,6 +17,148 @@ Template for each entry:
 
 ---
 
+## 2026-07-08 — E4.2 Orchestration (Dagster/Cloud Workflows): scheduled runs per project, freshness metadata written back (KAN-38)
+
+- **Last completed:**
+  - Implemented **KAN-38** (plan `13 §E4.2`, AC: "scheduled runs per project, freshness metadata
+    written back") — the story the prior run's own "Next step" flagged as the more tractable of the
+    two remaining sprint-3 `todo`s (KAN-38, KAN-39), reasoning that "scheduled runs" and "freshness
+    metadata written back" don't strictly need a real scheduler to start with. Followed that reasoning
+    through exactly: a Firestore-backed run-record model + a manually-triggerable "run once" service,
+    mirroring KAN-37's own dbt project as the thing being orchestrated.
+    - `packages/firebase-orm-models`: new `OrchestrationRunModel`
+      (`organizations/:organization_id/projects/:project_id/orchestration_runs`) — one document per
+      run: `status` (`running`/`succeeded`/`failed`), `trigger` (`manual` only today — kept as an
+      explicit enum, not an implicit default, so a future `scheduled` value is additive), started/
+      finished timestamps, and a `freshness` snapshot (per dbt core table — `entities`/`events`/
+      `measures` — row count + latest record timestamp) once succeeded. Project-scoped, not
+      per-environment, matching `IngestBatchModel`/`QuarantinedRecordModel`'s own "fold every
+      environment into one admin view" convention.
+    - New `orchestration/` module: an `OrchestrationExecutor` interface + `LocalDbtOrchestrationExecutor`
+      — the only real implementation today, the same "buildable today, swap the provider later" posture
+      `LocalKmsProvider` (KAN-29), `InMemoryTokenBucketRateLimiter` (KAN-34), and
+      `NotConfiguredWarehouseQueryExecutor` (KAN-42) already established. It actually shells out to a
+      real `dbt build` (KAN-37) against the buildable-today DuckDB stand-in via a new
+      `packages/dbt-transform/scripts/run-orchestration.mjs`, then reads the resulting `core` tables
+      back — filtered to the requesting org/project — for freshness metadata, via a new
+      `scripts/read_freshness.py` (uses the `duckdb` Python package `dbt-duckdb` already pulls in, no
+      new dependency). `scripts/dbt-env.mjs` factors the venv-provisioning logic already used by
+      `run-dbt.mjs` out into a shared module so both entry points use exactly one provisioning
+      implementation.
+    - New `orchestration.service.ts`: `triggerOrchestrationRun` writes a `running` record up front (so
+      a run is visible mid-flight even if the process dies before the executor settles), then updates
+      it to `succeeded`/`failed` once the executor resolves/throws — never throws itself for an
+      executor failure (the record carries the outcome, same posture as `replayQuarantinedRecord`'s
+      `still_quarantined` outcome), only for a project that doesn't exist in the caller's own org
+      (404-not-403, KAN-26). `listOrchestrationRunsForProject` is the newest-first history read side.
+      Best-effort audit logging (`orchestration_run.trigger`) when a human actor triggered the run,
+      skipped entirely for a future non-human caller — same "no synthetic system actor" posture
+      `replayFailedPipelineMessagesForProject` already uses for its own optional actor param.
+    - `apps/web`: extends the KAN-35 ingest-health page with a new **Orchestration** section — current
+      freshness (derived view-side from the already-fetched run history, no second Firestore query,
+      same posture `computeIngestHealthSummary` already uses), run history, and a **Run now** button —
+      gated on the existing `ingest.write` permission (checked `packages/shared/src/policy` first per
+      the run's own brief; nothing in the plan's permission catalog draws a finer distinction for this
+      surface, so no new permission added, matching KAN-42's own reasoning for its own read/write
+      split). New `POST .../ingest-health/trigger-orchestration-run` route. Full en/he translations,
+      reusing the ingest-health page's existing `entity`/`event`/`measure` translation keys for
+      freshness-table labels (`entities`/`events`/`measures`) via a small mapping function rather than
+      adding a near-duplicate set of plural keys.
+    - Tests: `orchestration.emulator.test.ts` (10 tests, fake-executor-driven: succeeded/failed
+      outcomes, `ProjectNotFoundError` for a missing/cross-org project, audit logging with/without an
+      actor, newest-first listing, the documented cap, cross-project isolation) +
+      `orchestration/local-dbt-executor.test.ts` (2 tests, the *only* place in the whole repo that
+      spawns the real dbt subprocess — deliberately kept singular, since DuckDB only tolerates one
+      writer to a given database file at a time and `dbt build` holds a write lock for its duration;
+      confirmed against the fixture's own known `org_1`/`proj_1` counts and a made-up project's honest
+      zero-row result). `turbo.json`'s `@growthos/firebase-orm-models#test` now explicitly depends on
+      `@growthos/dbt-transform#test` so that real-subprocess test never races
+      `@growthos/dbt-transform`'s own `pnpm test` (which builds the same DuckDB file) — the actual
+      mechanism that keeps this repo's "one real dbt build in flight at a time" invariant true across
+      packages, not just within one. New `apps/web` route/component tests
+      (`trigger-orchestration-run-button.test.tsx`, `orchestration-view.test.ts`) and new orchestration
+      assertions appended to the existing `ingest-health.spec.ts` e2e spec (trigger a run, see it
+      succeed, see the honest zero-row freshness snapshot for a project the dbt fixture has never heard
+      of).
+  - **A real bug found and fixed during manual verification** (not caught by any test, including the
+    real-subprocess unit tests above — those run under Vitest, not `next dev`): the original path-
+    resolution strategy for finding `@growthos/dbt-transform` from inside the compiled executor
+    (`require.resolve('@growthos/dbt-transform/package.json')`, with `__dirname` as a documented
+    fallback) is correct under plain Node, Vitest, and Jest (`apps/api`) — confirmed directly — but
+    silently breaks under a real `next dev`/`next build` server. Diagnosed by hand (a throwaway
+    diagnostic route + a manually-started `next dev`, not guessed at): Next's webpack pipeline bundles
+    this module into the requesting route's own compiled chunk even though nothing marks it for that
+    treatment, which rewrites `require.resolve()` into an internal module id (e.g.
+    `(rsc)/../../packages/dbt-transform`, not a real filesystem path) *and* rewrites `__dirname` to the
+    bundled chunk's own output location (`.next/server/app/api/...`) rather than this source file's own
+    directory — so neither the primary strategy nor its documented fallback survives, and the
+    subprocess spawn failed with a bare, misleading `ENOENT` (no `PATH`/permissions issue at all).
+    Adding `@growthos/firebase-orm-models`/`@growthos/dbt-transform` to Next's `serverExternalPackages`
+    config did **not** fix it (confirmed, then reverted — the module still got bundled anyway), so the
+    real fix resolves the monorepo root via `process.cwd()` (a genuine runtime syscall with no
+    compile-time footprint for any bundler to rewrite) walking up to `pnpm-workspace.yaml`, with the
+    original `require.resolve` strategy kept as a fallback for a caller running from somewhere
+    `process.cwd()` doesn't lead back to this monorepo's root. Verified fixed by hand against a live
+    `next dev` server (curl against the throwaway diagnostic route, deleted once confirmed) before
+    trusting it, not just by re-running the test suite. Separately also found: Playwright's per-test
+    `timeout` (30s, `playwright.config.ts`) caps every `expect(...)` inside a test regardless of that
+    assertion's own `timeout` option — the new e2e assertion's `{ timeout: 60_000 }` alone was silently
+    capped at 30s; fixed with `test.setTimeout(90_000)` for that one (genuinely slower, real-subprocess)
+    test instead.
+  - **Deliberate scope cuts** (documented per this run's own brief):
+    - No real cron/scheduler — explicitly deferred until KAN-18 provisions infra to run one on; `trigger`
+      is kept as an enum specifically so adding a `scheduled` value later is additive, not a shape
+      change.
+    - `dbt-transform`'s seed (KAN-37) is still a static fixture standing in for a real per-org/project
+      export — a run triggered for a project this product actually created (not the fixture's own
+      hardcoded `org_1`/`proj_1`/`org_2`/`proj_9`) legitimately shows zero rows in every table today.
+      Documented as an honest, expected result in `LocalDbtOrchestrationExecutor`'s own doc comment (and
+      exercised directly by the e2e spec), not hidden or worked around with a fake per-project seed.
+    - No new permission — reused `ingest.write`, the same permission the rest of the ingest-health page
+      already requires.
+  - `pnpm lint && pnpm typecheck && pnpm build` all green. `pnpm test`: 182 tests in `packages/shared`
+    (untouched), 42 dbt tests in `packages/dbt-transform` (untouched), 185 in
+    `packages/firebase-orm-models` (up from 173 — 12 new: 10 in `orchestration.emulator.test.ts` + 2 in
+    `orchestration/local-dbt-executor.test.ts`), 57 in `apps/api` (untouched), 275 web unit/route/
+    component tests (up from 269 — 6 new), 16/16 Playwright e2e specs (unique tests; the numbered list
+    Playwright prints runs higher than 16 once retries are counted). Several self-recovering flakes hit
+    across multiple full-suite runs during this session — `auth.spec.ts` sign-up, `keys.spec.ts`,
+    `metric-defs.spec.ts`, `orgs.spec.ts` invite/join, `resource-library.spec.ts`, and (new to this
+    run's own observation, not previously documented in this file) `schema-registry.spec.ts` — all the
+    same long-documented "resource contention under repeated dev-server + Chromium + Firestore/Auth-
+    emulator launches in one session" category every prior entry has recorded, confirmed by rerunning
+    `orgs.spec.ts` + `schema-registry.spec.ts` together in isolation (5/5 passed clean, zero retries)
+    after the rest of the suite had wound down — neither file is touched by this diff
+    (`git diff --stat` against both is empty). This session hit that flake category unusually hard
+    specifically because of the extensive manual `next dev` verification work above (many concurrent
+    dev-server/Chromium instances left running across several rounds of hand-testing before each was
+    cleaned up) — a self-inflicted, not environmental, aggravation worth calling out so a future run
+    doesn't read this entry's flake list as a sign the category has gotten worse.
+  - Branch `kan-38-orchestration`, PR #29. This entry is written before CI has finished — the PR
+    description documents the same scope/bugfix summary above.
+- **In progress (exact stopping point):** KAN-38 implementation, self-review (including the real
+  Next.js-bundling bug fix above), and local lint/typecheck/test/build are complete and green; opening
+  the PR is done, confirming CI is green and merging is the only remaining step for this story.
+- **Blocked + why:** nothing blocking; CI needs to run and go green before merge.
+- **Next step:** confirm PR #29's CI is green, merge (squash) into `main`, delete the branch if the git
+  remote allows it this time (every prior run this sandbox's remote has rejected branch deletion with an
+  HTTP 403). After that, **KAN-39** (cost guardrails: per-project BigQuery quotas/labels, query cost
+  logging) is the only remaining sprint-3 `todo` — likely the most infra-blocked of everything in this
+  sprint (needs a real BigQuery project to log real query costs against), though a "buildable today"
+  cost-*logging*-shape stand-in (recording *would-be* costs from compiled query metadata, without a real
+  warehouse to bill against) might still be scopeable; worth thinking through carefully before assuming
+  it's fully blocked, the same way KAN-37/KAN-38 both turned out more tractable than they first looked.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged branches from prior runs noted in earlier entries below, once this run's
+    own branch is also ready to prune.
+
+---
+
 ## 2026-07-07 — E4.1 dbt project: staging models + canonical entities/events/measures core tables (KAN-37)
 
 - **Last completed:**
