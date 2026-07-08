@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { PluginManifestView } from '@/lib/orgs/plugin-view';
+import { groupManifestsByPluginId, type PluginFamilyView, type PluginManifestView } from '@/lib/orgs/plugin-view';
 
 export interface InstallPluginFormProps {
   orgId: string;
@@ -14,36 +14,67 @@ export interface InstallPluginFormProps {
   manifests: readonly PluginManifestView[];
 }
 
-function manifestKey(manifest: Pick<PluginManifestView, 'pluginId' | 'version'>): string {
-  return `${manifest.pluginId}@${manifest.version}`;
+type ConfigValue = string | boolean;
+
+function newestVersion(family: PluginFamilyView): PluginManifestView {
+  return family.versions[family.versions.length - 1];
 }
 
 /**
- * Installs a registered manifest version into this project (KAN-46 AC:
- * "install-per-project flow (scope consent screen)"). The consent checkbox
- * covers the manifest's *entire* declared scope list — `installPlugin`
- * requires an exact match, so there's no partial-grant UI to build here.
- * Config fields render as a plain text/number input per `config_schema`
- * entry (a boolean field expects the literal text "true"/"false") — a
- * minimal, buildable-today form; richer per-type widgets (a real checkbox,
- * select, etc.) are KAN-48's "config forms rendered from config_schema"
- * scope, not this story's.
+ * Installs a registered manifest into this project (KAN-46 AC: "install-per-
+ * project flow (scope consent screen)"; KAN-48 AC: "Non-engineer installs
+ * and configures a plugin end-to-end"). A browsable card gallery (grouped by
+ * plugin id via `groupManifestsByPluginId`, one card per plugin) replaces
+ * picking a raw `pluginId@version` string out of a dropdown — a non-engineer
+ * can scan `displayName`/`type`/`scopes`/`registers` before picking. The
+ * consent checkbox covers the manifest's *entire* declared scope list —
+ * `installPlugin` requires an exact match, so there's no partial-grant UI to
+ * build. Config fields render a real typed widget per `config_schema` entry
+ * — a checkbox bound to an actual boolean for `boolean` fields (not the
+ * literal text "true"/"false" the pre-KAN-48 text input required), typed
+ * text/number inputs otherwise — with inline required-field validation
+ * feedback instead of a bare `*`.
  */
 export function InstallPluginForm({ orgId, projectId, manifests }: InstallPluginFormProps): React.ReactElement {
   const t = useTranslations('ProjectPlugins');
   const router = useRouter();
-  const [selectedKey, setSelectedKey] = useState(manifests[0] ? manifestKey(manifests[0]) : '');
+
+  const families = useMemo(() => groupManifestsByPluginId(manifests), [manifests]);
+
+  const [selectedPluginId, setSelectedPluginId] = useState(families[0]?.pluginId ?? '');
+  const selectedFamily = useMemo(() => families.find((family) => family.pluginId === selectedPluginId), [families, selectedPluginId]);
+
+  const [selectedVersion, setSelectedVersion] = useState(selectedFamily ? newestVersion(selectedFamily).version : '');
+  const selected = useMemo(() => {
+    if (!selectedFamily) {
+      return undefined;
+    }
+    return selectedFamily.versions.find((version) => version.version === selectedVersion) ?? newestVersion(selectedFamily);
+  }, [selectedFamily, selectedVersion]);
+
   const [consented, setConsented] = useState(false);
-  const [config, setConfig] = useState<Record<string, string>>({});
+  const [config, setConfig] = useState<Record<string, ConfigValue>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selected = useMemo(() => manifests.find((manifest) => manifestKey(manifest) === selectedKey), [manifests, selectedKey]);
-
-  function selectManifest(key: string): void {
-    setSelectedKey(key);
+  function resetSelection(): void {
     setConsented(false);
     setConfig({});
+    setFieldErrors({});
+    setError(null);
+  }
+
+  function selectPlugin(pluginId: string): void {
+    setSelectedPluginId(pluginId);
+    const family = families.find((candidate) => candidate.pluginId === pluginId);
+    setSelectedVersion(family ? newestVersion(family).version : '');
+    resetSelection();
+  }
+
+  function selectVersion(version: string): void {
+    setSelectedVersion(version);
+    resetSelection();
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -57,14 +88,27 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
       return;
     }
 
+    const nextFieldErrors: Record<string, string> = {};
     const parsedConfig: Record<string, unknown> = {};
     for (const [name, field] of Object.entries(selected.configSchema)) {
       const raw = config[name];
-      if (raw === undefined || raw === '') {
+      if (field.type === 'boolean') {
+        parsedConfig[name] = raw === true;
         continue;
       }
-      parsedConfig[name] = field.type === 'number' ? Number(raw) : field.type === 'boolean' ? raw === 'true' : raw;
+      if (raw === undefined || raw === '') {
+        if (field.required) {
+          nextFieldErrors[name] = t('configFieldRequiredError');
+        }
+        continue;
+      }
+      parsedConfig[name] = field.type === 'number' ? Number(raw) : raw;
     }
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      return;
+    }
+    setFieldErrors({});
 
     setSubmitting(true);
     try {
@@ -89,40 +133,75 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
         }
         return;
       }
-      setConsented(false);
-      setConfig({});
+      resetSelection();
       router.refresh();
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (manifests.length === 0) {
+  if (families.length === 0) {
     return <p className="text-muted-foreground">{t('noManifestsToInstall')}</p>;
   }
 
   return (
-    <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="install-plugin-select">
-          {t('selectPluginLabel')}
-        </label>
-        <select
-          id="install-plugin-select"
-          className="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
-          value={selectedKey}
-          onChange={(event) => selectManifest(event.target.value)}
-        >
-          {manifests.map((manifest) => (
-            <option key={manifestKey(manifest)} value={manifestKey(manifest)}>
-              {t('pluginOptionLabel', { displayName: manifest.displayName, version: manifest.version })}
-            </option>
-          ))}
-        </select>
+    <div className="flex flex-col gap-4">
+      <div role="listbox" aria-label={t('galleryLabel')} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {families.map((family) => {
+          const newest = newestVersion(family);
+          const isSelected = family.pluginId === selectedPluginId;
+          const registersCount = newest.registers.entities.length + newest.registers.events.length + newest.registers.metrics.length;
+          return (
+            <button
+              key={family.pluginId}
+              type="button"
+              role="option"
+              aria-selected={isSelected}
+              onClick={() => selectPlugin(family.pluginId)}
+              className={`flex flex-col gap-1.5 rounded-md border px-4 py-3 text-start text-sm shadow-sm transition-colors ${
+                isSelected ? 'border-primary ring-1 ring-primary' : 'border-input hover:border-primary/50'
+              }`}
+            >
+              <span className="font-medium">{newest.displayName}</span>
+              <span className="text-xs text-muted-foreground">{family.pluginId}</span>
+              <span className="text-xs text-muted-foreground">{t('galleryTypeLine', { type: newest.type })}</span>
+              <span className="text-xs text-muted-foreground">{t('galleryScopesLine', { scopes: newest.scopes.join(', ') })}</span>
+              {registersCount > 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  {t('galleryRegistersLine', {
+                    entities: newest.registers.entities.length,
+                    events: newest.registers.events.length,
+                    metrics: newest.registers.metrics.length,
+                  })}
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
 
       {selected ? (
-        <>
+        <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+          {selectedFamily && selectedFamily.versions.length > 1 ? (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium" htmlFor="install-plugin-version">
+                {t('selectVersionLabel')}
+              </label>
+              <select
+                id="install-plugin-version"
+                className="rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
+                value={selectedVersion}
+                onChange={(event) => selectVersion(event.target.value)}
+              >
+                {selectedFamily.versions.map((version) => (
+                  <option key={version.version} value={version.version}>
+                    {version.version}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
           <div className="flex flex-col gap-1.5 rounded-md border border-input px-3 py-2">
             <span className="text-sm font-medium">{t('scopesHeading')}</span>
             <ul className="text-sm text-muted-foreground">
@@ -141,32 +220,55 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
               <span className="text-sm font-medium">{t('configHeading')}</span>
               {Object.entries(selected.configSchema).map(([name, field]) => (
                 <div key={name} className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium" htmlFor={`install-plugin-config-${name}`}>
-                    {name}
-                    {field.required ? ' *' : ''}
-                  </label>
-                  <Input
-                    id={`install-plugin-config-${name}`}
-                    type={field.type === 'number' ? 'number' : 'text'}
-                    required={field.required}
-                    value={config[name] ?? ''}
-                    onChange={(event) => setConfig((prev) => ({ ...prev, [name]: event.target.value }))}
-                  />
+                  {field.type === 'boolean' ? (
+                    <label className="flex items-center gap-2 text-sm font-medium" htmlFor={`install-plugin-config-${name}`}>
+                      <input
+                        id={`install-plugin-config-${name}`}
+                        type="checkbox"
+                        checked={config[name] === true}
+                        onChange={(event) => setConfig((prev) => ({ ...prev, [name]: event.target.checked }))}
+                      />
+                      <span>
+                        {name}
+                        {field.required ? <span className="text-destructive"> {t('configFieldRequiredMarker')}</span> : null}
+                      </span>
+                    </label>
+                  ) : (
+                    <>
+                      <label className="text-sm font-medium" htmlFor={`install-plugin-config-${name}`}>
+                        {name}
+                        {field.required ? <span className="text-destructive"> {t('configFieldRequiredMarker')}</span> : null}
+                      </label>
+                      <Input
+                        id={`install-plugin-config-${name}`}
+                        type={field.type === 'number' ? 'number' : 'text'}
+                        required={field.required}
+                        aria-invalid={Boolean(fieldErrors[name])}
+                        value={typeof config[name] === 'string' ? (config[name] as string) : ''}
+                        onChange={(event) => setConfig((prev) => ({ ...prev, [name]: event.target.value }))}
+                      />
+                    </>
+                  )}
+                  {fieldErrors[name] ? (
+                    <p role="alert" className="text-xs text-destructive">
+                      {fieldErrors[name]}
+                    </p>
+                  ) : null}
                 </div>
               ))}
             </div>
           ) : null}
-        </>
-      ) : null}
 
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+          <Button type="submit" disabled={submitting}>
+            {t('installButton')}
+          </Button>
+        </form>
       ) : null}
-      <Button type="submit" disabled={submitting || !selected}>
-        {t('installButton')}
-      </Button>
-    </form>
+    </div>
   );
 }

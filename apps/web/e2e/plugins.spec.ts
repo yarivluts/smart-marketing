@@ -30,10 +30,16 @@ display_name: Shopify Commerce Pack
 scopes: [ingest:write, schema:write]
 config_schema:
   shop_domain: { type: string, required: true }
+  sandbox_mode: { type: boolean }
+registers:
+  entities: [customer, order]
+  events: [order_placed]
 `;
 
-test.describe('Plugins: register a manifest, install it into a project, disable/enable/uninstall (KAN-46)', () => {
-  test('an org owner registers a manifest, installs it with scope consent, then disables/enables/uninstalls it', async ({ page }) => {
+test.describe('Plugins: register a manifest, install it via the gallery, disable/enable/uninstall, see health (KAN-46/47/48)', () => {
+  test('an org owner registers a manifest, installs it from the plugin gallery with a config form + scope consent, then sees run health and disables/enables/uninstalls it', async ({
+    page,
+  }) => {
     // This spec drives a longer chain of actions (register -> install -> disable -> enable -> uninstall)
     // than most e2e specs in this suite; the default 30s test timeout is too tight under this sandbox's
     // documented dev-server/emulator contention (see PROGRESS.md), the same reasoning KAN-38's own
@@ -62,7 +68,27 @@ test.describe('Plugins: register a manifest, install it into a project, disable/
     await expect(page).toHaveURL(/\/en\/orgs\/[^/]+\/projects\/[^/]+\/plugins$/);
 
     await expect(page.getByText('No plugins have been installed in this project yet.')).toBeVisible();
+
+    // KAN-48: a browsable gallery card (not a raw pluginId@version dropdown) — scan its
+    // display name/type/scopes/registers, then pick it.
+    const galleryCard = page.getByRole('option', { name: /Shopify Commerce Pack/ });
+    await expect(galleryCard.getByText('Type: source')).toBeVisible();
+    await expect(galleryCard.getByText('Requests: ingest:write, schema:write')).toBeVisible();
+    await expect(galleryCard.getByText('Registers: 2 entities · 1 events · 0 metrics')).toBeVisible();
+    await galleryCard.click();
+    await expect(galleryCard).toHaveAttribute('aria-selected', 'true');
+
+    // KAN-48: the boolean config field renders as a real checkbox, not a text input expecting
+    // the literal string "true".
+    const sandboxCheckbox = page.getByLabel(/sandbox_mode/);
+    await expect(sandboxCheckbox).toHaveAttribute('type', 'checkbox');
+    await expect(sandboxCheckbox).not.toBeChecked();
+
+    // KAN-48: submitting without a required field shows an inline error and doesn't install yet.
     await page.getByLabel("I've reviewed and approve these scopes").check();
+    await page.getByRole('button', { name: 'Install plugin' }).click();
+    await expect(page.getByText('This field is required.')).toBeVisible();
+
     await page.getByLabel(/shop_domain/).fill('my-shop.myshopify.com');
     await page.getByRole('button', { name: 'Install plugin' }).click();
 
@@ -71,13 +97,19 @@ test.describe('Plugins: register a manifest, install it into a project, disable/
     await expect(page.getByRole('listitem').getByText('com.example.shopify-pack · v1.0.0')).toBeVisible();
     await expect(page.getByText('Installed', { exact: true })).toBeVisible();
 
-    // KAN-47: the install is a `source`-type manifest, so a "Source runtime" section with a
-    // run-now button + run history should now be visible for it.
+    // KAN-47/48: the install is a `source`-type manifest, so a "Source runtime" section with a
+    // health summary, run-now button, and a collapsible run history should now be visible.
     await expect(page.getByRole('heading', { name: 'Source runtime' })).toBeVisible();
+    await expect(page.getByText('Never run')).toBeVisible();
+    await page.getByText('Run history').click();
     await expect(page.getByText('No sync runs yet.')).toBeVisible();
+
     await page.getByRole('button', { name: 'Run now' }).click();
     await expect(page.getByText(/Succeeded · started/)).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('3 fetched · 0 accepted · 3 quarantined · 0 duplicate')).toBeVisible();
+    // The health summary rolls the same outcome up to a glance, above the run-history detail.
+    await expect(page.getByText('Healthy')).toBeVisible();
+    await expect(page.getByText(/Last succeeded/)).toBeVisible();
 
     await page.getByRole('button', { name: 'Disable' }).click();
     await expect(page.getByText('Disabled', { exact: true })).toBeVisible();
