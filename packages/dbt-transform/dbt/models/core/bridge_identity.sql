@@ -129,38 +129,22 @@ all_links as (
 ),
 
 -- Collapse every link between one (anon_id, customer_id) pair down to its
--- single best (lowest-precedence, then earliest) piece of evidence.
-pair_best as (
-    select
-        organization_id, project_id, environment_id, anon_id, customer_id,
-        min(precedence) as precedence,
-        min(observed_at) as observed_at
-    from all_links
-    group by 1, 2, 3, 4, 5
-),
-
-pair_method as (
-    select
-        organization_id, project_id, environment_id, anon_id, customer_id, method,
-        row_number() over (
-            partition by organization_id, project_id, environment_id, anon_id, customer_id
-            order by precedence asc, observed_at asc
-        ) as rn
-    from all_links
-),
-
+-- single best (lowest-precedence, then earliest) piece of evidence — taking
+-- `precedence`/`observed_at`/`method` from that *one* winning row, not
+-- independently min()-ing each column (which could otherwise stitch a
+-- winning precedence to a different, weaker link's own timestamp).
 pairs as (
-    select
-        b.organization_id, b.project_id, b.environment_id, b.anon_id, b.customer_id,
-        b.precedence, b.observed_at, m.method
-    from pair_best b
-    inner join pair_method m
-        on m.organization_id = b.organization_id
-        and m.project_id = b.project_id
-        and m.environment_id = b.environment_id
-        and m.anon_id = b.anon_id
-        and m.customer_id = b.customer_id
-        and m.rn = 1
+    select organization_id, project_id, environment_id, anon_id, customer_id, method, precedence, observed_at
+    from (
+        select
+            organization_id, project_id, environment_id, anon_id, customer_id, method, precedence, observed_at,
+            row_number() over (
+                partition by organization_id, project_id, environment_id, anon_id, customer_id
+                order by precedence asc, observed_at asc
+            ) as rn
+        from all_links
+    )
+    where rn = 1
 ),
 
 conflict_counts as (
