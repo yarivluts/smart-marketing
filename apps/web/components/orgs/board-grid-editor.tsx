@@ -1,0 +1,368 @@
+'use client';
+
+import { useState } from 'react';
+import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import type { TileRenderView } from '@/lib/orgs/board-view';
+import { BOARD_GRID_COLUMNS, BOARD_TILE_TYPES, defaultTileSize, nextTileRow, type BoardTileRow, type BoardTileTypeRow, type MetricCatalogEntryRow } from './board-types';
+import { BoardTileView } from './board-tile-view';
+
+export interface BoardGridEditorProps {
+  orgId: string;
+  projectId: string;
+  boardId: string;
+  initialTiles: BoardTileRow[];
+  metricCatalog: MetricCatalogEntryRow[];
+  renderViews: Record<string, TileRenderView>;
+}
+
+function newTileId(): string {
+  return `tile-${Math.random().toString(36).slice(2)}-${Date.now()}`;
+}
+
+function blankTile(metricCatalog: MetricCatalogEntryRow[], existingTiles: BoardTileRow[]): BoardTileRow {
+  const type: BoardTileTypeRow = 'big_number';
+  const firstMetric = metricCatalog[0]?.name;
+  return {
+    id: newTileId(),
+    type,
+    title: '',
+    layout: { x: 0, y: nextTileRow(existingTiles), ...defaultTileSize(type) },
+    metricNames: firstMetric ? [firstMetric] : [],
+    dimensions: [],
+  };
+}
+
+interface TileEditCardProps {
+  tile: BoardTileRow;
+  metricCatalog: MetricCatalogEntryRow[];
+  draggable: boolean;
+  onChange: (next: BoardTileRow) => void;
+  onRemove: () => void;
+  onDragStart: () => void;
+  onDrop: () => void;
+}
+
+function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDragStart, onDrop }: TileEditCardProps): React.ReactElement {
+  const t = useTranslations('Boards');
+  const dimensionOptions = tile.type === 'funnel' ? [] : (metricCatalog.find((entry) => entry.name === tile.metricNames[0])?.dimensions ?? []);
+
+  function setType(type: BoardTileTypeRow): void {
+    const size = defaultTileSize(type);
+    const isFunnel = type === 'funnel';
+    onChange({
+      ...tile,
+      type,
+      layout: { ...tile.layout, w: size.w, h: size.h },
+      metricNames: isFunnel ? (tile.metricNames.length >= 2 ? tile.metricNames : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? '', metricCatalog[1]?.name ?? metricCatalog[0]?.name ?? '']) : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? ''],
+      dimensions: isFunnel ? [] : tile.dimensions,
+    });
+  }
+
+  function setSingleMetric(name: string): void {
+    onChange({ ...tile, metricNames: [name], dimensions: [] });
+  }
+
+  function setFunnelStep(index: number, name: string): void {
+    onChange({ ...tile, metricNames: tile.metricNames.map((existing, i) => (i === index ? name : existing)) });
+  }
+
+  function addFunnelStep(): void {
+    onChange({ ...tile, metricNames: [...tile.metricNames, metricCatalog[0]?.name ?? ''] });
+  }
+
+  function removeFunnelStep(index: number): void {
+    onChange({ ...tile, metricNames: tile.metricNames.filter((_, i) => i !== index) });
+  }
+
+  function toggleDimension(dimension: string): void {
+    const has = tile.dimensions.includes(dimension);
+    onChange({ ...tile, dimensions: has ? tile.dimensions.filter((d) => d !== dimension) : [...tile.dimensions, dimension] });
+  }
+
+  return (
+    <div
+      className="flex h-full flex-col gap-2 overflow-auto rounded-md border border-input bg-card p-3"
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        onDrop();
+      }}
+      data-testid={`tile-edit-card-${tile.id}`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="cursor-move text-xs text-muted-foreground" aria-hidden="true">
+          {t('dragHandleLabel')}
+        </span>
+        <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+          {t('removeTileButton')}
+        </Button>
+      </div>
+
+      <Input
+        aria-label={t('tileTitleLabel')}
+        placeholder={t('tileTitlePlaceholder')}
+        value={tile.title}
+        onChange={(event) => onChange({ ...tile, title: event.target.value })}
+      />
+
+      <select
+        aria-label={t('tileTypeLabel')}
+        value={tile.type}
+        onChange={(event) => setType(event.target.value as BoardTileTypeRow)}
+        className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+      >
+        {BOARD_TILE_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {t(`tileType.${type}`)}
+          </option>
+        ))}
+      </select>
+
+      {tile.type === 'funnel' ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-muted-foreground">{t('funnelStepsLabel')}</span>
+          {tile.metricNames.map((name, index) => (
+            <div key={index} className="flex items-center gap-1">
+              <select
+                aria-label={t('funnelStepLabel', { step: index + 1 })}
+                value={name}
+                onChange={(event) => setFunnelStep(index, event.target.value)}
+                className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm"
+              >
+                {metricCatalog.map((entry) => (
+                  <option key={entry.name} value={entry.name}>
+                    {entry.name}
+                  </option>
+                ))}
+              </select>
+              {tile.metricNames.length > 2 ? (
+                <Button type="button" variant="ghost" size="sm" onClick={() => removeFunnelStep(index)}>
+                  {t('removeFunnelStepButton')}
+                </Button>
+              ) : null}
+            </div>
+          ))}
+          <Button type="button" variant="outline" size="sm" className="self-start" onClick={addFunnelStep}>
+            {t('addFunnelStepButton')}
+          </Button>
+        </div>
+      ) : (
+        <>
+          <select
+            aria-label={t('tileMetricLabel')}
+            value={tile.metricNames[0] ?? ''}
+            onChange={(event) => setSingleMetric(event.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            {metricCatalog.map((entry) => (
+              <option key={entry.name} value={entry.name}>
+                {entry.name}
+              </option>
+            ))}
+          </select>
+          {tile.type !== 'big_number' && dimensionOptions.length > 0 ? (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">{t('tileDimensionsLabel')}</span>
+              {dimensionOptions.map((dimension) => (
+                <label key={dimension} className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={tile.dimensions.includes(dimension)} onChange={() => toggleDimension(dimension)} />
+                  {dimension}
+                </label>
+              ))}
+            </div>
+          ) : null}
+        </>
+      )}
+
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          {t('tileWidthLabel')}
+          <Input
+            type="number"
+            min={1}
+            max={BOARD_GRID_COLUMNS}
+            className="h-8 w-16"
+            value={tile.layout.w}
+            onChange={(event) => onChange({ ...tile, layout: { ...tile.layout, w: Math.max(1, Math.min(BOARD_GRID_COLUMNS, Number(event.target.value) || 1)) } })}
+          />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          {t('tileHeightLabel')}
+          <Input
+            type="number"
+            min={1}
+            max={12}
+            className="h-8 w-16"
+            value={tile.layout.h}
+            onChange={(event) => onChange({ ...tile, layout: { ...tile.layout, h: Math.max(1, Number(event.target.value) || 1) } })}
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The board's grid — a plain 12-column CSS grid (`BOARD_GRID_COLUMNS`), each
+ * tile positioned via `grid-column`/`grid-row` from its own `layout`. View
+ * mode renders every tile's already-queried data (`renderViews`, computed
+ * server-side by the board page); edit mode swaps to editable cards with a
+ * native HTML5 drag-and-drop position swap, add/remove, and w/h resize
+ * inputs — the KAN-60 AC's "build a board with 6 tiles without code; layout
+ * persists" surface. Every edit is staged in local state; nothing reaches
+ * Firestore until "Save layout" replaces the board's whole `tiles` array in
+ * one write (see `saveBoardTiles`'s own doc comment for why).
+ */
+export function BoardGridEditor({ orgId, projectId, boardId, initialTiles, metricCatalog, renderViews }: BoardGridEditorProps): React.ReactElement {
+  const t = useTranslations('Boards');
+  const router = useRouter();
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [tiles, setTiles] = useState<BoardTileRow[]>(initialTiles);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function updateTile(id: string, next: BoardTileRow): void {
+    setTiles((current) => current.map((tile) => (tile.id === id ? next : tile)));
+  }
+
+  function removeTile(id: string): void {
+    setTiles((current) => current.filter((tile) => tile.id !== id));
+  }
+
+  function addTile(): void {
+    setTiles((current) => [...current, blankTile(metricCatalog, current)]);
+  }
+
+  function swapPositions(targetId: string): void {
+    if (!draggedId || draggedId === targetId) {
+      return;
+    }
+    setTiles((current) => {
+      const dragged = current.find((tile) => tile.id === draggedId);
+      const target = current.find((tile) => tile.id === targetId);
+      if (!dragged || !target) {
+        return current;
+      }
+      const draggedLayout = dragged.layout;
+      return current.map((tile) => {
+        if (tile.id === draggedId) {
+          return { ...tile, layout: { ...target.layout } };
+        }
+        if (tile.id === targetId) {
+          return { ...tile, layout: { ...draggedLayout } };
+        }
+        return tile;
+      });
+    });
+    setDraggedId(null);
+  }
+
+  async function handleSave(): Promise<void> {
+    setError(null);
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/boards/${boardId}/tiles`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tiles }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null;
+        setError(body?.error === 'invalid_board' ? t('saveLayoutInvalidError') : t('saveLayoutError'));
+        return;
+      }
+      setMode('view');
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleCancel(): void {
+    setTiles(initialTiles);
+    setError(null);
+    setMode('view');
+  }
+
+  const displayTiles = mode === 'edit' ? tiles : initialTiles;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold">{t('tilesHeading')}</h2>
+        {mode === 'view' ? (
+          <Button type="button" variant="outline" onClick={() => setMode('edit')}>
+            {t('editLayoutButton')}
+          </Button>
+        ) : (
+          <div className="flex items-center gap-2">
+            {metricCatalog.length === 0 ? <span className="text-xs text-muted-foreground">{t('noMetricsRegistered')}</span> : null}
+            <Button type="button" variant="outline" onClick={addTile} disabled={metricCatalog.length === 0}>
+              {t('addTileButton')}
+            </Button>
+            <Button type="button" variant="ghost" onClick={handleCancel} disabled={saving}>
+              {t('cancelEditButton')}
+            </Button>
+            <Button type="button" onClick={handleSave} disabled={saving}>
+              {t('saveLayoutButton')}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+
+      {displayTiles.length === 0 ? (
+        <p className="text-muted-foreground">{t('noTiles')}</p>
+      ) : (
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${BOARD_GRID_COLUMNS}, minmax(0, 1fr))`, gridAutoRows: '2.5rem' }}>
+          {displayTiles.map((tile) =>
+            mode === 'edit' ? (
+              <div
+                key={tile.id}
+                style={{
+                  gridColumn: `${tile.layout.x + 1} / span ${tile.layout.w}`,
+                  gridRow: `${tile.layout.y + 1} / span ${tile.layout.h}`,
+                }}
+              >
+                <TileEditCard
+                  tile={tile}
+                  metricCatalog={metricCatalog}
+                  draggable
+                  onChange={(next) => updateTile(tile.id, next)}
+                  onRemove={() => removeTile(tile.id)}
+                  onDragStart={() => setDraggedId(tile.id)}
+                  onDrop={() => swapPositions(tile.id)}
+                />
+              </div>
+            ) : (
+              <div
+                key={tile.id}
+                className="flex flex-col gap-1 rounded-md border border-input bg-card p-3"
+                style={{
+                  gridColumn: `${tile.layout.x + 1} / span ${tile.layout.w}`,
+                  gridRow: `${tile.layout.y + 1} / span ${tile.layout.h}`,
+                }}
+              >
+                <span className="text-sm font-medium">{tile.title || t(`tileType.${tile.type}`)}</span>
+                <div className="flex-1">
+                  <BoardTileView tile={tile} view={renderViews[tile.id] ?? { kind: 'unavailable', reason: 'query_error', message: tile.id }} />
+                </div>
+              </div>
+            ),
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

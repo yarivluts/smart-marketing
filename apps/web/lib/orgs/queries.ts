@@ -1,19 +1,24 @@
 import 'server-only';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
+  getBoard as getBoardInOrganization,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getProjectCostQuota as getProjectCostQuotaInOrganization,
   listTrackingAlertsForProject as listTrackingAlertsForProjectInOrganization,
   type ApiKeySummary,
+  type BoardModel,
+  type BoardTile,
   type EnvironmentModel,
   type EventVolumeOverviewEntry,
   listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
   listApiKeysForProject as listApiKeysForProjectInOrganization,
   listAttachmentsForProject as listAttachmentsForProjectInOrganization,
   listAuditLogEntriesForOrg as listAuditLogEntriesForOrgInOrganization,
+  listBoardsForProject as listBoardsForProjectInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
+  listMetricsCatalogForProject as listMetricsCatalogForProjectInOrganization,
   listOrgMembersWithProfiles,
   listOrchestrationRunsForProject as listOrchestrationRunsForProjectInOrganization,
   listOrgPeople as listOrgPeopleInOrganization,
@@ -30,12 +35,15 @@ import {
   listSharedCredentials as listSharedCredentialsInOrganization,
   MembershipModel,
   OrganizationModel,
+  queryBoardTile as queryBoardTileInOrganization,
   UserModel,
   verifyAuditLogChainForOrg as verifyAuditLogChainForOrgInOrganization,
   type AuditLogChainVerification,
   type AuditLogEntryModel,
+  type BoardTileQueryOutcome,
   type IngestBatchModel,
   type MembershipStatus,
+  type MetricCatalogEntry,
   type MetricDefModel,
   type OrchestrationRunModel,
   type OrgMemberSummary,
@@ -239,6 +247,33 @@ export async function listSourcePluginRunsForInstall(
 ): Promise<PluginSourceRunModel[]> {
   await ensureFirestoreOrm();
   return listSourcePluginRunsForInstallInOrganization(organizationId, projectId, installId, limit);
+}
+
+export async function listBoardsForProject(organizationId: string, projectId: string): Promise<BoardModel[]> {
+  await ensureFirestoreOrm();
+  return listBoardsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getBoard(organizationId: string, projectId: string, boardId: string): Promise<BoardModel | null> {
+  await ensureFirestoreOrm();
+  return getBoardInOrganization(organizationId, projectId, boardId);
+}
+
+/** Every `active` metric registered in a project — the shape a board's tile-editor metric picker (KAN-60) reads from (plan `10 §2.2`: "metric picker from the semantic layer, never free-SQL by default"). */
+export async function listMetricsCatalogForProject(organizationId: string, projectId: string): Promise<MetricCatalogEntry[]> {
+  await ensureFirestoreOrm();
+  return listMetricsCatalogForProjectInOrganization(organizationId, projectId);
+}
+
+/** One tile's queried data (or a typed, renderable "why not" outcome — see `BoardTileQueryOutcome`'s own doc comment) for board render time. */
+export async function queryBoardTile(
+  organizationId: string,
+  projectId: string,
+  board: Pick<BoardModel, 'date_range' | 'compare' | 'global_filters'>,
+  tile: BoardTile,
+): Promise<BoardTileQueryOutcome> {
+  await ensureFirestoreOrm();
+  return queryBoardTileInOrganization({ organizationId, projectId, board, tile });
 }
 
 export interface PendingAttachmentDetails {

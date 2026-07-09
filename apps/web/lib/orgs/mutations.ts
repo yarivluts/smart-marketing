@@ -3,13 +3,17 @@ import {
   acceptInvite as acceptInviteForOrganization,
   type ApiKeyModel,
   type ApiKeyScope,
+  type BoardModel,
+  type BoardTile,
   checkTrackingAlertsForProject as checkTrackingAlertsForProjectInOrganization,
+  createBoard as createBoardInOrganization,
   createOrganizationWithOwner,
   createOrgPerson as createOrgPersonInOrganization,
   createProject as createProjectInOrganization,
   createResourceTemplate as createResourceTemplateInOrganization,
   createSharedCredential as createSharedCredentialInOrganization,
   decideResourceAttachment as decideResourceAttachmentInOrganization,
+  deleteBoard as deleteBoardInOrganization,
   disablePlugin as disablePluginInOrganization,
   type DrainPipelineResult,
   detachResource as detachResourceInOrganization,
@@ -17,6 +21,8 @@ import {
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   installPlugin as installPluginInOrganization,
+  saveBoardTiles as saveBoardTilesInOrganization,
+  updateBoardSettings as updateBoardSettingsInOrganization,
   processStripeWebhookEvent as processStripeWebhookEventInOrganization,
   runSourcePluginInstall as runSourcePluginInstallInOrganization,
   inviteMemberToOrganization,
@@ -469,4 +475,50 @@ interface ProcessStripeWebhookEventInput {
 export async function processStripeWebhookEvent(input: ProcessStripeWebhookEventInput): Promise<ProcessStripeWebhookEventResult> {
   await ensureFirestoreOrm();
   return processStripeWebhookEventInOrganization(input);
+}
+
+interface CreateBoardInput {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  createdByUserId: string;
+}
+
+export async function createBoard(input: CreateBoardInput): Promise<BoardModel> {
+  await ensureFirestoreOrm();
+  return createBoardInOrganization(input);
+}
+
+interface UpdateBoardSettingsInput {
+  organizationId: string;
+  projectId: string;
+  boardId: string;
+  name?: string;
+  dateRange?: BoardModel['date_range'];
+  compare?: BoardModel['compare'] | null;
+  globalFilters?: BoardModel['global_filters'];
+  updatedByUserId: string;
+}
+
+export async function updateBoardSettings(input: UpdateBoardSettingsInput): Promise<BoardModel> {
+  await ensureFirestoreOrm();
+  return updateBoardSettingsInOrganization(input);
+}
+
+interface SaveBoardTilesInput {
+  organizationId: string;
+  projectId: string;
+  boardId: string;
+  tiles: BoardTile[];
+  updatedByUserId: string;
+}
+
+export async function saveBoardTiles(input: SaveBoardTilesInput): Promise<BoardModel> {
+  await ensureFirestoreOrm();
+  return saveBoardTilesInOrganization(input);
+}
+
+export async function deleteBoard(organizationId: string, projectId: string, boardId: string): Promise<void> {
+  await ensureFirestoreOrm();
+  return deleteBoardInOrganization(organizationId, projectId, boardId);
 }
