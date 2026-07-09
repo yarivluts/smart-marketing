@@ -48,9 +48,21 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     await page.getByRole('button', { name: 'Create key' }).click();
 
     await expect(page.getByText("Copy this key now — it won't be shown again.")).toBeVisible();
-    const rawKeyLocator = page.locator('code').filter({ hasText: 'gos_live_' });
+    // KAN-57 also renders the touchpoint-capture embed snippet alongside the
+    // raw key (it embeds the same key inline), so the raw-key locator must be
+    // scoped to `MintedApiKeyDisplay`'s own element, not any `<code>` block.
+    const rawKeyLocator = page.getByTestId('minted-api-key-value');
     const rawKey = await rawKeyLocator.innerText();
     expect(rawKey).toMatch(/^gos_live_/);
+
+    // KAN-57: minting a key with `ingest.write` also surfaces the touchpoint-capture
+    // embed snippet, since the raw key it needs is only ever available right here.
+    await expect(page.getByText('Website tracking snippet')).toBeVisible();
+    await expect(page.locator('pre code')).toContainText(rawKey);
+    await page.getByRole('button', { name: 'Copy snippet' }).click();
+    const snippetClipboardText = await page.evaluate(() => navigator.clipboard.readText());
+    expect(snippetClipboardText).toContain(rawKey);
+    expect(snippetClipboardText).toContain('window.growthos');
 
     await page.getByRole('button', { name: 'Copy' }).click();
     await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();

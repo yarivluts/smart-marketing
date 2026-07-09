@@ -18,7 +18,12 @@ const ENVIRONMENTS = [
 function renderForm(): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CreateApiKeyForm orgId="org-1" projectId="project-1" environments={ENVIRONMENTS} />
+      <CreateApiKeyForm
+        orgId="org-1"
+        projectId="project-1"
+        environments={ENVIRONMENTS}
+        ingestBaseUrl="https://api.example.com/v1/ingest"
+      />
     </NextIntlClientProvider>,
   );
 }
@@ -70,6 +75,36 @@ describe('CreateApiKeyForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(refresh).toHaveBeenCalled();
     expect(screen.queryByText('gos_live_abcdef1234567890')).not.toBeInTheDocument();
+  });
+
+  it('shows the touchpoint-capture embed snippet only when the minted key includes ingest.write', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ apiKeyId: 'key-1', keyPrefix: 'gos_live_ab', rawKey: 'gos_live_abcdef1234567890' }),
+    } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'CI key' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'ingest.write' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
+
+    expect(await screen.findByText('Website tracking snippet')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy snippet' })).toBeInTheDocument();
+  });
+
+  it('omits the touchpoint-capture embed snippet when the minted key has no ingest.write scope', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ apiKeyId: 'key-1', keyPrefix: 'gos_live_ab', rawKey: 'gos_live_abcdef1234567890' }),
+    } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'CI key' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'metrics.write' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create key' }));
+
+    await screen.findByText('gos_live_abcdef1234567890');
+    expect(screen.queryByText('Website tracking snippet')).not.toBeInTheDocument();
   });
 
   it('disables submit until at least one scope is checked', () => {

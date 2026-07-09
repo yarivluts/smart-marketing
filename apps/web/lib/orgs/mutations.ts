@@ -18,6 +18,8 @@ import {
   type DrainPipelineResult,
   detachResource as detachResourceInOrganization,
   enablePlugin as enablePluginInOrganization,
+  type EnsureTouchpointSchemaRegisteredResult,
+  ensureTouchpointSchemaRegistered as ensureTouchpointSchemaRegisteredInOrganization,
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   installPlugin as installPluginInOrganization,
@@ -390,6 +392,19 @@ export async function checkTrackingAlertsForProject(input: CheckTrackingAlertsIn
     projectId: input.projectId,
     triggeredByUserId: input.triggeredByUserId,
   });
+}
+
+interface EnsureTouchpointSchemaRegisteredInput {
+  organizationId: string;
+  projectId: string;
+  createdByUserId: string;
+}
+
+export async function ensureTouchpointSchemaRegistered(
+  input: EnsureTouchpointSchemaRegisteredInput,
+): Promise<EnsureTouchpointSchemaRegisteredResult> {
+  await ensureFirestoreOrm();
+  return ensureTouchpointSchemaRegisteredInOrganization(input);
 }
 
 interface RegisterPluginManifestInput {

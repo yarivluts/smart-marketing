@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listApiKeysForProject, listEnvironmentsForProject, listOrgProjects } from '@/lib/orgs/queries';
+import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
 import { RevokeApiKeyButton } from '@/components/orgs/revoke-api-key-button';
 
@@ -110,7 +111,7 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
         {environmentOptions.length === 0 ? (
           <p className="text-muted-foreground">{t('noEnvironments')}</p>
         ) : (
-          <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} />
+          <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
         )}
       </section>
     </main>

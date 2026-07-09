@@ -187,7 +187,10 @@
     "copied": "הועתק",
     "done": "סיום",
     "revoke": "ביטול",
-    "revokeError": "לא ניתן היה לבטל את המפתח. נסה שוב."
+    "revokeError": "לא ניתן היה לבטל את המפתח. נסה שוב.",
+    "touchpointSnippetHeading": "קטע מעקב לאתר",
+    "touchpointSnippetIntro": "הדביקו קטע זה פעם אחת, ממש לפני תגית הסגירה של ה-body, בכל עמוד שברצונכם לעקוב אחריו. הקטע לוכד פרמטרי UTM ומזהי קליק ממודעות בעת הכניסה ומצרף אותם לכל אירוע שהפרויקט של מפתח זה רושם.",
+    "copySnippet": "העתקת הקטע"
   },
   "SchemaRegistry": {
     "metaTitle": "מרשם סכימות",
@@ -238,7 +241,12 @@
     "trackingAlertStatusActive": "פעילה — שקטה למעלה משעה",
     "trackingAlertStatusResolved": "נפתרה",
     "trackingAlertCheckButton": "בדוק עכשיו",
-    "trackingAlertCheckError": "משהו השתבש. נסה שוב."
+    "trackingAlertCheckError": "משהו השתבש. נסה שוב.",
+    "touchpointCaptureHeading": "לכידת נקודות מגע",
+    "touchpointSchemaIntro": "הגדירו זאת פעם אחת כדי שאירועים מקטע המעקב לאתר (ראו בעמוד מפתחות ה-API) לא יוסגרו בהסגר עקב סכימה לא רשומה.",
+    "touchpointSchemaAlreadyRegistered": "סכימת נקודות המגע רשומה עבור פרויקט זה.",
+    "touchpointSchemaSetupButton": "הגדרת לכידת נקודות מגע",
+    "touchpointSchemaSetupError": "משהו השתבש. נסה שוב."
   },
   "MetricRegistry": {
     "metaTitle": "קטלוג מדדים",

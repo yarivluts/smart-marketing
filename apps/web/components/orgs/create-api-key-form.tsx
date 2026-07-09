@@ -7,6 +7,7 @@ import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MintedApiKeyDisplay } from './minted-api-key-display';
+import { TouchpointSnippetDisplay } from './touchpoint-snippet-display';
 
 export interface ProjectEnvironmentOption {
   id: string;
@@ -17,14 +18,16 @@ export interface CreateApiKeyFormProps {
   orgId: string;
   projectId: string;
   environments: readonly ProjectEnvironmentOption[];
+  ingestBaseUrl: string;
 }
 
 interface MintedKey {
   keyPrefix: string;
   rawKey: string;
+  scopes: ApiKeyScope[];
 }
 
-export function CreateApiKeyForm({ orgId, projectId, environments }: CreateApiKeyFormProps): React.ReactElement {
+export function CreateApiKeyForm({ orgId, projectId, environments, ingestBaseUrl }: CreateApiKeyFormProps): React.ReactElement {
   const t = useTranslations('ApiKeys');
   const tEnv = useTranslations('EnvBadge');
   const router = useRouter();
@@ -56,7 +59,7 @@ export function CreateApiKeyForm({ orgId, projectId, environments }: CreateApiKe
         return;
       }
       const body = (await response.json()) as { keyPrefix: string; rawKey: string };
-      setMintedKey({ keyPrefix: body.keyPrefix, rawKey: body.rawKey });
+      setMintedKey({ keyPrefix: body.keyPrefix, rawKey: body.rawKey, scopes: selectedScopes });
       setName('');
       setSelectedScopes([]);
     } finally {
@@ -70,7 +73,14 @@ export function CreateApiKeyForm({ orgId, projectId, environments }: CreateApiKe
   }
 
   if (mintedKey) {
-    return <MintedApiKeyDisplay rawKey={mintedKey.rawKey} onDismiss={handleMintedKeyDismiss} />;
+    return (
+      <div className="flex flex-col gap-4">
+        <MintedApiKeyDisplay rawKey={mintedKey.rawKey} onDismiss={handleMintedKeyDismiss} />
+        {mintedKey.scopes.includes('ingest.write') ? (
+          <TouchpointSnippetDisplay writeKey={mintedKey.rawKey} ingestBaseUrl={ingestBaseUrl} />
+        ) : null}
+      </div>
+    );
   }
 
   return (

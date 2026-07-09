@@ -16,6 +16,7 @@ import { RegisterSchemaDefForm } from '@/components/orgs/register-schema-def-for
 import { SchemaFamilyCard, type SchemaVersionView } from '@/components/orgs/schema-family-card';
 import { CheckTrackingAlertsButton } from '@/components/orgs/check-tracking-alerts-button';
 import { EventVolumeSparkline } from '@/components/orgs/event-volume-sparkline';
+import { RegisterTouchpointSchemaButton } from '@/components/orgs/register-touchpoint-schema-button';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -89,12 +90,23 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
 
   const families = groupIntoFamilies(schemaDefs.map(toSchemaDefView));
   const trackingAlertViews = trackingAlerts.map(toTrackingAlertView);
+  const touchpointSchemaRegistered = schemaDefs.some((schemaDef) => schemaDef.kind === 'event' && schemaDef.name === 'touchpoint');
 
   const t = await getTranslations('SchemaRegistry');
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">{t('touchpointCaptureHeading')}</h2>
+          {!touchpointSchemaRegistered ? <RegisterTouchpointSchemaButton orgId={orgId} projectId={projectId} /> : null}
+        </div>
+        <p className="text-muted-foreground">
+          {touchpointSchemaRegistered ? t('touchpointSchemaAlreadyRegistered') : t('touchpointSchemaIntro')}
+        </p>
+      </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('registeredHeading')}</h2>
