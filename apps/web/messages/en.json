@@ -74,7 +74,8 @@
     "projectIngestHealthLink": "Ingest health",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
-    "projectPluginsLink": "Plugins"
+    "projectPluginsLink": "Plugins",
+    "projectBoardsLink": "Boards"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -428,5 +429,88 @@
     "sourceRunStatusSucceeded": "Succeeded",
     "sourceRunStatusFailed": "Failed",
     "sourceRunCursorFromScratch": "from scratch"
+  },
+  "Boards": {
+    "metaTitle": "Boards",
+    "title": "Boards for {projectName}",
+    "boardsHeading": "Boards",
+    "noBoards": "This project has no boards yet.",
+    "tileCountLabel": "{count, plural, one {# tile} other {# tiles}}",
+    "createHeading": "New board",
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g. Marketing overview",
+    "createButton": "Create board",
+    "createError": "Could not create the board. Please try again.",
+    "deleteConfirm": "Delete this board? This cannot be undone.",
+    "deleteButton": "Delete board",
+    "deleteError": "Could not delete the board. Please try again.",
+    "settingsHeading": "Settings",
+    "dateRangeStartLabel": "Start date",
+    "dateRangeEndLabel": "End date",
+    "grainLabel": "Granularity",
+    "grainOption": {
+      "day": "Day",
+      "week": "Week",
+      "month": "Month",
+      "quarter": "Quarter",
+      "year": "Year"
+    },
+    "compareLabel": "Compare to",
+    "compareOption": {
+      "none": "No comparison",
+      "previous_period": "Previous period",
+      "previous_year": "Previous year"
+    },
+    "globalFiltersLabel": "Global filters",
+    "noGlobalFilters": "No global filters set — every tile queries its own metric unfiltered.",
+    "filterFieldLabel": "Filter field",
+    "filterFieldPlaceholder": "field",
+    "filterOperatorLabel": "Filter operator",
+    "filterValueLabel": "Filter value",
+    "filterValuePlaceholder": "value",
+    "removeFilterButton": "Remove",
+    "addFilterButton": "Add filter",
+    "invalidDateRangeError": "The start date must not be after the end date.",
+    "settingsError": "Could not save settings. Please try again.",
+    "saveSettingsButton": "Save settings",
+    "tilesHeading": "Tiles",
+    "editLayoutButton": "Edit layout",
+    "noMetricsRegistered": "Register a metric first to add tiles.",
+    "addTileButton": "Add tile",
+    "cancelEditButton": "Cancel",
+    "saveLayoutButton": "Save layout",
+    "saveLayoutInvalidError": "That layout isn't valid — check every tile has a title, a registered metric, and fits the grid.",
+    "saveLayoutError": "Could not save the layout. Please try again.",
+    "noTiles": "This board has no tiles yet. Click \"Edit layout\" to add one.",
+    "dragHandleLabel": "⠿",
+    "removeTileButton": "Remove",
+    "tileTitleLabel": "Tile title",
+    "tileTitlePlaceholder": "e.g. Ad spend",
+    "tileTypeLabel": "Tile type",
+    "tileType": {
+      "line": "Line chart",
+      "bar": "Bar chart",
+      "big_number": "Big number",
+      "table": "Table",
+      "funnel": "Funnel"
+    },
+    "funnelStepsLabel": "Funnel steps (in order)",
+    "funnelStepLabel": "Step {step}",
+    "removeFunnelStepButton": "Remove step",
+    "addFunnelStepButton": "Add step",
+    "tileMetricLabel": "Metric",
+    "tileDimensionsLabel": "Breakdown by",
+    "tileWidthLabel": "Width",
+    "tileHeightLabel": "Height",
+    "tileDeltaLabel": "{deltaPct}% vs. previous",
+    "barTooltip": "{bucket}: {value}",
+    "previousPeriodLabel": "Previous period",
+    "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
+    "tableEmpty": "No data for this range yet.",
+    "tileUnavailableReason": {
+      "warehouse_not_configured": "Warehouse not configured yet",
+      "quota_exceeded": "Daily query quota reached",
+      "query_error": "Couldn't load this tile"
+    }
   }
 }

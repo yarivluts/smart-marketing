@@ -74,7 +74,8 @@
     "projectIngestHealthLink": "תקינות הזרמת הנתונים",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
-    "projectPluginsLink": "תוספים"
+    "projectPluginsLink": "תוספים",
+    "projectBoardsLink": "לוחות מחוונים"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -428,5 +429,88 @@
     "sourceRunStatusSucceeded": "הצליח",
     "sourceRunStatusFailed": "נכשל",
     "sourceRunCursorFromScratch": "מההתחלה"
+  },
+  "Boards": {
+    "metaTitle": "לוחות מחוונים",
+    "title": "לוחות מחוונים עבור {projectName}",
+    "boardsHeading": "לוחות מחוונים",
+    "noBoards": "לפרויקט זה אין עדיין לוחות מחוונים.",
+    "tileCountLabel": "{count, plural, one {אריח #} other {# אריחים}}",
+    "createHeading": "לוח מחוונים חדש",
+    "nameLabel": "שם",
+    "namePlaceholder": "לדוגמה: סקירת שיווק",
+    "createButton": "צור לוח מחוונים",
+    "createError": "לא ניתן היה ליצור את לוח המחוונים. נסה שוב.",
+    "deleteConfirm": "למחוק את לוח המחוונים הזה? לא ניתן לבטל פעולה זו.",
+    "deleteButton": "מחק לוח מחוונים",
+    "deleteError": "לא ניתן היה למחוק את לוח המחוונים. נסה שוב.",
+    "settingsHeading": "הגדרות",
+    "dateRangeStartLabel": "תאריך התחלה",
+    "dateRangeEndLabel": "תאריך סיום",
+    "grainLabel": "רזולוציית זמן",
+    "grainOption": {
+      "day": "יום",
+      "week": "שבוע",
+      "month": "חודש",
+      "quarter": "רבעון",
+      "year": "שנה"
+    },
+    "compareLabel": "השווה אל",
+    "compareOption": {
+      "none": "ללא השוואה",
+      "previous_period": "תקופה קודמת",
+      "previous_year": "שנה קודמת"
+    },
+    "globalFiltersLabel": "מסננים גלובליים",
+    "noGlobalFilters": "לא הוגדרו מסננים גלובליים — כל אריח שואל את המדד שלו ללא סינון.",
+    "filterFieldLabel": "שדה סינון",
+    "filterFieldPlaceholder": "שדה",
+    "filterOperatorLabel": "אופרטור סינון",
+    "filterValueLabel": "ערך סינון",
+    "filterValuePlaceholder": "ערך",
+    "removeFilterButton": "הסר",
+    "addFilterButton": "הוסף מסנן",
+    "invalidDateRangeError": "תאריך ההתחלה לא יכול להיות מאוחר מתאריך הסיום.",
+    "settingsError": "לא ניתן היה לשמור את ההגדרות. נסה שוב.",
+    "saveSettingsButton": "שמור הגדרות",
+    "tilesHeading": "אריחים",
+    "editLayoutButton": "ערוך פריסה",
+    "noMetricsRegistered": "יש לרשום מדד קודם כדי להוסיף אריחים.",
+    "addTileButton": "הוסף אריח",
+    "cancelEditButton": "בטל",
+    "saveLayoutButton": "שמור פריסה",
+    "saveLayoutInvalidError": "הפריסה אינה תקינה — ודא שלכל אריח יש כותרת, מדד רשום, והוא מתאים לרשת.",
+    "saveLayoutError": "לא ניתן היה לשמור את הפריסה. נסה שוב.",
+    "noTiles": "ללוח המחוונים הזה אין עדיין אריחים. לחץ על \"ערוך פריסה\" כדי להוסיף אחד.",
+    "dragHandleLabel": "⠿",
+    "removeTileButton": "הסר",
+    "tileTitleLabel": "כותרת האריח",
+    "tileTitlePlaceholder": "לדוגמה: הוצאות פרסום",
+    "tileTypeLabel": "סוג אריח",
+    "tileType": {
+      "line": "תרשים קווי",
+      "bar": "תרשים עמודות",
+      "big_number": "מספר גדול",
+      "table": "טבלה",
+      "funnel": "משפך"
+    },
+    "funnelStepsLabel": "שלבי המשפך (לפי סדר)",
+    "funnelStepLabel": "שלב {step}",
+    "removeFunnelStepButton": "הסר שלב",
+    "addFunnelStepButton": "הוסף שלב",
+    "tileMetricLabel": "מדד",
+    "tileDimensionsLabel": "פילוח לפי",
+    "tileWidthLabel": "רוחב",
+    "tileHeightLabel": "גובה",
+    "tileDeltaLabel": "{deltaPct}% לעומת התקופה הקודמת",
+    "barTooltip": "{bucket}: {value}",
+    "previousPeriodLabel": "תקופה קודמת",
+    "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
+    "tableEmpty": "אין נתונים לטווח זה עדיין.",
+    "tileUnavailableReason": {
+      "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
+      "quota_exceeded": "מכסת השאילתות היומית מוצתה",
+      "query_error": "לא ניתן היה לטעון אריח זה"
+    }
   }
 }
