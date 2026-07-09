@@ -34,6 +34,18 @@ describe('parseAcquisitionParams', () => {
     expect(params.referrer).toBe('https://news.ycombinator.com/');
   });
 
+  it('classifies a same-site referrer (internal navigation) as direct, not referral', () => {
+    const params = parseAcquisitionParams({ url: 'https://example.com/signup', referrer: 'https://example.com/pricing' });
+    expect(params.channel).toBe('direct');
+    // The referrer is still recorded — only its influence on `channel` is cross-site-gated.
+    expect(params.referrer).toBe('https://example.com/pricing');
+  });
+
+  it('treats an unparseable referrer as not cross-site rather than throwing', () => {
+    const params = parseAcquisitionParams({ url: 'https://example.com/', referrer: 'not-a-url' });
+    expect(params.channel).toBe('direct');
+  });
+
   it('classifies a bare visit with no signal at all as direct', () => {
     const params = parseAcquisitionParams({ url: 'https://example.com/' });
     expect(params.channel).toBe('direct');

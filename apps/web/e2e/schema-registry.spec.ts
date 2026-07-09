@@ -85,5 +85,13 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
 
     await page.getByRole('button', { name: 'Check now' }).click();
     await expect(page.getByText('No tracking alerts for this project yet.')).toBeVisible();
+
+    // KAN-57: one-click "set up touchpoint capture" — idempotently registers the
+    // `touchpoint` event schema so the tracking snippet's events aren't quarantined.
+    await expect(page.getByRole('button', { name: 'Set up touchpoint capture' })).toBeVisible();
+    await page.getByRole('button', { name: 'Set up touchpoint capture' }).click();
+    await expect(page.getByText('The touchpoint schema is registered for this project.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Set up touchpoint capture' })).toHaveCount(0);
+    await expect(page.getByText('event: touchpoint')).toBeVisible();
   });
 });

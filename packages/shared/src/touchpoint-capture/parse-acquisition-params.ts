@@ -29,14 +29,24 @@ function trimmedOrUndefined(value: string | null): string | undefined {
  * `utm_medium` is next; a cross-site referrer with no UTM/click params at all
  * is `referral`; no signal at all is `direct`.
  */
+/** Whether `referrer` points at a different origin than the page itself — an internal link (e.g. `/pricing` -> `/signup` on the same site) is not acquisition evidence, however non-empty `document.referrer` happens to be. An unparseable referrer is treated as not cross-site (the safe default: it isn't good enough evidence to overrule `direct`). */
+function isCrossSiteReferrer(referrer: string | undefined, pageOrigin: string): boolean {
+  if (!referrer) return false;
+  try {
+    return new URL(referrer).origin !== pageOrigin;
+  } catch {
+    return false;
+  }
+}
+
 function deriveChannel(params: {
   matchedClickChannel: string | undefined;
   utmMedium: string | undefined;
-  referrer: string | undefined;
+  isCrossSiteReferrer: boolean;
 }): string {
   if (params.matchedClickChannel) return params.matchedClickChannel;
   if (params.utmMedium) return params.utmMedium.toLowerCase();
-  if (params.referrer) return 'referral';
+  if (params.isCrossSiteReferrer) return 'referral';
   return 'direct';
 }
 
@@ -76,6 +86,10 @@ export function parseAcquisitionParams(input: ParseAcquisitionParamsInput): Acqu
     utmTerm,
     landingPage: `${parsed.origin}${parsed.pathname}`,
     referrer,
-    channel: deriveChannel({ matchedClickChannel: matchedClickId?.channel, utmMedium, referrer }),
+    channel: deriveChannel({
+      matchedClickChannel: matchedClickId?.channel,
+      utmMedium,
+      isCrossSiteReferrer: isCrossSiteReferrer(referrer, parsed.origin),
+    }),
   };
 }

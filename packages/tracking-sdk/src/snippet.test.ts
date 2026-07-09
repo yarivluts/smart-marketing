@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { TOUCHPOINT_SCHEMA_FIELDS } from '@growthos/shared';
 import { buildEmbedSnippetBody, renderEmbedSnippet } from './snippet';
 
 declare global {
@@ -48,6 +49,14 @@ describe('buildEmbedSnippetBody (the real embeddable <script> content)', () => {
     expect(body.batch[0].event_id).toBe(window.growthos?.getAnonId());
   });
 
+  it('classifies a same-site referrer (internal navigation) as direct, not referral', () => {
+    navigateTo('https://shop.example.com/signup', 'https://shop.example.com/pricing');
+    runSnippet({ writeKey: 'gos_test_key', ingestBaseUrl: 'https://api.example.com/v1/ingest' });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.batch[0].properties.channel).toBe('direct');
+  });
+
   it('exposes window.growthos.track(), attaching the anon id to a later conversion event', () => {
     navigateTo('https://shop.example.com/landing?gclid=snippet_gclid_2');
     runSnippet({ writeKey: 'gos_test_key', ingestBaseUrl: 'https://api.example.com/v1/ingest' });
@@ -72,6 +81,29 @@ describe('buildEmbedSnippetBody (the real embeddable <script> content)', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(window.growthos?.getAnonId()).toBe(anonId);
+  });
+
+  it('never emits a touchpoint property the registered touchpoint schema does not declare (schema-parity guard)', () => {
+    // The snippet's capture logic is a hand-written vanilla-JS reimplementation of
+    // packages/shared/src/touchpoint-capture (it can't import that module — see this
+    // file's own module comment) — this test is the guard against the two silently
+    // drifting apart. Every UTM/click-id param set at once, so every possible
+    // property the snippet can emit shows up in one payload.
+    navigateTo(
+      'https://shop.example.com/landing?gclid=g1&utm_source=google&utm_medium=cpc&utm_campaign=spring&utm_content=banner&utm_term=shoes',
+      'https://google.com/',
+    );
+    runSnippet({ writeKey: 'gos_test_key', ingestBaseUrl: 'https://api.example.com/v1/ingest' });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const emittedKeys = Object.keys(body.batch[0].properties);
+    const declaredFieldNames = new Set(TOUCHPOINT_SCHEMA_FIELDS.map((field) => field.name));
+    for (const key of emittedKeys) {
+      expect(declaredFieldNames.has(key)).toBe(true);
+    }
+    // Every declared field is actually reachable too — a stale schema field
+    // the snippet can never populate would be just as silent a drift.
+    expect(new Set(emittedKeys)).toEqual(declaredFieldNames);
   });
 });
 

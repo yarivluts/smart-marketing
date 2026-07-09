@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { renderEmbedSnippet } from '@growthos/tracking-sdk';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ export interface TouchpointSnippetDisplayProps {
 export function TouchpointSnippetDisplay({ writeKey, ingestBaseUrl }: TouchpointSnippetDisplayProps): React.ReactElement {
   const t = useTranslations('ApiKeys');
   const [copied, setCopied] = useState(false);
-  const snippet = renderEmbedSnippet({ writeKey, ingestBaseUrl });
+  const snippet = useMemo(() => renderEmbedSnippet({ writeKey, ingestBaseUrl }), [writeKey, ingestBaseUrl]);
 
   async function handleCopy(): Promise<void> {
     try {

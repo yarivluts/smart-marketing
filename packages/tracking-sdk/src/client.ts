@@ -74,17 +74,30 @@ export function createTracker(options: TrackerOptions): Tracker {
     return document?.referrer && document.referrer.length > 0 ? document.referrer : undefined;
   }
 
-  async function page(): Promise<void> {
+  /**
+   * Mints the anon id on this browser's first-ever call, firing its
+   * touchpoint capture at that exact moment — shared by `page()`, `track()`,
+   * and `identify()` so *whichever one a caller happens to invoke first*
+   * still captures the entry touchpoint, rather than only `page()` doing so
+   * (a caller that only ever calls `track()`/`identify()` would otherwise
+   * silently mint an anon id with no touchpoint ever recorded for it, and
+   * every later `page()` call would then see the id already exists and skip).
+   */
+  async function ensureAnonId(): Promise<string> {
     const { id: anonId, isNew } = ensureStoredId(storage, ANON_ID_STORAGE_KEY);
-    if (!isNew) {
-      return;
+    if (isNew) {
+      const params = parseAcquisitionParams({ url: currentUrl(), referrer: currentReferrer() });
+      await send([buildTouchpointEventPayload({ anonId, ts: now(), params })]);
     }
-    const params = parseAcquisitionParams({ url: currentUrl(), referrer: currentReferrer() });
-    await send([buildTouchpointEventPayload({ anonId, ts: now(), params })]);
+    return anonId;
+  }
+
+  async function page(): Promise<void> {
+    await ensureAnonId();
   }
 
   async function track(eventName: string, properties?: Record<string, unknown>): Promise<void> {
-    const { id: anonId } = ensureStoredId(storage, ANON_ID_STORAGE_KEY);
+    const anonId = await ensureAnonId();
     const customerId = readStoredId(storage, CUSTOMER_ID_STORAGE_KEY);
     const mergedProperties = { ...(properties ?? {}) };
     if (customerId) {

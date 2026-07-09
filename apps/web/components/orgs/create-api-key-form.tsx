@@ -76,7 +76,11 @@ export function CreateApiKeyForm({ orgId, projectId, environments, ingestBaseUrl
     return (
       <div className="flex flex-col gap-4">
         <MintedApiKeyDisplay rawKey={mintedKey.rawKey} onDismiss={handleMintedKeyDismiss} />
-        {mintedKey.scopes.includes('ingest.write') ? (
+        {/* Only offered for an `ingest.write`-only key: this snippet is meant to be pasted into
+            public page source, so a key that also carries write access to schemas/metrics/exports
+            must never be the one rendered inline here — the admin should mint a second, narrowly
+            scoped key for the website instead. */}
+        {mintedKey.scopes.length === 1 && mintedKey.scopes[0] === 'ingest.write' ? (
           <TouchpointSnippetDisplay writeKey={mintedKey.rawKey} ingestBaseUrl={ingestBaseUrl} />
         ) : null}
       </div>

@@ -83,6 +83,15 @@ export function buildEmbedSnippetBody(options: EmbedSnippetOptions): string {
     return trimmed && trimmed.length > 0 ? trimmed : undefined;
   }
 
+  function isCrossSiteReferrer(referrer, pageOrigin) {
+    if (!referrer) return false;
+    try {
+      return new URL(referrer).origin !== pageOrigin;
+    } catch (e) {
+      return false;
+    }
+  }
+
   function captureAcquisitionProperties() {
     var url = new URL(window.location.href);
     var query = url.searchParams;
@@ -102,7 +111,13 @@ export function buildEmbedSnippetBody(options: EmbedSnippetOptions): string {
     var utmContent = trimmedOrUndefined(query.get('utm_content'));
     var utmTerm = trimmedOrUndefined(query.get('utm_term'));
     var referrer = trimmedOrUndefined(document.referrer);
-    var channel = matchedClick ? matchedClick.channel : utmMedium ? utmMedium.toLowerCase() : referrer ? 'referral' : 'direct';
+    var channel = matchedClick
+      ? matchedClick.channel
+      : utmMedium
+        ? utmMedium.toLowerCase()
+        : isCrossSiteReferrer(referrer, url.origin)
+          ? 'referral'
+          : 'direct';
 
     var properties = {};
     if (matchedClick) properties.click_id = matchedClick.value;
@@ -117,21 +132,32 @@ export function buildEmbedSnippetBody(options: EmbedSnippetOptions): string {
     return properties;
   }
 
-  function page() {
+  // Mints the anon id on this browser's first-ever call, firing its touchpoint
+  // capture at that exact moment — shared by page()/track()/identify() so
+  // whichever one runs first still captures the entry touchpoint (this
+  // snippet always calls page() itself at the bottom, but track()/identify()
+  // are also exposed on window.growthos for a caller to invoke directly).
+  function ensureAnonId() {
     var anon = ensureId(STORAGE_KEY_ANON);
-    if (!anon.isNew) return;
-    send([{ event_id: anon.id, event: 'touchpoint', ts: new Date().toISOString(), properties: captureAcquisitionProperties() }]);
+    if (anon.isNew) {
+      send([{ event_id: anon.id, event: 'touchpoint', ts: new Date().toISOString(), properties: captureAcquisitionProperties() }]);
+    }
+    return anon.id;
+  }
+
+  function page() {
+    ensureAnonId();
   }
 
   function track(eventName, properties) {
-    var anon = ensureId(STORAGE_KEY_ANON);
+    var anonId = ensureAnonId();
     var customerId = storage.getItem(STORAGE_KEY_CUSTOMER);
     var merged = {};
     for (var key in properties || {}) {
       if (Object.prototype.hasOwnProperty.call(properties, key)) merged[key] = properties[key];
     }
     if (customerId) merged.customer_id = customerId;
-    merged.anon_id = anon.id;
+    merged.anon_id = anonId;
     send([{ event_id: uuid(), event: eventName, ts: new Date().toISOString(), properties: merged }]);
   }
 

@@ -19,11 +19,12 @@ export function createInMemoryStorage(): KeyValueStorage {
 export function resolveStorage(override?: KeyValueStorage): KeyValueStorage {
   if (override) return override;
   try {
-    const globalLocalStorage = (globalThis as { localStorage?: KeyValueStorage }).localStorage;
+    const globalLocalStorage = (globalThis as { localStorage?: Storage }).localStorage;
     if (globalLocalStorage) {
       const probeKey = '__growthos_storage_probe__';
       globalLocalStorage.setItem(probeKey, '1');
       globalLocalStorage.getItem(probeKey);
+      globalLocalStorage.removeItem(probeKey);
       return globalLocalStorage;
     }
   } catch {
