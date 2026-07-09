@@ -17,6 +17,94 @@ Template for each entry:
 
 ---
 
+## 2026-07-09 — KAN-60 reconciliation: independent verification + merge of PR #36 (E11.2 dashboard framework)
+
+- **Last completed:**
+  - Started this run the normal way (read `PROGRESS.md`/`TASKS.md`, picked **KAN-60** — the remaining
+    sprint-4 `todo` per the prior run's own "Next step" now that KAN-46..49 were all done). Read
+    `docs/plan/13-task-breakdown.md`'s own E11.2 line and `10-product-ux.md §2.2` first, then implemented
+    a full, independently-designed KAN-60 (board/tile models path-nested as a subcollection under their
+    board rather than an embedded array, a pure `resolveDateRangeWindow` module in `packages/shared` for
+    the board's relative date-range preset, `board.service.ts` full CRUD + `queryBoardTile` composing a
+    tile's query through the existing KAN-41/42 `queryMetrics` pipeline, a 12-column drag-drop grid admin
+    UI, 6 new component test files, a `dashboards.spec.ts` e2e spec) — fully tested (unit + emulator +
+    route + component tests, ~140 new cases) and locally green (`pnpm lint && pnpm typecheck && pnpm test
+    && pnpm build`). Self-review before opening a PR found and fixed two real issues in this run's own
+    implementation: `updateBoard`/`deleteBoard` misattributed the audit-log actor to the board's original
+    creator instead of the caller actually performing the action (fixed by threading an explicit
+    `actorUserId` through, plus added matching `board_tile.create`/`board_tile.delete` audit entries for
+    consistency — deliberately not on `updateTile` itself, since that's also the drag/resize path and
+    would flood the log with noise), and a client-side race where `BoardGrid`'s resize/remove buttons
+    weren't disabled while a mutation for that same tile was already in flight, reproduced live during
+    e2e testing as an `unhandledRejection: NOT_FOUND` in the dev server log when a resize raced a delete.
+  - On push, discovered a **parallel same-day session had already implemented KAN-60 independently and
+    opened PR #36** (`kan-60-dashboard-framework`, opened 10:35:49 UTC — before this run's own
+    implementation was ready to push, and — coincidentally — using the exact same branch name, so the
+    push was rejected outright rather than silently diverging) with its own materially different design:
+    tiles live as an **embedded array on `BoardModel` itself** rather than a path-nested subcollection,
+    and `queryBoardTile` explicitly degrades per-tile (documented as "never blanks the whole board") on a
+    warehouse error rather than only surfacing the error to that one tile's own "preview data" affordance
+    the way this run's discarded implementation did. Rather than force-push over an already-open PR or
+    duplicate the implementation (the same "reconcile, don't re-implement" posture this file's
+    KAN-42/KAN-20/KAN-33/KAN-46/KAN-49 entries already established for parallel-run collisions), spawned
+    an independent review subagent (in an isolated git worktree, so it could run the *other* session's
+    own `pnpm test` without disturbing this session's state) to actually verify PR #36 rather than trust
+    its own self-reported "8-angle self-review" commit message. The subagent confirmed `pnpm lint`/
+    `typecheck`/`build` genuinely green (including checking the actual `apps/web` build output for a
+    bundle-size anomaly that would indicate a server-only import leaking into the client bundle — the
+    exact class of bug a prior KAN-49 run hit — and confirming `board-types.ts` deliberately avoids
+    importing `@growthos/firebase-orm-models` client-side), `pnpm test` genuinely green (dbt-transform
+    42/42, `packages/shared` 190/190, `packages/firebase-orm-models` 364/364 incl. 20 new board-service
+    cases, `apps/web` vitest 469/469, full Playwright e2e suite modulo one `auth.spec.ts` flake that
+    self-recovered on retry — the same long-documented pre-existing class every prior entry in this file
+    has recorded), and — most importantly, since it's the exact bug class this run's own self-review had
+    just found and fixed in its own (discarded) implementation of this same story — traced by hand that
+    PR #36's own audit-log-actor attribution does **not** have the `board.created_by`-instead-of-caller
+    mistake: every mutation passes the caller's own `user.id` (from `requireOrgPermission`), never the
+    board's own `created_by`, confirmed at both the route and service layer. Also traced cross-org/
+    cross-project isolation (an explicit `organization_id`/`project_id` match check on every load, 404 on
+    mismatch, with real emulator-backed isolation tests proving byte-identical responses for a foreign
+    org vs. a fabricated one), the metric-picker-never-free-SQL guarantee (validated against the active
+    catalog *before* `board.save()`, not just at query time), and every one of the PR's own eight
+    self-claimed bug fixes (stale-render, resize-on-drag position bug, metadata-title leak, Firestore
+    `null`-vs-missing field handling, error-masking, tooltip/color-map/compare-series rendering) against
+    the actual code, not just the commit message — all eight confirmed real and complete. One real but
+    non-blocking gap surfaced: only `createBoard` audit-logs; `updateBoardSettings`/`saveBoardTiles`/
+    `deleteBoard` don't yet (unlike sibling in-place-update surfaces such as `setProjectCostQuota`) —
+    recorded as a follow-up, not a merge blocker, since it's a missing-audit-trail gap, not a security or
+    correctness bug.
+  - Merged PR #36 (squash) into `main` via the GitHub API — CI (`lint · typecheck · test · build`) green,
+    `mergeable_state: clean`, no unresolved review comments, independent review found zero blocking
+    issues. Discarded this run's own local (never-pushed, now fully superseded) `kan-60-dashboard-
+    framework` branch and commits once `main` was confirmed to fast-forward cleanly through the merge.
+- **In progress (exact stopping point):** none — KAN-60 is fully delivered (by PR #36), independently
+  re-verified end to end by this run (not just re-reading the other session's own self-review or trusting
+  its test-plan checklist), and merged into `main`. This run's own from-scratch KAN-60 implementation was
+  discarded in favor of the already-open PR per this file's own established reconciliation convention —
+  its differing design choices (a path-nested tile subcollection rather than an embedded array, and
+  surfacing a warehouse error per-tile via the "preview data" affordance rather than an implicit
+  board-level degrade) are worth remembering as an alternative worth weighing if a future story needs to
+  extend the board/tile model further (e.g. KAN-61's default boards, KAN-62's cohort heatmap tile).
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the next sprint-5 `todo`s are **KAN-56** (E10.1 deterministic identity stitching),
+  **KAN-57** (E10.2 touchpoint capture JS snippet/SDK), **KAN-58** (E10.3 attribution models), and
+  **KAN-61** (E11.3 default boards shipped with pack — a direct, small extension of KAN-60's now-merged
+  board/tile CRUD: seed a project with pre-built Marketing/Revenue/Funnel boards on pack install).
+  **KAN-50** (Google Ads plugin) remains `blocked-by` KAN-43. KAN-61 is the more tractable "smallest
+  remaining gap" pick, but KAN-56 (deterministic identity stitching) is the sprint-5 story every later
+  attribution/cohort story transitively depends on, so a future run should weigh "smallest gap" against
+  "unblocks the most downstream work" rather than defaulting to whichever sorts first. Also worth a
+  human-optional follow-up (not blocking): wiring audit logging into `updateBoardSettings`/
+  `saveBoardTiles`/`deleteBoard`, the one gap this run's independent review of PR #36 surfaced.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+
+---
+
 ## 2026-07-09 — KAN-49 reconciliation: independent verification + merge of PR #35 (E8.1 Stripe plugin)
 
 - **Last completed:**
