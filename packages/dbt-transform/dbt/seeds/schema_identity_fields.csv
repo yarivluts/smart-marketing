@@ -6,3 +6,6 @@ org_1,proj_2,event,funnel_event,anon_id
 org_1,proj_2,event,funnel_event,email_hash
 org_1,proj_2,event,funnel_event,click_id
 org_1,proj_2,event,funnel_event,device_id
+org_1,proj_10,event,touchpoint,device_id
+org_1,proj_10,event,funnel_event,anon_id
+org_1,proj_10,event,funnel_event,device_id
