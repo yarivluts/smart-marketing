@@ -309,6 +309,15 @@ async function requireInstallInProject(organizationId: string, projectId: string
   return install;
 }
 
+/** Single-install lookup, `null` (not a thrown 404) when it doesn't resolve in this project — for a caller (KAN-49's "Run now" route) that needs to branch on an install's own `plugin_id` before deciding how to run it, not one that treats "missing" as an error in its own right. */
+export async function getPluginInstall(organizationId: string, projectId: string, installId: string): Promise<PluginInstallModel | null> {
+  const install = await PluginInstallModel.init(installId, { organization_id: organizationId, project_id: projectId });
+  if (!install || install.organization_id !== organizationId || install.project_id !== projectId) {
+    return null;
+  }
+  return install;
+}
+
 interface PluginInstallLifecycleParams {
   organizationId: string;
   projectId: string;

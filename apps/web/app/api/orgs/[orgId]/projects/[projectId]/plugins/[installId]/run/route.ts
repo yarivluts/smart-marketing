@@ -6,11 +6,13 @@ import {
   PluginInstallNotFoundError,
   PluginManifestNotFoundError,
   ProjectNotFoundError,
+  StripeCredentialConfigError,
 } from '@growthos/firebase-orm-models';
-import { triggerSourcePluginRun } from '@/lib/orgs/mutations';
+import { runSourcePluginInstall } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { toSourcePluginRunView } from '@/lib/orgs/plugin-view';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
+import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; installId: string }>;
@@ -22,7 +24,10 @@ interface RouteParams {
  * — see `@growthos/firebase-orm-models`'s `plugin-runtime.service.ts` for
  * why a real Cloud Run job scheduler is deferred to KAN-18). Gated on
  * `plugin.install`, the same permission every other action on this install
- * already requires.
+ * already requires. `runSourcePluginInstall` (KAN-49) transparently swaps in
+ * a real `StripeSourcePluginExecutor` when this install is the built-in
+ * Stripe plugin — every other plugin still gets the KAN-47 toy executor,
+ * unchanged.
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, installId } = await params;
@@ -40,13 +45,25 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return NextResponse.json({ error: 'environment_id_required' }, { status: 400 });
   }
 
+  // Only the built-in Stripe plugin ever consults this — resolved best-effort so a deployment
+  // without the vault configured (KAN-18) doesn't break "Run now" for every *other* plugin too.
+  let kms;
   try {
-    const run = await triggerSourcePluginRun({
+    kms = getServerKmsProvider();
+  } catch (err) {
+    if (!(err instanceof VaultNotConfiguredError)) {
+      throw err;
+    }
+  }
+
+  try {
+    const run = await runSourcePluginInstall({
       organizationId: orgId,
       projectId,
       environmentId,
       installId,
       triggeredByUserId: user.id,
+      kms,
     });
     return NextResponse.json({ run: toSourcePluginRunView(run) });
   } catch (err) {
@@ -58,6 +75,9 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     }
     if (err instanceof NotASourcePluginError || err instanceof PluginManifestNotFoundError) {
       return NextResponse.json({ error: 'not_a_source_plugin' }, { status: 400 });
+    }
+    if (err instanceof StripeCredentialConfigError) {
+      return NextResponse.json({ error: 'stripe_credential_not_configured', reason: err.reason }, { status: 400 });
     }
     throw err;
   }

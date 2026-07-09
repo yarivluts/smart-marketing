@@ -17,6 +17,8 @@ import {
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   installPlugin as installPluginInOrganization,
+  processStripeWebhookEvent as processStripeWebhookEventInOrganization,
+  runSourcePluginInstall as runSourcePluginInstallInOrganization,
   inviteMemberToOrganization,
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
@@ -24,6 +26,7 @@ import {
   type PluginInstallModel,
   type PluginManifestModel,
   type PluginSourceRunModel,
+  type ProcessStripeWebhookEventResult,
   registerMetricDefinition as registerMetricDefinitionInOrganization,
   registerPluginManifest as registerPluginManifestInOrganization,
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
@@ -37,7 +40,6 @@ import {
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   triggerOrchestrationRun as triggerOrchestrationRunInOrganization,
-  triggerSourcePluginRun as triggerSourcePluginRunInOrganization,
   uninstallPlugin as uninstallPluginInOrganization,
   type AcceptInviteResult,
   type CreateOrganizationResult,
@@ -432,15 +434,39 @@ export async function uninstallPlugin(input: PluginInstallLifecycleInput): Promi
   return uninstallPluginInOrganization(input);
 }
 
-interface TriggerSourcePluginRunInput {
+interface RunSourcePluginInstallInput {
   organizationId: string;
   projectId: string;
   environmentId: string;
   installId: string;
   triggeredByUserId: string;
+  /** Only consulted for the built-in Stripe plugin — every other install ignores it. */
+  kms?: KmsProvider;
 }
 
-export async function triggerSourcePluginRun(input: TriggerSourcePluginRunInput): Promise<PluginSourceRunModel> {
+/**
+ * The one "Run now" entry point (KAN-49) — transparently uses a real
+ * `StripeSourcePluginExecutor` for the built-in Stripe plugin (resolving its
+ * configured credential via `kms`) and falls through to the generic KAN-47
+ * toy-executor runtime for every other plugin, unchanged.
+ */
+export async function runSourcePluginInstall(input: RunSourcePluginInstallInput): Promise<PluginSourceRunModel> {
   await ensureFirestoreOrm();
-  return triggerSourcePluginRunInOrganization(input);
+  return runSourcePluginInstallInOrganization(input);
+}
+
+interface ProcessStripeWebhookEventInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  installId: string;
+  rawBody: string;
+  signatureHeader: string;
+  kms: KmsProvider;
+}
+
+/** Verifies and lands one Stripe webhook delivery (KAN-49) — the mutation the webhook route's `POST` handler calls after reading the raw request body. */
+export async function processStripeWebhookEvent(input: ProcessStripeWebhookEventInput): Promise<ProcessStripeWebhookEventResult> {
+  await ensureFirestoreOrm();
+  return processStripeWebhookEventInOrganization(input);
 }

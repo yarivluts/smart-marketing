@@ -30,6 +30,13 @@ const EXEMPT_ROUTES: Record<string, string> = {
   'app/api/invites/[orgId]/[membershipId]/accept/route.ts':
     'identity-scoped by design — a non-member must be able to accept their own invite — and does its own ' +
     'InviteNotFoundError -> 404 mapping instead of an org-membership check',
+  'app/api/orgs/[orgId]/projects/[projectId]/plugins/[installId]/environments/[environmentId]/stripe-webhook/route.ts':
+    'Stripe calls this directly with no GrowthOS session (KAN-49) — authenticated by Stripe-Signature ' +
+    'against the install\'s own webhook secret instead of org membership. Existence of a real org/project/' +
+    'install combination is distinguishable (404 vs. a signature-rejection 400) from a fabricated one for an ' +
+    'unauthenticated caller who already knows all three high-entropy Firestore ids, a materially different ' +
+    'threat model from KAN-26\'s "authenticated member enumerating sibling orgs" — documented, not silently ' +
+    'skipped, in stripe-webhook route.test.ts.',
 };
 
 function findRouteFiles(root: string): string[] {
