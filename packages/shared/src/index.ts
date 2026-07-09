@@ -11,3 +11,4 @@ export * from './ids';
 export * from './policy';
 export * from './metrics-compiler';
 export * from './plugin-manifest';
+export * from './touchpoint-capture';

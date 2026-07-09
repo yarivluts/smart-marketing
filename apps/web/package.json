@@ -15,6 +15,7 @@
   "dependencies": {
     "@growthos/firebase-orm-models": "workspace:*",
     "@growthos/shared": "workspace:*",
+    "@growthos/tracking-sdk": "workspace:*",
     "@radix-ui/react-slot": "^1.1.1",
     "class-variance-authority": "^0.7.1",
     "client-only": "^0.0.1",

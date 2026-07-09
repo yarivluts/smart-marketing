@@ -29,9 +29,11 @@ export function MintedApiKeyDisplay({ rawKey, onDismiss }: MintedApiKeyDisplayPr
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-md border border-input bg-muted/50 p-4">
+    <div data-testid="minted-api-key-display" className="flex flex-col gap-3 rounded-md border border-input bg-muted/50 p-4">
       <p className="text-sm font-medium">{t('secretShownOnceWarning')}</p>
-      <code className="break-all rounded-md bg-background p-3 text-sm">{rawKey}</code>
+      <code data-testid="minted-api-key-value" className="break-all rounded-md bg-background p-3 text-sm">
+        {rawKey}
+      </code>
       <div className="flex items-center gap-3">
         <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
           {copied ? t('copied') : t('copySecret')}

@@ -187,7 +187,10 @@
     "copied": "Copied",
     "done": "Done",
     "revoke": "Revoke",
-    "revokeError": "Couldn't revoke this key. Please try again."
+    "revokeError": "Couldn't revoke this key. Please try again.",
+    "touchpointSnippetHeading": "Website tracking snippet",
+    "touchpointSnippetIntro": "Paste this once, right before the closing body tag, on any page you want to track. It captures UTM parameters and ad-click ids at entry and attaches them to every event this key's project registers.",
+    "copySnippet": "Copy snippet"
   },
   "SchemaRegistry": {
     "metaTitle": "Schema registry",
@@ -238,7 +241,12 @@
     "trackingAlertStatusActive": "Active — silent for over an hour",
     "trackingAlertStatusResolved": "Resolved",
     "trackingAlertCheckButton": "Check now",
-    "trackingAlertCheckError": "Something went wrong. Please try again."
+    "trackingAlertCheckError": "Something went wrong. Please try again.",
+    "touchpointCaptureHeading": "Touchpoint capture",
+    "touchpointSchemaIntro": "Set this up once so events from the website tracking snippet (see the API keys page) aren't quarantined for an unregistered schema.",
+    "touchpointSchemaAlreadyRegistered": "The touchpoint schema is registered for this project.",
+    "touchpointSchemaSetupButton": "Set up touchpoint capture",
+    "touchpointSchemaSetupError": "Something went wrong. Please try again."
   },
   "MetricRegistry": {
     "metaTitle": "Metric catalog",

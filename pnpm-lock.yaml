@@ -81,6 +81,9 @@ importers:
       '@growthos/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@growthos/tracking-sdk':
+        specifier: workspace:*
+        version: link:../../packages/tracking-sdk
       '@radix-ui/react-slot':
         specifier: ^1.1.1
         version: 1.3.0(@types/react@19.2.17)(react@19.2.7)
@@ -245,6 +248,28 @@ importers:
       eslint:
         specifier: ^9.17.0
         version: 9.39.4(jiti@1.21.7)
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.0)(jsdom@25.0.1)
+
+  packages/tracking-sdk:
+    dependencies:
+      '@growthos/shared':
+        specifier: workspace:*
+        version: link:../shared
+    devDependencies:
+      '@growthos/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.4(jiti@1.21.7)
+      jsdom:
+        specifier: ^25.0.1
+        version: 25.0.1
       typescript:
         specifier: ^5.7.2
         version: 5.9.3
