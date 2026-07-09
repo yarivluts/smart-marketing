@@ -8,6 +8,7 @@ import {
   enablePlugin,
   ensureUserForFirebaseSession,
   getLatestPluginManifestVersion,
+  getPluginInstall,
   getPluginManifestVersion,
   installPlugin,
   InvalidPluginConfigError,
@@ -303,6 +304,47 @@ describe('installPlugin', () => {
 
     const installs = await listPluginInstallsForProject(organization.id, project.id);
     expect(installs).toHaveLength(2);
+  });
+});
+
+describe('getPluginInstall', () => {
+  it('returns the install when it resolves in this project', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Plugin Install Getter Org');
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: manifestYaml(), registeredByUserId: owner.id });
+    const install = await installPlugin({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: 'com.example.shopify-pack',
+      version: '1.0.0',
+      consentedScopes: ['ingest:write', 'schema:write'],
+      config: { shop_domain: 'x' },
+      installedByUserId: owner.id,
+    });
+
+    const found = await getPluginInstall(organization.id, project.id, install.id);
+    expect(found?.id).toBe(install.id);
+  });
+
+  it('returns null (not a thrown error) for an install id that does not exist', async () => {
+    const { organization, project } = await setupOrgWithProject('Plugin Install Getter Missing Org');
+    expect(await getPluginInstall(organization.id, project.id, 'nonexistent')).toBeNull();
+  });
+
+  it('returns null for another project\'s install (isolation)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Plugin Install Getter Isolation Org');
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: manifestYaml(), registeredByUserId: owner.id });
+    const install = await installPlugin({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: 'com.example.shopify-pack',
+      version: '1.0.0',
+      consentedScopes: ['ingest:write', 'schema:write'],
+      config: { shop_domain: 'x' },
+      installedByUserId: owner.id,
+    });
+
+    expect(await getPluginInstall(organization.id, otherProject.id, install.id)).toBeNull();
   });
 });
 

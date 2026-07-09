@@ -92,6 +92,7 @@ export * from './services/cost-guardrail.service';
 export * from './services/tracking-alert.service';
 export * from './services/plugin-registry.service';
 export * from './services/plugin-runtime.service';
+export * from './services/stripe-plugin.service';
 export * from './pipeline';
 export * from './services/ingest-health.service';
 export * from './vault';

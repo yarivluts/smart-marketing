@@ -88,6 +88,17 @@ export interface TriggerSourcePluginRunParams {
   executor?: SourcePluginExecutor;
   /** Defaults to {@link DEFAULT_RETRY_OPTIONS} — overridable so tests don't have to wait out real backoff delays. */
   retryOptions?: RetryBackoffOptions;
+  /**
+   * Skips this function's own install lookup when the caller already fetched
+   * it (e.g. KAN-49's `runSourcePluginInstall`, which must inspect the
+   * install's own `plugin_id` before deciding which executor to pass here) —
+   * the same "fetch once, pass it through" posture `precomputedQuota`
+   * (KAN-39) and `precomputedSchemaDefs` (KAN-36) already established for
+   * their own equivalent duplicate-fetch seams. Re-validated against
+   * `organizationId`/`projectId` regardless, so a caller can never bypass
+   * isolation by passing in a mismatched install.
+   */
+  precomputedInstall?: PluginInstallModel;
 }
 
 /**
@@ -121,7 +132,14 @@ export interface TriggerSourcePluginRunParams {
 export async function triggerSourcePluginRun(params: TriggerSourcePluginRunParams): Promise<PluginSourceRunModel> {
   await requireProjectInOrg(params.organizationId, params.projectId);
   const environment = await requireEnvironmentInProject(params.organizationId, params.projectId, params.environmentId);
-  const install = await requirePluginInstallInProject(params.organizationId, params.projectId, params.installId);
+  const precomputed = params.precomputedInstall;
+  const install =
+    precomputed &&
+    precomputed.id === params.installId &&
+    precomputed.organization_id === params.organizationId &&
+    precomputed.project_id === params.projectId
+      ? precomputed
+      : await requirePluginInstallInProject(params.organizationId, params.projectId, params.installId);
 
   if (install.status !== 'installed') {
     throw new PluginInstallNotActiveError(install.status);
