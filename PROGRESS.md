@@ -17,6 +17,67 @@ Template for each entry:
 
 ---
 
+## 2026-07-09 — E10.3 fact_attribution: first-touch + last-touch attribution (KAN-58)
+
+- **Last completed:**
+  - On starting, found this exact story already had an open PR (**#39**, `kan-58-fact-attribution`),
+    opened minutes earlier by a concurrent scheduled run — the same overlapping-schedule pattern
+    the KAN-20 entry documented earlier in this file. Rather than duplicate the implementation, this
+    run reviewed PR #39's diff in full, verified it independently, and merged it.
+  - What #39 delivers: a new core dbt model `packages/dbt-transform/dbt/models/core/fact_attribution.sql`
+    — rules-based first-touch/last-touch attribution (plan `04 §4`) for every customer-side
+    ("conversion") event. Conversion = any `events` row whose `event_type` isn't `touchpoint`, labeled
+    by the payload's own `event_name` when present, else `event_type` — generic, not a hard-coded event
+    name, matching `bridge_identity`'s own posture. Each conversion's `customer_id` is resolved back to
+    every `anon_id` `bridge_identity` (KAN-56) links to it, and every one of that anon_id's own
+    `touchpoint` events at-or-before the conversion is a candidate; `first_touch` credits the earliest,
+    `last_touch` the most recent. `channel_id`/`campaign_id` are the touchpoint's raw `channel`/
+    `utm_campaign` strings (no dimension table exists yet). A conversion with zero candidate touchpoints
+    still gets an explicit `channel_id = 'unattributed'` row per model rather than being dropped, so a
+    channel breakdown's denominator is never silently short.
+  - New `proj_10` fixture (`seeds/raw_records.csv` + `schema_identity_fields.csv`): a paid-search
+    touchpoint, then a paid-social touchpoint from the same device, then a signup declaring `anon_id`
+    for the second touchpoint — proving first-touch and last-touch genuinely diverge (not the same
+    number under two labels). A separate test proves the unattributed-fallback path against `proj_1`'s
+    pre-existing untouched signup/activated events. Plus one-row-per-(conversion,model) and
+    credit-in-[0,1] defensive tests, and standard not_null/unique/accepted_values schema tests.
+  - Verification performed this run (independent of the PR author): read the full model SQL and every
+    new test file line-by-line; ran `pnpm test` in `packages/dbt-transform` directly (77/77 green,
+    including all 8 new `fact_attribution`-related test cases); ran root `pnpm lint`, `pnpm typecheck`,
+    `pnpm build` (all green); confirmed GitHub Actions CI on the PR's head commit was already green
+    (`conclusion: success`) before merging. Root `pnpm test` locally hit the same pre-existing,
+    previously-documented sandbox limitation as prior runs — the Firestore emulator jar download to
+    `storage.googleapis.com` fails in this environment — but `git diff main --stat` confirmed this PR
+    touches only `packages/dbt-transform/**`, zero overlap with `firebase-orm-models`, so that failure
+    is unrelated to this change (and CI, which has real network access, already proved it green).
+  - Merged PR #39 into `main` (commit `229bcc8`). Attempted to delete the remote branch
+    `kan-58-fact-attribution` via `git push origin --delete`; got the same recurring `HTTP 403` this
+    file has documented before (the token this sandbox uses can merge but not delete branches) — no
+    branch-delete tool was available via the GitHub MCP server either. Left the stale branch in place;
+    a human with full repo permissions can delete it, or a future run can retry.
+- **In progress (exact stopping point):** none — KAN-58 is fully delivered, reviewed, tested, and
+  merged. This run did not implement new code itself (the PR predated this run's start), only
+  independently verified and merged an already-complete implementation.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked sprint order per `TASKS.md`: **KAN-61** (sprint 5, default boards —
+  Marketing/Revenue-MRR/Funnel — depends on having metrics to put on them; check whether KAN-59's
+  metric pack is a practical prerequisite even though it isn't marked `blocked-by`) or **KAN-52**
+  (sprint 6, GA4 plugin — no blocker recorded, buildable today the same way KAN-49's Stripe plugin
+  was). Recommend picking whichever has the smaller "buildable without KAN-18/real GCP" gap.
+  Note for future runs: this run and PR #39's author both picked KAN-58 within minutes of each other
+  from a stale `todo` status — the same overlapping-schedule race KAN-20 hit. Worth checking
+  `list_pull_requests` for an already-open PR on a story *before* starting fresh implementation work,
+  not just relying on `TASKS.md`'s status column (which lags until someone updates it after merge).
+- **Waiting on human:**
+  - **KAN-43** — Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18** — GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional cleanup: delete the merged `kan-58-fact-attribution` branch (blocked on this sandbox's
+    GitHub token permissions, not urgent).
+  - The pre-existing unreconciled KAN-20 observability-baseline PR triplicate (#2/#3/#5) and the
+    stale KAN-33 progress-followup PR (#22) still await a human decision — untouched by this run.
+
+---
+
 ## 2026-07-09 — E10.2 Touchpoint capture: JS snippet/SDK, UTM/click-ids attached to ingest events (KAN-57)
 
 - **Last completed:**
