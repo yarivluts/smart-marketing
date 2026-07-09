@@ -17,6 +17,128 @@ Template for each entry:
 
 ---
 
+## 2026-07-09 — E10.1 Deterministic identity stitching (dbt): bridge_identity, conflict rules (KAN-56)
+
+- **Last completed:**
+  - Started this run the normal way (read `PROGRESS.md`/`TASKS.md`, confirmed `main`/`origin/main` were
+    actually in sync — a stale local `main` ref pointed at the old bootstrap commit until an explicit
+    `git fetch origin main` pulled the real tip forward — then picked the next unblocked sprint-5 `todo`).
+    Weighed KAN-56 vs. KAN-61 per the prior run's own note ("smallest gap" vs. "unblocks the most
+    downstream work") and picked **KAN-56** (E10.1, plan `13 §E10.1`, AC: "Synthetic fixtures: anon ->
+    signup -> purchase stitched correctly") since KAN-58 (attribution), KAN-59, and KAN-62 (cohorts) all
+    transitively depend on identity resolution existing first. Read `docs/plan/04-data-model-and-metrics.md
+    §4` ("anon click -> known user via deterministic keys ... probabilistic fallback with a confidence
+    score. Stored in `bridge_identity`") and `08-generic-platform.md §1` ("the stitching engine works off
+    registered identity keys, not hard-coded ones") first.
+  - Implemented entirely inside `@growthos/dbt-transform` (no Firestore/TS changes needed — identity-key
+    *registration* already has an admin surface via KAN-31's Schema Registry `is_identity_key` checkbox;
+    this story is purely the warehouse-side consumer of that flag):
+    - New seed `seeds/schema_identity_fields.csv` — a warehouse-export stand-in for
+      `SchemaDefModel.field_defs` filtered to `is_identity_key = true`, the same "buildable-today, real
+      export lands here later" posture `raw_records.csv` already establishes for the raw ingest table
+      itself.
+    - New `models/staging/stg_identity_key_observations.sql`: pivots each registered identity-key field
+      out of a landed record's JSON payload (`json_extract_string(payload, '$.' || field_name)` — DuckDB
+      supports a computed JSON path, not just the static `->>'literal'` sugar the existing staging models
+      use).
+    - New core model `models/core/bridge_identity.sql`: resolves each anonymous client_id (defined
+      structurally as a `touchpoint`-kind event's own client_id — plan `04 §1`'s `fact_touchpoint`, a
+      fixed schema-name convention, the same way `stg_raw_records.kind` is a fixed vocabulary elsewhere in
+      this project) to a customer_id via two evidence types: a direct `anon_id_cooccurrence` (a record's
+      own payload declares `anon_id`, so its own client_id is a first-party identity assertion) and
+      `shared_key:<field_name>` (an anon-side and a customer-side record independently share another
+      registered identity key's value, ranked by a documented field-precedence table). **Conflict rule**:
+      lowest precedence wins regardless of how many weaker links disagree; ties at the winning precedence
+      broken by earliest evidence, then `customer_id` (fully deterministic, no ties left); `is_conflicted`
+      stays `true` whenever more than one distinct candidate existed at all, even when the winner is
+      unambiguous by precedence, so a human can audit the losing candidate; `confidence` only drops to a
+      documented `0.5` when the winner itself needed the earliest-evidence tie-break among purely
+      shared-key candidates (no direct declaration existed) — a direct declaration keeps full confidence
+      even in the face of disagreeing weaker evidence.
+    - New `proj_2` synthetic fixture rows appended to `raw_records.csv`, kept fully isolated from the
+      existing `proj_1`/`proj_9` rows (and the three test files elsewhere in the monorepo that assert
+      exact `proj_1` row counts/timestamps from a real dbt build — `local-dbt-executor.test.ts`,
+      `orchestration.emulator.test.ts`, `orchestration-view.test.ts`) so this story couldn't silently
+      perturb those. Covers: the AC's own anon -> signup -> purchase journey (`anon_abc` -> `cust_3`,
+      including a *conflicting* weaker `click_id` link to `cust_4` that the direct declaration correctly
+      overrides while still flagging `is_conflicted`), a case where direct and shared-key evidence agree
+      (`anon_xyz` -> `cust_4`, unconflicted), a shared-key-only conflict resolved by earliest-evidence
+      tie-break with reduced confidence (`anon_qrs`, contested by `cust_5`/`cust_6` sharing a `device_id`),
+      a shared-key-only *clean* resolution (`anon_lmn` -> `cust_7` via `email_hash`, full confidence), and
+      each customer's own first-party anon_id (`anon_other5/6/7`).
+    - Two new dbt data tests: `assert_bridge_identity_confidence_in_range` (mirrors the existing
+      `assert_measure_values_are_non_negative` pattern) and `assert_bridge_identity_fixture_matches_expected`
+      — an `EXCEPT`-diff against a hand-computed expected table (any missing, extra, or wrong-field row
+      fails), covering every branch above plus `resolved_at`.
+  - **A real bug found and fixed during this run's own self-review, before opening the PR**: the initial
+    winner-selection independently took `min(precedence)` and `min(observed_at)` across *all* links for an
+    `(anon_id, customer_id)` pair, so the winning precedence and the reported `resolved_at` could come from
+    two *different* links whenever a pair had more than one kind of identity-key evidence at different
+    times — `resolved_at` would silently report a weaker link's own (possibly much earlier) timestamp even
+    though a *different*, stronger link determined the winning method. Caught by hand-deriving the expected
+    fixture output before writing the assertion (not by trusting the query blind), then deliberately
+    designing one more fixture row (`anon_pqr`/`cust_8`, sharing `device_id` with `cust_8` on one record and
+    `click_id` — a stronger key — on a *later* record) specifically to expose it. Fixed by selecting
+    `precedence`/`observed_at`/`method` all from the single best-ranked link row via one `row_number()`
+    instead of two independent `min()` aggregations. Confirmed the fix actually matters, not just
+    theoretically: temporarily restored the pre-fix model file and reran `pnpm test` — the new fixture test
+    genuinely failed (`Got 1 result, configured to fail if != 0`) — then restored the fix and confirmed all
+    63 dbt tests green again.
+  - Also caught and fixed the very first bug of this run, before even the initial full green test run: an
+    earlier draft of `shared_key_links` emitted `a.field_value` (the shared key's own value, e.g.
+    `"gclid_123"`) as the resolved `anon_id` instead of `a.client_id` (the actual anonymous identifier) —
+    caught immediately by hand-inspecting the built table's contents (`gclid_123`/`dev_1`/`hash_c7` showing
+    up *as if they were anon_ids*) rather than trusting the dbt test suite alone, since the bug didn't
+    happen to trip any `not_null`/`unique` test.
+  - `pnpm --filter @growthos/dbt-transform test`: 63/63 dbt data tests green (up from the prior 4 core
+    models' worth). `pnpm lint && pnpm typecheck && pnpm build` green across all packages (needed a fresh
+    `pnpm install` first — root `node_modules`/`turbo` binary weren't present at the start of this run).
+    Full `pnpm test` (incl. Firestore/Auth emulators + the full Playwright e2e suite) green across all 8
+    turbo tasks — needed one `.venv`-adjacent workaround (the Firestore emulator JAR downloader flaked the
+    same documented way prior entries record; worked around by `curl`-fetching the 138MB jar directly into
+    `~/.cache/firebase/emulators/`). One e2e flake each on the two full runs (`auth.spec.ts` then, on a
+    second full run after the winner-selection fix, `resource-library.spec.ts`) both self-recovered on
+    retry — the same long-documented, pre-existing "resource contention under repeated dev-server + Chromium
+    + Firestore/Auth-emulator launches in one session" flake every prior entry in this file has recorded,
+    confirmed unrelated by `git diff --stat` (this diff touches zero `apps/web`/`firebase-orm-models`
+    files). `local-dbt-executor.test.ts`'s existing exact-`proj_1`-row-count assertions passed unchanged,
+    confirming the new `proj_2` fixture rows stayed isolated as intended.
+  - Branch `kan-56-identity-stitching`, PR #37. First CI run hit a genuine, unrelated flake — a 30s test
+    timeout in `resource-library.emulator.test.ts` (`RESOURCE_EXHAUSTED`-class Firestore-emulator
+    contention, the exact class of pre-existing flake this file's KAN-49 entry also recorded), confirmed
+    unrelated via `git diff --stat` against the base commit (this PR touches only
+    `packages/dbt-transform/**`); re-ran just the failed job via the GitHub Actions API rather than
+    re-pushing, and it went green on retry. `mergeable_state: clean`, no review comments, merged (squash)
+    into `main`. Remote branch deletion failed with the same HTTP 403 this sandbox's git remote has
+    rejected every prior run's delete attempt with; local branch deleted after confirming `main`
+    fast-forwarded to include it cleanly.
+- **In progress (exact stopping point):** none — KAN-56 is fully delivered, tested (two real bugs found and
+  fixed via the story's own hand-derived fixture verification, not just a green test suite), independently
+  re-verified against a temporarily-reverted pre-fix model to confirm the regression test actually catches
+  the bug it targets, CI-verified (including re-diagnosing and re-kicking a genuine unrelated CI flake, not
+  just re-running blind), and merged into `main`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the remaining sprint-5 `todo`s are **KAN-57** (E10.2 touchpoint capture: JS snippet/SDK
+  storing UTM/click-ids at entry, attached to ingest events) and **KAN-58** (E10.3 last-touch + first-touch
+  attribution models, `fact_attribution`) and **KAN-61** (E11.3 default boards shipped with pack). KAN-57
+  is worth reading closely against this run's own `bridge_identity` design before starting: this story's
+  `touchpoint`-kind-event convention and its `anon_id`/`click_id` payload-field shape were *invented* here
+  (no real capture SDK existed yet to observe), so KAN-57's actual JS snippet should be designed to emit
+  events that satisfy this run's own structural assumptions (or, if KAN-57's own AC pulls the shape in a
+  different direction, `bridge_identity` may need a small follow-up adjustment — flagged here so that
+  isn't a surprise). KAN-58 (attribution) is the sprint-5 story that most directly consumes this run's own
+  `bridge_identity` output (an attribution model needs a resolved customer identity to attach
+  spend/touchpoint credit to), so doing KAN-57 before KAN-58 (in that order) sets up KAN-58 with both a
+  populated `bridge_identity` and real touchpoint capture to attribute from.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+
+---
+
 ## 2026-07-09 — KAN-60 reconciliation: independent verification + merge of PR #36 (E11.2 dashboard framework)
 
 - **Last completed:**
