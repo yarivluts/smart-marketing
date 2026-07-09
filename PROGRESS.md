@@ -17,6 +17,87 @@ Template for each entry:
 
 ---
 
+## 2026-07-09 — KAN-49 reconciliation: independent verification + merge of PR #35 (E8.1 Stripe plugin)
+
+- **Last completed:**
+  - Started this run the normal way (read `PROGRESS.md`/`TASKS.md`, picked the next unblocked `todo` in
+    sprint order — **KAN-49**, the natural next sprint-4 pick after KAN-48, per that entry's own "Next
+    step" plus KAN-27/KAN-28's own earlier notes flagging KAN-49 as "the first story to store a real
+    OAuth token/secret"). Implemented a full, independently-designed KAN-49 (Stripe manifest + backfill
+    executor via Stripe's Events API + a public HMAC-verified webhook route + 5 commerce event schemas +
+    a new generic vault-backed `sensitive` config-field mechanism on `PluginInstallModel`, since no
+    existing seam stored a plugin's own secret at the time this run started) — fully tested
+    (unit + emulator + route tests, ~60 new cases across `packages/shared`/`packages/firebase-orm-models`/
+    `apps/web`) and locally green (`pnpm lint && pnpm typecheck && pnpm test && pnpm build`, including a
+    real bug this run found and fixed itself: `@growthos/shared`'s barrel is reachable from a client
+    component (`lib/permissions/permission-context.tsx`), so the first `node:crypto`-using module added
+    there (webhook signature verification) broke the Next.js client webpack bundle — fixed by relocating
+    that one module into the server-only `firebase-orm-models` package instead, confirmed via a clean
+    `next build`).
+  - On push, discovered a **parallel same-day session had already implemented KAN-49 independently and
+    opened PR #35** (`kan-49-stripe-plugin`, opened 06:13 UTC — before this run's own implementation was
+    ready to push) with its own materially different design: Stripe secrets ride through the *existing*
+    KAN-27/29 Resource Library credential vault (`SharedCredentialModel` + a new `stripe` `CREDENTIAL_PROVIDERS`
+    entry) rather than a new per-plugin-config encryption mechanism; the executor alternates `events`/
+    `entities` sync phases across successive calls (landing a real `stripe_subscription` *entity*, current-
+    state per plan `09 §2`'s `dim_subscription`, not just a subscription-updated event); and the webhook
+    route lives under the existing `app/api/orgs/...` project-scoped tree with a documented, reasoned
+    `route-isolation-guard.test.ts` exemption. Rather than force-push over an already-open PR or duplicate
+    the implementation (the same "reconcile, don't re-implement" posture this file's KAN-42/KAN-20/KAN-33/
+    KAN-46 entries already established for parallel-run collisions), spawned an independent review
+    subagent (in an isolated git worktree, so it could run the *other* session's own `pnpm test` without
+    disturbing this session's state) to actually verify PR #35 rather than trust its own self-reported test
+    plan: confirmed `pnpm lint`/`typecheck`/`build` genuinely green, `packages/shared` (205 tests) and
+    `packages/firebase-orm-models` (300 tests, including every new Stripe suite) genuinely green, and traced
+    (not just read the comments on) the security-critical paths by hand — signature verification reads the
+    raw request body before any JSON parse and runs before any Firestore write (a forged/malformed webhook
+    delivery provably can't create a run-history record — asserted by the PR's own emulator test), both
+    Stripe secrets are envelope-encrypted via the KAN-29 vault with no plaintext path to a browser,
+    `mrr_normalized` is computed correctly against hand-computed fixtures (yearly `/12`, monthly unchanged,
+    multi-seat multiplied), the backfill cursor only advances once every page for the current window is
+    fully drained (no page-boundary skip), and a webhook redelivery or backfill/webhook overlap dedupes
+    via `ingestBatch`'s own client-id slot. The PR's own CI (`lint · typecheck · test · build`) was already
+    green and `mergeable_state: clean`. The e2e Playwright suite showed 3 failures in this run's own full
+    `pnpm test` pass (`metric-defs.spec.ts`/`resource-library.spec.ts`/`schema-registry.spec.ts` — none
+    touching any Stripe/plugin file, confirmed via `git diff --stat` against the base commit) — the review
+    subagent independently reran the failed specs in isolation and got a *different* failing subset
+    (`orgs.spec.ts` twice, neither of the original three) on the exact same code, proving genuine
+    non-deterministic pre-existing emulator-contention flakiness (the same class every prior entry in this
+    file has recorded), not a KAN-49 regression, and not something either session's own diff touches.
+  - Merged PR #35 (squash) into `main` via the GitHub API — CI green, `mergeable_state: clean`, no
+    unresolved review comments, independent review found zero blocking issues. Remote branch deletion
+    failed with the same HTTP 403 this sandbox's git remote has rejected every prior run's delete attempt
+    with; discarded this run's own local (never-pushed, now fully superseded) `kan-49-stripe-plugin`
+    branch and commits once `main` was confirmed to fast-forward cleanly through the merge.
+  - Also fixed, in passing: an untracked `.claude/worktrees/` directory (created by this run's own review
+    subagent's isolated worktree) had never been gitignored in this repo — added a `.claude/` entry to
+    `.gitignore` so a future run's agent-worktree scratch state doesn't get flagged for commit again.
+- **In progress (exact stopping point):** none — KAN-49 is fully delivered (by PR #35), independently
+  re-verified end to end by this run (not just re-reading the other session's own self-review or trusting
+  its test-plan checklist), and merged into `main`. This run's own from-scratch KAN-49 implementation was
+  discarded in favor of the already-open PR per this file's own established reconciliation convention —
+  its differing design choices (reusing the KAN-27/29 credential vault rather than inventing a new
+  per-plugin-config secret-encryption mechanism, and modeling a subscription as a real current-state entity
+  rather than only an event) are worth remembering as the more idiomatic pattern for a *future* plugin
+  (KAN-50 Google Ads, KAN-51 Meta Ads, KAN-52 GA4) that also needs to store a real OAuth token/secret.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the remaining sprint-4 `todo` is **KAN-60** (E11.2 dashboard framework: board model, grid
+  drag-drop, tile types, metric picker, date range + compare, global filters) — the next unblocked pick in
+  sprint order now that KAN-46..49 are all done. It's a substantially bigger, more novel surface than the
+  plugin-framework/Stripe stories (no existing board/tile/grid machinery to extend), so budget accordingly;
+  read `docs/plan/13-task-breakdown.md`'s own E11.2 line and `docs/plan/10-product-ux.md §2.2` ("Dashboard &
+  tile system") before starting. **KAN-50** (Google Ads plugin, sprint 5) remains `blocked-by` KAN-43 until
+  a human submits the Google Ads developer token application.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding. Now also gates the sprint-5/6 Google Ads (KAN-50) and Meta Ads (KAN-51) plugin stories
+    directly, since KAN-49 (their sibling story) is done.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+
+---
+
 ## 2026-07-08 — E7.3 Admin UI polish: plugin gallery, config forms rendered from config_schema, per-plugin health (KAN-48)
 
 - **Last completed:**
