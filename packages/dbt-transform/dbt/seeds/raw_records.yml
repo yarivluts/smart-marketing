@@ -5,9 +5,11 @@ seeds:
     description: >
       Fixture "test dataset" standing in for a real export of KAN-33's
       Firestore `raw_records` collection (itself a stand-in for a partitioned
-      BigQuery raw table until KAN-18 provisions one) — enough rows across two
-      projects/environments and all three schema kinds to build and test the
-      staging/core layers against.
+      BigQuery raw table until KAN-18 provisions one) — enough rows across
+      three projects/environments and all three schema kinds to build and
+      test the staging/core layers against. `proj_2`'s rows are a synthetic
+      anon -> signup -> purchase identity journey (KAN-56's
+      `bridge_identity`), not a third unrelated tenant.
     columns:
       - name: organization_id
         tests:

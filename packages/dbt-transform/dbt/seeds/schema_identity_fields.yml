@@ -1,0 +1,34 @@
+version: 2
+
+seeds:
+  - name: schema_identity_fields
+    description: >
+      Fixture "test dataset" standing in for a warehouse export of KAN-31's
+      Firestore `SchemaDefModel.field_defs`, filtered to `is_identity_key =
+      true` on each schema's currently-active version (one row per
+      registered identity-key field) — the same "buildable-today, real
+      export lands here later" posture `raw_records.csv` already establishes
+      for the raw ingest table itself. `stg_identity_key_observations` joins
+      against this to know which payload fields to pivot out as identity-key
+      evidence for `bridge_identity` (KAN-56), so the stitching engine works
+      off whatever a project has actually registered, never a hard-coded
+      field list (plan `08 §1`).
+    columns:
+      - name: organization_id
+        tests:
+          - not_null
+      - name: project_id
+        tests:
+          - not_null
+      - name: kind
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['entity', 'event', 'measure']
+      - name: schema_name
+        tests:
+          - not_null
+      - name: field_name
+        tests:
+          - not_null

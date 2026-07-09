@@ -27,6 +27,13 @@ seeds:
         client_id: VARCHAR
         payload: JSON
         landed_at: TIMESTAMP
+    schema_identity_fields:
+      +column_types:
+        organization_id: VARCHAR
+        project_id: VARCHAR
+        kind: VARCHAR
+        schema_name: VARCHAR
+        field_name: VARCHAR
 
 models:
   growthos_transform:

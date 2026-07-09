@@ -11,3 +11,16 @@ org_1,proj_1,env_prod,2026-01-06,batch_006,measure,ad_spend,google:brand:2026-01
 org_2,proj_9,env_prod,2026-02-01,batch_101,entity,customer,cust_9,"{""email"": ""c@example.com"", ""plan"": ""starter"", ""geo"": ""UK""}",2026-02-01 08:00:00
 org_2,proj_9,env_prod,2026-02-01,batch_101,event,funnel_event,cust_9,"{""event_name"": ""signup"", ""ts"": ""2026-02-01T08:00:00Z""}",2026-02-01 08:00:02
 org_2,proj_9,env_prod,2026-02-01,batch_102,measure,ad_spend,meta:launch:2026-02-01,"{""channel"": ""meta"", ""campaign"": ""launch"", ""value"": 50.00, ""currency"": ""USD"", ""date"": ""2026-02-01""}",2026-02-01 23:59:00
+org_1,proj_2,env_prod,2026-03-01,batch_201,event,touchpoint,anon_abc,"{""event_name"": ""pageview"", ""click_id"": ""gclid_123"", ""ts"": ""2026-03-01T09:00:00Z""}",2026-03-01 09:00:01
+org_1,proj_2,env_prod,2026-03-01,batch_202,event,funnel_event,cust_3,"{""event_name"": ""signup"", ""anon_id"": ""anon_abc"", ""email_hash"": ""hash_c3"", ""ts"": ""2026-03-01T09:05:00Z""}",2026-03-01 09:05:02
+org_1,proj_2,env_prod,2026-03-01,batch_203,event,funnel_event,cust_3,"{""event_name"": ""purchase"", ""ts"": ""2026-03-01T09:20:00Z""}",2026-03-01 09:20:01
+org_1,proj_2,env_prod,2026-03-02,batch_204,event,touchpoint,anon_xyz,"{""event_name"": ""pageview"", ""click_id"": ""gclid_123"", ""ts"": ""2026-03-02T10:00:00Z""}",2026-03-02 10:00:01
+org_1,proj_2,env_prod,2026-03-02,batch_205,event,funnel_event,cust_4,"{""event_name"": ""signup"", ""anon_id"": ""anon_xyz"", ""email_hash"": ""hash_c4"", ""click_id"": ""gclid_123"", ""ts"": ""2026-03-02T10:05:00Z""}",2026-03-02 10:05:02
+org_1,proj_2,env_prod,2026-03-03,batch_206,event,touchpoint,anon_qrs,"{""event_name"": ""pageview"", ""device_id"": ""dev_1"", ""ts"": ""2026-03-03T08:00:00Z""}",2026-03-03 08:00:01
+org_1,proj_2,env_prod,2026-03-03,batch_207,event,funnel_event,cust_5,"{""event_name"": ""signup"", ""anon_id"": ""anon_other5"", ""device_id"": ""dev_1"", ""email_hash"": ""hash_c5"", ""ts"": ""2026-03-03T08:10:00Z""}",2026-03-03 08:10:02
+org_1,proj_2,env_prod,2026-03-03,batch_208,event,funnel_event,cust_6,"{""event_name"": ""signup"", ""anon_id"": ""anon_other6"", ""device_id"": ""dev_1"", ""email_hash"": ""hash_c6"", ""ts"": ""2026-03-03T09:00:00Z""}",2026-03-03 09:00:02
+org_1,proj_2,env_prod,2026-03-04,batch_209,event,touchpoint,anon_lmn,"{""event_name"": ""pageview"", ""email_hash"": ""hash_c7"", ""ts"": ""2026-03-04T07:00:00Z""}",2026-03-04 07:00:01
+org_1,proj_2,env_prod,2026-03-04,batch_210,event,funnel_event,cust_7,"{""event_name"": ""signup"", ""anon_id"": ""anon_other7"", ""email_hash"": ""hash_c7"", ""ts"": ""2026-03-04T07:10:00Z""}",2026-03-04 07:10:02
+org_1,proj_2,env_prod,2026-03-05,batch_211,event,touchpoint,anon_pqr,"{""event_name"": ""pageview"", ""device_id"": ""dev_9"", ""click_id"": ""gclid_999"", ""ts"": ""2026-03-05T06:00:00Z""}",2026-03-05 06:00:01
+org_1,proj_2,env_prod,2026-03-05,batch_212,event,funnel_event,cust_8,"{""event_name"": ""signup"", ""anon_id"": ""anon_other8"", ""device_id"": ""dev_9"", ""ts"": ""2026-03-05T06:10:00Z""}",2026-03-05 06:10:02
+org_1,proj_2,env_prod,2026-03-05,batch_213,event,funnel_event,cust_8,"{""event_name"": ""activated"", ""click_id"": ""gclid_999"", ""ts"": ""2026-03-05T07:00:00Z""}",2026-03-05 07:00:02
