@@ -17,6 +17,111 @@ Template for each entry:
 
 ---
 
+## 2026-07-09 — E10.2 Touchpoint capture: JS snippet/SDK, UTM/click-ids attached to ingest events (KAN-57)
+
+- **Last completed:**
+  - Started the normal way: `main`/`origin/main` had drifted apart again the same way the prior KAN-56
+    run flagged (`git checkout -b` off local `main` silently branched from the old bootstrap commit) —
+    caught it by comparing `git log -1` against `origin/main` before doing any work, then
+    `git fetch origin main && git reset --hard origin/main` before branching. Picked **KAN-57** (E10.2,
+    plan `13 §E10.2`, AC: "GCLID present on a test conversion end-to-end") per the KAN-56 entry's own
+    "Next step" (do it before KAN-58 attribution, since KAN-58 consumes real touchpoint capture and a
+    populated `bridge_identity`).
+  - Read `docs/plan/04-data-model-and-metrics.md §1`'s `fact_touchpoint` shape and re-read KAN-56's own
+    `bridge_identity.sql`/fixture rows closely first: a touchpoint event's own `event_id` *is* the anon
+    id every downstream reader keys off (not a separate field), and a customer-side event declares
+    `anon_id` in its own properties to link back — this run's design deliberately preserves that exact
+    convention so `bridge_identity` needs no follow-up adjustment.
+  - Delivered:
+    - `packages/shared/src/touchpoint-capture/`: pure, DOM-free `parseAcquisitionParams` (gclid/msclkid/
+      fbclid/ttclid, channel classification — a matched click id outranks `utm_medium`; a *cross-site*
+      referrer with no other signal is `referral`; anything else is `direct`), `buildTouchpointEventPayload`
+      (event_id = anon id, event = `touchpoint`), `buildTrackedEventPayload` (attaches `anon_id`, always a
+      fresh `event_id` so repeated same-named events never collide on ingest dedup), and
+      `TOUCHPOINT_SCHEMA_FIELDS` (the registerable field list, `click_id` the only identity key).
+    - `packages/firebase-orm-models`: `ensureTouchpointSchemaRegistered` (idempotent register-if-missing,
+      same "seed on demand" posture as KAN-49's Stripe schemas, recovers cleanly from the known
+      non-transactional race on `registerSchemaDefinition`) + an emulator test that lands a real
+      `gclid` through `ingestBatch` into the raw-record layer end to end, then links a follow-up event
+      back to it via `anon_id` — the concrete "GCLID present on a test conversion end-to-end" AC, not
+      just a dbt fixture.
+    - New `packages/tracking-sdk` package: `createTracker()` (`page()`/`track()`/`identify()`/
+      `getAnonId()`, `localStorage`-backed with an in-memory fallback for a locked-down/SSR context) and
+      `renderEmbedSnippet()` — a self-contained, dependency-free vanilla-JS `<script>` tag (no bundler,
+      no external asset to trust) implementing the identical capture/attach behavior for a site that can
+      only paste a snippet, not `npm install`.
+    - `apps/web`: the Keys page (KAN-30) now shows a copyable embed snippet immediately after minting a
+      key — the one moment the raw key is available at all, since `listApiKeysForProject` never returns
+      it again. The Schema Registry page (KAN-31) gets a one-click "set up touchpoint capture" action.
+      New `en`/`he` translation strings; no hardcoded UI strings, no Hebrew in code files.
+  - Self-reviewed via **5 parallel finder-agent passes** (line-by-line correctness, removed-behavior
+    audit, cross-file tracer, reuse/simplification, efficiency/altitude+CLAUDE.md conventions) before
+    merging, and fixed every real finding:
+    - `track()`/`identify()` minted the anon id but never fired its touchpoint capture, contradicting the
+      tracker's own doc comment ("the first `page()`/`track()`/`identify()` call") — a caller that only
+      ever calls `track()` would permanently lose that visitor's touchpoint. Fixed by centralizing anon-id
+      minting through a shared `ensureAnonId()` (both `client.ts` and the vanilla-JS snippet) that fires
+      the touchpoint exactly once, on whichever of the three methods runs first. Added regression tests
+      that call `track()`/`identify()` before `page()` and assert the touchpoint still fires.
+    - `deriveChannel` classified *any* non-empty referrer as `referral`, despite its own doc comment
+      promising "a **cross-site** referrer" — same-site internal navigation (e.g. `/pricing` ->
+      `/signup`) was misclassified. Fixed to compare the referrer's origin against the page's own.
+    - `resolveStorage()`'s `localStorage` writability probe never called `removeItem`, leaking a stray
+      `__growthos_storage_probe__` key into every visitor's storage (the hand-written vanilla-JS snippet
+      already cleaned its own probe up correctly — the drift is what surfaced this).
+    - A just-minted key's scopes could include more than `ingest.write` (e.g. also `schema.write`), in
+      which case the embed snippet must never be offered — it's meant to sit in public page source.
+      Narrowed the condition to an exactly-`['ingest.write']` key.
+    - An e2e locator collision: after adding a second "Copy"/"Copied" button (the embed snippet's own),
+      `keys.spec.ts`'s existing `getByRole('button', { name: 'Copied' })` became ambiguous once both
+      copy buttons had been clicked — scoped it to `MintedApiKeyDisplay`'s own container via a new
+      `data-testid`.
+    - Added a schema/snippet parity test: the vanilla-JS snippet can't `import` the shared package's
+      field list (it has to be a self-contained inline script), so a test executes the real shipped
+      snippet body with every possible acquisition param set and asserts its emitted property keys are
+      exactly `TOUCHPOINT_SCHEMA_FIELDS`'s names — catching future drift between the two independent
+      copies at test time instead of silently.
+    - Also added: a `route.test.ts` for the new "register touchpoint schema" admin route and e2e coverage
+      of the button on the Schema Registry page (both flagged as coverage gaps by the review).
+  - `pnpm lint && pnpm typecheck && pnpm build` green across all 7 packages (including the new
+    `packages/tracking-sdk`). `packages/shared` (206 tests), `packages/tracking-sdk` (21 tests),
+    `packages/firebase-orm-models` (all 39 emulator test files, 368+ tests), and `apps/web`'s full unit
+    suite (477 tests) all green. `apps/web`'s e2e suite for the two files this story actually changed
+    (`keys.spec.ts`, `schema-registry.spec.ts`) passed cleanly in isolated re-runs against a fresh
+    emulator once a real flake was fixed (the "Copied" locator collision above) and a genuinely
+    under-budgeted timeout was extended (registering the touchpoint schema round-trips a POST ->
+    Firestore write -> full server-render, the same class of slower op `createOrganization`'s own
+    15s-budgeted heading check already accounts for). Several *other*, unrelated e2e specs (auth,
+    boards, cost-guardrails, orgs, plugins, resource-library) flaked intermittently across repeated local
+    re-runs late in this session — confirmed unrelated via `git diff --stat` (zero overlap with this
+    diff) and consistent with this sandbox's long-documented "resource contention under repeated
+    dev-server + Chromium + emulator launches in one session" flake class every prior entry in this file
+    has recorded. Rather than keep fighting local sandbox degradation, opened the PR and let a **fresh**
+    GitHub Actions runner be the authoritative gate — it came back fully green (`lint · typecheck · test
+    · build`, one job, no re-run needed) — before merging.
+  - Branch `kan-57-touchpoint-capture`, PR #38. CI green, `mergeable_state: clean`, no review comments.
+    Merged (squash) into `main`. Remote branch deletion failed with the same HTTP 403 this sandbox's git
+    remote has rejected every prior run's delete attempt with; local branch deleted after confirming
+    `main` fast-forwarded to include it cleanly.
+- **In progress (exact stopping point):** none — KAN-57 is fully delivered, tested (incl. a real
+  end-to-end gclid ingest test and a schema/snippet drift-detection test), independently reviewed via 5
+  parallel finder passes with every real finding fixed, CI-verified on a fresh runner, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the remaining sprint-5 `todo` is **KAN-58** (E10.3 last-touch + first-touch attribution
+  models, `fact_attribution`) — the natural follow-on now that both identity stitching (KAN-56) and real
+  touchpoint capture (this run) exist to attribute from. **KAN-61** (E11.3 default boards) is the other
+  remaining sprint-5 `todo`, lower-dependency but arguably less impactful than unblocking attribution.
+  Sprint-6 `todo`s (KAN-52 GA4 plugin, KAN-53 webhook ingest, KAN-54 mapping engine, KAN-62 cohort engine,
+  KAN-64 goals) remain open after that.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, unchanged
+    by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-57-touchpoint-capture` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403).
+
 ## 2026-07-09 — E10.1 Deterministic identity stitching (dbt): bridge_identity, conflict rules (KAN-56)
 
 - **Last completed:**
