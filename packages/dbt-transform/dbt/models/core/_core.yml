@@ -69,3 +69,37 @@ models:
       - name: is_conflicted
         tests:
           - not_null
+
+  - name: fact_attribution
+    description: >
+      Rules-based attribution (plan `04 §4`, KAN-58): first-touch and
+      last-touch credit for every customer-side ("conversion") event,
+      resolved back through `bridge_identity` to the touchpoints that
+      preceded it — see the model's own doc comment for the full rule.
+    columns:
+      - name: attribution_key
+        description: Composite (project_id, environment_id, conversion_event_id, model) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: conversion_event_id
+        tests:
+          - not_null
+      - name: conversion_event
+        tests:
+          - not_null
+      - name: model
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['first_touch', 'last_touch']
+      - name: channel_id
+        tests:
+          - not_null
+      - name: credit
+        tests:
+          - not_null

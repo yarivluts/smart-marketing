@@ -9,7 +9,12 @@ seeds:
       three projects/environments and all three schema kinds to build and
       test the staging/core layers against. `proj_2`'s rows are a synthetic
       anon -> signup -> purchase identity journey (KAN-56's
-      `bridge_identity`), not a third unrelated tenant.
+      `bridge_identity`), not a third unrelated tenant. `proj_10`'s rows are
+      a synthetic two-channel touchpoint journey (KAN-58's
+      `fact_attribution`: a paid-search touchpoint followed by a paid-social
+      one, both resolved to the same customer via a shared device id) —
+      isolated from `proj_2`'s own exact-row-count-asserting bridge_identity
+      fixture test.
     columns:
       - name: organization_id
         tests:
