@@ -64,8 +64,12 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     expect(snippetClipboardText).toContain(rawKey);
     expect(snippetClipboardText).toContain('window.growthos');
 
-    await page.getByRole('button', { name: 'Copy' }).click();
-    await expect(page.getByRole('button', { name: 'Copied' })).toBeVisible();
+    // Scoped to `MintedApiKeyDisplay`'s own container: the touchpoint snippet's
+    // copy button above was just clicked too, so an unscoped 'Copied' lookup
+    // would now match two buttons.
+    const mintedKeyDisplay = page.getByTestId('minted-api-key-display');
+    await mintedKeyDisplay.getByRole('button', { name: 'Copy' }).click();
+    await expect(mintedKeyDisplay.getByRole('button', { name: 'Copied' })).toBeVisible();
     const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
     expect(clipboardText).toBe(rawKey);
 
