@@ -27,6 +27,15 @@ dbt compiles the same SQL against either adapter.
   - `events`: append-only event fact table.
   - `measures`: append-only pre-aggregated measure fact table (e.g. a daily
     ad-spend line).
+  - `bridge_identity` (KAN-56): deterministic identity stitching — resolves
+    each anonymous visitor id to the customer identity it shares registered
+    identity-key evidence with (plan `04 §4`). Reads
+    `seeds/schema_identity_fields.csv` (a stand-in for a warehouse export of
+    KAN-31's `SchemaDefModel.field_defs` filtered to `is_identity_key =
+    true`, same posture as `raw_records.csv`) via the new
+    `stg_identity_key_observations` staging model, so the fields it stitches
+    on are whatever a project has actually registered, never hard-coded. See
+    the model's own doc comment for the full conflict-resolution rule.
 
 This is a deliberately generic, denormalized shape — no join-graph/mart layer
 yet (the same simplification KAN-41's metrics compiler already documents for

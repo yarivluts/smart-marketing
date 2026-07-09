@@ -1,0 +1,8 @@
+organization_id,project_id,kind,schema_name,field_name
+org_1,proj_2,event,touchpoint,click_id
+org_1,proj_2,event,touchpoint,device_id
+org_1,proj_2,event,touchpoint,email_hash
+org_1,proj_2,event,funnel_event,anon_id
+org_1,proj_2,event,funnel_event,email_hash
+org_1,proj_2,event,funnel_event,click_id
+org_1,proj_2,event,funnel_event,device_id

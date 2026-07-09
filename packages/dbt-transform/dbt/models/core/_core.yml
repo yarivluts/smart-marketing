@@ -41,3 +41,31 @@ models:
         tests:
           - not_null
           - unique
+
+  - name: bridge_identity
+    description: >
+      Deterministic identity stitching (plan `04 §4`, KAN-56): one row per
+      resolved anon_id -> customer_id link, with the winning method,
+      confidence, and a conflict flag — see the model's own doc comment for
+      the full conflict-resolution rule.
+    columns:
+      - name: bridge_identity_key
+        description: Composite (project_id, environment_id, anon_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: anon_id
+        tests:
+          - not_null
+      - name: customer_id
+        tests:
+          - not_null
+      - name: method
+        tests:
+          - not_null
+      - name: confidence
+        tests:
+          - not_null
+      - name: is_conflicted
+        tests:
+          - not_null

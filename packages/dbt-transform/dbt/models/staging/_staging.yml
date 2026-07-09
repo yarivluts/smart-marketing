@@ -59,3 +59,20 @@ models:
         tests:
           - not_null
           - unique
+
+  - name: stg_identity_key_observations
+    description: >
+      One row per (raw_record_key, field_name) pivoted out of a record's
+      payload for every registered identity-key field (KAN-56) that record's
+      project has declared for its (kind, schema_name) — see
+      `schema_identity_fields.yml`.
+    columns:
+      - name: raw_record_key
+        tests:
+          - not_null
+      - name: field_name
+        tests:
+          - not_null
+      - name: field_value
+        tests:
+          - not_null
