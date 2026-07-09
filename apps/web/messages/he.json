@@ -432,7 +432,6 @@
   },
   "Boards": {
     "metaTitle": "לוחות מחוונים",
-    "boardMetaTitle": "{boardName}",
     "title": "לוחות מחוונים עבור {projectName}",
     "boardsHeading": "לוחות מחוונים",
     "noBoards": "לפרויקט זה אין עדיין לוחות מחוונים.",
@@ -504,6 +503,8 @@
     "tileWidthLabel": "רוחב",
     "tileHeightLabel": "גובה",
     "tileDeltaLabel": "{deltaPct}% לעומת התקופה הקודמת",
+    "barTooltip": "{bucket}: {value}",
+    "previousPeriodLabel": "תקופה קודמת",
     "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
     "tableEmpty": "אין נתונים לטווח זה עדיין.",
     "tileUnavailableReason": {

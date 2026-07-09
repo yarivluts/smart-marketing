@@ -134,6 +134,23 @@ describe('buildTileRenderView — time_series', () => {
       previousSeries: [{ label: 'google', points: [{ bucket: '2025-12-01', value: 80 }] }],
     });
   });
+
+  it('does not merge two genuinely different dimension-value combinations whose display labels collide on the join delimiter', () => {
+    // Two-dimension breakdown where one combination's own values, joined by
+    // ' / ', looks identical to a different combination's join — a naive
+    // string-concatenation grouping key would wrongly merge these into one
+    // series (2 + 3 = 5, corrupting both series' real point counts of 1 each).
+    const view = buildTileRenderView(tile({ type: 'bar', dimensions: ['channel', 'campaign'] }), {
+      ok: true,
+      series: [
+        { bucket_date: '2026-01-01', channel: 'A', campaign: 'B / C', ad_spend: 2 },
+        { bucket_date: '2026-01-01', channel: 'A / B', campaign: 'C', ad_spend: 3 },
+      ],
+    });
+    expect(view.kind).toBe('time_series');
+    expect(view.kind === 'time_series' && view.series).toHaveLength(2);
+    expect(view.kind === 'time_series' && view.series.every((series) => series.points.length === 1)).toBe(true);
+  });
 });
 
 describe('buildTileRenderView — table', () => {

@@ -5,6 +5,7 @@ import type {
   BoardTileType,
   WarehouseRow,
 } from '@growthos/firebase-orm-models';
+import type { ComparePeriod } from '@growthos/shared';
 
 /** A board's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface BoardSummaryView {
@@ -23,7 +24,8 @@ export interface BoardView {
   id: string;
   name: string;
   dateRange: BoardModel['date_range'];
-  compare?: BoardModel['compare'];
+  /** `undefined`, never `null` — this view's own conditional-spread construction (`toBoardView`) omits the key entirely rather than including an explicit `null` (unlike `BoardModel.compare` itself, whose stored `null` has its own storage-layer reason — see that field's own doc comment). */
+  compare?: ComparePeriod;
   globalFilters: BoardModel['global_filters'];
   tiles: BoardTile[];
 }
@@ -103,24 +105,36 @@ function buildBigNumberView(tile: BoardTile, rows: readonly WarehouseRow[]): Til
   return { kind: 'big_number', value, previousValue, ...(deltaPct !== undefined ? { deltaPct } : {}) };
 }
 
-function groupKey(row: WarehouseRow, dimensions: readonly string[]): string {
+/** A human-readable series label — display only, not used as the internal grouping key (see `groupKey`'s own doc comment for why). */
+function groupLabel(row: WarehouseRow, dimensions: readonly string[]): string {
   if (dimensions.length === 0) {
     return 'all';
   }
   return dimensions.map((dimension) => String(row[dimension] ?? '')).join(' / ');
 }
 
+/**
+ * The internal `Map` key one row's dimension-value combination groups
+ * under — JSON-encoded (not the human-readable `' / '`-joined label a
+ * dimension value could itself contain, e.g. a campaign name with a
+ * literal "/" in it) so two genuinely different combinations can never
+ * collide onto the same key and get silently merged into one series.
+ */
+function groupKey(row: WarehouseRow, dimensions: readonly string[]): string {
+  return JSON.stringify(dimensions.map((dimension) => String(row[dimension] ?? '')));
+}
+
 function buildSeries(rows: readonly WarehouseRow[], tile: BoardTile): TimeSeries[] {
   const metricName = tile.metricNames[0];
-  const byGroup = new Map<string, TimeSeriesPoint[]>();
+  const byGroup = new Map<string, { label: string; points: TimeSeriesPoint[] }>();
   for (const row of rows) {
     const key = groupKey(row, tile.dimensions);
-    const points = byGroup.get(key) ?? [];
-    points.push({ bucket: String(row.bucket_date ?? ''), value: toNumber(row[metricName] ?? null) });
-    byGroup.set(key, points);
+    const group = byGroup.get(key) ?? { label: groupLabel(row, tile.dimensions), points: [] };
+    group.points.push({ bucket: String(row.bucket_date ?? ''), value: toNumber(row[metricName] ?? null) });
+    byGroup.set(key, group);
   }
-  return [...byGroup.entries()]
-    .map(([label, points]) => ({ label, points: points.sort((a, b) => a.bucket.localeCompare(b.bucket)) }))
+  return [...byGroup.values()]
+    .map((group) => ({ label: group.label, points: group.points.sort((a, b) => a.bucket.localeCompare(b.bucket)) }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 

@@ -25,7 +25,9 @@ const signupsTile: BoardTileRow = {
   id: 'tile-2',
   type: 'big_number',
   title: 'Signups',
-  layout: { x: 3, y: 0, w: 3, h: 2 },
+  // Deliberately a different size from `adSpendTile` — the drag-swap test
+  // below asserts positions swap while each tile keeps its own size.
+  layout: { x: 6, y: 0, w: 6, h: 4 },
   metricNames: ['signups'],
   dimensions: [],
 };
@@ -137,7 +139,7 @@ describe('BoardGridEditor', () => {
     expect(screen.getAllByLabelText('Tile title')).toHaveLength(2);
   });
 
-  it('swaps two tiles’ positions on drag-and-drop', () => {
+  it('swaps two tiles’ positions on drag-and-drop, without swapping their (different) sizes', () => {
     renderEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
 
@@ -146,12 +148,22 @@ describe('BoardGridEditor', () => {
     const draggedParent = dragged.parentElement as HTMLElement;
     const targetParent = target.parentElement as HTMLElement;
     expect(draggedParent.style.gridColumn).toBe('1 / span 3');
-    expect(targetParent.style.gridColumn).toBe('4 / span 3');
+    expect(draggedParent.style.gridRow).toBe('1 / span 2');
+    expect(targetParent.style.gridColumn).toBe('7 / span 6');
+    expect(targetParent.style.gridRow).toBe('1 / span 4');
 
     fireEvent.dragStart(dragged);
     fireEvent.drop(target);
 
-    expect(draggedParent.style.gridColumn).toBe('4 / span 3');
-    expect(targetParent.style.gridColumn).toBe('1 / span 3');
+    // Positions (the grid-line start) swapped...
+    expect(draggedParent.style.gridColumn.split(' / ')[0]).toBe('7');
+    expect(targetParent.style.gridColumn.split(' / ')[0]).toBe('1');
+    // ...but each tile kept its own size (the `span` part) rather than
+    // taking on the other tile's — dragging a small tile onto a large one
+    // must not resize either.
+    expect(draggedParent.style.gridColumn).toBe('7 / span 3');
+    expect(draggedParent.style.gridRow).toBe('1 / span 2');
+    expect(targetParent.style.gridColumn).toBe('1 / span 6');
+    expect(targetParent.style.gridRow).toBe('1 / span 4');
   });
 });

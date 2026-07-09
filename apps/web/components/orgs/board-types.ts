@@ -1,24 +1,26 @@
 // Client components must never import from `@growthos/firebase-orm-models`
 // (its barrel drags in server-only code, e.g. `node:crypto` from
-// `key.service.ts`, which breaks the client webpack bundle) — this file is
-// the board feature's own local copy of the small bits of that package's
-// vocabulary a board's grid editor needs, the same reasoning
-// `metric-definition-editor.tsx`'s own `METRIC_AGG_FUNCTIONS` local copy
-// documents for its own case.
+// `key.service.ts`, which breaks the client webpack bundle) — `BOARD_TILE_
+// TYPES`/`BoardTileTypeRow` below is this board feature's own local copy of
+// the one bit of that package's vocabulary a board's grid editor needs
+// (`BoardTileType` only exists there), the same reasoning `metric-
+// definition-editor.tsx`'s own `METRIC_AGG_FUNCTIONS` local copy documents
+// for its own case.
+//
+// `@growthos/shared` is a different, Firestore-free package with no such
+// restriction — `parse-board-fields.ts` and the pre-existing `invite-
+// member-form.tsx` ('use client') both already import real values
+// (`TIME_GRAINS`/`COMPARE_PERIODS`/`METRIC_FILTER_OPERATORS`/`CompilerFilter`,
+// `INVITABLE_ROLES`) from it directly, so re-declaring those same three
+// vocabularies here too would just be a second copy to keep in sync by
+// hand — re-exported from there instead.
+export { TIME_GRAINS, COMPARE_PERIODS, METRIC_FILTER_OPERATORS } from '@growthos/shared';
+export type { TimeGrain as TimeGrainRow, ComparePeriod as ComparePeriodRow, MetricFilterOperator as MetricFilterOperatorRow, CompilerFilter as GlobalFilterRow } from '@growthos/shared';
 
 export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel'] as const;
 export type BoardTileTypeRow = (typeof BOARD_TILE_TYPES)[number];
 
 export const BOARD_GRID_COLUMNS = 12;
-
-export const TIME_GRAINS = ['day', 'week', 'month', 'quarter', 'year'] as const;
-export type TimeGrainRow = (typeof TIME_GRAINS)[number];
-
-export const COMPARE_PERIODS = ['previous_period', 'previous_year'] as const;
-export type ComparePeriodRow = (typeof COMPARE_PERIODS)[number];
-
-export const METRIC_FILTER_OPERATORS = ['=', '!=', '>', '>=', '<', '<=', 'in'] as const;
-export type MetricFilterOperatorRow = (typeof METRIC_FILTER_OPERATORS)[number];
 
 export interface BoardTileLayoutRow {
   x: number;
@@ -41,12 +43,6 @@ export interface BoardTileRow {
 export interface MetricCatalogEntryRow {
   name: string;
   dimensions: string[];
-}
-
-export interface GlobalFilterRow {
-  field: string;
-  operator: MetricFilterOperatorRow;
-  value: string;
 }
 
 /** Default size (in grid columns/rows) for a newly added tile of each type — big numbers are small, everything else needs room for a chart/table/steps. */

@@ -18,8 +18,8 @@ function tile(overrides: Partial<BoardTileRow> = {}): BoardTileRow {
   };
 }
 
-function renderTile(view: TileRenderView, overrides: Partial<BoardTileRow> = {}): void {
-  render(
+function renderTile(view: TileRenderView, overrides: Partial<BoardTileRow> = {}) {
+  return render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <BoardTileView tile={tile(overrides)} view={view} />
     </NextIntlClientProvider>,
@@ -58,6 +58,47 @@ describe('BoardTileView', () => {
   it('renders a time_series bar tile', () => {
     renderTile({ kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: [{ bucket: '2026-01-01', value: 10 }] }] }, { type: 'bar' });
     expect(screen.getByRole('img', { name: 'all' })).toBeInTheDocument();
+  });
+
+  it('colors a solid current-period line and its dashed previous-period counterpart identically, matched by label rather than array index', () => {
+    const { container } = renderTile(
+      {
+        kind: 'time_series',
+        chart: 'line',
+        // Current period has two channels; previous period only has one of
+        // them ("meta" is new this period) — if colors were assigned by
+        // each array's own independent index, "meta" (current, index 1)
+        // and "google" (previous, index 0) would wrongly share a color.
+        series: [
+          { label: 'google', points: [{ bucket: '2026-01-01', value: 10 }] },
+          { label: 'meta', points: [{ bucket: '2026-01-01', value: 5 }] },
+        ],
+        previousSeries: [{ label: 'google', points: [{ bucket: '2025-12-01', value: 8 }] }],
+      },
+      { type: 'line' },
+    );
+    // Render order (see LineChartView): every `previousSeries` polyline
+    // first (dashed), then every `view.series` polyline (solid), each in
+    // their own array order — so with one previousSeries entry ("google")
+    // and two current series ("google" then "meta"), the DOM order is
+    // [dashed google, solid google, solid meta].
+    const [dashedGoogle, solidGoogle, solidMeta] = container.querySelectorAll('polyline');
+    expect(dashedGoogle.getAttribute('stroke')).toBe(solidGoogle.getAttribute('stroke'));
+    expect(dashedGoogle.getAttribute('stroke')).not.toBe(solidMeta.getAttribute('stroke'));
+  });
+
+  it('renders a muted previous-period bar row beneath a matching current-period series, with a translated tooltip', () => {
+    renderTile(
+      {
+        kind: 'time_series',
+        chart: 'bar',
+        series: [{ label: 'all', points: [{ bucket: '2026-01-01', value: 10 }] }],
+        previousSeries: [{ label: 'all', points: [{ bucket: '2025-12-01', value: 8 }] }],
+      },
+      { type: 'bar' },
+    );
+    expect(screen.getByText('Previous period')).toBeInTheDocument();
+    expect(screen.getByTitle('2025-12-01: 8')).toBeInTheDocument();
   });
 
   it('renders a table tile', () => {

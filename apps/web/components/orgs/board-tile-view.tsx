@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { TileRenderView } from '@/lib/orgs/board-view';
+import type { TileRenderView, TimeSeries } from '@/lib/orgs/board-view';
 import type { BoardTileRow } from './board-types';
 
 export interface BoardTileViewProps {
@@ -14,6 +14,32 @@ const SERIES_STROKE_COLORS = ['var(--primary)', '#3b82f6', '#f59e0b', '#10b981',
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+}
+
+/**
+ * One color index per distinct series *label*, assigned from `view.series`
+ * (the current period) — `previousSeries` looks its own color up by this
+ * same map (falling back to a fresh index for a label that only exists in
+ * the previous period) instead of using its own independent array
+ * position. Without this, a dimension breakdown whose set of values
+ * differs between the current and previous period (a channel that's new
+ * this period, say) would color-index `previousSeries` purely by its own
+ * sort order, pairing a solid current-period line with a same-colored but
+ * *unrelated* dashed line instead of its own history.
+ */
+function buildColorIndexByLabel(currentSeries: readonly TimeSeries[], previousSeries: readonly TimeSeries[] = []): Map<string, number> {
+  const index = new Map<string, number>();
+  for (const series of currentSeries) {
+    if (!index.has(series.label)) {
+      index.set(series.label, index.size);
+    }
+  }
+  for (const series of previousSeries) {
+    if (!index.has(series.label)) {
+      index.set(series.label, index.size);
+    }
+  }
+  return index;
 }
 
 function UnavailableView({ message, reasonLabel }: { message: string; reasonLabel: string }): React.ReactElement {
@@ -42,6 +68,7 @@ function BigNumberView({ view }: { view: Extract<TileRenderView, { kind: 'big_nu
 function LineChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_series' }> }): React.ReactElement {
   const allSeries = [...view.series, ...(view.previousSeries ?? [])];
   const maxValue = Math.max(1, ...allSeries.flatMap((series) => series.points.map((point) => point.value)));
+  const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
   const width = 300;
   const height = 100;
 
@@ -58,35 +85,35 @@ function LineChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_s
       .join(' ');
   }
 
+  function colorFor(label: string): string {
+    return SERIES_STROKE_COLORS[(colorIndexByLabel.get(label) ?? 0) % SERIES_STROKE_COLORS.length];
+  }
+
   return (
     <div className="flex h-full flex-col gap-2">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-24 w-full" preserveAspectRatio="none" role="img" aria-hidden="true">
-        {(view.previousSeries ?? []).map((series, index) => (
+        {(view.previousSeries ?? []).map((series) => (
           <polyline
             key={`previous-${series.label}`}
             points={toPolylinePoints(series.points)}
             fill="none"
             strokeDasharray="4 3"
             strokeWidth={1.5}
-            stroke={SERIES_STROKE_COLORS[index % SERIES_STROKE_COLORS.length]}
+            stroke={colorFor(series.label)}
             opacity={0.5}
           />
         ))}
-        {view.series.map((series, index) => (
-          <polyline
-            key={series.label}
-            points={toPolylinePoints(series.points)}
-            fill="none"
-            strokeWidth={2}
-            stroke={SERIES_STROKE_COLORS[index % SERIES_STROKE_COLORS.length]}
-          />
+        {view.series.map((series) => (
+          <polyline key={series.label} points={toPolylinePoints(series.points)} fill="none" strokeWidth={2} stroke={colorFor(series.label)} />
         ))}
       </svg>
       {view.series.length > 1 ? (
         <ul className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          {view.series.map((series, index) => (
+          {view.series.map((series) => (
             <li key={series.label} className="flex items-center gap-1">
-              <span className={`inline-block h-2 w-2 rounded-full ${SERIES_COLOR_CLASSES[index % SERIES_COLOR_CLASSES.length]}`} />
+              <span
+                className={`inline-block h-2 w-2 rounded-full ${SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length]}`}
+              />
               {series.label}
             </li>
           ))}
@@ -96,25 +123,57 @@ function LineChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_s
   );
 }
 
+function BarRow({
+  points,
+  colorClass,
+  maxValue,
+  muted,
+}: {
+  points: readonly { bucket: string; value: number }[];
+  colorClass: string;
+  maxValue: number;
+  muted?: boolean;
+}): React.ReactElement {
+  const t = useTranslations('Boards');
+  return (
+    <div className="flex h-8 items-end gap-0.5">
+      {points.map((point) => (
+        <div
+          key={point.bucket}
+          title={t('barTooltip', { bucket: point.bucket, value: formatNumber(point.value) })}
+          className={`w-2 rounded-sm ${colorClass} ${muted ? 'opacity-40' : ''}`}
+          style={{ height: `${Math.max(2, Math.round((point.value / maxValue) * 100))}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
 function BarChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_series' }> }): React.ReactElement {
-  const maxValue = Math.max(1, ...view.series.flatMap((series) => series.points.map((point) => point.value)));
+  const t = useTranslations('Boards');
+  const allSeries = [...view.series, ...(view.previousSeries ?? [])];
+  const maxValue = Math.max(1, ...allSeries.flatMap((series) => series.points.map((point) => point.value)));
+  const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
+  const previousByLabel = new Map((view.previousSeries ?? []).map((series) => [series.label, series]));
+
   return (
     <div className="flex h-full flex-col justify-center gap-3">
-      {view.series.map((series, index) => (
-        <div key={series.label} className="flex flex-col gap-1">
-          {view.series.length > 1 ? <span className="text-xs text-muted-foreground">{series.label}</span> : null}
-          <div className="flex h-8 items-end gap-0.5" role="img" aria-label={series.label}>
-            {series.points.map((point) => (
-              <div
-                key={point.bucket}
-                title={`${point.bucket}: ${formatNumber(point.value)}`}
-                className={`w-2 rounded-sm ${SERIES_COLOR_CLASSES[index % SERIES_COLOR_CLASSES.length]}`}
-                style={{ height: `${Math.max(2, Math.round((point.value / maxValue) * 100))}%` }}
-              />
-            ))}
+      {view.series.map((series) => {
+        const colorClass = SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length];
+        const previous = previousByLabel.get(series.label);
+        return (
+          <div key={series.label} className="flex flex-col gap-1" role="img" aria-label={series.label}>
+            {view.series.length > 1 ? <span className="text-xs text-muted-foreground">{series.label}</span> : null}
+            <BarRow points={series.points} colorClass={colorClass} maxValue={maxValue} />
+            {previous ? (
+              <>
+                <span className="text-xs text-muted-foreground">{t('previousPeriodLabel')}</span>
+                <BarRow points={previous.points} colorClass={colorClass} maxValue={maxValue} muted />
+              </>
+            ) : null}
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

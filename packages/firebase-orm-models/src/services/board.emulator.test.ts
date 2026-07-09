@@ -93,7 +93,7 @@ describe('createBoard', () => {
     expect(board.name).toBe('Marketing');
     expect(board.tiles).toEqual([]);
     expect(board.global_filters).toEqual([]);
-    expect(board.compare).toBeUndefined();
+    expect(board.compare).toBeNull();
     expect(board.date_range.grain).toBe('day');
     expect(board.date_range.start < board.date_range.end).toBe(true);
     expect(board.created_by).toBe(owner.id);
@@ -188,7 +188,14 @@ describe('updateBoardSettings', () => {
       compare: null,
       updatedByUserId: owner.id,
     });
-    expect(cleared.compare).toBeUndefined();
+    expect(cleared.compare).toBeNull();
+
+    // Reloads from Firestore rather than trusting the in-memory returned
+    // instance — `updateDoc()` omits any field assigned `undefined` from
+    // its write, silently leaving a previous value in place; this only
+    // catches that class of bug by reading the persisted document back.
+    const reloaded = await getBoard(organization.id, project.id, board.id);
+    expect(reloaded?.compare).toBeNull();
 
     await expect(
       updateBoardSettings({
@@ -419,5 +426,28 @@ describe('queryBoardTile', () => {
     });
     expect(second.ok).toBe(false);
     expect(second.ok === false && second.reason).toBe('quota_exceeded');
+  });
+
+  it('rethrows a genuinely unexpected executor error rather than degrading it to a generic outcome', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Query Unexpected Error Org');
+    await registerAdSpend(organization.id, project.id, owner.id);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+
+    class ThrowingWarehouseQueryExecutor implements WarehouseQueryExecutor {
+      execute(): Promise<WarehouseRow[]> {
+        return Promise.reject(new TypeError('boom — a real bug, not an expected failure mode'));
+      }
+    }
+
+    await expect(
+      queryBoardTile({
+        organizationId: organization.id,
+        projectId: project.id,
+        board,
+        tile: bigNumberTile(),
+        executor: new ThrowingWarehouseQueryExecutor(),
+        cache: new InMemoryMetricQueryResultCache(),
+      }),
+    ).rejects.toBeInstanceOf(TypeError);
   });
 });

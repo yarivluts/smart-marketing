@@ -432,7 +432,6 @@
   },
   "Boards": {
     "metaTitle": "Boards",
-    "boardMetaTitle": "{boardName}",
     "title": "Boards for {projectName}",
     "boardsHeading": "Boards",
     "noBoards": "This project has no boards yet.",
@@ -504,6 +503,8 @@
     "tileWidthLabel": "Width",
     "tileHeightLabel": "Height",
     "tileDeltaLabel": "{deltaPct}% vs. previous",
+    "barTooltip": "{bucket}: {value}",
+    "previousPeriodLabel": "Previous period",
     "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
     "tableEmpty": "No data for this range yet.",
     "tileUnavailableReason": {

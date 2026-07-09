@@ -11,6 +11,7 @@ import {
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { listMetricsCatalogForProject, queryMetrics, type MetricCatalogEntry } from './metrics-query.service';
+import { MetricNotRegisteredError } from './metrics-compiler.service';
 import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import type { MetricQueryResultCache } from '../warehouse/result-cache';
@@ -78,6 +79,7 @@ export async function createBoard(params: CreateBoardParams): Promise<BoardModel
   board.name = name;
   board.tiles = [];
   board.date_range = defaultDateRange();
+  board.compare = null;
   board.global_filters = [];
   board.created_by = params.createdByUserId;
   board.created_at = now;
@@ -154,7 +156,10 @@ export async function updateBoardSettings(params: UpdateBoardSettingsParams): Pr
     board.date_range = params.dateRange;
   }
   if (params.compare !== undefined) {
-    board.compare = params.compare ?? undefined;
+    // Assigns a real `null`, never `undefined` — see `BoardModel.compare`'s
+    // own doc comment for why `undefined` would silently fail to clear a
+    // previously-set compare period in Firestore.
+    board.compare = params.compare;
   }
   if (params.globalFilters !== undefined) {
     board.global_filters = params.globalFilters;
@@ -284,6 +289,18 @@ export interface QueryBoardTileParams {
  * degrades gracefully instead of failing the whole board render (`10 §2.6`
  * / `13 §E13.2`'s "never a blank board" posture, applied at the single-tile
  * grain here since KAN-69 itself is a later story).
+ *
+ * Known, deliberately deferred inefficiency: the board detail page fans this
+ * out once per tile via `Promise.all`, and each call independently re-reads
+ * the project doc, the cost-quota config, and any metric definitions this
+ * tile shares with a sibling tile — a board with N tiles referencing M
+ * distinct metrics does more Firestore reads than the minimum (one project
+ * read, one quota check, M metric reads) a batched version could. Fixing
+ * this properly means threading precomputed project/quota/catalog state
+ * through `queryMetrics`/`compileMetricQueryForProject`, which are also
+ * `POST /v1/metrics/query`'s (KAN-42) own call path — out of scope for this
+ * story to change; the same "documented, not fixed" posture `cost-guardrail.
+ * service.ts`'s own non-transactional-quota-check gap already takes.
  */
 export async function queryBoardTile(params: QueryBoardTileParams): Promise<BoardTileQueryOutcome> {
   const request: MetricQueryRequest = {
@@ -314,7 +331,17 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
     if (error instanceof ProjectQueryQuotaExceededError) {
       return { ok: false, reason: 'quota_exceeded', message: error.message };
     }
-    if (error instanceof MetricCompilerError || error instanceof Error) {
+    // Every other *expected* failure mode `queryMetrics` itself documents
+    // throwing (see its own doc comment): an invalid/incompatible request
+    // against the current catalog, or whatever the executor threw once past
+    // the two checks above. Deliberately does NOT fall back to a blanket
+    // `error instanceof Error` — that would also swallow a genuine bug
+    // (e.g. a `TypeError` from a coding error elsewhere in the compile
+    // path) into this same silent per-tile "couldn't load" state with no
+    // signal to notice it. An unrecognized error rethrows instead, so it
+    // surfaces as a real failure on the board page rather than a
+    // convincingly-normal-looking degraded tile.
+    if (error instanceof MetricCompilerError || error instanceof ProjectNotFoundError || error instanceof MetricNotRegisteredError) {
       return { ok: false, reason: 'query_error', message: error.message };
     }
     throw error;

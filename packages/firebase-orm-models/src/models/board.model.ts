@@ -91,8 +91,22 @@ export class BoardModel extends BaseModel {
   @Field({ is_required: true })
   public date_range!: BoardDateRange;
 
+  /**
+   * `null` (not `undefined`) is this field's own honest "no compare period"
+   * value — always assigned explicitly (never left unset), for the same
+   * reason `PluginSourceRunModel.cursor_before` (KAN-47) is: `@arbel/
+   * firebase-orm`'s `getDocumentData()` omits any field whose value is
+   * `undefined` from the object it hands to Firestore's `updateDoc()`,
+   * which leaves the *previously stored* value untouched rather than
+   * clearing it — an explicit `null` is a real value that overwrites it.
+   * Deliberately `is_required: false` despite always being assigned:
+   * `verifyRequiredFields()` treats `null` the same as "missing" for a
+   * *required* field and silently skips the whole `save()` call (the exact
+   * bug that story found for `cursor_before`) — `is_required: false` opts
+   * this field out of that check regardless of its value.
+   */
   @Field({ is_required: false })
-  public compare?: ComparePeriod;
+  public compare!: ComparePeriod | null;
 
   @Field({ is_required: true })
   public global_filters!: CompilerFilter[];

@@ -239,6 +239,17 @@ export function BoardGridEditor({ orgId, projectId, boardId, initialTiles, metri
     setTiles((current) => [...current, blankTile(metricCatalog, current)]);
   }
 
+  /**
+   * Swaps only the two tiles' *positions* (`x`/`y`) — each tile keeps its
+   * own `w`/`h`. An earlier version swapped the whole `layout` (position
+   * *and* size), which meant dragging a small tile onto a larger one
+   * silently resized both — surprising for a "reorder" gesture. Swapping
+   * position only can leave tiles visually overlapping when the two
+   * differ in size (this is a reorder-by-drag, not a full collision-aware
+   * bin-packing layout engine); a user can always fix that with the w/h
+   * inputs afterward, the same "buildable-today, not the fully general
+   * mechanism" posture this codebase's other v1 stories already accept.
+   */
   function swapPositions(targetId: string): void {
     if (!draggedId || draggedId === targetId) {
       return;
@@ -249,13 +260,14 @@ export function BoardGridEditor({ orgId, projectId, boardId, initialTiles, metri
       if (!dragged || !target) {
         return current;
       }
-      const draggedLayout = dragged.layout;
+      const draggedPosition = { x: dragged.layout.x, y: dragged.layout.y };
+      const targetPosition = { x: target.layout.x, y: target.layout.y };
       return current.map((tile) => {
         if (tile.id === draggedId) {
-          return { ...tile, layout: { ...target.layout } };
+          return { ...tile, layout: { ...tile.layout, ...targetPosition } };
         }
         if (tile.id === targetId) {
-          return { ...tile, layout: { ...draggedLayout } };
+          return { ...tile, layout: { ...tile.layout, ...draggedPosition } };
         }
         return tile;
       });
@@ -290,7 +302,14 @@ export function BoardGridEditor({ orgId, projectId, boardId, initialTiles, metri
     setMode('view');
   }
 
-  const displayTiles = mode === 'edit' ? tiles : initialTiles;
+  // Always renders the local `tiles` state — it's seeded from `initialTiles`
+  // on mount and reset from it on Cancel, so it already reflects server
+  // truth outside an active edit. Reading `initialTiles` directly for the
+  // view-mode branch instead would flash stale content for a moment after a
+  // successful Save (`setMode('view')` runs before `router.refresh()`'s
+  // server round trip actually swaps in the freshly-saved `initialTiles`
+  // prop).
+  const displayTiles = tiles;
 
   return (
     <div className="flex flex-col gap-4">

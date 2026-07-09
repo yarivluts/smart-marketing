@@ -15,10 +15,16 @@ type PageProps = Readonly<{
 }>;
 
 export async function generateMetadata({ params }: PageProps) {
-  const { locale, orgId, projectId, boardId } = await params;
+  const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Boards' });
-  const board = await getBoard(orgId, projectId, boardId);
-  return { title: board ? t('boardMetaTitle', { boardName: board.name }) : t('metaTitle') };
+  // Deliberately static, not the real board name: generateMetadata runs
+  // independently of the page component's own session/permission check
+  // below, so fetching a caller-supplied board's name here (as an earlier
+  // version of this file did) would leak it into the page <title> for a
+  // caller who isn't even a member of the org that owns it — the same
+  // static-title posture every other per-resource admin page in this
+  // codebase (cost-guardrails, metric-defs, schema-defs, ...) already uses.
+  return { title: t('metaTitle') };
 }
 
 /**

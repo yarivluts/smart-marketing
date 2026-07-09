@@ -42,12 +42,19 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
     notFound();
   }
 
-  const [projects, boards] = await Promise.all([listOrgProjects(orgId), listBoardsForProject(orgId, projectId)]);
+  const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
     notFound();
   }
 
+  // Only reached once `projectId` is confirmed to belong to this org —
+  // `listBoardsForProject` itself throws `ProjectNotFoundError` for a
+  // project id that doesn't (unlike most list queries in this codebase,
+  // which just return an empty result for one), and this page has no error
+  // boundary to turn that into the 404 `notFound()` above already gives a
+  // bad project id via the same non-enumeration posture KAN-26 established.
+  const boards = await listBoardsForProject(orgId, projectId);
   const boardViews = boards.map(toBoardSummaryView);
   const t = await getTranslations('Boards');
 
