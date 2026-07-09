@@ -37,3 +37,6 @@ pnpm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 Thumbs.db
+
+# Claude Code tooling scratch space (agent worktrees, etc.) — not project content
+.claude/
