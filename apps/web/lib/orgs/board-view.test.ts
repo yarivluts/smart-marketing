@@ -236,4 +236,17 @@ describe('buildTileRenderView — heatmap (KAN-62)', () => {
     });
     expect(view).toEqual({ kind: 'heatmap', cohortMonths: [], periods: [], cells: [] });
   });
+
+  it('degrades to an explicit unavailable state, rather than silently rendering an empty table, if a heatmap tile is ever handed a metric-series outcome', () => {
+    // Can't happen through `queryBoardTile` today (it only ever resolves a
+    // `heatmap` tile to a `cohortMatrix` outcome) — this pins the defensive
+    // branch that would catch a future dispatch bug rather than letting it
+    // fall through silently.
+    const view = buildTileRenderView(tile({ type: 'heatmap', metricNames: [], cohortConversionEvent: 'activated' }), {
+      ok: true,
+      series: [{ bucket_date: '2026-01-01', ad_spend: 100 }],
+    });
+    expect(view.kind).toBe('unavailable');
+    expect(view).toMatchObject({ kind: 'unavailable', reason: 'query_error' });
+  });
 });

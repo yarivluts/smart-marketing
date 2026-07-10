@@ -22,16 +22,26 @@ function newTileId(): string {
   return `tile-${Math.random().toString(36).slice(2)}-${Date.now()}`;
 }
 
+/**
+ * Defaults a brand-new tile to `heatmap` when the project has no registered
+ * metric yet — every other type needs one (see `TileEditCard`'s own metric
+ * `<select>`), so defaulting to `big_number` with an unusably empty
+ * `metricNames` would leave "Add tile" effectively disabled for a project
+ * that hasn't registered a metric, even though a heatmap tile never needed
+ * the catalog in the first place (`BoardTile.cohortConversionEvent`'s own
+ * doc comment).
+ */
 function blankTile(metricCatalog: MetricCatalogEntryRow[], existingTiles: BoardTileRow[]): BoardTileRow {
-  const type: BoardTileTypeRow = 'big_number';
+  const type: BoardTileTypeRow = metricCatalog.length === 0 ? 'heatmap' : 'big_number';
   const firstMetric = metricCatalog[0]?.name;
   return {
     id: newTileId(),
     type,
     title: '',
     layout: { x: 0, y: nextTileRow(existingTiles), ...defaultTileSize(type) },
-    metricNames: firstMetric ? [firstMetric] : [],
+    metricNames: type === 'big_number' && firstMetric ? [firstMetric] : [],
     dimensions: [],
+    ...(type === 'heatmap' ? { cohortConversionEvent: '' } : {}),
   };
 }
 
@@ -43,6 +53,25 @@ interface TileEditCardProps {
   onRemove: () => void;
   onDragStart: () => void;
   onDrop: () => void;
+}
+
+/**
+ * The `metricNames` a tile should carry right after switching to `type` —
+ * `heatmap` never references the catalog at all; `funnel` keeps its
+ * existing steps if there are already ≥2, otherwise seeds two (its
+ * required minimum); every other type keeps just its own first metric.
+ */
+function defaultMetricNamesForType(type: BoardTileTypeRow, currentMetricNames: string[], metricCatalog: MetricCatalogEntryRow[]): string[] {
+  if (type === 'heatmap') {
+    return [];
+  }
+  if (type === 'funnel') {
+    if (currentMetricNames.length >= 2) {
+      return currentMetricNames;
+    }
+    return [currentMetricNames[0] ?? metricCatalog[0]?.name ?? '', metricCatalog[1]?.name ?? metricCatalog[0]?.name ?? ''];
+  }
+  return [currentMetricNames[0] ?? metricCatalog[0]?.name ?? ''];
 }
 
 function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDragStart, onDrop }: TileEditCardProps): React.ReactElement {
@@ -57,7 +86,7 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
       ...tile,
       type,
       layout: { ...tile.layout, w: size.w, h: size.h },
-      metricNames: isHeatmap ? [] : isFunnel ? (tile.metricNames.length >= 2 ? tile.metricNames : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? '', metricCatalog[1]?.name ?? metricCatalog[0]?.name ?? '']) : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? ''],
+      metricNames: defaultMetricNamesForType(type, tile.metricNames, metricCatalog),
       dimensions: isFunnel || isHeatmap ? [] : tile.dimensions,
       cohortConversionEvent: isHeatmap ? (tile.cohortConversionEvent ?? '') : undefined,
     });
@@ -335,7 +364,7 @@ export function BoardGridEditor({ orgId, projectId, boardId, initialTiles, metri
         ) : (
           <div className="flex items-center gap-2">
             {metricCatalog.length === 0 ? <span className="text-xs text-muted-foreground">{t('noMetricsRegistered')}</span> : null}
-            <Button type="button" variant="outline" onClick={addTile} disabled={metricCatalog.length === 0}>
+            <Button type="button" variant="outline" onClick={addTile}>
               {t('addTileButton')}
             </Button>
             <Button type="button" variant="ghost" onClick={handleCancel} disabled={saving}>

@@ -42,7 +42,7 @@ const renderViews: Record<string, TileRenderView> = {
   'tile-2': { kind: 'big_number', value: 40 },
 };
 
-function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile]): void {
+function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile], catalog: MetricCatalogEntryRow[] = metricCatalog): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <BoardGridEditor
@@ -50,7 +50,7 @@ function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile]): void 
         projectId="project-1"
         boardId="board-1"
         initialTiles={tiles}
-        metricCatalog={metricCatalog}
+        metricCatalog={catalog}
         renderViews={renderViews}
       />
     </NextIntlClientProvider>,
@@ -137,6 +137,16 @@ describe('BoardGridEditor', () => {
       "That layout isn't valid — check every tile has a title, a registered metric, and fits the grid.",
     );
     expect(screen.getAllByLabelText('Tile title')).toHaveLength(2);
+  });
+
+  it('adding a tile with no registered metrics defaults it to heatmap, not an unusable big_number (KAN-62)', () => {
+    renderEditor([], []);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+    expect(screen.getByText("Register a metric to add most tile types — a heatmap tile doesn't need one.")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add tile' }));
+    expect((screen.getByLabelText('Tile type') as HTMLSelectElement).value).toBe('heatmap');
+    expect(screen.getByLabelText('Conversion event')).toBeInTheDocument();
   });
 
   it('switching a tile to heatmap shows a conversion-event input instead of the metric picker, clearing metricNames/dimensions (KAN-62)', () => {

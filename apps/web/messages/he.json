@@ -567,7 +567,7 @@
     "saveSettingsButton": "שמור הגדרות",
     "tilesHeading": "אריחים",
     "editLayoutButton": "ערוך פריסה",
-    "noMetricsRegistered": "יש לרשום מדד קודם כדי להוסיף אריחים.",
+    "noMetricsRegistered": "יש לרשום מדד כדי להוסיף רוב סוגי האריחים — אריח מפת חום אינו זקוק לכך.",
     "addTileButton": "הוסף אריח",
     "cancelEditButton": "בטל",
     "saveLayoutButton": "שמור פריסה",

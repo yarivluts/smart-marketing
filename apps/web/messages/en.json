@@ -567,7 +567,7 @@
     "saveSettingsButton": "Save settings",
     "tilesHeading": "Tiles",
     "editLayoutButton": "Edit layout",
-    "noMetricsRegistered": "Register a metric first to add tiles.",
+    "noMetricsRegistered": "Register a metric to add most tile types — a heatmap tile doesn't need one.",
     "addTileButton": "Add tile",
     "cancelEditButton": "Cancel",
     "saveLayoutButton": "Save layout",

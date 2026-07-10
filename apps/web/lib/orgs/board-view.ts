@@ -211,20 +211,30 @@ export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutc
   if (!outcome.ok) {
     return { kind: 'unavailable', reason: outcome.reason, message: outcome.message };
   }
-  if ('cohortMatrix' in outcome) {
-    return buildHeatmapView(outcome.cohortMatrix);
+  // Dispatches on `tile.type` first, like every other branch below, rather
+  // than on the outcome's own shape — a `heatmap` tile is the only type
+  // `queryBoardTile` ever resolves to a `cohortMatrix` outcome for, but that
+  // correlation lives in `board.service.ts`, not in either type here, so a
+  // mismatch (a future bug in that dispatch) surfaces as an explicit
+  // degraded state instead of silently falling through to the series-based
+  // branches below with an empty series.
+  if (tile.type === 'heatmap') {
+    return 'cohortMatrix' in outcome
+      ? buildHeatmapView(outcome.cohortMatrix)
+      : { kind: 'unavailable', reason: 'query_error', message: 'This heatmap tile’s outcome carried a metric series instead of a cohort matrix.' };
   }
+  const series = 'series' in outcome ? outcome.series : [];
   switch (tile.type) {
     case 'big_number':
-      return buildBigNumberView(tile, outcome.series);
+      return buildBigNumberView(tile, series);
     case 'line':
     case 'bar':
-      return buildTimeSeriesView(tile, outcome.series);
+      return buildTimeSeriesView(tile, series);
     case 'table':
-      return buildTableView(outcome.series);
+      return buildTableView(series);
     case 'funnel':
-      return buildFunnelView(tile, outcome.series);
+      return buildFunnelView(tile, series);
     default:
-      return buildTableView(outcome.series);
+      return buildTableView(series);
   }
 }

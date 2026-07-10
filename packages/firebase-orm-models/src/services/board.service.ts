@@ -379,6 +379,20 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
  * rejects this at save time, but an older/hand-edited board doc could still
  * carry one) or an unconfigured warehouse degrade to `ok: false` instead of
  * throwing; any other error is a real bug and rethrows.
+ *
+ * Deliberately does NOT forward `params.board.global_filters` or
+ * `params.board.compare` to the cohort query, unlike the metric path above
+ * (which applies both to every tile uniformly). `global_filters` entries
+ * reference a metric's own dimensions (e.g. `channel`); `cohort_retention`
+ * has no dimension columns to filter by yet (its only breakdown axis,
+ * `conversion_event`, is the tile's own dedicated `cohortConversionEvent`
+ * field, not a generic filter) — silently ignoring a filter it can't honor
+ * would be worse than not attempting it. `compare` (a *previous-period*
+ * overlay) has no clean meaning against a matrix that's already broken down
+ * by cohort month x period offset; `funnel` tiles already establish the
+ * precedent that not every tile type honors board-level `compare`. A future
+ * story adding filterable dimensions to `cohort_retention` should revisit
+ * this alongside `queryCohortRetentionMatrix`'s own request shape.
  */
 async function queryBoardHeatmapTile(params: QueryBoardTileParams): Promise<BoardTileQueryOutcome> {
   const conversionEvent = params.tile.cohortConversionEvent;
