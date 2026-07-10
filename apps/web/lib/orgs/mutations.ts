@@ -11,6 +11,7 @@ import {
   createOrgPerson as createOrgPersonInOrganization,
   createProject as createProjectInOrganization,
   createResourceTemplate as createResourceTemplateInOrganization,
+  createFieldMapping as createFieldMappingInOrganization,
   createHookEndpoint as createHookEndpointInOrganization,
   createSharedCredential as createSharedCredentialInOrganization,
   decideResourceAttachment as decideResourceAttachmentInOrganization,
@@ -19,11 +20,13 @@ import {
   disablePlugin as disablePluginInOrganization,
   type DrainPipelineResult,
   detachResource as detachResourceInOrganization,
+  disableFieldMapping as disableFieldMappingInOrganization,
   enablePlugin as enablePluginInOrganization,
   type EnsureTouchpointSchemaRegisteredResult,
   ensureTouchpointSchemaRegistered as ensureTouchpointSchemaRegisteredInOrganization,
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
+  type FieldMappingModel,
   type HookEndpointModel,
   type HookSignatureMode,
   installPlugin as installPluginInOrganization,
@@ -55,6 +58,7 @@ import {
   setHookEndpointSigningSecret as setHookEndpointSigningSecretInOrganization,
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
+  testRunFieldMapping as testRunFieldMappingInOrganization,
   triggerOrchestrationRun as triggerOrchestrationRunInOrganization,
   uninstallPlugin as uninstallPluginInOrganization,
   type AcceptInviteResult,
@@ -63,10 +67,12 @@ import {
   type CredentialProvider,
   type InvitableRole,
   type KmsProvider,
+  type MappingRuleInput,
   type MembershipModel,
   type MetricDefinitionInput,
   type MetricDefModel,
   type OrgPersonModel,
+  type TestRunFieldMappingResult,
   type ProjectCostQuotaModel,
   type ResourceAttachmentModel,
   type ResourceKind,
@@ -319,6 +325,51 @@ interface SetHookDeliveryStatusInput {
 export async function setHookDeliveryStatus(input: SetHookDeliveryStatusInput): Promise<HookDeliveryModel> {
   await ensureFirestoreOrm();
   return setHookDeliveryStatusInOrganization(input);
+}
+
+interface CreateFieldMappingInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  hookEndpointId?: string;
+  name: string;
+  kind: string;
+  schemaName: string;
+  rules: readonly MappingRuleInput[];
+  createdByUserId: string;
+}
+
+export async function createFieldMapping(input: CreateFieldMappingInput): Promise<FieldMappingModel> {
+  await ensureFirestoreOrm();
+  return createFieldMappingInOrganization(input);
+}
+
+interface DisableFieldMappingInput {
+  organizationId: string;
+  projectId: string;
+  fieldMappingId: string;
+  disabledByUserId: string;
+}
+
+export async function disableFieldMapping(input: DisableFieldMappingInput): Promise<FieldMappingModel> {
+  await ensureFirestoreOrm();
+  return disableFieldMappingInOrganization(input);
+}
+
+interface TestRunFieldMappingInput {
+  organizationId: string;
+  projectId: string;
+  fieldMappingId?: string;
+  kind?: string;
+  rules?: readonly MappingRuleInput[];
+  schemaName?: string;
+  samplePayload?: string;
+  hookDeliveryId?: string;
+}
+
+export async function testRunFieldMapping(input: TestRunFieldMappingInput): Promise<TestRunFieldMappingResult> {
+  await ensureFirestoreOrm();
+  return testRunFieldMappingInOrganization(input);
 }
 
 interface RegisterSchemaDefinitionInput {
