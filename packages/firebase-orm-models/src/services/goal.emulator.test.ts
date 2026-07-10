@@ -530,4 +530,43 @@ describe('queryGoalProgress', () => {
     // goal's own deadline, not the far-future asOfDate passed in.
     expect(executor.lastQuery?.params.time_end_current).toBe('2026-01-10');
   });
+
+  it('short-circuits to a 0-progress outcome without querying when the goal has not started yet', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Query Not Started Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Future goal',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 100,
+      startDate: '2026-08-01',
+      deadline: '2026-12-01',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-08-01', signups: 999 }]);
+
+    const outcome = await queryGoalProgress({
+      organizationId: organization.id,
+      projectId: project.id,
+      goal,
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+      asOfDate: '2026-07-10', // before start_date
+    });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    expect(outcome.actualValue).toBe(0);
+    expect(outcome.progress.expectedAtNow).toBe(0);
+    expect(outcome.progress.status).toBe('on_track');
+    // Never reaches the warehouse — an inverted [start_date, asOfDate] range
+    // would otherwise throw a `MetricCompilerError` (`deriveTimeWindows`).
+    expect(executor.callCount).toBe(0);
+  });
 });

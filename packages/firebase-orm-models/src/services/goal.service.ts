@@ -293,6 +293,27 @@ function sumMetricRows(rows: readonly WarehouseRow[], metricName: string): numbe
 export async function queryGoalProgress(params: QueryGoalProgressParams): Promise<GoalProgressOutcome> {
   const { goal } = params;
   const asOfDate = params.asOfDate ?? todayDateOnly();
+
+  // A goal whose `start_date` is still in the future has no elapsed window to
+  // query yet — `[start_date, asOfDate]` would be an inverted (end < start)
+  // range, which `deriveTimeWindows` (packages/shared/src/metrics-compiler/
+  // time.ts) rejects as a `MetricCompilerError`. Short-circuiting here avoids
+  // that reaching the caller as a raw, internal-looking compiler message in
+  // the `query_error` degraded state; a not-yet-started goal is naturally
+  // "0 progress, 0% elapsed" without needing a real query or a distinct
+  // outcome kind of its own.
+  if (asOfDate < goal.start_date) {
+    const progress = calculateGoalProgress({
+      direction: goal.direction,
+      targetValue: goal.target_value ?? undefined,
+      rangeMin: goal.range_min ?? undefined,
+      rangeMax: goal.range_max ?? undefined,
+      actualValue: 0,
+      elapsedFraction: 0,
+    });
+    return { ok: true, actualValue: 0, progress };
+  }
+
   const queryEnd = asOfDate < goal.deadline ? asOfDate : goal.deadline;
 
   const request: MetricQueryRequest = {
