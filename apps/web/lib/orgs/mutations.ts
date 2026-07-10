@@ -27,6 +27,9 @@ import {
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   type FieldMappingModel,
+  createGoal as createGoalInOrganization,
+  deleteGoal as deleteGoalInOrganization,
+  type GoalModel,
   type HookEndpointModel,
   type HookSignatureMode,
   installPlugin as installPluginInOrganization,
@@ -649,4 +652,35 @@ export async function saveBoardTiles(input: SaveBoardTilesInput): Promise<BoardM
 export async function deleteBoard(organizationId: string, projectId: string, boardId: string): Promise<void> {
   await ensureFirestoreOrm();
   return deleteBoardInOrganization(organizationId, projectId, boardId);
+}
+
+interface CreateGoalInput {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  metricName: string;
+  direction: string;
+  targetValue?: number;
+  rangeMin?: number;
+  rangeMax?: number;
+  startDate: string;
+  deadline: string;
+  rhythm: string;
+  ownerPersonId: string;
+  createdByUserId: string;
+}
+
+export async function createGoal(input: CreateGoalInput): Promise<GoalModel> {
+  await ensureFirestoreOrm();
+  return createGoalInOrganization(input);
+}
+
+export async function deleteGoal(
+  organizationId: string,
+  projectId: string,
+  goalId: string,
+  deletedByUserId: string,
+): Promise<void> {
+  await ensureFirestoreOrm();
+  return deleteGoalInOrganization(organizationId, projectId, goalId, deletedByUserId);
 }

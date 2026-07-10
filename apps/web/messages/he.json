@@ -77,7 +77,8 @@
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
-    "projectBoardsLink": "לוחות מחוונים"
+    "projectBoardsLink": "לוחות מחוונים",
+    "projectGoalsLink": "יעדים"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -606,6 +607,59 @@
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",
       "query_error": "לא ניתן היה לטעון אריח זה"
+    }
+  },
+  "Goals": {
+    "metaTitle": "יעדים",
+    "title": "יעדים עבור {projectName}",
+    "goalsHeading": "יעדים",
+    "noGoals": "לפרויקט זה אין עדיין יעדים.",
+    "deadlineListLabel": "יעד זמן: {deadline}",
+    "createHeading": "יעד חדש",
+    "noMetricsRegistered": "יש לרשום מדד קודם כדי ליצור יעד.",
+    "noPeople": "הוסף איש קשר בספריית המשאבים תחילה, כדי להגדיר אותו כאחראי על היעד.",
+    "nameLabel": "שם",
+    "namePlaceholder": "לדוגמה: הרשמות ברבעון 3",
+    "metricLabel": "מדד",
+    "directionLabel": "כיוון",
+    "directionOption": {
+      "maximize": "מקסום (ככל שגבוה יותר כך טוב יותר)",
+      "minimize": "מזעור (ככל שנמוך יותר כך טוב יותר)",
+      "range": "להישאר בטווח"
+    },
+    "targetValueLabel": "ערך יעד",
+    "rangeMinLabel": "מינימום הטווח",
+    "rangeMaxLabel": "מקסימום הטווח",
+    "startDateLabel": "תאריך התחלה",
+    "deadlineLabel": "יעד זמן",
+    "rhythmLabel": "קצב",
+    "rhythmOption": {
+      "even": "אחיד (כל יום נספר באותה מידה)",
+      "work_week_weekend": "ימי חול מול סוף שבוע"
+    },
+    "ownerLabel": "אחראי",
+    "createButton": "צור יעד",
+    "createError": "לא ניתן היה ליצור את היעד. נסה שוב.",
+    "deleteConfirm": "למחוק את היעד הזה? לא ניתן לבטל פעולה זו.",
+    "deleteButton": "מחק יעד",
+    "deleteError": "לא ניתן היה למחוק את היעד. נסה שוב.",
+    "settingsHeading": "הגדרות",
+    "thermometerHeading": "התקדמות",
+    "paceStatus": {
+      "on_track": "בקצב טוב",
+      "at_risk": "בסיכון",
+      "off_track": "לא בקצב"
+    },
+    "goalMetLabel": "עומד ביעד כרגע: {met}",
+    "yes": "כן",
+    "no": "לא",
+    "actualValueLabel": "בפועל",
+    "expectedAtNowLabel": "צפוי עד כה",
+    "projectedFinalValueLabel": "תחזית ליעד הזמן",
+    "thermometerUnavailableReason": {
+      "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
+      "quota_exceeded": "מכסת השאילתות היומית מוצתה",
+      "query_error": "לא ניתן היה לטעון את התקדמות היעד"
     }
   }
 }

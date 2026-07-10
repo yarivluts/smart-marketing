@@ -77,7 +77,8 @@
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
-    "projectBoardsLink": "Boards"
+    "projectBoardsLink": "Boards",
+    "projectGoalsLink": "Goals"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -606,6 +607,59 @@
       "warehouse_not_configured": "Warehouse not configured yet",
       "quota_exceeded": "Daily query quota reached",
       "query_error": "Couldn't load this tile"
+    }
+  },
+  "Goals": {
+    "metaTitle": "Goals",
+    "title": "Goals for {projectName}",
+    "goalsHeading": "Goals",
+    "noGoals": "This project has no goals yet.",
+    "deadlineListLabel": "Deadline: {deadline}",
+    "createHeading": "New goal",
+    "noMetricsRegistered": "Register a metric first to create a goal.",
+    "noPeople": "Add a person in the resource library first, to set as a goal's owner.",
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g. Q3 signups",
+    "metricLabel": "Metric",
+    "directionLabel": "Direction",
+    "directionOption": {
+      "maximize": "Maximize (higher is better)",
+      "minimize": "Minimize (lower is better)",
+      "range": "Stay within a range"
+    },
+    "targetValueLabel": "Target value",
+    "rangeMinLabel": "Range minimum",
+    "rangeMaxLabel": "Range maximum",
+    "startDateLabel": "Start date",
+    "deadlineLabel": "Deadline",
+    "rhythmLabel": "Rhythm",
+    "rhythmOption": {
+      "even": "Even (every day counts the same)",
+      "work_week_weekend": "Work-week vs. weekend"
+    },
+    "ownerLabel": "Owner",
+    "createButton": "Create goal",
+    "createError": "Could not create the goal. Please try again.",
+    "deleteConfirm": "Delete this goal? This cannot be undone.",
+    "deleteButton": "Delete goal",
+    "deleteError": "Could not delete the goal. Please try again.",
+    "settingsHeading": "Settings",
+    "thermometerHeading": "Progress",
+    "paceStatus": {
+      "on_track": "On track",
+      "at_risk": "At risk",
+      "off_track": "Off track"
+    },
+    "goalMetLabel": "Currently met: {met}",
+    "yes": "Yes",
+    "no": "No",
+    "actualValueLabel": "Actual",
+    "expectedAtNowLabel": "Expected by now",
+    "projectedFinalValueLabel": "Projected at deadline",
+    "thermometerUnavailableReason": {
+      "warehouse_not_configured": "Warehouse not configured yet",
+      "quota_exceeded": "Daily query quota reached",
+      "query_error": "Couldn't load this goal's progress"
     }
   }
 }

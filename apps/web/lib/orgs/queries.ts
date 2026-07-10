@@ -3,6 +3,7 @@ import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
   getBoard as getBoardInOrganization,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
+  getGoal as getGoalInOrganization,
   getProjectCostQuota as getProjectCostQuotaInOrganization,
   listTrackingAlertsForProject as listTrackingAlertsForProjectInOrganization,
   type ApiKeySummary,
@@ -11,6 +12,8 @@ import {
   type EnvironmentModel,
   type EventVolumeOverviewEntry,
   type FieldMappingModel,
+  type GoalModel,
+  type GoalProgressOutcome,
   type HookDeliveryModel,
   type HookEndpointModel,
   listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
@@ -21,6 +24,7 @@ import {
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
   listFieldMappingsForProject as listFieldMappingsForProjectInOrganization,
+  listGoalsForProject as listGoalsForProjectInOrganization,
   listHookDeliveriesForProject as listHookDeliveriesForProjectInOrganization,
   listHookEndpointsForProject as listHookEndpointsForProjectInOrganization,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
@@ -42,6 +46,7 @@ import {
   MembershipModel,
   OrganizationModel,
   queryBoardTile as queryBoardTileInOrganization,
+  queryGoalProgress as queryGoalProgressInOrganization,
   UserModel,
   verifyAuditLogChainForOrg as verifyAuditLogChainForOrgInOrganization,
   type AuditLogChainVerification,
@@ -295,6 +300,26 @@ export async function queryBoardTile(
 ): Promise<BoardTileQueryOutcome> {
   await ensureFirestoreOrm();
   return queryBoardTileInOrganization({ organizationId, projectId, board, tile });
+}
+
+export async function listGoalsForProject(organizationId: string, projectId: string): Promise<GoalModel[]> {
+  await ensureFirestoreOrm();
+  return listGoalsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getGoal(organizationId: string, projectId: string, goalId: string): Promise<GoalModel | null> {
+  await ensureFirestoreOrm();
+  return getGoalInOrganization(organizationId, projectId, goalId);
+}
+
+/** One goal's computed progress (or a typed, renderable "why not" outcome — see `GoalProgressOutcome`'s own doc comment) for the goal detail page's thermometer. */
+export async function queryGoalProgress(
+  organizationId: string,
+  projectId: string,
+  goal: GoalModel,
+): Promise<GoalProgressOutcome> {
+  await ensureFirestoreOrm();
+  return queryGoalProgressInOrganization({ organizationId, projectId, goal });
 }
 
 export interface PendingAttachmentDetails {
