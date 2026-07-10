@@ -94,6 +94,8 @@ export * from './services/tracking-alert.service';
 export * from './services/plugin-registry.service';
 export * from './services/plugin-runtime.service';
 export * from './services/stripe-plugin.service';
+export * from './services/ga4-plugin.service';
+export * from './services/source-plugin-dispatch.service';
 export * from './services/board.service';
 export * from './services/touchpoint-capture.service';
 export * from './pipeline';

@@ -1,15 +1,11 @@
 import { ProjectModel } from '../models/project.model';
 import { EnvironmentModel } from '../models/environment.model';
 import { PluginInstallModel } from '../models/plugin-install.model';
-import { PluginSourceRunModel } from '../models/plugin-source-run.model';
 import { SharedCredentialModel } from '../models/shared-credential.model';
 import type { KmsProvider } from '../vault';
 import {
   STRIPE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
   STRIPE_PLUGIN_ID,
-  StripeHttpApiClient,
-  StripeSourcePluginExecutor,
-  ensureStripeCommerceSchemasRegistered,
   mapStripeWebhookEventToIngestInput,
   parseStripeCredentialSecret,
   verifyStripeWebhookSignature,
@@ -17,13 +13,11 @@ import {
   type StripeCredentialSecret,
   type StripeWebhookEvent,
 } from '../plugin-runtime/stripe';
-import type { SourcePluginExecutor } from '../plugin-runtime';
 import { ProjectNotFoundError, listActiveAttachmentsForProject } from './resource-library.service';
 import { EnvironmentNotFoundError } from './key.service';
-import { getPluginInstall, PluginInstallNotFoundError } from './plugin-registry.service';
+import { PluginInstallNotFoundError } from './plugin-registry.service';
 import { CredentialSecretNotSetError, revealSharedCredentialSecret } from './vault.service';
 import { ingestBatch, type IngestBatchSummary } from './ingest.service';
-import { triggerSourcePluginRun, type TriggerSourcePluginRunParams } from './plugin-runtime.service';
 
 /** An install claims to be (or was resolved as) the built-in Stripe plugin, but isn't configured with a usable Stripe credential yet — surfaced identically whether the caller is a webhook delivery or a "Run now" click. */
 export class StripeCredentialConfigError extends Error {
@@ -133,7 +127,10 @@ export interface ProcessStripeWebhookEventResult {
  * arrives lands the same honest `schema_not_registered` quarantine outcome
  * any other ingest path produces — the same "quarantine, don't fabricate"
  * posture this codebase already takes everywhere else, rather than
- * inventing a synthetic system actor.
+ * inventing a synthetic system actor. {@link runSourcePluginInstall} — the
+ * "Run now" seam that does auto-register — now lives in
+ * `source-plugin-dispatch.service.ts`, alongside the same seam's GA4 branch
+ * (KAN-52).
  */
 export async function processStripeWebhookEvent(params: ProcessStripeWebhookEventParams): Promise<ProcessStripeWebhookEventResult> {
   await requireProjectInOrg(params.organizationId, params.projectId);
@@ -178,44 +175,4 @@ export async function processStripeWebhookEvent(params: ProcessStripeWebhookEven
   });
 
   return { eventId: event.id, eventType: event.type, handled: true, summary };
-}
-
-export interface RunSourcePluginInstallParams extends TriggerSourcePluginRunParams {
-  /** Required to resolve a Stripe credential — `getServerKmsProvider()` in `apps/web`. Ignored for any non-Stripe install (most callers never need it). */
-  kms?: KmsProvider;
-}
-
-/**
- * The one seam a "Run now" click goes through, regardless of which plugin
- * is installed (KAN-49). For the built-in Stripe plugin, this resolves its
- * configured credential and builds a real {@link StripeSourcePluginExecutor}
- * against the live Stripe API — instead of `triggerSourcePluginRun`'s own
- * default (the KAN-47 toy counter executor) — and, when a human actually
- * triggered the run, idempotently registers this connector's commerce
- * schemas first (`ensureStripeCommerceSchemasRegistered`) so a project's
- * very first "Run now" doesn't quarantine everything for want of a
- * registered schema. Every other plugin type passes straight through to
- * `triggerSourcePluginRun` unchanged — this function is additive, not a
- * replacement for the generic runtime KAN-47 built.
- */
-export async function runSourcePluginInstall(params: RunSourcePluginInstallParams): Promise<PluginSourceRunModel> {
-  const install = await getPluginInstall(params.organizationId, params.projectId, params.installId);
-
-  if (install && install.plugin_id === STRIPE_PLUGIN_ID && install.status === 'installed') {
-    if (!params.kms) {
-      throw new StripeCredentialConfigError('no KMS provider was supplied to resolve its credential');
-    }
-    const { apiSecretKey } = await resolveStripeCredentialSecret(params.organizationId, params.projectId, install, params.kms);
-    const executor: SourcePluginExecutor = new StripeSourcePluginExecutor({ apiClient: new StripeHttpApiClient(apiSecretKey) });
-
-    if (params.triggeredByUserId) {
-      await ensureStripeCommerceSchemasRegistered(params.organizationId, params.projectId, params.triggeredByUserId);
-    }
-
-    return triggerSourcePluginRun({ ...params, executor, precomputedInstall: install });
-  }
-
-  // `install` is `null` for a genuinely nonexistent install (falls through to
-  // triggerSourcePluginRun's own 404) — passing `undefined` there is exactly its own default.
-  return triggerSourcePluginRun({ ...params, precomputedInstall: install ?? undefined });
 }
