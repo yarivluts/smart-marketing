@@ -17,6 +17,89 @@ Template for each entry:
 
 ---
 
+## 2026-07-10 — E8.4 GA4 plugin: Data API sessions/events sync (KAN-52)
+
+- **Last completed:**
+  - Picked **KAN-61** (sprint 5, default boards) first per sprint order, per the prior run's own
+    flagged concern. Confirmed via a research pass that it's a real, undocumented blocker: its AC
+    ("New project with pack installed shows populated boards after first sync") needs KAN-59's
+    metric-pack plugin to register `mrr`/`cac`/`troi`/etc.; nothing outside test fixtures registers
+    any metric today, no plugin-install hook wires a manifest's `registers.metrics` to
+    `registerMetricDefinition`, and `saveBoardTiles` rejects a tile referencing an unregistered
+    metric. Marked **KAN-61 `blocked-by` KAN-59** in `TASKS.md` (wasn't marked before) and moved to
+    the next unblocked story instead of inventing a metric-pack substitute bigger than this story.
+  - Delivered **KAN-52** (E8.4, GA4 plugin) instead — confirmed via `docs/plan/13-task-breakdown.md`
+    ("**Critical path:**... E6.1 (Google/Meta API approvals)... gates E8.2/E8.3") that GA4 is *not*
+    gated by KAN-43 the way Google Ads/Meta are, so it's genuinely buildable today.
+  - Modeled closely on the Stripe connector (KAN-49): `packages/firebase-orm-models/src/plugin-runtime/ga4/`
+    (`Ga4HttpApiClient` — plain `fetch` against `analyticsdata.googleapis.com/v1beta/{property}:runReport`,
+    no Google SDK dependency; `Ga4SourcePluginExecutor`; mappers to `ga4_session`/`ga4_event` event
+    records; `GA4_PLUGIN_MANIFEST_YAML`). Took the **Data API** path the plan doc offers ("via
+    BigQuery export **or** Data API") since BigQuery export needs a real GCP project (KAN-18) — this
+    means UTM-*equivalent* acquisition dimensions (source/medium/campaign/channel-group) are captured,
+    not raw click ids (gclid/fbclid), which need GA4's BigQuery export to see per-hit. A documented,
+    deliberate scope narrowing, not a gap found later.
+  - No OAuth connect flow, same posture as Stripe: a bearer access token through the existing
+    Resource Library credential vault (`ga4` added to `CREDENTIAL_PROVIDERS`), not a live Google OAuth
+    consent screen (needs a human app review, KAN-43-style, but GA4 itself doesn't need Google's
+    Ads-style developer-token approval, so it isn't `blocked-by` KAN-43).
+  - Extracted the previously Stripe-only "one seam" `runSourcePluginInstall` dispatcher out of
+    `stripe-plugin.service.ts` into a new `source-plugin-dispatch.service.ts` so a second built-in
+    connector can share it without either connector's service file knowing about the other.
+  - **Self-review** (3 independent parallel finder agents — correctness/removed-behavior,
+    cross-file/reuse, altitude/CLAUDE.md-conventions — followed by manual verification) found and
+    fixed two real bugs before merge:
+    1. The post-backfill cursor branch always re-fetched "yesterday relative to *this* call" instead
+       of continuing from where it left off — since there's no scheduler yet (manual "Run now" only),
+       any gap longer than a day between runs silently skipped days with no way to ever recover them.
+       Redesigned the cursor to always walk `nextDate` forward exactly one day per call (self-healing
+       any gap over subsequent calls, tested with a simulated 7-day gap) and to skip the fetch
+       entirely once caught up rather than pointlessly re-polling the same day — which never actually
+       picked up late-arriving corrections anyway, since `ingestBatch`'s dedup discards a repeated
+       `event_id` rather than merging it (this also simplified the cursor shape — dropped the
+       now-unnecessary `backfillComplete` field).
+    2. `event_id` was built by naively colon-joining free-text UTM dimension values
+       (source/medium/campaign), which can themselves contain `:` and collide across genuinely
+       different rows, silently dropping one via ingest dedup. Switched to `JSON.stringify`-encoding
+       the dimension tuple (unambiguous), with a regression test proving two previously-colliding rows
+       now land distinctly.
+    Also fixed a stale doc comment (claimed only Stripe consults the KMS provider) and reused an
+    exported type (`Ga4ReportHeader`/`Ga4ReportRow`) instead of an inline duplicate in the mappers.
+    Two minor findings deliberately left as documented follow-ups rather than fixed now, matching this
+    codebase's own "wait for a third instance before generalizing" convention (explicitly validated by
+    one of the review agents against `docs/plan/13-task-breakdown.md`'s own S4 risk note): the
+    per-connector credential-resolution boilerplate (`resolveStripeCredentialSecret` /
+    `resolveGa4RuntimeConfig` — near-identical shape, ~35 lines each) and the dispatch file's
+    per-plugin-id `if` branches — both worth extracting into a shared helper/registry once a third
+    built-in connector (Google Ads/Meta, once KAN-43 clears) needs the same seam again.
+  - `pnpm lint`/`pnpm typecheck`/`pnpm build` green across all packages; `pnpm test` green
+    (`packages/firebase-orm-models`: 405/405 against the real Firestore emulator, incl. new
+    `ga4-plugin.emulator.test.ts`; `apps/web`: 478/478, incl. a new GA4 branch of the plugin run route
+    test). Opened PR #40, subscribed to its activity, confirmed CI green (`conclusion: success`) and
+    `mergeable_state: clean`, then merged into `main` and reset the local branch to match. Remote
+    branch delete rejected with the same recurring `HTTP 403` this file has documented before (token
+    can merge but not delete branches) — left `kan-52-ga4-plugin` in place for a human/future run.
+- **In progress (exact stopping point):** none — KAN-52 is fully delivered, reviewed, tested, and
+  merged. KAN-61 was investigated but correctly *not* started (genuinely blocked).
+- **Blocked + why:** nothing blocking the next code task. KAN-61 is blocked-by KAN-59 (see above,
+  now reflected in `TASKS.md`).
+- **Next step:** next unblocked sprint order per `TASKS.md`: sprint 6 has **KAN-53** (webhook hook
+  endpoints — no external dependency, same shape as KAN-49's existing Stripe webhook route),
+  **KAN-54** (mapping engine), **KAN-62** (cohort engine + heatmap), **KAN-64** (goal model) — all
+  `todo`, no blockers recorded. KAN-53 is the lowest KAN number among these and a well-scoped single-run
+  task; recommend picking it next unless a human wants KAN-59 (metric pack) prioritized to unblock
+  KAN-61.
+- **Waiting on human:**
+  - **KAN-43** — Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18** — GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional cleanup: delete the merged `kan-52-ga4-plugin` branch (blocked on this sandbox's GitHub
+    token permissions, not urgent — same recurring issue as prior runs' branches).
+  - KAN-59 (metric-pack plugin) would unblock KAN-61 (default boards) if prioritized.
+  - The pre-existing unreconciled KAN-20 observability-baseline PR triplicate (#2/#3/#5) and the
+    stale KAN-33 progress-followup PR (#22) still await a human decision — untouched by this run.
+
+---
+
 ## 2026-07-09 — E10.3 fact_attribution: first-touch + last-touch attribution (KAN-58)
 
 - **Last completed:**
