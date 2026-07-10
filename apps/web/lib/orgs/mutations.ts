@@ -61,6 +61,8 @@ import {
   setHookEndpointSigningSecret as setHookEndpointSigningSecretInOrganization,
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
+  type MappingSuggestion,
+  suggestFieldMappingRules as suggestFieldMappingRulesInOrganization,
   testRunFieldMapping as testRunFieldMappingInOrganization,
   triggerOrchestrationRun as triggerOrchestrationRunInOrganization,
   uninstallPlugin as uninstallPluginInOrganization,
@@ -373,6 +375,19 @@ interface TestRunFieldMappingInput {
 export async function testRunFieldMapping(input: TestRunFieldMappingInput): Promise<TestRunFieldMappingResult> {
   await ensureFirestoreOrm();
   return testRunFieldMappingInOrganization(input);
+}
+
+interface SuggestFieldMappingRulesInput {
+  organizationId: string;
+  projectId: string;
+  kind: string;
+  schemaName: string;
+  samplePayload: string;
+}
+
+export async function suggestFieldMappingRules(input: SuggestFieldMappingRulesInput): Promise<{ suggestions: readonly MappingSuggestion[] }> {
+  await ensureFirestoreOrm();
+  return suggestFieldMappingRulesInOrganization(input);
 }
 
 interface RegisterSchemaDefinitionInput {

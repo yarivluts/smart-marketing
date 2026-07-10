@@ -7,6 +7,7 @@ import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { blankFieldMappingRuleRow, FieldMappingRuleEditor, type FieldMappingRuleRow } from './field-mapping-rule-editor';
+import { SuggestFieldMappingsPanel } from './suggest-field-mappings-panel';
 
 // Client components must never import a *value* from `@growthos/firebase-orm-models` — see
 // `create-hook-endpoint-form.tsx`'s own doc comment for why. `MappingRecordKind` and `SchemaDefKind`
@@ -55,6 +56,28 @@ export function CreateFieldMappingForm({
   const [error, setError] = useState<string | null>(null);
 
   const schemaOptions = schemaNamesByKind[kind] ?? [];
+
+  /**
+   * Merges suggested rules into the rule list without clobbering rows the user already filled in
+   * for the same target field — the suggestion panel's own "user confirms" step is this merge plus
+   * the normal rule editor, not a direct save. A row counts as "already in use" by *any* typed
+   * content, not just a non-empty `targetField` — a row where the user has only typed a
+   * `sourcePath` so far (hasn't named the target field yet) must survive, not be silently dropped
+   * just because a suggestion happened to be applied elsewhere on the form.
+   */
+  function applySuggestedRules(suggested: FieldMappingRuleRow[]): void {
+    setRules((previousRules) => {
+      const keptRows = previousRules.filter(
+        (rule) => rule.targetField.trim().length > 0 || rule.sourcePath.trim().length > 0 || rule.template.trim().length > 0 || rule.staticValue.trim().length > 0,
+      );
+      const existingTargets = new Set(
+        keptRows.filter((rule) => rule.targetField.trim().length > 0).map((rule) => rule.targetField.trim()),
+      );
+      const newRows = suggested.filter((rule) => !existingTargets.has(rule.targetField.trim()));
+      const merged = [...keptRows, ...newRows];
+      return merged.length > 0 ? merged : [blankFieldMappingRuleRow()];
+    });
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -184,6 +207,8 @@ export function CreateFieldMappingForm({
           </div>
         ) : null}
       </div>
+
+      <SuggestFieldMappingsPanel orgId={orgId} projectId={projectId} kind={kind} schemaName={schemaName} onApplySuggestions={applySuggestedRules} />
 
       <FieldMappingRuleEditor rules={rules} onChange={setRules} />
 

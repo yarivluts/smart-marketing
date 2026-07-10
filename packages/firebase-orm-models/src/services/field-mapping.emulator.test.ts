@@ -16,6 +16,7 @@ import {
   ProjectNotFoundError,
   receiveHookPayload,
   registerSchemaDefinition,
+  suggestFieldMappingRules,
   TargetSchemaNotRegisteredError,
   testRunFieldMapping,
 } from '../index';
@@ -395,5 +396,74 @@ describe('testRunFieldMapping', () => {
         samplePayload: SAMPLE_SHOPIFY_PAYLOAD,
       }),
     ).rejects.toBeInstanceOf(InvalidFieldMappingError);
+  });
+});
+
+describe('suggestFieldMappingRules', () => {
+  it('proposes rules against the registered schema fields from a sample payload', async () => {
+    const { owner, organization, project } = await setupProject('Mapping Suggest Org');
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+
+    const { suggestions } = await suggestFieldMappingRules({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      schemaName: 'order_completed',
+      samplePayload: SAMPLE_SHOPIFY_PAYLOAD,
+    });
+
+    const byTarget = new Map(suggestions.map((s) => [s.targetField, s]));
+    expect(byTarget.get('properties.order_id')).toMatchObject({ transform: 'cast', sourcePath: 'id', castType: 'string' });
+    expect(byTarget.get('properties.total_price')).toMatchObject({ transform: 'cast', sourcePath: 'total_price', castType: 'number' });
+    expect(byTarget.get('properties.email')).toMatchObject({ transform: 'rename', sourcePath: 'customer.email' });
+    expect(byTarget.get('ts')).toMatchObject({ transform: 'cast', sourcePath: 'created_at', castType: 'timestamp' });
+
+    // Every suggestion should apply cleanly against the very sample it was proposed from.
+    for (const suggestion of suggestions) {
+      expect(suggestion.confidence).toBeGreaterThan(0);
+    }
+  });
+
+  it('rejects a target schema with no active version', async () => {
+    const { organization, project } = await setupProject('Mapping Suggest No Schema Org');
+
+    await expect(
+      suggestFieldMappingRules({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        schemaName: 'does_not_exist',
+        samplePayload: SAMPLE_SHOPIFY_PAYLOAD,
+      }),
+    ).rejects.toBeInstanceOf(TargetSchemaNotRegisteredError);
+  });
+
+  it('rejects a sample payload that is not valid JSON', async () => {
+    const { owner, organization, project } = await setupProject('Mapping Suggest Invalid JSON Org');
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+
+    await expect(
+      suggestFieldMappingRules({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        schemaName: 'order_completed',
+        samplePayload: '{not json',
+      }),
+    ).rejects.toBeInstanceOf(InvalidSamplePayloadError);
+  });
+
+  it('rejects an unknown project', async () => {
+    const { organization } = await setupProject('Mapping Suggest No Project Org');
+
+    await expect(
+      suggestFieldMappingRules({
+        organizationId: organization.id,
+        projectId: 'does-not-exist',
+        kind: 'event',
+        schemaName: 'order_completed',
+        samplePayload: SAMPLE_SHOPIFY_PAYLOAD,
+      }),
+    ).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 });

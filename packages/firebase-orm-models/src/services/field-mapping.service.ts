@@ -1,10 +1,13 @@
 import {
   applyFieldMapping,
+  mappingTargetFields,
+  suggestFieldMappingRules as suggestMappingRulesFromSample,
   validateMappingRules,
   type MappingApplyResult,
   type MappingRecordKind,
   type MappingRule,
   type MappingRuleInput,
+  type MappingSuggestion,
 } from '@growthos/shared';
 import { EnvironmentModel } from '../models/environment.model';
 import { FieldMappingModel } from '../models/field-mapping.model';
@@ -296,4 +299,56 @@ export async function testRunFieldMapping(params: TestRunFieldMappingParams): Pr
 
   const schemaValidationErrors = validateAgainstSchema(fieldsToValidate, activeSchema.field_defs);
   return { ...applied, envelopeErrors: [], schemaRegistered: true, schemaValidationErrors };
+}
+
+export interface SuggestFieldMappingRulesParams {
+  organizationId: string;
+  projectId: string;
+  kind: string;
+  /** The target schema (must already have an active version, same requirement `createFieldMapping` enforces) to build the candidate target-field list from. */
+  schemaName: string;
+  samplePayload: string;
+}
+
+export interface SuggestFieldMappingRulesResult {
+  suggestions: readonly MappingSuggestion[];
+}
+
+/**
+ * Proposes a `rename`/`cast` rule for each of the target schema's fields it can confidently match
+ * from one sample payload (KAN-55 AC: "LLM proposes field mapping from sample payload; user
+ * confirms"). Nothing is saved or applied here — the admin UI lets the user review, edit, and drop
+ * suggestions before adding them to the mapping form's own rule list, so the "user confirms" half of
+ * the AC lives entirely client-side.
+ *
+ * The proposer itself (`suggestFieldMappingRules`, `@growthos/shared`) is a deterministic
+ * name/type-similarity heuristic — a buildable-today stand-in for a real LLM call, the same
+ * "provider-agnostic, real backend deferred" posture `NotConfiguredWarehouseQueryExecutor` (KAN-42)
+ * and `LocalKmsProvider` (KAN-29) establish for their own external dependencies — since this
+ * function's own contract (sample payload + target schema in, ranked suggestions out) wouldn't
+ * change if a real LLM-backed proposer replaced it later.
+ */
+export async function suggestFieldMappingRules(params: SuggestFieldMappingRulesParams): Promise<SuggestFieldMappingRulesResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const kind = requireMappingKind(params.kind);
+  const schemaName = params.schemaName.trim();
+  if (schemaName.length === 0) {
+    throw new InvalidFieldMappingError(['A suggestion request requires a non-empty target schema name.']);
+  }
+
+  const activeSchema = await getActiveSchemaDefinition(params.organizationId, params.projectId, kind, schemaName);
+  if (!activeSchema) {
+    throw new TargetSchemaNotRegisteredError();
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(params.samplePayload);
+  } catch {
+    throw new InvalidSamplePayloadError();
+  }
+
+  const targetFields = mappingTargetFields(kind, activeSchema.field_defs);
+  const suggestions = suggestMappingRulesFromSample(targetFields, payload);
+  return { suggestions };
 }
