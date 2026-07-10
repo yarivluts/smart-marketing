@@ -42,7 +42,7 @@ const renderViews: Record<string, TileRenderView> = {
   'tile-2': { kind: 'big_number', value: 40 },
 };
 
-function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile]): void {
+function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile], catalog: MetricCatalogEntryRow[] = metricCatalog): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <BoardGridEditor
@@ -50,7 +50,7 @@ function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile]): void 
         projectId="project-1"
         boardId="board-1"
         initialTiles={tiles}
-        metricCatalog={metricCatalog}
+        metricCatalog={catalog}
         renderViews={renderViews}
       />
     </NextIntlClientProvider>,
@@ -165,5 +165,38 @@ describe('BoardGridEditor', () => {
     expect(draggedParent.style.gridRow).toBe('1 / span 2');
     expect(targetParent.style.gridColumn).toBe('1 / span 6');
     expect(targetParent.style.gridRow).toBe('1 / span 4');
+  });
+
+  describe('heatmap tile type', () => {
+    const cohortCatalog: MetricCatalogEntryRow[] = [{ name: 'cohort_retention_rate', dimensions: ['period_number', 'cohort_size'] }];
+    const cohortTile: BoardTileRow = {
+      id: 'tile-1',
+      type: 'big_number',
+      title: 'Cohort retention',
+      layout: { x: 0, y: 0, w: 3, h: 2 },
+      metricNames: ['cohort_retention_rate'],
+      dimensions: [],
+    };
+
+    it('switching a tile to heatmap auto-selects the metric’s first dimension as a single-select, not a checkbox list', () => {
+      renderEditor([cohortTile], cohortCatalog);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+
+      fireEvent.change(screen.getByLabelText('Tile type'), { target: { value: 'heatmap' } });
+
+      const dimensionSelect = screen.getByLabelText('Breakdown by') as HTMLSelectElement;
+      expect(dimensionSelect.tagName).toBe('SELECT');
+      expect(dimensionSelect.value).toBe('period_number');
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    });
+
+    it('lets the user pick a different single dimension, replacing (not adding to) the current selection', () => {
+      renderEditor([{ ...cohortTile, type: 'heatmap', dimensions: ['period_number'] }], cohortCatalog);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+
+      fireEvent.change(screen.getByLabelText('Breakdown by'), { target: { value: 'cohort_size' } });
+
+      expect((screen.getByLabelText('Breakdown by') as HTMLSelectElement).value).toBe('cohort_size');
+    });
   });
 });

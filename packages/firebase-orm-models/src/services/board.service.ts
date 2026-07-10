@@ -1,4 +1,4 @@
-import type { ComparePeriod, CompilerFilter, MetricQueryRequest } from '@growthos/shared';
+import type { ComparePeriod, CompilerFilter, MetricQueryRequest, TimeGrain } from '@growthos/shared';
 import { MetricCompilerError } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import {
@@ -153,6 +153,15 @@ export async function updateBoardSettings(params: UpdateBoardSettingsParams): Pr
     if (params.dateRange.start > params.dateRange.end) {
       throw new InvalidBoardError(['The date range start must not be after its end.']);
     }
+    if (params.dateRange.grain !== 'month' && board.tiles.some((tile) => tile.type === 'heatmap')) {
+      // A `heatmap` tile's matrix row axis comes from the board's own time
+      // bucketing (see `BOARD_TILE_TYPES`'s own doc comment on
+      // `board.model.ts`) — a coarser-than-month grain would `DATE_TRUNC`
+      // multiple distinct cohort months into the same bucket, silently
+      // blending distinct cohorts into one matrix row. Remove the heatmap
+      // tile(s) first if a non-month grain is genuinely wanted.
+      throw new InvalidBoardError(['This board has a heatmap tile — its date-range granularity must stay "month".']);
+    }
     board.date_range = params.dateRange;
   }
   if (params.compare !== undefined) {
@@ -170,7 +179,7 @@ export async function updateBoardSettings(params: UpdateBoardSettingsParams): Pr
   return board;
 }
 
-function validateTiles(tiles: readonly BoardTile[], catalog: readonly MetricCatalogEntry[]): void {
+function validateTiles(tiles: readonly BoardTile[], catalog: readonly MetricCatalogEntry[], grain: TimeGrain): void {
   const reasons: string[] = [];
   const catalogByName = new Map(catalog.map((entry) => [entry.name, entry]));
   const seenIds = new Set<string>();
@@ -209,8 +218,16 @@ function validateTiles(tiles: readonly BoardTile[], catalog: readonly MetricCata
       );
     }
 
-    if (tile.type === 'heatmap' && tile.dimensions.length !== 1) {
-      reasons.push(`Heatmap tile "${tile.id}" needs exactly one breakdown dimension (its matrix's column axis).`);
+    if (tile.type === 'heatmap') {
+      if (tile.dimensions.length !== 1) {
+        reasons.push(`Heatmap tile "${tile.id}" needs exactly one breakdown dimension (its matrix's column axis).`);
+      }
+      if (grain !== 'month') {
+        // See `updateBoardSettings`'s own matching check for why — this
+        // half catches the opposite ordering (a heatmap tile added to a
+        // board whose date range already has a non-month grain).
+        reasons.push(`Heatmap tile "${tile.id}" needs the board's date-range granularity set to "month".`);
+      }
     }
 
     for (const metricName of tile.metricNames) {
@@ -254,7 +271,7 @@ export interface SaveBoardTilesParams {
 export async function saveBoardTiles(params: SaveBoardTilesParams): Promise<BoardModel> {
   const board = await loadBoard(params.organizationId, params.projectId, params.boardId);
   const catalog = await listMetricsCatalogForProject(params.organizationId, params.projectId);
-  validateTiles(params.tiles, catalog);
+  validateTiles(params.tiles, catalog, board.date_range.grain);
 
   board.tiles = params.tiles;
   board.updated_by = params.updatedByUserId;

@@ -16,9 +16,10 @@ import type { ComparePeriod, CompilerFilter, TimeGrain } from '@growthos/shared'
  * (already every other tile type's row/x-axis) supplies the matrix's *row*
  * axis — a metric registered against `fact_cohort_retention` with
  * `timeColumn: 'cohort_month'` buckets naturally into one row per cohort
- * month. A board rendering a heatmap tile should set its own date-range
- * `grain` to `'month'` — a finer grain would split/merge cohort months in a
- * way this v1 doesn't guard against.
+ * month. `validateTiles`/`updateBoardSettings` both enforce that a board
+ * with a `heatmap` tile keeps its date-range `grain` at `'month'` — a
+ * coarser grain would `DATE_TRUNC` multiple distinct cohort months into the
+ * same bucket, silently blending distinct cohorts into one matrix row.
  */
 export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel', 'heatmap'] as const;
 export type BoardTileType = (typeof BOARD_TILE_TYPES)[number];

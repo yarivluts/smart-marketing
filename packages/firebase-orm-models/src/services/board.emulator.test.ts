@@ -310,10 +310,17 @@ describe('saveBoardTiles', () => {
     ).rejects.toBeInstanceOf(InvalidBoardError);
   });
 
-  it('accepts a heatmap tile with exactly one dimension, and rejects one with zero or more than one', async () => {
+  it('accepts a heatmap tile with exactly one dimension on a month-grain board, and rejects one with zero or more than one', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Org');
     await registerCohortRetention(organization.id, project.id, owner.id, ['period_number', 'cohort_size']);
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+    await updateBoardSettings({
+      organizationId: organization.id,
+      projectId: project.id,
+      boardId: board.id,
+      dateRange: { ...board.date_range, grain: 'month' },
+      updatedByUserId: owner.id,
+    });
 
     const saved = await saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: board.id, tiles: [heatmapTile()], updatedByUserId: owner.id });
     expect(saved.tiles[0].dimensions).toEqual(['period_number']);
@@ -334,6 +341,41 @@ describe('saveBoardTiles', () => {
         projectId: project.id,
         boardId: board.id,
         tiles: [heatmapTile({ dimensions: ['period_number', 'cohort_size'] })],
+        updatedByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidBoardError);
+  });
+
+  it('rejects a heatmap tile on a board whose date-range grain is not "month"', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Grain Org');
+    await registerCohortRetention(organization.id, project.id, owner.id);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+    expect(board.date_range.grain).toBe('day');
+
+    await expect(
+      saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: board.id, tiles: [heatmapTile()], updatedByUserId: owner.id }),
+    ).rejects.toBeInstanceOf(InvalidBoardError);
+  });
+
+  it('rejects changing a heatmap-carrying board’s grain away from "month"', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Settings Org');
+    await registerCohortRetention(organization.id, project.id, owner.id);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+    await updateBoardSettings({
+      organizationId: organization.id,
+      projectId: project.id,
+      boardId: board.id,
+      dateRange: { ...board.date_range, grain: 'month' },
+      updatedByUserId: owner.id,
+    });
+    await saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: board.id, tiles: [heatmapTile()], updatedByUserId: owner.id });
+
+    await expect(
+      updateBoardSettings({
+        organizationId: organization.id,
+        projectId: project.id,
+        boardId: board.id,
+        dateRange: { ...board.date_range, grain: 'day' },
         updatedByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(InvalidBoardError);
