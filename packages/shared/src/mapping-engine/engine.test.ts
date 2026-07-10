@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyFieldMapping, validateMappingRules } from './engine';
+import { applyFieldMapping, mappingTargetFields, validateMappingRules } from './engine';
 import type { MappingRule, MappingRuleInput } from './types';
 
 describe('applyFieldMapping', () => {
@@ -145,5 +145,39 @@ describe('validateMappingRules', () => {
     const { rules, reasons } = validateMappingRules('entity', [{ targetField: 'id', transform: 'static', staticValue: 'x' }]);
     expect(reasons).toEqual([]);
     expect(Object.keys(rules[0]).sort()).toEqual(['staticValue', 'targetField', 'transform']);
+  });
+});
+
+describe('mappingTargetFields', () => {
+  it('lists an event kind\'s fixed envelope fields ahead of its schema fields, nested under "properties"', () => {
+    const fields = mappingTargetFields('event', [
+      { name: 'order_id', type: 'string', is_required: true },
+      { name: 'amount', type: 'number', is_required: false },
+    ]);
+    expect(fields).toEqual([
+      { targetField: 'event_id', type: 'string', required: true },
+      { targetField: 'event', type: 'string', required: true },
+      { targetField: 'ts', type: 'timestamp', required: true },
+      { targetField: 'properties.order_id', type: 'string', required: true },
+      { targetField: 'properties.amount', type: 'number', required: false },
+    ]);
+  });
+
+  it('nests an entity kind\'s schema fields under "attributes" behind its single "id" envelope field', () => {
+    const fields = mappingTargetFields('entity', [{ name: 'plan', type: 'string', is_required: true }]);
+    expect(fields).toEqual([
+      { targetField: 'id', type: 'string', required: true },
+      { targetField: 'attributes.plan', type: 'string', required: true },
+    ]);
+  });
+
+  it('nests a measure kind\'s schema fields under "dimensions" behind its measure/ts/value envelope fields', () => {
+    const fields = mappingTargetFields('measure', [{ name: 'region', type: 'string', is_required: false }]);
+    expect(fields).toEqual([
+      { targetField: 'measure', type: 'string', required: true },
+      { targetField: 'ts', type: 'timestamp', required: true },
+      { targetField: 'value', type: 'number', required: true },
+      { targetField: 'dimensions.region', type: 'string', required: false },
+    ]);
   });
 });

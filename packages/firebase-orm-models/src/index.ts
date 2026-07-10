@@ -55,6 +55,7 @@ export type {
   MappingRule,
   MappingRuleInput,
   MappingApplyResult,
+  MappingSuggestion,
 } from '@growthos/shared';
 export * from './models/user.model';
 export * from './models/organization.model';

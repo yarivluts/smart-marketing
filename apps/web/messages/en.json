@@ -275,7 +275,16 @@
     "envelopeErrors": "Envelope errors: {errors}",
     "schemaNotRegisteredWarning": "The target schema has no active registered version, so this record wasn't checked against it.",
     "schemaValidationErrors": "Schema validation errors: {errors}",
-    "testRunSuccess": "Mapped record is valid for the target schema."
+    "testRunSuccess": "Mapped record is valid for the target schema.",
+    "suggestMappings": "Suggest mappings",
+    "suggestSamplePayloadLabel": "Sample payload to propose mappings from (JSON)",
+    "runSuggest": "Suggest",
+    "suggestError": "Couldn't get suggestions. Please try again.",
+    "noSuggestions": "No confident suggestions for this sample — add rules by hand below.",
+    "suggestionsHeading": "{count, plural, one {# suggestion} other {# suggestions}}",
+    "applyAllSuggestions": "Apply all",
+    "applySuggestion": "Apply",
+    "suggestionSummary": "{targetField} ← {sourcePath} ({confidence}% match)"
   },
   "SchemaRegistry": {
     "metaTitle": "Schema registry",

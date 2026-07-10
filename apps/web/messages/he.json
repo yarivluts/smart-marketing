@@ -275,7 +275,16 @@
     "envelopeErrors": "שגיאות מעטפה: {errors}",
     "schemaNotRegisteredWarning": "לסכימת היעד אין גרסה פעילה רשומה, כך שהרשומה לא נבדקה מולה.",
     "schemaValidationErrors": "שגיאות אימות סכימה: {errors}",
-    "testRunSuccess": "הרשומה הממופה תקינה עבור סכימת היעד."
+    "testRunSuccess": "הרשומה הממופה תקינה עבור סכימת היעד.",
+    "suggestMappings": "הצעת מיפויים",
+    "suggestSamplePayloadLabel": "מטען דוגמה להצעת מיפויים ממנו (JSON)",
+    "runSuggest": "הצע",
+    "suggestError": "לא ניתן היה לקבל הצעות. נסה שוב.",
+    "noSuggestions": "אין הצעות בעלות רמת ביטחון מספקת עבור דוגמה זו — הוסף כללים ידנית למטה.",
+    "suggestionsHeading": "{count, plural, one {הצעה #} other {# הצעות}}",
+    "applyAllSuggestions": "החל הכול",
+    "applySuggestion": "החל",
+    "suggestionSummary": "{targetField} ← {sourcePath} (התאמה של {confidence}%)"
   },
   "SchemaRegistry": {
     "metaTitle": "מרשם סכימות",

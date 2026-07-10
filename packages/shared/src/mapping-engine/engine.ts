@@ -5,6 +5,7 @@ import {
   isMappingRuleTransform,
   MAPPING_CAST_TYPES,
   type MappingApplyResult,
+  type MappingCastType,
   type MappingRecordKind,
   type MappingRule,
   type MappingRuleInput,
@@ -23,6 +24,45 @@ const ENVELOPE_FIELDS_BY_KIND: Record<MappingRecordKind, readonly string[]> = {
   entity: ['id'],
   measure: ['measure', 'ts', 'value'],
 };
+
+/** Each envelope field's own fixed type — unlike a schema field's type, this never varies by project, since it's part of `ingest.service.ts`'s envelope shape itself rather than anything project-registered. */
+const ENVELOPE_FIELD_TYPES_BY_KIND: Record<MappingRecordKind, Readonly<Record<string, MappingCastType>>> = {
+  event: { event_id: 'string', event: 'string', ts: 'timestamp' },
+  entity: { id: 'string' },
+  measure: { measure: 'string', ts: 'timestamp', value: 'number' },
+};
+
+/** One field a mapping of a given kind needs a rule for, alongside the type a rule targeting it must ultimately produce. */
+export interface MappingTargetFieldDescriptor {
+  targetField: string;
+  type: MappingCastType;
+  required: boolean;
+}
+
+/**
+ * Every field a mapping of `kind` needs a rule for: the kind's fixed envelope fields, plus the
+ * target schema's own registered fields (nested under the kind's container, e.g.
+ * `properties.order_id`). Centralizes the envelope-shape knowledge `validateMappingRules` already
+ * has so callers that need the *full* target-field list — e.g. KAN-55's mapping-suggestion feature —
+ * don't have to duplicate `ENVELOPE_FIELDS_BY_KIND`/`CONTAINER_FIELD_BY_KIND` themselves.
+ */
+export function mappingTargetFields(
+  kind: MappingRecordKind,
+  schemaFields: readonly { name: string; type: MappingCastType; is_required: boolean }[],
+): MappingTargetFieldDescriptor[] {
+  const container = CONTAINER_FIELD_BY_KIND[kind];
+  const envelopeFields = ENVELOPE_FIELDS_BY_KIND[kind].map((name) => ({
+    targetField: name,
+    type: ENVELOPE_FIELD_TYPES_BY_KIND[kind][name],
+    required: true,
+  }));
+  const schemaTargetFields = schemaFields.map((field) => ({
+    targetField: `${container}.${field.name}`,
+    type: field.type,
+    required: field.is_required,
+  }));
+  return [...envelopeFields, ...schemaTargetFields];
+}
 
 /** Assigns `value` at `targetField` in `record` — a bare name (an envelope field) sets it directly; a `container.name` name nests it under `container`, creating the bucket on first use. Only one level of nesting is supported, matching every `SchemaFieldDef` being flat. */
 function setTargetField(record: Record<string, unknown>, targetField: string, value: unknown): void {
