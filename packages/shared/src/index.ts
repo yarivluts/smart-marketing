@@ -13,3 +13,4 @@ export * from './metrics-compiler';
 export * from './plugin-manifest';
 export * from './touchpoint-capture';
 export * from './mapping-engine';
+export * from './goals';
