@@ -7,6 +7,10 @@ import {
   disablePlugin,
   ensureUserForFirebaseSession,
   registerSchemaDefinition,
+  GA4_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
+  GA4_PLUGIN_ID,
+  GA4_PLUGIN_MANIFEST_YAML,
+  GA4_PROPERTY_ID_CONFIG_FIELD,
   STRIPE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
   STRIPE_PLUGIN_ID,
   STRIPE_PLUGIN_MANIFEST_YAML,
@@ -194,5 +198,30 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins/[installId]/run', 
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: string };
     expect(body.error).toBe('stripe_credential_not_configured');
+  });
+
+  it('returns 400 for the built-in GA4 plugin with no configured credential attachment (KAN-52)', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: unique('GA4 Run Route Org'), ownerUserId: owner.id });
+    const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
+    const environment = environments.find((e) => e.name === 'dev')!;
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: GA4_PLUGIN_MANIFEST_YAML, registeredByUserId: owner.id });
+    const install = await installPlugin({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: GA4_PLUGIN_ID,
+      version: '1.0.0',
+      consentedScopes: ['ingest:write', 'schema:write'],
+      config: { [GA4_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: 'nonexistent-attachment', [GA4_PROPERTY_ID_CONFIG_FIELD]: 'properties/123' },
+      installedByUserId: owner.id,
+    });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = runRequest(organization.id, project.id, install.id, { environmentId: environment.id });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe('ga4_credential_not_configured');
   });
 });

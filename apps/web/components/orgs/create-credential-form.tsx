@@ -6,7 +6,7 @@ import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-const CREDENTIAL_PROVIDERS = ['google_ads', 'meta_ads', 'stripe', 'generic'] as const;
+const CREDENTIAL_PROVIDERS = ['google_ads', 'meta_ads', 'stripe', 'ga4', 'generic'] as const;
 
 export interface CreateCredentialFormProps {
   orgId: string;

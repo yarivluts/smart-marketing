@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   EnvironmentNotFoundError,
+  Ga4CredentialConfigError,
   NotASourcePluginError,
   PluginInstallNotActiveError,
   PluginInstallNotFoundError,
@@ -24,10 +25,10 @@ interface RouteParams {
  * — see `@growthos/firebase-orm-models`'s `plugin-runtime.service.ts` for
  * why a real Cloud Run job scheduler is deferred to KAN-18). Gated on
  * `plugin.install`, the same permission every other action on this install
- * already requires. `runSourcePluginInstall` (KAN-49) transparently swaps in
- * a real `StripeSourcePluginExecutor` when this install is the built-in
- * Stripe plugin — every other plugin still gets the KAN-47 toy executor,
- * unchanged.
+ * already requires. `runSourcePluginInstall` (KAN-49/KAN-52) transparently
+ * swaps in a real `StripeSourcePluginExecutor`/`Ga4SourcePluginExecutor` when
+ * this install is one of the built-in connectors — every other plugin still
+ * gets the KAN-47 toy executor, unchanged.
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, installId } = await params;
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return NextResponse.json({ error: 'environment_id_required' }, { status: 400 });
   }
 
-  // Only the built-in Stripe plugin ever consults this — resolved best-effort so a deployment
+  // Only the built-in Stripe/GA4 plugins ever consult this — resolved best-effort so a deployment
   // without the vault configured (KAN-18) doesn't break "Run now" for every *other* plugin too.
   let kms;
   try {
@@ -78,6 +79,9 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     }
     if (err instanceof StripeCredentialConfigError) {
       return NextResponse.json({ error: 'stripe_credential_not_configured', reason: err.reason }, { status: 400 });
+    }
+    if (err instanceof Ga4CredentialConfigError) {
+      return NextResponse.json({ error: 'ga4_credential_not_configured', reason: err.reason }, { status: 400 });
     }
     throw err;
   }

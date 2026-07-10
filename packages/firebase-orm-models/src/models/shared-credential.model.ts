@@ -7,7 +7,7 @@ import type { SecretEnvelope } from '../vault';
  * connector stories (KAN-49/50/51); `generic` covers anything pushed in
  * manually (e.g. a CRM API key) ahead of a dedicated plugin existing.
  */
-export const CREDENTIAL_PROVIDERS = ['google_ads', 'meta_ads', 'stripe', 'generic'] as const;
+export const CREDENTIAL_PROVIDERS = ['google_ads', 'meta_ads', 'stripe', 'ga4', 'generic'] as const;
 export type CredentialProvider = (typeof CREDENTIAL_PROVIDERS)[number];
 
 export function isCredentialProvider(value: string): value is CredentialProvider {
