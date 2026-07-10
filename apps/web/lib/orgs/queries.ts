@@ -10,6 +10,8 @@ import {
   type BoardTile,
   type EnvironmentModel,
   type EventVolumeOverviewEntry,
+  type HookDeliveryModel,
+  type HookEndpointModel,
   listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
   listApiKeysForProject as listApiKeysForProjectInOrganization,
   listAttachmentsForProject as listAttachmentsForProjectInOrganization,
@@ -17,6 +19,8 @@ import {
   listBoardsForProject as listBoardsForProjectInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
+  listHookDeliveriesForProject as listHookDeliveriesForProjectInOrganization,
+  listHookEndpointsForProject as listHookEndpointsForProjectInOrganization,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
   listMetricsCatalogForProject as listMetricsCatalogForProjectInOrganization,
   listOrgMembersWithProfiles,
@@ -124,6 +128,16 @@ export async function listEnvironmentsForProject(
 export async function listApiKeysForProject(organizationId: string, projectId: string): Promise<ApiKeySummary[]> {
   await ensureFirestoreOrm();
   return listApiKeysForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listHookEndpointsForProject(organizationId: string, projectId: string): Promise<HookEndpointModel[]> {
+  await ensureFirestoreOrm();
+  return listHookEndpointsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listHookDeliveriesForProject(organizationId: string, projectId: string): Promise<HookDeliveryModel[]> {
+  await ensureFirestoreOrm();
+  return listHookDeliveriesForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listSchemaDefinitionsForProject(

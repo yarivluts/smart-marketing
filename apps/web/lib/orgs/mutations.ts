@@ -11,9 +11,11 @@ import {
   createOrgPerson as createOrgPersonInOrganization,
   createProject as createProjectInOrganization,
   createResourceTemplate as createResourceTemplateInOrganization,
+  createHookEndpoint as createHookEndpointInOrganization,
   createSharedCredential as createSharedCredentialInOrganization,
   decideResourceAttachment as decideResourceAttachmentInOrganization,
   deleteBoard as deleteBoardInOrganization,
+  disableHookEndpoint as disableHookEndpointInOrganization,
   disablePlugin as disablePluginInOrganization,
   type DrainPipelineResult,
   detachResource as detachResourceInOrganization,
@@ -22,6 +24,8 @@ import {
   ensureTouchpointSchemaRegistered as ensureTouchpointSchemaRegisteredInOrganization,
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
+  type HookEndpointModel,
+  type HookSignatureMode,
   installPlugin as installPluginInOrganization,
   saveBoardTiles as saveBoardTilesInOrganization,
   updateBoardSettings as updateBoardSettingsInOrganization,
@@ -45,6 +49,10 @@ import {
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
   rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
+  setHookDeliveryStatus as setHookDeliveryStatusInOrganization,
+  type HookDeliveryModel,
+  type HookDeliveryStatus,
+  setHookEndpointSigningSecret as setHookEndpointSigningSecretInOrganization,
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   triggerOrchestrationRun as triggerOrchestrationRunInOrganization,
@@ -257,6 +265,60 @@ interface RevokeApiKeyInput {
 export async function revokeApiKey(input: RevokeApiKeyInput): Promise<ApiKeyModel> {
   await ensureFirestoreOrm();
   return revokeApiKeyInOrganization(input);
+}
+
+interface CreateHookEndpointInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  name: string;
+  signatureMode: HookSignatureMode;
+  signatureHeaderName?: string;
+  createdByUserId: string;
+}
+
+export async function createHookEndpoint(input: CreateHookEndpointInput): Promise<HookEndpointModel> {
+  await ensureFirestoreOrm();
+  return createHookEndpointInOrganization(input);
+}
+
+interface DisableHookEndpointInput {
+  organizationId: string;
+  projectId: string;
+  hookEndpointId: string;
+  disabledByUserId: string;
+}
+
+export async function disableHookEndpoint(input: DisableHookEndpointInput): Promise<HookEndpointModel> {
+  await ensureFirestoreOrm();
+  return disableHookEndpointInOrganization(input);
+}
+
+interface SetHookEndpointSigningSecretInput {
+  organizationId: string;
+  projectId: string;
+  hookEndpointId: string;
+  signingSecret: string;
+  kms: KmsProvider;
+  actedByUserId: string;
+}
+
+export async function setHookEndpointSigningSecret(input: SetHookEndpointSigningSecretInput): Promise<HookEndpointModel> {
+  await ensureFirestoreOrm();
+  return setHookEndpointSigningSecretInOrganization(input);
+}
+
+interface SetHookDeliveryStatusInput {
+  organizationId: string;
+  projectId: string;
+  hookDeliveryId: string;
+  status: Extract<HookDeliveryStatus, 'reviewed' | 'discarded'>;
+  actedByUserId: string;
+}
+
+export async function setHookDeliveryStatus(input: SetHookDeliveryStatusInput): Promise<HookDeliveryModel> {
+  await ensureFirestoreOrm();
+  return setHookDeliveryStatusInOrganization(input);
 }
 
 interface RegisterSchemaDefinitionInput {
