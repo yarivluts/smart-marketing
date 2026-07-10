@@ -72,6 +72,7 @@
     "projectKeysLink": "מפתחות API",
     "projectSchemaRegistryLink": "מרשם סכימות",
     "projectIngestHealthLink": "תקינות הזרמת הנתונים",
+    "projectHooksLink": "וובהוקים נכנסים",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
@@ -191,6 +192,44 @@
     "touchpointSnippetHeading": "קטע מעקב לאתר",
     "touchpointSnippetIntro": "הדביקו קטע זה פעם אחת, ממש לפני תגית הסגירה של ה-body, בכל עמוד שברצונכם לעקוב אחריו. הקטע לוכד פרמטרי UTM ומזהי קליק ממודעות בעת הכניסה ומצרף אותם לכל אירוע שהפרויקט של מפתח זה רושם.",
     "copySnippet": "העתקת הקטע"
+  },
+  "Hooks": {
+    "metaTitle": "וובהוקים נכנסים",
+    "title": "וובהוקים נכנסים עבור {projectName}",
+    "existingHookEndpointsHeading": "נקודות קצה קיימות",
+    "noHookEndpoints": "עדיין לא נוצרו נקודות קצה עבור פרויקט זה.",
+    "revokedLabel": "בוטל",
+    "signatureModeLine": "אימות חתימה: {mode}",
+    "createHookEndpointHeading": "יצירת נקודת קצה",
+    "noEnvironments": "לפרויקט זה אין עדיין סביבות.",
+    "nameLabel": "שם",
+    "environmentLabel": "סביבה",
+    "signatureModeLabel": "אימות חתימה",
+    "signatureMode": {
+      "none": "ללא — קבלת כל תוכן",
+      "hmac_sha256": "HMAC-SHA256‏ (X-GrowthOS-Signature)"
+    },
+    "createHookEndpoint": "יצירת נקודת קצה",
+    "createError": "משהו השתבש. נסה שוב.",
+    "secretShownOnceWarning": "העתק את הכתובת והסוד כעת — הסוד לא יוצג שוב.",
+    "hookUrlLabel": "כתובת הוובהוק",
+    "signingSecretLabel": "סוד החתימה",
+    "copySecret": "העתקה",
+    "copied": "הועתק",
+    "done": "סיום",
+    "revoke": "ביטול",
+    "revokeError": "לא ניתן היה לבטל את נקודת הקצה. נסה שוב.",
+    "reviewQueueHeading": "תור לבדיקה",
+    "noPendingPayloads": "אין תכנים הממתינים לבדיקה.",
+    "payloadSummary": "{hookEndpointName} — חתימה: {signatureStatus} — התקבל {receivedAt}",
+    "signatureStatus": {
+      "verified": "מאומת",
+      "invalid": "לא תקין",
+      "missing": "חסר",
+      "not_configured": "לא נבדק"
+    },
+    "dismissButtonLabel": "דחייה",
+    "dismissError": "לא ניתן היה לדחות תוכן זה. נסה שוב."
   },
   "SchemaRegistry": {
     "metaTitle": "מרשם סכימות",

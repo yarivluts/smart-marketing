@@ -11,6 +11,9 @@ import { POST as requestAttachment } from '@/app/api/orgs/[orgId]/projects/[proj
 import { DELETE as detachAttachment, PATCH as decideAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/route';
 import { GET as listApiKeys, POST as mintApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/route';
 import { DELETE as revokeApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]/route';
+import { GET as listHookEndpoints, POST as mintHookEndpointRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/hooks/route';
+import { DELETE as revokeHookEndpointRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/hooks/[hookEndpointId]/route';
+import { POST as dismissHookPayloadRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/hook-payloads/[hookPayloadId]/dismiss/route';
 import { GET as listSchemaDefs, POST as registerSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/route';
 import { POST as evolveSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/evolve/route';
 import { GET as listMetricDefs, POST as registerMetricDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/metric-defs/route';
@@ -292,6 +295,72 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
       () =>
         revokeApiKey(new Request('https://growthos.test'), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, apiKeyId: FAKE_MEMBERSHIP_ID }),
+        }),
+    );
+  });
+
+  it('GET/POST/DELETE /api/orgs/[orgId]/projects/[projectId]/hooks(/[hookEndpointId]): org caller cannot see vs. fake org id (KAN-53)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-hooks-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (hooks)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-hooks-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (hooks)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const getRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/hooks`);
+
+    await expectIndistinguishable(
+      () =>
+        listHookEndpoints(getRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () =>
+        listHookEndpoints(getRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+
+    const postRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/hooks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Leaked hook', environmentId: 'does-not-matter', signatureMode: 'none' }),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        mintHookEndpointRoute(postRequestFor(orgB.id, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }),
+        }),
+      () =>
+        mintHookEndpointRoute(postRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+
+    await expectIndistinguishable(
+      () =>
+        revokeHookEndpointRoute(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID, hookEndpointId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        revokeHookEndpointRoute(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, hookEndpointId: FAKE_MEMBERSHIP_ID }),
+        }),
+    );
+
+    await expectIndistinguishable(
+      () =>
+        dismissHookPayloadRoute(new Request('https://growthos.test', { method: 'POST' }), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID, hookPayloadId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        dismissHookPayloadRoute(new Request('https://growthos.test', { method: 'POST' }), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, hookPayloadId: FAKE_MEMBERSHIP_ID }),
         }),
     );
   });

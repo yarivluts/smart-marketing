@@ -72,6 +72,7 @@
     "projectKeysLink": "API keys",
     "projectSchemaRegistryLink": "Schema registry",
     "projectIngestHealthLink": "Ingest health",
+    "projectHooksLink": "Inbound webhooks",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
@@ -191,6 +192,44 @@
     "touchpointSnippetHeading": "Website tracking snippet",
     "touchpointSnippetIntro": "Paste this once, right before the closing body tag, on any page you want to track. It captures UTM parameters and ad-click ids at entry and attaches them to every event this key's project registers.",
     "copySnippet": "Copy snippet"
+  },
+  "Hooks": {
+    "metaTitle": "Inbound webhooks",
+    "title": "Inbound webhooks for {projectName}",
+    "existingHookEndpointsHeading": "Existing hook endpoints",
+    "noHookEndpoints": "No hook endpoints created for this project yet.",
+    "revokedLabel": "Revoked",
+    "signatureModeLine": "Signature verification: {mode}",
+    "createHookEndpointHeading": "Create a hook endpoint",
+    "noEnvironments": "This project has no environments yet.",
+    "nameLabel": "Name",
+    "environmentLabel": "Environment",
+    "signatureModeLabel": "Signature verification",
+    "signatureMode": {
+      "none": "None — accept any payload",
+      "hmac_sha256": "HMAC-SHA256 (X-GrowthOS-Signature)"
+    },
+    "createHookEndpoint": "Create hook endpoint",
+    "createError": "Something went wrong. Please try again.",
+    "secretShownOnceWarning": "Copy the URL and signing secret now — the secret won't be shown again.",
+    "hookUrlLabel": "Hook URL",
+    "signingSecretLabel": "Signing secret",
+    "copySecret": "Copy",
+    "copied": "Copied",
+    "done": "Done",
+    "revoke": "Revoke",
+    "revokeError": "Couldn't revoke this hook endpoint. Please try again.",
+    "reviewQueueHeading": "Review queue",
+    "noPendingPayloads": "No payloads pending review.",
+    "payloadSummary": "{hookEndpointName} — signature: {signatureStatus} — received {receivedAt}",
+    "signatureStatus": {
+      "verified": "verified",
+      "invalid": "invalid",
+      "missing": "missing",
+      "not_configured": "not checked"
+    },
+    "dismissButtonLabel": "Dismiss",
+    "dismissError": "Couldn't dismiss this payload. Please try again."
   },
   "SchemaRegistry": {
     "metaTitle": "Schema registry",

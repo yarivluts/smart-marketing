@@ -17,6 +17,10 @@ import {
   listBoardsForProject as listBoardsForProjectInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
+  listHookEndpointsForProject as listHookEndpointsForProjectInOrganization,
+  listHookPayloadsForProject as listHookPayloadsForProjectInOrganization,
+  type HookEndpointSummary,
+  type HookPayloadModel,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
   listMetricsCatalogForProject as listMetricsCatalogForProjectInOrganization,
   listOrgMembersWithProfiles,
@@ -124,6 +128,20 @@ export async function listEnvironmentsForProject(
 export async function listApiKeysForProject(organizationId: string, projectId: string): Promise<ApiKeySummary[]> {
   await ensureFirestoreOrm();
   return listApiKeysForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listHookEndpointsForProject(organizationId: string, projectId: string): Promise<HookEndpointSummary[]> {
+  await ensureFirestoreOrm();
+  return listHookEndpointsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listHookPayloadsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<HookPayloadModel[]> {
+  await ensureFirestoreOrm();
+  return listHookPayloadsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export async function listSchemaDefinitionsForProject(

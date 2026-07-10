@@ -27,9 +27,15 @@ import {
   updateBoardSettings as updateBoardSettingsInOrganization,
   processStripeWebhookEvent as processStripeWebhookEventInOrganization,
   runSourcePluginInstall as runSourcePluginInstallInOrganization,
+  dismissHookPayload as dismissHookPayloadInOrganization,
   inviteMemberToOrganization,
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
+  mintHookEndpoint as mintHookEndpointInOrganization,
+  type MintHookEndpointResult,
+  type HookEndpointModel,
+  type HookPayloadModel,
+  type HookSignatureMode,
   type OrchestrationRunModel,
   type PluginInstallModel,
   type PluginManifestModel,
@@ -44,6 +50,7 @@ import {
   type ReplayQuarantinedRecordResult,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
+  revokeHookEndpoint as revokeHookEndpointInOrganization,
   rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
@@ -257,6 +264,45 @@ interface RevokeApiKeyInput {
 export async function revokeApiKey(input: RevokeApiKeyInput): Promise<ApiKeyModel> {
   await ensureFirestoreOrm();
   return revokeApiKeyInOrganization(input);
+}
+
+interface MintHookEndpointInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  name: string;
+  signatureMode: HookSignatureMode;
+  createdByUserId: string;
+  kms?: KmsProvider;
+}
+
+export async function mintHookEndpoint(input: MintHookEndpointInput): Promise<MintHookEndpointResult> {
+  await ensureFirestoreOrm();
+  return mintHookEndpointInOrganization(input);
+}
+
+interface RevokeHookEndpointInput {
+  organizationId: string;
+  projectId: string;
+  hookEndpointId: string;
+  revokedByUserId: string;
+}
+
+export async function revokeHookEndpoint(input: RevokeHookEndpointInput): Promise<HookEndpointModel> {
+  await ensureFirestoreOrm();
+  return revokeHookEndpointInOrganization(input);
+}
+
+interface DismissHookPayloadInput {
+  organizationId: string;
+  projectId: string;
+  hookPayloadId: string;
+  reviewedByUserId: string;
+}
+
+export async function dismissHookPayload(input: DismissHookPayloadInput): Promise<HookPayloadModel> {
+  await ensureFirestoreOrm();
+  return dismissHookPayloadInOrganization(input);
 }
 
 interface RegisterSchemaDefinitionInput {
