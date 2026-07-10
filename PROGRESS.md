@@ -17,6 +17,48 @@ Template for each entry:
 
 ---
 
+## 2026-07-10 — KAN-53 duplicate collision (PR #42 closed, superseded by #41)
+
+- **Last completed:** Picked **KAN-53** (next unblocked sprint-6 `todo` at the time, per table
+  order) and independently implemented it in full: `HookEndpointModel`/`HookPayloadModel` +
+  `hook-endpoint.service.ts`/`hook-ingest.service.ts` in `packages/firebase-orm-models`,
+  `POST /v1/hooks/{project}/{hook_id}` in `apps/api` (nested path, per the plan `12 §2.4` sketch
+  verbatim — a different URL shape than the sibling run's flat `/v1/hooks/:hookId`), and a
+  project-scoped Hooks admin page in `apps/web` (create endpoint, copy-once `hmac_sha256` signing
+  secret, review queue with dismiss, revoke) gated on `ingest.write`. Full test coverage at every
+  layer (emulator service tests, an `apps/api` e2e spec, `apps/web` route/component/isolation
+  tests, a Playwright e2e spec) — 427 + 64 + 505 tests green, lint/typecheck/build green, opened as
+  **PR #42**. On merge attempt, discovered **another parallel run had already independently
+  delivered and merged KAN-53 as PR #41** (`26115b7`) minutes earlier — same story, picked up by
+  two scheduled runs before either had merged, the same collision pattern KAN-20/KAN-32/KAN-42 hit
+  before. Closed **PR #42 without merging** (commented + closed, branch deleted) rather than trying
+  to reconcile two independent full-stack implementations of the same story — `main`'s version
+  (#41) was already CI-green, self-reviewed, and merged first. No code from this run's KAN-53
+  attempt is in `main`.
+- **In progress (exact stopping point):** None — this run's own KAN-53 work is fully abandoned
+  (superseded), not partially merged. `main` is clean at whatever #41 left it (see the entry below
+  this one for what #41 actually delivered — it took a different URL shape: flat
+  `/v1/hooks/:hookId` token-resolved rather than this run's nested `/v1/hooks/{project}/{hook_id}`
+  path-resolved; both are defensible reads of the plan's sketch).
+- **Blocked + why:** Nothing blocked — KAN-53 is done in `main` via #41.
+- **Next step:** Next unblocked sprint-6 `todo` in table order is **KAN-54** (mapping engine:
+  saved field-mappings, JSONPath -> schema fields, transforms, test-run on sample) — the #41 run's
+  own PROGRESS entry already flags this as its own suggested next step too. A future run picking
+  this up should build against #41's actual delivered shape (`hook.service.ts`,
+  `hook_deliveries`-style review queue, flat ingest URL) — read that PR's code, not this entry's
+  abandoned nested-URL design.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Consider whether the scheduled-run cadence needs adjusting (again) — this is at least the
+    fourth time two-plus runs have independently started the same story before either merged
+    (KAN-20 three-way, KAN-32, KAN-42, now KAN-53). A shorter per-run "check PR list before
+    starting" step, or a longer gap between scheduled fires, would avoid burning a run's entire
+    budget on work that gets thrown away.
+
+---
+
 ## 2026-07-10 — PR #41 merged (KAN-53)
 
 - **Last completed:** PR #41 (KAN-53: inbound hook endpoints) passed CI (`lint · typecheck · test ·
