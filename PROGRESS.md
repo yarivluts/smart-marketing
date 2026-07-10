@@ -17,6 +17,21 @@ Template for each entry:
 
 ---
 
+## 2026-07-10 — PR #41 merged (KAN-53)
+
+- **Last completed:** PR #41 (KAN-53: inbound hook endpoints) passed CI (`lint · typecheck · test ·
+  build` green, `mergeable_state: clean`, no review comments) and was squash-merged into `main` at
+  `26115b7`. Local `kan-53-inbound-hooks` branch deleted; remote delete hit the recurring HTTP 403 on
+  this git remote (documented in prior entries) — remote branch left in place, harmless since it's
+  fully merged.
+- **In progress (exact stopping point):** None — KAN-53 is fully closed out.
+- **Blocked + why:** Nothing blocked.
+- **Next step:** Start **KAN-54** (mapping engine — consumes the `hook_deliveries` review queue
+  KAN-53 built) in the next run, per the plan sequencing noted in the entry below.
+- **Waiting on human:** Nothing.
+
+---
+
 ## 2026-07-10 — E9.1 Inbound hook endpoints (KAN-53)
 
 - **Last completed:**
