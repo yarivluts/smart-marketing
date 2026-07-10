@@ -17,6 +17,84 @@ Template for each entry:
 
 ---
 
+## 2026-07-10 — E9.3 Mapping UI with AI-assisted suggestion (KAN-55)
+
+- **Last completed:**
+  - Picked **KAN-55** (next unblocked sprint-7 `todo` in table order — every sprint 1-6 story is
+    `done`/`needs-human`/`blocked-by` an unfinished blocker; KAN-55 depends only on KAN-54's
+    (done) field-mapping engine).
+  - Delivered: a "Suggest mappings" panel on the KAN-54 field-mappings admin UI. Paste a sample
+    payload, get proposed `rename`/`cast` rules for the target schema's fields, ranked by
+    confidence; nothing is auto-applied — the user reviews/edits/drops suggestions in the existing
+    rule editor before saving (the AC's "user confirms" half).
+  - The AC calls for "LLM proposes field mapping" but there's no LLM API key/secret provisioned in
+    this headless environment (not a KAN-18 GCP-style blocker — just no secret to reach for — so
+    treated the same way this codebase treats other not-yet-provisioned external dependencies:
+    KMS (`LocalKmsProvider`, KAN-29), the warehouse query executor (`NotConfiguredWarehouseQueryExecutor`,
+    KAN-42)). Built a **deterministic name/type-similarity heuristic** as the buildable-today
+    stand-in instead of stubbing the feature out entirely: `packages/shared/src/mapping-suggestion`
+    flattens a sample JSON payload into scalar JSONPaths (bounded depth/array-width), scores each
+    candidate against a target field via token-overlap (Jaccard) + exact-leaf-match + substring-
+    containment + a small curated synonym list (id/ts/amount/email/status/name), and only proposes
+    a rule when the candidate's value can actually satisfy the target field's type (reusing the
+    existing `castMappingValue`) — hand-verified against the Shopify fixture and a synthetic schema
+    (e.g. `event_id`←`id` cast-to-string 0.45 confidence, `ts`←`created_at` cast-to-timestamp via
+    the synonym list alone 0.3, `properties.email`←root `email` not nested `customer.email` 1.0 vs
+    0.8). A real LLM-backed proposer could swap in later without changing the contract (sample +
+    target schema in, ranked suggestions out).
+  - New `mappingTargetFields()` in `packages/shared/src/mapping-engine/engine.ts` centralizes the
+    envelope-field-types-per-kind knowledge (previously only implicit in `validateMappingRules`) so
+    the suggester (and any future caller) doesn't have to re-derive it.
+  - New `suggestFieldMappingRules()` service (`packages/firebase-orm-models`), a
+    `POST .../field-mappings/suggest` route (`apps/web`, gated on `ingest.write` exactly like the
+    sibling create/test-run routes), and a `SuggestFieldMappingsPanel` component wired into the
+    create-mapping form.
+  - Self-reviewed the diff via an independent subagent before merging; it found and this run fixed
+    a real bug: the suggestion-merge logic considered a rule row "already in use" only by a
+    non-empty `targetField`, so applying any suggestion anywhere on the form would silently drop a
+    row where the user had only typed a `sourcePath` so far (hadn't named the target field yet) —
+    fixed to treat a row as in-use by *any* typed content, plus a trim inconsistency in the same
+    comparison, both pinned by new regression tests.
+  - `pnpm lint && pnpm typecheck && pnpm build` green; `pnpm test` green across
+    `@growthos/shared`/`@growthos/firebase-orm-models`/`@growthos/api`/`@growthos/web`'s unit +
+    emulator suites. The PR's own CI run hit the known, previously-documented Firestore emulator
+    gRPC flake (`RESOURCE_EXHAUSTED: Received message larger than max`) on `audit-log.emulator.test.ts`
+    — a file untouched by this change — and passed clean on a re-run of the failed job, same
+    resolution as prior runs' notes on this exact flake.
+  - `apps/web`'s Playwright e2e suite has separate, pre-existing flakiness in this sandbox unrelated
+    to this change: re-ran `boards.spec.ts`/`resource-library.spec.ts` in isolation (neither touches
+    field-mapping code) and both still failed/flaked on unrelated org-creation/credential-approval
+    timing, not something this run introduced or could practically fix — noted here rather than
+    chased further, since CI (which doesn't run the e2e suite) is the actual merge gate.
+  - Branch `kan-55-mapping-ai-suggestion`, PR #46, merged into `main` (squash). Remote branch
+    deletion failed with the same HTTP 403 from this sandbox's git remote recorded in several prior
+    entries (not a GitHub permissions issue) — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-55 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked sprint-7 `todo` in table order is **KAN-59** (SaaS/marketing
+  metric-pack plugin: ad_spend, signups, cost_per_signup, cac, conversion_to_paying, mrr,
+  mrr_movements, net_mrr_churn, troi, collected_revenue, failed_charge_rate) — this also unblocks
+  **KAN-61** (default boards shipped with the pack), which was picked up once already and found
+  blocked on exactly this. After KAN-59, remaining sprint-7 `todo`s in table order: **KAN-65**
+  (win rules engine), **KAN-67** (war-room TV mode, depends on KAN-65), **KAN-68** (onboarding
+  wizard), **KAN-69** (freshness badges/degraded-state UX), **KAN-70** (alpha feedback
+  instrumentation). **KAN-63** (engagement pack) and **KAN-66** (win catalog) have no sprint
+  assigned yet but no blocker either — reasonable to pick up if the sprint-7 items are blocked or
+  exhausted.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional, not blocking: if/when an LLM API key (e.g. `ANTHROPIC_API_KEY`) is provisioned, KAN-55's
+    heuristic proposer could be swapped for a real LLM-backed one without changing its contract —
+    not requested by the AC's "buildable-today" precedent elsewhere, just flagging the option.
+  - Optional: delete the merged `kan-55-mapping-ai-suggestion` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403).
+
+---
+
 ## 2026-07-10 — E12.1 Goal model: metric/target/deadline/owner, direction, rhythm, thermometer + pace projection (KAN-64)
 
 - **Last completed:**
