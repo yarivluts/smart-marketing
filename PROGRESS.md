@@ -17,6 +17,100 @@ Template for each entry:
 
 ---
 
+## 2026-07-10 — E9.1 Inbound hook endpoints (KAN-53)
+
+- **Last completed:**
+  - Delivered **KAN-53** (E9.1, plan `08 §3.2`/`12 §2.4`): the zero-config inbound webhook
+    receiver — "point any SaaS webhook here." New `packages/firebase-orm-models/src/models/`
+    `hook-endpoint.model.ts`/`hook-delivery.model.ts` + `services/hook.service.ts`: create/disable
+    a per-project+environment hook endpoint (`signature_mode: 'none'` or `'hmac_sha256'`), set/rotate
+    its signing secret through the existing KAN-29 vault (a two-step create-then-set-secret split,
+    mirroring `createSharedCredential`/`setSharedCredentialSecret` — an `hmac_sha256` endpoint fails
+    closed on every delivery until a secret is set), `receiveHookPayload` (looked up purely by an
+    opaque `hook_id` via a Firestore collection-group query, the same pattern
+    `findLiveApiKeyByRawKey` established for API keys), and review-queue status transitions
+    (pending/reviewed/discarded — KAN-54's mapping engine will consume this queue later, this story
+    is store+verify+queue only). A new `hook-signature.ts` provides a generic HMAC-SHA256 verifier
+    (GitHub/Shopify-style bare-or-`sha256=`-prefixed hex digest), deliberately simpler than KAN-49's
+    Stripe-specific timestamped scheme, which keeps its own dedicated webhook route.
+  - `apps/api`: public `POST /v1/hooks/:hookId` — flat and token-resolved rather than the plan
+    sketch's nested `/v1/hooks/{project}/{hook_id}`, the same deliberate deviation KAN-32's
+    `/v1/ingest/*` already established (the token, not the URL path, is the source of truth for
+    which org/project/environment a request belongs to). No API key involved — the unguessable
+    `hook_id` in the URL is the credential for `signature_mode: 'none'` endpoints. Enabled
+    `rawBody: true` globally in `main.ts` so HMAC verification runs against the exact bytes posted
+    (a re-serialized JSON body would compute a different digest); scope note: this only populates
+    `request.rawBody` for `Content-Type: application/json` senders, which covers every mainstream
+    webhook provider (Stripe, GitHub, Shopify, ...) — a non-JSON sender is a documented gap, not
+    silently mishandled.
+  - `apps/web`: a project-scoped Hooks admin page — create an endpoint (environment + signature
+    mode picker), an always-redisplayable receive URL with a copy button (unlike an API key's raw
+    secret, `hook_id` isn't one-way hashed, so there's no "shown once" flow to build), set/rotate the
+    signing secret, and browse the review queue (mark reviewed / discard). Whole feature gated on the
+    existing `ingest.write` permission, matching the sibling ingest-health/keys admin pages' posture.
+    New `Hooks` translation namespace (en + he) plus a `projectHooksLink` nav-link key on the org
+    detail page.
+  - **Self-review** (an independent subagent pass over the full diff, plus my own verification while
+    building) found and fixed real bugs before opening the PR:
+    1. `create-hook-endpoint-form.tsx` (a client component) imported `HOOK_SIGNATURE_MODES`/
+       `HookSignatureMode` — a **value** import — from `@growthos/firebase-orm-models`. That package's
+       barrel unconditionally pulls in the orchestration module's `node:child_process` use, which
+       broke the Next.js client webpack bundle (`UnhandledSchemeError` on `next dev`). Fixed by adding
+       a local, hand-copied client-safe mirror of the constant, the same pattern `schema-fields-editor.tsx`'s
+       own `SCHEMA_FIELD_TYPES` already establishes (its doc comment explains the same reasoning) —
+       this bug only surfaces at real browser-bundle time, never in `tsc`/`vitest`, so it was only
+       caught by actually driving the page through Playwright.
+    2. The Playwright e2e spec (`e2e/hooks.spec.ts`) hit real, reproducible bugs of its own, found
+       and fixed via several iterations against the real dev server: a strict-mode-ambiguous
+       `getByText` match (the "no signature check" copy appears both in the endpoint list and as a
+       `<select>` option on the same page — scoped to the endpoint's own list item), an exact-text
+       match against a status word that's actually part of one interpolated sentence
+       ("Received {at} — {status}", not a standalone node — switched to substring/regex matching),
+       and a genuine race: `seedHookDelivery` writes through a *separate* Node process (the spec file
+       itself, not the Next.js server under test) against the same Firestore emulator, so a single
+       `page.reload()` right after could run before the write lands — replaced with a poll-until-visible
+       (`expect(async () => {...}).toPass(...)`) instead of a single reload.
+  - `pnpm lint`/`pnpm typecheck`/`pnpm build` all green across every package.
+    `packages/firebase-orm-models` `pnpm test`: 424/424 (new `hook.emulator.test.ts` +
+    `hook-signature.test.ts`). `apps/api` `pnpm test`: 61/61 (new `hooks.controller.e2e.spec.ts`,
+    a real-HTTP e2e proving `rawBody: true` genuinely round-trips through a live request).
+    `apps/web` `pnpm test` (vitest): 517/517 across four independent full runs, zero flakes, ever —
+    new route tests for all four hook-endpoints/hook-deliveries API routes plus every new client
+    component. `apps/web`'s Playwright e2e suite is a separate, well-documented story: this sandbox's
+    long-running, heavily-loaded container produced non-deterministic timing flakiness across *many
+    pre-existing, untouched* specs during verification (`auth.spec.ts`'s sign-up redirect,
+    `boards.spec.ts`, `keys.spec.ts`, `metric-defs.spec.ts`, `orgs.spec.ts`, `plugins.spec.ts`,
+    `resource-library.spec.ts` all flaked or failed at least once across repeated full-suite runs,
+    none of which touch any file this PR changes) — consistent with this file's own prior
+    documented sandbox limitations (see the 2026-07-04 KAN-22 entry's gRPC/emulator flake note).
+    The new `hooks.spec.ts` itself passed cleanly (no retry needed) in the one full-suite run where
+    the rest of the suite also ran cleanest (13 passed, 5 flaky-but-recovered, 2 pre-existing
+    failures in `boards.spec.ts`/`keys.spec.ts` unrelated to this diff). Root `pnpm build` (all 6
+    packages) green.
+  - Opened PR #41, subscribed to its activity. An independent review-subagent pass over the full
+    diff (correctness/security-sensitive-surface, test coverage, reuse/simplification, CLAUDE.md
+    compliance) found zero further issues beyond what was already fixed above.
+- **In progress (exact stopping point):** PR #41 open, CI running at time of this entry. Will merge
+  once CI is green (or, if this sandbox's own Playwright flakiness reappears in CI in a way clearly
+  isolated to the pre-existing untouched specs above, that's a known/documented limitation, not a
+  reason to hold this PR — `hooks.spec.ts` itself and every non-e2e test suite are solid).
+- **Blocked + why:** nothing blocking; waiting on CI to confirm green before merge.
+- **Next step:** merge PR #41 once CI passes, delete the branch, then pick the next unblocked
+  sprint-6 `todo`: **KAN-54** (mapping engine — the natural consumer of KAN-53's review queue) is
+  the obvious next story given it directly builds on this one, or **KAN-62**/**KAN-64** (cohort
+  engine, goal model) if a future run wants to diversify instead.
+- **Waiting on human:**
+  - **KAN-43** — Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18** — GCP/Firebase projects + billing + secrets — still outstanding.
+  - The pre-existing unreconciled KAN-20 observability-baseline PR triplicate (#2/#3/#5) and the
+    stale KAN-33 progress-followup PR (#22) still await a human decision — untouched by this run.
+  - Optional: if this sandbox's own e2e flakiness (documented above) is becoming a recurring drag on
+    every run's verification time, worth a human decision on whether to invest in stabilizing the
+    Playwright/Firestore-emulator setup itself (e.g. more generous timeouts, retries, or a lighter
+    per-spec fixture) rather than each run re-diagnosing the same class of environment noise.
+
+---
+
 ## 2026-07-10 — E8.4 GA4 plugin: Data API sessions/events sync (KAN-52)
 
 - **Last completed:**
