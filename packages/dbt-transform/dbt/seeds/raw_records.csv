@@ -28,3 +28,9 @@ org_1,proj_10,env_prod,2026-04-01,batch_301,event,touchpoint,anon_j1,"{""event_n
 org_1,proj_10,env_prod,2026-04-03,batch_302,event,touchpoint,anon_j2,"{""event_name"": ""pageview"", ""device_id"": ""dev_100"", ""channel"": ""paid_social"", ""utm_campaign"": ""spring_social"", ""ts"": ""2026-04-03T09:00:00Z""}",2026-04-03 09:00:01
 org_1,proj_10,env_prod,2026-04-03,batch_303,event,funnel_event,cust_j1,"{""event_name"": ""signup"", ""anon_id"": ""anon_j2"", ""device_id"": ""dev_100"", ""ts"": ""2026-04-03T09:10:00Z""}",2026-04-03 09:10:02
 org_1,proj_10,env_prod,2026-04-05,batch_304,event,funnel_event,cust_j1,"{""event_name"": ""purchase"", ""ts"": ""2026-04-05T12:00:00Z""}",2026-04-05 12:00:01
+org_1,proj_11,env_prod,2026-01-10,batch_401,event,funnel_event,cust_c1,"{""event_name"": ""signup"", ""ts"": ""2026-01-10T09:00:00Z""}",2026-01-10 09:00:02
+org_1,proj_11,env_prod,2026-01-15,batch_402,event,funnel_event,cust_c1,"{""event_name"": ""activated"", ""ts"": ""2026-01-15T10:00:00Z""}",2026-01-15 10:00:02
+org_1,proj_11,env_prod,2026-03-20,batch_403,event,funnel_event,cust_c1,"{""event_name"": ""purchase"", ""ts"": ""2026-03-20T11:00:00Z""}",2026-03-20 11:00:02
+org_1,proj_11,env_prod,2026-01-12,batch_404,event,funnel_event,cust_c2,"{""event_name"": ""signup"", ""ts"": ""2026-01-12T08:00:00Z""}",2026-01-12 08:00:02
+org_1,proj_11,env_prod,2026-02-05,batch_405,event,funnel_event,cust_c3,"{""event_name"": ""signup"", ""ts"": ""2026-02-05T07:00:00Z""}",2026-02-05 07:00:02
+org_1,proj_11,env_prod,2026-02-10,batch_406,event,funnel_event,cust_c3,"{""event_name"": ""activated"", ""ts"": ""2026-02-10T07:30:00Z""}",2026-02-10 07:30:02

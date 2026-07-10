@@ -137,6 +137,9 @@ function parseTile(value: unknown): BoardTile | undefined {
   if (!Array.isArray(record.dimensions) || record.dimensions.some((entry) => typeof entry !== 'string')) {
     return undefined;
   }
+  if (record.cohortConversionEvent !== undefined && typeof record.cohortConversionEvent !== 'string') {
+    return undefined;
+  }
   const { x, y, w, h } = layout as { x: number; y: number; w: number; h: number };
   return {
     id: record.id,
@@ -145,6 +148,7 @@ function parseTile(value: unknown): BoardTile | undefined {
     layout: { x, y, w, h },
     metricNames: record.metricNames as string[],
     dimensions: record.dimensions as string[],
+    ...(typeof record.cohortConversionEvent === 'string' ? { cohortConversionEvent: record.cohortConversionEvent } : {}),
   };
 }
 

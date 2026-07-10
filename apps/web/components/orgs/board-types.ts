@@ -17,7 +17,7 @@
 export { TIME_GRAINS, COMPARE_PERIODS, METRIC_FILTER_OPERATORS } from '@growthos/shared';
 export type { TimeGrain as TimeGrainRow, ComparePeriod as ComparePeriodRow, MetricFilterOperator as MetricFilterOperatorRow, CompilerFilter as GlobalFilterRow } from '@growthos/shared';
 
-export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel'] as const;
+export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel', 'heatmap'] as const;
 export type BoardTileTypeRow = (typeof BOARD_TILE_TYPES)[number];
 
 export const BOARD_GRID_COLUMNS = 12;
@@ -37,6 +37,8 @@ export interface BoardTileRow {
   layout: BoardTileLayoutRow;
   metricNames: string[];
   dimensions: string[];
+  /** Only used by a `heatmap` tile (KAN-62) — see `BoardTile.cohortConversionEvent`'s own doc comment. */
+  cohortConversionEvent?: string;
 }
 
 /** A plain mirror of `MetricCatalogEntry` — the shape the tile editor's metric picker reads from. */
@@ -45,9 +47,15 @@ export interface MetricCatalogEntryRow {
   dimensions: string[];
 }
 
-/** Default size (in grid columns/rows) for a newly added tile of each type — big numbers are small, everything else needs room for a chart/table/steps. */
+/** Default size (in grid columns/rows) for a newly added tile of each type — big numbers are small, a heatmap needs a little extra height for its cohort-month rows, everything else needs room for a chart/table/steps. */
 export function defaultTileSize(type: BoardTileTypeRow): { w: number; h: number } {
-  return type === 'big_number' ? { w: 3, h: 2 } : { w: 6, h: 4 };
+  if (type === 'big_number') {
+    return { w: 3, h: 2 };
+  }
+  if (type === 'heatmap') {
+    return { w: 6, h: 5 };
+  }
+  return { w: 6, h: 4 };
 }
 
 /** The next free row below every existing tile, for a newly added tile's default `y` — simple "append at the bottom" placement rather than packing into gaps, the same buildable-today posture this codebase's other v1 features take over a full bin-packing algorithm. */

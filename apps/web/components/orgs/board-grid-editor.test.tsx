@@ -139,6 +139,21 @@ describe('BoardGridEditor', () => {
     expect(screen.getAllByLabelText('Tile title')).toHaveLength(2);
   });
 
+  it('switching a tile to heatmap shows a conversion-event input instead of the metric picker, clearing metricNames/dimensions (KAN-62)', () => {
+    renderEditor([adSpendTile]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+
+    expect(screen.getByLabelText('Metric')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Tile type'), { target: { value: 'heatmap' } });
+
+    expect(screen.queryByLabelText('Metric')).not.toBeInTheDocument();
+    const conversionEventInput = screen.getByLabelText('Conversion event') as HTMLInputElement;
+    expect(conversionEventInput.value).toBe('');
+
+    fireEvent.change(conversionEventInput, { target: { value: 'activated' } });
+    expect(conversionEventInput.value).toBe('activated');
+  });
+
   it('swaps two tiles’ positions on drag-and-drop, without swapping their (different) sizes', () => {
     renderEditor();
     fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));

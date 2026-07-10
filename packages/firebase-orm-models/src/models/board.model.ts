@@ -3,12 +3,14 @@ import type { ComparePeriod, CompilerFilter, TimeGrain } from '@growthos/shared'
 
 /**
  * The task-breakdown AC's own tile-type list (plan `13 §E11.2`: "tile types
- * (line/bar/big-number/table/funnel)") — a deliberately smaller vocabulary
- * than `10-product-ux.md §2.2`'s fuller wishlist (area/cohort-heatmap/pie/
- * map/AI-note/iframe), the same "AC over wishlist" scoping every prior
- * KAN-3x/4x story in this codebase already applied to its own spec section.
+ * (line/bar/big-number/table/funnel)"), plus `heatmap` — KAN-62's own AC
+ * ("cohort engine v1 + heatmap tile") explicitly names the tile type it
+ * adds, unlike `10-product-ux.md §2.2`'s remaining wishlist items (area/pie/
+ * map/AI-note/iframe), which stay out of scope, the same "AC over wishlist"
+ * scoping every prior KAN-3x/4x story in this codebase already applied to
+ * its own spec section.
  */
-export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel'] as const;
+export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel', 'heatmap'] as const;
 export type BoardTileType = (typeof BOARD_TILE_TYPES)[number];
 
 export function isBoardTileType(value: string): value is BoardTileType {
@@ -48,8 +50,20 @@ export interface BoardTile {
    * steps.
    */
   metricNames: string[];
-  /** Breakdown dimension(s), each must be one of the tile's metric's own registered dimensions (enforced at query time by the compiler, KAN-41). Ignored by `funnel` (breaks down by step, not by dimension) and `big_number` (a single total has nothing to break down by). */
+  /** Breakdown dimension(s), each must be one of the tile's metric's own registered dimensions (enforced at query time by the compiler, KAN-41). Ignored by `funnel` (breaks down by step, not by dimension), `big_number` (a single total has nothing to break down by), and `heatmap` (see `cohortConversionEvent`). */
   dimensions: string[];
+  /**
+   * Only used by a `heatmap` tile (KAN-62): the conversion-event label
+   * (`cohort_retention.conversion_event`, e.g. `activated`/`purchase`) this
+   * tile's signup-month cohort matrix breaks down by. A cohort tile doesn't
+   * reference the KAN-40 metric catalog the same way every other tile type
+   * does — `metricNames`/`dimensions` stay empty for a heatmap tile, the
+   * same "field only meaningful for one tile type" shape `metricNames`
+   * itself already has for `funnel`'s multi-step case. Optional (rather
+   * than a required, possibly-empty string) so a non-heatmap tile's JSON
+   * shape doesn't grow a meaningless field.
+   */
+  cohortConversionEvent?: string;
 }
 
 export interface BoardDateRange {

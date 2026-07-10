@@ -103,3 +103,34 @@ models:
       - name: credit
         tests:
           - not_null
+
+  - name: cohort_retention
+    description: >
+      Cohort engine v1 (plan `04 §5`, KAN-62): signup-month cohort x
+      conversion/retention matrix -- one row per (cohort_month,
+      conversion_event, period_index) heatmap cell, see the model's own
+      doc comment for the full rule.
+    columns:
+      - name: cohort_retention_key
+        description: Composite (project_id, environment_id, cohort_month, conversion_event, period_index) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: cohort_month
+        tests:
+          - not_null
+      - name: conversion_event
+        tests:
+          - not_null
+      - name: period_index
+        tests:
+          - not_null
+      - name: cohort_size
+        tests:
+          - not_null
+      - name: converted_customers
+        tests:
+          - not_null
+      - name: retention_rate
+        tests:
+          - not_null

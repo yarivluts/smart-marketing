@@ -235,7 +235,74 @@ function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }
   );
 }
 
-/** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel), plus a per-tile degraded state instead of the whole board failing. */
+function formatMonthLabel(cohortMonth: string): string {
+  // `cohortMonth` is `YYYY-MM-DD` (always the first of the month) — a plain
+  // `YYYY-MM` slice avoids a `Date`-parsing/timezone round trip for what's
+  // already an unambiguous calendar month.
+  return cohortMonth.slice(0, 7);
+}
+
+/**
+ * A cohort retention matrix (KAN-62): cohort months as rows, month-offset
+ * periods as columns, each cell's background opacity scaled by its own
+ * retention percentage — plain CSS grid + `<div>`s, the same no-charting-
+ * library posture every other tile renderer in this file already
+ * establishes. A (cohort month, period) pair with no row at all (nobody
+ * converted, see `cohort_retention.sql`'s own "sparse, missing = 0%" doc
+ * comment) renders as an explicit 0% cell rather than a visual gap, so the
+ * grid always fills to a full rectangle.
+ */
+function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap' }> }): React.ReactElement {
+  const t = useTranslations('Boards');
+  if (view.cohortMonths.length === 0 || view.periods.length === 0) {
+    return <p className="text-xs text-muted-foreground">{t('tableEmpty')}</p>;
+  }
+  const cellByKey = new Map(view.cells.map((cell) => [`${cell.cohortMonth}|${cell.periodIndex}`, cell]));
+
+  return (
+    <div className="max-h-56 overflow-auto">
+      <table className="w-full text-left text-xs">
+        <thead>
+          <tr>
+            <th className="border-b border-input px-2 py-1 font-medium">{t('heatmapCohortMonthLabel')}</th>
+            {view.periods.map((period) => (
+              <th key={period} className="border-b border-input px-2 py-1 text-center font-medium">
+                {t('heatmapPeriodLabel', { period })}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {view.cohortMonths.map((cohortMonth) => (
+            <tr key={cohortMonth}>
+              <td className="border-b border-input px-2 py-1 font-medium tabular-nums">{formatMonthLabel(cohortMonth)}</td>
+              {view.periods.map((period) => {
+                const cell = cellByKey.get(`${cohortMonth}|${period}`);
+                const retentionPct = cell?.retentionPct ?? 0;
+                return (
+                  <td
+                    key={period}
+                    className="border-b border-input px-2 py-1 text-center tabular-nums"
+                    style={{ backgroundColor: `color-mix(in srgb, var(--primary) ${Math.round(retentionPct)}%, transparent)` }}
+                    title={
+                      cell
+                        ? t('heatmapCellTooltip', { converted: cell.convertedCustomers, cohortSize: cell.cohortSize })
+                        : t('heatmapCellEmptyTooltip')
+                    }
+                  >
+                    {t('heatmapCellValueLabel', { retentionPct: formatNumber(retentionPct) })}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel), plus KAN-62's `heatmap`, plus a per-tile degraded state instead of the whole board failing. */
 export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactElement {
   const t = useTranslations('Boards');
 
@@ -250,6 +317,8 @@ export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactEl
       return <TableView view={view} />;
     case 'funnel':
       return <FunnelView view={view} />;
+    case 'heatmap':
+      return <HeatmapView view={view} />;
     default:
       return <UnavailableView message={tile.title} reasonLabel={t('tileUnavailableReason.query_error')} />;
   }

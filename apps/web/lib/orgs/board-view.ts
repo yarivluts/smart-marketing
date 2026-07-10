@@ -3,6 +3,7 @@ import type {
   BoardTile,
   BoardTileQueryOutcome,
   BoardTileType,
+  CohortRetentionRow,
   WarehouseRow,
 } from '@growthos/firebase-orm-models';
 import type { ComparePeriod } from '@growthos/shared';
@@ -58,6 +59,15 @@ export interface FunnelStep {
   pctOfFirstStep: number;
 }
 
+/** One heatmap cell, ready to render — `retentionRate` already 0–100 (not 0–1) so the view layer never re-derives a percentage. */
+export interface HeatmapCell {
+  cohortMonth: string;
+  periodIndex: number;
+  cohortSize: number;
+  convertedCustomers: number;
+  retentionPct: number;
+}
+
 /** Mirrors `BoardTileQueryOutcome`'s own `reason` union (`board.service.ts`) — not derived via a conditional type since that union is only ever seen through the `ok: false` branch, and spelling it out here is clearer than an `Extract<...>` gymnastic. */
 export type BoardTileUnavailableReason = 'warehouse_not_configured' | 'quota_exceeded' | 'query_error';
 
@@ -66,7 +76,8 @@ export type TileRenderView =
   | { kind: 'big_number'; value: number; previousValue?: number; deltaPct?: number }
   | { kind: 'time_series'; chart: Extract<BoardTileType, 'line' | 'bar'>; series: TimeSeries[]; previousSeries?: TimeSeries[] }
   | { kind: 'table'; columns: string[]; rows: WarehouseRow[] }
-  | { kind: 'funnel'; steps: FunnelStep[] };
+  | { kind: 'funnel'; steps: FunnelStep[] }
+  | { kind: 'heatmap'; cohortMonths: string[]; periods: number[]; cells: HeatmapCell[] };
 
 function toNumber(value: string | number | null): number {
   if (value === null) {
@@ -161,6 +172,20 @@ function buildTableView(rows: readonly WarehouseRow[]): TileRenderView {
   return { kind: 'table', columns, rows: sorted };
 }
 
+/** Sorted ascending, deduplicated — `cohortMonth` strings sort correctly as-is (`YYYY-MM-DD`), `periods` numerically. */
+function buildHeatmapView(rows: readonly CohortRetentionRow[]): TileRenderView {
+  const cohortMonths = [...new Set(rows.map((row) => row.cohortMonth))].sort();
+  const periods = [...new Set(rows.map((row) => row.periodIndex))].sort((a, b) => a - b);
+  const cells: HeatmapCell[] = rows.map((row) => ({
+    cohortMonth: row.cohortMonth,
+    periodIndex: row.periodIndex,
+    cohortSize: row.cohortSize,
+    convertedCustomers: row.convertedCustomers,
+    retentionPct: row.retentionRate * 100,
+  }));
+  return { kind: 'heatmap', cohortMonths, periods, cells };
+}
+
 function buildFunnelView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRenderView {
   const totals = tile.metricNames.map((metricName) => sumMetric(rows, metricName));
   const firstTotal = totals[0] ?? 0;
@@ -185,6 +210,9 @@ function buildFunnelView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRe
 export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutcome): TileRenderView {
   if (!outcome.ok) {
     return { kind: 'unavailable', reason: outcome.reason, message: outcome.message };
+  }
+  if ('cohortMatrix' in outcome) {
+    return buildHeatmapView(outcome.cohortMatrix);
   }
   switch (tile.type) {
     case 'big_number':

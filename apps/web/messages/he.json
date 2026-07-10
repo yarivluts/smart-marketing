@@ -584,7 +584,8 @@
       "bar": "תרשים עמודות",
       "big_number": "מספר גדול",
       "table": "טבלה",
-      "funnel": "משפך"
+      "funnel": "משפך",
+      "heatmap": "מפת חום"
     },
     "funnelStepsLabel": "שלבי המשפך (לפי סדר)",
     "funnelStepLabel": "שלב {step}",
@@ -592,6 +593,8 @@
     "addFunnelStepButton": "הוסף שלב",
     "tileMetricLabel": "מדד",
     "tileDimensionsLabel": "פילוח לפי",
+    "tileCohortConversionEventLabel": "אירוע המרה",
+    "tileCohortConversionEventPlaceholder": "לדוגמה: activated, purchase",
     "tileWidthLabel": "רוחב",
     "tileHeightLabel": "גובה",
     "tileDeltaLabel": "{deltaPct}% לעומת התקופה הקודמת",
@@ -599,6 +602,11 @@
     "previousPeriodLabel": "תקופה קודמת",
     "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
     "tableEmpty": "אין נתונים לטווח זה עדיין.",
+    "heatmapCohortMonthLabel": "חודש קבוצה",
+    "heatmapPeriodLabel": "M+{period}",
+    "heatmapCellValueLabel": "{retentionPct}%",
+    "heatmapCellTooltip": "{converted} מתוך {cohortSize} לקוחות",
+    "heatmapCellEmptyTooltip": "אין עדיין המרות",
     "tileUnavailableReason": {
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",

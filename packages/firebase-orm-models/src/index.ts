@@ -99,6 +99,7 @@ export * from './services/schema-registry.service';
 export * from './services/metric-registry.service';
 export * from './services/metrics-compiler.service';
 export * from './services/metrics-query.service';
+export * from './services/cohort-retention.service';
 export * from './services/ingest.service';
 export * from './services/pipeline.service';
 export * from './services/quarantine.service';

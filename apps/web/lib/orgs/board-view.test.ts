@@ -206,3 +206,34 @@ describe('buildTileRenderView — funnel', () => {
     });
   });
 });
+
+describe('buildTileRenderView — heatmap (KAN-62)', () => {
+  it('converts the cohort matrix into sorted, deduplicated month/period axes with a retention percentage per cell', () => {
+    const view = buildTileRenderView(tile({ type: 'heatmap', metricNames: [], cohortConversionEvent: 'activated' }), {
+      ok: true,
+      cohortMatrix: [
+        { cohortMonth: '2026-02-01', periodIndex: 0, cohortSize: 1, convertedCustomers: 1, retentionRate: 1 },
+        { cohortMonth: '2026-01-01', periodIndex: 2, cohortSize: 2, convertedCustomers: 1, retentionRate: 0.5 },
+        { cohortMonth: '2026-01-01', periodIndex: 0, cohortSize: 2, convertedCustomers: 1, retentionRate: 0.5 },
+      ],
+    });
+    expect(view).toEqual({
+      kind: 'heatmap',
+      cohortMonths: ['2026-01-01', '2026-02-01'],
+      periods: [0, 2],
+      cells: [
+        { cohortMonth: '2026-02-01', periodIndex: 0, cohortSize: 1, convertedCustomers: 1, retentionPct: 100 },
+        { cohortMonth: '2026-01-01', periodIndex: 2, cohortSize: 2, convertedCustomers: 1, retentionPct: 50 },
+        { cohortMonth: '2026-01-01', periodIndex: 0, cohortSize: 2, convertedCustomers: 1, retentionPct: 50 },
+      ],
+    });
+  });
+
+  it('renders an empty matrix (no signups in range yet) as empty axes rather than throwing', () => {
+    const view = buildTileRenderView(tile({ type: 'heatmap', metricNames: [], cohortConversionEvent: 'activated' }), {
+      ok: true,
+      cohortMatrix: [],
+    });
+    expect(view).toEqual({ kind: 'heatmap', cohortMonths: [], periods: [], cells: [] });
+  });
+});

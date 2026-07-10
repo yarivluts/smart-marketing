@@ -18,6 +18,9 @@ import {
   setProjectCostQuota,
   updateBoardSettings,
   type BoardTile,
+  type CohortRetentionQuery,
+  type CohortRetentionQueryExecutor,
+  type CohortRetentionRow,
   type WarehouseQueryExecutor,
   type WarehouseRow,
 } from '../index';
@@ -81,6 +84,28 @@ class FakeWarehouseQueryExecutor implements WarehouseQueryExecutor {
   constructor(private readonly rows: WarehouseRow[]) {}
   execute(): Promise<WarehouseRow[]> {
     this.callCount += 1;
+    return Promise.resolve(this.rows);
+  }
+}
+
+function heatmapTile(overrides: Partial<BoardTile> = {}): BoardTile {
+  return {
+    id: unique('tile'),
+    type: 'heatmap',
+    title: 'Signup cohorts',
+    layout: { x: 0, y: 0, w: 6, h: 5 },
+    metricNames: [],
+    dimensions: [],
+    cohortConversionEvent: 'activated',
+    ...overrides,
+  };
+}
+
+class FakeCohortRetentionQueryExecutor implements CohortRetentionQueryExecutor {
+  public calls: CohortRetentionQuery[] = [];
+  constructor(private readonly rows: CohortRetentionRow[]) {}
+  execute(query: CohortRetentionQuery): Promise<CohortRetentionRow[]> {
+    this.calls.push(query);
     return Promise.resolve(this.rows);
   }
 }
@@ -339,6 +364,40 @@ describe('saveBoardTiles', () => {
       }),
     ).rejects.toBeInstanceOf(InvalidBoardError);
   });
+
+  it('accepts a heatmap tile with a conversion event and no registered metric (KAN-62)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+
+    const tiles = [heatmapTile()];
+    const saved = await saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: board.id, tiles, updatedByUserId: owner.id });
+    expect(saved.tiles).toEqual(tiles);
+  });
+
+  it('rejects a heatmap tile with no conversion event configured', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Invalid Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+
+    await expect(
+      saveBoardTiles({
+        organizationId: organization.id,
+        projectId: project.id,
+        boardId: board.id,
+        tiles: [heatmapTile({ cohortConversionEvent: undefined })],
+        updatedByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidBoardError);
+
+    await expect(
+      saveBoardTiles({
+        organizationId: organization.id,
+        projectId: project.id,
+        boardId: board.id,
+        tiles: [heatmapTile({ cohortConversionEvent: '   ' })],
+        updatedByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidBoardError);
+  });
 });
 
 describe('deleteBoard', () => {
@@ -447,6 +506,81 @@ describe('queryBoardTile', () => {
         tile: bigNumberTile(),
         executor: new ThrowingWarehouseQueryExecutor(),
         cache: new InMemoryMetricQueryResultCache(),
+      }),
+    ).rejects.toBeInstanceOf(TypeError);
+  });
+
+  it('returns the cohort executor’s matrix for a heatmap tile, narrowing the board date range to cohort months (KAN-62)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Query Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+    const rows: CohortRetentionRow[] = [{ cohortMonth: '2026-01-01', periodIndex: 0, cohortSize: 2, convertedCustomers: 1, retentionRate: 0.5 }];
+    const cohortExecutor = new FakeCohortRetentionQueryExecutor(rows);
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: heatmapTile(),
+      cohortExecutor,
+    });
+
+    expect(outcome).toEqual({ ok: true, cohortMatrix: rows });
+    expect(cohortExecutor.calls).toEqual([
+      {
+        organizationId: organization.id,
+        projectId: project.id,
+        conversionEvent: 'activated',
+        cohortMonthStart: board.date_range.start.slice(0, 7),
+        cohortMonthEnd: board.date_range.end.slice(0, 7),
+      },
+    ]);
+  });
+
+  it('degrades a heatmap tile to "warehouse not configured" using the default cohort executor', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Unconfigured Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+
+    const outcome = await queryBoardTile({ organizationId: organization.id, projectId: project.id, board, tile: heatmapTile() });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('warehouse_not_configured');
+  });
+
+  it('degrades a heatmap tile with no conversion event configured, without calling the cohort executor', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap No Event Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+    const cohortExecutor = new FakeCohortRetentionQueryExecutor([]);
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: heatmapTile({ cohortConversionEvent: undefined }),
+      cohortExecutor,
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('query_error');
+    expect(cohortExecutor.calls).toEqual([]);
+  });
+
+  it('rethrows a genuinely unexpected cohort executor error rather than degrading it', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Unexpected Error Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+
+    class ThrowingCohortRetentionQueryExecutor implements CohortRetentionQueryExecutor {
+      execute(): Promise<CohortRetentionRow[]> {
+        return Promise.reject(new TypeError('boom — a real bug, not an expected failure mode'));
+      }
+    }
+
+    await expect(
+      queryBoardTile({
+        organizationId: organization.id,
+        projectId: project.id,
+        board,
+        tile: heatmapTile(),
+        cohortExecutor: new ThrowingCohortRetentionQueryExecutor(),
       }),
     ).rejects.toBeInstanceOf(TypeError);
   });

@@ -112,4 +112,17 @@ describe('parseSaveBoardTilesRequestBody', () => {
     expect((await parseSaveBoardTilesRequestBody(request({ tiles: [{ ...validTile, metricNames: [1] }] }))).error?.status).toBe(400);
     expect((await parseSaveBoardTilesRequestBody(request({ tiles: [{ ...validTile, dimensions: [1] }] }))).error?.status).toBe(400);
   });
+
+  it('accepts a heatmap tile carrying cohortConversionEvent, and rejects a non-string value (KAN-62)', async () => {
+    const heatmapTile = { ...validTile, type: 'heatmap', metricNames: [], cohortConversionEvent: 'activated' };
+    const parsed = await parseSaveBoardTilesRequestBody(request({ tiles: [heatmapTile] }));
+    expect(parsed).toEqual({ tiles: [heatmapTile] });
+
+    expect((await parseSaveBoardTilesRequestBody(request({ tiles: [{ ...heatmapTile, cohortConversionEvent: 5 }] }))).error?.status).toBe(400);
+  });
+
+  it('omits cohortConversionEvent entirely for a tile that never sent it, rather than defaulting it to an empty string', async () => {
+    const parsed = await parseSaveBoardTilesRequestBody(request({ tiles: [validTile] }));
+    expect(parsed.tiles?.[0]).not.toHaveProperty('cohortConversionEvent');
+  });
 });

@@ -15,6 +15,8 @@ import { MetricNotRegisteredError } from './metrics-compiler.service';
 import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import type { MetricQueryResultCache } from '../warehouse/result-cache';
+import { CohortWarehouseNotConfiguredError, type CohortRetentionQueryExecutor, type CohortRetentionRow } from '../warehouse/cohort-query-executor';
+import { queryCohortRetentionMatrix } from './cohort-retention.service';
 
 export class InvalidBoardError extends Error {
   constructor(public readonly reasons: readonly string[]) {
@@ -199,6 +201,18 @@ function validateTiles(tiles: readonly BoardTile[], catalog: readonly MetricCata
       reasons.push(`Tile "${tile.id}" extends past the ${BOARD_GRID_COLUMNS}-column grid.`);
     }
 
+    // A `heatmap` tile doesn't reference the KAN-40 metric catalog at all
+    // (see `BoardTile.cohortConversionEvent`'s own doc comment) — validated
+    // on its own branch instead of falling through into the metric-count/
+    // dimension checks below, which assume every tile references at least
+    // one registered metric.
+    if (tile.type === 'heatmap') {
+      if (!tile.cohortConversionEvent || tile.cohortConversionEvent.trim().length === 0) {
+        reasons.push(`Heatmap tile "${tile.id}" must specify a conversion event.`);
+      }
+      continue;
+    }
+
     const minMetrics = tile.type === 'funnel' ? 2 : 1;
     const maxMetrics = tile.type === 'funnel' ? Infinity : 1;
     if (tile.metricNames.length < minMetrics || tile.metricNames.length > maxMetrics) {
@@ -267,6 +281,7 @@ export async function deleteBoard(organizationId: string, projectId: string, boa
 
 export type BoardTileQueryOutcome =
   | { ok: true; series: WarehouseRow[] }
+  | { ok: true; cohortMatrix: CohortRetentionRow[] }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
 
 export interface QueryBoardTileParams {
@@ -276,6 +291,8 @@ export interface QueryBoardTileParams {
   tile: BoardTile;
   executor?: WarehouseQueryExecutor;
   cache?: MetricQueryResultCache;
+  /** Only consulted for a `heatmap` tile — see `executor`'s own role for every other tile type. */
+  cohortExecutor?: CohortRetentionQueryExecutor;
 }
 
 /**
@@ -303,6 +320,10 @@ export interface QueryBoardTileParams {
  * service.ts`'s own non-transactional-quota-check gap already takes.
  */
 export async function queryBoardTile(params: QueryBoardTileParams): Promise<BoardTileQueryOutcome> {
+  if (params.tile.type === 'heatmap') {
+    return queryBoardHeatmapTile(params);
+  }
+
   const request: MetricQueryRequest = {
     metrics: params.tile.metricNames,
     ...(params.tile.type === 'funnel' ? {} : { dimensions: params.tile.dimensions }),
@@ -343,6 +364,41 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
     // convincingly-normal-looking degraded tile.
     if (error instanceof MetricCompilerError || error instanceof ProjectNotFoundError || error instanceof MetricNotRegisteredError) {
       return { ok: false, reason: 'query_error', message: error.message };
+    }
+    throw error;
+  }
+}
+
+/**
+ * A `heatmap` tile's own query path (KAN-62): the board's date range narrows
+ * to the cohort months it covers (`YYYY-MM-DD` truncated to `YYYY-MM`) and
+ * runs through `queryCohortRetentionMatrix` instead of `queryMetrics` — see
+ * `queryBoardTile`'s dispatch at the top of this file. Same per-tile
+ * degradation posture as the metric path: a missing conversion event
+ * (an author saved the tile before filling it in — `saveBoardTiles`
+ * rejects this at save time, but an older/hand-edited board doc could still
+ * carry one) or an unconfigured warehouse degrade to `ok: false` instead of
+ * throwing; any other error is a real bug and rethrows.
+ */
+async function queryBoardHeatmapTile(params: QueryBoardTileParams): Promise<BoardTileQueryOutcome> {
+  const conversionEvent = params.tile.cohortConversionEvent;
+  if (!conversionEvent || conversionEvent.trim().length === 0) {
+    return { ok: false, reason: 'query_error', message: 'This heatmap tile has no conversion event configured.' };
+  }
+
+  try {
+    const rows = await queryCohortRetentionMatrix({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      conversionEvent,
+      cohortMonthStart: params.board.date_range.start.slice(0, 7),
+      cohortMonthEnd: params.board.date_range.end.slice(0, 7),
+      ...(params.cohortExecutor ? { executor: params.cohortExecutor } : {}),
+    });
+    return { ok: true, cohortMatrix: rows };
+  } catch (error) {
+    if (error instanceof CohortWarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured', message: error.message };
     }
     throw error;
   }

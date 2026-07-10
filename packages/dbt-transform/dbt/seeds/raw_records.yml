@@ -14,7 +14,12 @@ seeds:
       `fact_attribution`: a paid-search touchpoint followed by a paid-social
       one, both resolved to the same customer via a shared device id) —
       isolated from `proj_2`'s own exact-row-count-asserting bridge_identity
-      fixture test.
+      fixture test. `proj_11`'s rows are a synthetic multi-month signup
+      cohort (KAN-62's `cohort_retention`): two January signups (one
+      `activated` same-month, one `purchase` two calendar months later) and
+      one February signup (`activated` same-month) — isolated from every
+      other project's own exact-row-count-asserting fixture test the same
+      way `proj_10` is from `proj_2`'s.
     columns:
       - name: organization_id
         tests:

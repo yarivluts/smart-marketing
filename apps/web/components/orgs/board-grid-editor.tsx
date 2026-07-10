@@ -52,13 +52,19 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
   function setType(type: BoardTileTypeRow): void {
     const size = defaultTileSize(type);
     const isFunnel = type === 'funnel';
+    const isHeatmap = type === 'heatmap';
     onChange({
       ...tile,
       type,
       layout: { ...tile.layout, w: size.w, h: size.h },
-      metricNames: isFunnel ? (tile.metricNames.length >= 2 ? tile.metricNames : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? '', metricCatalog[1]?.name ?? metricCatalog[0]?.name ?? '']) : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? ''],
-      dimensions: isFunnel ? [] : tile.dimensions,
+      metricNames: isHeatmap ? [] : isFunnel ? (tile.metricNames.length >= 2 ? tile.metricNames : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? '', metricCatalog[1]?.name ?? metricCatalog[0]?.name ?? '']) : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? ''],
+      dimensions: isFunnel || isHeatmap ? [] : tile.dimensions,
+      cohortConversionEvent: isHeatmap ? (tile.cohortConversionEvent ?? '') : undefined,
     });
+  }
+
+  function setCohortConversionEvent(value: string): void {
+    onChange({ ...tile, cohortConversionEvent: value });
   }
 
   function setSingleMetric(name: string): void {
@@ -123,7 +129,14 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
         ))}
       </select>
 
-      {tile.type === 'funnel' ? (
+      {tile.type === 'heatmap' ? (
+        <Input
+          aria-label={t('tileCohortConversionEventLabel')}
+          placeholder={t('tileCohortConversionEventPlaceholder')}
+          value={tile.cohortConversionEvent ?? ''}
+          onChange={(event) => setCohortConversionEvent(event.target.value)}
+        />
+      ) : tile.type === 'funnel' ? (
         <div className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">{t('funnelStepsLabel')}</span>
           {tile.metricNames.map((name, index) => (

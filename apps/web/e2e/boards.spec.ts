@@ -81,18 +81,23 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await expect(page.getByText('Ad spend')).toBeVisible();
     await expect(page.getByText('Warehouse not configured yet')).toBeVisible();
 
-    // Add a second tile, then remove the first — both a multi-tile board and
-    // a remove-then-save round trip.
+    // Add a second tile, switch it to a heatmap (KAN-62) with a conversion
+    // event instead of a registered metric, then remove the first tile —
+    // both a multi-tile board and a remove-then-save round trip.
     await page.getByRole('button', { name: 'Edit layout' }).click();
     await page.getByRole('button', { name: 'Add tile' }).click();
     const titleInputs = page.getByLabel('Tile title');
     await expect(titleInputs).toHaveCount(2);
     await titleInputs.nth(1).fill('Second tile');
+    await page.getByLabel('Tile type').nth(1).selectOption('heatmap');
+    await page.getByLabel('Conversion event').fill('activated');
     await page.getByRole('button', { name: 'Remove' }).first().click();
     await expect(titleInputs).toHaveCount(1);
     await page.getByRole('button', { name: 'Save layout' }).click();
     await expect(page.getByText('Second tile')).toBeVisible();
     await expect(page.getByText('Ad spend')).toHaveCount(0);
+    // Same honest-degrade posture as every other tile type — no warehouse yet.
+    await expect(page.getByText('Warehouse not configured yet')).toBeVisible();
 
     // Board-level settings: rename, and it's reflected as the page heading.
     await page.getByLabel('Name', { exact: true }).first().fill('Revenue');

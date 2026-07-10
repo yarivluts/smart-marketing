@@ -112,6 +112,39 @@ describe('BoardTileView', () => {
     expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
   });
 
+  it('renders a heatmap tile as a cohort-month x period matrix with retention percentages, filling a missing cell as 0% (KAN-62)', () => {
+    renderTile(
+      {
+        kind: 'heatmap',
+        cohortMonths: ['2026-01-01', '2026-02-01'],
+        periods: [0, 2],
+        cells: [
+          { cohortMonth: '2026-01-01', periodIndex: 0, cohortSize: 2, convertedCustomers: 1, retentionPct: 50 },
+          { cohortMonth: '2026-01-01', periodIndex: 2, cohortSize: 2, convertedCustomers: 2, retentionPct: 100 },
+          { cohortMonth: '2026-02-01', periodIndex: 0, cohortSize: 1, convertedCustomers: 1, retentionPct: 100 },
+          // No 2026-02-01/period-2 row — the cohort hasn't reached that period yet, renders as an explicit 0% cell.
+        ],
+      },
+      { type: 'heatmap', metricNames: [], cohortConversionEvent: 'activated' },
+    );
+    expect(screen.getByText('2026-01')).toBeInTheDocument();
+    expect(screen.getByText('2026-02')).toBeInTheDocument();
+    expect(screen.getByText('M+0')).toBeInTheDocument();
+    expect(screen.getByText('M+2')).toBeInTheDocument();
+    expect(screen.getByText('50%')).toBeInTheDocument();
+    expect(screen.getAllByText('100%')).toHaveLength(2);
+    expect(screen.getByText('0%')).toBeInTheDocument();
+    expect(screen.getByTitle('1 of 2 customers')).toBeInTheDocument();
+    expect(screen.getByTitle('2 of 2 customers')).toBeInTheDocument();
+    expect(screen.getByTitle('1 of 1 customers')).toBeInTheDocument();
+    expect(screen.getByTitle('No conversions yet')).toBeInTheDocument();
+  });
+
+  it('renders the empty table state for a heatmap tile with no cohort data yet', () => {
+    renderTile({ kind: 'heatmap', cohortMonths: [], periods: [], cells: [] }, { type: 'heatmap', metricNames: [], cohortConversionEvent: 'activated' });
+    expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
+  });
+
   it('renders a funnel tile with each step and its percentage of the first step', () => {
     renderTile(
       {
