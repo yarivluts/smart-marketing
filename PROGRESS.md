@@ -17,6 +17,100 @@ Template for each entry:
 
 ---
 
+## 2026-07-10 — E11.4 Cohort engine v1 + heatmap board tile (KAN-62)
+
+- **Last completed:**
+  - Picked **KAN-62** (lowest-sprint remaining `todo` in `TASKS.md` — sprint 6, tied with KAN-64;
+    table order picks KAN-62 first, and the prior run's own PROGRESS entry already flagged it as
+    the likely next pick). Checked first for a collision (per this file's own recurring
+    "two runs picked the same story" note): no open PR, branch, or commit referenced KAN-62,
+    cohort, heatmap, or goal — clear to start.
+  - New **`fact_cohort_retention`** dbt core model (`packages/dbt-transform/dbt/models/core/`):
+    assigns each customer a cohort by the calendar month of their *first* customer-side event —
+    the same "conversion event" generalization `fact_attribution` (KAN-58) already established,
+    not hard-coded to a `signup` event name — then computes, per elapsed calendar month
+    (`period_number`), how many of that cohort's customers had any further activity
+    (`cohort_size`/`retained_count`/`retention_rate`). Periods only run up to the project's own
+    latest observed activity month (via a `generate_series` spine joined against each cohort's
+    own size), not a fixed lookback window, so a younger cohort naturally has fewer observed
+    periods rather than speculative future rows — the classic lower-triangular cohort-matrix
+    shape.
+  - A new fixture project **`proj_11`** in `seeds/raw_records.csv` (a hand-built January cohort of
+    3 customers and a February cohort of 2, with hand-picked return activity spanning
+    January-March, isolated from every other project's own exact-row-count-asserting fixture
+    test) backs `assert_fact_cohort_retention_fixture_matches_expected.sql` — the literal AC:
+    "Cohort matrix matches hand-computed fixture." Hand-recomputed independently during review and
+    confirmed to match. A companion `assert_fact_cohort_retention_rate_in_range.sql` checks
+    `retention_rate` stays in `[0,1]`, `retained_count <= cohort_size`, etc. `dbt build` — 87/87
+    tests green, first try.
+  - New **`heatmap`** board tile type (KAN-60's dashboard framework), added to `BOARD_TILE_TYPES`
+    in both `board.model.ts` (source of truth) and `apps/web`'s client-safe `board-types.ts`
+    mirror. Rather than a bespoke two-dimension query, it reuses the *existing* single-metric +
+    single-breakdown-dimension query shape every other tile type already uses: the board's own
+    time bucketing supplies the matrix's row axis (a metric registered against
+    `fact_cohort_retention` with `timeColumn: 'cohort_month'` naturally buckets one row per
+    cohort month), and the tile's one required dimension supplies the column axis (e.g.
+    `period_number`) — no new compiler capability needed at all (`compileMetricQuery` already
+    supports N-dimensional breakdown mechanically; this needed a metric shape, not new code).
+    `queryBoardTile` excludes `compare` for `heatmap` (alongside `funnel`) — a cohort matrix's
+    rows are already their own kind of time axis.
+  - `board.service.ts`'s `validateTiles` now requires a heatmap tile to have exactly one
+    dimension, and both `validateTiles` (save-time) and `updateBoardSettings` (settings-change time)
+    reject a heatmap tile paired with anything other than a `'month'` board date-range grain — a
+    coarser grain would `DATE_TRUNC` multiple distinct cohort months into the same bucket,
+    silently blending distinct cohorts into one matrix row.
+  - `apps/web`: a pure `buildHeatmapView` view-mapper (`lib/orgs/board-view.ts`, null-vs-zero-aware
+    for periods that haven't elapsed yet, numeric-aware column sort) + a hand-rolled `HeatmapView`
+    table renderer (`board-tile-view.tsx`, CSS-grid/table with an opacity-scaled cell background,
+    no charting library — matching every other tile type's own convention). The grid editor's
+    dimension picker (`board-grid-editor.tsx`) renders a single `<select>` for a heatmap tile
+    instead of the free-form multi-checkbox list every other breakdown-capable type uses, so the
+    UI can't even construct the invalid zero-or-many-dimension state. New `FieldMappings`-style
+    en/he translation keys (`tileType.heatmap`, `heatmapEmpty`, `heatmapCellTooltip`).
+  - Verification: `packages/dbt-transform` (87/87 dbt tests); `packages/firebase-orm-models`
+    (full emulator suite green — one pre-existing GA4 test timeout confirmed flaky/sandbox-only,
+    re-ran it in isolation where it passed cleanly, the same class of sandbox-only limitation this
+    file has documented before); `apps/web` targeted vitest (`board-view`/`board-tile-view`/
+    `board-types`/`board-grid-editor`, 44/44). `pnpm lint`/`typecheck`/`build` green across every
+    touched package.
+  - An independent review pass (a second agent, fresh context, hand-recomputed the dbt fixture and
+    traced the compiler's compare-mode SQL tokens rather than trusting the numbers above) found no
+    correctness bugs in the dbt model or view-mapper layer, but flagged two real gaps before merge:
+    (1) the grid editor didn't yet enforce "exactly one dimension" for a heatmap tile client-side,
+    and (2) nothing enforced the board-grain-must-be-month requirement the model's own doc comment
+    documented but didn't check anywhere. Both fixed in a second commit — `validateTiles`/
+    `updateBoardSettings` now hard-reject the grain mismatch server-side (can't persist the
+    invalid state at all, not just document it), and the grid editor's dimension picker became a
+    single-select for `heatmap` — plus new tests for both (`board.emulator.test.ts`:
+    grain-rejection on save and on settings-update; `board-grid-editor.test.tsx`: single-select
+    behavior). Re-verified green.
+  - Opened **PR #44**, subscribed to its activity. CI (`lint · typecheck · test · build`) went
+    green (~14 minutes), `mergeable_state: clean`, no review comments. Squash-merged into `main`.
+    Remote branch delete hit the same recurring HTTP 403 this file has documented before on this
+    git remote — remote branch left in place, harmless since it's fully merged; local branch
+    deleted.
+- **In progress (exact stopping point):** None — KAN-62 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** Nothing blocked.
+- **Next step:** Next unblocked sprint-6 `todo` in table order is **KAN-64** (goal model: metric,
+  target, deadline, owner, direction min/max/range, work-week/weekend rhythm, progress + pace
+  projection) — infra-light, buildable today the same way KAN-36's tracking alerts were. A natural
+  KAN-62 follow-on (not required by its own AC, so not built this run): a *conversion* cohort
+  variant parameterized by a specific target event name (this story only computes the "retention"
+  half of "signup-month x conversion/retention" — any activity counts, not a specific target
+  event), and a configurable grain other than month. **KAN-59** (SaaS/marketing metric-pack
+  plugin) would be a good pairing with this story once picked — it's what would actually register
+  a `cohort_retention_rate`-style metric + a default heatmap board tile for a real project, closing
+  the loop this story's own emulator test proves only in isolation.
+- **Waiting on human:**
+  - **KAN-43** — Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — GCP/Firebase projects + billing + secrets — still outstanding.
+  - The pre-existing unreconciled KAN-20 observability-baseline PR triplicate (#2/#3/#5) and the
+    stale KAN-33 progress-followup PR (#22) still await a human decision — untouched by this run.
+
+---
+
 ## 2026-07-10 — E9.2 Mapping engine: saved field-mappings, JSONPath transforms, test-run on sample (KAN-54)
 
 - **Last completed:**
