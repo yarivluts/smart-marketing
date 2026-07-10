@@ -135,6 +135,11 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
                     {t('projectHooksLink')}
                   </Link>
                 ) : null}
+                {canViewIngestHealth ? (
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/field-mappings`}>
+                    {t('projectFieldMappingsLink')}
+                  </Link>
+                ) : null}
                 {canManageProjects ? (
                   <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/cost-guardrails`}>
                     {t('projectCostGuardrailsLink')}

@@ -10,6 +10,7 @@ import {
   type BoardTile,
   type EnvironmentModel,
   type EventVolumeOverviewEntry,
+  type FieldMappingModel,
   type HookDeliveryModel,
   type HookEndpointModel,
   listActiveAttachmentsForProject as listActiveAttachmentsForProjectInOrganization,
@@ -19,6 +20,7 @@ import {
   listBoardsForProject as listBoardsForProjectInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
+  listFieldMappingsForProject as listFieldMappingsForProjectInOrganization,
   listHookDeliveriesForProject as listHookDeliveriesForProjectInOrganization,
   listHookEndpointsForProject as listHookEndpointsForProjectInOrganization,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
@@ -138,6 +140,11 @@ export async function listHookEndpointsForProject(organizationId: string, projec
 export async function listHookDeliveriesForProject(organizationId: string, projectId: string): Promise<HookDeliveryModel[]> {
   await ensureFirestoreOrm();
   return listHookDeliveriesForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listFieldMappingsForProject(organizationId: string, projectId: string): Promise<FieldMappingModel[]> {
+  await ensureFirestoreOrm();
+  return listFieldMappingsForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listSchemaDefinitionsForProject(

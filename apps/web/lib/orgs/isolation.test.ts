@@ -13,6 +13,9 @@ import { GET as listApiKeys, POST as mintApiKey } from '@/app/api/orgs/[orgId]/p
 import { DELETE as revokeApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]/route';
 import { GET as listSchemaDefs, POST as registerSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/route';
 import { POST as evolveSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/evolve/route';
+import { GET as listFieldMappings, POST as createFieldMappingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/field-mappings/route';
+import { DELETE as disableFieldMappingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/field-mappings/[fieldMappingId]/route';
+import { POST as testRunFieldMappingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/field-mappings/test-run/route';
 import { GET as listMetricDefs, POST as registerMetricDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/metric-defs/route';
 import { POST as evolveMetricDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/metric-defs/evolve/route';
 import { GET as listAuditLog } from '@/app/api/orgs/[orgId]/audit-log/route';
@@ -363,6 +366,60 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         }),
       () =>
         evolveSchemaDef(evolveRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+  });
+
+  it('GET/POST/DELETE /api/orgs/[orgId]/projects/[projectId]/field-mappings(/[fieldMappingId]) and its test-run: org caller cannot see vs. fake org id (KAN-54)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-mapping-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (field-mappings)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-mapping-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (field-mappings)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const leakedRules = [{ targetField: 'id', transform: 'static', staticValue: 'x' }];
+
+    const getRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/field-mappings`);
+    await expectIndistinguishable(
+      () => listFieldMappings(getRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () => listFieldMappings(getRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }) }),
+    );
+
+    const postRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/field-mappings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'leaked mapping', environmentId: FAKE_ORG_ID, kind: 'entity', schemaName: 'leaked', rules: leakedRules }),
+      });
+    await expectIndistinguishable(
+      () => createFieldMappingRoute(postRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () => createFieldMappingRoute(postRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }) }),
+    );
+
+    const params = (orgId: string) => Promise.resolve({ orgId, projectId: FAKE_ORG_ID, fieldMappingId: FAKE_MEMBERSHIP_ID });
+    await expectIndistinguishable(
+      () => disableFieldMappingRoute(new Request('https://growthos.test'), { params: params(orgB.id) }),
+      () => disableFieldMappingRoute(new Request('https://growthos.test'), { params: params(FAKE_ORG_ID) }),
+    );
+
+    const testRunRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/field-mappings/test-run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind: 'entity', schemaName: 'leaked', rules: leakedRules, samplePayload: '{}' }),
+      });
+    await expectIndistinguishable(
+      () => testRunFieldMappingRoute(testRunRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () =>
+        testRunFieldMappingRoute(testRunRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
         }),
     );

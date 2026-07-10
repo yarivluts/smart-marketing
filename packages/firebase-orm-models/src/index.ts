@@ -28,6 +28,12 @@ export {
   PLUGIN_CONFIG_FIELD_TYPES,
   isPluginConfigFieldType,
   PluginManifestValidationError,
+  MAPPING_RECORD_KINDS,
+  isMappingRecordKind,
+  MAPPING_RULE_TRANSFORMS,
+  isMappingRuleTransform,
+  MAPPING_CAST_TYPES,
+  isMappingCastType,
 } from '@growthos/shared';
 export type {
   Role,
@@ -43,6 +49,12 @@ export type {
   PluginManifest,
   PluginManifestRegisters,
   PluginManifestEndpoints,
+  MappingRecordKind,
+  MappingRuleTransform,
+  MappingCastType,
+  MappingRule,
+  MappingRuleInput,
+  MappingApplyResult,
 } from '@growthos/shared';
 export * from './models/user.model';
 export * from './models/organization.model';
@@ -74,6 +86,7 @@ export * from './models/plugin-source-run.model';
 export * from './models/board.model';
 export * from './models/hook-endpoint.model';
 export * from './models/hook-delivery.model';
+export * from './models/field-mapping.model';
 export * from './firestore-connection';
 export * from './services/membership.service';
 export * from './services/user.service';
@@ -102,6 +115,7 @@ export * from './services/board.service';
 export * from './services/touchpoint-capture.service';
 export * from './services/hook-signature';
 export * from './services/hook.service';
+export * from './services/field-mapping.service';
 export * from './pipeline';
 export * from './services/ingest-health.service';
 export * from './vault';

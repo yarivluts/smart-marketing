@@ -310,7 +310,8 @@ export class HookDeliveryNotFoundError extends Error {
   }
 }
 
-async function loadHookDelivery(organizationId: string, projectId: string, hookDeliveryId: string): Promise<HookDeliveryModel> {
+/** A project-scoped hook delivery lookup, exported so `field-mapping.service.ts`'s test-run can prefill a sample payload from a real queued delivery (read-only — no status change) instead of requiring the caller to paste JSON by hand. */
+export async function getHookDeliveryForProject(organizationId: string, projectId: string, hookDeliveryId: string): Promise<HookDeliveryModel> {
   const delivery = await HookDeliveryModel.init(hookDeliveryId, { organization_id: organizationId, project_id: projectId });
   if (!delivery || delivery.organization_id !== organizationId || delivery.project_id !== projectId) {
     throw new HookDeliveryNotFoundError();
@@ -328,7 +329,7 @@ export interface SetHookDeliveryStatusParams {
 
 /** Marks a queued delivery `reviewed` or `discarded` — the human side of the review queue, since KAN-54's mapping engine doesn't exist yet to consume these automatically. */
 export async function setHookDeliveryStatus(params: SetHookDeliveryStatusParams): Promise<HookDeliveryModel> {
-  const delivery = await loadHookDelivery(params.organizationId, params.projectId, params.hookDeliveryId);
+  const delivery = await getHookDeliveryForProject(params.organizationId, params.projectId, params.hookDeliveryId);
   delivery.status = params.status;
   delivery.reviewed_at = new Date().toISOString();
   delivery.reviewed_by = params.actedByUserId;
