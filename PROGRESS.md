@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-07-10 — E12.1 Goal model: metric/target/deadline/owner, direction, rhythm, thermometer + pace projection (KAN-64)
+
+- **Last completed:**
+  - Picked **KAN-64** (next unblocked sprint-6 `todo` — the KAN-62/PR #44 run's own PROGRESS entry
+    already flagged it as the natural next pick). Checked first for a collision: no open PR, branch,
+    or commit referenced KAN-64 or "goal" — clear to start.
+  - Delegated the implementation to a background agent with a fully-specified design (worked out from
+    reading `board.model.ts`/`board.service.ts`/`metric-registry.service.ts` as templates before
+    dispatching, so the agent had exact file paths/conventions to mirror rather than improvising):
+    - **`packages/shared/src/goals/goal-progress.ts`**: pure, Firestore-free `computeElapsedFraction`
+      (rhythm-weighted — a `work_week_weekend` goal counts a weekend day as
+      `WEEKEND_RHYTHM_WEIGHT = 0.4` of a weekday's expected pace, a fixed v1 constant) and
+      `calculateGoalProgress` for `maximize`/`minimize`/`range` directions. The AC's own callout
+      ("minimize-goal (signup cost) shows correct red/green") is the one place a plausible-looking
+      but wrong implementation was most likely: `minimize`'s pace ratio must invert
+      (`expectedAtNow / actualValue`, lower is better) rather than reusing `maximize`'s
+      `actualValue / expectedAtNow` — got right, pinned by a dedicated regression test plus 29 unit
+      tests total across all three directions' status boundaries.
+    - **`packages/firebase-orm-models`**: `GoalModel` (mirrors `BoardModel`'s
+      null-vs-undefined-required-field convention for `target_value`/`range_min`/`range_max`) +
+      `goal.service.ts` — `createGoal` (metric must resolve to an *active* `MetricDefModel`, owner
+      must resolve to an `OrgPersonModel` in-org, direction-specific fields required, `startDate <
+      deadline`, every validation failure collected into one `InvalidGoalError`), `listGoalsForProject`
+      (deadline-sorted, a deliberate departure from `listBoardsForProject`'s alphabetical default),
+      `getGoal`, `deleteGoal`, `queryGoalProgress` (mirrors `queryBoardTile`'s exact
+      `warehouse_not_configured`/`quota_exceeded`/`query_error` degraded-outcome + rethrow posture).
+      15 emulator tests.
+    - **`apps/web`**: full CRUD-minus-edit admin surface — API routes, `goal-view.ts` (progress outcome
+      -> thermometer render view, on_track/at_risk/off_track -> green/amber/red), `GoalThermometer`/
+      `CreateGoalForm`/`DeleteGoalButton` components (no charting library, matching every other tile
+      renderer), list + detail pages, nav link — all gated on the existing `dashboards.write`
+      permission (deliberately not a new `goals.manage` — documented as a v1 scoping decision, the
+      same posture KAN-36 took reusing `schema.write`). En/he translations, no hardcoded strings.
+  - The implementation agent stalled once mid-run (stopped saying it would "wait for a background
+    `pnpm test` to notify it" — subagents don't get an implicit wake-up the way this top-level session
+    does) with everything written but uncommitted; resumed it with an explicit instruction to poll
+    synchronously instead. It then finished cleanly: full `pnpm lint/typecheck/test/build` green,
+    3 commits, PR #45 opened (not merged, per instruction).
+  - Ran an **independent review pass** (a second, fresh-context agent) before merging: hand-traced the
+    minimize-direction ratio against its own extra scenarios (not just the existing tests), verified
+    the elapsed-fraction rhythm math and edge guards, tried to construct an inconsistent persisted
+    `GoalModel` state (couldn't — `validateGoalFields` nulls out the direction-inappropriate fields
+    before `createGoal` ever persists them), and checked permission/cross-org isolation. Found one
+    real (low-severity) gap: a goal with a future `start_date` produced an inverted `[start_date,
+    asOfDate]` query window, which the compiler's `deriveTimeWindows` rejects as a `MetricCompilerError`
+    — caught by the existing degraded-outcome handling, but it surfaced that raw internal-looking
+    message on the goal's thermometer instead of a sensible "hasn't started yet" state. Fixed directly
+    (short-circuit `queryGoalProgress` to a 0-progress/0-elapsed outcome when `asOfDate < start_date`,
+    before ever building the query), added a regression test (`goal.emulator.test.ts`, now 16 tests),
+    re-verified `pnpm lint/typecheck/test/build` green, pushed.
+  - CI's first run on that push failed — diagnosed as `resource-library.emulator.test.ts` (a KAN-27
+    test this PR never touches) timing out on a `RESOURCE_EXHAUSTED` gRPC error from Firestore-emulator
+    contention (458/459 tests passed; only that one unrelated test failed) — the same class of
+    pre-existing emulator-contention flake this file has documented repeatedly. Re-ran the failed job
+    (no code change) rather than pushing anything; it passed clean on retry.
+  - `mergeable_state: clean`, no review comments. Squash-merged into `main` as PR #45. Remote branch
+    delete hit the same recurring HTTP 403 this file has documented before on this git remote — remote
+    branch left in place, harmless since it's fully merged; local branch deleted.
+- **In progress (exact stopping point):** None — KAN-64 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** Nothing blocked.
+- **Next step:** Next unblocked sprint-6/7 `todo` in table order is **KAN-59** (SaaS/marketing
+  metric-pack plugin: `ad_spend`, `signups`, `cost_per_signup`, `cac`, `mrr`, `troi`, ... — sprint 7,
+  but the lowest-sprint `todo` remaining since sprint 6 is now clear) — it would also unblock **KAN-61**
+  (default boards, currently `blocked-by` KAN-59) and pairs naturally with this story (a real
+  `cost_per_signup` metric registered by KAN-59 is exactly what a minimize-direction goal like this
+  story's own AC example needs to be non-hypothetical). **KAN-55** (AI-assisted mapping UI) and
+  **KAN-63** (engagement pack: dau/wau/mau + histogram tile) are the other sprint-7 `todo`s.
+- **Waiting on human:**
+  - **KAN-43** — Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — GCP/Firebase projects + billing + secrets — still outstanding.
+  - The pre-existing unreconciled KAN-20 observability-baseline PR triplicate (#2/#3/#5) and the
+    stale KAN-33 progress-followup PR (#22) still await a human decision — untouched by this run.
+
+---
+
 ## 2026-07-10 — E11.4 Cohort engine v1 + heatmap board tile (KAN-62)
 
 - **Last completed:**

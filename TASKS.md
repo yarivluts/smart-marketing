@@ -69,7 +69,7 @@ blocker is unfinished. See [CLAUDE.md](./CLAUDE.md) for the full working rules.
 | KAN-61 | E11.3 Default boards shipped with pack: Marketing, Revenue/MRR, Funnel | 1 | 5 | blocked-by | blocked-by KAN-59 (not marked so originally, but its own AC — "New project with pack installed shows populated boards after first sync" — needs KAN-59's metric-pack plugin to register `mrr`/`cac`/`troi`/etc. metrics; none exist outside test fixtures today, and `saveBoardTiles` rejects a tile referencing an unregistered metric). Picked up and investigated this run before discovering the blocker; see PROGRESS.md. |
 | KAN-62 | E11.4 Cohort engine v1 + heatmap tile (signup-month x conversion/retention) | 1 | 6 | done | Delivered (PR #44). |
 | KAN-63 | E11.5 Engagement pack: dau/wau/mau, stickiness ratio, L28/LN histogram + histogram tile type | 1 | - | todo |  |
-| KAN-64 | E12.1 Goal model (metric, target, deadline, owner, direction min/max/range, work-week/weekend rhythm) + progress + pace projection | 1 | 6 | todo |  |
+| KAN-64 | E12.1 Goal model (metric, target, deadline, owner, direction min/max/range, work-week/weekend rhythm) + progress + pace projection | 1 | 6 | done | Delivered (PR #45). |
 | KAN-65 | E12.2 Win rules engine: event pattern -> win, realtime path (ingest -> Pub/Sub -> WebSocket) | 1 | 7 | todo |  |
 | KAN-66 | E12.2b Win catalog: reactivation + trial-conversion win types; trial-pipeline war-room widget | 1 | - | todo |  |
 | KAN-67 | E12.3 War-room TV mode: fullscreen rotation, win feed overlay, confetti + sound per win type, device pairing code, reduced-motion | 1 | 7 | todo |  |
