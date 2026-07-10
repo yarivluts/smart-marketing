@@ -584,7 +584,8 @@
       "bar": "Bar chart",
       "big_number": "Big number",
       "table": "Table",
-      "funnel": "Funnel"
+      "funnel": "Funnel",
+      "heatmap": "Cohort heatmap"
     },
     "funnelStepsLabel": "Funnel steps (in order)",
     "funnelStepLabel": "Step {step}",
@@ -599,6 +600,8 @@
     "previousPeriodLabel": "Previous period",
     "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
     "tableEmpty": "No data for this range yet.",
+    "heatmapEmpty": "No cohort data for this range yet.",
+    "heatmapCellTooltip": "{row} · {column}: {value}",
     "tileUnavailableReason": {
       "warehouse_not_configured": "Warehouse not configured yet",
       "quota_exceeded": "Daily query quota reached",

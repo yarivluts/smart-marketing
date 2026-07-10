@@ -7,8 +7,20 @@ import type { ComparePeriod, CompilerFilter, TimeGrain } from '@growthos/shared'
  * than `10-product-ux.md §2.2`'s fuller wishlist (area/cohort-heatmap/pie/
  * map/AI-note/iframe), the same "AC over wishlist" scoping every prior
  * KAN-3x/4x story in this codebase already applied to its own spec section.
+ * `heatmap` (KAN-62) is the first addition past that original five — a
+ * cohort_month x period_number matrix, plugged into this same "one metric,
+ * time-bucketed, broken down by dimensions" query shape rather than a
+ * bespoke two-dimension query of its own: its one required dimension (see
+ * `validateTiles` in `board.service.ts`) supplies the matrix's *column*
+ * axis (e.g. `period_number`), while the board's own time bucketing
+ * (already every other tile type's row/x-axis) supplies the matrix's *row*
+ * axis — a metric registered against `fact_cohort_retention` with
+ * `timeColumn: 'cohort_month'` buckets naturally into one row per cohort
+ * month. A board rendering a heatmap tile should set its own date-range
+ * `grain` to `'month'` — a finer grain would split/merge cohort months in a
+ * way this v1 doesn't guard against.
  */
-export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel'] as const;
+export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel', 'heatmap'] as const;
 export type BoardTileType = (typeof BOARD_TILE_TYPES)[number];
 
 export function isBoardTileType(value: string): value is BoardTileType {

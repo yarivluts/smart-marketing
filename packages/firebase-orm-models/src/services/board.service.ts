@@ -209,6 +209,10 @@ function validateTiles(tiles: readonly BoardTile[], catalog: readonly MetricCata
       );
     }
 
+    if (tile.type === 'heatmap' && tile.dimensions.length !== 1) {
+      reasons.push(`Heatmap tile "${tile.id}" needs exactly one breakdown dimension (its matrix's column axis).`);
+    }
+
     for (const metricName of tile.metricNames) {
       const entry = catalogByName.get(metricName);
       if (!entry) {
@@ -303,6 +307,12 @@ export interface QueryBoardTileParams {
  * service.ts`'s own non-transactional-quota-check gap already takes.
  */
 export async function queryBoardTile(params: QueryBoardTileParams): Promise<BoardTileQueryOutcome> {
+  // `compare` (a "vs. previous period" overlay) is excluded for `heatmap`
+  // alongside `funnel` — a cohort matrix's rows are already "cohort month",
+  // its own kind of time axis, so a second doubled-up period wouldn't
+  // overlay onto the same matrix cleanly the way it does for a line/bar
+  // series.
+  const supportsCompare = params.tile.type !== 'funnel' && params.tile.type !== 'heatmap';
   const request: MetricQueryRequest = {
     metrics: params.tile.metricNames,
     ...(params.tile.type === 'funnel' ? {} : { dimensions: params.tile.dimensions }),
@@ -311,7 +321,7 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
       start: params.board.date_range.start,
       end: params.board.date_range.end,
       grain: params.board.date_range.grain,
-      ...(params.tile.type !== 'funnel' && params.board.compare ? { compare: params.board.compare } : {}),
+      ...(supportsCompare && params.board.compare ? { compare: params.board.compare } : {}),
     },
   };
 

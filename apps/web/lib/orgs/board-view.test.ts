@@ -206,3 +206,39 @@ describe('buildTileRenderView — funnel', () => {
     });
   });
 });
+
+describe('buildTileRenderView — heatmap', () => {
+  it('builds a cohort_month x dimension matrix, numeric-sorting the dimension column labels', () => {
+    const view = buildTileRenderView(tile({ type: 'heatmap', metricNames: ['retention_rate'], dimensions: ['period_number'] }), {
+      ok: true,
+      series: [
+        { bucket_date: '2026-01-01', period_number: '0', retention_rate: 1 },
+        { bucket_date: '2026-01-01', period_number: '10', retention_rate: 0.2 },
+        { bucket_date: '2026-01-01', period_number: '2', retention_rate: 0.5 },
+        { bucket_date: '2026-02-01', period_number: '0', retention_rate: 1 },
+      ],
+    });
+    expect(view).toEqual({
+      kind: 'heatmap',
+      rowLabels: ['2026-01-01', '2026-02-01'],
+      columnLabels: ['0', '2', '10'],
+      matrix: [
+        [1, 0.5, 0.2],
+        [1, null, null],
+      ],
+    });
+  });
+
+  it('renders null (not zero) for a cohort x period combination absent from the series', () => {
+    const view = buildTileRenderView(tile({ type: 'heatmap', metricNames: ['retention_rate'], dimensions: ['period_number'] }), {
+      ok: true,
+      series: [{ bucket_date: '2026-01-01', period_number: '0', retention_rate: 1 }],
+    });
+    expect(view).toEqual({ kind: 'heatmap', rowLabels: ['2026-01-01'], columnLabels: ['0'], matrix: [[1]] });
+  });
+
+  it('returns an empty matrix for no rows', () => {
+    const view = buildTileRenderView(tile({ type: 'heatmap', metricNames: ['retention_rate'], dimensions: ['period_number'] }), { ok: true, series: [] });
+    expect(view).toEqual({ kind: 'heatmap', rowLabels: [], columnLabels: [], matrix: [] });
+  });
+});

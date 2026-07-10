@@ -64,6 +64,21 @@ async function registerSignups(organizationId: string, projectId: string, create
   });
 }
 
+/** KAN-62's cohort engine, registered the same way any other `fact_*` table is (see `BOARD_TILE_TYPES`'s own doc comment on `board.model.ts` for why `cohort_month` as `timeColumn` gives a `heatmap` tile its matrix's row axis "for free" via the existing time-bucketing path). */
+async function registerCohortRetention(organizationId: string, projectId: string, createdByUserId: string, dimensions: string[] = ['period_number']) {
+  return registerMetricDefinition({
+    organizationId,
+    projectId,
+    name: 'cohort_retention_rate',
+    definition: {
+      kind: 'aggregation',
+      aggregation: { function: 'avg', table: 'fact_cohort_retention', column: 'retention_rate', timeColumn: 'cohort_month', filters: [] },
+    },
+    dimensions,
+    createdByUserId,
+  });
+}
+
 function bigNumberTile(overrides: Partial<BoardTile> = {}): BoardTile {
   return {
     id: unique('tile'),
@@ -72,6 +87,18 @@ function bigNumberTile(overrides: Partial<BoardTile> = {}): BoardTile {
     layout: { x: 0, y: 0, w: 3, h: 2 },
     metricNames: ['ad_spend'],
     dimensions: [],
+    ...overrides,
+  };
+}
+
+function heatmapTile(overrides: Partial<BoardTile> = {}): BoardTile {
+  return {
+    id: unique('tile'),
+    type: 'heatmap',
+    title: 'Cohort retention',
+    layout: { x: 0, y: 0, w: 6, h: 4 },
+    metricNames: ['cohort_retention_rate'],
+    dimensions: ['period_number'],
     ...overrides,
   };
 }
@@ -283,6 +310,35 @@ describe('saveBoardTiles', () => {
     ).rejects.toBeInstanceOf(InvalidBoardError);
   });
 
+  it('accepts a heatmap tile with exactly one dimension, and rejects one with zero or more than one', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Org');
+    await registerCohortRetention(organization.id, project.id, owner.id, ['period_number', 'cohort_size']);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+
+    const saved = await saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: board.id, tiles: [heatmapTile()], updatedByUserId: owner.id });
+    expect(saved.tiles[0].dimensions).toEqual(['period_number']);
+
+    await expect(
+      saveBoardTiles({
+        organizationId: organization.id,
+        projectId: project.id,
+        boardId: board.id,
+        tiles: [heatmapTile({ dimensions: [] })],
+        updatedByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidBoardError);
+
+    await expect(
+      saveBoardTiles({
+        organizationId: organization.id,
+        projectId: project.id,
+        boardId: board.id,
+        tiles: [heatmapTile({ dimensions: ['period_number', 'cohort_size'] })],
+        updatedByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidBoardError);
+  });
+
   it('rejects duplicate tile ids, an unknown tile type, and a layout that overflows the grid', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Invalid Layout Org');
     await registerAdSpend(organization.id, project.id, owner.id);
@@ -426,6 +482,46 @@ describe('queryBoardTile', () => {
     });
     expect(second.ok).toBe(false);
     expect(second.ok === false && second.reason).toBe('quota_exceeded');
+  });
+
+  it('returns a cohort_month x period_number matrix series for a heatmap tile, ignoring any board-level compare', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Heatmap Query Org');
+    await registerCohortRetention(organization.id, project.id, owner.id);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Cohorts', createdByUserId: owner.id });
+    await updateBoardSettings({ organizationId: organization.id, projectId: project.id, boardId: board.id, compare: 'previous_period', updatedByUserId: owner.id });
+    const reloaded = await getBoard(organization.id, project.id, board.id);
+    const rows: WarehouseRow[] = [
+      { bucket_date: '2026-01-01', period_number: '0', cohort_retention_rate: 1 },
+      { bucket_date: '2026-01-01', period_number: '1', cohort_retention_rate: 0.5 },
+    ];
+    class RecordingWarehouseQueryExecutor implements WarehouseQueryExecutor {
+      public lastQuery: { sql: string } | undefined;
+      execute(query: { sql: string }): Promise<WarehouseRow[]> {
+        this.lastQuery = query;
+        return Promise.resolve(rows);
+      }
+    }
+    const executor = new RecordingWarehouseQueryExecutor();
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board: reloaded!,
+      tile: heatmapTile(),
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(outcome).toEqual({ ok: true, series: rows });
+    // Proves `compare` (`previous_period`, set on the board above) was
+    // genuinely excluded from the compiled query, not just that this fake's
+    // canned response ignores whatever it received — a real
+    // `WarehouseQueryExecutor` would run whatever SQL it's handed, so a
+    // heatmap tile silently compiling in a `period` column and `UNION ALL`
+    // anyway (harmless against this fake, wrong against a real warehouse)
+    // would slip past an assertion on `outcome` alone.
+    expect(executor.lastQuery?.sql).not.toContain('UNION ALL');
+    expect(executor.lastQuery?.sql).not.toContain('AS period');
   });
 
   it('rethrows a genuinely unexpected executor error rather than degrading it to a generic outcome', async () => {
