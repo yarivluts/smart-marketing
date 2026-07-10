@@ -56,35 +56,61 @@ describe('Ga4SourcePluginExecutor', () => {
       organizationId: 'org_1', projectId: 'proj_1', pluginId: 'p', config: {}, credential: CREDENTIAL, cursor: null,
     });
     const cursor1 = parseGa4SyncCursor(first.nextCursor, '2026-07-10', 3);
-    expect(cursor1.sessions).toEqual({ nextDate: '2026-07-08', backfillComplete: false });
+    expect(cursor1.sessions).toEqual({ nextDate: '2026-07-08' });
 
     const second = await new Ga4SourcePluginExecutor({ apiClient: { runReport }, propertyId: 'properties/123', backfillDays: 3, now: NOW }).sync({
       organizationId: 'org_1', projectId: 'proj_1', pluginId: 'p', config: {}, credential: CREDENTIAL, cursor: first.nextCursor,
     });
     const cursor2 = parseGa4SyncCursor(second.nextCursor, '2026-07-10', 3);
-    expect(cursor2.sessions).toEqual({ nextDate: '2026-07-09', backfillComplete: false });
+    expect(cursor2.sessions).toEqual({ nextDate: '2026-07-09' });
 
     const args = callArgs(runReport);
     expect(args[0].date).toBe('2026-07-07');
     expect(args[2].date).toBe('2026-07-08');
   });
 
-  it('reaches backfillComplete once it fetches yesterday, then re-polls yesterday on every subsequent call', async () => {
+  it('stops fetching once caught up to yesterday, without re-fetching it on a later call the same day', async () => {
     const runReport = vi.fn().mockResolvedValue(EMPTY_REPORT);
-    // backfillDays=1 -> starts at yesterday (2026-07-09) already, one call away from done.
+    // backfillDays=1 -> starts at yesterday (2026-07-09) already, one call away from caught up.
     const { executor } = syncParams(null, { runReport }, 1);
     const first = await executor.sync({ organizationId: 'org_1', projectId: 'proj_1', pluginId: 'p', config: {}, credential: CREDENTIAL, cursor: null });
     const cursor1 = parseGa4SyncCursor(first.nextCursor, '2026-07-10', 1);
-    expect(cursor1.sessions).toEqual({ nextDate: '2026-07-09', backfillComplete: true });
+    expect(cursor1.sessions).toEqual({ nextDate: '2026-07-10' });
+    expect(callArgs(runReport).every((call) => call.date === '2026-07-09')).toBe(true);
 
+    const callsBeforeSecond = runReport.mock.calls.length;
     const second = await new Ga4SourcePluginExecutor({ apiClient: { runReport }, propertyId: 'properties/123', backfillDays: 1, now: NOW }).sync({
       organizationId: 'org_1', projectId: 'proj_1', pluginId: 'p', config: {}, credential: CREDENTIAL, cursor: first.nextCursor,
     });
-    const cursor2 = parseGa4SyncCursor(second.nextCursor, '2026-07-10', 1);
-    expect(cursor2.sessions).toEqual({ nextDate: '2026-07-09', backfillComplete: true });
 
-    const args = callArgs(runReport);
-    expect(args.every((call) => call.date === '2026-07-09')).toBe(true);
+    // Cursor already caught up to (or past) "yesterday" — no new API call, and yesterday's day is not re-fetched.
+    expect(runReport.mock.calls.length).toBe(callsBeforeSecond);
+    expect(second.records).toEqual([]);
+    const cursor2 = parseGa4SyncCursor(second.nextCursor, '2026-07-10', 1);
+    expect(cursor2.sessions).toEqual({ nextDate: '2026-07-10' });
+  });
+
+  it('recovers a multi-day gap between manual runs one day at a time, instead of jumping straight to the new "yesterday"', async () => {
+    const runReport = vi.fn().mockResolvedValue(EMPTY_REPORT);
+    const nowDay1 = () => new Date('2026-07-10T12:00:00.000Z');
+    const nowDay8 = () => new Date('2026-07-17T12:00:00.000Z');
+
+    // backfillDays=1 -> starts at yesterday relative to day 1 (2026-07-09).
+    const first = await new Ga4SourcePluginExecutor({ apiClient: { runReport }, propertyId: 'properties/123', backfillDays: 1, now: nowDay1 }).sync({
+      organizationId: 'org_1', projectId: 'proj_1', pluginId: 'p', config: {}, credential: CREDENTIAL, cursor: null,
+    });
+    expect(callArgs(runReport).every((call) => call.date === '2026-07-09')).toBe(true);
+
+    // A week passes with no "Run now" click in between (no scheduler exists yet). "Yesterday" relative
+    // to day 8 is now 2026-07-16, but the next call must fetch 2026-07-10 (the day right after the
+    // cursor's last synced day) — not skip straight to 2026-07-16 and silently lose six days.
+    runReport.mockClear();
+    const second = await new Ga4SourcePluginExecutor({ apiClient: { runReport }, propertyId: 'properties/123', backfillDays: 1, now: nowDay8 }).sync({
+      organizationId: 'org_1', projectId: 'proj_1', pluginId: 'p', config: {}, credential: CREDENTIAL, cursor: first.nextCursor,
+    });
+    expect(callArgs(runReport).every((call) => call.date === '2026-07-10')).toBe(true);
+    const cursor2 = parseGa4SyncCursor(second.nextCursor, '2026-07-17', 1);
+    expect(cursor2.sessions).toEqual({ nextDate: '2026-07-11' });
   });
 
   it('maps report rows into ga4_session and ga4_event records in one result', async () => {

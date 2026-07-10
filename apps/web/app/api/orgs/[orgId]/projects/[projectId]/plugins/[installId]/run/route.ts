@@ -46,7 +46,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return NextResponse.json({ error: 'environment_id_required' }, { status: 400 });
   }
 
-  // Only the built-in Stripe plugin ever consults this — resolved best-effort so a deployment
+  // Only the built-in Stripe/GA4 plugins ever consult this — resolved best-effort so a deployment
   // without the vault configured (KAN-18) doesn't break "Run now" for every *other* plugin too.
   let kms;
   try {

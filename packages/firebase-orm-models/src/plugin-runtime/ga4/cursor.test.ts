@@ -30,11 +30,11 @@ describe('addDaysUtc', () => {
 });
 
 describe('initialGa4SyncCursor', () => {
-  it('starts both resources backfillDays before today, not yet complete', () => {
+  it('starts both resources backfillDays before today', () => {
     const cursor = initialGa4SyncCursor('2026-07-10', 10);
     expect(cursor).toEqual({
-      sessions: { nextDate: '2026-06-30', backfillComplete: false },
-      events: { nextDate: '2026-06-30', backfillComplete: false },
+      sessions: { nextDate: '2026-06-30' },
+      events: { nextDate: '2026-06-30' },
     });
   });
 
@@ -60,8 +60,6 @@ describe('parseGa4SyncCursor', () => {
   });
 
   it('rejects JSON missing the events resource', () => {
-    expect(() => parseGa4SyncCursor(JSON.stringify({ sessions: { nextDate: '2026-01-01', backfillComplete: false } }), '2026-07-10')).toThrow(
-      InvalidGa4SyncCursorError,
-    );
+    expect(() => parseGa4SyncCursor(JSON.stringify({ sessions: { nextDate: '2026-01-01' } }), '2026-07-10')).toThrow(InvalidGa4SyncCursorError);
   });
 });

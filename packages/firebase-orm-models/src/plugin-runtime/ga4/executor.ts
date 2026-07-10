@@ -19,32 +19,28 @@ import {
 } from './mappers';
 import type { Ga4RunReportResponse } from './types';
 
+const NOTHING_TO_SYNC_YET: Ga4RunReportResponse = { dimensionHeaders: [], metricHeaders: [] };
+
 /**
- * One report's own single-day fetch + cursor advance. While backfill is
- * still in progress (`!backfillComplete`), walks `nextDate` forward one
- * calendar day per call; once it reaches `yesterday` (GA4 never has
- * complete same-day data), future calls switch to re-fetching `yesterday`
- * every time — a harmless no-op via `ingestBatch`'s own client-id dedup
- * when nothing changed, and how late-arriving data for that day gets
- * picked up when something did.
+ * One report's own single-day fetch + cursor advance. Walks `nextDate`
+ * forward exactly one calendar day per call, whether it's still catching up
+ * from a fresh install or recovering from a gap between manual "Run now"
+ * clicks — see `cursor.ts`'s own doc comment for why a day is fetched at
+ * most once, ever. Once `nextDate` has caught up to (or past) `yesterday`,
+ * there is nothing new to sync yet this call — skipped without an API call,
+ * not re-fetched.
  */
 async function syncResourceDay(
   cursor: Ga4ResourceCursor,
   yesterday: string,
   fetchDay: (date: string) => Promise<Ga4RunReportResponse>,
 ): Promise<{ response: Ga4RunReportResponse; date: string; cursor: Ga4ResourceCursor }> {
-  if (cursor.backfillComplete) {
-    const response = await fetchDay(yesterday);
-    return { response, date: yesterday, cursor: { nextDate: yesterday, backfillComplete: true } };
+  if (cursor.nextDate > yesterday) {
+    return { response: NOTHING_TO_SYNC_YET, date: cursor.nextDate, cursor };
   }
 
-  const date = cursor.nextDate > yesterday ? yesterday : cursor.nextDate;
-  const response = await fetchDay(date);
-
-  if (date >= yesterday) {
-    return { response, date, cursor: { nextDate: yesterday, backfillComplete: true } };
-  }
-  return { response, date, cursor: { nextDate: addDaysUtc(date, 1), backfillComplete: false } };
+  const response = await fetchDay(cursor.nextDate);
+  return { response, date: cursor.nextDate, cursor: { nextDate: addDaysUtc(cursor.nextDate, 1) } };
 }
 
 export interface Ga4SourcePluginExecutorOptions {

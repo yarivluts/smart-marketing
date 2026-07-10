@@ -1,4 +1,4 @@
-/** How many days of history to walk backward through on a from-scratch sync, before switching to daily polling of "yesterday". Unlike Google Ads (KAN-50)'s 13-month AC bar, KAN-52 states no specific backfill window — 90 days is a reasonable default, adjustable later without a schema change (it only affects a fresh install's starting point). */
+/** How many days of history to walk backward through on a from-scratch sync. Unlike Google Ads (KAN-50)'s 13-month AC bar, KAN-52 states no specific backfill window — 90 days is a reasonable default, adjustable later without a schema change (it only affects a fresh install's starting point). */
 export const DEFAULT_GA4_BACKFILL_DAYS = 90;
 
 /** Formats a `Date` as a UTC calendar day, `YYYY-MM-DD` — the same granularity GA4 reports are scoped to. */
@@ -14,18 +14,30 @@ export function addDaysUtc(dateString: string, days: number): string {
 }
 
 /**
- * One report's own backfill/incremental progress. GA4's Data API has no
- * object-id pagination the way Stripe's list endpoints do — reports are
- * scoped to a calendar day, so "paging through history" here means walking
- * `nextDate` forward one day per `sync()` call until it reaches yesterday
- * (GA4 never has complete same-day data), then re-fetching yesterday on
- * every subsequent call to pick up late-arriving data — the same
- * "re-fetch the same boundary, harmless via ingest dedup" posture
- * `StripeResourceCursor`'s `created[gte]` polling already established.
+ * One report's own sync position: the next calendar day that has never been
+ * fetched yet. GA4's Data API has no object-id pagination the way Stripe's
+ * list endpoints do — reports are scoped to a calendar day, so "paging
+ * through history" here means walking `nextDate` forward exactly one day per
+ * `sync()` call, whether that call is catching up from a fresh install or
+ * recovering from a gap between manual "Run now" clicks (no scheduler exists
+ * yet, KAN-18) — the same one-day-at-a-time advance either way, so a week-long
+ * gap between runs is walked through over the next several calls rather than
+ * silently jumped over.
+ *
+ * A day, once fetched, is never re-fetched: `ingestBatch`'s dedup discards a
+ * repeated `event_id` outright rather than merging/overwriting it (see
+ * `mapSessionsReportToEventRecords`'s own doc comment), so re-polling a day
+ * already landed would not actually pick up a late-arriving GA4 correction —
+ * it would just waste an API call. `nextDate` only ever advances past
+ * "yesterday" once "yesterday" itself has moved (i.e. real time has passed),
+ * which naturally gives GA4 roughly a day of processing lag before its numbers
+ * are captured — a documented, accepted limitation, not a promise that later
+ * corrections are ever picked up (matching this codebase's posture on
+ * accuracy bars that need a live account to verify, e.g. KAN-49/50/51's own
+ * ±1% bars).
  */
 export interface Ga4ResourceCursor {
   nextDate: string;
-  backfillComplete: boolean;
 }
 
 /**
@@ -44,8 +56,8 @@ export interface Ga4SyncCursor {
 export function initialGa4SyncCursor(today: string, backfillDays: number = DEFAULT_GA4_BACKFILL_DAYS): Ga4SyncCursor {
   const start = addDaysUtc(today, -backfillDays);
   return {
-    sessions: { nextDate: start, backfillComplete: false },
-    events: { nextDate: start, backfillComplete: false },
+    sessions: { nextDate: start },
+    events: { nextDate: start },
   };
 }
 
@@ -57,12 +69,7 @@ export class InvalidGa4SyncCursorError extends Error {
 }
 
 function isResourceCursor(value: unknown): value is Ga4ResourceCursor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as Ga4ResourceCursor).nextDate === 'string' &&
-    typeof (value as Ga4ResourceCursor).backfillComplete === 'boolean'
-  );
+  return typeof value === 'object' && value !== null && typeof (value as Ga4ResourceCursor).nextDate === 'string';
 }
 
 /** Parses a persisted cursor string, or returns a fresh one for `null` ("sync from scratch" — this install has never completed a sync before). */
