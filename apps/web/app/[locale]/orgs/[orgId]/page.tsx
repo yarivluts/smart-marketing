@@ -155,6 +155,11 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
                     {t('projectBoardsLink')}
                   </Link>
                 ) : null}
+                {canManageBoards ? (
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/goals`}>
+                    {t('projectGoalsLink')}
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </>
