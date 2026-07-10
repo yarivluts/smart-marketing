@@ -112,6 +112,31 @@ describe('BoardTileView', () => {
     expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
   });
 
+  it('renders a heatmap tile as a row/column matrix, with a translated tooltip and an em-dash for missing cells', () => {
+    renderTile(
+      {
+        kind: 'heatmap',
+        rowLabels: ['2026-01-01', '2026-02-01'],
+        columnLabels: ['0', '1'],
+        matrix: [
+          [1, 0.5],
+          [1, null],
+        ],
+      },
+      { type: 'heatmap', dimensions: ['period_number'] },
+    );
+    expect(screen.getByText('2026-01-01')).toBeInTheDocument();
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('0.5')).toBeInTheDocument();
+    expect(screen.getByTitle('2026-01-01 · 1: 0.5')).toBeInTheDocument();
+    expect(screen.getAllByText('—')).toHaveLength(1);
+  });
+
+  it('renders an empty heatmap state', () => {
+    renderTile({ kind: 'heatmap', rowLabels: [], columnLabels: [], matrix: [] }, { type: 'heatmap' });
+    expect(screen.getByText('No cohort data for this range yet.')).toBeInTheDocument();
+  });
+
   it('renders a funnel tile with each step and its percentage of the first step', () => {
     renderTile(
       {

@@ -103,3 +103,33 @@ models:
       - name: credit
         tests:
           - not_null
+
+  - name: fact_cohort_retention
+    description: >
+      Generic cohort engine v1 (plan `04 §5`, KAN-62): one row per
+      (cohort_month, period_number) — every customer's cohort is the
+      calendar month of their first customer-side event; `retention_rate`
+      is the fraction of that cohort still active `period_number` months
+      later. Feeds the KAN-60 `heatmap` board tile. See the model's own doc
+      comment for the full periods/observability rule.
+    columns:
+      - name: cohort_retention_key
+        description: Composite (project_id, environment_id, cohort_month, period_number) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: cohort_month
+        tests:
+          - not_null
+      - name: period_number
+        tests:
+          - not_null
+      - name: cohort_size
+        tests:
+          - not_null
+      - name: retained_count
+        tests:
+          - not_null
+      - name: retention_rate
+        tests:
+          - not_null

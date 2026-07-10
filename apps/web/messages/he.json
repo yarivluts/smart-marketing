@@ -584,7 +584,8 @@
       "bar": "תרשים עמודות",
       "big_number": "מספר גדול",
       "table": "טבלה",
-      "funnel": "משפך"
+      "funnel": "משפך",
+      "heatmap": "מפת חום של קוהורטות"
     },
     "funnelStepsLabel": "שלבי המשפך (לפי סדר)",
     "funnelStepLabel": "שלב {step}",
@@ -599,6 +600,8 @@
     "previousPeriodLabel": "תקופה קודמת",
     "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
     "tableEmpty": "אין נתונים לטווח זה עדיין.",
+    "heatmapEmpty": "אין נתוני קוהורטות לטווח זה עדיין.",
+    "heatmapCellTooltip": "{row} · {column}: {value}",
     "tileUnavailableReason": {
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",

@@ -22,6 +22,7 @@ describe('defaultTileSize', () => {
     expect(defaultTileSize('bar')).toEqual({ w: 6, h: 4 });
     expect(defaultTileSize('table')).toEqual({ w: 6, h: 4 });
     expect(defaultTileSize('funnel')).toEqual({ w: 6, h: 4 });
+    expect(defaultTileSize('heatmap')).toEqual({ w: 6, h: 4 });
   });
 });
 

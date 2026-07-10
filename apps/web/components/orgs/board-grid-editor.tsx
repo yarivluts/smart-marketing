@@ -52,17 +52,35 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
   function setType(type: BoardTileTypeRow): void {
     const size = defaultTileSize(type);
     const isFunnel = type === 'funnel';
+    const isHeatmap = type === 'heatmap';
+    const metricName = tile.metricNames[0] ?? metricCatalog[0]?.name ?? '';
+    // A heatmap tile's matrix has no column axis without exactly one
+    // dimension (`validateTiles`'s own server-side rule) — default to the
+    // tile's current dimension if it's still valid for this metric,
+    // otherwise the metric's first declared dimension, rather than
+    // carrying over a zero- or multi-dimension selection from whatever
+    // type this tile was before.
+    const heatmapDimensionOptions = metricCatalog.find((entry) => entry.name === metricName)?.dimensions ?? [];
+    const heatmapDimension = tile.dimensions.find((dimension) => heatmapDimensionOptions.includes(dimension)) ?? heatmapDimensionOptions[0];
     onChange({
       ...tile,
       type,
       layout: { ...tile.layout, w: size.w, h: size.h },
-      metricNames: isFunnel ? (tile.metricNames.length >= 2 ? tile.metricNames : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? '', metricCatalog[1]?.name ?? metricCatalog[0]?.name ?? '']) : [tile.metricNames[0] ?? metricCatalog[0]?.name ?? ''],
-      dimensions: isFunnel ? [] : tile.dimensions,
+      metricNames: isFunnel ? (tile.metricNames.length >= 2 ? tile.metricNames : [metricName, metricCatalog[1]?.name ?? metricName]) : [metricName],
+      dimensions: isFunnel ? [] : isHeatmap ? (heatmapDimension ? [heatmapDimension] : []) : tile.dimensions,
     });
   }
 
   function setSingleMetric(name: string): void {
-    onChange({ ...tile, metricNames: [name], dimensions: [] });
+    // A heatmap tile always needs exactly one dimension — default to the
+    // newly-selected metric's first declared dimension rather than leaving
+    // the tile momentarily invalid (see `setType`'s own doc comment).
+    const firstDimension = tile.type === 'heatmap' ? (metricCatalog.find((entry) => entry.name === name)?.dimensions[0] ?? undefined) : undefined;
+    onChange({ ...tile, metricNames: [name], dimensions: firstDimension ? [firstDimension] : [] });
+  }
+
+  function setHeatmapDimension(dimension: string): void {
+    onChange({ ...tile, dimensions: [dimension] });
   }
 
   function setFunnelStep(index: number, name: string): void {
@@ -165,7 +183,29 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
               </option>
             ))}
           </select>
-          {tile.type !== 'big_number' && dimensionOptions.length > 0 ? (
+          {tile.type === 'heatmap' && dimensionOptions.length > 0 ? (
+            // A heatmap's matrix column axis needs exactly one dimension
+            // (`validateTiles`'s own server-side rule) — a single select,
+            // not the free-form multi-checkbox list every other
+            // breakdown-capable type below uses, so the grid editor can't
+            // even construct the invalid zero-or-many-dimension state.
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">{t('tileDimensionsLabel')}</span>
+              <select
+                aria-label={t('tileDimensionsLabel')}
+                value={tile.dimensions[0] ?? ''}
+                onChange={(event) => setHeatmapDimension(event.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              >
+                {dimensionOptions.map((dimension) => (
+                  <option key={dimension} value={dimension}>
+                    {dimension}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+          {tile.type !== 'big_number' && tile.type !== 'heatmap' && dimensionOptions.length > 0 ? (
             <div className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">{t('tileDimensionsLabel')}</span>
               {dimensionOptions.map((dimension) => (

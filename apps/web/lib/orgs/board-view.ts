@@ -61,12 +61,20 @@ export interface FunnelStep {
 /** Mirrors `BoardTileQueryOutcome`'s own `reason` union (`board.service.ts`) — not derived via a conditional type since that union is only ever seen through the `ok: false` branch, and spelling it out here is clearer than an `Extract<...>` gymnastic. */
 export type BoardTileUnavailableReason = 'warehouse_not_configured' | 'quota_exceeded' | 'query_error';
 
+/** One `(rowLabels[i], columnLabels[j])` cell's value — `null` when that combination has no data (e.g. a period that hasn't happened yet for a younger cohort). */
+export interface HeatmapView {
+  rowLabels: string[];
+  columnLabels: string[];
+  matrix: (number | null)[][];
+}
+
 export type TileRenderView =
   | { kind: 'unavailable'; reason: BoardTileUnavailableReason; message: string }
   | { kind: 'big_number'; value: number; previousValue?: number; deltaPct?: number }
   | { kind: 'time_series'; chart: Extract<BoardTileType, 'line' | 'bar'>; series: TimeSeries[]; previousSeries?: TimeSeries[] }
   | { kind: 'table'; columns: string[]; rows: WarehouseRow[] }
-  | { kind: 'funnel'; steps: FunnelStep[] };
+  | { kind: 'funnel'; steps: FunnelStep[] }
+  | ({ kind: 'heatmap' } & HeatmapView);
 
 function toNumber(value: string | number | null): number {
   if (value === null) {
@@ -172,6 +180,40 @@ function buildFunnelView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRe
   return { kind: 'funnel', steps };
 }
 
+/** Ascending, numeric-aware when every label parses as a number (e.g. `period_number` values `"0"`, `"1"`, `"10"` — a plain string sort would put `"10"` before `"2"`); falls back to a locale string sort for non-numeric labels. */
+function sortLabels(labels: readonly string[]): string[] {
+  const numeric = labels.every((label) => label !== '' && Number.isFinite(Number(label)));
+  return [...labels].sort(numeric ? (a, b) => Number(a) - Number(b) : (a, b) => a.localeCompare(b));
+}
+
+/**
+ * A `cohort_month x <dimension>` matrix (KAN-62) — the board's own time
+ * bucketing (`bucket_date`) supplies the row axis, the tile's one required
+ * dimension supplies the column axis (see `BOARD_TILE_TYPES`'s own doc
+ * comment in `board.model.ts` for why a heatmap reuses this shape instead
+ * of a bespoke two-dimension query). A `(row, column)` combination absent
+ * from `rows` — a period that hasn't elapsed yet for a younger cohort —
+ * renders as `null`, not `0`: "not yet observable" is a different fact
+ * than "observed and zero".
+ */
+function buildHeatmapView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRenderView {
+  const metricName = tile.metricNames[0];
+  const dimension = tile.dimensions[0];
+  const rowLabels = sortLabels([...new Set(rows.map((row) => String(row.bucket_date ?? '')))]);
+  const columnLabels = sortLabels([...new Set(rows.map((row) => String(row[dimension] ?? '')))]);
+  // JSON-encoded, not a plain string join with a literal separator -- the
+  // same delimiter-collision reasoning groupKey's own doc comment gives (a
+  // row/column label could itself contain whatever plain separator this
+  // used).
+  const cellKey = (rowLabel: string, columnLabel: string) => JSON.stringify([rowLabel, columnLabel]);
+  const valueByKey = new Map<string, number>();
+  for (const row of rows) {
+    valueByKey.set(cellKey(String(row.bucket_date ?? ''), String(row[dimension] ?? '')), toNumber(row[metricName] ?? null));
+  }
+  const matrix = rowLabels.map((rowLabel) => columnLabels.map((columnLabel) => valueByKey.get(cellKey(rowLabel, columnLabel)) ?? null));
+  return { kind: 'heatmap', rowLabels, columnLabels, matrix };
+}
+
 /**
  * Turns one tile's raw `queryBoardTile` outcome into the shape its
  * type-specific renderer consumes — grouping/summing/sorting the flat
@@ -196,6 +238,8 @@ export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutc
       return buildTableView(outcome.series);
     case 'funnel':
       return buildFunnelView(tile, outcome.series);
+    case 'heatmap':
+      return buildHeatmapView(tile, outcome.series);
     default:
       return buildTableView(outcome.series);
   }

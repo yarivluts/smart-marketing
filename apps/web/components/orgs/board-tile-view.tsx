@@ -211,6 +211,50 @@ function TableView({ view }: { view: Extract<TileRenderView, { kind: 'table' }> 
   );
 }
 
+function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap' }> }): React.ReactElement {
+  const t = useTranslations('Boards');
+  if (view.rowLabels.length === 0) {
+    return <p className="text-xs text-muted-foreground">{t('heatmapEmpty')}</p>;
+  }
+  const maxValue = Math.max(1e-9, ...view.matrix.flat().filter((value): value is number => value !== null));
+  return (
+    <div className="max-h-48 overflow-auto">
+      <table className="w-full text-center text-xs">
+        <thead>
+          <tr>
+            <th className="px-2 py-1" />
+            {view.columnLabels.map((column) => (
+              <th key={column} className="border-b border-input px-2 py-1 font-medium">
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {view.rowLabels.map((row, rowIndex) => (
+            <tr key={row}>
+              <th className="border-r border-input px-2 py-1 text-left font-medium">{row}</th>
+              {view.columnLabels.map((column, columnIndex) => {
+                const value = view.matrix[rowIndex][columnIndex];
+                return (
+                  <td
+                    key={column}
+                    className="px-2 py-1 tabular-nums"
+                    style={value === null ? undefined : { backgroundColor: `rgba(59, 130, 246, ${Math.max(0.08, value / maxValue)})` }}
+                    title={t('heatmapCellTooltip', { row, column, value: value === null ? '—' : formatNumber(value) })}
+                  >
+                    {value === null ? '—' : formatNumber(value)}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }> }): React.ReactElement {
   const t = useTranslations('Boards');
   return (
@@ -235,7 +279,7 @@ function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }
   );
 }
 
-/** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel), plus a per-tile degraded state instead of the whole board failing. */
+/** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel) plus KAN-62's `heatmap`, plus a per-tile degraded state instead of the whole board failing. */
 export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactElement {
   const t = useTranslations('Boards');
 
@@ -250,6 +294,8 @@ export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactEl
       return <TableView view={view} />;
     case 'funnel':
       return <FunnelView view={view} />;
+    case 'heatmap':
+      return <HeatmapView view={view} />;
     default:
       return <UnavailableView message={tile.title} reasonLabel={t('tileUnavailableReason.query_error')} />;
   }
