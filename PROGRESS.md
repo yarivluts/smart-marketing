@@ -17,6 +17,93 @@ Template for each entry:
 
 ---
 
+## 2026-07-10 — E9.2 Mapping engine: saved field-mappings, JSONPath transforms, test-run on sample (KAN-54)
+
+- **Last completed:**
+  - Picked **KAN-54** (next unblocked sprint-6 `todo` in table order — the #41/KAN-53 run's own
+    PROGRESS entry already flagged this as the natural next story, since it consumes KAN-53's hook
+    delivery review queue). No open PR or existing branch for it at pick time (checked first, per
+    this file's own recurring "two runs picked the same story" collision note).
+  - New **`packages/shared/src/mapping-engine/`**: a pure, Firestore-free engine mirroring
+    `metrics-compiler`'s independence from its own Firestore model — a practical JSONPath subset
+    (`data.object.id`, `line_items[0].sku` — no wildcards/slices/recursive-descent), four rule
+    transforms (`rename`/`cast`/`template`/`static`), `applyFieldMapping` (never throws — a rule
+    whose source is missing or whose cast fails is a per-field error, not an aborted mapping), and
+    `validateMappingRules` (structural save-time validation: every rule targets a valid
+    envelope/`container.field` name for its kind, every transform carries the config it needs,
+    every required envelope field — `event_id`/`event`/`ts`, `id`, or `measure`/`ts`/`value` — has
+    a rule). A golden-file test reproduces the plan doc's own AC verbatim: "Shopify
+    `orders/create` sample -> `order_completed` event mapped in tests."
+  - New **`FieldMappingModel`** + `field-mapping.service.ts` in `packages/firebase-orm-models`:
+    `createFieldMapping` (requires the target schema to already have an `active` registered
+    version — KAN-31 — the same "reject a reference to something unregistered" posture
+    `saveBoardTiles`/KAN-60 established for a tile's metric reference), `listFieldMappingsForProject`,
+    `disableFieldMapping` (immediate + idempotent), and `testRunFieldMapping` — reuses
+    `ingest.service.ts`'s own `checkRecordEnvelope`/`validateAgainstSchema` so a test-run shows
+    exactly what would happen on a real ingest, without ever persisting anything. The sample is
+    either pasted JSON or an existing queued hook delivery's raw payload (KAN-53) — read-only, the
+    delivery's status is never touched. `hook.service.ts`'s private `loadHookDelivery` became an
+    exported `getHookDeliveryForProject` so this read-only lookup reuses the same org/project-scoped
+    not-found handling rather than duplicating it.
+  - `apps/web`: a project-scoped Field mappings page — browse saved mappings, a rule-builder create
+    form (target field + transform + transform-specific inputs, schema-name picker restricted to
+    currently-registered/active schemas so a mapping can't be saved against a typo), disable, and a
+    collapsible per-mapping test-run panel (paste JSON or pick a pending hook delivery). Gated on
+    `ingest.write`, same as the sibling Hooks/ingest-health admin surfaces. New `FieldMappings`
+    translation namespace (en + he) and a nav link on the org page.
+  - A real bug found and fixed before opening the PR: `validateMappingRules`'s typed output
+    originally always included all four optional rule keys (`sourcePath`/`castType`/`template`/
+    `staticValue`), several set to an explicit `undefined` depending on the rule's transform.
+    Firestore's client SDK rejects `undefined` anywhere in a document tree — including nested
+    inside an array element — so saving *any* mapping whose rules didn't use all four keys (i.e.
+    every realistic mapping) silently failed: `FieldMappingModel.save()` logged an error internally
+    but didn't propagate it, leaving the model with no persisted document and an unset id. Caught by
+    the emulator test suite (a `FieldMappingNotFoundError` on the very next read, and a `testRunFieldMapping`
+    call falling through to its "unknown kind" branch because the id it was given was undefined) —
+    fixed by only spreading in the keys a rule's own transform actually uses.
+  - Deliberately out of scope, matching the story's literal AC ("saved field-mappings, transforms,
+    test-run on sample"): actually applying a mapping to a queued hook delivery to produce a real
+    ingested event (turning KAN-53's review queue into accepted data) is *not* built here — the
+    `testRunFieldMapping` service function proves a mapping is correct against a real sample, but
+    nothing calls `ingestBatch` with the result. That's a natural, well-scoped next story.
+  - Full verification: `packages/shared` (43 tests, incl. the golden Shopify fixture) green;
+    `packages/firebase-orm-models` (15 new emulator tests) green against the real Firestore
+    emulator; `apps/web` (551 tests total — 18 new route tests, 15 new component tests, and a new
+    KAN-26 isolation scenario for the field-mappings routes) green against real Firestore + Auth
+    emulators; `apps/api` re-verified green (61 tests, unaffected but depends on
+    `firebase-orm-models`). `pnpm lint`/`pnpm typecheck` green across every touched package.
+    `pnpm build` green for every package except `packages/dbt-transform`, which failed in this
+    sandbox only on a pre-existing `pip install` SSL/network error unrelated to this diff (untouched
+    by it) — the same class of sandbox-only limitation this file has documented before (e.g. the
+    2026-07-10 KAN-53 entry's Playwright flakiness note).
+  - An independent review pass (a second agent, fresh context, given no prior findings to bias it)
+    read every touched file and re-ran every test suite itself rather than trusting the numbers
+    above; found no correctness, coverage, or reuse issues.
+  - Opened **PR #43**, subscribed to its activity. CI (`lint · typecheck · test · build`) went
+    green (~13 minutes — the Test step covers the full apps/web suite incl. Playwright), no review
+    comments, `mergeable_state: clean`. Squash-merged into `main` at `961438d`. Remote branch delete
+    hit the same recurring HTTP 403 this file has documented before on this git remote — remote
+    branch left in place, harmless since it's fully merged; local branch deleted.
+- **In progress (exact stopping point):** None — KAN-54 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** Nothing blocked.
+- **Next step:** Next unblocked sprint-6 `todo` in table order is **KAN-62** (cohort engine v1 +
+  heatmap tile) or **KAN-64** (goal model). A natural KAN-54 follow-on (not required by its own AC,
+  so not built this run) would be wiring `testRunFieldMapping`'s already-correct mapped-record
+  output into a real `ingestBatch` call plus marking the source hook delivery `reviewed` on
+  success — closing the loop KAN-53's queue was built to feed. **KAN-55** (AI-assisted mapping UI)
+  builds on this story and is the more obvious next pick if a future run wants to stay in this area,
+  though it depends on an LLM call this codebase hasn't wired up anywhere yet (worth checking
+  whether that's buildable-today before picking it).
+- **Waiting on human:**
+  - **KAN-43** — Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — GCP/Firebase projects + billing + secrets — still outstanding.
+  - The pre-existing unreconciled KAN-20 observability-baseline PR triplicate (#2/#3/#5) and the
+    stale KAN-33 progress-followup PR (#22) still await a human decision — untouched by this run.
+
+---
+
 ## 2026-07-10 — KAN-53 duplicate collision (PR #42 closed, superseded by #41)
 
 - **Last completed:** Picked **KAN-53** (next unblocked sprint-6 `todo` at the time, per table
