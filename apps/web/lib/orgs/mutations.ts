@@ -32,7 +32,7 @@ import {
   type GoalModel,
   type HookEndpointModel,
   type HookSignatureMode,
-  installPlugin as installPluginInOrganization,
+  installPluginAndProvisionBuiltins as installPluginInOrganization,
   saveBoardTiles as saveBoardTilesInOrganization,
   updateBoardSettings as updateBoardSettingsInOrganization,
   processStripeWebhookEvent as processStripeWebhookEventInOrganization,
@@ -559,6 +559,13 @@ interface InstallPluginInput {
   installedByUserId: string;
 }
 
+/**
+ * Installs a plugin into a project. Transparently registers every metric a
+ * built-in SaaS/marketing metric pack (KAN-59) declares right after install
+ * — `installPluginInOrganization` here is actually
+ * `installPluginAndProvisionBuiltins`, not the raw generic `installPlugin` —
+ * and falls through unchanged for every other plugin.
+ */
 export async function installPlugin(input: InstallPluginInput): Promise<PluginInstallModel> {
   await ensureFirestoreOrm();
   return installPluginInOrganization(input);
