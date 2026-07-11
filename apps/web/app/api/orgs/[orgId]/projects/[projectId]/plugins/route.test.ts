@@ -5,6 +5,7 @@ import {
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  listBoardsForProject,
   listMetricDefinitionsForProject,
   SAAS_METRIC_PACK_MANIFEST_YAML,
   SAAS_METRIC_PACK_PLUGIN_ID,
@@ -163,21 +164,28 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins', () => {
     expect(listed.installs).toHaveLength(1);
   });
 
-  it('installing the built-in SaaS metric pack (KAN-59) registers its metrics end to end', async () => {
-    const { ownerSession, organization, project, owner } = await setupOrgProject('Plugin Installs Route Metric Pack Org');
-    await registerPluginManifest({ organizationId: organization.id, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML, registeredByUserId: owner.id });
-    getServerSessionMock.mockResolvedValue(ownerSession);
+  it(
+    'installing the built-in SaaS metric pack (KAN-59) registers its metrics and seeds its default boards (KAN-61) end to end',
+    async () => {
+      const { ownerSession, organization, project, owner } = await setupOrgProject('Plugin Installs Route Metric Pack Org');
+      await registerPluginManifest({ organizationId: organization.id, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML, registeredByUserId: owner.id });
+      getServerSessionMock.mockResolvedValue(ownerSession);
 
-    const { request, params } = pluginInstallsRequest(organization.id, project.id, {
-      pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
-      version: '1.0.0',
-      consentedScopes: ['metrics:write'],
-      config: {},
-    });
-    const response = await POST(request, { params });
-    expect(response.status).toBe(201);
+      const { request, params } = pluginInstallsRequest(organization.id, project.id, {
+        pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
+        version: '1.0.0',
+        consentedScopes: ['metrics:write'],
+        config: {},
+      });
+      const response = await POST(request, { params });
+      expect(response.status).toBe(201);
 
-    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
-    expect(defs.map((def) => def.name)).toEqual(expect.arrayContaining(['ad_spend', 'signups', 'mrr', 'cac', 'troi']));
-  });
+      const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+      expect(defs.map((def) => def.name)).toEqual(expect.arrayContaining(['ad_spend', 'signups', 'mrr', 'cac', 'troi']));
+
+      const boards = await listBoardsForProject(organization.id, project.id);
+      expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
+    },
+    60_000, // seventeen metric registrations + three board creates/tile-saves in one request — see saas-metric-pack.emulator.test.ts's own timeout note
+  );
 });

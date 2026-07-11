@@ -5,6 +5,7 @@ import {
   createProject,
   ensureUserForFirebaseSession,
   installPluginAndProvisionBuiltins,
+  listBoardsForProject,
   listMetricDefinitionsForProject,
   PluginScopeConsentMismatchError,
   registerPluginManifest,
@@ -44,7 +45,7 @@ scopes: [ingest:write]
 `;
 
 describe('installPluginAndProvisionBuiltins', () => {
-  it('installing the built-in SaaS metric pack registers all of its metrics', async () => {
+  it('installing the built-in SaaS metric pack registers all of its metrics and seeds its default boards (KAN-61)', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Metric Pack Org');
     await registerPluginManifest({ organizationId: organization.id, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML, registeredByUserId: owner.id });
 
@@ -63,9 +64,13 @@ describe('installPluginAndProvisionBuiltins', () => {
     expect(defs.map((def) => def.name)).toContain('ad_spend');
     expect(defs.map((def) => def.name)).toContain('troi');
     expect(defs).toHaveLength(17);
+
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
+    expect(boards.every((board) => board.tiles.length > 0)).toBe(true);
   }, 60_000); // seventeen sequential metric registrations — see saas-metric-pack.emulator.test.ts's own timeout note
 
-  it('installing an unrelated plugin registers no metrics and behaves exactly like the generic installPlugin', async () => {
+  it('installing an unrelated plugin registers no metrics and seeds no boards, behaving exactly like the generic installPlugin', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Unrelated Org');
     await registerPluginManifest({ organizationId: organization.id, manifestYaml: OTHER_MANIFEST_YAML, registeredByUserId: owner.id });
 
@@ -82,9 +87,11 @@ describe('installPluginAndProvisionBuiltins', () => {
     expect(install.status).toBe('installed');
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs).toHaveLength(0);
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards).toHaveLength(0);
   });
 
-  it('re-installing the metric pack after an uninstall does not duplicate metric versions', async () => {
+  it('re-installing the metric pack after an uninstall does not duplicate metric versions or boards', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Reinstall Org');
     await registerPluginManifest({ organizationId: organization.id, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML, registeredByUserId: owner.id });
 
@@ -112,9 +119,12 @@ describe('installPluginAndProvisionBuiltins', () => {
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs).toHaveLength(17);
     expect(defs.every((def) => def.version === 1)).toBe(true);
+
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards).toHaveLength(3);
   }, 60_000); // two full seventeen-metric passes (install + reinstall)
 
-  it('registers no metrics when the install itself is rejected (scope consent mismatch)', async () => {
+  it('registers no metrics and seeds no boards when the install itself is rejected (scope consent mismatch)', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Rejected Install Org');
     await registerPluginManifest({ organizationId: organization.id, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML, registeredByUserId: owner.id });
 
@@ -132,5 +142,7 @@ describe('installPluginAndProvisionBuiltins', () => {
 
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs).toHaveLength(0);
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards).toHaveLength(0);
   });
 });
