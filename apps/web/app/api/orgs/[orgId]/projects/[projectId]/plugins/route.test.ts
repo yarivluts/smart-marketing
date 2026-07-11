@@ -1,7 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSession } from '@growthos/firebase-orm-models';
+import {
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  listMetricDefinitionsForProject,
+  SAAS_METRIC_PACK_MANIFEST_YAML,
+  SAAS_METRIC_PACK_PLUGIN_ID,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { registerPluginManifest } from '@/lib/orgs/mutations';
 import { GET, POST } from './route';
@@ -154,5 +161,23 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins', () => {
     const listResponse = await GET(pluginInstallsRequest(organization.id, project.id).request, { params });
     const listed = (await listResponse.json()) as { installs: Array<Record<string, unknown>> };
     expect(listed.installs).toHaveLength(1);
+  });
+
+  it('installing the built-in SaaS metric pack (KAN-59) registers its metrics end to end', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Plugin Installs Route Metric Pack Org');
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML, registeredByUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = pluginInstallsRequest(organization.id, project.id, {
+      pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
+      version: '1.0.0',
+      consentedScopes: ['metrics:write'],
+      config: {},
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
+
+    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+    expect(defs.map((def) => def.name)).toEqual(expect.arrayContaining(['ad_spend', 'signups', 'mrr', 'cac', 'troi']));
   });
 });
