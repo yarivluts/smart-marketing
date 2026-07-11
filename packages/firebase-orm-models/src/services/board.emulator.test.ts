@@ -649,6 +649,37 @@ describe('queryBoardTile', () => {
     expect(executor.lastQuery?.sql).not.toContain('AS period');
   });
 
+  it('widens a histogram tile’s query start far below the board’s own date range, so a narrow board range can never filter out the one-row-per-project snapshot', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Histogram Time Range Org');
+    await registerEngagementDepthHistogram(organization.id, project.id, owner.id);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Engagement', createdByUserId: owner.id });
+    // The board's own default range is a trailing 30 days — deliberately far
+    // narrower than the fixed floor a histogram tile's query should widen to,
+    // proving the widening isn't merely "whatever the board already covers".
+    expect(board.date_range.start > '1970-01-01').toBe(true);
+
+    class RecordingWarehouseQueryExecutor implements WarehouseQueryExecutor {
+      public lastQuery: { sql: string; params: Record<string, unknown> } | undefined;
+      execute(query: { sql: string; params: Record<string, unknown> }): Promise<WarehouseRow[]> {
+        this.lastQuery = query;
+        return Promise.resolve([]);
+      }
+    }
+    const executor = new RecordingWarehouseQueryExecutor();
+
+    await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: histogramTile(),
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(executor.lastQuery?.params.time_start_current).toBe('1970-01-01');
+    expect(executor.lastQuery?.params.time_end_current).toBe(board.date_range.end);
+  });
+
   it('rethrows a genuinely unexpected executor error rather than degrading it to a generic outcome', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Query Unexpected Error Org');
     await registerAdSpend(organization.id, project.id, owner.id);

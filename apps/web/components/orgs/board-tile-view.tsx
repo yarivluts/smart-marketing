@@ -255,31 +255,20 @@ function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap'
   );
 }
 
-/** One bucket's bar — a fixed-height (`h-24`, matching `LineChartView`'s own chart height) container so each bar's percentage height resolves against a definite pixel height, the same reasoning `BarRow`'s own `h-8` gives, rather than an ambient `h-full` that only resolves correctly when some ancestor happens to constrain it. */
+/** Reuses `BarRow` (the same bar-with-tooltip renderer `BarChartView` already uses for a time series) for the bars themselves, adding only a per-bucket label row underneath — `BarRow`'s own bars are a fixed `w-2` each with a `gap-0.5` row, so this label row matches those exact widths/gap to stay aligned underneath. */
 function HistogramView({ view }: { view: Extract<TileRenderView, { kind: 'histogram' }> }): React.ReactElement {
   const t = useTranslations('Boards');
   if (view.labels.length === 0) {
     return <p className="text-xs text-muted-foreground">{t('histogramEmpty')}</p>;
   }
   const maxValue = Math.max(1, ...view.values);
+  const points = view.labels.map((label, index) => ({ bucket: label, value: view.values[index] }));
   return (
     <div className="flex flex-col gap-1" role="img" aria-label={t('histogramAriaLabel')}>
-      <div className="flex h-24 items-end gap-1">
-        {view.labels.map((label, index) => {
-          const value = view.values[index];
-          return (
-            <div
-              key={label}
-              title={t('barTooltip', { bucket: label, value: formatNumber(value) })}
-              className={`flex-1 rounded-sm ${SERIES_COLOR_CLASSES[0]}`}
-              style={{ height: `${Math.max(2, Math.round((value / maxValue) * 100))}%` }}
-            />
-          );
-        })}
-      </div>
-      <div className="flex gap-1">
+      <BarRow points={points} colorClass={SERIES_COLOR_CLASSES[0]} maxValue={maxValue} />
+      <div className="flex gap-0.5">
         {view.labels.map((label) => (
-          <span key={label} className="flex-1 truncate text-center text-xs text-muted-foreground">
+          <span key={label} className="w-2 flex-shrink-0 truncate text-center text-[10px] text-muted-foreground">
             {label}
           </span>
         ))}

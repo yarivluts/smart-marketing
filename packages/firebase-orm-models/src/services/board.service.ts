@@ -327,6 +327,24 @@ export interface QueryBoardTileParams {
  * story to change; the same "documented, not fixed" posture `cost-guardrail.
  * service.ts`'s own non-transactional-quota-check gap already takes.
  */
+// A `histogram` tile's source metric buckets by an "as of latest observed
+// activity date" snapshot column (e.g. `fact_engagement_depth_histogram.
+// as_of_date`) — every row shares the exact same date, unlike a heatmap's
+// `cohort_month` (a real per-row time axis the board's own date range is
+// meant to slice). `compileMetricQuery` (KAN-41) always filters its
+// `timeColumn` to `[start, end]`, so threading the board's own `date_range.
+// start` through unchanged would silently empty the tile the moment that
+// start is later than the snapshot's one `as_of_date` — which the board's
+// own default (a trailing 30-day window) already risks the instant a
+// project's pipeline goes quiet for a month. Widened to a fixed floor far
+// enough in the past that it can never exclude a real snapshot, while still
+// respecting the board's own `end` (a `histogram` tile genuinely has no
+// snapshot to show once the user asks to look further back than the
+// snapshot's own date — that's correct, not a bug, the same "current =
+// newest, no history kept" convention `ProjectCostQuotaModel`/
+// `TrackingAlertModel` already establish elsewhere in this codebase).
+const HISTOGRAM_TIME_RANGE_FLOOR = '1970-01-01';
+
 export async function queryBoardTile(params: QueryBoardTileParams): Promise<BoardTileQueryOutcome> {
   // `compare` (a "vs. previous period" overlay) is excluded for `heatmap`
   // alongside `funnel` — a cohort matrix's rows are already "cohort month",
@@ -344,7 +362,8 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
     ...(params.tile.type === 'funnel' ? {} : { dimensions: params.tile.dimensions }),
     ...(params.board.global_filters.length > 0 ? { filters: params.board.global_filters } : {}),
     time: {
-      start: params.board.date_range.start,
+      // See `HISTOGRAM_TIME_RANGE_FLOOR`'s own doc comment.
+      start: params.tile.type === 'histogram' ? HISTOGRAM_TIME_RANGE_FLOOR : params.board.date_range.start,
       end: params.board.date_range.end,
       grain: params.board.date_range.grain,
       ...(supportsCompare && params.board.compare ? { compare: params.board.compare } : {}),
