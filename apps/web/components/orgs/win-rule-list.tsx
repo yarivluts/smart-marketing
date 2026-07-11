@@ -16,7 +16,7 @@ function describeFilters(rule: WinRuleSummaryView, t: (key: string) => string): 
   if (rule.filters.length === 0) {
     return t('anyOccurrence');
   }
-  return rule.filters.map((filter) => `${filter.field} ${filter.operator} ${filter.value}`).join(' AND ');
+  return rule.filters.map((filter) => `${filter.field} ${filter.operator} ${filter.value}`).join(` ${t('filterJoiner')} `);
 }
 
 /** One win rule's row: schema + filter summary, an active/disabled toggle, and a delete button (KAN-65). */

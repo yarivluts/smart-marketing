@@ -17,6 +17,73 @@ Template for each entry:
 
 ---
 
+## 2026-07-11 — E12.2 Win rules engine (KAN-65): parallel-run collision, reconciled
+
+- **Last completed:**
+  - Picked **KAN-65** (win rules engine: event pattern -> win, realtime path) as the next unblocked
+    task per the prior entry's own recommendation. On starting, found a parallel scheduled run had
+    already opened **PR #50** (branch `kan-65-win-rules-engine`) moments earlier implementing this
+    exact story — a pure `evaluateWinRuleFilters` engine in `packages/shared/src/win-rules`
+    (reusing `mapping-engine`'s JSON-path extraction), `WinRuleModel`/`WinEventModel` +
+    `win-rule.service.ts` (CRUD, `evaluateRecordAgainstWinRules` wired synchronously into
+    `ingest.service.ts`'s `ingestBatch` right after a record lands), a project-scoped admin UI
+    (`orgs/:orgId/projects/:projectId/win-rules`) with a dynamic filter-row builder, and a
+    Server-Sent-Events live win feed (`win-rules/feed`) — this story's buildable-today stand-in for
+    a literal WebSocket, since apps/api's NestJS layer has no human-session auth wired in yet
+    (KAN-24). Following the same reconciliation posture the KAN-59/KAN-61 collision entries in this
+    file already established: didn't duplicate the work — independently reviewed and verified it
+    instead.
+  - The branch (2 commits) was based on `1ca0909` (right after KAN-61 merged), one merge behind
+    `main`'s actual tip (KAN-63's engagement pack, `ebf9c8f`). Merged `main` into it locally — clean,
+    no conflicts (the only overlapping files, `metric-pack-dispatch.service.ts` and both `messages/
+    *.json`, auto-merged: KAN-63's engagement-pack dispatch branch and KAN-65's win-rules code touch
+    disjoint parts of the same files).
+  - Ran the full verification suite from scratch: `pnpm lint`/`pnpm typecheck`/`pnpm build` green
+    across every package; `packages/firebase-orm-models`'s full emulator suite green (552/552,
+    including 21 new win-rule emulator tests — CRUD validation, org isolation (404-not-403), filter
+    matching, disabled-rule no-op, idempotent re-evaluation, multi-rule fan-out, two end-to-end tests
+    driving a real `ingestBatch` call through to a fired `WinEventModel`); `apps/web`'s suite green
+    (679/679) after one re-run — a single `lib/orgs/isolation.test.ts` (KAN-60 board-isolation) sub-test
+    timed out on the first full-suite pass, then passed cleanly (13/13) when re-run in isolation,
+    matching this file's own extensively-documented history of sandbox emulator-contention flakes
+    under load — not a KAN-65 regression (that test file doesn't touch win-rules code at all).
+  - **Independent review** of the diff found one real bug: `win-rule-list.tsx`'s `describeFilters`
+    joined multiple filter clauses with a bare `.join(' AND ')` — a hard-coded English literal that
+    would leak untranslated into the Hebrew UI (`ruleSummary`'s `filterSummary` parameter is rendered
+    inside an otherwise-Hebrew sentence for `he` locale users), violating CLAUDE.md's "no hard-coded
+    UI strings" rule. Not caught by the `react/jsx-no-literals` lint rule (it only matches literal
+    JSX text children, not a string built inside a function body) or by the existing test suite (no
+    test exercised the multi-filter join path). Fixed: added a `filterJoiner` key to both
+    `messages/en.json` ("AND") and `messages/he.json` ("וגם"), and changed the join to
+    `` .join(` ${t('filterJoiner')} `) ``. Added a regression test in `win-rule-list.test.tsx`
+    rendering a two-filter rule and asserting the translated joiner appears in the summary text.
+    Re-verified: `pnpm lint && pnpm typecheck` green; the touched test files (`win-rule-list.test.tsx`,
+    `win-rule-view.test.ts`, `messages/messages.test.ts` for en/he key parity) all green; the
+    `route-isolation-guard.test.ts` (KAN-26's filesystem-scanning non-enumeration guard) still passes,
+    confirming every new win-rules route calls `requireOrgPermission`.
+  - Merged into `main` as PR #50 (fast-forward, no new PR needed — pushed the fix commit onto the
+    existing branch/PR before merging).
+- **In progress (exact stopping point):** none — KAN-65 is fully delivered, tested, reviewed, and
+  merged. `TASKS.md` updated to `done`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked `todo` in sprint order is **KAN-66** (win catalog: reactivation +
+  trial-conversion win types; trial-pipeline war-room widget), layered on this story's engine — or
+  **KAN-67** (war-room TV mode), **KAN-68** (onboarding wizard), **KAN-69** (freshness badges/empty
+  states), **KAN-70** (alpha feedback instrumentation), all sprint-7 `todo` with no blocker.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`, opened by a separate concurrent run against a real deployed-
+    image bug) is still open and untouched by this run — out of scope for KAN-65, flagged here so the
+    next run doesn't lose track of it.
+  - Optional: investigate why `origin` branch deletion fails from this environment (still outstanding,
+    repo hygiene only).
+
+---
+
 ## 2026-07-11 — E11.5 Engagement pack + histogram tile (KAN-63)
 
 - **Last completed:**

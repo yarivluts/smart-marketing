@@ -693,6 +693,7 @@
     "namePlaceholder": "e.g. Big order",
     "schemaLabel": "Event",
     "filtersLabel": "Filters (all must match)",
+    "filterJoiner": "AND",
     "noFilters": "No filters — any occurrence of this event is a win.",
     "filterFieldLabel": "Field",
     "filterFieldPlaceholder": "e.g. properties.amount",

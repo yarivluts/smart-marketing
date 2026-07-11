@@ -693,6 +693,7 @@
     "namePlaceholder": "לדוגמה: הזמנה גדולה",
     "schemaLabel": "אירוע",
     "filtersLabel": "מסננים (כולם חייבים להתאים)",
+    "filterJoiner": "וגם",
     "noFilters": "אין מסננים — כל התרחשות של האירוע הזה היא ניצחון.",
     "filterFieldLabel": "שדה",
     "filterFieldPlaceholder": "לדוגמה: properties.amount",

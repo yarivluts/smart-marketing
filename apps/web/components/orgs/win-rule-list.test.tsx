@@ -51,6 +51,19 @@ describe('WinRuleList', () => {
     expect(screen.getByText('On order_completed — any occurrence')).toBeInTheDocument();
   });
 
+  it('joins multiple filters with the translated joiner, not a hard-coded literal', () => {
+    renderList([
+      {
+        ...activeRule,
+        filters: [
+          { field: 'properties.amount', operator: '>', value: '100' },
+          { field: 'plan', operator: '=', value: 'enterprise' },
+        ],
+      },
+    ]);
+    expect(screen.getByText('On order_completed — properties.amount > 100 AND plan = enterprise')).toBeInTheDocument();
+  });
+
   it('disables a rule and refreshes', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderList([activeRule]);
