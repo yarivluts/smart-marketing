@@ -17,6 +17,90 @@ Template for each entry:
 
 ---
 
+## 2026-07-11 — E11.5 Engagement pack + histogram tile (KAN-63)
+
+- **Last completed:**
+  - **KAN-63 (Engagement pack: dau/wau/mau, stickiness ratio, L28/LN histogram + histogram tile
+    type)**, done, delivered as **PR #53** (branch `kan-63-engagement-pack`, merged into `main`).
+  - Two new dbt core models in `packages/dbt-transform`: `fact_engagement_daily` (per-day DAU + a
+    trailing L28/LN active-customer count + `dau_mau_ratio`, the stickiness metric) and
+    `fact_engagement_depth_histogram` (the L28/LN engagement-depth histogram — customers bucketed
+    by how many of the trailing `engagement_window_days` days they were active, as of the project's
+    own latest observed activity date; N defaults to 28 and is configurable via a dbt `var`).
+    `dau`/`wau`/`mau` themselves are deliberately *not* sourced from these tables — they're one
+    shared `count_distinct` aggregation over the existing aspirational `fact_funnel_event` table
+    (mirroring the SaaS pack's own convention), queried at day/week/month grain respectively; only
+    the cross-grain *ratio* genuinely needs a dedicated precomputed table (a same-grain `dau / mau`
+    formula would always evaluate to exactly `1`, since the compiler buckets a whole query by one
+    grain — documented in `plugin-runtime/engagement-pack/metrics.ts`'s own doc comment). Verified
+    against a hand-built `proj_12` fixture (four customers with distinct 10/3/1/6-day activity
+    counts over a 28-day window) via two new dbt singular tests
+    (`assert_fact_engagement_daily_fixture_matches_expected.sql`,
+    `assert_fact_engagement_depth_histogram_fixture_matches_expected.sql`) — the literal KAN-63 AC:
+    "L28 histogram matches fixture on synthetic events". `dbt build`: 104/104 tests green.
+  - New built-in **Engagement pack** metric-pack plugin
+    (`packages/firebase-orm-models/src/plugin-runtime/engagement-pack`), mirroring KAN-59's SaaS
+    pack shape exactly (manifest + `ensureEngagementPackRegistered`, idempotent, one `Promise.all`
+    since none of its five metrics is formula-kind), wired into the existing
+    `installPluginAndProvisionBuiltins` install-time dispatch. No default boards (not part of this
+    story's AC, unlike KAN-61's SaaS-pack boards).
+  - New `histogram` board tile type, added to the KAN-60 tile framework the same way KAN-62's
+    `heatmap` was: `BOARD_TILE_TYPES` (both the server copy in `board.model.ts` and the client copy
+    in `apps/web`'s `board-types.ts`), `validateTiles`/`queryBoardTile` in `board.service.ts`, a
+    `HistogramView` view-mapper in `apps/web/lib/orgs/board-view.ts`, a grid-editor single-dimension
+    selector (refactored `board-grid-editor.tsx`'s heatmap-only single-dimension logic into a shared
+    `needsSingleDimension` check covering both `heatmap` and `histogram`), and a renderer in
+    `board-tile-view.tsx`.
+  - **Independent review** (3 parallel finder agents — correctness line-by-line, removed-behavior +
+    cross-file trace, reuse/simplification/efficiency/altitude/conventions — followed by a 1-vote
+    verify pass) converged on one real bug from two independent agents: a `histogram` tile's source
+    metric (`engagement_depth_histogram`) buckets by a single "as of latest observed activity date"
+    snapshot column, but `queryBoardTile` was still threading the board's own (often narrower)
+    `date_range.start` through as a time filter — silently emptying the tile the instant the
+    board's own range didn't happen to bracket that one snapshot date (the board's own default is a
+    trailing 30-day window, which already risks this the moment a project's pipeline goes quiet for
+    a month). Fixed by widening a `histogram` tile's own query start to a fixed `1970-01-01` floor
+    (documented in `board.service.ts`'s `HISTOGRAM_TIME_RANGE_FLOOR`), with a new emulator test
+    proving the compiled query's `time_start_current` param no longer inherits the board's own
+    start. Also fixed a real reuse gap the review caught: the first draft of `HistogramView`
+    reimplemented `BarRow`'s bar-with-tooltip rendering from scratch instead of reusing it — now
+    calls `BarRow` directly. A third finding (registering `dau`/`wau`/`mau` as three
+    literally-identical metric definitions) was considered and deliberately kept as-is: the metric
+    catalog/board picker has no separate "display name" concept from a metric's own registered
+    `name`, so giving a human three business-recognizable names for one query shape needs either
+    this triplication or a new alias mechanism — out of scope for this story; documented as a known
+    tradeoff in the pack's own doc comment, not a silent gap.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green locally (including the full
+    `apps/web` e2e suite) both before and after the review-fix commit; PR #53's own CI
+    (`lint · typecheck · test · build`) green before merge.
+- **In progress (exact stopping point):** none — KAN-63 is fully delivered, tested, reviewed, and
+  merged. `TASKS.md` updated to `done`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Known, deliberately-not-fixed gap:** the feature branch `kan-63-engagement-pack` could not be
+  deleted from `origin` after merging — `git push origin :refs/heads/kan-63-engagement-pack`
+  (and the `-d` form) both fail with an HTTP 403 from this environment's git credentials, even
+  though the same credentials can push commits and the GitHub API token can merge PRs. This is not
+  new to this run: every prior feature branch back through `kan-20-observability-baseline` is still
+  present on `origin` (`git branch -r` / GitHub's branch list has dozens of merged-and-abandoned
+  branches), so branch deletion has silently never worked across any past run either. Worth a human
+  checking the git remote's token scopes/branch-protection rules if repo tidiness matters; not
+  blocking any code work.
+- **Next step:** next unblocked `todo` in sprint order is **KAN-65** (E12.2 win rules engine +
+  realtime path) or **KAN-66** (win catalog: reactivation + trial-conversion types) — both sprint 7,
+  phase 1, no `blocked-by`. KAN-67/68/69/70 are also sprint-7 `todo` with no blocker. Sprint 3
+  `KAN-71`+ (phase 3 epics) are lower priority per phase ordering.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding, still explicitly flagged as needing a human (or a future run told to reconcile) to
+    pick one and close the rest.
+  - Optional: investigate why `origin` branch deletion fails from this environment (see above) —
+    not urgent, just repo hygiene.
+
+---
+
 ## 2026-07-11 — E11.3 Default boards (KAN-61): parallel-run collision, reconciled
 
 - **Last completed:**
