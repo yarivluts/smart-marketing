@@ -17,6 +17,85 @@ Template for each entry:
 
 ---
 
+## 2026-07-11 — E12.2b Win catalog + trial-pipeline widget (KAN-66): parallel-run collision, reconciled
+
+- **Last completed:**
+  - Picked **KAN-66** (win catalog: reactivation + trial-conversion win types; trial-pipeline
+    war-room widget) as the next unblocked task per the prior entry's own recommendation. On
+    starting, found a parallel scheduled run had already opened **PR #54** (branch
+    `kan-66-win-catalog`) moments earlier implementing this exact story — following the same
+    reconciliation posture the KAN-59/KAN-61/KAN-65 collision entries in this file already
+    established: didn't duplicate the work, independently reviewed and verified it instead.
+  - The branch (1 commit) was already based directly on `da9d42a` — `main`'s actual tip (KAN-65)
+    — so no rebase/merge was needed. (Diffing against a stale local `main` ref left over from
+    earlier in this run initially made the diff look far larger than it was — a local-only
+    artifact, not a branch problem; `git branch -f main origin/main` fixed the comparison base
+    before review.)
+  - What it delivers: a `win_type` catalog (`generic`/`reactivation`/`trial_conversion`) layered on
+    KAN-65's win-rules engine — `WinRuleModel`/`WinEventModel` gain the field (denormalized onto
+    the fired event, same rationale as `win_rule_name`), threaded through `createWinRule`/
+    `updateWinRule` validation, both win-rule API routes, and the admin UI (a type selector + hint
+    text on the create form, badges on the rule list and live feed). Five new SaaS metric-pack
+    metrics (`reactivations`, `trial_starts`, `trial_conversions`, `trials_active`,
+    `trial_conversion_rate`) over a new aspirational `fact_subscription_event` table, following the
+    pack's existing buildable-today convention. A trial-pipeline war-room widget ("in trial now ->
+    converting at X%") on the win-rules page: `getTrialPipelineSummary` mirrors `queryBoardTile`'s
+    three-reason degrade-to-outcome shape (warehouse not configured / quota exceeded / query error)
+    rather than throwing, so the widget shows a translated empty state instead of breaking when the
+    SaaS pack isn't installed yet.
+  - Ran the full verification suite from scratch: `pnpm lint`/`pnpm typecheck`/`pnpm build` green
+    across every package (dbt-transform's Python-venv provisioning and the Firestore-emulator
+    download both needed `PIP_CERT`/`SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE`/`NODE_EXTRA_CA_CERTS`
+    pointed at this environment's proxy CA bundle to get past a cert-verification failure — an
+    environment quirk, not a code issue, and not new: this run's tools didn't have those vars set
+    by default the way a from-scratch CI runner apparently does). `packages/firebase-orm-models`'s
+    full emulator suite green (564/564, including the new `win-rule.emulator.test.ts` win-type
+    cases and `trial-pipeline.emulator.test.ts`). `packages/shared` (304/304), `packages/tracking-sdk`
+    (21/21), `apps/web` (697 unit/component + full Playwright e2e green — 4 specs needed Playwright's
+    built-in retry on the first pass, all pre-existing emulator-contention flakes unrelated to this
+    diff: `auth`, `hooks`, `ingest-health`, `resource-library`, none of which touch win-rules/
+    trial-pipeline code) all green. PR #54's own CI run (`e2019687`) independently reports
+    `conclusion: success`, matching this run's from-scratch local verification.
+  - **Independent review** of the diff: `win_type` validation collects-then-throws the same way
+    `validateFilters` already does (not two different error-reporting conventions for one rule);
+    `WinType`/`WIN_TYPES`/`isWinType` follow the exact `WinRuleFilterOperator` pattern already
+    established in `packages/shared`; `trial-pipeline-view.ts` reuses `board-view.ts`'s own
+    `sumMetric` rather than reimplementing it (the PR's own description notes this was already
+    caught and fixed in the PR author's own self-review pass); en/he translation keys added in
+    matching pairs for every new UI string (`winTypeFieldLabel`, `winTypeLabel.*`, `winTypeHint.*`,
+    the whole `TrialPipeline` namespace) — no hard-coded strings, no Hebrew outside `messages/*.json`;
+    the win-rules API routes reuse the existing KAN-65 permission guard (no new routes were added
+    that could skip `requireOrgPermission`, so KAN-26's filesystem-scanning isolation guard test
+    needed no changes and still passes). No correctness bugs, no missing test coverage, and no
+    reuse/simplification issues found — nothing left to fix before merge.
+  - Merged PR #54 into `main` (`e98143e`, plain merge commit — no new PR needed, the existing one
+    was already clean and green). Remote branch deletion (`git push origin --delete
+    kan-66-win-catalog`) failed with the same HTTP 403 documented for every prior feature branch
+    back through `kan-20-observability-baseline` — not new, not investigated further this run.
+  - `TASKS.md` updated to `done` for KAN-66.
+- **In progress (exact stopping point):** none — KAN-66 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked `todo` in sprint order is **KAN-67** (war-room TV mode: fullscreen
+  rotation, win feed overlay, confetti + sound per win type, device pairing code, reduced-motion),
+  layered on KAN-65/KAN-66's win engine/catalog — or **KAN-68** (onboarding wizard), **KAN-69**
+  (freshness badges/empty states), **KAN-70** (alpha feedback instrumentation), all sprint-7 `todo`
+  with no blocker. Check for a parallel-run collision (an already-open PR for the same story) before
+  starting new implementation work, same as this entry and the last several before it.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`, opened by a separate concurrent run against a real deployed-
+    image bug) is still open and untouched by this run — out of scope for KAN-66, flagged here so the
+    next run doesn't lose track of it.
+  - Optional: investigate why `origin` branch deletion fails from this environment (still outstanding,
+    repo hygiene only).
+
+---
+
 ## 2026-07-11 — E12.2 Win rules engine (KAN-65): parallel-run collision, reconciled
 
 - **Last completed:**
