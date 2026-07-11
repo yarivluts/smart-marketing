@@ -80,11 +80,23 @@ describe('SAAS_METRIC_PACK_DEFAULT_BOARDS', () => {
         }
       });
 
-      it('requests only dimensions its metric(s) actually declare', () => {
+      // Mirrors `validateTiles`'s own nested loop exactly (`board.service.ts`):
+      // for every metric a tile references, every one of that tile's
+      // dimensions must be declared by *that* metric — not just by any one
+      // of the tile's metrics. Only `funnel` tiles (this pack's only
+      // multi-metric tile type) could ever tell the difference, and every
+      // funnel tile here has `dimensions: []`, but this asserts the real
+      // per-metric rule rather than a looser "some metric declares it" one.
+      it('requests only dimensions every one of its referenced metrics actually declares', () => {
         for (const tile of board.tiles) {
-          for (const dimension of tile.dimensions) {
-            const declaredByAnyMetric = tile.metricNames.some((metricName) => metricsByName.get(metricName)?.dimensions.includes(dimension));
-            expect(declaredByAnyMetric, `tile "${tile.id}" requests undeclared dimension "${dimension}"`).toBe(true);
+          for (const metricName of tile.metricNames) {
+            const metric = metricsByName.get(metricName);
+            for (const dimension of tile.dimensions) {
+              expect(
+                metric?.dimensions.includes(dimension),
+                `tile "${tile.id}" requests dimension "${dimension}", which metric "${metricName}" doesn't declare`,
+              ).toBe(true);
+            }
           }
         }
       });

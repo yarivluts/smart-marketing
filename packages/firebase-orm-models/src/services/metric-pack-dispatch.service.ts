@@ -35,10 +35,18 @@ import { installPlugin, type InstallPluginParams } from './plugin-registry.servi
  * `installed` `PluginInstallModel` with only some of its metrics/boards
  * provisioned, and a re-POST to install the same plugin id in the same
  * project throws `PluginAlreadyInstalledError` rather than resuming — there
- * is no retry surface yet. Both provisioning calls are themselves
- * idempotent, so a human can uninstall and reinstall to retry today; a
- * dedicated re-provision action is a reasonable follow-up if this proves to
- * matter in practice.
+ * is no retry surface yet. `ensureSaasMetricPackRegistered` is fully
+ * retry-safe (each metric is one atomic write, so a human can uninstall and
+ * reinstall to converge on all seventeen registered). Board seeding is
+ * *not* equally retry-safe, and `uninstallPlugin` only flips the install's
+ * own `status` — it never deletes what got provisioned: if
+ * `ensureSaasMetricPackDefaultBoardsSeeded` creates a board but then fails
+ * before `saveBoardTiles` populates it (see that function's own doc comment
+ * on its name-keyed idempotency), that board is stuck empty forever — a
+ * reinstall's name check sees it already exists and skips it, same as it
+ * would for a human's own real customization. A dedicated re-provision
+ * action (or a tiles-empty-means-retry check) is a reasonable follow-up if
+ * this proves to matter in practice.
  */
 export async function installPluginAndProvisionBuiltins(params: InstallPluginParams): Promise<PluginInstallModel> {
   const install = await installPlugin(params);

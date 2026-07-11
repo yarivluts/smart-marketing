@@ -175,6 +175,16 @@ export interface EnsureSaasMetricPackDefaultBoardsSeededResult {
  * function never edits an existing board's tiles, so a human free to
  * customize "Marketing" after the first install won't have their edits
  * clobbered by a re-install.
+ *
+ * Known gap this name-keyed check can't distinguish: `createBoard` and
+ * `saveBoardTiles` below are two separate writes, not one transaction. If
+ * the process dies (or Firestore errors) between them, the board persists
+ * with `tiles: []`, and every future call sees its name already present and
+ * skips it forever — indistinguishable from a human's own deliberate
+ * customization. `installPluginAndProvisionBuiltins`'s own doc comment
+ * documents this as a real, not-yet-remediable gap (unlike its sibling
+ * metric-registration half, `uninstallPlugin` doesn't delete boards, so
+ * "uninstall and reinstall" doesn't actually retry a stuck-empty board).
  */
 export async function ensureSaasMetricPackDefaultBoardsSeeded(
   organizationId: string,
