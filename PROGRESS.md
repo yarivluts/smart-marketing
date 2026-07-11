@@ -17,6 +17,56 @@ Template for each entry:
 
 ---
 
+## 2026-07-11 — E11.3 Default boards (KAN-61): parallel-run collision, reconciled
+
+- **Last completed:**
+  - Picked **KAN-61** (default boards: Marketing, Revenue/MRR, Funnel) as the next unblocked task —
+    same pick as the entry below this one, which had just unblocked it by delivering KAN-59.
+    Implemented it independently from scratch: a new `default-boards.ts` in
+    `packages/firebase-orm-models/src/plugin-runtime/saas-metric-pack/` (three board definitions +
+    an idempotent, name-keyed `ensureSaasMetricPackDefaultBoardsSeeded`), wired into
+    `installPluginAndProvisionBuiltins` right after `ensureSaasMetricPackRegistered`, with emulator
+    test coverage. `pnpm lint && pnpm typecheck && pnpm build` green locally; full
+    `packages/firebase-orm-models` emulator suite (491 tests) green.
+  - On `git push`, discovered a remote branch **already named `kan-61-default-boards`** — a parallel
+    scheduled run had independently implemented the *same* story (same three board names, same
+    metric choices, same name-keyed idempotency approach) and opened it as **PR #49**, already
+    through its own independent-review pass (a doc-comment fix + a tightened per-metric dimension
+    check in its pure unit tests) and CI-green (`lint · typecheck · test · build` all green in one
+    check run). Per this file's established "reconcile, don't duplicate" posture for exactly this
+    situation (see the KAN-20/KAN-33/KAN-46/KAN-59 precedents), did not push a second competing
+    implementation. Instead: renamed my own branch aside locally, checked out PR #49's branch,
+    re-read its full diff line by line (tile layouts, dimension declarations against
+    `metrics.ts`'s declared dimensions, grid-bounds math, idempotency semantics) — found no
+    correctness issues, and it's a superset of my own version (also adds a pure
+    `default-boards.test.ts` mirroring `validateTiles`'s exact per-metric dimension-check semantics,
+    plus an end-to-end `apps/web` plugin-install route assertion). Re-ran `pnpm typecheck`/`pnpm lint`
+    and the new tests locally from a clean checkout (`default-boards.test.ts`,
+    `default-boards.emulator.test.ts`, `metric-pack-dispatch.emulator.test.ts` — 32/32 passing) to
+    independently confirm CI's own green result. Merged **PR #49** (squash).
+  - Remote branch deletion for `kan-61-default-boards` failed with the same known HTTP 403 this
+    sandbox's git remote has hit before (KAN-24, KAN-59) — merged and dead but not deleted; a human
+    with direct repo access can delete it.
+  - My own from-scratch implementation was discarded unpushed (superseded, not merged) — no trace
+    left in git history beyond this note.
+- **In progress (exact stopping point):** none — KAN-61 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked `todo` in sprint order is **KAN-65** (win rules engine + realtime
+  path, sprint 7) — every sprint 1-6 story is now `done`/`needs-human`/`blocked-by` an unfinished
+  blocker, and KAN-63 (E11.5 engagement pack) has no sprint assigned (`-`) but is otherwise
+  unblocked too and could reasonably be picked instead.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-61-default-boards` branch on GitHub (403 from this sandbox's
+    git remote, as above); same for the still-outstanding `kan-59-metric-pack` branch noted below.
+
+---
+
 ## 2026-07-11 — Independent re-verification of KAN-59 (no new code)
 
 - **Last completed:** Picked up KAN-59 as the next unblocked sprint-7 `todo`, same as the entry
