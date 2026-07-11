@@ -213,6 +213,9 @@ importers:
       firebase:
         specifier: ^11.10.0
         version: 11.10.0
+      firebase-admin:
+        specifier: ^13.0.2
+        version: 13.10.0
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
