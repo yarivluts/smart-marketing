@@ -199,4 +199,28 @@ describe('BoardGridEditor', () => {
       expect((screen.getByLabelText('Breakdown by') as HTMLSelectElement).value).toBe('cohort_size');
     });
   });
+
+  describe('histogram tile type', () => {
+    const engagementCatalog: MetricCatalogEntryRow[] = [{ name: 'engagement_depth_histogram', dimensions: ['days_active_bucket'] }];
+    const engagementTile: BoardTileRow = {
+      id: 'tile-1',
+      type: 'big_number',
+      title: 'Engagement depth',
+      layout: { x: 0, y: 0, w: 3, h: 2 },
+      metricNames: ['engagement_depth_histogram'],
+      dimensions: [],
+    };
+
+    it('switching a tile to histogram auto-selects the metric’s first dimension as a single-select, not a checkbox list', () => {
+      renderEditor([engagementTile], engagementCatalog);
+      fireEvent.click(screen.getByRole('button', { name: 'Edit layout' }));
+
+      fireEvent.change(screen.getByLabelText('Tile type'), { target: { value: 'histogram' } });
+
+      const dimensionSelect = screen.getByLabelText('Breakdown by') as HTMLSelectElement;
+      expect(dimensionSelect.tagName).toBe('SELECT');
+      expect(dimensionSelect.value).toBe('days_active_bucket');
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    });
+  });
 });

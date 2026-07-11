@@ -595,7 +595,8 @@
       "big_number": "מספר גדול",
       "table": "טבלה",
       "funnel": "משפך",
-      "heatmap": "מפת חום של קוהורטות"
+      "heatmap": "מפת חום של קוהורטות",
+      "histogram": "היסטוגרמה"
     },
     "funnelStepsLabel": "שלבי המשפך (לפי סדר)",
     "funnelStepLabel": "שלב {step}",
@@ -612,6 +613,8 @@
     "tableEmpty": "אין נתונים לטווח זה עדיין.",
     "heatmapEmpty": "אין נתוני קוהורטות לטווח זה עדיין.",
     "heatmapCellTooltip": "{row} · {column}: {value}",
+    "histogramEmpty": "אין נתונים לטווח זה עדיין.",
+    "histogramAriaLabel": "היסטוגרמה",
     "tileUnavailableReason": {
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",

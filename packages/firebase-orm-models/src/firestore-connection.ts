@@ -2,6 +2,29 @@ import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import { collection, connectFirestoreEmulator, getDocs, getFirestore } from 'firebase/firestore';
 import { FirestoreOrmRepository } from '@arbel/firebase-orm';
 
+/**
+ * `firebase-admin/app` and `@arbel/firebase-orm/admin` are only reachable
+ * through their packages' `exports` maps, which this package's Node10
+ * (`moduleResolution: "Node"`) TypeScript setup cannot see — a static import
+ * of the latter would even pull the package's raw `admin.ts` source into our
+ * build. Non-literal dynamic imports below sidestep the checker and resolve
+ * correctly at runtime (Node CJS `require`, Next/webpack, and vitest all
+ * honour `exports` maps), with the minimal shapes we rely on typed here.
+ */
+interface AdminAppLike {
+  name: string;
+}
+interface FirebaseAdminAppModule {
+  getApps: () => AdminAppLike[];
+  initializeApp: (options?: { projectId?: string }) => AdminAppLike;
+}
+interface FirebaseOrmAdminModule {
+  initializeAdminApp: (app: AdminAppLike, key?: string) => Promise<AdminAppLike>;
+}
+
+const FIREBASE_ADMIN_APP_ENTRY = 'firebase-admin/app';
+const FIREBASE_ORM_ADMIN_ENTRY = '@arbel/firebase-orm/admin';
+
 const DEFAULT_APP_NAME = 'growthos-firestore-orm';
 const WARMUP_ATTEMPTS = 20;
 const WARMUP_RETRY_DELAY_MS = 500;
@@ -37,6 +60,31 @@ async function warmUpEmulatorConnection(firestore: ReturnType<typeof getFirestor
       await delay(WARMUP_RETRY_DELAY_MS);
     }
   }
+}
+
+/**
+ * Connects the global ORM connection through the Firebase **Admin** SDK —
+ * the correct path for trusted server environments (Cloud Run, functions)
+ * against a real Firestore project: credentials come from Application
+ * Default Credentials and bypass security rules, whereas the client-SDK
+ * path below is unauthenticated server-side and gets `permission-denied`
+ * outside the emulator. The Admin SDK honours `FIRESTORE_EMULATOR_HOST` on
+ * its own, so this path works against the emulator too. Idempotent, same as
+ * `connectFirestoreOrm`.
+ */
+export async function connectFirestoreOrmAdmin(options: { projectId: string }): Promise<void> {
+  if (connected) {
+    return;
+  }
+
+  const adminAppModule = (await import(FIREBASE_ADMIN_APP_ENTRY)) as FirebaseAdminAppModule;
+  const ormAdminModule = (await import(FIREBASE_ORM_ADMIN_ENTRY)) as FirebaseOrmAdminModule;
+
+  const adminApp =
+    adminAppModule.getApps()[0] ?? adminAppModule.initializeApp({ projectId: options.projectId });
+  await ormAdminModule.initializeAdminApp(adminApp);
+
+  connected = true;
 }
 
 /**

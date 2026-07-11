@@ -18,7 +18,13 @@ seeds:
       retention journey (KAN-62's `fact_cohort_retention`: a January cohort
       of 3 customers and a February cohort of 2, with hand-picked return
       activity spanning January–March) — isolated from every other
-      project's own exact-row-count-asserting fixture test.
+      project's own exact-row-count-asserting fixture test. `proj_12`'s rows
+      are a synthetic 28-day engagement window (KAN-63's `fact_engagement_
+      daily`/`fact_engagement_depth_histogram`: four customers with
+      deliberately distinct activity-day counts — 10/3/1/6 out of the
+      2026-04-01..2026-04-28 window — so both the daily DAU/stickiness table
+      and the days-active histogram have hand-computable, mutually distinct
+      expected values) — isolated the same way.
     columns:
       - name: organization_id
         tests:

@@ -9,8 +9,9 @@ WORKDIR /app
 FROM base AS build
 COPY . .
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @growthos/shared build \
- && pnpm --filter @growthos/firebase-orm-models build \
+# Build every workspace dependency of the app (present and future), except
+# @growthos/dbt-transform — a Python/dbt project that must not run here.
+RUN pnpm --filter "@growthos/api^..." --filter "!@growthos/dbt-transform" build \
  && pnpm --filter @growthos/api build
 
 FROM base AS runner
