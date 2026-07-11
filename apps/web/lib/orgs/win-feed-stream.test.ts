@@ -48,6 +48,32 @@ async function setupProjectWithRule(orgName: string) {
   return { organization, project, environmentId: environments[0].id };
 }
 
+/** Two rules watching the same schema — one `evaluateRecordAgainstWinRules` call against a matching record fires both, sharing one millisecond-resolution `created_at` (the same-timestamp collision `listWinEventsSince`'s own doc comment describes). */
+async function setupProjectWithTwoRulesOnSameSchema(orgName: string) {
+  const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('owner') });
+  const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
+  const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
+  await registerSchemaDefinition({
+    organizationId: organization.id,
+    projectId: project.id,
+    kind: 'event',
+    name: 'order_completed',
+    fields: [{ name: 'amount', type: 'number', isRequired: false, isPii: false, isIdentityKey: false }],
+    createdByUserId: owner.id,
+  });
+  for (const name of ['Any order', 'Big order']) {
+    await createWinRule({
+      organizationId: organization.id,
+      projectId: project.id,
+      name,
+      schemaName: 'order_completed',
+      filters: name === 'Big order' ? [{ field: 'properties.amount', operator: '>', value: '100' }] : [],
+      createdByUserId: owner.id,
+    });
+  }
+  return { organization, project, environmentId: environments[0].id };
+}
+
 /** Reads SSE chunks off `stream` until `predicate` matches decoded text so far, or `timeoutMs` elapses. */
 async function readUntil(stream: ReadableStream<Uint8Array>, predicate: (text: string) => boolean, timeoutMs = 5000): Promise<string> {
   const reader = stream.getReader();
@@ -108,6 +134,61 @@ describe('createWinFeedStream', () => {
     const item = JSON.parse(dataLine!.slice('data: '.length)) as WinEventFeedItem;
     expect(item.schemaName).toBe('signup');
     expect(item.clientId).toBe('evt_1');
+
+    const idLine = text.split('\n').find((line) => line.startsWith('id: '));
+    expect(idLine).toBe(`id: ${item.createdAt}`);
+  });
+
+  it('flushes every win sharing the same created_at exactly once, then dedupes a same-cursor requery', async () => {
+    const { organization, project, environmentId } = await setupProjectWithTwoRulesOnSameSchema('Win Feed Stream Collision Org');
+    const before = new Date(Date.now() - 1000).toISOString();
+
+    await evaluateRecordAgainstWinRules({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId,
+      kind: 'event',
+      schemaName: 'order_completed',
+      clientId: 'evt_1',
+      payload: { properties: { amount: 500 } },
+      rawRecordId: 'raw_1',
+      occurredAt: new Date().toISOString(),
+    });
+
+    const controller = new AbortController();
+    const stream = createWinFeedStream({
+      organizationId: organization.id,
+      projectId: project.id,
+      since: before,
+      signal: controller.signal,
+      pollIntervalMs: 20,
+      maxDurationMs: 4000,
+    });
+
+    // Two rules matched -> two win events with an identical `created_at`. Keep reading past the
+    // point both have arrived, through several more poll ticks (still well inside `maxDurationMs`),
+    // to prove a same-cursor requery doesn't re-send either of them.
+    const reader = stream.getReader();
+    const decoder = new TextDecoder();
+    let text = '';
+    const deadline = Date.now() + 1000;
+    while (Date.now() < deadline) {
+      const { value, done } = await reader.read();
+      if (done) {
+        break;
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    controller.abort();
+    await reader.cancel().catch(() => undefined);
+
+    expect(text.split('event: win').length - 1).toBe(2);
+    const winRuleNames = text
+      .split('\n')
+      .filter((line) => line.startsWith('data: '))
+      .map((line) => (JSON.parse(line.slice('data: '.length)) as WinEventFeedItem).winRuleName)
+      .sort();
+    expect(winRuleNames).toEqual(['Any order', 'Big order']);
   });
 
   it('never flushes a win that occurred before the cursor', async () => {
@@ -141,6 +222,31 @@ describe('createWinFeedStream', () => {
 
     expect(text).toContain('heartbeat');
     expect(text).not.toContain('event: win');
+  });
+
+  it('closes promptly, not spinning for the full maxDurationMs, when the project does not exist', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Win Feed Stream Missing Project Org', ownerUserId: owner.id });
+
+    const controller = new AbortController();
+    const stream = createWinFeedStream({
+      organizationId: organization.id,
+      projectId: 'does-not-exist',
+      since: new Date().toISOString(),
+      signal: controller.signal,
+      pollIntervalMs: 20,
+      maxDurationMs: 60_000,
+    });
+
+    const reader = stream.getReader();
+    const start = Date.now();
+    let done = false;
+    while (!done && Date.now() - start < 5000) {
+      done = (await reader.read()).done;
+    }
+    controller.abort();
+    expect(done).toBe(true);
+    expect(Date.now() - start).toBeLessThan(5000);
   });
 
   it('stops enqueueing once the caller aborts', async () => {

@@ -6,14 +6,21 @@ interface RouteParams {
   params: Promise<{ orgId: string; projectId: string }>;
 }
 
+function firstNonEmpty(value: string | null): string | null {
+  return value && value.trim().length > 0 ? value : null;
+}
+
 /**
  * KAN-65's realtime win feed (AC: "ingest -> Pub/Sub -> WebSocket", test
  * purchase appears in feed < 5s) — see `createWinFeedStream`'s own doc
  * comment (`win-feed-stream.ts`) for why this is a Server-Sent Events stream
- * rather than a literal WebSocket. `?since=<ISO>` resumes from a client's
- * last-seen cursor (an `EventSource` reconnect included) — omitted on a
- * fresh connection, defaulting to "now" so a first-time viewer doesn't get
- * flooded with a project's entire win history.
+ * rather than a literal WebSocket. The resume cursor is resolved in priority
+ * order: the standard `Last-Event-ID` header (a native `EventSource`
+ * reconnect sets this automatically to the `id:` of the last event it saw —
+ * see `createWinFeedStream`'s own doc comment for why closing this gap
+ * matters), then `?since=<ISO>` (a caller-supplied starting point), then
+ * "now" so a first-time viewer doesn't get flooded with a project's entire
+ * win history.
  */
 export async function GET(request: NextRequest, { params }: RouteParams): Promise<Response> {
   const { orgId, projectId } = await params;
@@ -22,8 +29,9 @@ export async function GET(request: NextRequest, { params }: RouteParams): Promis
     return error;
   }
 
+  const lastEventId = request.headers.get('last-event-id');
   const sinceParam = request.nextUrl.searchParams.get('since');
-  const since = sinceParam && sinceParam.trim().length > 0 ? sinceParam : new Date().toISOString();
+  const since = firstNonEmpty(lastEventId) ?? firstNonEmpty(sinceParam) ?? new Date().toISOString();
 
   const stream = createWinFeedStream({
     organizationId: orgId,

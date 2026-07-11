@@ -466,7 +466,7 @@ describe('evaluateRecordAgainstWinRules', () => {
 });
 
 describe('listWinEventsSince', () => {
-  it('returns only wins created strictly after the given cursor, oldest-first', async () => {
+  it('returns wins created at-or-after the given cursor, oldest-first', async () => {
     const { owner, organization, project, environmentId } = await setupOrgWithProject('Win Feed Poll Org');
     await registerEventSchema(organization.id, project.id, 'signup', owner.id);
     await createWinRule({
@@ -491,12 +491,58 @@ describe('listWinEventsSince', () => {
     });
     const [firstBatch] = await listRecentWinEventsForProject(organization.id, project.id);
 
-    const none = await listWinEventsSince(organization.id, project.id, firstBatch.created_at);
+    const afterCursor = new Date(Date.parse(firstBatch.created_at) + 1).toISOString();
+    const none = await listWinEventsSince(organization.id, project.id, afterCursor);
     expect(none).toHaveLength(0);
+
+    const atCursor = await listWinEventsSince(organization.id, project.id, firstBatch.created_at);
+    expect(atCursor.map((event) => event.id)).toEqual([firstBatch.id]);
 
     const beforeCursor = new Date(Date.parse(firstBatch.created_at) - 1).toISOString();
     const some = await listWinEventsSince(organization.id, project.id, beforeCursor);
     expect(some.map((event) => event.id)).toEqual([firstBatch.id]);
+  });
+
+  it('includes every win sharing the exact same created_at as the cursor — the same-millisecond collision a concurrent ingest batch can produce', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Win Feed Poll Collision Org');
+    await registerEventSchema(organization.id, project.id, 'order_completed', owner.id);
+    await createWinRule({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Any order',
+      schemaName: 'order_completed',
+      filters: [],
+      createdByUserId: owner.id,
+    });
+    await createWinRule({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Big order',
+      schemaName: 'order_completed',
+      filters: [{ field: 'properties.amount', operator: '>', value: '100' }],
+      createdByUserId: owner.id,
+    });
+
+    // Two rules matching the same record in one `evaluateRecordAgainstWinRules` call
+    // share a single `now` — the exact same-timestamp collision the real ingest path
+    // produces when several delivered records finish evaluation in the same millisecond.
+    await evaluateRecordAgainstWinRules({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId,
+      kind: 'event',
+      schemaName: 'order_completed',
+      clientId: 'evt_1',
+      payload: { properties: { amount: 500 } },
+      rawRecordId: 'raw_1',
+      occurredAt: '2026-07-11T00:00:00.000Z',
+    });
+    const wins = await listRecentWinEventsForProject(organization.id, project.id);
+    expect(wins).toHaveLength(2);
+    expect(wins[0].created_at).toBe(wins[1].created_at);
+
+    const atCursor = await listWinEventsSince(organization.id, project.id, wins[0].created_at);
+    expect(atCursor.map((event) => event.id).sort()).toEqual(wins.map((event) => event.id).sort());
   });
 });
 

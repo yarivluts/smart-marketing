@@ -331,12 +331,24 @@ export async function listRecentWinEventsForProject(
 }
 
 /**
- * Every win created strictly after `sinceIso`, oldest-first — the live
- * feed's incremental-poll building block (`apps/web`'s win-feed SSE stream
- * stands in for a real WebSocket push subscription; see that route's own
- * doc comment). Oldest-first (unlike {@link listRecentWinEventsForProject})
+ * Every win created at-or-after `sinceIso` (inclusive), oldest-first — the
+ * live feed's incremental-poll building block (`apps/web`'s win-feed SSE
+ * stream stands in for a real WebSocket push subscription; see that route's
+ * own doc comment). Oldest-first (unlike {@link listRecentWinEventsForProject})
  * so a poller can advance its own cursor to the last item's `created_at`
- * without skipping or re-sending anything in between.
+ * without skipping anything in between.
+ *
+ * Deliberately inclusive, not strictly-after: `evaluateRecordAgainstWinRules`
+ * stamps every win fired within one call with the same millisecond-resolution
+ * `created_at`, and `ingestBatch` fans that call out concurrently across a
+ * batch's delivered records — so two win events sharing an identical
+ * `created_at` is a real, expected occurrence under load, not an edge case.
+ * A strictly-after cursor would let a poller that already advanced past that
+ * timestamp permanently miss a same-timestamp sibling written a moment later.
+ * Callers that re-poll with a cursor equal to an already-seen win's
+ * `created_at` are expected to dedupe by id against what they've already
+ * flushed (see `createWinFeedStream`'s own `seenAtCursor` tracking) rather
+ * than rely on this query to exclude it.
  */
 export async function listWinEventsSince(
   organizationId: string,
@@ -347,7 +359,7 @@ export async function listWinEventsSince(
   await requireProjectInOrg(organizationId, projectId);
   return WinEventModel.initPath({ organization_id: organizationId, project_id: projectId })
     .query()
-    .where('created_at', '>', sinceIso)
+    .where('created_at', '>=', sinceIso)
     .orderBy('created_at')
     .limit(Math.min(limit, DEFAULT_WIN_EVENT_LIST_LIMIT))
     .get();
