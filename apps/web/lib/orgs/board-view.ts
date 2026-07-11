@@ -83,7 +83,8 @@ export type TileRenderView =
   | ({ kind: 'heatmap' } & HeatmapView)
   | ({ kind: 'histogram' } & HistogramView);
 
-function toNumber(value: string | number | null): number {
+/** Exported for reuse by other view-mappers in this app (e.g. `trial-pipeline-view.ts`) that sum the same `WarehouseRow[]` shape — not shared with `packages/firebase-orm-models`, which keeps its own local mirror since that package must not depend on `apps/web` (see `goal.service.ts`'s `sumMetricRows`). */
+export function toNumber(value: string | number | null): number {
   if (value === null) {
     return 0;
   }
@@ -104,7 +105,8 @@ function splitByPeriod(rows: readonly WarehouseRow[]): { current: WarehouseRow[]
   return { current, previous };
 }
 
-function sumMetric(rows: readonly WarehouseRow[], metricName: string): number {
+/** Exported — see `toNumber`'s own doc comment on why this is shared within `apps/web` but not with `packages/firebase-orm-models`. */
+export function sumMetric(rows: readonly WarehouseRow[], metricName: string): number {
   return rows.reduce((total, row) => total + toNumber(row[metricName] ?? null), 0);
 }
 

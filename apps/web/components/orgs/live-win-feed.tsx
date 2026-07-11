@@ -49,8 +49,13 @@ export function LiveWinFeed({ orgId, projectId }: LiveWinFeedProps): React.React
       ) : (
         <ul className="flex flex-col gap-2">
           {items.map((item) => (
-            <li key={item.id} className="rounded-md border border-input px-3 py-2 text-sm">
-              {t('feedItem', { winRuleName: item.winRuleName, schemaName: item.schemaName, clientId: item.clientId })}
+            <li key={item.id} className="flex items-center gap-2 rounded-md border border-input px-3 py-2 text-sm">
+              <span>{t('feedItem', { winRuleName: item.winRuleName, schemaName: item.schemaName, clientId: item.clientId })}</span>
+              {item.winType !== 'generic' ? (
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  {t(`winTypeLabel.${item.winType}`)}
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>

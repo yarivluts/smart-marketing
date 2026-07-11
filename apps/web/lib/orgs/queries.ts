@@ -5,6 +5,7 @@ import {
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getGoal as getGoalInOrganization,
   getProjectCostQuota as getProjectCostQuotaInOrganization,
+  getTrialPipelineSummary as getTrialPipelineSummaryInOrganization,
   listTrackingAlertsForProject as listTrackingAlertsForProjectInOrganization,
   type ApiKeySummary,
   type BoardModel,
@@ -75,6 +76,7 @@ import {
   type SchemaDefModel,
   type SharedCredentialModel,
   type TrackingAlertModel,
+  type TrialPipelineOutcome,
   listWinRulesForProject as listWinRulesForProjectInOrganization,
   listRecentWinEventsForProject as listRecentWinEventsForProjectInOrganization,
   listWinEventsSince as listWinEventsSinceInOrganization,
@@ -342,6 +344,12 @@ export async function listRecentWinEventsForProject(organizationId: string, proj
 export async function listWinEventsSince(organizationId: string, projectId: string, sinceIso: string): Promise<WinEventModel[]> {
   await ensureFirestoreOrm();
   return listWinEventsSinceInOrganization(organizationId, projectId, sinceIso);
+}
+
+/** KAN-66's trial-pipeline war-room widget query — see `getTrialPipelineSummary`'s own doc comment (`trial-pipeline.service.ts`) for its degrade-to-outcome shape. */
+export async function getTrialPipelineSummary(organizationId: string, projectId: string): Promise<TrialPipelineOutcome> {
+  await ensureFirestoreOrm();
+  return getTrialPipelineSummaryInOrganization({ organizationId, projectId });
 }
 
 /** Every currently-active `event` schema name in a project — the win-rule create form's schema picker. */

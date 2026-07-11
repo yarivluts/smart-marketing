@@ -29,6 +29,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       winRuleId,
       ...(parsed.name !== undefined ? { name: parsed.name } : {}),
       ...(parsed.filters !== undefined ? { filters: parsed.filters } : {}),
+      ...(parsed.winType !== undefined ? { winType: parsed.winType } : {}),
       ...(parsed.active !== undefined ? { active: parsed.active } : {}),
       updatedByUserId: user.id,
     });

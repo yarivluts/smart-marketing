@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { evaluateWinRuleFilters, isWinRuleFilterOperator, type WinRuleFilter } from '@growthos/shared';
+import { evaluateWinRuleFilters, isWinRuleFilterOperator, isWinType, type WinRuleFilter, type WinType } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import { WinRuleModel } from '../models/win-rule.model';
 import { WinEventModel } from '../models/win-event.model';
@@ -68,12 +68,26 @@ function validateFilters(filters: readonly WinRuleFilter[], reasons: string[]): 
   return validated;
 }
 
+/** Validates an optional win-type tag, defaulting to `generic` — the same "collect every reason, validate here, not in the model" convention `validateFilters` uses. */
+function validateWinType(winType: string | undefined, reasons: string[]): WinType {
+  if (winType === undefined) {
+    return 'generic';
+  }
+  if (!isWinType(winType)) {
+    reasons.push(`Unknown win type "${winType}".`);
+    return 'generic';
+  }
+  return winType;
+}
+
 export interface CreateWinRuleParams {
   organizationId: string;
   projectId: string;
   name: string;
   schemaName: string;
   filters: readonly WinRuleFilter[];
+  /** KAN-66 win catalog tag — defaults to `generic` when omitted (every KAN-65 rule). */
+  winType?: string;
   createdByUserId: string;
 }
 
@@ -98,6 +112,7 @@ export async function createWinRule(params: CreateWinRuleParams): Promise<WinRul
   }
 
   const filters = validateFilters(params.filters, reasons);
+  const winType = validateWinType(params.winType, reasons);
 
   if (reasons.length > 0) {
     throw new InvalidWinRuleError(reasons);
@@ -110,6 +125,7 @@ export async function createWinRule(params: CreateWinRuleParams): Promise<WinRul
   rule.name = name;
   rule.schema_name = schemaName;
   rule.filters = filters;
+  rule.win_type = winType;
   rule.active = true;
   rule.created_by = params.createdByUserId;
   rule.created_at = now;
@@ -165,11 +181,13 @@ export interface UpdateWinRuleParams {
   winRuleId: string;
   name?: string;
   filters?: readonly WinRuleFilter[];
+  /** KAN-66 win catalog tag — omit to leave the rule's current tag untouched. */
+  winType?: string;
   active?: boolean;
   updatedByUserId: string;
 }
 
-/** Updates a win rule's name/filters/active flag in place — a win rule is mutable config, the same "current = only" posture `updateBoardSettings` uses for boards. */
+/** Updates a win rule's name/filters/win-type/active flag in place — a win rule is mutable config, the same "current = only" posture `updateBoardSettings` uses for boards. */
 export async function updateWinRule(params: UpdateWinRuleParams): Promise<WinRuleModel> {
   const rule = await loadWinRule(params.organizationId, params.projectId, params.winRuleId);
 
@@ -187,12 +205,18 @@ export async function updateWinRule(params: UpdateWinRuleParams): Promise<WinRul
     filters = validateFilters(params.filters, reasons);
   }
 
+  let winType = rule.win_type;
+  if (params.winType !== undefined) {
+    winType = validateWinType(params.winType, reasons);
+  }
+
   if (reasons.length > 0) {
     throw new InvalidWinRuleError(reasons);
   }
 
   rule.name = name;
   rule.filters = filters;
+  rule.win_type = winType;
   if (params.active !== undefined) {
     rule.active = params.active;
   }
@@ -303,6 +327,7 @@ export async function evaluateRecordAgainstWinRules(params: EvaluateRecordAgains
       winEvent.environment_id = params.environmentId;
       winEvent.win_rule_id = rule.id;
       winEvent.win_rule_name = rule.name;
+      winEvent.win_type = rule.win_type;
       winEvent.schema_name = params.schemaName;
       winEvent.raw_record_id = params.rawRecordId;
       winEvent.client_id = params.clientId;

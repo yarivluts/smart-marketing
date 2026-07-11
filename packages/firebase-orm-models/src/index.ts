@@ -125,6 +125,7 @@ export * from './services/hook-signature';
 export * from './services/hook.service';
 export * from './services/field-mapping.service';
 export * from './services/win-rule.service';
+export * from './services/trial-pipeline.service';
 export * from './pipeline';
 export * from './services/ingest-health.service';
 export * from './vault';

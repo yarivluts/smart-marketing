@@ -718,6 +718,7 @@ interface CreateWinRuleInput {
   name: string;
   schemaName: string;
   filters: readonly WinRuleFilter[];
+  winType?: string;
   createdByUserId: string;
 }
 
@@ -732,6 +733,7 @@ interface UpdateWinRuleInput {
   winRuleId: string;
   name?: string;
   filters?: readonly WinRuleFilter[];
+  winType?: string;
   active?: boolean;
   updatedByUserId: string;
 }

@@ -75,9 +75,44 @@ describe('createWinRule', () => {
     expect(rule.schema_name).toBe('order_completed');
     expect(rule.active).toBe(true);
     expect(rule.filters).toEqual([{ field: 'properties.amount', operator: '>', value: '100' }]);
+    expect(rule.win_type).toBe('generic');
 
     const entries = await listAuditLogEntriesForOrg(organization.id);
     expect(entries.some((entry) => entry.action === 'win_rule.create')).toBe(true);
+  });
+
+  it('accepts a KAN-66 win-catalog type and stores it', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Win Rule Type Org');
+    await registerEventSchema(organization.id, project.id, 'subscription_reactivated', owner.id);
+
+    const rule = await createWinRule({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Reactivated customer',
+      schemaName: 'subscription_reactivated',
+      filters: [],
+      winType: 'reactivation',
+      createdByUserId: owner.id,
+    });
+
+    expect(rule.win_type).toBe('reactivation');
+  });
+
+  it('rejects an unknown win type', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Win Rule Bad Type Org');
+    await registerEventSchema(organization.id, project.id, 'order_completed', owner.id);
+
+    await expect(
+      createWinRule({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'Bad type',
+        schemaName: 'order_completed',
+        filters: [],
+        winType: 'churn' as never,
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidWinRuleError);
   });
 
   it('rejects an empty name', async () => {
@@ -217,6 +252,55 @@ describe('updateWinRule', () => {
     expect(updated.name).toBe('Huge order');
     expect(updated.filters).toEqual([{ field: 'properties.amount', operator: '>', value: '1000' }]);
     expect(updated.active).toBe(true);
+    expect(updated.win_type).toBe('generic');
+  });
+
+  it('retags a rule with a different win type', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Win Rule Retag Org');
+    await registerEventSchema(organization.id, project.id, 'subscription_converted', owner.id);
+    const rule = await createWinRule({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Trial converted',
+      schemaName: 'subscription_converted',
+      filters: [],
+      createdByUserId: owner.id,
+    });
+    expect(rule.win_type).toBe('generic');
+
+    const updated = await updateWinRule({
+      organizationId: organization.id,
+      projectId: project.id,
+      winRuleId: rule.id,
+      winType: 'trial_conversion',
+      updatedByUserId: owner.id,
+    });
+
+    expect(updated.win_type).toBe('trial_conversion');
+    expect(updated.name).toBe('Trial converted');
+  });
+
+  it('rejects an unknown win type on update', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Win Rule Retag Bad Org');
+    await registerEventSchema(organization.id, project.id, 'signup', owner.id);
+    const rule = await createWinRule({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'New signup',
+      schemaName: 'signup',
+      filters: [],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      updateWinRule({
+        organizationId: organization.id,
+        projectId: project.id,
+        winRuleId: rule.id,
+        winType: 'churn' as never,
+        updatedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidWinRuleError);
   });
 
   it('toggles active without touching name/filters when omitted', async () => {
@@ -305,10 +389,41 @@ describe('evaluateRecordAgainstWinRules', () => {
     expect(wins).toHaveLength(1);
     expect(wins[0].win_rule_id).toBe(rule.id);
     expect(wins[0].win_rule_name).toBe('First charge');
+    expect(wins[0].win_type).toBe('generic');
 
     const feed = await listRecentWinEventsForProject(organization.id, project.id);
     expect(feed).toHaveLength(1);
     expect(feed[0].raw_record_id).toBe('raw_1');
+  });
+
+  it('denormalizes the rule\'s KAN-66 win type onto the fired win event', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Win Eval Type Org');
+    await registerEventSchema(organization.id, project.id, 'subscription_reactivated', owner.id);
+    const rule = await createWinRule({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Reactivated customer',
+      schemaName: 'subscription_reactivated',
+      filters: [],
+      winType: 'reactivation',
+      createdByUserId: owner.id,
+    });
+
+    const wins = await evaluateRecordAgainstWinRules({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId,
+      kind: 'event',
+      schemaName: 'subscription_reactivated',
+      clientId: 'evt_1',
+      payload: {},
+      rawRecordId: 'raw_1',
+      occurredAt: '2026-07-11T00:00:00.000Z',
+    });
+
+    expect(wins).toHaveLength(1);
+    expect(wins[0].win_rule_id).toBe(rule.id);
+    expect(wins[0].win_type).toBe('reactivation');
   });
 
   it('only fires when the numeric filter is satisfied', async () => {

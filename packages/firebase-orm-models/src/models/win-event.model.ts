@@ -1,4 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
+import type { WinType } from '@growthos/shared';
 
 /**
  * One fired win (KAN-65, E12.2, plan `04 §6`'s "real-time win feed"): a
@@ -39,6 +40,10 @@ export class WinEventModel extends BaseModel {
 
   @Field({ is_required: true })
   public win_rule_name!: string;
+
+  /** Denormalized from the rule's own `win_type` at fire time (KAN-66) — same rationale as `win_rule_name`: a win is a historical fact, so it shouldn't change if the rule is later retagged. */
+  @Field({ is_required: true })
+  public win_type!: WinType;
 
   @Field({ is_required: true })
   public schema_name!: string;

@@ -45,7 +45,26 @@ describe('CreateWinRuleForm', () => {
       '/api/orgs/org-1/projects/project-1/win-rules',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ name: 'New signup', schemaName: 'order_completed', filters: [] }),
+        body: JSON.stringify({ name: 'New signup', schemaName: 'order_completed', filters: [], winType: 'generic' }),
+      }),
+    );
+  });
+
+  it('submits a KAN-66 win-catalog type and shows its hint text', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ winRule: { id: 'rule-1' } }) } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Reactivated customer' } });
+    fireEvent.change(screen.getByLabelText('Win type'), { target: { value: 'reactivation' } });
+    expect(screen.getByText('Typically fires on an event marking a previously churned customer as active again.')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create win rule' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/orgs/org-1/projects/project-1/win-rules',
+      expect.objectContaining({
+        body: JSON.stringify({ name: 'Reactivated customer', schemaName: 'order_completed', filters: [], winType: 'reactivation' }),
       }),
     );
   });
@@ -70,6 +89,7 @@ describe('CreateWinRuleForm', () => {
           name: 'Big order',
           schemaName: 'order_completed',
           filters: [{ field: 'properties.amount', operator: '>', value: '100' }],
+          winType: 'generic',
         }),
       }),
     );

@@ -40,7 +40,7 @@ async function registerOne(
  * Idempotently registers every metric this pack declares (KAN-59, plan
  * `13 §E11.1`: "Installing pack registers all metrics"), so a project
  * installing the SaaS/marketing metric pack doesn't need an admin to
- * hand-register seventeen metric definitions first. Registering is the only
+ * hand-register twenty-two metric definitions first. Registering is the only
  * side effect this pack's own runtime performs on the generic metric
  * registry — mirrors `ensureStripeCommerceSchemasRegistered`'s posture for
  * the schema registry.

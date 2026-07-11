@@ -105,6 +105,25 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/win-rules/[winRuleId]', (
     const response = await PATCH(request, { params });
     expect(response.status).toBe(400);
   });
+
+  it('retags a win rule with a KAN-66 win-catalog type', async () => {
+    const { ownerSession, organization, project, rule } = await setupOrgProjectWithRule('Win Rule Patch Type Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = winRuleRequest(organization.id, project.id, rule.id, 'PATCH', { winType: 'trial_conversion' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { winRule: { winType: string } };
+    expect(body.winRule.winType).toBe('trial_conversion');
+  });
+
+  it('rejects an unknown win type (400, shape validation)', async () => {
+    const { ownerSession, organization, project, rule } = await setupOrgProjectWithRule('Win Rule Patch Bad Type Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = winRuleRequest(organization.id, project.id, rule.id, 'PATCH', { winType: 'churn' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+    expect((await response.json()) as { error: string }).toEqual({ error: 'invalid_win_type' });
+  });
 });
 
 describe('DELETE /api/orgs/[orgId]/projects/[projectId]/win-rules/[winRuleId]', () => {

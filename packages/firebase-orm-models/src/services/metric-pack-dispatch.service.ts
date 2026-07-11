@@ -38,7 +38,7 @@ import { installPlugin, type InstallPluginParams } from './plugin-registry.servi
  * project throws `PluginAlreadyInstalledError` rather than resuming — there
  * is no retry surface yet. `ensureSaasMetricPackRegistered` is fully
  * retry-safe (each metric is one atomic write, so a human can uninstall and
- * reinstall to converge on all seventeen registered). Board seeding is
+ * reinstall to converge on all twenty-two registered). Board seeding is
  * *not* equally retry-safe, and `uninstallPlugin` only flips the install's
  * own `status` — it never deletes what got provisioned: if
  * `ensureSaasMetricPackDefaultBoardsSeeded` creates a board but then fails

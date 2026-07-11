@@ -186,6 +186,6 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins', () => {
       const boards = await listBoardsForProject(organization.id, project.id);
       expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
     },
-    60_000, // seventeen metric registrations + three board creates/tile-saves in one request — see saas-metric-pack.emulator.test.ts's own timeout note
+    60_000, // twenty-two metric registrations + three board creates/tile-saves in one request — see saas-metric-pack.emulator.test.ts's own timeout note
   );
 });

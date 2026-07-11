@@ -24,6 +24,7 @@ const activeRule: WinRuleSummaryView = {
   name: 'Big order',
   schemaName: 'order_completed',
   filters: [{ field: 'properties.amount', operator: '>', value: '100' }],
+  winType: 'generic',
   active: true,
   createdAt: '2026-07-11T00:00:00.000Z',
 };
@@ -49,6 +50,12 @@ describe('WinRuleList', () => {
   it('shows "any occurrence" for a filterless rule', () => {
     renderList([{ ...activeRule, filters: [] }]);
     expect(screen.getByText('On order_completed — any occurrence')).toBeInTheDocument();
+  });
+
+  it('shows no win-type badge for a generic rule, but shows one for a KAN-66 catalog type', () => {
+    renderList([activeRule, { ...activeRule, id: 'rule-2', winType: 'reactivation' }]);
+    expect(screen.queryByText('Generic')).not.toBeInTheDocument();
+    expect(screen.getByText('Reactivation')).toBeInTheDocument();
   });
 
   it('joins multiple filters with the translated joiner, not a hard-coded literal', () => {

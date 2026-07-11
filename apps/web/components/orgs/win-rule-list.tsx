@@ -64,7 +64,14 @@ function WinRuleRow({ orgId, projectId, rule }: { orgId: string; projectId: stri
     <li className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
       <div className="flex items-center justify-between gap-3">
         <div className="flex flex-col">
-          <span className="font-medium">{rule.name}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-medium">{rule.name}</span>
+            {rule.winType !== 'generic' ? (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t(`winTypeLabel.${rule.winType}`)}
+              </span>
+            ) : null}
+          </div>
           <span className="text-xs text-muted-foreground">
             {t('ruleSummary', { schemaName: rule.schemaName, filterSummary: describeFilters(rule, t) })}
           </span>

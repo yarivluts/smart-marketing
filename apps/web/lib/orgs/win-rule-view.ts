@@ -1,5 +1,5 @@
 import type { WinEventModel, WinRuleModel } from '@growthos/firebase-orm-models';
-import type { WinRuleFilter } from '@growthos/shared';
+import type { WinRuleFilter, WinType } from '@growthos/shared';
 
 /** A win rule's own admin-list/edit-form shape — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface WinRuleSummaryView {
@@ -7,6 +7,7 @@ export interface WinRuleSummaryView {
   name: string;
   schemaName: string;
   filters: WinRuleFilter[];
+  winType: WinType;
   active: boolean;
   createdAt: string;
 }
@@ -17,6 +18,7 @@ export function toWinRuleSummaryView(rule: WinRuleModel): WinRuleSummaryView {
     name: rule.name,
     schemaName: rule.schema_name,
     filters: rule.filters,
+    winType: rule.win_type,
     active: rule.active,
     createdAt: rule.created_at,
   };
@@ -26,6 +28,7 @@ export function toWinRuleSummaryView(rule: WinRuleModel): WinRuleSummaryView {
 export interface WinEventFeedItem {
   id: string;
   winRuleName: string;
+  winType: WinType;
   schemaName: string;
   clientId: string;
   payload: Record<string, unknown>;
@@ -37,6 +40,7 @@ export function toWinEventFeedItem(event: WinEventModel): WinEventFeedItem {
   return {
     id: event.id,
     winRuleName: event.win_rule_name,
+    winType: event.win_type,
     schemaName: event.schema_name,
     clientId: event.client_id,
     payload: event.payload,
