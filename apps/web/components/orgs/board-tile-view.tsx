@@ -255,6 +255,28 @@ function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap'
   );
 }
 
+/** Reuses `BarRow` (the same bar-with-tooltip renderer `BarChartView` already uses for a time series) for the bars themselves, adding only a per-bucket label row underneath — `BarRow`'s own bars are a fixed `w-2` each with a `gap-0.5` row, so this label row matches those exact widths/gap to stay aligned underneath. */
+function HistogramView({ view }: { view: Extract<TileRenderView, { kind: 'histogram' }> }): React.ReactElement {
+  const t = useTranslations('Boards');
+  if (view.labels.length === 0) {
+    return <p className="text-xs text-muted-foreground">{t('histogramEmpty')}</p>;
+  }
+  const maxValue = Math.max(1, ...view.values);
+  const points = view.labels.map((label, index) => ({ bucket: label, value: view.values[index] }));
+  return (
+    <div className="flex flex-col gap-1" role="img" aria-label={t('histogramAriaLabel')}>
+      <BarRow points={points} colorClass={SERIES_COLOR_CLASSES[0]} maxValue={maxValue} />
+      <div className="flex gap-0.5">
+        {view.labels.map((label) => (
+          <span key={label} className="w-2 flex-shrink-0 truncate text-center text-[10px] text-muted-foreground">
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }> }): React.ReactElement {
   const t = useTranslations('Boards');
   return (
@@ -279,7 +301,7 @@ function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }
   );
 }
 
-/** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel) plus KAN-62's `heatmap`, plus a per-tile degraded state instead of the whole board failing. */
+/** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel) plus KAN-62's `heatmap` and KAN-63's `histogram`, plus a per-tile degraded state instead of the whole board failing. */
 export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactElement {
   const t = useTranslations('Boards');
 
@@ -296,6 +318,8 @@ export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactEl
       return <FunnelView view={view} />;
     case 'heatmap':
       return <HeatmapView view={view} />;
+    case 'histogram':
+      return <HistogramView view={view} />;
     default:
       return <UnavailableView message={tile.title} reasonLabel={t('tileUnavailableReason.query_error')} />;
   }

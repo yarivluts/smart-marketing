@@ -137,6 +137,23 @@ describe('BoardTileView', () => {
     expect(screen.getByText('No cohort data for this range yet.')).toBeInTheDocument();
   });
 
+  it('renders a histogram tile as one bar per bucket label, with a translated tooltip', () => {
+    renderTile(
+      { kind: 'histogram', labels: ['1', '3', '10'], values: [1, 0, 2] },
+      { type: 'histogram', dimensions: ['days_active_bucket'] },
+    );
+    expect(screen.getByRole('img', { name: 'Histogram' })).toBeInTheDocument();
+    expect(screen.getByText('1')).toBeInTheDocument();
+    expect(screen.getByText('10')).toBeInTheDocument();
+    expect(screen.getByTitle('1: 1')).toBeInTheDocument();
+    expect(screen.getByTitle('10: 2')).toBeInTheDocument();
+  });
+
+  it('renders an empty histogram state', () => {
+    renderTile({ kind: 'histogram', labels: [], values: [] }, { type: 'histogram' });
+    expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
+  });
+
   it('renders a funnel tile with each step and its percentage of the first step', () => {
     renderTile(
       {

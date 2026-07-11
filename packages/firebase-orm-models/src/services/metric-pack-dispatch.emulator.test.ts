@@ -4,6 +4,8 @@ import {
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  ENGAGEMENT_PACK_MANIFEST_YAML,
+  ENGAGEMENT_PACK_PLUGIN_ID,
   installPluginAndProvisionBuiltins,
   listBoardsForProject,
   listMetricDefinitionsForProject,
@@ -142,6 +144,29 @@ describe('installPluginAndProvisionBuiltins', () => {
 
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs).toHaveLength(0);
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards).toHaveLength(0);
+  });
+
+  it('installing the built-in Engagement pack registers all five of its metrics and seeds no boards (KAN-63)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Dispatch Engagement Pack Org');
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: ENGAGEMENT_PACK_MANIFEST_YAML, registeredByUserId: owner.id });
+
+    const install = await installPluginAndProvisionBuiltins({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: ENGAGEMENT_PACK_PLUGIN_ID,
+      version: '1.0.0',
+      consentedScopes: ['metrics:write'],
+      config: {},
+      installedByUserId: owner.id,
+    });
+
+    expect(install.status).toBe('installed');
+    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+    expect(defs.map((def) => def.name).sort()).toEqual(['dau', 'dau_mau_ratio', 'engagement_depth_histogram', 'mau', 'wau']);
+
+    // No default-boards story exists for this pack (unlike KAN-61's SaaS-pack boards).
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards).toHaveLength(0);
   });

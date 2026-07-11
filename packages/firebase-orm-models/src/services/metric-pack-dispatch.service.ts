@@ -1,5 +1,6 @@
 import type { PluginInstallModel } from '../models/plugin-install.model';
 import { ensureSaasMetricPackDefaultBoardsSeeded, ensureSaasMetricPackRegistered, SAAS_METRIC_PACK_PLUGIN_ID } from '../plugin-runtime/saas-metric-pack';
+import { ensureEngagementPackRegistered, ENGAGEMENT_PACK_PLUGIN_ID } from '../plugin-runtime/engagement-pack';
 import { installPlugin, type InstallPluginParams } from './plugin-registry.service';
 
 /**
@@ -47,6 +48,11 @@ import { installPlugin, type InstallPluginParams } from './plugin-registry.servi
  * would for a human's own real customization. A dedicated re-provision
  * action (or a tiles-empty-means-retry check) is a reasonable follow-up if
  * this proves to matter in practice.
+ *
+ * The built-in Engagement pack (KAN-63) follows the same "registers metrics,
+ * nothing to sync" shape as the SaaS pack, minus default boards (not part
+ * of that story's own AC) — its five metrics register via
+ * `ensureEngagementPackRegistered`, equally retry-safe for the same reason.
  */
 export async function installPluginAndProvisionBuiltins(params: InstallPluginParams): Promise<PluginInstallModel> {
   const install = await installPlugin(params);
@@ -54,6 +60,8 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
   if (install.plugin_id === SAAS_METRIC_PACK_PLUGIN_ID) {
     await ensureSaasMetricPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
     await ensureSaasMetricPackDefaultBoardsSeeded(params.organizationId, params.projectId, params.installedByUserId);
+  } else if (install.plugin_id === ENGAGEMENT_PACK_PLUGIN_ID) {
+    await ensureEngagementPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
   }
 
   return install;
