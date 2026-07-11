@@ -30,6 +30,11 @@ import {
   createGoal as createGoalInOrganization,
   deleteGoal as deleteGoalInOrganization,
   type GoalModel,
+  createWinRule as createWinRuleInOrganization,
+  updateWinRule as updateWinRuleInOrganization,
+  deleteWinRule as deleteWinRuleInOrganization,
+  type WinRuleFilter,
+  type WinRuleModel,
   type HookEndpointModel,
   type HookSignatureMode,
   installPluginAndProvisionBuiltins as installPluginInOrganization,
@@ -705,4 +710,43 @@ export async function deleteGoal(
 ): Promise<void> {
   await ensureFirestoreOrm();
   return deleteGoalInOrganization(organizationId, projectId, goalId, deletedByUserId);
+}
+
+interface CreateWinRuleInput {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  schemaName: string;
+  filters: readonly WinRuleFilter[];
+  createdByUserId: string;
+}
+
+export async function createWinRule(input: CreateWinRuleInput): Promise<WinRuleModel> {
+  await ensureFirestoreOrm();
+  return createWinRuleInOrganization(input);
+}
+
+interface UpdateWinRuleInput {
+  organizationId: string;
+  projectId: string;
+  winRuleId: string;
+  name?: string;
+  filters?: readonly WinRuleFilter[];
+  active?: boolean;
+  updatedByUserId: string;
+}
+
+export async function updateWinRule(input: UpdateWinRuleInput): Promise<WinRuleModel> {
+  await ensureFirestoreOrm();
+  return updateWinRuleInOrganization(input);
+}
+
+export async function deleteWinRule(
+  organizationId: string,
+  projectId: string,
+  winRuleId: string,
+  deletedByUserId: string,
+): Promise<void> {
+  await ensureFirestoreOrm();
+  return deleteWinRuleInOrganization(organizationId, projectId, winRuleId, deletedByUserId);
 }

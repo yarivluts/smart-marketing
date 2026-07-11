@@ -9,6 +9,7 @@ import { QuarantinedRecordModel } from '../models/quarantined-record.model';
 import type { SchemaDefKind, SchemaFieldDef, SchemaFieldType } from '../models/schema-def.model';
 import { getActiveSchemaDefinition } from './schema-registry.service';
 import { enqueueAcceptedRecordsForPipeline, landPipelineMessages } from './pipeline.service';
+import { evaluateRecordAgainstWinRules } from './win-rule.service';
 
 export class EmptyIngestBatchError extends Error {
   constructor() {
@@ -417,6 +418,12 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   // records. Best-effort for the same reason as the dedup-key claims just above — a transient
   // pipeline failure must not turn an otherwise-successful 202 into a 500; a record whose landing
   // fails is marked `failed` for KAN-34's future replay/DLQ to pick up, not surfaced to this caller.
+  //
+  // KAN-65: for `event`-kind batches, every message that actually landed is then checked against
+  // this project's active win rules, synchronously, right here — the "ingest -> Pub/Sub -> WebSocket"
+  // realtime path's first two hops, sharing this exact landing step rather than a separate sweep, so
+  // a win is detected within the same request that accepted it. Each record is evaluated
+  // independently (`Promise.allSettled`) so one record's win-rule failure can't block its batch-mates.
   if (acceptedClaims.length > 0) {
     try {
       const messages = await enqueueAcceptedRecordsForPipeline({
@@ -428,6 +435,25 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
         records: acceptedClaims.map(({ clientId, schemaName, payload }) => ({ clientId, schemaName, payload })),
       });
       await landPipelineMessages(messages);
+
+      if (params.input.kind === 'event') {
+        const delivered = messages.filter((message) => message.status === 'delivered');
+        await Promise.allSettled(
+          delivered.map((message) =>
+            evaluateRecordAgainstWinRules({
+              organizationId: params.organizationId,
+              projectId: params.projectId,
+              environmentId: params.environmentId,
+              kind: message.kind,
+              schemaName: message.schema_name,
+              clientId: message.client_id,
+              payload: message.payload,
+              rawRecordId: message.id,
+              occurredAt: message.delivered_at ?? new Date().toISOString(),
+            }),
+          ),
+        );
+      }
     } catch {
       // Best-effort — see the comment above this block.
     }

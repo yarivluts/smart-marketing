@@ -75,6 +75,12 @@ import {
   type SchemaDefModel,
   type SharedCredentialModel,
   type TrackingAlertModel,
+  listWinRulesForProject as listWinRulesForProjectInOrganization,
+  listRecentWinEventsForProject as listRecentWinEventsForProjectInOrganization,
+  listWinEventsSince as listWinEventsSinceInOrganization,
+  activeSchemaNamesForKind,
+  type WinEventModel,
+  type WinRuleModel,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
@@ -320,6 +326,28 @@ export async function queryGoalProgress(
 ): Promise<GoalProgressOutcome> {
   await ensureFirestoreOrm();
   return queryGoalProgressInOrganization({ organizationId, projectId, goal });
+}
+
+export async function listWinRulesForProject(organizationId: string, projectId: string): Promise<WinRuleModel[]> {
+  await ensureFirestoreOrm();
+  return listWinRulesForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listRecentWinEventsForProject(organizationId: string, projectId: string): Promise<WinEventModel[]> {
+  await ensureFirestoreOrm();
+  return listRecentWinEventsForProjectInOrganization(organizationId, projectId);
+}
+
+/** The live win feed's incremental-poll building block — see `feed/route.ts`'s own doc comment. */
+export async function listWinEventsSince(organizationId: string, projectId: string, sinceIso: string): Promise<WinEventModel[]> {
+  await ensureFirestoreOrm();
+  return listWinEventsSinceInOrganization(organizationId, projectId, sinceIso);
+}
+
+/** Every currently-active `event` schema name in a project — the win-rule create form's schema picker. */
+export async function listActiveEventSchemaNames(organizationId: string, projectId: string): Promise<string[]> {
+  const schemaDefs = await listSchemaDefinitionsForProject(organizationId, projectId);
+  return activeSchemaNamesForKind(schemaDefs, 'event');
 }
 
 export interface PendingAttachmentDetails {
