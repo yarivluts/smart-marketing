@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-07-11 — E11.1 SaaS/marketing metric-pack plugin (KAN-59)
+
+- **Last completed:**
+  - Picked **KAN-59** (next unblocked sprint-7 `todo` in table order).
+  - Delivered a built-in `metric_pack` plugin that registers all eleven AC-listed metrics —
+    `ad_spend`, `signups`, `cost_per_signup`, `cac`, `conversion_to_paying`, `mrr`, `mrr_movements`,
+    `net_mrr_churn`, `troi`, `collected_revenue`, `failed_charge_rate` — plus six supporting
+    aggregations their formulas depend on (`new_paying`, `expansion_mrr`, `churned_mrr`,
+    `total_charges`, `failed_charges`, `attributed_gross_profit`):
+    `packages/firebase-orm-models/src/plugin-runtime/saas-metric-pack/` (manifest — `type:
+    metric_pack`, `scopes: [metrics:write]`, no sync endpoint — + the metric catalog, table/column
+    names following plan `04 §1`'s canonical warehouse schema, the same aspirational-but-canonical
+    convention `metrics-compiler`'s `test-catalog.ts` already established, since no real warehouse
+    exists yet, KAN-18/KAN-37) + `ensureSaasMetricPackRegistered` (idempotent, two-phase —
+    aggregations before formulas, since `registerMetricDefinition` requires a formula's references to
+    already be *active*).
+  - New install-time dispatch seam, `installPluginAndProvisionBuiltins`
+    (`packages/firebase-orm-models/src/services/metric-pack-dispatch.service.ts`), mirroring
+    `source-plugin-dispatch.service.ts`'s run-time seam: this pack has no sync/run concept to hang
+    provisioning off of the way Stripe/GA4 do, so "installing the pack registers all its metrics"
+    (plan `13 §E11.1`) happens right after `installPlugin` succeeds. `apps/web`'s install route now
+    goes through this dispatch; every other plugin id falls through unchanged. No new admin UI
+    needed — the existing KAN-46/48 Plugin Registry + Plugins gallery pages handle any manifest type
+    generically already.
+  - Several deliberate, documented simplifications given no real warehouse exists yet: `net_mrr_churn`'s
+    `starting_mrr` term uses the same-period `mrr` value (a formula can't reference a shifted period);
+    `troi`'s `attributed_gross_profit` approximates gross revenue (`fact_revenue_event.amount`) since
+    there's no real margin figure or a join-capable compiler yet; `mrr_movements` is one metric broken
+    down by a `type` dimension, not four separate `mrr_movement{new,expansion,contraction,churn}`
+    names, matching the AC's own singular name.
+  - Independent self-review (4 parallel finder passes + verification) found and fixed: a
+    `type='charge'` vs `type='first_charge'` modeling ambiguity between `total_charges`/`new_paying`
+    (added clarifying comments — not a bug, but needed disambiguation), the install's non-transactional
+    partial-failure gap left undocumented (now documented, same accepted posture as
+    `registerSchemaDefinition`/`registerMetricDefinition` elsewhere in this codebase), and two missing
+    test cases (a partial-idempotency case, and a rejected-install-registers-nothing case).
+  - `pnpm lint && pnpm typecheck && pnpm build` green locally. `pnpm test` green locally across
+    several full runs, but PR #48's CI **failed twice** before merging — both failures were this
+    package's own already-documented "known emulator/client-SDK interaction" Firestore flake (see
+    `packages/firebase-orm-models/vitest.config.ts`'s own comment), not a logic bug: the first CI run
+    hit a cascading `FIRESTORE INTERNAL ASSERTION FAILED` thrown asynchronously from the SDK's watch-
+    stream machinery (confirmed via the stack trace it's unrelated to any application code — my new
+    tests just happened to be the heaviest Firestore consumer running when it fired); the second hit a
+    plain `RESOURCE_EXHAUSTED` "maximum backoff delay" wait that ran my heaviest new test file long
+    enough (255s) to starve an unrelated, pre-existing test file into a 30s timeout. Fixed by refactoring
+    `saas-metric-pack.emulator.test.ts` to share one pack registration across all twelve per-metric
+    assertion tests (`beforeAll` instead of one fresh 17-metric registration per `it`), cutting that
+    file's Firestore round-trips by ~70% (255s → 109s in a clean local re-run). Reproduced the original
+    signup-flow e2e flake (unrelated file) against a clean `origin/main` worktree with none of this PR's
+    changes to confirm it long-predates this change, rather than blocking on it. Third CI run (after the
+    test refactor) passed clean; merged via squash.
+  - Branch `kan-59-metric-pack`, PR #48, merged into `main`. Remote branch deletion failed with an
+    HTTP 403 from this sandbox's git remote (the same known proxy/remote restriction prior runs have
+    hit, e.g. KAN-24's entry above) — merged and dead but not deleted; a human with direct repo access
+    can delete `kan-59-metric-pack` when convenient.
+  - Updated `TASKS.md`: KAN-59 `done`; KAN-61 (default boards) un-blocked from `blocked-by` back to
+    `todo` now that the metrics it needs (`mrr`/`cac`/`troi`/etc.) are registrable via this pack.
+- **In progress (exact stopping point):** none — KAN-59 is fully delivered, tested, reviewed, and
+  merged. KAN-61 is unblocked but not yet re-picked up.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked sprint-7 `todo` in table order is **KAN-65** (win rules engine +
+  realtime path). **KAN-61** (default boards) is now unblocked too and could reasonably be picked
+  instead, since it's a natural, small follow-on to this run's work (define 3 default board+tile
+  configs referencing this pack's metric names, wire them into whatever "pack installed" flow the
+  onboarding wizard (KAN-68, not yet built) will eventually drive — or a simpler standalone "seed
+  default boards" action in the interim, mirroring this run's own install-time-dispatch pattern).
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding,
+    unchanged by this run.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Optional: delete the merged `kan-59-metric-pack` branch on GitHub (403 from this sandbox's git
+    remote, as above).
+
+---
+
 ## 2026-07-10 — E9.3 Mapping UI with AI-assisted suggestion (KAN-55)
 
 - **Last completed:**
