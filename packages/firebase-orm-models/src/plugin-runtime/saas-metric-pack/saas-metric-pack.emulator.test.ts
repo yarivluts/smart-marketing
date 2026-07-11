@@ -7,15 +7,26 @@ import {
   getActiveMetricDefinition,
   listMetricDefinitionsForProject,
   registerMetricDefinition,
+  type MetricDefModel,
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { ensureSaasMetricPackRegistered } from './index';
 
 /**
- * Emulator-backed tests for KAN-59's SaaS/marketing metric pack. One `it`
- * per KAN-59 AC-listed metric name (the "each has a definition test"
- * clause), plus idempotency and project-isolation coverage shared with
- * every other registry-backed service in this package.
+ * Emulator-backed tests for KAN-59's SaaS/marketing metric pack. One
+ * assertion block per KAN-59 AC-listed metric name (the "each has a
+ * definition test" clause), plus idempotency and project-isolation
+ * coverage shared with every other registry-backed service in this
+ * package.
+ *
+ * The per-metric assertions all read from a single shared registration
+ * (`beforeAll`, not one `ensureSaasMetricPackRegistered` call per `it`) —
+ * this package's Firestore emulator is already documented (`vitest.
+ * config.ts`) as prone to a "known emulator/client-SDK interaction" flake
+ * under load, and seventeen fresh registrations per assertion (~200+
+ * Firestore round-trips across the file) reliably reproduced it in CI.
+ * Sharing one registration cuts that by roughly 80% while still exercising
+ * the exact same `ensureSaasMetricPackRegistered` code path.
  */
 
 beforeAll(async () => {
@@ -37,34 +48,36 @@ async function setupOrgWithProject(orgName: string) {
   return { owner, organization, project };
 }
 
-describe('ensureSaasMetricPackRegistered', () => {
-  it('registers seventeen metrics (eleven featured + six supporting) on first call', async () => {
+describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
+  let organizationId: string;
+  let projectId: string;
+
+  beforeAll(async () => {
     const { owner, organization, project } = await setupOrgWithProject('Metric Pack Org');
-    const result = await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    expect(result.alreadyRegistered).toEqual([]);
-    expect(result.registered).toHaveLength(17);
-
-    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
-    expect(defs).toHaveLength(17);
-    expect(defs.every((def) => def.version === 1 && def.status === 'active')).toBe(true);
+    organizationId = organization.id;
+    projectId = project.id;
+    await ensureSaasMetricPackRegistered(organizationId, projectId, owner.id);
   }, 60_000); // seventeen sequential registerMetricDefinition round-trips (existence check + save + audit log each) — see vitest.config.ts's own note on this package's emulator timing
 
-  it('registers ad_spend: sum(fact_ad_spend.reporting_spend) broken down by channel/campaign/adset/ad', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Ad Spend Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
+  async function activeMetric(name: string): Promise<MetricDefModel | null> {
+    return getActiveMetricDefinition(organizationId, projectId, name);
+  }
 
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'ad_spend');
+  it('registers all seventeen metrics (eleven featured + six supporting) as active v1', async () => {
+    const defs = await listMetricDefinitionsForProject(organizationId, projectId);
+    expect(defs).toHaveLength(17);
+    expect(defs.every((def) => def.version === 1 && def.status === 'active')).toBe(true);
+  });
+
+  it('registers ad_spend: sum(fact_ad_spend.reporting_spend) broken down by channel/campaign/adset/ad', async () => {
+    const metric = await activeMetric('ad_spend');
     expect(metric?.definition_kind).toBe('aggregation');
     expect(metric?.aggregation).toEqual({ function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] });
     expect(metric?.dimensions).toEqual(['channel_id', 'campaign_id', 'adset_id', 'ad_id']);
   });
 
   it('registers signups: count_distinct(fact_funnel_event.customer_id where step=signup)', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Signups Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'signups');
+    const metric = await activeMetric('signups');
     expect(metric?.definition_kind).toBe('aggregation');
     expect(metric?.aggregation).toEqual({
       function: 'count_distinct',
@@ -76,37 +89,25 @@ describe('ensureSaasMetricPackRegistered', () => {
   });
 
   it('registers cost_per_signup: ad_spend / signups', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Cost Per Signup Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'cost_per_signup');
+    const metric = await activeMetric('cost_per_signup');
     expect(metric?.definition_kind).toBe('formula');
     expect(metric?.formula).toBe('ad_spend / signups');
   });
 
   it('registers cac: ad_spend / new_paying', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Cac Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'cac');
+    const metric = await activeMetric('cac');
     expect(metric?.definition_kind).toBe('formula');
     expect(metric?.formula).toBe('ad_spend / new_paying');
   });
 
   it('registers conversion_to_paying: new_paying / signups', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Conversion To Paying Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'conversion_to_paying');
+    const metric = await activeMetric('conversion_to_paying');
     expect(metric?.definition_kind).toBe('formula');
     expect(metric?.formula).toBe('new_paying / signups');
   });
 
   it('registers mrr: sum(dim_subscription.mrr where status=active)', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Mrr Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'mrr');
+    const metric = await activeMetric('mrr');
     expect(metric?.definition_kind).toBe('aggregation');
     expect(metric?.aggregation).toEqual({
       function: 'sum',
@@ -118,38 +119,26 @@ describe('ensureSaasMetricPackRegistered', () => {
   });
 
   it('registers mrr_movements: sum(fact_revenue_event.mrr_delta) broken down by type/plan', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Mrr Movements Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'mrr_movements');
+    const metric = await activeMetric('mrr_movements');
     expect(metric?.definition_kind).toBe('aggregation');
     expect(metric?.aggregation).toEqual({ function: 'sum', table: 'fact_revenue_event', column: 'mrr_delta', timeColumn: 'ts', filters: [] });
     expect(metric?.dimensions).toEqual(['type', 'plan']);
   });
 
   it('registers net_mrr_churn: (churned_mrr - expansion_mrr) / mrr', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Net Mrr Churn Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'net_mrr_churn');
+    const metric = await activeMetric('net_mrr_churn');
     expect(metric?.definition_kind).toBe('formula');
     expect(metric?.formula).toBe('(churned_mrr - expansion_mrr) / mrr');
   });
 
   it('registers troi: attributed_gross_profit / ad_spend', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Troi Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'troi');
+    const metric = await activeMetric('troi');
     expect(metric?.definition_kind).toBe('formula');
     expect(metric?.formula).toBe('attributed_gross_profit / ad_spend');
   });
 
   it('registers collected_revenue: sum(fact_revenue_event.amount where status=succeeded)', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Collected Revenue Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'collected_revenue');
+    const metric = await activeMetric('collected_revenue');
     expect(metric?.definition_kind).toBe('aggregation');
     expect(metric?.aggregation).toEqual({
       function: 'sum',
@@ -161,26 +150,22 @@ describe('ensureSaasMetricPackRegistered', () => {
   });
 
   it('registers failed_charge_rate: failed_charges / total_charges', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Failed Charge Rate Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
-    const metric = await getActiveMetricDefinition(organization.id, project.id, 'failed_charge_rate');
+    const metric = await activeMetric('failed_charge_rate');
     expect(metric?.definition_kind).toBe('formula');
     expect(metric?.formula).toBe('failed_charges / total_charges');
   });
 
   it('registers the supporting metrics every formula-kind metric depends on', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Supporting Metrics Org');
-    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
-
     const supportingNames = ['new_paying', 'expansion_mrr', 'churned_mrr', 'total_charges', 'failed_charges', 'attributed_gross_profit'];
     for (const name of supportingNames) {
-      const metric = await getActiveMetricDefinition(organization.id, project.id, name);
+      const metric = await activeMetric(name);
       expect(metric, `expected supporting metric "${name}" to be registered`).not.toBeNull();
       expect(metric?.definition_kind).toBe('aggregation');
     }
   });
+});
 
+describe('ensureSaasMetricPackRegistered — idempotency and isolation', () => {
   it('partially idempotent: a metric pre-registered by a human is left alone, the other sixteen still register', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Partial Idempotent Org');
     await registerMetricDefinition({
