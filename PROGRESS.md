@@ -17,6 +17,39 @@ Template for each entry:
 
 ---
 
+## 2026-07-11 — Independent re-verification of KAN-59 (no new code)
+
+- **Last completed:** Picked up KAN-59 as the next unblocked sprint-7 `todo`, same as the entry
+  immediately below — but by the time this run reached the merge step, a parallel scheduled run had
+  already independently implemented, reviewed, and merged it as PR #48 (squash commit `96c1dc7`) and
+  pushed its own `PROGRESS.md`/`TASKS.md` update (commit `512ffdb`, the entry below this one). Per this
+  file's established "reconcile, don't re-implement" posture for parallel-run collisions (see the
+  KAN-46/KAN-33/KAN-20 precedents), did not duplicate the work. Instead performed an independent
+  verification pass: a fresh-context subagent reviewed the full `af0cb35..kan-59-metric-pack` diff
+  (metric definitions, two-phase aggregation-then-formula registration ordering, the
+  `installPluginAndProvisionBuiltins` dispatch seam, manifest parsing) against the metric-registry
+  service, metrics-compiler, and plugin-manifest source it depends on — found no blocking issues. Also
+  re-ran the full local verification suite from a clean `pnpm install`: `pnpm lint`/`pnpm typecheck`
+  green; `pnpm build` green (6/6 non-dbt packages plus dbt-transform once a transient sandbox pip/TLS
+  retry was worked past by installing directly); `pnpm test` green across every non-e2e suite (291
+  `packages/shared`, 87/87 dbt tests, 21 `tracking-sdk`, 485 `firebase-orm-models` incl. the new
+  `saas-metric-pack`/`metric-pack-dispatch` tests, 61 `apps/api`, 620 `apps/web` vitest) — the local
+  Playwright e2e run hit 3 failures/5 flakes, all in specs this diff doesn't touch
+  (`auth`/`boards`/`cost-guardrails`/`keys`/`schema-registry`/`orgs`/`resource-library`/`metric-defs`
+  .spec.ts) and already long-documented in this file as this sandbox's own pre-existing e2e flakiness —
+  confirmed the real merge gate (GitHub CI, which runs the identical `pnpm test`) was green on PR #48
+  before it merged. Called `merge_pull_request` on PR #48 as this run's own next step before noticing it
+  was already merged — GitHub returned the same already-merged SHA, a no-op.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** nothing blocking.
+- **Next step:** KAN-59's own entry below already correctly flags **KAN-61** (default boards) as
+  unblocked and next by sprint order (sprint 5, ahead of KAN-65's sprint 7) — picking that up next in
+  this same run.
+- **Waiting on human:** unchanged from the entry below — KAN-20 PR reconciliation, KAN-43, KAN-18 still
+  outstanding.
+
+---
+
 ## 2026-07-11 — E11.1 SaaS/marketing metric-pack plugin (KAN-59)
 
 - **Last completed:**
