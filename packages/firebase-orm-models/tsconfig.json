@@ -5,6 +5,11 @@
     "moduleResolution": "Node",
     "rootDir": "src",
     "outDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@arbel/firebase-orm/admin": ["./src/types/arbel-firebase-orm-admin"],
+      "firebase-admin/app": ["./src/types/firebase-admin-app"]
+    },
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false
