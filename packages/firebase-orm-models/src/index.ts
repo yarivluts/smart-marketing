@@ -56,6 +56,8 @@ export type {
   MappingRuleInput,
   MappingApplyResult,
   MappingSuggestion,
+  WinRuleFilter,
+  WinRuleFilterOperator,
 } from '@growthos/shared';
 export * from './models/user.model';
 export * from './models/organization.model';
@@ -89,6 +91,8 @@ export * from './models/goal.model';
 export * from './models/hook-endpoint.model';
 export * from './models/hook-delivery.model';
 export * from './models/field-mapping.model';
+export * from './models/win-rule.model';
+export * from './models/win-event.model';
 export * from './firestore-connection';
 export * from './services/membership.service';
 export * from './services/user.service';
@@ -120,6 +124,7 @@ export * from './services/touchpoint-capture.service';
 export * from './services/hook-signature';
 export * from './services/hook.service';
 export * from './services/field-mapping.service';
+export * from './services/win-rule.service';
 export * from './pipeline';
 export * from './services/ingest-health.service';
 export * from './vault';
