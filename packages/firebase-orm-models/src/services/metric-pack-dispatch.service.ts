@@ -1,5 +1,5 @@
 import type { PluginInstallModel } from '../models/plugin-install.model';
-import { ensureSaasMetricPackRegistered, SAAS_METRIC_PACK_PLUGIN_ID } from '../plugin-runtime/saas-metric-pack';
+import { ensureSaasMetricPackDefaultBoardsSeeded, ensureSaasMetricPackRegistered, SAAS_METRIC_PACK_PLUGIN_ID } from '../plugin-runtime/saas-metric-pack';
 import { installPlugin, type InstallPluginParams } from './plugin-registry.service';
 
 /**
@@ -18,15 +18,24 @@ import { installPlugin, type InstallPluginParams } from './plugin-registry.servi
  * id other than the built-in metric pack falls through to the generic
  * `installPlugin` unchanged.
  *
+ * Also seeds this pack's three default boards (KAN-61, plan `13 §E11.3`:
+ * "New project with pack installed shows populated boards after first
+ * sync") via `ensureSaasMetricPackDefaultBoardsSeeded` — strictly *after*
+ * `ensureSaasMetricPackRegistered`, since every default board's tiles
+ * reference metric names that must already be active in the project's
+ * catalog (`saveBoardTiles` rejects a tile referencing an unregistered
+ * metric).
+ *
  * Not transactional, the same documented, deliberately-deferred tradeoff
  * `registerMetricDefinition`/`registerSchemaDefinition` already accept: the
- * install is saved *before* `ensureSaasMetricPackRegistered` runs, so a
- * failure partway through registration (a transient Firestore error, not the
- * expected `DuplicateMetricDefinitionError` path, which is swallowed) leaves
- * an `installed` `PluginInstallModel` with only some of its metrics
- * registered, and a re-POST to install the same plugin id in the same
+ * install is saved *before* `ensureSaasMetricPackRegistered`/
+ * `ensureSaasMetricPackDefaultBoardsSeeded` run, so a failure partway
+ * through (a transient Firestore error, not the expected
+ * `DuplicateMetricDefinitionError` path, which is swallowed) leaves an
+ * `installed` `PluginInstallModel` with only some of its metrics/boards
+ * provisioned, and a re-POST to install the same plugin id in the same
  * project throws `PluginAlreadyInstalledError` rather than resuming — there
- * is no retry surface yet. `ensureSaasMetricPackRegistered` itself is
+ * is no retry surface yet. Both provisioning calls are themselves
  * idempotent, so a human can uninstall and reinstall to retry today; a
  * dedicated re-provision action is a reasonable follow-up if this proves to
  * matter in practice.
@@ -36,6 +45,7 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
 
   if (install.plugin_id === SAAS_METRIC_PACK_PLUGIN_ID) {
     await ensureSaasMetricPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
+    await ensureSaasMetricPackDefaultBoardsSeeded(params.organizationId, params.projectId, params.installedByUserId);
   }
 
   return install;
