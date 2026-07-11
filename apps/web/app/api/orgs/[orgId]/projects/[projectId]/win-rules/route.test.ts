@@ -156,12 +156,45 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/win-rules', () => {
     });
     const response = await POST(request, { params });
     expect(response.status).toBe(201);
-    const body = (await response.json()) as { winRule: { id: string; name: string; active: boolean } };
-    expect(body.winRule).toMatchObject({ name: 'Big order', active: true });
+    const body = (await response.json()) as { winRule: { id: string; name: string; active: boolean; winType: string } };
+    expect(body.winRule).toMatchObject({ name: 'Big order', active: true, winType: 'generic' });
 
     const listResponse = await GET(winRulesRequest(organization.id, project.id).request, { params });
     const listed = (await listResponse.json()) as { winRules: Array<{ id: string }> };
     expect(listed.winRules).toHaveLength(1);
     expect(listed.winRules[0].id).toBe(body.winRule.id);
+  });
+
+  it('creates a win rule tagged with a KAN-66 win-catalog type', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Win Rule Create Typed Org');
+    await registerOrderCompleted(organization.id, project.id, owner.id);
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = winRulesRequest(organization.id, project.id, {
+      name: 'Reactivated customer',
+      schemaName: 'order_completed',
+      filters: [],
+      winType: 'reactivation',
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { winRule: { winType: string } };
+    expect(body.winRule.winType).toBe('reactivation');
+  });
+
+  it('rejects an unknown win type (400, shape validation)', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Win Rule Create Bad Type Org');
+    await registerOrderCompleted(organization.id, project.id, owner.id);
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = winRulesRequest(organization.id, project.id, {
+      name: 'Big order',
+      schemaName: 'order_completed',
+      filters: [],
+      winType: 'churn',
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    expect((await response.json()) as { error: string }).toEqual({ error: 'invalid_win_type' });
   });
 });

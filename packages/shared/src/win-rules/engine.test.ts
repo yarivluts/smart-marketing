@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluateWinRuleFilters, isWinRuleFilterOperator, WIN_RULE_FILTER_OPERATORS } from './index';
+import { evaluateWinRuleFilters, isWinRuleFilterOperator, isWinType, WIN_RULE_FILTER_OPERATORS, WIN_TYPES } from './index';
 
 describe('evaluateWinRuleFilters', () => {
   it('matches unconditionally when there are no filters', () => {
@@ -67,5 +67,19 @@ describe('isWinRuleFilterOperator', () => {
   it('rejects an unknown operator', () => {
     expect(isWinRuleFilterOperator('in')).toBe(false);
     expect(isWinRuleFilterOperator('~=')).toBe(false);
+  });
+});
+
+describe('isWinType', () => {
+  it('accepts every catalog entry, including generic', () => {
+    expect(WIN_TYPES).toEqual(['generic', 'reactivation', 'trial_conversion']);
+    for (const winType of WIN_TYPES) {
+      expect(isWinType(winType)).toBe(true);
+    }
+  });
+
+  it('rejects an unknown win type', () => {
+    expect(isWinType('churn')).toBe(false);
+    expect(isWinType('')).toBe(false);
   });
 });

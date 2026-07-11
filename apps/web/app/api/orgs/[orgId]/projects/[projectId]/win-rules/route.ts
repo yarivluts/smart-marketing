@@ -49,6 +49,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       name: parsed.name,
       schemaName: parsed.schemaName,
       filters: parsed.filters,
+      ...(parsed.winType !== undefined ? { winType: parsed.winType } : {}),
       createdByUserId: user.id,
     });
     return NextResponse.json({ winRule: toWinRuleSummaryView(rule) }, { status: 201 });

@@ -293,10 +293,99 @@ const FAILED_CHARGE_RATE: SaasMetricPackDefinition = {
 };
 
 /**
+ * KAN-66 (E12.2b, `14` gap 14) additions: `reactivations` — plan `09 §2`'s
+ * `fact_subscription_event.type = 'reactivate'` (a churned subscription's
+ * customer becoming active again) — is a first-class metric here for the
+ * first time, even though the underlying event type already existed in the
+ * plan ("we had the event ... but not the KPI/celebration"). `trials_active`/
+ * `trial_starts`/`trial_conversions`/`trial_conversion_rate` back the
+ * trial-pipeline war-room widget's "in trial now -> converting at X%".
+ * `fact_subscription_event` is a new aggregation table for this pack (plan
+ * `09 §2`'s own spine, distinct from `fact_revenue_event`'s charge/refund
+ * ledger and `dim_subscription`'s current-state snapshot) — same aspirational-
+ * but-canonical posture this module's own doc comment already established
+ * for every other table here; no real warehouse or dbt model backs it yet.
+ */
+const REACTIVATIONS: SaasMetricPackDefinition = {
+  name: 'reactivations',
+  featured: true,
+  dimensions: [],
+  definition: {
+    kind: 'aggregation',
+    aggregation: {
+      function: 'count_distinct',
+      table: 'fact_subscription_event',
+      column: 'subscription_id',
+      timeColumn: 'ts',
+      filters: [{ field: 'type', operator: '=', value: 'reactivate' }],
+    },
+  },
+};
+
+/** Supporting aggregation for `trial_conversion_rate`'s denominator — every subscription that began a trial. */
+const TRIAL_STARTS: SaasMetricPackDefinition = {
+  name: 'trial_starts',
+  featured: false,
+  dimensions: [],
+  definition: {
+    kind: 'aggregation',
+    aggregation: {
+      function: 'count_distinct',
+      table: 'fact_subscription_event',
+      column: 'subscription_id',
+      timeColumn: 'ts',
+      filters: [{ field: 'type', operator: '=', value: 'trial_start' }],
+    },
+  },
+};
+
+/** Supporting aggregation for `trial_conversion_rate`'s numerator — every trial that converted to paid. */
+const TRIAL_CONVERSIONS: SaasMetricPackDefinition = {
+  name: 'trial_conversions',
+  featured: false,
+  dimensions: [],
+  definition: {
+    kind: 'aggregation',
+    aggregation: {
+      function: 'count_distinct',
+      table: 'fact_subscription_event',
+      column: 'subscription_id',
+      timeColumn: 'ts',
+      filters: [{ field: 'type', operator: '=', value: 'convert' }],
+    },
+  },
+};
+
+/** The trial-pipeline widget's headline count — subscriptions currently mid-trial, the same `dim_subscription` current-state snapshot `mrr`'s own `status = 'active'` filter reads from. */
+const TRIALS_ACTIVE: SaasMetricPackDefinition = {
+  name: 'trials_active',
+  featured: true,
+  dimensions: [],
+  definition: {
+    kind: 'aggregation',
+    aggregation: {
+      function: 'count_distinct',
+      table: 'dim_subscription',
+      column: 'subscription_id',
+      timeColumn: 'started_at',
+      filters: [{ field: 'status', operator: '=', value: 'trialing' }],
+    },
+  },
+};
+
+const TRIAL_CONVERSION_RATE: SaasMetricPackDefinition = {
+  name: 'trial_conversion_rate',
+  featured: true,
+  dimensions: [],
+  definition: { kind: 'formula', formula: 'trial_conversions / trial_starts' },
+};
+
+/**
  * Every metric this pack registers, aggregation-kind first so every formula
  * below only ever references an already-active metric (see this module's
- * own doc comment). Exactly eleven entries have `featured: true`, matching
- * KAN-59's AC list name-for-name.
+ * own doc comment). Fourteen entries have `featured: true`: KAN-59's
+ * original eleven plus KAN-66's `reactivations`/`trials_active`/
+ * `trial_conversion_rate`.
  */
 export const SAAS_METRIC_PACK_METRICS: readonly SaasMetricPackDefinition[] = [
   AD_SPEND,
@@ -310,15 +399,20 @@ export const SAAS_METRIC_PACK_METRICS: readonly SaasMetricPackDefinition[] = [
   TOTAL_CHARGES,
   FAILED_CHARGES,
   ATTRIBUTED_GROSS_PROFIT,
+  REACTIVATIONS,
+  TRIAL_STARTS,
+  TRIAL_CONVERSIONS,
+  TRIALS_ACTIVE,
   COST_PER_SIGNUP,
   CAC,
   CONVERSION_TO_PAYING,
   NET_MRR_CHURN,
   TROI,
   FAILED_CHARGE_RATE,
+  TRIAL_CONVERSION_RATE,
 ];
 
-/** The eleven metric names KAN-59's own AC lists by name. */
+/** KAN-59's original eleven named metrics plus KAN-66's three (`reactivations`, `trials_active`, `trial_conversion_rate`) — see {@link SAAS_METRIC_PACK_MANIFEST_YAML}'s own `registers.metrics` list, which must match this set exactly. */
 export const SAAS_METRIC_PACK_FEATURED_METRIC_NAMES: readonly string[] = SAAS_METRIC_PACK_METRICS.filter(
   (metric) => metric.featured,
 ).map((metric) => metric.name);

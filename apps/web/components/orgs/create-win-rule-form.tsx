@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { WIN_RULE_FILTER_OPERATORS, type WinRuleFilterOperator } from '@growthos/shared';
+import { WIN_RULE_FILTER_OPERATORS, WIN_TYPES, type WinRuleFilterOperator, type WinType } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ export function CreateWinRuleForm({ orgId, projectId, eventSchemaNames }: Create
   const router = useRouter();
   const [name, setName] = useState('');
   const [schemaName, setSchemaName] = useState(eventSchemaNames[0] ?? '');
+  const [winType, setWinType] = useState<WinType>('generic');
   const [filters, setFilters] = useState<FilterRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +52,7 @@ export function CreateWinRuleForm({ orgId, projectId, eventSchemaNames }: Create
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/win-rules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, schemaName, filters }),
+        body: JSON.stringify({ name, schemaName, filters, winType }),
       });
       if (!response.ok) {
         setError(t('createError'));
@@ -59,6 +60,7 @@ export function CreateWinRuleForm({ orgId, projectId, eventSchemaNames }: Create
       }
       setName('');
       setFilters([]);
+      setWinType('generic');
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -98,7 +100,26 @@ export function CreateWinRuleForm({ orgId, projectId, eventSchemaNames }: Create
             ))}
           </select>
         </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium" htmlFor="create-win-rule-type">
+            {t('winTypeFieldLabel')}
+          </label>
+          <select
+            id="create-win-rule-type"
+            value={winType}
+            onChange={(event) => setWinType(event.target.value as WinType)}
+            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            {WIN_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {t(`winTypeLabel.${type}`)}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+      {winType !== 'generic' ? <p className="text-xs text-muted-foreground">{t(`winTypeHint.${winType}`)}</p> : null}
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">{t('filtersLabel')}</span>

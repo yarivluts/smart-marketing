@@ -702,6 +702,16 @@
     "filterValuePlaceholder": "e.g. 100",
     "removeFilter": "Remove",
     "addFilter": "Add filter",
+    "winTypeFieldLabel": "Win type",
+    "winTypeLabel": {
+      "generic": "Generic",
+      "reactivation": "Reactivation",
+      "trial_conversion": "Trial conversion"
+    },
+    "winTypeHint": {
+      "reactivation": "Typically fires on an event marking a previously churned customer as active again.",
+      "trial_conversion": "Typically fires on an event marking a trial subscription converting to a paid plan."
+    },
     "createButton": "Create win rule",
     "createError": "Could not create the win rule. Please try again.",
     "feedHeading": "Live win feed",
@@ -709,5 +719,16 @@
     "feedConnecting": "Connecting…",
     "feedEmpty": "No wins yet. They'll appear here in real time.",
     "feedItem": "{winRuleName} — {schemaName} ({clientId})"
+  },
+  "TrialPipeline": {
+    "heading": "Trial pipeline",
+    "inTrialLabel": "In trial now",
+    "convertingLabel": "Converting at",
+    "convertingValue": "{ratePct}%",
+    "unavailable": {
+      "warehouse_not_configured": "Trial pipeline data needs a connected warehouse.",
+      "quota_exceeded": "This project's daily query quota is exhausted. Try again tomorrow.",
+      "query_error": "Couldn't load trial pipeline data. Install the SaaS metric pack to see it here."
+    }
   }
 }

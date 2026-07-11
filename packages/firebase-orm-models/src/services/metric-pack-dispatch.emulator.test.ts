@@ -65,12 +65,12 @@ describe('installPluginAndProvisionBuiltins', () => {
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs.map((def) => def.name)).toContain('ad_spend');
     expect(defs.map((def) => def.name)).toContain('troi');
-    expect(defs).toHaveLength(17);
+    expect(defs).toHaveLength(22);
 
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
     expect(boards.every((board) => board.tiles.length > 0)).toBe(true);
-  }, 60_000); // seventeen sequential metric registrations — see saas-metric-pack.emulator.test.ts's own timeout note
+  }, 60_000); // twenty-two sequential metric registrations — see saas-metric-pack.emulator.test.ts's own timeout note
 
   it('installing an unrelated plugin registers no metrics and seeds no boards, behaving exactly like the generic installPlugin', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Unrelated Org');
@@ -119,12 +119,12 @@ describe('installPluginAndProvisionBuiltins', () => {
     });
 
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
-    expect(defs).toHaveLength(17);
+    expect(defs).toHaveLength(22);
     expect(defs.every((def) => def.version === 1)).toBe(true);
 
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards).toHaveLength(3);
-  }, 60_000); // two full seventeen-metric passes (install + reinstall)
+  }, 60_000); // two full twenty-two-metric passes (install + reinstall)
 
   it('registers no metrics and seeds no boards when the install itself is rejected (scope consent mismatch)', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Rejected Install Org');

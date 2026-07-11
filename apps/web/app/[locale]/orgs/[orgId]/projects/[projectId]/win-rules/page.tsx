@@ -4,11 +4,13 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listActiveEventSchemaNames, listOrgProjects, listWinRulesForProject } from '@/lib/orgs/queries';
+import { getTrialPipelineSummary, listActiveEventSchemaNames, listOrgProjects, listWinRulesForProject } from '@/lib/orgs/queries';
 import { toWinRuleSummaryView } from '@/lib/orgs/win-rule-view';
+import { toTrialPipelineWidgetView } from '@/lib/orgs/trial-pipeline-view';
 import { CreateWinRuleForm } from '@/components/orgs/create-win-rule-form';
 import { WinRuleList } from '@/components/orgs/win-rule-list';
 import { LiveWinFeed } from '@/components/orgs/live-win-feed';
+import { TrialPipelineWidget } from '@/components/orgs/trial-pipeline-widget';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -48,16 +50,20 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
     notFound();
   }
 
-  const [winRules, eventSchemaNames] = await Promise.all([
+  const [winRules, eventSchemaNames, trialPipelineOutcome] = await Promise.all([
     listWinRulesForProject(orgId, projectId),
     listActiveEventSchemaNames(orgId, projectId),
+    getTrialPipelineSummary(orgId, projectId),
   ]);
   const winRuleViews = winRules.map(toWinRuleSummaryView);
+  const trialPipelineView = toTrialPipelineWidgetView(trialPipelineOutcome);
   const t = await getTranslations('WinRules');
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+
+      <TrialPipelineWidget view={trialPipelineView} />
 
       <LiveWinFeed orgId={orgId} projectId={projectId} />
 

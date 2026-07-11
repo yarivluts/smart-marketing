@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isWinRuleFilterOperator, type WinRuleFilter } from '@growthos/shared';
+import { isWinRuleFilterOperator, isWinType, type WinRuleFilter } from '@growthos/shared';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 function invalid(error: string): { error: NextResponse } {
@@ -41,6 +41,7 @@ export interface ParsedCreateWinRuleFields {
   name: string;
   schemaName: string;
   filters: WinRuleFilter[];
+  winType?: string;
 }
 
 export type ParsedCreateWinRuleRequest = (ParsedCreateWinRuleFields & { error?: undefined }) | { error: NextResponse };
@@ -49,6 +50,7 @@ interface RawCreateWinRuleBody {
   name?: unknown;
   schemaName?: unknown;
   filters?: unknown;
+  winType?: unknown;
 }
 
 export async function parseCreateWinRuleRequestBody(request: NextRequest): Promise<ParsedCreateWinRuleRequest> {
@@ -68,13 +70,17 @@ export async function parseCreateWinRuleRequestBody(request: NextRequest): Promi
   if (filters === undefined) {
     return invalid('invalid_filters');
   }
+  if (body.winType !== undefined && (typeof body.winType !== 'string' || !isWinType(body.winType))) {
+    return invalid('invalid_win_type');
+  }
 
-  return { name: body.name, schemaName: body.schemaName, filters };
+  return { name: body.name, schemaName: body.schemaName, filters, ...(body.winType !== undefined ? { winType: body.winType as string } : {}) };
 }
 
 export interface ParsedUpdateWinRuleFields {
   name?: string;
   filters?: WinRuleFilter[];
+  winType?: string;
   active?: boolean;
 }
 
@@ -83,6 +89,7 @@ export type ParsedUpdateWinRuleRequest = (ParsedUpdateWinRuleFields & { error?: 
 interface RawUpdateWinRuleBody {
   name?: unknown;
   filters?: unknown;
+  winType?: unknown;
   active?: unknown;
 }
 
@@ -99,6 +106,9 @@ export async function parseUpdateWinRuleRequestBody(request: NextRequest): Promi
   if (body.active !== undefined && typeof body.active !== 'boolean') {
     return invalid('invalid_active');
   }
+  if (body.winType !== undefined && (typeof body.winType !== 'string' || !isWinType(body.winType))) {
+    return invalid('invalid_win_type');
+  }
   let filters: WinRuleFilter[] | undefined;
   if (body.filters !== undefined) {
     filters = parseFilters(body.filters);
@@ -110,6 +120,7 @@ export async function parseUpdateWinRuleRequestBody(request: NextRequest): Promi
   return {
     ...(body.name !== undefined ? { name: body.name } : {}),
     ...(filters !== undefined ? { filters } : {}),
+    ...(body.winType !== undefined ? { winType: body.winType as string } : {}),
     ...(body.active !== undefined ? { active: body.active } : {}),
   };
 }

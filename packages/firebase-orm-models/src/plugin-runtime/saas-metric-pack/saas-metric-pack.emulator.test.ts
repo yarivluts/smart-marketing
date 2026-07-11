@@ -23,7 +23,7 @@ import { ensureSaasMetricPackRegistered } from './index';
  * (`beforeAll`, not one `ensureSaasMetricPackRegistered` call per `it`) —
  * this package's Firestore emulator is already documented (`vitest.
  * config.ts`) as prone to a "known emulator/client-SDK interaction" flake
- * under load, and seventeen fresh registrations per assertion (~200+
+ * under load, and twenty-two fresh registrations per assertion (~250+
  * Firestore round-trips across the file) reliably reproduced it in CI.
  * Sharing one registration cuts that by roughly 80% while still exercising
  * the exact same `ensureSaasMetricPackRegistered` code path.
@@ -57,15 +57,15 @@ describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
     organizationId = organization.id;
     projectId = project.id;
     await ensureSaasMetricPackRegistered(organizationId, projectId, owner.id);
-  }, 60_000); // seventeen sequential registerMetricDefinition round-trips (existence check + save + audit log each) — see vitest.config.ts's own note on this package's emulator timing
+  }, 60_000); // twenty-two sequential registerMetricDefinition round-trips (existence check + save + audit log each) — see vitest.config.ts's own note on this package's emulator timing
 
   async function activeMetric(name: string): Promise<MetricDefModel | null> {
     return getActiveMetricDefinition(organizationId, projectId, name);
   }
 
-  it('registers all seventeen metrics (eleven featured + six supporting) as active v1', async () => {
+  it('registers all twenty-two metrics (fourteen featured + eight supporting) as active v1', async () => {
     const defs = await listMetricDefinitionsForProject(organizationId, projectId);
-    expect(defs).toHaveLength(17);
+    expect(defs).toHaveLength(22);
     expect(defs.every((def) => def.version === 1 && def.status === 'active')).toBe(true);
   });
 
@@ -155,8 +155,38 @@ describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
     expect(metric?.formula).toBe('failed_charges / total_charges');
   });
 
+  it('registers reactivations (KAN-66): count_distinct(fact_subscription_event.subscription_id where type=reactivate)', async () => {
+    const metric = await activeMetric('reactivations');
+    expect(metric?.definition_kind).toBe('aggregation');
+    expect(metric?.aggregation).toEqual({
+      function: 'count_distinct',
+      table: 'fact_subscription_event',
+      column: 'subscription_id',
+      timeColumn: 'ts',
+      filters: [{ field: 'type', operator: '=', value: 'reactivate' }],
+    });
+  });
+
+  it('registers trials_active (KAN-66): count_distinct(dim_subscription.subscription_id where status=trialing)', async () => {
+    const metric = await activeMetric('trials_active');
+    expect(metric?.definition_kind).toBe('aggregation');
+    expect(metric?.aggregation).toEqual({
+      function: 'count_distinct',
+      table: 'dim_subscription',
+      column: 'subscription_id',
+      timeColumn: 'started_at',
+      filters: [{ field: 'status', operator: '=', value: 'trialing' }],
+    });
+  });
+
+  it('registers trial_conversion_rate (KAN-66): trial_conversions / trial_starts', async () => {
+    const metric = await activeMetric('trial_conversion_rate');
+    expect(metric?.definition_kind).toBe('formula');
+    expect(metric?.formula).toBe('trial_conversions / trial_starts');
+  });
+
   it('registers the supporting metrics every formula-kind metric depends on', async () => {
-    const supportingNames = ['new_paying', 'expansion_mrr', 'churned_mrr', 'total_charges', 'failed_charges', 'attributed_gross_profit'];
+    const supportingNames = ['new_paying', 'expansion_mrr', 'churned_mrr', 'total_charges', 'failed_charges', 'attributed_gross_profit', 'trial_starts', 'trial_conversions'];
     for (const name of supportingNames) {
       const metric = await activeMetric(name);
       expect(metric, `expected supporting metric "${name}" to be registered`).not.toBeNull();
@@ -166,7 +196,7 @@ describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
 });
 
 describe('ensureSaasMetricPackRegistered — idempotency and isolation', () => {
-  it('partially idempotent: a metric pre-registered by a human is left alone, the other sixteen still register', async () => {
+  it('partially idempotent: a metric pre-registered by a human is left alone, the other twenty-one still register', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Partial Idempotent Org');
     await registerMetricDefinition({
       organizationId: organization.id,
@@ -180,7 +210,7 @@ describe('ensureSaasMetricPackRegistered — idempotency and isolation', () => {
     const result = await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
 
     expect(result.alreadyRegistered).toEqual(['ad_spend']);
-    expect(result.registered).toHaveLength(16);
+    expect(result.registered).toHaveLength(21);
     expect(result.registered).not.toContain('ad_spend');
 
     const adSpend = await getActiveMetricDefinition(organization.id, project.id, 'ad_spend');
@@ -194,12 +224,12 @@ describe('ensureSaasMetricPackRegistered — idempotency and isolation', () => {
 
     const second = await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
     expect(second.registered).toEqual([]);
-    expect(second.alreadyRegistered).toHaveLength(17);
+    expect(second.alreadyRegistered).toHaveLength(22);
 
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
-    expect(defs).toHaveLength(17);
+    expect(defs).toHaveLength(22);
     expect(defs.every((def) => def.version === 1)).toBe(true);
-  }, 60_000); // two full seventeen-metric passes — see the first test's own timeout note
+  }, 60_000); // two full twenty-two-metric passes — see the first test's own timeout note
 
   it('is isolated per project: registering in one project leaves a sibling project untouched', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Isolation Org');

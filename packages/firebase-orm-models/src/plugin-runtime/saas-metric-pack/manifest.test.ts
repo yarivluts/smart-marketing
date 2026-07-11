@@ -14,9 +14,9 @@ describe('SAAS_METRIC_PACK_MANIFEST_YAML', () => {
     expect(manifest.registers.events).toEqual([]);
   });
 
-  it('declares registers.metrics as exactly the eleven featured metric names KAN-59\'s AC lists, regardless of order', () => {
+  it('declares registers.metrics as exactly the fourteen featured metric names (KAN-59\'s original eleven plus KAN-66\'s three), regardless of order', () => {
     const manifest = parsePluginManifest(SAAS_METRIC_PACK_MANIFEST_YAML);
     expect(new Set(manifest.registers.metrics)).toEqual(new Set(SAAS_METRIC_PACK_FEATURED_METRIC_NAMES));
-    expect(manifest.registers.metrics).toHaveLength(11);
+    expect(manifest.registers.metrics).toHaveLength(14);
   });
 });

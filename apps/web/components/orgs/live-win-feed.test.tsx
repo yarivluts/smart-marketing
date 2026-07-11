@@ -44,6 +44,7 @@ function renderFeed(): void {
 const item: WinEventFeedItem = {
   id: 'win-1',
   winRuleName: 'Big order',
+  winType: 'generic',
   schemaName: 'order_completed',
   clientId: 'ord_9001',
   payload: {},
@@ -81,6 +82,16 @@ describe('LiveWinFeed', () => {
       source.emitWin(item);
     });
     expect(screen.getByText('Big order — order_completed (ord_9001)')).toBeInTheDocument();
+    expect(screen.queryByText('Reactivation')).not.toBeInTheDocument();
+  });
+
+  it('shows a win-type badge for a KAN-66 catalog type, but not for generic', () => {
+    renderFeed();
+    const source = FakeEventSource.instances[0];
+    act(() => {
+      source.emitWin({ ...item, winType: 'trial_conversion' });
+    });
+    expect(screen.getByText('Trial conversion')).toBeInTheDocument();
   });
 
   it('closes the connection on unmount', () => {

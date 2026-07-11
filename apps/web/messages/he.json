@@ -702,6 +702,16 @@
     "filterValuePlaceholder": "לדוגמה: 100",
     "removeFilter": "הסר",
     "addFilter": "הוסף מסנן",
+    "winTypeFieldLabel": "סוג ניצחון",
+    "winTypeLabel": {
+      "generic": "כללי",
+      "reactivation": "הפעלה מחדש",
+      "trial_conversion": "המרת ניסיון"
+    },
+    "winTypeHint": {
+      "reactivation": "בדרך כלל מופעל על ידי אירוע המציין שלקוח שנטש חזר לפעילות.",
+      "trial_conversion": "בדרך כלל מופעל על ידי אירוע המציין שמנוי ניסיון הומר למנוי בתשלום."
+    },
     "createButton": "צור כלל ניצחון",
     "createError": "לא ניתן היה ליצור את כלל הניצחון. נסה שוב.",
     "feedHeading": "פיד ניצחונות בזמן אמת",
@@ -709,5 +719,16 @@
     "feedConnecting": "מתחבר…",
     "feedEmpty": "אין עדיין ניצחונות. הם יופיעו כאן בזמן אמת.",
     "feedItem": "{winRuleName} — {schemaName} ({clientId})"
+  },
+  "TrialPipeline": {
+    "heading": "צינור ניסיונות",
+    "inTrialLabel": "בניסיון כרגע",
+    "convertingLabel": "שיעור המרה",
+    "convertingValue": "{ratePct}%",
+    "unavailable": {
+      "warehouse_not_configured": "נתוני צינור הניסיונות דורשים מחסן נתונים מחובר.",
+      "quota_exceeded": "מכסת השאילתות היומית של הפרויקט מוצתה. נסה שוב מחר.",
+      "query_error": "לא ניתן היה לטעון את נתוני צינור הניסיונות. התקן את חבילת המדדים של SaaS כדי לראות אותם כאן."
+    }
   }
 }

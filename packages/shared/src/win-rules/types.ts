@@ -30,3 +30,24 @@ export interface WinRuleFilter {
   operator: WinRuleFilterOperator;
   value: string;
 }
+
+/**
+ * The win catalog (KAN-66, E12.2b, plan `04 §6` / `14` gap 14): a fixed set
+ * of recognized win "shapes" a rule can be tagged with, on top of KAN-65's
+ * otherwise-generic event-pattern engine. `generic` is the default and
+ * covers every rule KAN-65 itself could already express (`first_charge`,
+ * "order > X"); `reactivation`/`trial_conversion` are the two named types
+ * this story adds so a rule author can flag *why* an event counts as a win,
+ * and so a future celebration/rendering layer (KAN-67's TV mode: "confetti +
+ * sound per win type") has something concrete to key off besides a rule's
+ * own free-text name. This module intentionally does not prescribe *which*
+ * schema/filters make a rule "a reactivation" — that's still project-
+ * specific (every project registers its own event schema names), so the
+ * catalog is a label, not a canned rule template.
+ */
+export const WIN_TYPES = ['generic', 'reactivation', 'trial_conversion'] as const;
+export type WinType = (typeof WIN_TYPES)[number];
+
+export function isWinType(value: string): value is WinType {
+  return (WIN_TYPES as readonly string[]).includes(value);
+}
