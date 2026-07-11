@@ -6,6 +6,7 @@ import {
   ensureUserForFirebaseSession,
   installPluginAndProvisionBuiltins,
   listMetricDefinitionsForProject,
+  PluginScopeConsentMismatchError,
   registerPluginManifest,
   SAAS_METRIC_PACK_MANIFEST_YAML,
   SAAS_METRIC_PACK_PLUGIN_ID,
@@ -62,7 +63,7 @@ describe('installPluginAndProvisionBuiltins', () => {
     expect(defs.map((def) => def.name)).toContain('ad_spend');
     expect(defs.map((def) => def.name)).toContain('troi');
     expect(defs).toHaveLength(17);
-  });
+  }, 60_000); // seventeen sequential metric registrations — see saas-metric-pack.emulator.test.ts's own timeout note
 
   it('installing an unrelated plugin registers no metrics and behaves exactly like the generic installPlugin', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Unrelated Org');
@@ -111,5 +112,25 @@ describe('installPluginAndProvisionBuiltins', () => {
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs).toHaveLength(17);
     expect(defs.every((def) => def.version === 1)).toBe(true);
+  }, 60_000); // two full seventeen-metric passes (install + reinstall)
+
+  it('registers no metrics when the install itself is rejected (scope consent mismatch)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Dispatch Rejected Install Org');
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML, registeredByUserId: owner.id });
+
+    await expect(
+      installPluginAndProvisionBuiltins({
+        organizationId: organization.id,
+        projectId: project.id,
+        pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
+        version: '1.0.0',
+        consentedScopes: [], // doesn't match the manifest's declared `[metrics:write]`
+        config: {},
+        installedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(PluginScopeConsentMismatchError);
+
+    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+    expect(defs).toHaveLength(0);
   });
 });

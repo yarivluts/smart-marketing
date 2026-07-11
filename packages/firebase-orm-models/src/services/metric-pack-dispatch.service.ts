@@ -17,6 +17,19 @@ import { installPlugin, type InstallPluginParams } from './plugin-registry.servi
  * knowledge lives, same as the source-plugin dispatch above it. Every plugin
  * id other than the built-in metric pack falls through to the generic
  * `installPlugin` unchanged.
+ *
+ * Not transactional, the same documented, deliberately-deferred tradeoff
+ * `registerMetricDefinition`/`registerSchemaDefinition` already accept: the
+ * install is saved *before* `ensureSaasMetricPackRegistered` runs, so a
+ * failure partway through registration (a transient Firestore error, not the
+ * expected `DuplicateMetricDefinitionError` path, which is swallowed) leaves
+ * an `installed` `PluginInstallModel` with only some of its metrics
+ * registered, and a re-POST to install the same plugin id in the same
+ * project throws `PluginAlreadyInstalledError` rather than resuming — there
+ * is no retry surface yet. `ensureSaasMetricPackRegistered` itself is
+ * idempotent, so a human can uninstall and reinstall to retry today; a
+ * dedicated re-provision action is a reasonable follow-up if this proves to
+ * matter in practice.
  */
 export async function installPluginAndProvisionBuiltins(params: InstallPluginParams): Promise<PluginInstallModel> {
   const install = await installPlugin(params);

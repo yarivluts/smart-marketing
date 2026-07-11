@@ -6,6 +6,7 @@ import {
   ensureUserForFirebaseSession,
   getActiveMetricDefinition,
   listMetricDefinitionsForProject,
+  registerMetricDefinition,
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { ensureSaasMetricPackRegistered } from './index';
@@ -47,7 +48,7 @@ describe('ensureSaasMetricPackRegistered', () => {
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs).toHaveLength(17);
     expect(defs.every((def) => def.version === 1 && def.status === 'active')).toBe(true);
-  });
+  }, 60_000); // seventeen sequential registerMetricDefinition round-trips (existence check + save + audit log each) — see vitest.config.ts's own note on this package's emulator timing
 
   it('registers ad_spend: sum(fact_ad_spend.reporting_spend) broken down by channel/campaign/adset/ad', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Ad Spend Org');
@@ -180,6 +181,28 @@ describe('ensureSaasMetricPackRegistered', () => {
     }
   });
 
+  it('partially idempotent: a metric pre-registered by a human is left alone, the other sixteen still register', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Partial Idempotent Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: ['region'], // deliberately different from the pack's own dimensions, to prove this pre-existing version is left untouched
+      createdByUserId: owner.id,
+    });
+
+    const result = await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
+
+    expect(result.alreadyRegistered).toEqual(['ad_spend']);
+    expect(result.registered).toHaveLength(16);
+    expect(result.registered).not.toContain('ad_spend');
+
+    const adSpend = await getActiveMetricDefinition(organization.id, project.id, 'ad_spend');
+    expect(adSpend?.dimensions).toEqual(['region']);
+    expect(adSpend?.version).toBe(1);
+  }, 60_000);
+
   it('is idempotent: a second call registers nothing new and creates no duplicate versions', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Idempotent Org');
     await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
@@ -191,7 +214,7 @@ describe('ensureSaasMetricPackRegistered', () => {
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs).toHaveLength(17);
     expect(defs.every((def) => def.version === 1)).toBe(true);
-  });
+  }, 60_000); // two full seventeen-metric passes — see the first test's own timeout note
 
   it('is isolated per project: registering in one project leaves a sibling project untouched', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Isolation Org');
@@ -201,5 +224,5 @@ describe('ensureSaasMetricPackRegistered', () => {
 
     const metricInOtherProject = await getActiveMetricDefinition(organization.id, otherProject.id, 'ad_spend');
     expect(metricInOtherProject).toBeNull();
-  });
+  }, 60_000);
 });

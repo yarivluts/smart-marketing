@@ -65,7 +65,17 @@ const SIGNUPS: SaasMetricPackDefinition = {
   },
 };
 
-/** Supporting aggregation for `cac`/`conversion_to_paying` — not itself one of KAN-59's eleven named metrics, same posture as `test-catalog.ts`'s `new_paying`. */
+/**
+ * Supporting aggregation for `cac`/`conversion_to_paying` — not itself one of
+ * KAN-59's eleven named metrics, same posture as `test-catalog.ts`'s
+ * `new_paying`. `type='first_charge'` (plan `04 §2`'s own literal example)
+ * is a narrower, distinguished sub-category of `total_charges`/`failed_
+ * charges`'s `type='charge'` below — specifically a customer's *first*
+ * successful charge, not every charge attempt — so the two filters
+ * deliberately don't overlap 1:1; a real warehouse's `type` column would
+ * need to support both values (or `first_charge` derived from `charge` +
+ * a first-occurrence window) once KAN-18 lands.
+ */
 const NEW_PAYING: SaasMetricPackDefinition = {
   name: 'new_paying',
   featured: false,
@@ -166,7 +176,7 @@ const COLLECTED_REVENUE: SaasMetricPackDefinition = {
   },
 };
 
-/** Supporting aggregation for `failed_charge_rate`'s denominator. */
+/** Supporting aggregation for `failed_charge_rate`'s denominator — every charge attempt (`type='charge'`), success or fail; see `new_paying`'s own comment on why this is a broader category than its `type='first_charge'`. */
 const TOTAL_CHARGES: SaasMetricPackDefinition = {
   name: 'total_charges',
   featured: false,
