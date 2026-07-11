@@ -242,3 +242,42 @@ describe('buildTileRenderView — heatmap', () => {
     expect(view).toEqual({ kind: 'heatmap', rowLabels: [], columnLabels: [], matrix: [] });
   });
 });
+
+describe('buildTileRenderView — histogram', () => {
+  it('builds a one-dimension bar series, numeric-sorting the dimension labels', () => {
+    const view = buildTileRenderView(
+      tile({ type: 'histogram', metricNames: ['engagement_depth_histogram'], dimensions: ['days_active_bucket'] }),
+      {
+        ok: true,
+        series: [
+          { bucket_date: '2026-04-28', days_active_bucket: '10', engagement_depth_histogram: 1 },
+          { bucket_date: '2026-04-28', days_active_bucket: '1', engagement_depth_histogram: 1 },
+          { bucket_date: '2026-04-28', days_active_bucket: '3', engagement_depth_histogram: 0 },
+        ],
+      },
+    );
+    expect(view).toEqual({ kind: 'histogram', labels: ['1', '3', '10'], values: [1, 0, 1] });
+  });
+
+  it('sums more than one row sharing the same dimension value, rather than overwriting', () => {
+    const view = buildTileRenderView(
+      tile({ type: 'histogram', metricNames: ['engagement_depth_histogram'], dimensions: ['days_active_bucket'] }),
+      {
+        ok: true,
+        series: [
+          { bucket_date: '2026-04-28', days_active_bucket: '1', engagement_depth_histogram: 2 },
+          { bucket_date: '2026-04-27', days_active_bucket: '1', engagement_depth_histogram: 3 },
+        ],
+      },
+    );
+    expect(view).toEqual({ kind: 'histogram', labels: ['1'], values: [5] });
+  });
+
+  it('returns an empty series for no rows', () => {
+    const view = buildTileRenderView(
+      tile({ type: 'histogram', metricNames: ['engagement_depth_histogram'], dimensions: ['days_active_bucket'] }),
+      { ok: true, series: [] },
+    );
+    expect(view).toEqual({ kind: 'histogram', labels: [], values: [] });
+  });
+});

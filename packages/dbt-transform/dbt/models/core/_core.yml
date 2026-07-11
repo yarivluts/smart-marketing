@@ -133,3 +133,55 @@ models:
       - name: retention_rate
         tests:
           - not_null
+
+  - name: fact_engagement_daily
+    description: >
+      Daily engagement (plan `04 §3`/`14` gap 2, KAN-63): one row per
+      (project, environment, activity_date) — `dau` that day, the trailing
+      `engagement_window_days`-day (default 28) distinct active-customer
+      count, and their ratio (`dau_mau_ratio`, the stickiness metric). Feeds
+      the engagement-pack's own `dau_mau_ratio` metric. See the model's own
+      doc comment for why `dau`/`wau`/`mau` themselves come from a different,
+      aspirational metric definition instead of this table.
+    columns:
+      - name: engagement_daily_key
+        description: Composite (project_id, environment_id, activity_date) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: activity_date
+        tests:
+          - not_null
+      - name: dau
+        tests:
+          - not_null
+      - name: active_customers_l_n
+        tests:
+          - not_null
+      - name: dau_mau_ratio
+        tests:
+          - not_null
+
+  - name: fact_engagement_depth_histogram
+    description: >
+      The L28/LN engagement-depth histogram (plan `14` gap 2, KAN-63): one
+      row per (project, environment, as_of_date, days_active_bucket) — how
+      many customers were active on exactly that many of the trailing
+      `engagement_window_days` days, as of the project's own latest observed
+      activity date. Feeds the KAN-60 `histogram` board tile via the
+      engagement-pack's own `engagement_depth_histogram` metric.
+    columns:
+      - name: engagement_depth_histogram_key
+        description: Composite (project_id, environment_id, as_of_date, days_active_bucket) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: as_of_date
+        tests:
+          - not_null
+      - name: days_active_bucket
+        tests:
+          - not_null
+      - name: customer_count
+        tests:
+          - not_null

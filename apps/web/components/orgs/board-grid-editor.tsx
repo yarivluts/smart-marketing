@@ -49,37 +49,42 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
   const t = useTranslations('Boards');
   const dimensionOptions = tile.type === 'funnel' ? [] : (metricCatalog.find((entry) => entry.name === tile.metricNames[0])?.dimensions ?? []);
 
+  // `heatmap` (KAN-62) and `histogram` (KAN-63) both need exactly one
+  // breakdown dimension (`validateTiles`'s own server-side rule for each) —
+  // treated identically here so the grid editor can't construct either
+  // type's invalid zero-or-many-dimension state.
+  const needsSingleDimension = tile.type === 'heatmap' || tile.type === 'histogram';
+
   function setType(type: BoardTileTypeRow): void {
     const size = defaultTileSize(type);
     const isFunnel = type === 'funnel';
-    const isHeatmap = type === 'heatmap';
+    const isSingleDimension = type === 'heatmap' || type === 'histogram';
     const metricName = tile.metricNames[0] ?? metricCatalog[0]?.name ?? '';
-    // A heatmap tile's matrix has no column axis without exactly one
-    // dimension (`validateTiles`'s own server-side rule) — default to the
-    // tile's current dimension if it's still valid for this metric,
-    // otherwise the metric's first declared dimension, rather than
-    // carrying over a zero- or multi-dimension selection from whatever
-    // type this tile was before.
-    const heatmapDimensionOptions = metricCatalog.find((entry) => entry.name === metricName)?.dimensions ?? [];
-    const heatmapDimension = tile.dimensions.find((dimension) => heatmapDimensionOptions.includes(dimension)) ?? heatmapDimensionOptions[0];
+    // A heatmap/histogram tile has no column/x-axis without exactly one
+    // dimension — default to the tile's current dimension if it's still
+    // valid for this metric, otherwise the metric's first declared
+    // dimension, rather than carrying over a zero- or multi-dimension
+    // selection from whatever type this tile was before.
+    const singleDimensionOptions = metricCatalog.find((entry) => entry.name === metricName)?.dimensions ?? [];
+    const singleDimension = tile.dimensions.find((dimension) => singleDimensionOptions.includes(dimension)) ?? singleDimensionOptions[0];
     onChange({
       ...tile,
       type,
       layout: { ...tile.layout, w: size.w, h: size.h },
       metricNames: isFunnel ? (tile.metricNames.length >= 2 ? tile.metricNames : [metricName, metricCatalog[1]?.name ?? metricName]) : [metricName],
-      dimensions: isFunnel ? [] : isHeatmap ? (heatmapDimension ? [heatmapDimension] : []) : tile.dimensions,
+      dimensions: isFunnel ? [] : isSingleDimension ? (singleDimension ? [singleDimension] : []) : tile.dimensions,
     });
   }
 
   function setSingleMetric(name: string): void {
-    // A heatmap tile always needs exactly one dimension — default to the
-    // newly-selected metric's first declared dimension rather than leaving
-    // the tile momentarily invalid (see `setType`'s own doc comment).
-    const firstDimension = tile.type === 'heatmap' ? (metricCatalog.find((entry) => entry.name === name)?.dimensions[0] ?? undefined) : undefined;
+    // A heatmap/histogram tile always needs exactly one dimension — default
+    // to the newly-selected metric's first declared dimension rather than
+    // leaving the tile momentarily invalid (see `setType`'s own doc comment).
+    const firstDimension = needsSingleDimension ? (metricCatalog.find((entry) => entry.name === name)?.dimensions[0] ?? undefined) : undefined;
     onChange({ ...tile, metricNames: [name], dimensions: firstDimension ? [firstDimension] : [] });
   }
 
-  function setHeatmapDimension(dimension: string): void {
+  function setSingleDimension(dimension: string): void {
     onChange({ ...tile, dimensions: [dimension] });
   }
 
@@ -183,18 +188,18 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
               </option>
             ))}
           </select>
-          {tile.type === 'heatmap' && dimensionOptions.length > 0 ? (
-            // A heatmap's matrix column axis needs exactly one dimension
-            // (`validateTiles`'s own server-side rule) — a single select,
-            // not the free-form multi-checkbox list every other
-            // breakdown-capable type below uses, so the grid editor can't
-            // even construct the invalid zero-or-many-dimension state.
+          {needsSingleDimension && dimensionOptions.length > 0 ? (
+            // A heatmap/histogram tile's column/x-axis needs exactly one
+            // dimension (`validateTiles`'s own server-side rule for each) —
+            // a single select, not the free-form multi-checkbox list every
+            // other breakdown-capable type below uses, so the grid editor
+            // can't even construct the invalid zero-or-many-dimension state.
             <div className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">{t('tileDimensionsLabel')}</span>
               <select
                 aria-label={t('tileDimensionsLabel')}
                 value={tile.dimensions[0] ?? ''}
-                onChange={(event) => setHeatmapDimension(event.target.value)}
+                onChange={(event) => setSingleDimension(event.target.value)}
                 className="h-9 rounded-md border border-input bg-background px-2 text-sm"
               >
                 {dimensionOptions.map((dimension) => (
@@ -205,7 +210,7 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
               </select>
             </div>
           ) : null}
-          {tile.type !== 'big_number' && tile.type !== 'heatmap' && dimensionOptions.length > 0 ? (
+          {tile.type !== 'big_number' && !needsSingleDimension && dimensionOptions.length > 0 ? (
             <div className="flex flex-col gap-1">
               <span className="text-xs font-medium text-muted-foreground">{t('tileDimensionsLabel')}</span>
               {dimensionOptions.map((dimension) => (

@@ -68,13 +68,20 @@ export interface HeatmapView {
   matrix: (number | null)[][];
 }
 
+/** One `(label, value)` bar — `labels` sorted ascending (numeric-aware, see `sortLabels`), one per distinct breakdown-dimension value the query returned. */
+export interface HistogramView {
+  labels: string[];
+  values: number[];
+}
+
 export type TileRenderView =
   | { kind: 'unavailable'; reason: BoardTileUnavailableReason; message: string }
   | { kind: 'big_number'; value: number; previousValue?: number; deltaPct?: number }
   | { kind: 'time_series'; chart: Extract<BoardTileType, 'line' | 'bar'>; series: TimeSeries[]; previousSeries?: TimeSeries[] }
   | { kind: 'table'; columns: string[]; rows: WarehouseRow[] }
   | { kind: 'funnel'; steps: FunnelStep[] }
-  | ({ kind: 'heatmap' } & HeatmapView);
+  | ({ kind: 'heatmap' } & HeatmapView)
+  | ({ kind: 'histogram' } & HistogramView);
 
 function toNumber(value: string | number | null): number {
   if (value === null) {
@@ -215,6 +222,29 @@ function buildHeatmapView(tile: BoardTile, rows: readonly WarehouseRow[]): TileR
 }
 
 /**
+ * A one-dimension bar chart (KAN-63) — e.g. `days_active_bucket x
+ * engagement_depth_histogram`, the same "one metric, one breakdown
+ * dimension" query shape `heatmap` already established, just collapsed to a
+ * single axis instead of a matrix: every row is summed into its own
+ * dimension-value bucket (there should only ever be one row per bucket for
+ * a real "as of latest date" snapshot metric, but summing rather than
+ * overwriting tolerates a query that happens to return more than one, the
+ * same defensive posture `sumMetric` already takes for `big_number`/
+ * `funnel`).
+ */
+function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRenderView {
+  const metricName = tile.metricNames[0];
+  const dimension = tile.dimensions[0];
+  const valueByLabel = new Map<string, number>();
+  for (const row of rows) {
+    const label = String(row[dimension] ?? '');
+    valueByLabel.set(label, (valueByLabel.get(label) ?? 0) + toNumber(row[metricName] ?? null));
+  }
+  const labels = sortLabels([...valueByLabel.keys()]);
+  return { kind: 'histogram', labels, values: labels.map((label) => valueByLabel.get(label) ?? 0) };
+}
+
+/**
  * Turns one tile's raw `queryBoardTile` outcome into the shape its
  * type-specific renderer consumes — grouping/summing/sorting the flat
  * `WarehouseRow[]` series so no rendering component needs to know about
@@ -240,6 +270,8 @@ export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutc
       return buildFunnelView(tile, outcome.series);
     case 'heatmap':
       return buildHeatmapView(tile, outcome.series);
+    case 'histogram':
+      return buildHistogramView(tile, outcome.series);
     default:
       return buildTableView(outcome.series);
   }

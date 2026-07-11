@@ -103,6 +103,33 @@ function heatmapTile(overrides: Partial<BoardTile> = {}): BoardTile {
   };
 }
 
+/** KAN-63's engagement-depth histogram, registered the same way any other `fact_*` table is (see `BOARD_TILE_TYPES`'s own doc comment on `board.model.ts` for why a `histogram` tile needs no grain constraint, unlike `heatmap`). */
+async function registerEngagementDepthHistogram(organizationId: string, projectId: string, createdByUserId: string, dimensions: string[] = ['days_active_bucket']) {
+  return registerMetricDefinition({
+    organizationId,
+    projectId,
+    name: 'engagement_depth_histogram',
+    definition: {
+      kind: 'aggregation',
+      aggregation: { function: 'sum', table: 'fact_engagement_depth_histogram', column: 'customer_count', timeColumn: 'as_of_date', filters: [] },
+    },
+    dimensions,
+    createdByUserId,
+  });
+}
+
+function histogramTile(overrides: Partial<BoardTile> = {}): BoardTile {
+  return {
+    id: unique('tile'),
+    type: 'histogram',
+    title: 'Engagement depth',
+    layout: { x: 0, y: 0, w: 6, h: 4 },
+    metricNames: ['engagement_depth_histogram'],
+    dimensions: ['days_active_bucket'],
+    ...overrides,
+  };
+}
+
 class FakeWarehouseQueryExecutor implements WarehouseQueryExecutor {
   public callCount = 0;
   constructor(private readonly rows: WarehouseRow[]) {}
@@ -381,6 +408,26 @@ describe('saveBoardTiles', () => {
     ).rejects.toBeInstanceOf(InvalidBoardError);
   });
 
+  it('accepts a histogram tile with exactly one dimension, and rejects one with zero or more than one — no grain constraint unlike heatmap', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Histogram Org');
+    await registerEngagementDepthHistogram(organization.id, project.id, owner.id, ['days_active_bucket']);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Engagement', createdByUserId: owner.id });
+    expect(board.date_range.grain).toBe('day');
+
+    const saved = await saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: board.id, tiles: [histogramTile()], updatedByUserId: owner.id });
+    expect(saved.tiles[0].dimensions).toEqual(['days_active_bucket']);
+
+    await expect(
+      saveBoardTiles({
+        organizationId: organization.id,
+        projectId: project.id,
+        boardId: board.id,
+        tiles: [histogramTile({ dimensions: [] })],
+        updatedByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidBoardError);
+  });
+
   it('rejects duplicate tile ids, an unknown tile type, and a layout that overflows the grid', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Invalid Layout Org');
     await registerAdSpend(organization.id, project.id, owner.id);
@@ -562,6 +609,42 @@ describe('queryBoardTile', () => {
     // heatmap tile silently compiling in a `period` column and `UNION ALL`
     // anyway (harmless against this fake, wrong against a real warehouse)
     // would slip past an assertion on `outcome` alone.
+    expect(executor.lastQuery?.sql).not.toContain('UNION ALL');
+    expect(executor.lastQuery?.sql).not.toContain('AS period');
+  });
+
+  it('returns a days_active_bucket series for a histogram tile, ignoring any board-level compare', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Histogram Query Org');
+    await registerEngagementDepthHistogram(organization.id, project.id, owner.id);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Engagement', createdByUserId: owner.id });
+    await updateBoardSettings({ organizationId: organization.id, projectId: project.id, boardId: board.id, compare: 'previous_period', updatedByUserId: owner.id });
+    const reloaded = await getBoard(organization.id, project.id, board.id);
+    const rows: WarehouseRow[] = [
+      { bucket_date: '2026-04-28', days_active_bucket: '1', engagement_depth_histogram: 1 },
+      { bucket_date: '2026-04-28', days_active_bucket: '10', engagement_depth_histogram: 1 },
+    ];
+    class RecordingWarehouseQueryExecutor implements WarehouseQueryExecutor {
+      public lastQuery: { sql: string } | undefined;
+      execute(query: { sql: string }): Promise<WarehouseRow[]> {
+        this.lastQuery = query;
+        return Promise.resolve(rows);
+      }
+    }
+    const executor = new RecordingWarehouseQueryExecutor();
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board: reloaded!,
+      tile: histogramTile(),
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(outcome).toEqual({ ok: true, series: rows });
+    // Same "prove compare was genuinely excluded from the compiled SQL, not
+    // just that this fake ignores whatever it received" reasoning the
+    // heatmap query test's own comment gives.
     expect(executor.lastQuery?.sql).not.toContain('UNION ALL');
     expect(executor.lastQuery?.sql).not.toContain('AS period');
   });

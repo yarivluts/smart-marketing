@@ -20,8 +20,18 @@ import type { ComparePeriod, CompilerFilter, TimeGrain } from '@growthos/shared'
  * with a `heatmap` tile keeps its date-range `grain` at `'month'` — a
  * coarser grain would `DATE_TRUNC` multiple distinct cohort months into the
  * same bucket, silently blending distinct cohorts into one matrix row.
+ *
+ * `histogram` (KAN-63) is the second addition past the original five — a
+ * bar chart over one breakdown dimension (e.g. `days_active_bucket`), the
+ * same "one metric, one required dimension" shape `heatmap` established,
+ * just rendered as a 1-D bar per dimension value (summed across whatever
+ * `bucket_date` rows the query returns) instead of a 2-D matrix. No grain
+ * constraint like heatmap's: its own source metrics (`engagement_depth_
+ * histogram`, KAN-63's engagement pack) are already-collapsed snapshots
+ * keyed by an "as of" date, not a value that a coarser `DATE_TRUNC` could
+ * silently blend across distinct buckets the way cohort months could.
  */
-export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel', 'heatmap'] as const;
+export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel', 'heatmap', 'histogram'] as const;
 export type BoardTileType = (typeof BOARD_TILE_TYPES)[number];
 
 export function isBoardTileType(value: string): value is BoardTileType {

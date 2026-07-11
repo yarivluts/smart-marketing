@@ -230,6 +230,10 @@ function validateTiles(tiles: readonly BoardTile[], catalog: readonly MetricCata
       }
     }
 
+    if (tile.type === 'histogram' && tile.dimensions.length !== 1) {
+      reasons.push(`Histogram tile "${tile.id}" needs exactly one breakdown dimension (its bar chart's x-axis).`);
+    }
+
     for (const metricName of tile.metricNames) {
       const entry = catalogByName.get(metricName);
       if (!entry) {
@@ -328,8 +332,13 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
   // alongside `funnel` — a cohort matrix's rows are already "cohort month",
   // its own kind of time axis, so a second doubled-up period wouldn't
   // overlay onto the same matrix cleanly the way it does for a line/bar
-  // series.
-  const supportsCompare = params.tile.type !== 'funnel' && params.tile.type !== 'heatmap';
+  // series. `histogram` is excluded for a related reason: its own source
+  // metrics are already-collapsed "as of latest date" snapshots (see
+  // `BOARD_TILE_TYPES`'s own doc comment), so a shifted-back "previous
+  // period" window would just query the same snapshot a second time (or
+  // miss it entirely if the shifted window falls before it), never a
+  // genuinely different prior distribution.
+  const supportsCompare = params.tile.type !== 'funnel' && params.tile.type !== 'heatmap' && params.tile.type !== 'histogram';
   const request: MetricQueryRequest = {
     metrics: params.tile.metricNames,
     ...(params.tile.type === 'funnel' ? {} : { dimensions: params.tile.dimensions }),
