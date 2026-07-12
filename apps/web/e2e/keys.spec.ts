@@ -35,8 +35,10 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}\\?project=`));
-    const projectId = new URL(page.url()).searchParams.get('project')!;
+    // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    const projectId = page.url().split('/').slice(-2)[0];
+    await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     await page.getByRole('link', { name: 'API keys' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/keys$`));

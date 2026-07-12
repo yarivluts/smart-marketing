@@ -6,6 +6,8 @@ import {
   type BoardModel,
   type BoardTile,
   checkTrackingAlertsForProject as checkTrackingAlertsForProjectInOrganization,
+  completeOnboarding as completeOnboardingInOrganization,
+  confirmOnboardingFunnelSteps as confirmOnboardingFunnelStepsInOrganization,
   createBoard as createBoardInOrganization,
   createOrganizationWithOwner,
   createOrgPerson as createOrgPersonInOrganization,
@@ -27,6 +29,13 @@ import {
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   type FieldMappingModel,
+  getOrCreateOnboardingState as getOrCreateOnboardingStateInOrganization,
+  markOnboardingSourceConnected as markOnboardingSourceConnectedInOrganization,
+  selectOnboardingMetricPack as selectOnboardingMetricPackInOrganization,
+  type OnboardingFunnelStep,
+  type OnboardingPackKey,
+  type OnboardingSourceConnectionMethod,
+  type OnboardingStateModel,
   createGoal as createGoalInOrganization,
   deleteGoal as deleteGoalInOrganization,
   type GoalModel,
@@ -788,4 +797,64 @@ export async function revokeTvPairing(
 ): Promise<TvPairingModel> {
   await ensureFirestoreOrm();
   return revokeTvPairingInOrganization({ organizationId, projectId, pairingId, revokedByUserId });
+}
+
+/** Starts (or resumes) a project's onboarding wizard (KAN-68) — creates the singleton state doc on first visit. */
+export async function startOnboarding(
+  organizationId: string,
+  projectId: string,
+  userId: string,
+): Promise<OnboardingStateModel> {
+  await ensureFirestoreOrm();
+  return getOrCreateOnboardingStateInOrganization(organizationId, projectId, userId);
+}
+
+export interface SelectOnboardingMetricPackInput {
+  organizationId: string;
+  projectId: string;
+  userId: string;
+  packKey: OnboardingPackKey;
+}
+
+/** The wizard's "pick a vertical/metric pack" step. */
+export async function selectOnboardingMetricPack(input: SelectOnboardingMetricPackInput): Promise<OnboardingStateModel> {
+  await ensureFirestoreOrm();
+  return selectOnboardingMetricPackInOrganization(input);
+}
+
+export interface MarkOnboardingSourceConnectedInput {
+  organizationId: string;
+  projectId: string;
+  userId: string;
+  method: OnboardingSourceConnectionMethod;
+  pluginId?: string;
+}
+
+/** The wizard's "connect a first source" step. */
+export async function markOnboardingSourceConnected(input: MarkOnboardingSourceConnectedInput): Promise<OnboardingStateModel> {
+  await ensureFirestoreOrm();
+  return markOnboardingSourceConnectedInOrganization(input);
+}
+
+export interface ConfirmOnboardingFunnelStepsInput {
+  organizationId: string;
+  projectId: string;
+  userId: string;
+  steps: readonly OnboardingFunnelStep[];
+}
+
+/** The wizard's "confirm the AI-proposed funnel mapping" step. */
+export async function confirmOnboardingFunnelSteps(input: ConfirmOnboardingFunnelStepsInput): Promise<OnboardingStateModel> {
+  await ensureFirestoreOrm();
+  return confirmOnboardingFunnelStepsInOrganization(input);
+}
+
+/** The wizard's final "done" step. */
+export async function completeOnboarding(
+  organizationId: string,
+  projectId: string,
+  userId: string,
+): Promise<OnboardingStateModel> {
+  await ensureFirestoreOrm();
+  return completeOnboardingInOrganization({ organizationId, projectId, userId });
 }
