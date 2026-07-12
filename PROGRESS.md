@@ -17,6 +17,117 @@ Template for each entry:
 
 ---
 
+## 2026-07-12 — E21.1 Automation-service action pipeline (KAN-71)
+
+- **Last completed:**
+  - **KAN-71 (Automation-service action pipeline)**, done, merged as PR #59. First Phase-3 story;
+    the prior entry flagged it as "a materially bigger scope jump" worth budgeting more than one
+    run for, but it fit in one. Checked for a parallel-run collision first (no open PR touched
+    KAN-71) before starting.
+  - **`packages/shared/src/automation-guardrails`**: a pure `evaluateBudgetChangeGuardrails(policy,
+    change, context)` — every guardrail type the AC lists (max daily budget change %, absolute
+    spend ceiling, protected/frozen targets, an allowed-hours window incl. overnight wraparound,
+    a blast-radius/day limit), each producing its own typed violation so a blocked action's UI can
+    say *which* rule fired. No Firestore/IO, mirroring the `metrics-compiler` pure-function
+    posture. 10 unit tests — one per guardrail type blocking a simulated budget change (the AC's
+    own phrasing), plus a zero-budget edge case and a multi-violation case.
+  - **`packages/firebase-orm-models`**:
+    - `AutomationGuardrailPolicyModel` (project-scoped, "current = newest" convention, same as
+      KAN-39's `ProjectCostQuotaModel`) + `automation-guardrail.service.ts`
+      (`getActiveAutomationGuardrailPolicy`/`setAutomationGuardrailPolicy`, with sane generous
+      defaults so no story's own demo traffic trips a guardrail by accident).
+    - `AutomationKillSwitchEventModel` (org-scoped append-only "pause all automation" event log) +
+      `automation-kill-switch.service.ts`. Per-tenant (org) scope only — the plan's "global +
+      per-tenant" kill switch only gets the per-tenant half today, since there's no platform-wide
+      admin surface anywhere in this app yet for a human to operate a cross-tenant one; flagged as
+      a follow-up, not silently dropped.
+    - `AutomationTargetStateModel` — a buildable-today stand-in for "the live state of one
+      ad-platform campaign as reported by a real connector's API," the same "actually works,
+      not just a no-op" posture `LocalDbtOrchestrationExecutor` (KAN-38) established — gives
+      execute -> verify -> rollback something real to mutate end to end before KAN-72/73
+      (Google/Meta Manage-tier plugins) exist to supply the real thing.
+    - `AutomationActionModel` + `automation.service.ts` — the full lifecycle:
+      `proposeAutomationBudgetChangeAction` (dry-run diff against the target's current simulated
+      state + guardrail/kill-switch evaluation -> lands as `blocked` or `awaiting_approval`,
+      never an unevaluated `proposed`), `approveAutomationAction`/`rejectAutomationAction`
+      (re-checks the kill switch at approval time too — defense in depth), `executeAutomationAction`
+      (via the existing KAN-47 `runWithRetryBackoff` helper), `verifyAutomationAction` (an optional
+      guarded-metric before/after pair triggers an auto-rollback once regression exceeds the
+      policy's threshold — the plan's "if a guarded metric worsens past threshold, revert and
+      alert"), `rollbackAutomationAction` (restores the target's prior state — both a direct manual
+      call and the auto-rollback path share this). Every transition is best-effort audit-logged
+      (propose/approve/reject/execute/verify/rollback/kill-switch engage-disengage/policy set),
+      matching the codebase's existing swallowed-failure convention.
+    - `automation-runtime/`: the `AutomationActionExecutor` interface (KAN-72/73's real
+      Google/Meta integration seam) + `SimulatedAdAccountExecutor`, the default stand-in that
+      mutates `AutomationTargetStateModel`.
+    - 22 new Firestore-emulator tests: the full propose -> approve -> execute -> verify -> rollback
+      lifecycle, each guardrail type blocking a proposal, kill-switch gating at propose/approve/
+      execute, cross-project isolation (KAN-26 posture — a sibling project's action id 404s), and
+      audit-log entries. A dedicated regression test proves **rollback restores the target's prior
+      budget** (the AC's explicit requirement) both for a manual rollback and for the auto-rollback
+      triggered by a guarded-metric regression.
+  - **Admin UI**: a new project-scoped `.../automation` page — org kill-switch panel (engage with a
+    required reason / disengage), project guardrail-policy form (every field optional — blank means
+    that guardrail type is off), a target-seeding form (the demo/manual stand-in for "connect a real
+    ad account" until KAN-72/73), a propose-action form, and the action queue itself with
+    approve/reject/execute/verify/rollback controls per action's current status. Gated on
+    `automation.execute` (already in the KAN-23 permission catalog and granted to `project_admin`/
+    `operator`); approve/reject additionally require `automation.approve` (checked both server-side
+    per route and client-side to hide controls a caller can't use). New `en`/`he` `Automation`
+    translation namespace (68 keys, no hard-coded strings, no Hebrew in code files).
+  - **Self-review (fixed before the PR settled):**
+    - `verifyAutomationAction` now rejects non-finite (`NaN`/`Infinity`) guarded-metric input
+      instead of silently skipping the auto-rollback check — the API route's own
+      `typeof === 'number'` validation lets `NaN` through unnoticed.
+    - Target lookups (propose, seed, and the simulated executor) now re-check the loaded doc's own
+      `project_id` against the requested project, mirroring `loadAction`'s existing
+      belt-and-suspenders check for `AutomationActionModel` — the same KAN-26 cross-project
+      isolation posture applied consistently across every lookup, not just the action one.
+    - Also added 2 new `isolation.test.ts` (KAN-26 non-enumeration) scenarios for the new
+      project-scoped actions route and the org-scoped kill-switch route, per the codebase's own
+      `route-isolation-guard.test.ts` convention (every route already calls `requireOrgPermission`,
+      so the filesystem-scanning guard test itself needed no exemption entry).
+  - `pnpm build && pnpm lint && pnpm typecheck && pnpm test` all green across every package
+    (`packages/shared`, `packages/firebase-orm-models`, `apps/web` — 836 unit tests plus the
+    Playwright e2e suite, `apps/api`); `packages/dbt-transform`'s pip-based venv provisioning
+    needed this sandbox's usual `PIP_CERT=/root/.ccr/ca-bundle.crt` workaround (unrelated to this
+    PR's own diff, which never touches `dbt-transform`).
+  - PR #59 merged (squash) into `main`. Remote branch deletion failed with the same documented
+    HTTP 403 as every prior feature branch in this sandbox.
+  - `TASKS.md` updated to `done` for KAN-71.
+- **In progress (exact stopping point):** none — KAN-71 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the remaining `todo` stories are **KAN-72** (Google Ads Manage plugin) and
+  **KAN-73** (Meta Manage plugin) — both real ad-platform write-back plugins that would consume
+  this run's `AutomationActionExecutor` interface, but both need real OAuth apps/API access this
+  sandbox doesn't have (Google Ads dev token / Meta Marketing API review, KAN-43, still
+  outstanding) — likely `needs-human`/`blocked-by` in practice even though `TASKS.md` doesn't yet
+  formally mark them that way. **KAN-74** (admin: write-tier selector, guardrail policy editor,
+  action-history UI with before/after) is the natural next unblocked pick: it builds *on* this
+  run's pipeline (already has a guardrail-policy editor and an action queue with before/after —
+  KAN-74 would add the write-tier selector per connection and polish the history view, the same
+  "KAN-48 polishes KAN-46/47" relationship). **KAN-75..78** (MCP server) are further out and
+  likely want KAN-74 (and possibly KAN-72/73) landed first per the epic's own ordering.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding) — now also gates whether KAN-72/73 can be built against real APIs rather than a
+    provider-agnostic executor interface alone.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - A platform-wide (cross-tenant) automation kill switch is deferred — this run only built the
+    per-org one, since no platform-level admin surface exists yet for a human to operate a
+    cross-tenant switch. Worth a human call on whether/when that's needed, or whether per-org is
+    sufficient until there's an actual multi-tenant-platform-ops surface.
+  - PR #52 (`fix/admin-static-imports`) is still open and untouched — out of scope for KAN-71,
+    carried forward from prior entries so it isn't lost.
+  - `apps/web/repro-tmp.mjs` (a leftover debug script noted in the KAN-70 entry) is still sitting
+    in `main`'s working tree, still out of scope for this run's own diff.
+
+---
+
 ## 2026-07-12 — E13.3 Alpha feedback instrumentation (KAN-70): collision with a parallel run, independently reviewed + merged
 
 - **Last completed:**
