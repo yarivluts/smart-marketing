@@ -64,6 +64,15 @@ describe('overallFreshnessAsOf', () => {
     ).toBe('2026-07-01T00:00:00.000Z');
   });
 
+  it('compares parsed instants, not raw strings — a whole-second timestamp (no fraction, as read_freshness.py emits when microseconds are exactly zero) is correctly treated as earlier than a later-in-the-same-second timestamp that does carry a fraction, even though "." sorts before "Z" lexicographically', () => {
+    expect(
+      overallFreshnessAsOf([
+        { table: 'entities', rowCount: 5, latestRecordAt: '2026-07-10T14:12:00.500000Z' },
+        { table: 'events', rowCount: 5, latestRecordAt: '2026-07-10T14:12:00Z' },
+      ]),
+    ).toBe('2026-07-10T14:12:00Z');
+  });
+
   it('ignores a table with no rows yet (null) rather than letting it win as "oldest"', () => {
     expect(
       overallFreshnessAsOf([

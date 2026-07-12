@@ -83,8 +83,14 @@ export function overallFreshnessAsOf(freshness: readonly OrchestrationFreshnessE
   if (timestamps.length === 0) {
     return null;
   }
-  // ISO 8601 timestamps compare correctly as plain strings.
-  return timestamps.reduce((oldest, current) => (current < oldest ? current : oldest));
+  // Compares parsed instants, not the raw strings: `read_freshness.py`
+  // builds each timestamp via Python's `datetime.isoformat()`, which omits
+  // the fractional-seconds component whenever it's exactly zero (producing
+  // e.g. `"...:00Z"` alongside a sibling table's `"...:00.500000Z"`) — a
+  // plain string comparison of that pair is backwards (`.` sorts before
+  // `Z`), so the fraction-less, earlier timestamp would wrongly lose to the
+  // later one.
+  return timestamps.reduce((oldest, current) => (new Date(current).getTime() < new Date(oldest).getTime() ? current : oldest));
 }
 
 /** The `IngestHealth` translation key for one run's status label. */
