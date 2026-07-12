@@ -14,6 +14,13 @@ export interface ClaimTvPairingFormProps {
 }
 
 const DEFAULT_ROTATION_SECONDS = 30;
+// A client-safe local mirror of `ROTATION_SECONDS_MIN`/`MAX`
+// (`tv-pairing.service.ts`, `@growthos/firebase-orm-models` — off-limits to
+// client components, see `board-types.ts`'s own doc comment for why) so this
+// form can reject an out-of-range value before ever submitting, instead of
+// only finding out from the server's generic error response.
+const ROTATION_SECONDS_MIN = 5;
+const ROTATION_SECONDS_MAX = 600;
 
 /** Pairs a TV (KAN-67 AC: "device pairing code") by redeeming the code it's currently displaying — pick which board(s) it rotates through, how long each stays on screen, its display label, and whether it opens in reduced-motion mode (plan `10 §4`: "reduced-motion mode (confetti off)"). */
 export function ClaimTvPairingForm({ orgId, projectId, boards }: ClaimTvPairingFormProps): React.ReactElement {
@@ -27,7 +34,13 @@ export function ClaimTvPairingForm({ orgId, projectId, boards }: ClaimTvPairingF
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = code.trim().length > 0 && label.trim().length > 0 && boardIds.length > 0 && rotationSeconds > 0;
+  const canSubmit =
+    code.trim().length > 0 &&
+    label.trim().length > 0 &&
+    boardIds.length > 0 &&
+    Number.isInteger(rotationSeconds) &&
+    rotationSeconds >= ROTATION_SECONDS_MIN &&
+    rotationSeconds <= ROTATION_SECONDS_MAX;
 
   function toggleBoard(boardId: string): void {
     setBoardIds((current) => (current.includes(boardId) ? current.filter((id) => id !== boardId) : [...current, boardId]));
@@ -44,7 +57,25 @@ export function ClaimTvPairingForm({ orgId, projectId, boards }: ClaimTvPairingF
         body: JSON.stringify({ code: code.trim().toUpperCase(), boardIds, rotationSeconds, reducedMotion, label }),
       });
       if (!response.ok) {
-        setError(t('claimError'));
+        // The most common cause (an out-of-range rotation value) is now
+        // caught client-side by `canSubmit` above; a residual 400
+        // `invalid_tv_pairing` at this point almost always means the code
+        // itself was wrong/expired/already claimed — worth a more specific,
+        // still-translated message than the fully generic fallback. The
+        // service's own `reasons: string[]` (`InvalidTvPairingError`) are
+        // deliberately not surfaced here: they're hard-coded English
+        // sentences from the service layer, not translation-resource
+        // strings, so echoing them raw would break for a `he`-locale admin
+        // — the same reasoning `CreateWinRuleForm`'s own generic
+        // `createError` fallback already applies to its sibling
+        // `InvalidWinRuleError.reasons`.
+        let errorCode: string | undefined;
+        try {
+          errorCode = ((await response.json()) as { error?: string }).error;
+        } catch {
+          // Response body wasn't JSON (or was empty) — fall through to the generic message.
+        }
+        setError(errorCode === 'invalid_tv_pairing' ? t('claimErrorInvalidCode') : t('claimError'));
         return;
       }
       setCode('');

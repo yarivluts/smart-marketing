@@ -27,31 +27,47 @@ function buildFrames(manifest: TvRotationManifest): RotationFrame[] {
  * becomes current (not all up front) — the same "don't pay for every
  * board's query before it's even shown" reasoning `rotation/route.ts`'s own
  * doc comment gives for keeping tile data out of the manifest fetch itself.
- * `setInterval` is cleared on unmount and whenever the frame list itself
- * changes size (a manifest refresh in `tv-app.tsx` that added/removed a
- * board) — the AC's own "runs 24h without leak" bar applied to the one timer
- * this screen owns.
+ *
+ * The rotation timer runs even when there's only one frame (a TV paired to a
+ * single board with no goals — a common, not edge-case, configuration): it
+ * still bumps `refreshTick` every `rotationSeconds`, which the board-fetch
+ * effect below also depends on, so that single frame's data keeps refreshing
+ * in the background and — critically — a fetch that failed once (a transient
+ * network blip, a momentary 401 mid-session-renewal) gets retried on the next
+ * tick instead of leaving the screen stuck on `loadingBoard` forever, which a
+ * naive "only re-fetch when the frame identity changes" effect would do the
+ * moment there's nothing for the identity to change *to*. `setInterval` is
+ * cleared on unmount and whenever the frame list itself changes size (a
+ * manifest refresh in `tv-app.tsx` that added/removed a board) — the AC's own
+ * "runs 24h without leak" bar applied to the one timer this screen owns.
  */
 export function TvRotationScreen({ deviceToken, manifest }: TvRotationScreenProps): React.ReactElement {
   const t = useTranslations('TvMode');
   const frames = buildFrames(manifest);
   const [frameIndex, setFrameIndex] = useState(0);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [boardFrame, setBoardFrame] = useState<TvBoardFrame | null>(null);
 
   useEffect(() => {
-    if (frames.length <= 1) {
-      return;
-    }
     const timer = setInterval(() => {
-      setFrameIndex((current) => (current + 1) % frames.length);
+      setRefreshTick((tick) => tick + 1);
+      setFrameIndex((current) => (frames.length > 1 ? (current + 1) % frames.length : current));
     }, manifest.rotationSeconds * 1000);
     return () => clearInterval(timer);
   }, [frames.length, manifest.rotationSeconds]);
 
   const currentFrame = frames[frameIndex % frames.length];
+  const currentBoardId = currentFrame && currentFrame.kind === 'board' ? currentFrame.boardId : null;
 
+  // Resets to the loading state only when the *target* board actually
+  // changes (a real frame switch) — not on every `refreshTick`, which would
+  // otherwise flash "Loading board…" over already-visible data on every
+  // single rotation cycle, including ones where nothing changed.
   useEffect(() => {
     setBoardFrame(null);
+  }, [currentFrame?.kind, currentBoardId]);
+
+  useEffect(() => {
     if (!currentFrame || currentFrame.kind !== 'board') {
       return;
     }
@@ -63,20 +79,15 @@ export function TvRotationScreen({ deviceToken, manifest }: TvRotationScreenProp
         }
       })
       .catch(() => {
-        // A transient fetch failure just leaves this frame blank until the
-        // next rotation tick tries again — the same "never a blank board,
-        // degrade per-tile" posture already applies one level up inside
-        // each tile's own `unavailable` render state; a whole-frame fetch
-        // failure is rarer and shorter-lived (one rotation interval) than
-        // worth a dedicated retry loop for.
+        // A transient fetch failure leaves whatever was last successfully
+        // loaded (or `null`/loading, for a first attempt) on screen — the
+        // next `refreshTick` retries automatically, see this component's own
+        // doc comment.
       });
     return () => {
       cancelled = true;
     };
-    // `currentFrame` is a derived value re-created every render — keying off
-    // its own identity fields (rather than the object itself) avoids
-    // re-fetching on every unrelated re-render.
-  }, [deviceToken, currentFrame?.kind, currentFrame && currentFrame.kind === 'board' ? currentFrame.boardId : null]);
+  }, [deviceToken, refreshTick, currentFrame?.kind, currentBoardId]);
 
   if (!currentFrame) {
     return (

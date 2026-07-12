@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
   fetchTvPairingStatus,
@@ -37,14 +37,6 @@ export function TvApp(): React.ReactElement {
   const [code, setCode] = useState('');
   const [manifest, setManifest] = useState<TvRotationManifest | null>(null);
   const [resetCounter, setResetCounter] = useState(0);
-  // The poll loop below reads this instead of closing over `phase` directly
-  // — it decides its own next delay (`CLAIMED_POLL_INTERVAL_MS` vs.
-  // `PENDING_POLL_INTERVAL_MS`) from the *latest* phase without needing
-  // `phase` in its effect's dependency array, which would otherwise tear
-  // down and rebuild the whole loop (dropping in-flight poll ordering) on
-  // every single phase transition.
-  const phaseRef = useRef<TvAppPhase>('loading');
-  phaseRef.current = phase;
 
   // Ensures a device token exists — resumes an already-claimed pairing from
   // `localStorage`, or mints a brand-new one. Re-runs whenever `resetCounter`
@@ -86,6 +78,13 @@ export function TvApp(): React.ReactElement {
     }
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // Tracked locally (not via a ref synced on render, and not via reading
+    // React `phase` state, which wouldn't reflect this tick's own result
+    // until after a re-render) so the very poll that transitions into
+    // 'claimed' immediately schedules its *next* tick at the slower claimed
+    // cadence, instead of one extra tick at the pending cadence while
+    // waiting for React to catch up.
+    let knownPhase: TvAppPhase = phase;
 
     async function poll(): Promise<void> {
       try {
@@ -94,6 +93,7 @@ export function TvApp(): React.ReactElement {
           return;
         }
         if (status.status === 'pending') {
+          knownPhase = 'pairing';
           setPhase('pairing');
         } else if (status.status === 'claimed') {
           if (typeof window !== 'undefined') {
@@ -101,6 +101,7 @@ export function TvApp(): React.ReactElement {
           }
           const nextManifest = await fetchTvRotationManifest(deviceToken as string);
           if (!cancelled) {
+            knownPhase = 'claimed';
             setManifest(nextManifest);
             setPhase('claimed');
           }
@@ -123,7 +124,7 @@ export function TvApp(): React.ReactElement {
         // board-frame fetch takes.
       }
       if (!cancelled) {
-        timer = setTimeout(poll, phaseRef.current === 'claimed' ? CLAIMED_POLL_INTERVAL_MS : PENDING_POLL_INTERVAL_MS);
+        timer = setTimeout(poll, knownPhase === 'claimed' ? CLAIMED_POLL_INTERVAL_MS : PENDING_POLL_INTERVAL_MS);
       }
     }
 

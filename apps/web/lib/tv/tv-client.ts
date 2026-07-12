@@ -65,28 +65,34 @@ async function parseJsonOrThrow<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
 }
 
+/** Every plain `fetch()` call below authenticates via this header rather than a `?token=` query param — the device token then never lands in a URL (and by extension, server/proxy access logs or the TV kiosk browser's own history) for the up-to-48h life of a claimed session. See `tv-viewer-auth.ts`'s own doc comment for the one exception (`tvWinFeedUrl`, below) that can't. */
+function bearerAuthHeaders(deviceToken: string): HeadersInit {
+  return { Authorization: `Bearer ${deviceToken}` };
+}
+
 export async function requestTvPairing(): Promise<RequestPairingResponse> {
   const response = await fetch('/api/tv-pairing', { method: 'POST' });
   return parseJsonOrThrow(response);
 }
 
 export async function fetchTvPairingStatus(deviceToken: string): Promise<TvPairingStatusResponse> {
-  const response = await fetch(`/api/tv-pairing/status?token=${encodeURIComponent(deviceToken)}`);
+  const response = await fetch('/api/tv-pairing/status', { headers: bearerAuthHeaders(deviceToken) });
   return parseJsonOrThrow(response);
 }
 
 export async function fetchTvRotationManifest(deviceToken: string): Promise<TvRotationManifest> {
-  const response = await fetch(`/api/tv-pairing/rotation?token=${encodeURIComponent(deviceToken)}`);
+  const response = await fetch('/api/tv-pairing/rotation', { headers: bearerAuthHeaders(deviceToken) });
   return parseJsonOrThrow(response);
 }
 
 export async function fetchTvBoardFrame(deviceToken: string, boardId: string): Promise<TvBoardFrame> {
-  const response = await fetch(
-    `/api/tv-pairing/board?token=${encodeURIComponent(deviceToken)}&boardId=${encodeURIComponent(boardId)}`,
-  );
+  const response = await fetch(`/api/tv-pairing/board?boardId=${encodeURIComponent(boardId)}`, {
+    headers: bearerAuthHeaders(deviceToken),
+  });
   return parseJsonOrThrow(response);
 }
 
+/** Unlike every other call in this file, `EventSource` cannot set a custom `Authorization` header — the device token has to ride along in the URL here, the one place `tv-viewer-auth.ts`'s `Bearer`-header preference falls back to `?token=`. */
 export function tvWinFeedUrl(deviceToken: string): string {
   return `/api/tv-pairing/win-feed?token=${encodeURIComponent(deviceToken)}`;
 }

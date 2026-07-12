@@ -5,11 +5,17 @@ import { WarRoomWinOverlay } from './war-room-win-overlay';
 import type { WinEventFeedItem } from '@/lib/orgs/win-rule-view';
 import messages from '../../messages/en.json';
 
-/** Mirrors `live-win-feed.test.tsx`'s own fake — jsdom has no native `EventSource`. */
+/** Mirrors `live-win-feed.test.tsx`'s own fake — jsdom has no native `EventSource`. Also models `readyState`/`onerror` so the reconnect-after-hard-failure path can be exercised (see `emitHardFailure`). */
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSED = 2;
+  readonly CLOSED = FakeEventSource.CLOSED;
   url: string;
   closed = false;
+  readyState = FakeEventSource.OPEN;
+  onerror: (() => void) | null = null;
   private listeners: Record<string, Array<(event: MessageEvent<string>) => void>> = {};
 
   constructor(url: string) {
@@ -28,6 +34,12 @@ class FakeEventSource {
   emitWin(item: WinEventFeedItem): void {
     const event = { data: JSON.stringify(item) } as MessageEvent<string>;
     this.listeners.win?.forEach((listener) => listener(event));
+  }
+
+  /** Simulates the WHATWG "fail the connection" outcome (e.g. a revoked pairing's 401) — `readyState` goes to `CLOSED` and no further native reconnect attempt follows, unlike a plain dropped-mid-stream `onerror`. */
+  emitHardFailure(): void {
+    this.readyState = FakeEventSource.CLOSED;
+    this.onerror?.();
   }
 }
 
@@ -101,6 +113,42 @@ describe('WarRoomWinOverlay', () => {
       vi.advanceTimersByTime(3000);
     });
     expect(screen.getByText('Trial converted — order_completed (ord_9001)')).toBeInTheDocument();
+  });
+
+  it('reopens the connection after a hard failure (e.g. a revoked pairing), so wins keep firing without a manual reload', () => {
+    renderOverlay();
+    expect(FakeEventSource.instances).toHaveLength(1);
+
+    act(() => {
+      FakeEventSource.instances[0].emitHardFailure();
+    });
+    expect(FakeEventSource.instances).toHaveLength(1);
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(FakeEventSource.instances).toHaveLength(2);
+
+    act(() => {
+      FakeEventSource.instances[1].emitWin(item);
+    });
+    expect(screen.getByText('Big order — order_completed (ord_9001)')).toBeInTheDocument();
+  });
+
+  it('does not attempt to reconnect after unmount, even if a hard failure was already scheduled to retry', () => {
+    const { unmount } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <WarRoomWinOverlay deviceToken="device-token-1" reducedMotion={false} />
+      </NextIntlClientProvider>,
+    );
+    act(() => {
+      FakeEventSource.instances[0].emitHardFailure();
+    });
+    unmount();
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
+    expect(FakeEventSource.instances).toHaveLength(1);
   });
 
   it('closes the connection and clears its timer on unmount, leaking neither', () => {

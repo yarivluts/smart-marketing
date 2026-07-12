@@ -752,7 +752,8 @@
     "boardsLabel": "Boards to rotate through",
     "reducedMotionLabel": "Reduced motion (disable confetti)",
     "claimButton": "Pair TV",
-    "claimError": "Could not pair this TV. Check the code and try again."
+    "claimError": "Could not pair this TV. Check the code and try again.",
+    "claimErrorInvalidCode": "That pairing code is invalid, expired, or already used. Ask the TV to display a new one."
   },
   "TvMode": {
     "metaTitle": "War room",

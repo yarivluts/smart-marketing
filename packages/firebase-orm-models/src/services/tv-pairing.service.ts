@@ -41,11 +41,22 @@ function generateDeviceToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
+// The largest multiple of CODE_ALPHABET.length that fits in a byte (0-255) —
+// rejecting bytes at or above this cutoff avoids the modulo-bias a plain
+// `byte % CODE_ALPHABET.length` would introduce (256 isn't a multiple of 31,
+// so a naive modulo would make the first `256 % 31 = 8` alphabet characters
+// ~12.5% more likely than the rest, weakening the code's real entropy against
+// guessing within its `CODE_TTL_MS` window).
+const CODE_BYTE_CUTOFF = 256 - (256 % CODE_ALPHABET.length);
+
 function generatePairingCode(): string {
-  const bytes = randomBytes(CODE_LENGTH);
   let code = '';
-  for (let i = 0; i < CODE_LENGTH; i += 1) {
-    code += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  while (code.length < CODE_LENGTH) {
+    for (const byte of randomBytes(CODE_LENGTH - code.length)) {
+      if (byte < CODE_BYTE_CUTOFF) {
+        code += CODE_ALPHABET[byte % CODE_ALPHABET.length];
+      }
+    }
   }
   return code;
 }
@@ -73,6 +84,11 @@ async function loadTvPairingInProject(organizationId: string, projectId: string,
 
 function isRevoked(pairing: TvPairingModel): boolean {
   return pairing.revoked_at !== undefined;
+}
+
+/** Whether a *claimed* pairing's viewer session is still live — the one revoked/session-expiry check `getTvPairingStatus` and `requireClaimedTvPairing` both need, factored out so a future change to either rule (e.g. a grace period) can't be applied to one call site and missed on the other. Callers are responsible for handling the "not yet claimed" case themselves (see `getTvPairingStatus`'s own `pending`/`expired` branch), since an unclaimed pairing has no session to be live or not. */
+function isClaimedSessionLive(pairing: TvPairingModel, nowIso: string): boolean {
+  return !isRevoked(pairing) && pairing.session_expires_at !== undefined && pairing.session_expires_at >= nowIso;
 }
 
 export interface RequestTvPairingResult {
@@ -128,9 +144,15 @@ export type TvPairingStatus =
     }
   | { status: 'invalid' };
 
-/** Marks a live pairing as "seen" — pushes `session_expires_at` forward another `SESSION_TTL_MS` (a claimed pairing only) and always refreshes `last_seen_at`, so the admin pairing list's "last seen" column reflects every poll, not just the original claim. Best-effort: a write failure here must never fail the caller's own read. */
+/** Floor on how often `touchTvPairing` actually writes for one pairing. A TV can legally rotate boards as fast as `ROTATION_SECONDS_MIN` (5s), and every board/rotation/win-feed request calls this — without a floor, a fast-rotating TV would drive a Firestore write on nearly every request (tens of thousands over a 24h shift) just to bump fields that only need coarse, minute-scale freshness: `last_seen_at` is a human-facing "how recently was this TV seen" label, and `SESSION_TTL_MS` (48h) has enormous slack against a 60s staleness window. */
+const TOUCH_THROTTLE_MS = 60 * 1000;
+
+/** Marks a live pairing as "seen" — pushes `session_expires_at` forward another `SESSION_TTL_MS` (a claimed pairing only) and refreshes `last_seen_at`, so the admin pairing list's "last seen" column reflects recent activity, not just the original claim. Throttled (see `TOUCH_THROTTLE_MS`) rather than firing on every call. Best-effort: a write failure here must never fail the caller's own read. */
 async function touchTvPairing(pairing: TvPairingModel): Promise<void> {
   const now = new Date();
+  if (pairing.last_seen_at && now.getTime() - new Date(pairing.last_seen_at).getTime() < TOUCH_THROTTLE_MS) {
+    return;
+  }
   pairing.last_seen_at = now.toISOString();
   if (pairing.claimed) {
     pairing.session_expires_at = new Date(now.getTime() + SESSION_TTL_MS).toISOString();
@@ -164,7 +186,7 @@ export async function getTvPairingStatus(deviceToken: string): Promise<TvPairing
   }
 
   const { organization_id: organizationId, project_id: projectId } = pairing;
-  if (!pairing.session_expires_at || pairing.session_expires_at < now || !organizationId || !projectId) {
+  if (!isClaimedSessionLive(pairing, now) || !organizationId || !projectId) {
     return { status: 'expired' };
   }
 
@@ -198,8 +220,7 @@ export async function requireClaimedTvPairing(deviceToken: string): Promise<Resu
   if (isRevoked(pairing) || !pairing.claimed) {
     return err('This TV is not currently paired.');
   }
-  const now = new Date().toISOString();
-  if (!pairing.session_expires_at || pairing.session_expires_at < now) {
+  if (!isClaimedSessionLive(pairing, new Date().toISOString())) {
     return err('This TV pairing session has expired.');
   }
   await touchTvPairing(pairing);
@@ -239,6 +260,19 @@ function validateClaimFields(params: ClaimTvPairingParams, reasons: string[]): v
  * `InvalidTvPairingError` rather than distinguishing "no such code" from
  * "someone else already claimed it", which would let a caller brute-force
  * discover which codes are currently live.
+ *
+ * Not transactional: the read-then-write on `claimed` below (look up an
+ * unclaimed pairing by code, then save it as claimed) has the same narrow
+ * concurrent-write race every other multi-step Firestore read/write in this
+ * package documents and accepts — this ORM's client-SDK-based API exposes no
+ * transaction primitive (raw Firestore SDK access is reserved to
+ * `firestore-connection.ts`; see `registerSchemaDefinition`'s own doc
+ * comment for the fullest statement of this codebase-wide tradeoff). Two
+ * admins claiming the exact same still-valid code within the same instant
+ * would race on which write wins — low real-world likelihood (a code is
+ * single-use, 10-minute-lived, and only ever known to whoever is physically
+ * reading it off one TV screen), and a losing caller simply doesn't see
+ * their TV appear in `listTvPairingsForProject` afterward and can re-pair.
  */
 export async function claimTvPairing(params: ClaimTvPairingParams): Promise<TvPairingModel> {
   await requireProjectInOrg(params.organizationId, params.projectId);
@@ -246,12 +280,19 @@ export async function claimTvPairing(params: ClaimTvPairingParams): Promise<TvPa
   const reasons: string[] = [];
   validateClaimFields(params, reasons);
 
-  const boards = await BoardModel.initPath({ organization_id: params.organizationId, project_id: params.projectId })
-    .where('project_id', '==', params.projectId)
-    .get();
-  const boardIdsInProject = new Set(boards.map((board) => board.id));
-  for (const boardId of params.boardIds) {
-    if (!boardIdsInProject.has(boardId)) {
+  // Per-id lookups (mirroring `getBoard`'s own `.init` + org/project-match
+  // pattern in `board.service.ts`) rather than a full collection scan of
+  // every board in the project — this only reads the handful of boards
+  // actually being claimed, not every board the project has ever had.
+  const uniqueBoardIds = [...new Set(params.boardIds)];
+  const boardLookups = await Promise.all(
+    uniqueBoardIds.map(async (boardId) => {
+      const board = await BoardModel.init(boardId, { organization_id: params.organizationId, project_id: params.projectId });
+      return { boardId, exists: board !== null && board.project_id === params.projectId };
+    }),
+  );
+  for (const { boardId, exists } of boardLookups) {
+    if (!exists) {
       reasons.push(`Board "${boardId}" does not exist in this project.`);
     }
   }

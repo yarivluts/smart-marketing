@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getTvPairingStatus } from '@/lib/orgs/queries';
+import { extractTvDeviceToken } from '@/lib/orgs/tv-viewer-auth';
 
 /**
  * The TV's own poll loop (KAN-67): before claim, reports `pending` (with the
@@ -12,7 +13,7 @@ import { getTvPairingStatus } from '@/lib/orgs/queries';
  * is to be pollable by a device that doesn't know its own status yet.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
-  const token = request.nextUrl.searchParams.get('token');
+  const token = extractTvDeviceToken(request);
   if (!token) {
     return NextResponse.json({ status: 'invalid' });
   }

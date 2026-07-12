@@ -92,4 +92,39 @@ describe('ClaimTvPairingForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not pair this TV. Check the code and try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('shows a more specific translated error for an invalid/expired code', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'invalid_tv_pairing', reasons: ['This pairing code is invalid or has expired. Ask the TV to display a new one.'] }),
+    } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Pairing code'), { target: { value: 'AB12CD' } });
+    fireEvent.change(screen.getByLabelText('TV label'), { target: { value: 'Office lobby' } });
+    fireEvent.click(screen.getByLabelText('Marketing'));
+    fireEvent.click(screen.getByRole('button', { name: 'Pair TV' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'That pairing code is invalid, expired, or already used. Ask the TV to display a new one.',
+    );
+  });
+
+  it('disables submit for a rotation interval outside the 5-600s server-enforced range', () => {
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Pairing code'), { target: { value: 'AB12CD' } });
+    fireEvent.change(screen.getByLabelText('TV label'), { target: { value: 'Office lobby' } });
+    fireEvent.click(screen.getByLabelText('Marketing'));
+    expect(screen.getByRole('button', { name: 'Pair TV' })).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText('Seconds per frame'), { target: { value: '900' } });
+    expect(screen.getByRole('button', { name: 'Pair TV' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Seconds per frame'), { target: { value: '0' } });
+    expect(screen.getByRole('button', { name: 'Pair TV' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Seconds per frame'), { target: { value: '60' } });
+    expect(screen.getByRole('button', { name: 'Pair TV' })).toBeEnabled();
+  });
 });
