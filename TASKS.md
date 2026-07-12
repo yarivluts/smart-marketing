@@ -72,7 +72,7 @@ blocker is unfinished. See [CLAUDE.md](./CLAUDE.md) for the full working rules.
 | KAN-64 | E12.1 Goal model (metric, target, deadline, owner, direction min/max/range, work-week/weekend rhythm) + progress + pace projection | 1 | 6 | done | Delivered (PR #45). |
 | KAN-65 | E12.2 Win rules engine: event pattern -> win, realtime path (ingest -> Pub/Sub -> WebSocket) | 1 | 7 | done | Delivered (PR #50, a parallel session's implementation, merged after this run's independent review). |
 | KAN-66 | E12.2b Win catalog: reactivation + trial-conversion win types; trial-pipeline war-room widget | 1 | - | done | Delivered (PR #54, a parallel session's implementation, merged after this run's independent review). |
-| KAN-67 | E12.3 War-room TV mode: fullscreen rotation, win feed overlay, confetti + sound per win type, device pairing code, reduced-motion | 1 | 7 | todo |  |
+| KAN-67 | E12.3 War-room TV mode: fullscreen rotation, win feed overlay, confetti + sound per win type, device pairing code, reduced-motion | 1 | 7 | done | Delivered (PR #55, a parallel session's implementation, merged after this run's independent review — see PROGRESS.md). |
 | KAN-68 | E13.1 Onboarding wizard: org/project -> pack pick -> connect sources or push-your-own (curl+key) -> AI-proposed funnel mapping -> starter board | 1 | 7 | todo |  |
 | KAN-69 | E13.2 Freshness badges + degraded-state UX on every tile; empty states | 1 | 7 | todo |  |
 | KAN-70 | E13.3 Alpha feedback instrumentation: dogfood our own funnel via our Ingest API | 1 | 7 | todo |  |

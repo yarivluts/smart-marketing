@@ -17,6 +17,94 @@ Template for each entry:
 
 ---
 
+## 2026-07-12 — E12.3 War-room TV mode (KAN-67): parallel-run collision, reviewed, fixed, reconciled
+
+- **Last completed:**
+  - Picked **KAN-67** (war-room TV mode: fullscreen rotation, win feed overlay, confetti + sound
+    per win type, device pairing code, reduced-motion) as the next unblocked task per the prior
+    entry's own recommendation. On starting, found a parallel scheduled run had already opened
+    **PR #55** (branch `kan-67-war-room-tv-mode`) minutes earlier implementing this exact story —
+    a session-less `TvPairingModel`/`tv-pairing.service.ts` (hashed device-token + human-code
+    pairing, mirroring `ApiKeyModel`'s pattern), a TV viewer (`/[locale]/tv`) reusing the existing
+    `BoardTileView`/`GoalThermometer` view-mappers for fullscreen rotation, a hand-rolled CSS
+    confetti + WebAudio chime win overlay, and a project-scoped admin page to claim/list/revoke
+    pairings. Following this file's now-established reconciliation posture (KAN-59/61/65/66):
+    didn't duplicate the work — independently reviewed and verified it instead, this time actually
+    finding and fixing real issues before merge rather than finding none.
+  - GitHub Actions CI was already green on the PR's latest commit at pick-up time. Verified
+    independently from scratch: `pnpm lint`/`pnpm typecheck`/`pnpm build` green across all 7
+    packages (dbt-transform's pip install and the Firestore emulator jar download both hit
+    transient TLS/network blips in this environment — resolved on retry, not code issues);
+    `pnpm test` green across `packages/shared`, `packages/dbt-transform` (104/104 dbt tests),
+    `packages/firebase-orm-models` (full emulator suite), `apps/api` (61/61), and `apps/web`
+    (775/775 vitest). The full-suite Playwright e2e run flagged 2 "failed" specs
+    (`cost-guardrails.spec.ts`, `plugins.spec.ts`) neither of which touches anything in this diff;
+    re-ran both in isolation and under retry and both passed cleanly — the same class of
+    environment-timing flake (cold Next.js dev-server compilation) this file has documented
+    repeatedly for `auth`/`hooks`/`keys`/`resource-library`/`ingest-health`, not a regression.
+  - **Independent review found and fixed real issues** the PR's own self-review pass hadn't
+    caught (a fresh adversarial pass, not re-grading the same homework):
+    1. **Win-chime never audibly plays on a real unattended TV.** `win-chime.ts`'s own doc comment
+       claimed the pairing screen provides a user-gesture to unlock `AudioContext`, but
+       `tv-pairing-screen.tsx` has no click handler, no `requestFullscreen()`, nothing a user ever
+       interacts with — so on a genuinely unattended kiosk the context stays browser-suspended
+       forever, silently defeating half of the "confetti + chime" AC. Fixed the doc comment to
+       state the real constraint (a kiosk deployment needs to launch Chromium with
+       `--autoplay-policy=no-user-gesture-required`, the standard digital-signage approach) and
+       made `playWinChime` attempt `context.resume()` on every call so playback self-heals the
+       moment the browser does allow it.
+    2. **No rate limiting on the pairing-claim route** — a signed-in admin of *any* org could
+       script guesses against another org's live 10-minute pairing code with nothing but the
+       32^6 keyspace slowing them down, hijacking a TV they don't own. **No rate limiting on the
+       fully-anonymous pairing-mint route** either — an unbounded-write DoS/cost vector, the first
+       fully public write surface this codebase has. Fixed both: new
+       `apps/web/lib/orgs/tv-pairing-rate-limit.ts` reuses KAN-34's existing
+       `InMemoryTokenBucketRateLimiter` (no new dependency) to throttle the claim route per
+       authenticated user and the mint route per caller IP, returning 429 + `Retry-After` the same
+       way `ApiKeyAuthGuard` already does for API keys. Added regression tests for both 429 paths.
+    3. **Invalid CSS color in the shared confetti/chart palette.** `SERIES_STROKE_COLORS`'s first
+       entry was the bare string `'var(--primary)'`, but `--primary` is defined as unwrapped HSL
+       components (`"222.2 47.4% 11.2%"`) meant to be wrapped in `hsl(...)` — an invalid
+       `background-color`/`stroke` value the browser silently drops. This pre-existing bug
+       (previously only dimming ~1/6 of board-tile chart lines) got newly extended into win
+       confetti by this PR's own reuse of the palette; fixed to `'hsl(var(--primary))'`.
+    - Considered and deliberately left as a documented, non-blocking gap (informational-severity,
+      requires a separate DB-read compromise to exploit): the 6-character human code's SHA-256
+      hash is brute-forceable offline in under a second given direct Firestore read access — the
+      same posture `ApiKeyModel`'s own hash already accepts, not a new gap this story introduces.
+    - No other correctness bugs, missing-test gaps, or reuse/simplification issues survived the
+      review — auth/isolation design (`tv-viewer-auth.ts`'s collapsed-401 non-enumeration, org/
+      project scope always read from the pairing document rather than caller-supplied params), the
+      admin surface, and CLAUDE.md compliance (no raw Firebase SDK outside firebase-orm-models, no
+      Hebrew outside message JSON, matching en/he keys for every new string) were all sound as
+      delivered.
+  - Re-ran `pnpm lint`/`pnpm typecheck`/`pnpm build`/`pnpm test` after the fixes — all green,
+    including the two new 429-regression tests. Pushed as a second commit on the same PR branch;
+    GitHub Actions CI passed on it. Merged PR #55 into `main` (`74f9500`). Remote branch deletion
+    failed with the same HTTP 403 documented for every prior feature branch — not investigated
+    further, matching this file's established posture on that issue.
+  - `TASKS.md` updated to `done` for KAN-67.
+- **In progress (exact stopping point):** none — KAN-67 is fully delivered, tested, independently
+  reviewed (with real fixes applied), and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked `todo` in sprint order is **KAN-68** (onboarding wizard), **KAN-69**
+  (freshness badges/empty states), or **KAN-70** (alpha feedback instrumentation), all sprint-7
+  with no blocker. Check for a parallel-run collision (an already-open PR for the same story)
+  before starting new implementation work, same as this entry and the last several before it.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`, opened by a separate concurrent run against a real deployed-
+    image bug) is still open and untouched by this run — out of scope for KAN-67, flagged here so
+    the next run doesn't lose track of it.
+  - Optional: investigate why `origin` branch deletion fails from this environment (still
+    outstanding, repo hygiene only).
+
+---
+
 ## 2026-07-11 — E12.2b Win catalog + trial-pipeline widget (KAN-66): parallel-run collision, reconciled
 
 - **Last completed:**
