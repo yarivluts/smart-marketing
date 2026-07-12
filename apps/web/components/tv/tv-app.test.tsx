@@ -170,4 +170,35 @@ describe('TvApp', () => {
     expect(mintFetch).not.toHaveBeenCalled();
     expect(screen.getByText('This TV has no boards or goals to show yet.')).toBeInTheDocument();
   });
+
+  it('mints a fresh pairing after the stored one is revoked', async () => {
+    window.localStorage.setItem('growthos-tv-device-token', 'revoked-token');
+    let statusCalls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === '/api/tv-pairing') {
+          return jsonResponse({ deviceToken: 'dev-token-3', code: 'NEW999', codeExpiresAt: '2026-07-12T01:00:00.000Z' });
+        }
+        if (url.startsWith('/api/tv-pairing/status')) {
+          statusCalls += 1;
+          if (statusCalls === 1) {
+            return jsonResponse({ status: 'revoked' });
+          }
+          return jsonResponse({ status: 'pending', codeExpiresAt: '2026-07-12T01:00:00.000Z' });
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+
+    renderApp();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(window.localStorage.getItem('growthos-tv-device-token')).toBeNull();
+    expect(screen.getByText('NEW999')).toBeInTheDocument();
+  });
 });
