@@ -34,9 +34,15 @@ describe('BoardTileView', () => {
   });
 
   it('renders a big_number tile with a delta', () => {
-    renderTile({ kind: 'big_number', value: 150, previousValue: 100, deltaPct: 50 });
+    renderTile({ kind: 'big_number', value: 150, previousValue: 100, deltaPct: 50, isEmpty: false, freshness: null });
     expect(screen.getByText('150')).toBeInTheDocument();
     expect(screen.getByText('50% vs. previous')).toBeInTheDocument();
+  });
+
+  it('renders an empty big_number state instead of a misleading zero', () => {
+    renderTile({ kind: 'big_number', value: 0, isEmpty: true, freshness: null });
+    expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
   });
 
   it('renders a time_series line tile with a legend for more than one series', () => {
@@ -48,6 +54,8 @@ describe('BoardTileView', () => {
           { label: 'google', points: [{ bucket: '2026-01-01', value: 10 }] },
           { label: 'meta', points: [{ bucket: '2026-01-01', value: 5 }] },
         ],
+        isEmpty: false,
+        freshness: null,
       },
       { type: 'line' },
     );
@@ -55,9 +63,22 @@ describe('BoardTileView', () => {
     expect(screen.getByText('meta')).toBeInTheDocument();
   });
 
+  it('renders an empty line-chart state', () => {
+    renderTile({ kind: 'time_series', chart: 'line', series: [], isEmpty: true, freshness: null }, { type: 'line' });
+    expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
+  });
+
   it('renders a time_series bar tile', () => {
-    renderTile({ kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: [{ bucket: '2026-01-01', value: 10 }] }] }, { type: 'bar' });
+    renderTile(
+      { kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: [{ bucket: '2026-01-01', value: 10 }] }], isEmpty: false, freshness: null },
+      { type: 'bar' },
+    );
     expect(screen.getByRole('img', { name: 'all' })).toBeInTheDocument();
+  });
+
+  it('renders an empty bar-chart state', () => {
+    renderTile({ kind: 'time_series', chart: 'bar', series: [], isEmpty: true, freshness: null }, { type: 'bar' });
+    expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
   });
 
   it('colors a solid current-period line and its dashed previous-period counterpart identically, matched by label rather than array index', () => {
@@ -74,6 +95,8 @@ describe('BoardTileView', () => {
           { label: 'meta', points: [{ bucket: '2026-01-01', value: 5 }] },
         ],
         previousSeries: [{ label: 'google', points: [{ bucket: '2025-12-01', value: 8 }] }],
+        isEmpty: false,
+        freshness: null,
       },
       { type: 'line' },
     );
@@ -94,6 +117,8 @@ describe('BoardTileView', () => {
         chart: 'bar',
         series: [{ label: 'all', points: [{ bucket: '2026-01-01', value: 10 }] }],
         previousSeries: [{ label: 'all', points: [{ bucket: '2025-12-01', value: 8 }] }],
+        isEmpty: false,
+        freshness: null,
       },
       { type: 'bar' },
     );
@@ -102,13 +127,16 @@ describe('BoardTileView', () => {
   });
 
   it('renders a table tile', () => {
-    renderTile({ kind: 'table', columns: ['bucket_date', 'ad_spend'], rows: [{ bucket_date: '2026-01-01', ad_spend: 100 }] }, { type: 'table' });
+    renderTile(
+      { kind: 'table', columns: ['bucket_date', 'ad_spend'], rows: [{ bucket_date: '2026-01-01', ad_spend: 100 }], isEmpty: false, freshness: null },
+      { type: 'table' },
+    );
     expect(screen.getByText('bucket_date')).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
   });
 
   it('renders an empty table state', () => {
-    renderTile({ kind: 'table', columns: [], rows: [] }, { type: 'table' });
+    renderTile({ kind: 'table', columns: [], rows: [], isEmpty: true, freshness: null }, { type: 'table' });
     expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
   });
 
@@ -122,6 +150,8 @@ describe('BoardTileView', () => {
           [1, 0.5],
           [1, null],
         ],
+        isEmpty: false,
+        freshness: null,
       },
       { type: 'heatmap', dimensions: ['period_number'] },
     );
@@ -133,13 +163,13 @@ describe('BoardTileView', () => {
   });
 
   it('renders an empty heatmap state', () => {
-    renderTile({ kind: 'heatmap', rowLabels: [], columnLabels: [], matrix: [] }, { type: 'heatmap' });
+    renderTile({ kind: 'heatmap', rowLabels: [], columnLabels: [], matrix: [], isEmpty: true, freshness: null }, { type: 'heatmap' });
     expect(screen.getByText('No cohort data for this range yet.')).toBeInTheDocument();
   });
 
   it('renders a histogram tile as one bar per bucket label, with a translated tooltip', () => {
     renderTile(
-      { kind: 'histogram', labels: ['1', '3', '10'], values: [1, 0, 2] },
+      { kind: 'histogram', labels: ['1', '3', '10'], values: [1, 0, 2], isEmpty: false, freshness: null },
       { type: 'histogram', dimensions: ['days_active_bucket'] },
     );
     expect(screen.getByRole('img', { name: 'Histogram' })).toBeInTheDocument();
@@ -150,7 +180,7 @@ describe('BoardTileView', () => {
   });
 
   it('renders an empty histogram state', () => {
-    renderTile({ kind: 'histogram', labels: [], values: [] }, { type: 'histogram' });
+    renderTile({ kind: 'histogram', labels: [], values: [], isEmpty: true, freshness: null }, { type: 'histogram' });
     expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
   });
 
@@ -162,10 +192,44 @@ describe('BoardTileView', () => {
           { metricName: 'signups', total: 100, pctOfFirstStep: 100 },
           { metricName: 'purchases', total: 25, pctOfFirstStep: 25 },
         ],
+        isEmpty: false,
+        freshness: null,
       },
       { type: 'funnel', metricNames: ['signups', 'purchases'] },
     );
     expect(screen.getByText('signups')).toBeInTheDocument();
     expect(screen.getByText('25 (25%)')).toBeInTheDocument();
+  });
+
+  it('renders an empty funnel state instead of misleading 0% steps', () => {
+    renderTile(
+      { kind: 'funnel', steps: [{ metricName: 'signups', total: 0, pctOfFirstStep: 0 }], isEmpty: true, freshness: null },
+      { type: 'funnel', metricNames: ['signups'] },
+    );
+    expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();
+    expect(screen.queryByText('signups')).not.toBeInTheDocument();
+  });
+
+  describe('freshness badge', () => {
+    it('shows no badge when freshness is unknown', () => {
+      renderTile({ kind: 'big_number', value: 10, isEmpty: false, freshness: null });
+      expect(screen.queryByText(/Data as of/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Stale/)).not.toBeInTheDocument();
+    });
+
+    it('shows a fresh badge when data is within the stale threshold', () => {
+      renderTile({ kind: 'big_number', value: 10, isEmpty: false, freshness: { asOf: '2026-07-12T00:00:00.000Z', isStale: false } });
+      expect(screen.getByText('Data as of 2026-07-12T00:00:00.000Z')).toBeInTheDocument();
+    });
+
+    it('shows a stale badge when data is past the stale threshold', () => {
+      renderTile({ kind: 'big_number', value: 10, isEmpty: false, freshness: { asOf: '2026-01-01T00:00:00.000Z', isStale: true } });
+      expect(screen.getByText('Stale — data as of 2026-01-01T00:00:00.000Z')).toBeInTheDocument();
+    });
+
+    it('shows no badge on an unavailable tile, which has no queried data to attach one to', () => {
+      renderTile({ kind: 'unavailable', reason: 'query_error', message: 'boom' });
+      expect(screen.queryByText(/Data as of/)).not.toBeInTheDocument();
+    });
   });
 });

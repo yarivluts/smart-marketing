@@ -4,8 +4,9 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTile } from '@/lib/orgs/queries';
-import { buildTileRenderView, toBoardView, type TileRenderView } from '@/lib/orgs/board-view';
+import { getBoard, listMetricsCatalogForProject, listOrchestrationRunsForProject, listOrgProjects, queryBoardTile } from '@/lib/orgs/queries';
+import { buildTileRenderView, computeTileFreshness, toBoardView, type TileRenderView } from '@/lib/orgs/board-view';
+import { deriveCurrentFreshness, overallFreshnessAsOf, toOrchestrationRunView } from '@/lib/orgs/orchestration-view';
 import { BoardSettingsForm } from '@/components/orgs/board-settings-form';
 import { BoardGridEditor } from '@/components/orgs/board-grid-editor';
 import { DeleteBoardButton } from '@/components/orgs/delete-board-button';
@@ -50,10 +51,11 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
     notFound();
   }
 
-  const [projects, board, metricCatalog] = await Promise.all([
+  const [projects, board, metricCatalog, orchestrationRuns] = await Promise.all([
     listOrgProjects(orgId),
     getBoard(orgId, projectId, boardId),
     listMetricsCatalogForProject(orgId, projectId),
+    listOrchestrationRunsForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project || !board) {
@@ -62,10 +64,16 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
 
   const boardView = toBoardView(board);
 
+  // KAN-69: one project-wide freshness badge, shared by every tile on this
+  // board — see `computeTileFreshness`'s own doc comment for why a tile
+  // doesn't get its own per-metric freshness.
+  const currentFreshness = deriveCurrentFreshness(orchestrationRuns.map(toOrchestrationRunView));
+  const freshness = computeTileFreshness(overallFreshnessAsOf(currentFreshness?.freshness ?? []));
+
   const tileOutcomes = await Promise.all(board.tiles.map((tile) => queryBoardTile(orgId, projectId, board, tile)));
   const renderViews: Record<string, TileRenderView> = {};
   board.tiles.forEach((tile, index) => {
-    renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index]);
+    renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index], freshness);
   });
 
   const t = await getTranslations('Boards');

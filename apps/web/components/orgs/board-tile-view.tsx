@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import type { TileRenderView, TimeSeries } from '@/lib/orgs/board-view';
+import type { TileFreshness, TileRenderView, TimeSeries } from '@/lib/orgs/board-view';
 import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
 
 export interface BoardTileViewProps {
@@ -50,8 +50,24 @@ function UnavailableView({ message, reasonLabel }: { message: string; reasonLabe
   );
 }
 
+const FRESHNESS_TEXT_CLASS = { fresh: 'text-muted-foreground', stale: 'text-amber-600 dark:text-amber-400' } as const;
+
+/** A tile's data-freshness badge (KAN-69, plan `13 §E13.2`) — the project-wide "as of" timestamp every successfully-queried tile shares (see `computeTileFreshness`'s own doc comment), rendered as small corner text rather than a full status card since it's a secondary signal, not the tile's primary content. */
+function TileFreshnessBadge({ freshness }: { freshness: TileFreshness }): React.ReactElement {
+  const t = useTranslations('Boards');
+  const label = t(freshness.isStale ? 'freshnessStaleLabel' : 'freshnessAsOfLabel', { asOf: freshness.asOf });
+  return (
+    <span className={`text-[10px] font-medium ${FRESHNESS_TEXT_CLASS[freshness.isStale ? 'stale' : 'fresh']}`} title={label}>
+      {label}
+    </span>
+  );
+}
+
 function BigNumberView({ view }: { view: Extract<TileRenderView, { kind: 'big_number' }> }): React.ReactElement {
   const t = useTranslations('Boards');
+  if (view.isEmpty) {
+    return <p className="text-xs text-muted-foreground">{t('bigNumberEmpty')}</p>;
+  }
   return (
     <div className="flex h-full flex-col items-center justify-center gap-1">
       <span className="text-3xl font-bold tabular-nums">{formatNumber(view.value)}</span>
@@ -65,6 +81,10 @@ function BigNumberView({ view }: { view: Extract<TileRenderView, { kind: 'big_nu
 }
 
 function LineChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_series' }> }): React.ReactElement {
+  const t = useTranslations('Boards');
+  if (view.isEmpty) {
+    return <p className="text-xs text-muted-foreground">{t('timeSeriesEmpty')}</p>;
+  }
   const allSeries = [...view.series, ...(view.previousSeries ?? [])];
   const maxValue = Math.max(1, ...allSeries.flatMap((series) => series.points.map((point) => point.value)));
   const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
@@ -150,6 +170,9 @@ function BarRow({
 
 function BarChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_series' }> }): React.ReactElement {
   const t = useTranslations('Boards');
+  if (view.isEmpty) {
+    return <p className="text-xs text-muted-foreground">{t('timeSeriesEmpty')}</p>;
+  }
   const allSeries = [...view.series, ...(view.previousSeries ?? [])];
   const maxValue = Math.max(1, ...allSeries.flatMap((series) => series.points.map((point) => point.value)));
   const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
@@ -179,7 +202,7 @@ function BarChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_se
 
 function TableView({ view }: { view: Extract<TileRenderView, { kind: 'table' }> }): React.ReactElement {
   const t = useTranslations('Boards');
-  if (view.rows.length === 0) {
+  if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('tableEmpty')}</p>;
   }
   return (
@@ -212,7 +235,7 @@ function TableView({ view }: { view: Extract<TileRenderView, { kind: 'table' }> 
 
 function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap' }> }): React.ReactElement {
   const t = useTranslations('Boards');
-  if (view.rowLabels.length === 0) {
+  if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('heatmapEmpty')}</p>;
   }
   const maxValue = Math.max(1e-9, ...view.matrix.flat().filter((value): value is number => value !== null));
@@ -257,7 +280,7 @@ function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap'
 /** Reuses `BarRow` (the same bar-with-tooltip renderer `BarChartView` already uses for a time series) for the bars themselves, adding only a per-bucket label row underneath — `BarRow`'s own bars are a fixed `w-2` each with a `gap-0.5` row, so this label row matches those exact widths/gap to stay aligned underneath. */
 function HistogramView({ view }: { view: Extract<TileRenderView, { kind: 'histogram' }> }): React.ReactElement {
   const t = useTranslations('Boards');
-  if (view.labels.length === 0) {
+  if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('histogramEmpty')}</p>;
   }
   const maxValue = Math.max(1, ...view.values);
@@ -278,6 +301,9 @@ function HistogramView({ view }: { view: Extract<TileRenderView, { kind: 'histog
 
 function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }> }): React.ReactElement {
   const t = useTranslations('Boards');
+  if (view.isEmpty) {
+    return <p className="text-xs text-muted-foreground">{t('funnelEmpty')}</p>;
+  }
   return (
     <div className="flex h-full flex-col justify-center gap-2">
       {view.steps.map((step, index) => (
@@ -300,26 +326,40 @@ function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }
   );
 }
 
-/** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel) plus KAN-62's `heatmap` and KAN-63's `histogram`, plus a per-tile degraded state instead of the whole board failing. */
+/** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel) plus KAN-62's `heatmap` and KAN-63's `histogram`, plus a per-tile degraded state instead of the whole board failing. A `freshness` badge (KAN-69) floats in the tile's top-right corner for every kind except `unavailable`, which has no queried data to attach one to. Both consumers of this component (the board detail page's grid and the TV war-room rotation, `tv-rotation-screen.tsx`) get the badge for free — there's no TV-specific rendering fork to keep in sync. */
 export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactElement {
   const t = useTranslations('Boards');
 
-  switch (view.kind) {
-    case 'unavailable':
-      return <UnavailableView message={view.message} reasonLabel={t(`tileUnavailableReason.${view.reason}`)} />;
-    case 'big_number':
-      return <BigNumberView view={view} />;
-    case 'time_series':
-      return view.chart === 'line' ? <LineChartView view={view} /> : <BarChartView view={view} />;
-    case 'table':
-      return <TableView view={view} />;
-    case 'funnel':
-      return <FunnelView view={view} />;
-    case 'heatmap':
-      return <HeatmapView view={view} />;
-    case 'histogram':
-      return <HistogramView view={view} />;
-    default:
-      return <UnavailableView message={tile.title} reasonLabel={t('tileUnavailableReason.query_error')} />;
-  }
+  const content = (() => {
+    switch (view.kind) {
+      case 'unavailable':
+        return <UnavailableView message={view.message} reasonLabel={t(`tileUnavailableReason.${view.reason}`)} />;
+      case 'big_number':
+        return <BigNumberView view={view} />;
+      case 'time_series':
+        return view.chart === 'line' ? <LineChartView view={view} /> : <BarChartView view={view} />;
+      case 'table':
+        return <TableView view={view} />;
+      case 'funnel':
+        return <FunnelView view={view} />;
+      case 'heatmap':
+        return <HeatmapView view={view} />;
+      case 'histogram':
+        return <HistogramView view={view} />;
+      default:
+        return <UnavailableView message={tile.title} reasonLabel={t('tileUnavailableReason.query_error')} />;
+    }
+  })();
+
+  const freshness = view.kind === 'unavailable' ? null : view.freshness;
+  return (
+    <div className="relative h-full">
+      {freshness ? (
+        <div className="absolute right-0 top-0">
+          <TileFreshnessBadge freshness={freshness} />
+        </div>
+      ) : null}
+      {content}
+    </div>
+  );
 }

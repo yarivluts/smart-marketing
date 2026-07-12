@@ -65,6 +65,28 @@ export function freshnessTableLabelKey(table: OrchestrationFreshnessTable): Sche
   return FRESHNESS_TABLE_LABEL_KEYS[table];
 }
 
+/**
+ * The single most-stale "as of" timestamp across every table in one run's
+ * freshness snapshot — the *oldest* of the non-null `latestRecordAt` values,
+ * not the newest (KAN-69, plan `13 §E13.2`). A board tile doesn't know which
+ * canonical table (entities/events/measures) backs its own metric, so this
+ * is the one project-wide freshness figure every tile's badge shares.
+ * Taking the oldest rather than the newest means a single connector going
+ * quiet — its table's freshness stalls while the others keep advancing —
+ * still surfaces as stale everywhere instead of being masked by whichever
+ * other table is still fresh, matching the AC's own "killing a connector
+ * shows a stale badge" scenario. `null` when every table has no rows yet or
+ * the snapshot itself is empty.
+ */
+export function overallFreshnessAsOf(freshness: readonly OrchestrationFreshnessEntryView[]): string | null {
+  const timestamps = freshness.map((entry) => entry.latestRecordAt).filter((value): value is string => value !== null);
+  if (timestamps.length === 0) {
+    return null;
+  }
+  // ISO 8601 timestamps compare correctly as plain strings.
+  return timestamps.reduce((oldest, current) => (current < oldest ? current : oldest));
+}
+
 /** The `IngestHealth` translation key for one run's status label. */
 const RUN_STATUS_LABEL_KEYS: Record<OrchestrationRunStatus, 'orchestrationRunStatusRunning' | 'orchestrationRunStatusSucceeded' | 'orchestrationRunStatusFailed'> = {
   running: 'orchestrationRunStatusRunning',

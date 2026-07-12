@@ -313,7 +313,13 @@ export interface QueryBoardTileParams {
  * any other compiler/executor error — so one broken/unconfigured tile
  * degrades gracefully instead of failing the whole board render (`10 §2.6`
  * / `13 §E13.2`'s "never a blank board" posture, applied at the single-tile
- * grain here since KAN-69 itself is a later story).
+ * grain here). KAN-69's own half of that story — the "stale badge" side, for
+ * a tile whose query still *succeeds* but against data a dead connector
+ * hasn't refreshed — is computed independently in `apps/web`'s
+ * `computeTileFreshness`/`overallFreshnessAsOf` from the KAN-38 orchestration
+ * freshness snapshot, not here: this function's own `ok: false` branch below
+ * is about the query itself failing, not about the successfully-returned
+ * data's age.
  *
  * Known, deliberately deferred inefficiency: the board detail page fans this
  * out once per tile via `Promise.all`, and each call independently re-reads

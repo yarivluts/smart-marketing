@@ -20,13 +20,23 @@ class FakeEventSource {
 const BOARD_FRAME_A: TvBoardFrame = {
   id: 'board-1',
   name: 'Marketing',
-  tiles: [{ tile: { id: 'tile-1', type: 'big_number', title: 'Signups', layout: { x: 0, y: 0, w: 3, h: 2 }, metricNames: ['signups'], dimensions: [] }, view: { kind: 'big_number', value: 42 } }],
+  tiles: [
+    {
+      tile: { id: 'tile-1', type: 'big_number', title: 'Signups', layout: { x: 0, y: 0, w: 3, h: 2 }, metricNames: ['signups'], dimensions: [] },
+      view: { kind: 'big_number', value: 42, isEmpty: false, freshness: null },
+    },
+  ],
 };
 
 const BOARD_FRAME_B: TvBoardFrame = {
   id: 'board-2',
   name: 'Revenue',
-  tiles: [{ tile: { id: 'tile-2', type: 'big_number', title: 'MRR', layout: { x: 0, y: 0, w: 3, h: 2 }, metricNames: ['mrr'], dimensions: [] }, view: { kind: 'big_number', value: 1000 } }],
+  tiles: [
+    {
+      tile: { id: 'tile-2', type: 'big_number', title: 'MRR', layout: { x: 0, y: 0, w: 3, h: 2 }, metricNames: ['mrr'], dimensions: [] },
+      view: { kind: 'big_number', value: 1000, isEmpty: false, freshness: null },
+    },
+  ],
 };
 
 function manifestWith(overrides: Partial<TvRotationManifest>): TvRotationManifest {

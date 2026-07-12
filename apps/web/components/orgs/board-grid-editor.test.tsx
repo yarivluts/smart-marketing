@@ -38,8 +38,8 @@ const metricCatalog: MetricCatalogEntryRow[] = [
 ];
 
 const renderViews: Record<string, TileRenderView> = {
-  'tile-1': { kind: 'big_number', value: 100 },
-  'tile-2': { kind: 'big_number', value: 40 },
+  'tile-1': { kind: 'big_number', value: 100, isEmpty: false, freshness: null },
+  'tile-2': { kind: 'big_number', value: 40, isEmpty: false, freshness: null },
 };
 
 function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile], catalog: MetricCatalogEntryRow[] = metricCatalog): void {
