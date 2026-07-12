@@ -1,6 +1,8 @@
 import 'server-only';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
+  getActiveAutomationGuardrailPolicy as getActiveAutomationGuardrailPolicyInOrganization,
+  getAutomationKillSwitchStatus as getAutomationKillSwitchStatusInOrganization,
   getBoard as getBoardInOrganization,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -22,6 +24,8 @@ import {
   listApiKeysForProject as listApiKeysForProjectInOrganization,
   listAttachmentsForProject as listAttachmentsForProjectInOrganization,
   listAuditLogEntriesForOrg as listAuditLogEntriesForOrgInOrganization,
+  listAutomationActionsForProject as listAutomationActionsForProjectInOrganization,
+  listAutomationTargetStatesForProject as listAutomationTargetStatesForProjectInOrganization,
   listBoardsForProject as listBoardsForProjectInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
@@ -55,6 +59,10 @@ import {
   verifyAuditLogChainForOrg as verifyAuditLogChainForOrgInOrganization,
   type AuditLogChainVerification,
   type AuditLogEntryModel,
+  type AutomationActionModel,
+  type AutomationGuardrailPolicyConfig,
+  type AutomationKillSwitchStatus,
+  type AutomationTargetStateModel,
   type BoardTileQueryOutcome,
   type IngestBatchModel,
   type MembershipStatus,
@@ -259,6 +267,30 @@ export async function getEventVolumeOverviewForProject(
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
   await ensureFirestoreOrm();
   return listTrackingAlertsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getActiveAutomationGuardrailPolicy(organizationId: string, projectId: string): Promise<AutomationGuardrailPolicyConfig> {
+  await ensureFirestoreOrm();
+  return getActiveAutomationGuardrailPolicyInOrganization(organizationId, projectId);
+}
+
+export async function getAutomationKillSwitchStatus(organizationId: string): Promise<AutomationKillSwitchStatus> {
+  await ensureFirestoreOrm();
+  return getAutomationKillSwitchStatusInOrganization(organizationId);
+}
+
+export async function listAutomationActionsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<AutomationActionModel[]> {
+  await ensureFirestoreOrm();
+  return listAutomationActionsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listAutomationTargetStatesForProject(organizationId: string, projectId: string): Promise<AutomationTargetStateModel[]> {
+  await ensureFirestoreOrm();
+  return listAutomationTargetStatesForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listQueryCostLogEntriesForProject(

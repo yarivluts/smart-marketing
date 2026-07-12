@@ -3,6 +3,20 @@ import {
   acceptInvite as acceptInviteForOrganization,
   type ApiKeyModel,
   type ApiKeyScope,
+  approveAutomationAction as approveAutomationActionInOrganization,
+  type AutomationActionModel,
+  type AutomationGuardrailPolicyModel,
+  type AutomationKillSwitchStatus,
+  type AutomationTargetStateModel,
+  disengageAutomationKillSwitch as disengageAutomationKillSwitchInOrganization,
+  engageAutomationKillSwitch as engageAutomationKillSwitchInOrganization,
+  ensureAutomationTargetSeeded as ensureAutomationTargetSeededInOrganization,
+  executeAutomationAction as executeAutomationActionInOrganization,
+  proposeAutomationBudgetChangeAction as proposeAutomationBudgetChangeActionInOrganization,
+  rejectAutomationAction as rejectAutomationActionInOrganization,
+  rollbackAutomationAction as rollbackAutomationActionInOrganization,
+  setAutomationGuardrailPolicy as setAutomationGuardrailPolicyInOrganization,
+  verifyAutomationAction as verifyAutomationActionInOrganization,
   type BoardModel,
   type BoardTile,
   checkTrackingAlertsForProject as checkTrackingAlertsForProjectInOrganization,
@@ -857,4 +871,120 @@ export async function completeOnboarding(
 ): Promise<OnboardingStateModel> {
   await ensureFirestoreOrm();
   return completeOnboardingInOrganization({ organizationId, projectId, userId });
+}
+
+interface SetAutomationGuardrailPolicyInput {
+  organizationId: string;
+  projectId: string;
+  maxDailyBudgetChangePct: number | null;
+  spendCeilingUsd: number | null;
+  protectedTargetIds: string[];
+  allowedHours: { startHourUtc: number; endHourUtc: number } | null;
+  maxActionsPerDay: number | null;
+  maxGuardedMetricRegressionPct: number | null;
+  setByUserId: string;
+}
+
+export async function setAutomationGuardrailPolicy(input: SetAutomationGuardrailPolicyInput): Promise<AutomationGuardrailPolicyModel> {
+  await ensureFirestoreOrm();
+  return setAutomationGuardrailPolicyInOrganization(input);
+}
+
+interface EngageAutomationKillSwitchInput {
+  organizationId: string;
+  reason: string;
+  actorId: string;
+}
+
+export async function engageAutomationKillSwitch(input: EngageAutomationKillSwitchInput): Promise<AutomationKillSwitchStatus> {
+  await ensureFirestoreOrm();
+  return engageAutomationKillSwitchInOrganization(input);
+}
+
+export async function disengageAutomationKillSwitch(organizationId: string, actorId: string): Promise<AutomationKillSwitchStatus> {
+  await ensureFirestoreOrm();
+  return disengageAutomationKillSwitchInOrganization({ organizationId, actorId });
+}
+
+interface SeedAutomationTargetInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  targetType: string;
+  label: string;
+  initialDailyBudgetUsd: number;
+  seededByUserId: string;
+}
+
+export async function ensureAutomationTargetSeeded(input: SeedAutomationTargetInput): Promise<AutomationTargetStateModel> {
+  await ensureFirestoreOrm();
+  return ensureAutomationTargetSeededInOrganization(input);
+}
+
+interface ProposeAutomationBudgetChangeInput {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  afterDailyBudgetUsd: number;
+  requestedByUserId: string;
+}
+
+export async function proposeAutomationBudgetChangeAction(input: ProposeAutomationBudgetChangeInput): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return proposeAutomationBudgetChangeActionInOrganization(input);
+}
+
+export async function approveAutomationAction(
+  organizationId: string,
+  projectId: string,
+  actionId: string,
+  approverId: string,
+): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return approveAutomationActionInOrganization({ organizationId, projectId, actionId, approverId });
+}
+
+export async function rejectAutomationAction(
+  organizationId: string,
+  projectId: string,
+  actionId: string,
+  rejectedByUserId: string,
+): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return rejectAutomationActionInOrganization({ organizationId, projectId, actionId, rejectedByUserId });
+}
+
+export async function executeAutomationAction(
+  organizationId: string,
+  projectId: string,
+  actionId: string,
+  executedByUserId: string,
+): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return executeAutomationActionInOrganization({ organizationId, projectId, actionId, executedByUserId });
+}
+
+interface VerifyAutomationActionInput {
+  organizationId: string;
+  projectId: string;
+  actionId: string;
+  verifiedByUserId: string;
+  guardedMetricBefore?: number;
+  guardedMetricAfter?: number;
+}
+
+export async function verifyAutomationAction(input: VerifyAutomationActionInput): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return verifyAutomationActionInOrganization(input);
+}
+
+export async function rollbackAutomationAction(
+  organizationId: string,
+  projectId: string,
+  actionId: string,
+  actorId: string,
+): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return rollbackAutomationActionInOrganization({ organizationId, projectId, actionId, reason: 'manual', actorId });
 }

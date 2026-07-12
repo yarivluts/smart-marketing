@@ -24,6 +24,8 @@ import { DELETE as deleteBoard, PATCH as patchBoard } from '@/app/api/orgs/[orgI
 import { PUT as saveBoardTiles } from '@/app/api/orgs/[orgId]/projects/[projectId]/boards/[boardId]/tiles/route';
 import { GET as listTvPairings, POST as claimTvPairingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/tv-pairing/route';
 import { DELETE as revokeTvPairingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/tv-pairing/[pairingId]/route';
+import { GET as listAutomationActions, POST as proposeAutomationActionRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/route';
+import { GET as getKillSwitchStatus, POST as toggleKillSwitchRoute } from '@/app/api/orgs/[orgId]/automation/kill-switch/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -641,6 +643,68 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         revokeTvPairingRoute(deleteRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, pairingId: FAKE_PAIRING_ID }),
         }),
+    );
+  });
+
+  it('GET/POST /api/orgs/[orgId]/projects/[projectId]/automation/actions: org caller cannot see vs. fake org id (KAN-71)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-automation-caller'));
+    const caller = await ensureUserForFirebaseSession({ firebaseUid: callerSession.uid, email: callerSession.email as string });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (automation)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-automation-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (automation)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const getRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/automation/actions`);
+    await expectIndistinguishable(
+      () => listAutomationActions(getRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () =>
+        listAutomationActions(getRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }) }),
+    );
+
+    const postRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/automation/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetId: 'does-not-exist', afterDailyBudgetUsd: 10 }),
+      });
+    await expectIndistinguishable(
+      () =>
+        proposeAutomationActionRoute(postRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () =>
+        proposeAutomationActionRoute(postRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+  });
+
+  it('GET/POST /api/orgs/[orgId]/automation/kill-switch: org caller cannot see vs. fake org id (KAN-71)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-kill-switch-caller'));
+    const caller = await ensureUserForFirebaseSession({ firebaseUid: callerSession.uid, email: callerSession.email as string });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (kill-switch)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-kill-switch-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (kill-switch)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const getRequestFor = (orgId: string) => new NextRequest(`https://growthos.test/api/orgs/${orgId}/automation/kill-switch`);
+    await expectIndistinguishable(
+      () => getKillSwitchStatus(getRequestFor(orgB.id), { params: Promise.resolve({ orgId: orgB.id }) }),
+      () => getKillSwitchStatus(getRequestFor(FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID }) }),
+    );
+
+    const postRequestFor = (orgId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/automation/kill-switch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ engaged: true, reason: 'leaked' }),
+      });
+    await expectIndistinguishable(
+      () => toggleKillSwitchRoute(postRequestFor(orgB.id), { params: Promise.resolve({ orgId: orgB.id }) }),
+      () => toggleKillSwitchRoute(postRequestFor(FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID }) }),
     );
   });
 });
