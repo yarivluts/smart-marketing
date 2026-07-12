@@ -14,6 +14,7 @@ import { activeSchemaNamesForKind, listSchemaDefinitionsForProject } from './sch
 import { recordAuditLogEntry } from './audit-log.service';
 import { installPluginAndProvisionBuiltins } from './metric-pack-dispatch.service';
 import { getLatestPluginManifestVersion, registerPluginManifest, PluginAlreadyInstalledError } from './plugin-registry.service';
+import { recordActivationEvent } from './product-analytics.service';
 
 /** One built-in metric pack the wizard's "pick a vertical" step can install (plan `10 §2.6` step 1). `custom` (skip installing any pack) has no entry here — it's handled as a special case in {@link selectOnboardingMetricPack}. */
 interface OnboardingPackDefinition {
@@ -104,6 +105,12 @@ export async function getOrCreateOnboardingState(organizationId: string, project
     // Best-effort — audit logging must never turn a successful start into a failure for the caller.
   }
 
+  await recordActivationEvent({
+    funnelStep: 'onboarding_started',
+    targetOrganizationId: organizationId,
+    targetProjectId: projectId,
+  });
+
   return state;
 }
 
@@ -183,6 +190,14 @@ export async function selectOnboardingMetricPack(params: SelectOnboardingMetricP
   advanceStep(state, 'sources');
   state.updated_at = new Date().toISOString();
   await state.save();
+
+  await recordActivationEvent({
+    funnelStep: 'pack_selected',
+    targetOrganizationId: params.organizationId,
+    targetProjectId: params.projectId,
+    packKey: params.packKey,
+  });
+
   return state;
 }
 
@@ -203,6 +218,14 @@ export async function markOnboardingSourceConnected(params: MarkOnboardingSource
   advanceStep(state, 'funnel');
   state.updated_at = new Date().toISOString();
   await state.save();
+
+  await recordActivationEvent({
+    funnelStep: 'source_connected',
+    targetOrganizationId: params.organizationId,
+    targetProjectId: params.projectId,
+    sourceConnectionMethod: params.method,
+  });
+
   return state;
 }
 
@@ -228,6 +251,14 @@ export async function confirmOnboardingFunnelSteps(params: ConfirmOnboardingFunn
   advanceStep(state, 'board');
   state.updated_at = new Date().toISOString();
   await state.save();
+
+  await recordActivationEvent({
+    funnelStep: 'funnel_confirmed',
+    targetOrganizationId: params.organizationId,
+    targetProjectId: params.projectId,
+    funnelStepCount: params.steps.length,
+  });
+
   return state;
 }
 
@@ -259,6 +290,12 @@ export async function completeOnboarding(params: CompleteOnboardingParams): Prom
   } catch {
     // Best-effort — audit logging must never turn a successful completion into a failure for the caller.
   }
+
+  await recordActivationEvent({
+    funnelStep: 'onboarding_completed',
+    targetOrganizationId: params.organizationId,
+    targetProjectId: params.projectId,
+  });
 
   return state;
 }

@@ -130,6 +130,7 @@ export * from './services/win-rule.service';
 export * from './services/trial-pipeline.service';
 export * from './services/tv-pairing.service';
 export * from './services/onboarding.service';
+export * from './services/product-analytics.service';
 export * from './pipeline';
 export * from './services/ingest-health.service';
 export * from './vault';
