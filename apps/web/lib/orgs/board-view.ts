@@ -61,6 +61,38 @@ export interface FunnelStep {
 /** Mirrors `BoardTileQueryOutcome`'s own `reason` union (`board.service.ts`) — not derived via a conditional type since that union is only ever seen through the `ok: false` branch, and spelling it out here is clearer than an `Extract<...>` gymnastic. */
 export type BoardTileUnavailableReason = 'warehouse_not_configured' | 'quota_exceeded' | 'query_error';
 
+/**
+ * Data older than this renders its freshness badge as "stale" rather than
+ * "fresh" (KAN-69, plan `13 §E13.2`: "killing a connector shows a stale
+ * badge, not a blank board"). A full day, matching the daily cadence
+ * orchestration runs (KAN-38) and most connector polling operate on today —
+ * not configurable per-board/tile since there's no per-metric SLA concept
+ * yet.
+ */
+export const TILE_STALE_THRESHOLD_HOURS = 24;
+
+/** One tile's data-freshness badge state — `asOf` is the project-wide freshness timestamp (see `overallFreshnessAsOf` in `orchestration-view.ts`), `isStale` whether it's past {@link TILE_STALE_THRESHOLD_HOURS}. */
+export interface TileFreshness {
+  asOf: string;
+  isStale: boolean;
+}
+
+/**
+ * Resolves a raw "as of" timestamp (or `null` when no orchestration run has
+ * ever succeeded for this project) into a tile's freshness badge state.
+ * Takes `nowMs` as a parameter rather than reading `Date.now()` itself so
+ * it's testable with a fixed clock — the same posture
+ * `computeIngestHealthSummary` (KAN-35) already takes for its own
+ * `freshnessMinutes` derivation.
+ */
+export function computeTileFreshness(asOf: string | null, nowMs: number = Date.now()): TileFreshness | null {
+  if (asOf === null) {
+    return null;
+  }
+  const ageMs = nowMs - new Date(asOf).getTime();
+  return { asOf, isStale: ageMs >= TILE_STALE_THRESHOLD_HOURS * 60 * 60 * 1000 };
+}
+
 /** One `(rowLabels[i], columnLabels[j])` cell's value — `null` when that combination has no data (e.g. a period that hasn't happened yet for a younger cohort). */
 export interface HeatmapView {
   rowLabels: string[];
@@ -74,14 +106,17 @@ export interface HistogramView {
   values: number[];
 }
 
+/** Every data-bearing tile kind carries the same two KAN-69 fields: whether its query returned zero rows (an "empty state", distinct from a genuine zero) and its project-wide data-freshness badge (`null` when no orchestration run has ever succeeded). `unavailable` carries neither — it's already its own degraded state with no queried data to attach either to. */
+type WithFreshness<T> = T & { isEmpty: boolean; freshness: TileFreshness | null };
+
 export type TileRenderView =
   | { kind: 'unavailable'; reason: BoardTileUnavailableReason; message: string }
-  | { kind: 'big_number'; value: number; previousValue?: number; deltaPct?: number }
-  | { kind: 'time_series'; chart: Extract<BoardTileType, 'line' | 'bar'>; series: TimeSeries[]; previousSeries?: TimeSeries[] }
-  | { kind: 'table'; columns: string[]; rows: WarehouseRow[] }
-  | { kind: 'funnel'; steps: FunnelStep[] }
-  | ({ kind: 'heatmap' } & HeatmapView)
-  | ({ kind: 'histogram' } & HistogramView);
+  | WithFreshness<{ kind: 'big_number'; value: number; previousValue?: number; deltaPct?: number }>
+  | WithFreshness<{ kind: 'time_series'; chart: Extract<BoardTileType, 'line' | 'bar'>; series: TimeSeries[]; previousSeries?: TimeSeries[] }>
+  | WithFreshness<{ kind: 'table'; columns: string[]; rows: WarehouseRow[] }>
+  | WithFreshness<{ kind: 'funnel'; steps: FunnelStep[] }>
+  | WithFreshness<{ kind: 'heatmap' } & HeatmapView>
+  | WithFreshness<{ kind: 'histogram' } & HistogramView>;
 
 /** Exported for reuse by other view-mappers in this app (e.g. `trial-pipeline-view.ts`) that sum the same `WarehouseRow[]` shape — not shared with `packages/firebase-orm-models`, which keeps its own local mirror since that package must not depend on `apps/web` (see `goal.service.ts`'s `sumMetricRows`). */
 export function toNumber(value: string | number | null): number {
@@ -110,16 +145,16 @@ export function sumMetric(rows: readonly WarehouseRow[], metricName: string): nu
   return rows.reduce((total, row) => total + toNumber(row[metricName] ?? null), 0);
 }
 
-function buildBigNumberView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRenderView {
+function buildBigNumberView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const metricName = tile.metricNames[0];
   const { current, previous } = splitByPeriod(rows);
   const value = sumMetric(current, metricName);
   if (previous.length === 0) {
-    return { kind: 'big_number', value };
+    return { kind: 'big_number' as const, value };
   }
   const previousValue = sumMetric(previous, metricName);
   const deltaPct = previousValue !== 0 ? ((value - previousValue) / previousValue) * 100 : undefined;
-  return { kind: 'big_number', value, previousValue, ...(deltaPct !== undefined ? { deltaPct } : {}) };
+  return { kind: 'big_number' as const, value, previousValue, ...(deltaPct !== undefined ? { deltaPct } : {}) };
 }
 
 /** A human-readable series label — display only, not used as the internal grouping key (see `groupKey`'s own doc comment for why). */
@@ -155,18 +190,18 @@ function buildSeries(rows: readonly WarehouseRow[], tile: BoardTile): TimeSeries
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-function buildTimeSeriesView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRenderView {
+function buildTimeSeriesView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const { current, previous } = splitByPeriod(rows);
-  const chart = tile.type === 'bar' ? 'bar' : 'line';
+  const chart: Extract<BoardTileType, 'line' | 'bar'> = tile.type === 'bar' ? 'bar' : 'line';
   return {
-    kind: 'time_series',
+    kind: 'time_series' as const,
     chart,
     series: buildSeries(current, tile),
     ...(previous.length > 0 ? { previousSeries: buildSeries(previous, tile) } : {}),
   };
 }
 
-function buildTableView(rows: readonly WarehouseRow[]): TileRenderView {
+function buildTableView(rows: readonly WarehouseRow[]) {
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   const sorted = [...rows].sort((a, b) => {
     const bucketCompare = String(a.bucket_date ?? '').localeCompare(String(b.bucket_date ?? ''));
@@ -175,10 +210,10 @@ function buildTableView(rows: readonly WarehouseRow[]): TileRenderView {
     }
     return String(a.period ?? '').localeCompare(String(b.period ?? ''));
   });
-  return { kind: 'table', columns, rows: sorted };
+  return { kind: 'table' as const, columns, rows: sorted };
 }
 
-function buildFunnelView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRenderView {
+function buildFunnelView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const totals = tile.metricNames.map((metricName) => sumMetric(rows, metricName));
   const firstTotal = totals[0] ?? 0;
   const steps: FunnelStep[] = tile.metricNames.map((metricName, index) => ({
@@ -186,7 +221,7 @@ function buildFunnelView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRe
     total: totals[index],
     pctOfFirstStep: firstTotal > 0 ? (totals[index] / firstTotal) * 100 : 0,
   }));
-  return { kind: 'funnel', steps };
+  return { kind: 'funnel' as const, steps };
 }
 
 /** Ascending, numeric-aware when every label parses as a number (e.g. `period_number` values `"0"`, `"1"`, `"10"` — a plain string sort would put `"10"` before `"2"`); falls back to a locale string sort for non-numeric labels. */
@@ -205,7 +240,7 @@ function sortLabels(labels: readonly string[]): string[] {
  * renders as `null`, not `0`: "not yet observable" is a different fact
  * than "observed and zero".
  */
-function buildHeatmapView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRenderView {
+function buildHeatmapView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const metricName = tile.metricNames[0];
   const dimension = tile.dimensions[0];
   const rowLabels = sortLabels([...new Set(rows.map((row) => String(row.bucket_date ?? '')))]);
@@ -220,7 +255,7 @@ function buildHeatmapView(tile: BoardTile, rows: readonly WarehouseRow[]): TileR
     valueByKey.set(cellKey(String(row.bucket_date ?? ''), String(row[dimension] ?? '')), toNumber(row[metricName] ?? null));
   }
   const matrix = rowLabels.map((rowLabel) => columnLabels.map((columnLabel) => valueByKey.get(cellKey(rowLabel, columnLabel)) ?? null));
-  return { kind: 'heatmap', rowLabels, columnLabels, matrix };
+  return { kind: 'heatmap' as const, rowLabels, columnLabels, matrix };
 }
 
 /**
@@ -234,7 +269,7 @@ function buildHeatmapView(tile: BoardTile, rows: readonly WarehouseRow[]): TileR
  * same defensive posture `sumMetric` already takes for `big_number`/
  * `funnel`).
  */
-function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]): TileRenderView {
+function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const metricName = tile.metricNames[0];
   const dimension = tile.dimensions[0];
   const valueByLabel = new Map<string, number>();
@@ -243,7 +278,7 @@ function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]): Til
     valueByLabel.set(label, (valueByLabel.get(label) ?? 0) + toNumber(row[metricName] ?? null));
   }
   const labels = sortLabels([...valueByLabel.keys()]);
-  return { kind: 'histogram', labels, values: labels.map((label) => valueByLabel.get(label) ?? 0) };
+  return { kind: 'histogram' as const, labels, values: labels.map((label) => valueByLabel.get(label) ?? 0) };
 }
 
 /**
@@ -255,26 +290,39 @@ function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]): Til
  * through as its own render kind so the grid can show a per-tile degraded
  * state instead of failing the whole board (plan `10 §2.6`'s "never a blank
  * board", applied per-tile — see `queryBoardTile`'s own doc comment).
+ *
+ * `freshness` (KAN-69, plan `13 §E13.2`) is the project-wide data-freshness
+ * badge state every successfully-queried tile shares — see
+ * `computeTileFreshness`'s own doc comment for why one shared value covers
+ * every tile rather than a per-metric one. Omitted (`null`) by callers that
+ * haven't computed it (e.g. existing tests), which simply renders no badge.
+ * `isEmpty` (the query succeeded but returned zero rows, as opposed to a
+ * genuine zero) is derived here once for every kind, rather than each
+ * type-specific renderer re-deriving it from its own already-shaped data.
  */
-export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutcome): TileRenderView {
+export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutcome, freshness: TileFreshness | null = null): TileRenderView {
   if (!outcome.ok) {
     return { kind: 'unavailable', reason: outcome.reason, message: outcome.message };
   }
-  switch (tile.type) {
-    case 'big_number':
-      return buildBigNumberView(tile, outcome.series);
-    case 'line':
-    case 'bar':
-      return buildTimeSeriesView(tile, outcome.series);
-    case 'table':
-      return buildTableView(outcome.series);
-    case 'funnel':
-      return buildFunnelView(tile, outcome.series);
-    case 'heatmap':
-      return buildHeatmapView(tile, outcome.series);
-    case 'histogram':
-      return buildHistogramView(tile, outcome.series);
-    default:
-      return buildTableView(outcome.series);
-  }
+  const isEmpty = outcome.series.length === 0;
+  const content = (() => {
+    switch (tile.type) {
+      case 'big_number':
+        return buildBigNumberView(tile, outcome.series);
+      case 'line':
+      case 'bar':
+        return buildTimeSeriesView(tile, outcome.series);
+      case 'table':
+        return buildTableView(outcome.series);
+      case 'funnel':
+        return buildFunnelView(tile, outcome.series);
+      case 'heatmap':
+        return buildHeatmapView(tile, outcome.series);
+      case 'histogram':
+        return buildHistogramView(tile, outcome.series);
+      default:
+        return buildTableView(outcome.series);
+    }
+  })();
+  return { ...content, isEmpty, freshness };
 }

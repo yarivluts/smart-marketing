@@ -65,6 +65,34 @@ export function freshnessTableLabelKey(table: OrchestrationFreshnessTable): Sche
   return FRESHNESS_TABLE_LABEL_KEYS[table];
 }
 
+/**
+ * The single most-stale "as of" timestamp across every table in one run's
+ * freshness snapshot — the *oldest* of the non-null `latestRecordAt` values,
+ * not the newest (KAN-69, plan `13 §E13.2`). A board tile doesn't know which
+ * canonical table (entities/events/measures) backs its own metric, so this
+ * is the one project-wide freshness figure every tile's badge shares.
+ * Taking the oldest rather than the newest means a single connector going
+ * quiet — its table's freshness stalls while the others keep advancing —
+ * still surfaces as stale everywhere instead of being masked by whichever
+ * other table is still fresh, matching the AC's own "killing a connector
+ * shows a stale badge" scenario. `null` when every table has no rows yet or
+ * the snapshot itself is empty.
+ */
+export function overallFreshnessAsOf(freshness: readonly OrchestrationFreshnessEntryView[]): string | null {
+  const timestamps = freshness.map((entry) => entry.latestRecordAt).filter((value): value is string => value !== null);
+  if (timestamps.length === 0) {
+    return null;
+  }
+  // Compares parsed instants, not the raw strings: `read_freshness.py`
+  // builds each timestamp via Python's `datetime.isoformat()`, which omits
+  // the fractional-seconds component whenever it's exactly zero (producing
+  // e.g. `"...:00Z"` alongside a sibling table's `"...:00.500000Z"`) — a
+  // plain string comparison of that pair is backwards (`.` sorts before
+  // `Z`), so the fraction-less, earlier timestamp would wrongly lose to the
+  // later one.
+  return timestamps.reduce((oldest, current) => (new Date(current).getTime() < new Date(oldest).getTime() ? current : oldest));
+}
+
 /** The `IngestHealth` translation key for one run's status label. */
 const RUN_STATUS_LABEL_KEYS: Record<OrchestrationRunStatus, 'orchestrationRunStatusRunning' | 'orchestrationRunStatusSucceeded' | 'orchestrationRunStatusFailed'> = {
   running: 'orchestrationRunStatusRunning',

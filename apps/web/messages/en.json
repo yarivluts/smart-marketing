@@ -666,6 +666,11 @@
     "heatmapCellTooltip": "{row} · {column}: {value}",
     "histogramEmpty": "No data for this range yet.",
     "histogramAriaLabel": "Histogram",
+    "bigNumberEmpty": "No data for this range yet.",
+    "timeSeriesEmpty": "No data for this range yet.",
+    "funnelEmpty": "No data for this range yet.",
+    "freshnessAsOfLabel": "Data as of {asOf}",
+    "freshnessStaleLabel": "Stale — data as of {asOf}",
     "tileUnavailableReason": {
       "warehouse_not_configured": "Warehouse not configured yet",
       "quota_exceeded": "Daily query quota reached",

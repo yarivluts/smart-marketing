@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardModel, BoardTile } from '@growthos/firebase-orm-models';
-import { buildTileRenderView, toBoardSummaryView, toBoardView } from './board-view';
+import { buildTileRenderView, computeTileFreshness, TILE_STALE_THRESHOLD_HOURS, toBoardSummaryView, toBoardView } from './board-view';
 
 function board(overrides: Partial<BoardModel> & Pick<BoardModel, 'id'>): BoardModel {
   return {
@@ -60,7 +60,7 @@ describe('buildTileRenderView — big_number', () => {
         { bucket_date: '2026-01-02', ad_spend: 50 },
       ],
     });
-    expect(view).toEqual({ kind: 'big_number', value: 150 });
+    expect(view).toEqual({ kind: 'big_number', value: 150, isEmpty: false, freshness: null });
   });
 
   it('computes a delta percentage against the previous period', () => {
@@ -71,7 +71,7 @@ describe('buildTileRenderView — big_number', () => {
         { bucket_date: '2025-12-01', ad_spend: 100, period: 'previous' },
       ],
     });
-    expect(view).toEqual({ kind: 'big_number', value: 150, previousValue: 100, deltaPct: 50 });
+    expect(view).toEqual({ kind: 'big_number', value: 150, previousValue: 100, deltaPct: 50, isEmpty: false, freshness: null });
   });
 
   it('omits deltaPct (division by zero) when the previous period totals zero', () => {
@@ -82,12 +82,27 @@ describe('buildTileRenderView — big_number', () => {
         { bucket_date: '2025-12-01', ad_spend: 0, period: 'previous' },
       ],
     });
-    expect(view).toEqual({ kind: 'big_number', value: 150, previousValue: 0 });
+    expect(view).toEqual({ kind: 'big_number', value: 150, previousValue: 0, isEmpty: false, freshness: null });
   });
 
   it('treats a null metric value as zero', () => {
     const view = buildTileRenderView(tile({ type: 'big_number' }), { ok: true, series: [{ bucket_date: '2026-01-01', ad_spend: null }] });
-    expect(view).toEqual({ kind: 'big_number', value: 0 });
+    expect(view).toEqual({ kind: 'big_number', value: 0, isEmpty: false, freshness: null });
+  });
+
+  it('flags isEmpty when the query returned zero rows, distinct from a genuine zero value', () => {
+    const view = buildTileRenderView(tile({ type: 'big_number' }), { ok: true, series: [] });
+    expect(view).toEqual({ kind: 'big_number', value: 0, isEmpty: true, freshness: null });
+  });
+
+  it('threads a precomputed freshness badge straight through to the render view', () => {
+    const freshness = { asOf: '2026-01-01T00:00:00.000Z', isStale: true };
+    const view = buildTileRenderView(
+      tile({ type: 'big_number' }),
+      { ok: true, series: [{ bucket_date: '2026-01-01', ad_spend: 10 }] },
+      freshness,
+    );
+    expect(view).toEqual({ kind: 'big_number', value: 10, isEmpty: false, freshness });
   });
 });
 
@@ -112,7 +127,14 @@ describe('buildTileRenderView — time_series', () => {
           ],
         },
       ],
+      isEmpty: false,
+      freshness: null,
     });
+  });
+
+  it('flags isEmpty when the query returned zero rows', () => {
+    const view = buildTileRenderView(tile({ type: 'line' }), { ok: true, series: [] });
+    expect(view).toEqual({ kind: 'time_series', chart: 'line', series: [], isEmpty: true, freshness: null });
   });
 
   it('groups into one series per dimension value, and includes a previousSeries when compare rows are present', () => {
@@ -169,7 +191,14 @@ describe('buildTileRenderView — table', () => {
         { bucket_date: '2026-01-01', ad_spend: 100, channel: 'google' },
         { bucket_date: '2026-01-02', ad_spend: 50 },
       ],
+      isEmpty: false,
+      freshness: null,
     });
+  });
+
+  it('flags isEmpty when the query returned zero rows', () => {
+    const view = buildTileRenderView(tile({ type: 'table' }), { ok: true, series: [] });
+    expect(view).toEqual({ kind: 'table', columns: [], rows: [], isEmpty: true, freshness: null });
   });
 });
 
@@ -189,6 +218,8 @@ describe('buildTileRenderView — funnel', () => {
         { metricName: 'activations', total: 60, pctOfFirstStep: 40 },
         { metricName: 'purchases', total: 15, pctOfFirstStep: 10 },
       ],
+      isEmpty: false,
+      freshness: null,
     });
   });
 
@@ -203,6 +234,24 @@ describe('buildTileRenderView — funnel', () => {
         { metricName: 'signups', total: 0, pctOfFirstStep: 0 },
         { metricName: 'purchases', total: 0, pctOfFirstStep: 0 },
       ],
+      isEmpty: false,
+      freshness: null,
+    });
+  });
+
+  it('flags isEmpty when the query returned zero rows, distinct from every step totaling zero', () => {
+    const view = buildTileRenderView(tile({ type: 'funnel', metricNames: ['signups', 'purchases'], dimensions: [] }), {
+      ok: true,
+      series: [],
+    });
+    expect(view).toEqual({
+      kind: 'funnel',
+      steps: [
+        { metricName: 'signups', total: 0, pctOfFirstStep: 0 },
+        { metricName: 'purchases', total: 0, pctOfFirstStep: 0 },
+      ],
+      isEmpty: true,
+      freshness: null,
     });
   });
 });
@@ -226,6 +275,8 @@ describe('buildTileRenderView — heatmap', () => {
         [1, 0.5, 0.2],
         [1, null, null],
       ],
+      isEmpty: false,
+      freshness: null,
     });
   });
 
@@ -234,12 +285,12 @@ describe('buildTileRenderView — heatmap', () => {
       ok: true,
       series: [{ bucket_date: '2026-01-01', period_number: '0', retention_rate: 1 }],
     });
-    expect(view).toEqual({ kind: 'heatmap', rowLabels: ['2026-01-01'], columnLabels: ['0'], matrix: [[1]] });
+    expect(view).toEqual({ kind: 'heatmap', rowLabels: ['2026-01-01'], columnLabels: ['0'], matrix: [[1]], isEmpty: false, freshness: null });
   });
 
-  it('returns an empty matrix for no rows', () => {
+  it('returns an empty matrix for no rows, flagged isEmpty', () => {
     const view = buildTileRenderView(tile({ type: 'heatmap', metricNames: ['retention_rate'], dimensions: ['period_number'] }), { ok: true, series: [] });
-    expect(view).toEqual({ kind: 'heatmap', rowLabels: [], columnLabels: [], matrix: [] });
+    expect(view).toEqual({ kind: 'heatmap', rowLabels: [], columnLabels: [], matrix: [], isEmpty: true, freshness: null });
   });
 });
 
@@ -256,7 +307,7 @@ describe('buildTileRenderView — histogram', () => {
         ],
       },
     );
-    expect(view).toEqual({ kind: 'histogram', labels: ['1', '3', '10'], values: [1, 0, 1] });
+    expect(view).toEqual({ kind: 'histogram', labels: ['1', '3', '10'], values: [1, 0, 1], isEmpty: false, freshness: null });
   });
 
   it('sums more than one row sharing the same dimension value, rather than overwriting', () => {
@@ -270,14 +321,38 @@ describe('buildTileRenderView — histogram', () => {
         ],
       },
     );
-    expect(view).toEqual({ kind: 'histogram', labels: ['1'], values: [5] });
+    expect(view).toEqual({ kind: 'histogram', labels: ['1'], values: [5], isEmpty: false, freshness: null });
   });
 
-  it('returns an empty series for no rows', () => {
+  it('returns an empty series for no rows, flagged isEmpty', () => {
     const view = buildTileRenderView(
       tile({ type: 'histogram', metricNames: ['engagement_depth_histogram'], dimensions: ['days_active_bucket'] }),
       { ok: true, series: [] },
     );
-    expect(view).toEqual({ kind: 'histogram', labels: [], values: [] });
+    expect(view).toEqual({ kind: 'histogram', labels: [], values: [], isEmpty: true, freshness: null });
+  });
+});
+
+describe('computeTileFreshness', () => {
+  it('returns null when there is no known "as of" timestamp yet', () => {
+    expect(computeTileFreshness(null)).toBeNull();
+  });
+
+  it('marks data fresh when it is younger than the stale threshold', () => {
+    const nowMs = new Date('2026-07-12T12:00:00.000Z').getTime();
+    const asOf = new Date(nowMs - (TILE_STALE_THRESHOLD_HOURS - 1) * 60 * 60 * 1000).toISOString();
+    expect(computeTileFreshness(asOf, nowMs)).toEqual({ asOf, isStale: false });
+  });
+
+  it('marks data stale once it is at least the stale threshold old', () => {
+    const nowMs = new Date('2026-07-12T12:00:00.000Z').getTime();
+    const asOf = new Date(nowMs - TILE_STALE_THRESHOLD_HOURS * 60 * 60 * 1000).toISOString();
+    expect(computeTileFreshness(asOf, nowMs)).toEqual({ asOf, isStale: true });
+  });
+
+  it('marks data far in the past as stale', () => {
+    const nowMs = new Date('2026-07-12T12:00:00.000Z').getTime();
+    const asOf = '2026-01-01T00:00:00.000Z';
+    expect(computeTileFreshness(asOf, nowMs)).toEqual({ asOf, isStale: true });
   });
 });

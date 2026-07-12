@@ -6,6 +6,7 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTile } from '@/lib/orgs/queries';
 import { buildTileRenderView, toBoardView, type TileRenderView } from '@/lib/orgs/board-view';
+import { resolveBoardFreshness } from '@/lib/orgs/board-freshness';
 import { BoardSettingsForm } from '@/components/orgs/board-settings-form';
 import { BoardGridEditor } from '@/components/orgs/board-grid-editor';
 import { DeleteBoardButton } from '@/components/orgs/delete-board-button';
@@ -50,10 +51,14 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
     notFound();
   }
 
-  const [projects, board, metricCatalog] = await Promise.all([
+  // `freshness` (KAN-69): one project-wide badge shared by every tile on
+  // this board — see `resolveBoardFreshness`'s own doc comment for why a
+  // tile doesn't get its own per-metric freshness.
+  const [projects, board, metricCatalog, freshness] = await Promise.all([
     listOrgProjects(orgId),
     getBoard(orgId, projectId, boardId),
     listMetricsCatalogForProject(orgId, projectId),
+    resolveBoardFreshness(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project || !board) {
@@ -65,7 +70,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
   const tileOutcomes = await Promise.all(board.tiles.map((tile) => queryBoardTile(orgId, projectId, board, tile)));
   const renderViews: Record<string, TileRenderView> = {};
   board.tiles.forEach((tile, index) => {
-    renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index]);
+    renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index], freshness);
   });
 
   const t = await getTranslations('Boards');

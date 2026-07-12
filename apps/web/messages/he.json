@@ -666,6 +666,11 @@
     "heatmapCellTooltip": "{row} · {column}: {value}",
     "histogramEmpty": "אין נתונים לטווח זה עדיין.",
     "histogramAriaLabel": "היסטוגרמה",
+    "bigNumberEmpty": "אין נתונים לטווח זה עדיין.",
+    "timeSeriesEmpty": "אין נתונים לטווח זה עדיין.",
+    "funnelEmpty": "אין נתונים לטווח זה עדיין.",
+    "freshnessAsOfLabel": "הנתונים נכונים ל-{asOf}",
+    "freshnessStaleLabel": "מיושן — הנתונים נכונים ל-{asOf}",
     "tileUnavailableReason": {
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",
