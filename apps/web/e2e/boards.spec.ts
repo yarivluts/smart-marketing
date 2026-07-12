@@ -25,11 +25,12 @@ async function createOrganization(page: Page, name: string): Promise<string> {
 
 test.describe('Dashboard boards: create a board, add tiles via the grid editor, layout persists (KAN-60)', () => {
   test('an org owner builds a board with tiles and their layout survives a reload', async ({ page }) => {
-    // This flow visits more distinct, first-compile-in-this-run pages (org,
-    // project, metric catalog, boards list, board detail) than most other
-    // specs — the same "cold dev-server compile" budget `ingest-health.spec.ts`/
-    // `plugins.spec.ts` already raise their own timeout for.
-    test.setTimeout(90_000);
+    // This flow visits more distinct, first-compile-in-this-run pages (onboarding wizard, org,
+    // project, metric catalog, boards list, board detail) than most other specs — the same
+    // "cold dev-server compile" budget `ingest-health.spec.ts`/`plugins.spec.ts` already raise
+    // their own timeout for. The onboarding wizard (KAN-68) now sits in this path too, on top of
+    // the org page, since project creation lands there first.
+    test.setTimeout(120_000);
     await signUp(page, uniqueEmail('board-owner'));
     const orgId = await createOrganization(page, 'Board E2E Org');
 
