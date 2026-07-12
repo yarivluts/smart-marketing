@@ -7,7 +7,7 @@ async function loadTarget(input: AutomationBudgetChangeExecutionInput): Promise<
     organization_id: input.organizationId,
     project_id: input.projectId,
   });
-  if (!target) {
+  if (!target || target.project_id !== input.projectId) {
     throw new AutomationTargetNotFoundError(input.targetId);
   }
   return target;

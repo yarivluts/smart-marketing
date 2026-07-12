@@ -94,7 +94,7 @@ export async function ensureAutomationTargetSeeded(params: SeedAutomationTargetP
   }
 
   const existing = await AutomationTargetStateModel.init(params.targetId, { organization_id: params.organizationId, project_id: params.projectId });
-  if (existing) {
+  if (existing && existing.project_id === params.projectId) {
     return existing;
   }
 
@@ -160,7 +160,7 @@ export async function proposeAutomationBudgetChangeAction(params: ProposeAutomat
   }
 
   const target = await AutomationTargetStateModel.init(params.targetId, { organization_id: params.organizationId, project_id: params.projectId });
-  if (!target) {
+  if (!target || target.project_id !== params.projectId) {
     throw new AutomationTargetNotFoundError(params.targetId);
   }
 
@@ -453,6 +453,9 @@ export async function verifyAutomationAction(params: VerifyAutomationActionParam
   await requireStatus(action, 'executed', 'verify');
 
   const hasGuardedMetric = params.guardedMetricBefore !== undefined && params.guardedMetricAfter !== undefined;
+  if (hasGuardedMetric && (!Number.isFinite(params.guardedMetricBefore) || !Number.isFinite(params.guardedMetricAfter))) {
+    throw new InvalidAutomationActionError('guardedMetricBefore/guardedMetricAfter must be finite numbers');
+  }
   let regressionPct: number | undefined;
   if (hasGuardedMetric) {
     const guardedBefore = params.guardedMetricBefore as number;

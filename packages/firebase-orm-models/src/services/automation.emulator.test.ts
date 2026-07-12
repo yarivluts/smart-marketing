@@ -14,6 +14,7 @@ import {
   ensureUserForFirebaseSession,
   executeAutomationAction,
   getAutomationKillSwitchStatus,
+  InvalidAutomationActionError,
   listAuditLogEntriesForOrg,
   listAutomationActionsForProject,
   listAutomationTargetStatesForProject,
@@ -377,6 +378,31 @@ describe('executeAutomationAction / rollbackAutomationAction / verifyAutomationA
     expect(verified.status).toBe('verified');
     const [reloadedTarget] = await listAutomationTargetStatesForProject(organization.id, project.id);
     expect(reloadedTarget.daily_budget_usd).toBe(120);
+  });
+
+  it('rejects a non-finite guarded metric value instead of silently skipping the regression check', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Verify NaN Guard Org');
+    const target = await seedTarget(organization.id, project.id, owner.id, 100);
+    const proposed = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      afterDailyBudgetUsd: 120,
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, executedByUserId: owner.id });
+
+    await expect(
+      verifyAutomationAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        actionId: proposed.id,
+        verifiedByUserId: owner.id,
+        guardedMetricBefore: Number.NaN,
+        guardedMetricAfter: 105,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
   });
 
   it('auto-rolls back when the guarded metric regresses past the policy threshold — restoring the target’s prior budget', async () => {
