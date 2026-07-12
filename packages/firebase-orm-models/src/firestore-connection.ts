@@ -2,28 +2,14 @@ import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
 import { collection, connectFirestoreEmulator, getDocs, getFirestore } from 'firebase/firestore';
 import { FirestoreOrmRepository } from '@arbel/firebase-orm';
 
-/**
- * `firebase-admin/app` and `@arbel/firebase-orm/admin` are only reachable
- * through their packages' `exports` maps, which this package's Node10
- * (`moduleResolution: "Node"`) TypeScript setup cannot see — a static import
- * of the latter would even pull the package's raw `admin.ts` source into our
- * build. Non-literal dynamic imports below sidestep the checker and resolve
- * correctly at runtime (Node CJS `require`, Next/webpack, and vitest all
- * honour `exports` maps), with the minimal shapes we rely on typed here.
- */
-interface AdminAppLike {
-  name: string;
-}
-interface FirebaseAdminAppModule {
-  getApps: () => AdminAppLike[];
-  initializeApp: (options?: { projectId?: string }) => AdminAppLike;
-}
-interface FirebaseOrmAdminModule {
-  initializeAdminApp: (app: AdminAppLike, key?: string) => Promise<AdminAppLike>;
-}
-
-const FIREBASE_ADMIN_APP_ENTRY = 'firebase-admin/app';
-const FIREBASE_ORM_ADMIN_ENTRY = '@arbel/firebase-orm/admin';
+// Both admin subpaths below are exports-map-only, invisible to this package's
+// Node10 TS resolution — the imports type-check against local stubs mapped in
+// tsconfig `paths` (see src/types/*.d.ts), while the emitted literal
+// `require(...)` calls resolve through the real `exports` maps at runtime AND
+// stay visible to Next's standalone file tracer (a non-literal dynamic import
+// here previously left firebase-admin out of the deployed image entirely).
+import { initializeAdminApp } from '@arbel/firebase-orm/admin';
+import { getApps as getAdminApps, initializeApp as initializeAdminSdkApp } from 'firebase-admin/app';
 
 const DEFAULT_APP_NAME = 'growthos-firestore-orm';
 const WARMUP_ATTEMPTS = 20;
@@ -77,12 +63,9 @@ export async function connectFirestoreOrmAdmin(options: { projectId: string }): 
     return;
   }
 
-  const adminAppModule = (await import(FIREBASE_ADMIN_APP_ENTRY)) as FirebaseAdminAppModule;
-  const ormAdminModule = (await import(FIREBASE_ORM_ADMIN_ENTRY)) as FirebaseOrmAdminModule;
-
   const adminApp =
-    adminAppModule.getApps()[0] ?? adminAppModule.initializeApp({ projectId: options.projectId });
-  await ormAdminModule.initializeAdminApp(adminApp);
+    getAdminApps()[0] ?? initializeAdminSdkApp({ projectId: options.projectId });
+  await initializeAdminApp(adminApp);
 
   connected = true;
 }
