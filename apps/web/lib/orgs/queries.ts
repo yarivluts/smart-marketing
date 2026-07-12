@@ -81,9 +81,15 @@ import {
   listRecentWinEventsForProject as listRecentWinEventsForProjectInOrganization,
   listWinEventsSince as listWinEventsSinceInOrganization,
   activeSchemaNamesForKind,
+  getTvPairingStatus as getTvPairingStatusForOrganization,
+  listTvPairingsForProject as listTvPairingsForProjectInOrganization,
+  requireClaimedTvPairing as requireClaimedTvPairingForOrganization,
+  type TvPairingModel,
+  type TvPairingStatus,
   type WinEventModel,
   type WinRuleModel,
 } from '@growthos/firebase-orm-models';
+import type { Result } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 export async function listOrgMembers(organizationId: string): Promise<OrgMemberSummary[]> {
@@ -356,6 +362,29 @@ export async function getTrialPipelineSummary(organizationId: string, projectId:
 export async function listActiveEventSchemaNames(organizationId: string, projectId: string): Promise<string[]> {
   const schemaDefs = await listSchemaDefinitionsForProject(organizationId, projectId);
   return activeSchemaNamesForKind(schemaDefs, 'event');
+}
+
+/** Every TV paired to a project (KAN-67) — the war-room TV admin list. */
+export async function listTvPairingsForProject(organizationId: string, projectId: string): Promise<TvPairingModel[]> {
+  await ensureFirestoreOrm();
+  return listTvPairingsForProjectInOrganization(organizationId, projectId);
+}
+
+/**
+ * Resolves a TV's own device token to its current status — used by the
+ * session-less `app/api/tv-pairing/status` route (not `requireOrgPermission`,
+ * since the caller here is an unauthenticated TV browser, not a signed-in
+ * org member — see `TvPairingModel`'s own doc comment).
+ */
+export async function getTvPairingStatus(deviceToken: string): Promise<TvPairingStatus> {
+  await ensureFirestoreOrm();
+  return getTvPairingStatusForOrganization(deviceToken);
+}
+
+/** The shared guard every session-less viewer endpoint (board data, win feed) calls — see its own doc comment (`tv-pairing.service.ts`) for why "wrong token"/"not yet claimed"/"expired" all collapse to one failure. */
+export async function requireClaimedTvPairing(deviceToken: string): Promise<Result<TvPairingModel, string>> {
+  await ensureFirestoreOrm();
+  return requireClaimedTvPairingForOrganization(deviceToken);
 }
 
 export interface PendingAttachmentDetails {

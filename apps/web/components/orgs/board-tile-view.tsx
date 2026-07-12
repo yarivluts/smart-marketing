@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import type { TileRenderView, TimeSeries } from '@/lib/orgs/board-view';
-import type { BoardTileRow } from './board-types';
+import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
 
 export interface BoardTileViewProps {
   tile: BoardTileRow;
@@ -10,7 +10,6 @@ export interface BoardTileViewProps {
 }
 
 const SERIES_COLOR_CLASSES = ['bg-primary', 'bg-blue-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500', 'bg-violet-500'];
-const SERIES_STROKE_COLORS = ['var(--primary)', '#3b82f6', '#f59e0b', '#10b981', '#f43f5e', '#8b5cf6'];
 
 function formatNumber(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);

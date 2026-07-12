@@ -78,7 +78,8 @@
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
     "projectBoardsLink": "לוחות מחוונים",
-    "projectGoalsLink": "יעדים"
+    "projectGoalsLink": "יעדים",
+    "projectTvLink": "טלוויזיית חדר מלחמה"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -730,5 +731,40 @@
       "quota_exceeded": "מכסת השאילתות היומית של הפרויקט מוצתה. נסה שוב מחר.",
       "query_error": "לא ניתן היה לטעון את נתוני צינור הניסיונות. התקן את חבילת המדדים של SaaS כדי לראות אותם כאן."
     }
+  },
+  "TvPairing": {
+    "metaTitle": "טלוויזיית חדר מלחמה",
+    "title": "טלוויזיית חדר מלחמה עבור {projectName}",
+    "description": "פתח את כתובת מצב הטלוויזיה בכל טלוויזיה או דפדפן — היא תציג קוד צימוד ללא צורך בהתחברות. הזן את הקוד למטה כדי לקשר אותה ללוחות של פרויקט זה.",
+    "pairedHeading": "טלוויזיות מצומדות",
+    "noPaired": "אין עדיין טלוויזיות מצומדות לפרויקט זה.",
+    "lastSeenLabel": "נראתה לאחרונה {lastSeenAt}",
+    "neverSeenLabel": "לא נראתה מעולם",
+    "revoke": "בטל צימוד",
+    "revokeError": "לא ניתן היה לבטל את צימוד הטלוויזיה. נסה שוב.",
+    "pairHeading": "צמד טלוויזיה חדשה",
+    "noBoards": "צור לוח קודם כדי לצמד טלוויזיה.",
+    "codeLabel": "קוד צימוד",
+    "codePlaceholder": "לדוגמה: AB12CD",
+    "labelLabel": "תווית הטלוויזיה",
+    "labelPlaceholder": "לדוגמה: לובי המשרד",
+    "rotationSecondsLabel": "שניות לכל מסך",
+    "boardsLabel": "לוחות לסבב",
+    "reducedMotionLabel": "תנועה מופחתת (ביטול קונפטי)",
+    "claimButton": "צמד טלוויזיה",
+    "claimError": "לא ניתן היה לצמד את הטלוויזיה. בדוק את הקוד ונסה שוב.",
+    "claimErrorInvalidCode": "קוד הצימוד אינו תקף, פג תוקפו, או שכבר נעשה בו שימוש. בקש מהטלוויזיה להציג קוד חדש."
+  },
+  "TvMode": {
+    "metaTitle": "חדר מלחמה",
+    "loading": "טוען…",
+    "pairingHeading": "צמד טלוויזיה זו",
+    "pairingCodeAriaLabel": "קוד צימוד {code}",
+    "pairingInstructions": "ב-GrowthOS, פתח את דף טלוויזיית חדר המלחמה של הפרויקט והזן קוד זה.",
+    "pairingError": "משהו השתבש. אנא רענן דף זה.",
+    "noFrames": "לטלוויזיה זו אין עדיין לוחות או יעדים להצגה.",
+    "loadingBoard": "טוען לוח…",
+    "goalsFrameHeading": "יעדים",
+    "winOverlayHeading": "ניצחון חדש!"
   }
 }
