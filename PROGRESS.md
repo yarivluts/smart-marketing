@@ -17,6 +17,81 @@ Template for each entry:
 
 ---
 
+## 2026-07-12 — E13.3 Alpha feedback instrumentation (KAN-70): collision with a parallel run, independently reviewed + merged
+
+- **Last completed:**
+  - Read `PROGRESS.md` + `TASKS.md` per the standing rule; the prior entry's own "next step" pointed
+    at **KAN-70** (alpha feedback instrumentation: dogfood our own funnel via our Ingest API),
+    sprint-7, no blocker. Checked for a parallel-run collision first (this file's now-established
+    habit) — found **PR #58**, opened minutes earlier by a parallel run, already implementing KAN-70
+    end to end. Rather than duplicate the work, treated this the same way this file's history treats
+    every other same-story collision (KAN-59/60/61/65/66/67): independently reviewed and merged
+    the existing PR instead of re-implementing.
+  - **Independent review of PR #58:**
+    - Read the full diff. New `packages/shared/src/product-analytics` (`ACTIVATION_FUNNEL_STEPS`,
+      `buildActivationEventPayload`) + `packages/firebase-orm-models`'s `product-analytics.service.ts`
+      (`ensureProductAnalyticsProject` — idempotent bootstrap of an internal "GrowthOS Internal" org/
+      "Product Analytics" project/`prod` environment + the activation-event schema;
+      `recordActivationEvent` — fires one event through the exact same `ingestBatch` function
+      `POST /v1/ingest/events` calls, config-gated on `GROWTHOS_PRODUCT_ANALYTICS_OWNER_USER_ID` and
+      best-effort/non-throwing so a broken dogfood pipeline can never fail a design partner's own
+      onboarding action). Wired into all five KAN-68 onboarding-wizard steps.
+    - Verified the call sites against their real signatures (`createOrganizationWithOwner`'s optional
+      `slug` param, `ingestBatch`'s `{organizationId, projectId, environmentId, input}` shape) — both
+      match exactly, no drift between the PR's usage and current `main`.
+    - No raw Firebase SDK usage (all access via `@growthos/firebase-orm-models`), no UI added so no
+      hard-coded-string/Hebrew/admin-surface concerns apply — the internal analytics project is just
+      an ordinary project once bootstrapped, so every existing admin surface (ingest health, schema
+      registry, boards) already works against it, same "reuse what exists" posture KAN-68 took.
+    - Found no correctness bugs, no missing test coverage, no reuse/simplification issues — this PR
+      had already been through its own self-review (a second commit specifically documenting the
+      internal-org bootstrap's non-transactional find-or-create race, the same accepted tradeoff
+      `registerSchemaDefinition`/`getOrCreateOnboardingState` already carry).
+  - **Independently re-verified green** by fetching the PR branch into a scratch `git worktree`
+    (rather than trusting the PR description's own claims) and running the full local pipeline: CI's
+    own check (`lint · typecheck · test · build`) was already green on GitHub; `pnpm lint` and
+    `pnpm typecheck` green across all 7 packages; `pnpm test` green — 590/590 in
+    `packages/firebase-orm-models` (incl. the new `product-analytics.emulator.test.ts`, which lands
+    exactly one activation event per funnel step into the internal project and confirms it stays
+    isolated from the design partner's own org/project) and 312/312 in `packages/shared`
+    (incl. `build-activation-event.test.ts`); `pnpm build` green (this sandbox's local `pnpm build`
+    needed `PIP_CERT=/root/.ccr/ca-bundle.crt` for `packages/dbt-transform`'s pip-based venv
+    provisioning step to get past a self-signed-cert error against this sandbox's proxy — a local
+    verification-environment quirk unrelated to the PR's own diff, which never touches
+    `dbt-transform`; the real CI run needed no such workaround and was green on its own).
+  - Squash-merged PR #58 into `main` (`03f00a9`). Remote branch deletion failed with the same
+    documented HTTP 403 as every prior feature branch in this sandbox.
+  - `TASKS.md` updated to `done` for KAN-70.
+- **In progress (exact stopping point):** none — KAN-70 is fully delivered, independently reviewed,
+  verified green from scratch, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** KAN-70 was the last sprint-7 `todo`. The remaining `todo` stories (**KAN-71**
+  through **KAN-78**) are all Phase 3 with no sprint assigned yet (`sprint: -` in `TASKS.md`) — the
+  next run should treat them as the next unblocked batch in table order (KAN-71 first: E21.1
+  automation-service action pipeline), checking for a parallel-run collision before starting, same
+  as this entry and the last several before it. These are a materially bigger scope jump than
+  sprint-0/1 stories (dry-run diff -> approval -> execute -> verify -> rollback, a guardrail policy
+  engine, a kill switch) — worth budgeting more than one run if KAN-71 doesn't fit cleanly in one.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`, opened by a separate concurrent run against a real deployed-
+    image bug) is still open and untouched by this run — out of scope for KAN-70, flagged here so
+    the next run doesn't lose track of it.
+  - New this run: `apps/web/repro-tmp.mjs` (a debug script with hardcoded test credentials for a
+    `claude-e2e-test@example.com` account, added by the unrelated already-merged PR #47) is still
+    sitting in `main`'s working tree — looks like a forgotten scratch file rather than something
+    intentionally kept; worth a human or a future run's judgment call on deleting it, since it's out
+    of scope for KAN-70's own diff and this run didn't want to make an unreviewed unrelated change
+    while merging someone else's PR.
+  - Optional: investigate why `origin` branch deletion fails from this environment (repo hygiene
+    only, still outstanding).
+
+---
+
 ## 2026-07-12 — E13.2 Freshness badges + degraded-state UX (KAN-69): no collision, delivered end to end
 
 - **Last completed:**
