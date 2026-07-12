@@ -92,6 +92,11 @@ import {
   type SchemaFieldInput,
   type SharedCredentialModel,
   type TrackingAlertCheckResult,
+  claimTvPairing as claimTvPairingInOrganization,
+  requestTvPairing as requestTvPairingInOrganization,
+  revokeTvPairing as revokeTvPairingInOrganization,
+  type RequestTvPairingResult,
+  type TvPairingModel,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
@@ -751,4 +756,36 @@ export async function deleteWinRule(
 ): Promise<void> {
   await ensureFirestoreOrm();
   return deleteWinRuleInOrganization(organizationId, projectId, winRuleId, deletedByUserId);
+}
+
+/** A brand-new, unclaimed TV pairing (KAN-67) — called from the fully public `app/api/tv-pairing` route, not `requireOrgPermission`, since the caller is an anonymous TV browser with no org context yet. */
+export async function requestTvPairing(): Promise<RequestTvPairingResult> {
+  await ensureFirestoreOrm();
+  return requestTvPairingInOrganization();
+}
+
+export interface ClaimTvPairingInput {
+  organizationId: string;
+  projectId: string;
+  code: string;
+  boardIds: string[];
+  rotationSeconds: number;
+  reducedMotion: boolean;
+  label: string;
+  claimedByUserId: string;
+}
+
+export async function claimTvPairing(input: ClaimTvPairingInput): Promise<TvPairingModel> {
+  await ensureFirestoreOrm();
+  return claimTvPairingInOrganization(input);
+}
+
+export async function revokeTvPairing(
+  organizationId: string,
+  projectId: string,
+  pairingId: string,
+  revokedByUserId: string,
+): Promise<TvPairingModel> {
+  await ensureFirestoreOrm();
+  return revokeTvPairingInOrganization({ organizationId, projectId, pairingId, revokedByUserId });
 }

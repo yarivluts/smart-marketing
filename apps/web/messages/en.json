@@ -78,7 +78,8 @@
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
     "projectBoardsLink": "Boards",
-    "projectGoalsLink": "Goals"
+    "projectGoalsLink": "Goals",
+    "projectTvLink": "War-room TV"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -730,5 +731,39 @@
       "quota_exceeded": "This project's daily query quota is exhausted. Try again tomorrow.",
       "query_error": "Couldn't load trial pipeline data. Install the SaaS metric pack to see it here."
     }
+  },
+  "TvPairing": {
+    "metaTitle": "War-room TV",
+    "title": "War-room TV for {projectName}",
+    "description": "Open the TV mode URL on any TV or browser — it will display a pairing code with no login required. Enter that code below to link it to this project's boards.",
+    "pairedHeading": "Paired TVs",
+    "noPaired": "No TVs are paired to this project yet.",
+    "lastSeenLabel": "Last seen {lastSeenAt}",
+    "neverSeenLabel": "Never seen",
+    "revoke": "Unpair",
+    "revokeError": "Could not unpair this TV. Please try again.",
+    "pairHeading": "Pair a new TV",
+    "noBoards": "Create a board first to pair a TV.",
+    "codeLabel": "Pairing code",
+    "codePlaceholder": "e.g. AB12CD",
+    "labelLabel": "TV label",
+    "labelPlaceholder": "e.g. Office lobby",
+    "rotationSecondsLabel": "Seconds per frame",
+    "boardsLabel": "Boards to rotate through",
+    "reducedMotionLabel": "Reduced motion (disable confetti)",
+    "claimButton": "Pair TV",
+    "claimError": "Could not pair this TV. Check the code and try again."
+  },
+  "TvMode": {
+    "metaTitle": "War room",
+    "loading": "Loading…",
+    "pairingHeading": "Pair this TV",
+    "pairingCodeAriaLabel": "Pairing code {code}",
+    "pairingInstructions": "In GrowthOS, open this project's War-room TV page and enter this code.",
+    "pairingError": "Something went wrong. Please reload this page.",
+    "noFrames": "This TV has no boards or goals to show yet.",
+    "loadingBoard": "Loading board…",
+    "goalsFrameHeading": "Goals",
+    "winOverlayHeading": "New win!"
   }
 }

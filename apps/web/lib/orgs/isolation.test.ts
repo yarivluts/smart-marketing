@@ -22,6 +22,7 @@ import { GET as listAuditLog } from '@/app/api/orgs/[orgId]/audit-log/route';
 import { GET as listBoards, POST as createBoard } from '@/app/api/orgs/[orgId]/projects/[projectId]/boards/route';
 import { DELETE as deleteBoard, PATCH as patchBoard } from '@/app/api/orgs/[orgId]/projects/[projectId]/boards/[boardId]/route';
 import { PUT as saveBoardTiles } from '@/app/api/orgs/[orgId]/projects/[projectId]/boards/[boardId]/tiles/route';
+import { GET as listTvPairings, POST as claimTvPairingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/tv-pairing/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -585,6 +586,35 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
     await expectIndistinguishable(
       () => saveBoardTiles(tilesRequestFor(orgB.id), { params: params(orgB.id) }),
       () => saveBoardTiles(tilesRequestFor(FAKE_ORG_ID), { params: params(FAKE_ORG_ID) }),
+    );
+  });
+
+  it('GET/POST /api/orgs/[orgId]/projects/[projectId]/tv-pairing: org caller cannot see vs. fake org id (KAN-67)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-tv-pairing-caller'));
+    const caller = await ensureUserForFirebaseSession({ firebaseUid: callerSession.uid, email: callerSession.email as string });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (tv-pairing)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-tv-pairing-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (tv-pairing)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const getRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/tv-pairing`);
+    await expectIndistinguishable(
+      () => listTvPairings(getRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () => listTvPairings(getRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }) }),
+    );
+
+    const postRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/tv-pairing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: 'ABCDEF', boardIds: ['b'], rotationSeconds: 30, reducedMotion: false, label: 'leaked' }),
+      });
+    await expectIndistinguishable(
+      () => claimTvPairingRoute(postRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () => claimTvPairingRoute(postRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }) }),
     );
   });
 });
