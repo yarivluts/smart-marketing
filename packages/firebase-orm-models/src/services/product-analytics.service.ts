@@ -104,6 +104,13 @@ async function ensureActivationSchemaRegistered(
  * until a human designates a real staff account to own it. Doesn't check that the configured owner id
  * actually resolves to a `UserModel` — same accepted tradeoff `createOrganizationWithOwner` already
  * documents for `ownerUserId`.
+ *
+ * Not transactional: two concurrent callers can both pass the "does the internal org/project already
+ * exist" check before either writes, producing two `growthos-internal`-slugged orgs (or two "Product
+ * Analytics" projects within one). This can only happen once, in the narrow window before the very
+ * first bootstrap completes in a given Firestore instance — the same accepted, documented tradeoff
+ * `registerSchemaDefinition`/`getOrCreateOnboardingState` already carry for their own singleton
+ * find-or-create races.
  */
 export async function ensureProductAnalyticsProject(
   env: NodeJS.ProcessEnv = process.env,
