@@ -18,3 +18,4 @@ export * from './funnel-suggestion';
 export * from './goals';
 export * from './win-rules';
 export * from './product-analytics';
+export * from './automation-guardrails';

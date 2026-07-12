@@ -58,6 +58,8 @@ export type {
   MappingSuggestion,
   WinRuleFilter,
   WinRuleFilterOperator,
+  GuardrailViolation,
+  GuardrailViolationType,
 } from '@growthos/shared';
 export * from './models/user.model';
 export * from './models/organization.model';
@@ -95,6 +97,10 @@ export * from './models/win-rule.model';
 export * from './models/win-event.model';
 export * from './models/tv-pairing.model';
 export * from './models/onboarding-state.model';
+export * from './models/automation-guardrail-policy.model';
+export * from './models/automation-kill-switch-event.model';
+export * from './models/automation-target-state.model';
+export * from './models/automation-action.model';
 export * from './firestore-connection';
 export * from './services/membership.service';
 export * from './services/user.service';
@@ -138,3 +144,7 @@ export * from './rate-limit';
 export * from './warehouse';
 export * from './orchestration';
 export * from './plugin-runtime';
+export * from './services/automation-guardrail.service';
+export * from './services/automation-kill-switch.service';
+export * from './services/automation.service';
+export * from './automation-runtime';
