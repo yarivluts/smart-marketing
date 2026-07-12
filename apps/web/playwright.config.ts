@@ -16,7 +16,12 @@ const sandboxChromiumExecutable = existsSync(SANDBOX_CHROMIUM_PATH) ? SANDBOX_CH
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
+  // The onboarding wizard (KAN-68) now sits between "create a project" and the org page for every
+  // spec that creates a project through the UI — one more first-compile-in-this-run page in a hot
+  // path most specs already exercise, on top of the "cold dev-server compile" budget individual
+  // specs already raise their own `test.setTimeout` for. Bumped from the original 30s to absorb
+  // that one extra compile across the whole suite rather than patching every affected spec file.
+  timeout: 45_000,
   fullyParallel: false,
   workers: 1,
   retries: 1,

@@ -25,19 +25,22 @@ async function createOrganization(page: Page, name: string): Promise<string> {
 
 test.describe('Dashboard boards: create a board, add tiles via the grid editor, layout persists (KAN-60)', () => {
   test('an org owner builds a board with tiles and their layout survives a reload', async ({ page }) => {
-    // This flow visits more distinct, first-compile-in-this-run pages (org,
-    // project, metric catalog, boards list, board detail) than most other
-    // specs — the same "cold dev-server compile" budget `ingest-health.spec.ts`/
-    // `plugins.spec.ts` already raise their own timeout for.
-    test.setTimeout(90_000);
+    // This flow visits more distinct, first-compile-in-this-run pages (onboarding wizard, org,
+    // project, metric catalog, boards list, board detail) than most other specs — the same
+    // "cold dev-server compile" budget `ingest-health.spec.ts`/`plugins.spec.ts` already raise
+    // their own timeout for. The onboarding wizard (KAN-68) now sits in this path too, on top of
+    // the org page, since project creation lands there first.
+    test.setTimeout(120_000);
     await signUp(page, uniqueEmail('board-owner'));
     const orgId = await createOrganization(page, 'Board E2E Org');
 
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}\\?project=`));
-    const projectId = new URL(page.url()).searchParams.get('project')!;
+    // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    const projectId = page.url().split('/').slice(-2)[0];
+    await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     // A board's tile picker only offers registered, active metrics — register one first.
     await page.getByRole('link', { name: 'Metric catalog' }).click();

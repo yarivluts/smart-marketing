@@ -4,6 +4,7 @@ import {
   getBoard as getBoardInOrganization,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getGoal as getGoalInOrganization,
+  getOnboardingState as getOnboardingStateInOrganization,
   getProjectCostQuota as getProjectCostQuotaInOrganization,
   getTrialPipelineSummary as getTrialPipelineSummaryInOrganization,
   listTrackingAlertsForProject as listTrackingAlertsForProjectInOrganization,
@@ -34,6 +35,7 @@ import {
   listOrchestrationRunsForProject as listOrchestrationRunsForProjectInOrganization,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
+  listOnboardingMetricPacks,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
   listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
@@ -46,6 +48,7 @@ import {
   listSharedCredentials as listSharedCredentialsInOrganization,
   MembershipModel,
   OrganizationModel,
+  proposeOnboardingFunnelSteps as proposeOnboardingFunnelStepsInOrganization,
   queryBoardTile as queryBoardTileInOrganization,
   queryGoalProgress as queryGoalProgressInOrganization,
   UserModel,
@@ -57,6 +60,7 @@ import {
   type MembershipStatus,
   type MetricCatalogEntry,
   type MetricDefModel,
+  type OnboardingStateModel,
   type OrchestrationRunModel,
   type OrgMemberSummary,
   type OrgPersonModel,
@@ -89,7 +93,7 @@ import {
   type WinEventModel,
   type WinRuleModel,
 } from '@growthos/firebase-orm-models';
-import type { Result } from '@growthos/shared';
+import type { FunnelStepSuggestion, Result } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 export async function listOrgMembers(organizationId: string): Promise<OrgMemberSummary[]> {
@@ -362,6 +366,23 @@ export async function getTrialPipelineSummary(organizationId: string, projectId:
 export async function listActiveEventSchemaNames(organizationId: string, projectId: string): Promise<string[]> {
   const schemaDefs = await listSchemaDefinitionsForProject(organizationId, projectId);
   return activeSchemaNamesForKind(schemaDefs, 'event');
+}
+
+/** A project's onboarding-wizard state (KAN-68), or `null` if the wizard has never been opened for it. */
+export async function getOnboardingState(organizationId: string, projectId: string): Promise<OnboardingStateModel | null> {
+  await ensureFirestoreOrm();
+  return getOnboardingStateInOrganization(organizationId, projectId);
+}
+
+/** The built-in metric packs the onboarding wizard's "pick a vertical" step offers — a pure catalog, no Firestore read needed. */
+export function onboardingMetricPacks(): ReturnType<typeof listOnboardingMetricPacks> {
+  return listOnboardingMetricPacks();
+}
+
+/** An AI-proposed funnel step order for a project's already-registered event schemas (KAN-68 AC). */
+export async function proposeOnboardingFunnelSteps(organizationId: string, projectId: string): Promise<FunnelStepSuggestion[]> {
+  await ensureFirestoreOrm();
+  return proposeOnboardingFunnelStepsInOrganization(organizationId, projectId);
 }
 
 /** Every TV paired to a project (KAN-67) — the war-room TV admin list. */

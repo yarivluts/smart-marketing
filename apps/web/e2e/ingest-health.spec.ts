@@ -40,8 +40,10 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}\\?project=`));
-    const projectId = new URL(page.url()).searchParams.get('project')!;
+    // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    const projectId = page.url().split('/').slice(-2)[0];
+    await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     await seedIngestFixture({ organizationId: orgId, projectId, ownerEmail: email });
 
@@ -91,6 +93,10 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
+    // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page — this
+    // project is the org's only one, so the org page defaults its switcher to it without a `?project=`.
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await page.goto(`/en/orgs/${orgId}`);
 
     await page.getByRole('link', { name: 'Ingest health' }).click();
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();

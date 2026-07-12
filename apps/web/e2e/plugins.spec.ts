@@ -51,7 +51,9 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}\\?project=`));
+    // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    await page.goto(`/en/orgs/${orgId}`);
 
     await page.getByRole('link', { name: 'Plugin registry' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/plugins$`));
