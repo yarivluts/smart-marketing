@@ -40,6 +40,7 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
     const projectId = page.url().split('/').slice(-2)[0];
+    await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     // A board's tile picker only offers registered, active metrics — register one first.
     await page.getByRole('link', { name: 'Metric catalog' }).click();
