@@ -17,6 +17,102 @@ Template for each entry:
 
 ---
 
+## 2026-07-12 — E13.1 Onboarding wizard (KAN-68): no collision, delivered end to end
+
+- **Last completed:**
+  - Picked **KAN-68** (onboarding wizard: org/project -> pack pick -> connect sources or
+    push-your-own -> AI-proposed funnel mapping -> starter board) as the next unblocked task per
+    the prior entry's own recommendation. Checked for a parallel-run collision first (this file's
+    now-established habit) — no open PR existed for this story, so implemented it directly.
+  - Delivered as **PR #56**, built almost entirely by orchestrating existing infrastructure rather
+    than adding new machinery:
+    1. **Pick a vertical/metric pack** — `packages/firebase-orm-models/src/services/
+       onboarding.service.ts`'s `selectOnboardingMetricPack` registers the built-in SaaS/Marketing
+       or Engagement pack's manifest (if not already registered) and installs it via the existing
+       `installPluginAndProvisionBuiltins` (KAN-59/61/63) — the exact same call the org/project
+       plugin pages already use, which registers the pack's metrics and seeds its starter boards
+       in one step. `custom` records the selection and skips installing anything.
+    2. **Connect a first source** — reuses `InstallPluginForm` (filtered to `source`-type
+       manifests) and `CreateApiKeyForm` ("push your own data") verbatim, embedded directly in the
+       wizard page rather than re-implemented; a small "Continue" action records *how* the source
+       was connected once the page's own server-side detection (an active source install, or a
+       live `ingest.write` key) confirms it.
+    3. **AI-proposed funnel mapping** — new `packages/shared/src/funnel-suggestion`
+       (`proposeFunnelSteps`): a deterministic keyword heuristic over the project's registered
+       event schema names, weighting a match on an event name's *last* token (its "verb") over an
+       earlier one — the same "buildable-today stand-in for a real LLM call" posture
+       `suggestFieldMappingRules` (KAN-55) already established. The review UI lets the human
+       reorder/recategorize/exclude any proposed step before confirming.
+    4. **Starter board** — the final wizard screen links to the pack's seeded boards plus CTAs to
+       invite the team (KAN-25), set a goal (KAN-64), and turn on the war room (KAN-67) — each its
+       own existing surface. `OnboardingStateModel`'s own doc comment explains why this folds plan
+       `10 §2.6` step 5 into the `board` step rather than a separate `invite` step: nothing about
+       that step needs its own persisted state.
+    - New `OnboardingStateModel` (a per-project singleton wizard-progress doc, queried by
+      `project_id` rather than a fixed doc id) tracks furthest-step-reached, the pack/source
+      choice, and the confirmed funnel — giving the AC's own "< 30 min" time-to-value a concrete
+      `started_at`/`completed_at` to eventually measure against.
+    - `CreateProjectForm` now redirects straight into `.../onboarding` instead of the org page.
+  - **Self-review found and fixed real issues** before merge:
+    1. Updating the project-creation redirect broke the "land on the org page" assumption baked
+       into **eleven** other e2e specs (every one of them creates a project via the UI as their
+       first step) — each needed a `page.goto` back to the org page inserted after the new
+       onboarding-wizard URL assertion. Caught by actually running the full suite, not just this
+       story's own new spec.
+    2. One of those eleven fixes (`boards.spec.ts`) was itself missing that `page.goto` call —
+       found because the test then hung waiting for a link that only exists on the org page, not
+       the wizard, until it timed out even after a retry. A genuine bug in the fix, not
+       environment flakiness — confirmed by tracing the exact locator Playwright was stuck on.
+    3. The wizard now sits as one more first-compile-in-this-run page in front of every
+       project-creation e2e flow; `boards.spec.ts`'s own already-tight multi-page budget needed a
+       further bump (90s -> 120s) and the suite-wide default (`playwright.config.ts`) needed a
+       smaller one (30s -> 45s) to absorb it everywhere else.
+    4. A new funnel-route test registered a schema with `fields: []`, which `registerSchemaDefinition`
+       correctly rejects ("must declare at least one field") — a test bug, not a service bug.
+    5. Five new client components and the state view mapper were missing their own unit tests —
+       this codebase's established 1:1 convention (confirmed against `revoke-api-key-button.test.tsx`/
+       `goal-view.test.ts` as templates) — added all six.
+    - No other correctness bugs, missing-test gaps, or reuse/simplification issues survived the
+      review; CLAUDE.md compliance (Firestore only via `@growthos/firebase-orm-models`, no
+      hard-coded UI strings, no Hebrew outside message JSON, matching en/he keys, an admin surface
+      for the new wizard state) held as delivered.
+  - One environment-only wrinkle, not a code issue: `packages/dbt-transform`'s pip install hit
+    this sandbox's documented TLS-proxy self-signed-cert issue on the first full-suite run —
+    resolved by exporting `PIP_CERT=/root/.ccr/ca-bundle.crt` for the verification commands (see
+    `/root/.ccr/README.md`), no code change needed. A `keys.spec.ts` e2e failure during one
+    concurrent full-suite run (this sandbox was running several emulator-heavy processes at once)
+    passed cleanly when re-run in isolation — the same class of load-induced flake this file has
+    documented repeatedly, not a regression.
+  - Final green run (isolated, no concurrent contention): `pnpm lint`/`pnpm typecheck`/`pnpm build`
+    across all packages; `pnpm test` — `packages/shared` (new `funnel-suggestion` suite),
+    `packages/firebase-orm-models` (new `onboarding.emulator.test.ts` + full existing suite),
+    `apps/api`, `packages/dbt-transform`, `apps/web` (795 unit tests + new onboarding API route
+    tests + the full Playwright e2e suite including a new `onboarding.spec.ts` walking the whole
+    wizard end to end). CI (`lint · typecheck · test · build`) passed on PR #56; squash-merged into
+    `main`. Remote branch deletion failed with the same documented HTTP 403 as every prior feature
+    branch.
+  - `TASKS.md` updated to `done` for KAN-68.
+- **In progress (exact stopping point):** none — KAN-68 is fully delivered, tested, self-reviewed
+  (with real fixes applied), and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked `todo` in sprint order is **KAN-69** (freshness badges/degraded-state
+  UX) or **KAN-70** (alpha feedback instrumentation), both sprint-7 with no blocker. Check for a
+  parallel-run collision before starting new implementation work, same as this entry and the last
+  several before it.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`, opened by a separate concurrent run against a real deployed-
+    image bug) is still open and untouched by this run — out of scope for KAN-68, flagged here so
+    the next run doesn't lose track of it.
+  - Optional: investigate why `origin` branch deletion fails from this environment (still
+    outstanding, repo hygiene only).
+
+---
+
 ## 2026-07-12 — E12.3 War-room TV mode (KAN-67): parallel-run collision, reviewed, fixed, reconciled
 
 - **Last completed:**
