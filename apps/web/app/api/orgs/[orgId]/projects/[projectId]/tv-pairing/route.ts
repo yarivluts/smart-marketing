@@ -5,6 +5,7 @@ import { listTvPairingsForProject } from '@/lib/orgs/queries';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseClaimTvPairingRequestBody } from '@/lib/orgs/parse-tv-pairing-fields';
 import { toTvPairingSummaryView } from '@/lib/orgs/tv-pairing-view';
+import { checkClaimPairingRateLimit } from '@/lib/orgs/tv-pairing-rate-limit';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string }>;
@@ -29,12 +30,25 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
   }
 }
 
-/** Redeems a pairing code a TV is currently displaying (KAN-67 AC: "device pairing code"), scoping it to this project and the board(s)/rotation settings the admin chose. */
+/**
+ * Redeems a pairing code a TV is currently displaying (KAN-67 AC: "device
+ * pairing code"), scoping it to this project and the board(s)/rotation
+ * settings the admin chose. The 6-character human code has a small enough
+ * keyspace that an unthrottled caller could script guesses within its TTL —
+ * `checkClaimPairingRateLimit` throttles attempts per authenticated caller
+ * (on top of the code's own short expiry) the same way `ApiKeyAuthGuard`
+ * throttles per API key for KAN-34.
+ */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
   const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
   if (error) {
     return error;
+  }
+
+  const rateLimited = checkClaimPairingRateLimit(user.id);
+  if (rateLimited) {
+    return rateLimited;
   }
 
   const parsed = await parseClaimTvPairingRequestBody(request);

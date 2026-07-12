@@ -22,7 +22,16 @@ const CHIME_SEQUENCES: Record<WinType, number[]> = {
 const NOTE_DURATION_SECONDS = 0.18;
 const NOTE_GAP_SECONDS = 0.05;
 
-/** One process-wide `AudioContext`, created lazily on first use — browsers require a user gesture before audio can play, and the pairing screen's own "press to pair"/fullscreen affordance (see `tv-app.tsx`) provides that gesture before any win could plausibly fire. */
+/**
+ * One process-wide `AudioContext`, created lazily on first use. Note: browsers suspend a freshly
+ * created `AudioContext` until a user-activation event occurs on the document, and nothing in this
+ * feature's flow (an unattended TV screen showing a pairing code, then a rotation) ever produces
+ * one — a real deployment needs to either launch the kiosk browser with autoplay restrictions
+ * disabled (e.g. Chromium's `--autoplay-policy=no-user-gesture-required`, the standard approach for
+ * digital-signage kiosks) or accept that the chime stays silent until some other interaction with
+ * the page happens. `playWinChime` below still attempts `resume()` on every call so it self-heals
+ * the moment the browser does allow it, but this in itself is not a fix for the unattended case.
+ */
 let sharedAudioContext: AudioContext | null = null;
 
 function getAudioContext(): AudioContext | null {
@@ -47,6 +56,9 @@ export function playWinChime(winType: WinType): void {
     return;
   }
   try {
+    if (context.state === 'suspended' && typeof context.resume === 'function') {
+      void context.resume();
+    }
     const notes = CHIME_SEQUENCES[winType] ?? CHIME_SEQUENCES.generic;
     let startTime = context.currentTime;
     for (const frequency of notes) {

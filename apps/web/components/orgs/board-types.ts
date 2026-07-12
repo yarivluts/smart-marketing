@@ -21,7 +21,7 @@ export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel',
 export type BoardTileTypeRow = (typeof BOARD_TILE_TYPES)[number];
 
 /** The one series/category color palette shared across every chart-ish surface in this codebase — board tiles (`board-tile-view.tsx`) and the war-room's confetti burst (`components/tv/confetti-burst.tsx`) both draw from this single array so a future palette change (rebrand, accessibility-driven color swap) only has one place to edit. */
-export const SERIES_STROKE_COLORS = ['var(--primary)', '#3b82f6', '#f59e0b', '#10b981', '#f43f5e', '#8b5cf6'];
+export const SERIES_STROKE_COLORS = ['hsl(var(--primary))', '#3b82f6', '#f59e0b', '#10b981', '#f43f5e', '#8b5cf6'];
 
 export const BOARD_GRID_COLUMNS = 12;
 

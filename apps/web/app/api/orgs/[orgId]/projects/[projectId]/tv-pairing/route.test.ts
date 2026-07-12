@@ -134,6 +134,26 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/tv-pairing', () => {
     expect((await response.json()).error).toBe('invalid_tv_pairing');
   });
 
+  it('returns 429 with a Retry-After header once the same caller exhausts the claim-attempt bucket', async () => {
+    const { ownerSession, organization, project, board } = await setupOrgProjectBoard('TV Pairing Claim Rate Limit Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    let lastResponse: Awaited<ReturnType<typeof POST>> | null = null;
+    for (let i = 0; i < 25 && (!lastResponse || lastResponse.status !== 429); i += 1) {
+      const { request, params } = tvPairingRequest(organization.id, project.id, {
+        code: 'ZZZZZZ',
+        boardIds: [board.id],
+        rotationSeconds: 30,
+        reducedMotion: false,
+        label: 'Office TV',
+      });
+      lastResponse = await POST(request, { params });
+    }
+
+    expect(lastResponse!.status).toBe(429);
+    expect(lastResponse!.headers.get('Retry-After')).toEqual(expect.any(String));
+  });
+
   it('claims a real pairing code, then lists it', async () => {
     const { ownerSession, organization, project, board } = await setupOrgProjectBoard('TV Pairing Claim Org');
     const { code } = await requestTvPairing();
