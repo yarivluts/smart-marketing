@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { TvRotationScreen } from './tv-rotation-screen';
 import type { TvBoardFrame, TvRotationManifest } from '@/lib/tv/tv-client';
@@ -50,6 +50,14 @@ function renderScreen(manifest: TvRotationManifest): void {
   );
 }
 
+/** Flushes pending microtasks (a mocked fetch's own promise resolution plus React's resulting state update) without relying on `@testing-library/react`'s `waitFor` — `waitFor` polls via real timers internally, which never fire once `vi.useFakeTimers()` is active, so it would just hang until the test's own real-wall-clock timeout. */
+async function flushMicrotasks(): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 describe('TvRotationScreen (KAN-67)', () => {
   beforeEach(() => {
     vi.stubGlobal('EventSource', FakeEventSource);
@@ -65,31 +73,33 @@ describe('TvRotationScreen (KAN-67)', () => {
   it('fetches and renders the current board frame', async () => {
     vi.mocked(fetchTvBoardFrame).mockResolvedValue(BOARD_FRAME_A);
     renderScreen(manifestWith({}));
+    await flushMicrotasks();
 
-    await waitFor(() => expect(screen.getByText('Signups')).toBeInTheDocument());
+    expect(screen.getByText('Signups')).toBeInTheDocument();
     expect(fetchTvBoardFrame).toHaveBeenCalledWith('device-token-1', 'board-1');
   });
 
   it('rotates to the next board after rotationSeconds and fetches its data', async () => {
     vi.mocked(fetchTvBoardFrame).mockResolvedValueOnce(BOARD_FRAME_A).mockResolvedValueOnce(BOARD_FRAME_B);
     renderScreen(manifestWith({ boards: [{ id: 'board-1', name: 'Marketing' }, { id: 'board-2', name: 'Revenue' }] }));
-
-    await waitFor(() => expect(screen.getByText('Signups')).toBeInTheDocument());
+    await flushMicrotasks();
+    expect(screen.getByText('Signups')).toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(10_000);
-      await Promise.resolve();
     });
+    await flushMicrotasks();
 
-    await waitFor(() => expect(screen.getByText('MRR')).toBeInTheDocument());
+    expect(screen.getByText('MRR')).toBeInTheDocument();
     expect(fetchTvBoardFrame).toHaveBeenCalledWith('device-token-1', 'board-2');
   });
 
   it('a single-board TV (no goals) retries automatically after a failed fetch, instead of staying stuck on "loading" forever', async () => {
     vi.mocked(fetchTvBoardFrame).mockRejectedValueOnce(new Error('network blip')).mockResolvedValueOnce(BOARD_FRAME_A);
     renderScreen(manifestWith({}));
+    await flushMicrotasks();
 
-    await waitFor(() => expect(fetchTvBoardFrame).toHaveBeenCalledTimes(1));
+    expect(fetchTvBoardFrame).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Loading board…')).toBeInTheDocument();
 
     // The rotation timer still ticks even with only one frame — this is the
@@ -98,23 +108,23 @@ describe('TvRotationScreen (KAN-67)', () => {
     // failed fetch, since the frame's own identity never changes.
     await act(async () => {
       vi.advanceTimersByTime(10_000);
-      await Promise.resolve();
     });
+    await flushMicrotasks();
 
-    await waitFor(() => expect(fetchTvBoardFrame).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.getByText('Signups')).toBeInTheDocument());
+    expect(fetchTvBoardFrame).toHaveBeenCalledTimes(2);
+    expect(screen.getByText('Signups')).toBeInTheDocument();
   });
 
   it('refreshing the same board on a later rotation tick does not flash back to the loading state', async () => {
     vi.mocked(fetchTvBoardFrame).mockResolvedValue(BOARD_FRAME_A);
     renderScreen(manifestWith({}));
-
-    await waitFor(() => expect(screen.getByText('Signups')).toBeInTheDocument());
+    await flushMicrotasks();
+    expect(screen.getByText('Signups')).toBeInTheDocument();
 
     await act(async () => {
       vi.advanceTimersByTime(10_000);
-      await Promise.resolve();
     });
+    await flushMicrotasks();
 
     // Still showing the (re-fetched, same) tile the whole time — never fell
     // back through the `null` "Loading board…" placeholder in between.
