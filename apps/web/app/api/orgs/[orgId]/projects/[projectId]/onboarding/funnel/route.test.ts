@@ -79,7 +79,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/onboarding/funnel', () => 
       projectId: project.id,
       kind: 'event',
       name: 'user_signed_up',
-      fields: [],
+      fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
       createdByUserId: owner.id,
     });
     getServerSessionMock.mockResolvedValue(ownerSession);
