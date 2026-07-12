@@ -74,7 +74,7 @@ blocker is unfinished. See [CLAUDE.md](./CLAUDE.md) for the full working rules.
 | KAN-66 | E12.2b Win catalog: reactivation + trial-conversion win types; trial-pipeline war-room widget | 1 | - | done | Delivered (PR #54, a parallel session's implementation, merged after this run's independent review). |
 | KAN-67 | E12.3 War-room TV mode: fullscreen rotation, win feed overlay, confetti + sound per win type, device pairing code, reduced-motion | 1 | 7 | done | Delivered (PR #55, a parallel session's implementation, merged after this run's independent review — see PROGRESS.md). |
 | KAN-68 | E13.1 Onboarding wizard: org/project -> pack pick -> connect sources or push-your-own (curl+key) -> AI-proposed funnel mapping -> starter board | 1 | 7 | done | Delivered (PR #56). Project creation now redirects into the wizard instead of the org page. |
-| KAN-69 | E13.2 Freshness badges + degraded-state UX on every tile; empty states | 1 | 7 | todo |  |
+| KAN-69 | E13.2 Freshness badges + degraded-state UX on every tile; empty states | 1 | 7 | done | Delivered (PR #57). |
 | KAN-70 | E13.3 Alpha feedback instrumentation: dogfood our own funnel via our Ingest API | 1 | 7 | todo |  |
 | KAN-71 | E21.1 Automation-service action pipeline: dry-run diff -> approval -> execute -> verify -> rollback; guardrail policy engine; kill switch | 3 | - | todo |  |
 | KAN-72 | E21.2 Google Ads Manage plugin: campaign/ad-group/ad create+edit (RSA/PMax), keywords/negatives, default-paused creation | 3 | - | todo |  |

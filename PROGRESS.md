@@ -17,6 +17,90 @@ Template for each entry:
 
 ---
 
+## 2026-07-12 — E13.2 Freshness badges + degraded-state UX (KAN-69): no collision, delivered end to end
+
+- **Last completed:**
+  - Picked **KAN-69** (freshness badges + degraded-state UX on every board tile; empty states) as
+    the next unblocked task per the prior entry's own recommendation. Checked open PRs first (this
+    file's now-established habit) — no open PR existed for this story.
+  - Delivered as **PR #57**:
+    1. **Freshness badges** — a new project-wide "data as of" figure, computed from KAN-38's
+       orchestration freshness snapshot: `overallFreshnessAsOf` (`apps/web/lib/orgs/
+       orchestration-view.ts`) takes the *oldest* non-null `latestRecordAt` across
+       entities/events/measures rather than the newest, so a single connector going quiet drags the
+       whole badge down instead of being masked by whichever other table is still updating — the
+       AC's own "killing a connector shows a stale badge" scenario. `computeTileFreshness`
+       (`board-view.ts`) turns that timestamp into a fresh/stale badge state (24h threshold,
+       `TILE_STALE_THRESHOLD_HOURS`), and a new `resolveBoardFreshness` (`board-freshness.ts`)
+       fetches + derives it once per board render, shared by both the board detail page and the TV
+       war-room rotation frame (`api/tv-pairing/board/route.ts`) — a war room is exactly the
+       scenario the AC describes, so it gets the badge for free through the same shared
+       `BoardTileView` component both surfaces already render through, no TV-specific fork needed.
+    2. **Empty states** — `big_number`/`time_series` (line/bar)/`funnel` tiles previously showed a
+       misleading `0` or a blank chart with no message when a query genuinely returned zero rows;
+       now show an explicit "no data yet" message, matching the convention `table`/`heatmap`/
+       `histogram` already established. Centralized into one `isEmpty` flag computed once in
+       `buildTileRenderView` (`outcome.series.length === 0`) and threaded onto every tile kind,
+       replacing each renderer's own ad hoc `rows.length`/`rowLabels.length`/`labels.length` check
+       with a single source of truth.
+    3. **Degraded-state UX**: already existing from KAN-60 (the `unavailable` render kind + its
+       `warehouse_not_configured`/`quota_exceeded`/`query_error` reasons) — confirmed still correct
+       and left untouched; freshness/empty states apply only to the six data-bearing kinds.
+  - **Self-review found and fixed two real issues** before merge (see PR #57's own description):
+    1. `overallFreshnessAsOf` compared `latestRecordAt` timestamps as plain strings, assuming ISO
+       8601 sorts correctly lexicographically — it doesn't: `read_freshness.py` builds each
+       timestamp via Python's `datetime.isoformat()`, which omits the fractional-seconds component
+       whenever it's exactly zero, so a whole-second timestamp (`"...:00Z"`) can sort *after* a
+       later, same-second timestamp that carries a fraction (`"...:00.5Z"`), silently picking the
+       wrong table as "oldest". Fixed to compare parsed instants; added a regression test covering
+       the exact mixed-fraction case (independently verified the root cause against
+       `read_freshness.py` and a real Python REPL before fixing, not just taking the reviewer's word
+       for it).
+    2. The board detail page and the TV pairing board route had duplicated the identical
+       fetch-then-derive freshness sequence — extracted into the shared `resolveBoardFreshness`
+       helper above, which also fixed the TV route awaiting it sequentially after `getBoard`
+       instead of in parallel.
+  - Full verification: `pnpm lint`/`pnpm typecheck`/`pnpm build` green across all packages;
+    `pnpm test` (apps/web, Firestore/Auth emulator) 833/833 unit tests green — one file
+    (`field-mappings/route.test.ts`) showed a transient emulator RESOURCE_EXHAUSTED timeout during
+    the full concurrent run, the same documented class of load-induced flake this file has
+    repeatedly noted; reran in isolation and it passed cleanly, confirming it wasn't a regression.
+  - `e2e/boards.spec.ts` failed 3 out of 3 attempts on this branch, always at the exact same
+    point — the shared `signUp()` helper timing out waiting for the post-signup redirect to
+    `/en/dashboard`, before any board-tile code ever runs. Rather than assume this away, verified
+    it against unmodified `origin/main` in a scratch `git worktree` (symlinked `node_modules` to
+    skip a full reinstall) — the identical failure reproduced there too on the very first attempt,
+    conclusively confirming this is pre-existing environment flakiness in this sandbox session, not
+    a KAN-69 regression. `e2e/tv-pairing.spec.ts` passed cleanly. CI (`lint · typecheck · test ·
+    build`, which runs the Firestore/Auth-emulator-backed vitest suite but not the Playwright e2e
+    suite) was fully green on PR #57; squash-merged into `main`. Remote branch deletion failed with
+    the same documented HTTP 403 as every prior feature branch.
+  - `TASKS.md` updated to `done` for KAN-69.
+- **In progress (exact stopping point):** none — KAN-69 is fully delivered, tested, self-reviewed
+  (with two real bugs found and fixed), and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next unblocked `todo` in sprint order is **KAN-70** (alpha feedback
+  instrumentation: dogfood our own funnel via our Ingest API), sprint-7 with no blocker. Check for a
+  parallel-run collision before starting new implementation work, same as this entry and the last
+  several before it.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`, opened by a separate concurrent run against a real deployed-
+    image bug) is still open and untouched by this run — out of scope for KAN-69, flagged here so
+    the next run doesn't lose track of it.
+  - Optional: investigate why `origin` branch deletion fails from this environment (still
+    outstanding, repo hygiene only). This run additionally observed `e2e/boards.spec.ts`'s
+    signup-flow flakiness (3/3 attempts, reproduced on unmodified `origin/main` too) — worth a
+    dedicated look if it keeps recurring across runs, since it currently blocks reliably exercising
+    that spec in this sandbox at all, though CI itself (which doesn't run Playwright e2e) was
+    unaffected.
+
+---
+
 ## 2026-07-12 — E13.1 Onboarding wizard (KAN-68): no collision, delivered end to end
 
 - **Last completed:**
