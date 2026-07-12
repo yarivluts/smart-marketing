@@ -1,0 +1,102 @@
+diff --git a/dist/cjs/admin.js b/dist/cjs/admin.js
+index b390fe4bab594a790b9dd68d927e5f9e71d77214..b3be3588aa96937e5b8909e6e9c210656577e70a 100644
+--- a/dist/cjs/admin.js
++++ b/dist/cjs/admin.js
+@@ -172,6 +172,9 @@ async function initializeAdminApp(adminApp, key = repository_1.FirestoreOrmRepos
+         const repository = new repository_1.FirestoreOrmRepository(connection);
+         // Setup Admin SDK compatibility wrapper
+         setupAdminSDKWrapper(connection, repository);
++        // PATCH(growthos): force admin-mode query functions even if the client
++        // SDK was loaded first (see query.js patch note).
++        require('./query').__setupAdminSDKQueryCompatibility();
+         // Mark as ready immediately for Admin SDK
+         repository_1.FirestoreOrmRepository.isReady = true;
+         // Register it in the global connections
+diff --git a/dist/cjs/query.js b/dist/cjs/query.js
+index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..6532207fa78f5861a1515e09cabeb9aeab8b059d 100644
+--- a/dist/cjs/query.js
++++ b/dist/cjs/query.js
+@@ -91,6 +91,11 @@ function setupAdminSDKQueryCompatibility() {
+     }));
+     onSnapshot = ((query, callback) => query.onSnapshot(callback));
+     or = ((...queries) => ({
++        // PATCH(growthos): `type` must be set so getCurrentQueryArray()'s
++        // `op.type == 'where' || op.type == 'or'` filter (mirroring the real
++        // client-SDK QueryConstraint.type tag) doesn't silently drop this
++        // constraint from the built admin query (see query() note below).
++        type: 'or',
+         apply: (ref) => {
+             console.warn("OR queries not directly supported in Admin SDK - using first query only");
+             return queries.length > 0 ? queries[0].apply(ref) : ref;
+@@ -126,6 +131,9 @@ function setupAdminSDKQueryCompatibility() {
+         apply: (ref) => ref.startAt(...values)
+     }));
+     where = ((field, op, value) => ({
++        // PATCH(growthos): see the `or` shim above — same missing `type` tag,
++        // same silent-filter-drop consequence.
++        type: 'where',
+         apply: (ref) => ref.where(field, op, value)
+     }));
+     collectionGroup = ((collectionId) => {
+@@ -680,3 +688,9 @@ class Query {
+ }
+ exports.Query = Query;
+ //# sourceMappingURL=query.js.map
++// PATCH(growthos): initializeAdminApp never re-installed the admin query
++// functions when the client SDK loaded first (lazyLoadFirestoreImports runs
++// at import time with no connection yet and locks in client-SDK query/where,
++// crashing later with `_freezeSettings is not a function` on admin refs).
++// Expose the setup so the admin entry can force admin mode.
++exports.__setupAdminSDKQueryCompatibility = setupAdminSDKQueryCompatibility;
+\ No newline at end of file
+diff --git a/dist/esm/admin.js b/dist/esm/admin.js
+index b35b2fdc56e1b810575490feaeddb815613f2bf5..2f9e8cbda56a3e5ede58c38dd27be6abb720b6ad 100644
+--- a/dist/esm/admin.js
++++ b/dist/esm/admin.js
+@@ -1,3 +1,4 @@
++import { __setupAdminSDKQueryCompatibility } from './query.js';
+ /**
+  * Admin SDK-specific functionality for Firebase ORM
+  * This module should only be imported in Node.js environments
+@@ -132,6 +133,9 @@ export async function initializeAdminApp(adminApp, key = FirestoreOrmRepository.
+         const repository = new FirestoreOrmRepository(connection);
+         // Setup Admin SDK compatibility wrapper
+         setupAdminSDKWrapper(connection, repository);
++        // PATCH(growthos): force admin-mode query functions even if the client
++        // SDK was loaded first (see query.js patch note).
++        __setupAdminSDKQueryCompatibility();
+         // Mark as ready immediately for Admin SDK
+         FirestoreOrmRepository.isReady = true;
+         // Register it in the global connections
+diff --git a/dist/esm/query.js b/dist/esm/query.js
+index d7976dd33dc08bf8c54726d983beddf30a441762..1ea52bd51e8972d6ae7ef3242c8651fece5e66f5 100644
+--- a/dist/esm/query.js
++++ b/dist/esm/query.js
+@@ -55,6 +55,11 @@ function setupAdminSDKQueryCompatibility() {
+     }));
+     onSnapshot = ((query, callback) => query.onSnapshot(callback));
+     or = ((...queries) => ({
++        // PATCH(growthos): `type` must be set so getCurrentQueryArray()'s
++        // `op.type == 'where' || op.type == 'or'` filter (mirroring the real
++        // client-SDK QueryConstraint.type tag) doesn't silently drop this
++        // constraint from the built admin query (see query() note below).
++        type: 'or',
+         apply: (ref) => {
+             console.warn("OR queries not directly supported in Admin SDK - using first query only");
+             return queries.length > 0 ? queries[0].apply(ref) : ref;
+@@ -90,6 +95,9 @@ function setupAdminSDKQueryCompatibility() {
+         apply: (ref) => ref.startAt(...values)
+     }));
+     where = ((field, op, value) => ({
++        // PATCH(growthos): see the `or` shim above — same missing `type` tag,
++        // same silent-filter-drop consequence.
++        type: 'where',
+         apply: (ref) => ref.where(field, op, value)
+     }));
+     collectionGroup = ((collectionId) => {
+@@ -643,3 +651,5 @@ export class Query {
+     }
+ }
+ //# sourceMappingURL=query.js.map
++// PATCH(growthos): see cjs/query.js — expose admin query compat for admin entry.
++export { setupAdminSDKQueryCompatibility as __setupAdminSDKQueryCompatibility };

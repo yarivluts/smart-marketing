@@ -7,6 +7,11 @@ settings:
 overrides:
   zod: ^3.25.0
 
+patchedDependencies:
+  '@arbel/firebase-orm@1.9.97':
+    hash: 2zxf6r6zewk2icsm5e7c7aopie
+    path: patches/@arbel__firebase-orm@1.9.97.patch
+
 importers:
 
   .:
@@ -212,7 +217,7 @@ importers:
     dependencies:
       '@arbel/firebase-orm':
         specifier: ^1.9.97
-        version: 1.9.97(atob@2.1.2)(axios@1.18.1)(blob@0.0.5)(btoa@1.2.1)(firebase-admin@13.10.0)(firebase@11.10.0)(moment@2.30.1)(qs@6.15.3)(ws@8.21.0)(xhr2@0.2.1)
+        version: 1.9.97(patch_hash=2zxf6r6zewk2icsm5e7c7aopie)(atob@2.1.2)(axios@1.18.1)(blob@0.0.5)(btoa@1.2.1)(firebase-admin@13.10.0)(firebase@11.10.0)(moment@2.30.1)(qs@6.15.3)(ws@8.21.0)(xhr2@0.2.1)
       '@growthos/dbt-transform':
         specifier: workspace:*
         version: link:../dbt-transform
@@ -6408,7 +6413,7 @@ snapshots:
 
   '@apphosting/common@0.0.8': {}
 
-  '@arbel/firebase-orm@1.9.97(atob@2.1.2)(axios@1.18.1)(blob@0.0.5)(btoa@1.2.1)(firebase-admin@13.10.0)(firebase@11.10.0)(moment@2.30.1)(qs@6.15.3)(ws@8.21.0)(xhr2@0.2.1)':
+  '@arbel/firebase-orm@1.9.97(patch_hash=2zxf6r6zewk2icsm5e7c7aopie)(atob@2.1.2)(axios@1.18.1)(blob@0.0.5)(btoa@1.2.1)(firebase-admin@13.10.0)(firebase@11.10.0)(moment@2.30.1)(qs@6.15.3)(ws@8.21.0)(xhr2@0.2.1)':
     dependencies:
       atob: 2.1.2
       axios: 1.18.1
