@@ -12,6 +12,7 @@ import { DELETE as detachAttachment, PATCH as decideAttachment } from '@/app/api
 import { POST as setWriteTier } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/write-tier/route';
 import { GET as listApiKeys, POST as mintApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/route';
 import { DELETE as revokeApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]/route';
+import { DELETE as revokeMcpGrant } from '@/app/api/orgs/[orgId]/projects/[projectId]/mcp-grants/[grantId]/route';
 import { GET as listSchemaDefs, POST as registerSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/route';
 import { POST as evolveSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/evolve/route';
 import { GET as listFieldMappings, POST as createFieldMappingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/field-mappings/route';
@@ -332,6 +333,31 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
       () =>
         revokeApiKey(new Request('https://growthos.test'), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, apiKeyId: FAKE_MEMBERSHIP_ID }),
+        }),
+    );
+  });
+
+  it('DELETE /api/orgs/[orgId]/projects/[projectId]/mcp-grants/[grantId]: org caller cannot see vs. fake org id (KAN-75)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-mcp-grants-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (mcp-grants)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-mcp-grants-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (mcp-grants)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    await expectIndistinguishable(
+      () =>
+        revokeMcpGrant(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID, grantId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        revokeMcpGrant(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, grantId: FAKE_MEMBERSHIP_ID }),
         }),
     );
   });

@@ -17,7 +17,15 @@ import { type Permission } from './permissions';
  * change history is an admin/operator concern, not something a leaked
  * ingest key should expose). What's left is the machine-appropriate surface: pushing
  * data in, writing schemas/metrics/dashboards, exporting, and using AI
- * tooling. `index.test.ts` pins this as a full partition of `PERMISSIONS` —
+ * tooling. `mcp.read` (KAN-75 — the MCP server's read-tool surface) is
+ * included: it is itself already a read-only, least-privilege grant (the
+ * same reasoning that keeps `metrics.write` grantable despite its name —
+ * there is no separate `*.read` permission in the catalog for any of these
+ * surfaces). `mcp.act` does not exist yet — the MCP server's act tools
+ * (`propose_action`/`approve_action`, KAN-76) aren't built, so there is
+ * nothing yet to withhold or grant; add it (withheld, mirroring
+ * `automation.approve`/`automation.execute`) when that story lands.
+ * `index.test.ts` pins this as a full partition of `PERMISSIONS` —
  * every permission is either here or in that withheld list, never neither
  * (silently un-grantable) nor both.
  */
@@ -28,6 +36,7 @@ export const API_KEY_SCOPES = [
   'dashboards.write',
   'data.export',
   'ai.use',
+  'mcp.read',
 ] as const satisfies readonly Permission[];
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];

@@ -4,10 +4,12 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listApiKeysForProject, listEnvironmentsForProject, listOrgProjects } from '@/lib/orgs/queries';
+import { listApiKeysForProject, listEnvironmentsForProject, listMcpOAuthGrantsForProject, listOrgProjects } from '@/lib/orgs/queries';
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
+import { mcpApiUrl } from '@/lib/orgs/mcp-api-url';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
 import { RevokeApiKeyButton } from '@/components/orgs/revoke-api-key-button';
+import { RevokeMcpConnectionButton } from '@/components/orgs/revoke-mcp-connection-button';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -50,9 +52,10 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [environments, apiKeys] = await Promise.all([
+  const [environments, apiKeys, mcpGrants] = await Promise.all([
     listEnvironmentsForProject(orgId, projectId),
     listApiKeysForProject(orgId, projectId),
+    listMcpOAuthGrantsForProject(orgId, projectId),
   ]);
 
   const t = await getTranslations('ApiKeys');
@@ -112,6 +115,42 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
           <p className="text-muted-foreground">{t('noEnvironments')}</p>
         ) : (
           <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('mcpConnectionsHeading')}</h2>
+        <p className="text-muted-foreground">{t('mcpEndpointIntro')}</p>
+        <p className="text-sm">
+          {t('mcpEndpointLabel')} <code>{mcpApiUrl()}</code>
+        </p>
+        <p className="text-muted-foreground text-sm">{t('mcpApiKeyIntro')}</p>
+        {mcpGrants.length === 0 ? (
+          <p className="text-muted-foreground">{t('noMcpConnections')}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {mcpGrants.map((grant) => (
+              <li
+                key={grant.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm"
+              >
+                <div className="flex flex-col gap-1">
+                  <span className="font-medium">{grant.clientId}</span>
+                  <span className="text-muted-foreground">{t('mcpConnectionGrantedLabel', { createdAt: grant.createdAt })}</span>
+                  <span className="text-muted-foreground">
+                    {grant.revokedAt
+                      ? t('mcpConnectionRevokedLabel')
+                      : grant.isActive
+                        ? grant.lastUsedAt
+                          ? t('mcpConnectionLastUsedLabel', { lastUsedAt: grant.lastUsedAt })
+                          : t('mcpConnectionNeverUsedLabel')
+                        : t('mcpConnectionPendingLabel')}
+                  </span>
+                </div>
+                {!grant.revokedAt ? <RevokeMcpConnectionButton orgId={orgId} projectId={projectId} grantId={grant.id} /> : null}
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </main>

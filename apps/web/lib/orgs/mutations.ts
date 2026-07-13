@@ -44,7 +44,10 @@ import {
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   type FieldMappingModel,
   getOrCreateOnboardingState as getOrCreateOnboardingStateInOrganization,
+  issueMcpAuthorizationCode as issueMcpAuthorizationCodeInOrganization,
   markOnboardingSourceConnected as markOnboardingSourceConnectedInOrganization,
+  type McpOAuthGrantModel,
+  revokeMcpOAuthGrant as revokeMcpOAuthGrantInOrganization,
   selectOnboardingMetricPack as selectOnboardingMetricPackInOrganization,
   type OnboardingFunnelStep,
   type OnboardingPackKey,
@@ -325,6 +328,37 @@ interface RevokeApiKeyInput {
 export async function revokeApiKey(input: RevokeApiKeyInput): Promise<ApiKeyModel> {
   await ensureFirestoreOrm();
   return revokeApiKeyInOrganization(input);
+}
+
+interface IssueMcpAuthorizationCodeInput {
+  clientId: string;
+  redirectUri: string;
+  codeChallenge: string;
+  codeChallengeMethod: string;
+  organizationId: string;
+  projectId: string;
+  grantedByUserId: string;
+}
+
+/** Mints a single-use MCP OAuth authorization code once the consent page's user has approved (KAN-75) — see `mcp-oauth.service.ts`'s own doc comment for the full flow. */
+export async function issueMcpAuthorizationCode(
+  input: IssueMcpAuthorizationCodeInput,
+): Promise<{ code: string }> {
+  await ensureFirestoreOrm();
+  const { code } = await issueMcpAuthorizationCodeInOrganization(input);
+  return { code };
+}
+
+interface RevokeMcpOAuthGrantInput {
+  organizationId: string;
+  projectId: string;
+  grantId: string;
+  revokedByUserId: string;
+}
+
+export async function revokeMcpOAuthGrant(input: RevokeMcpOAuthGrantInput): Promise<McpOAuthGrantModel> {
+  await ensureFirestoreOrm();
+  return revokeMcpOAuthGrantInOrganization(input);
 }
 
 interface CreateHookEndpointInput {

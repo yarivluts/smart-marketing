@@ -41,6 +41,22 @@ const ALL_PERMISSIONS: readonly Permission[] = PERMISSIONS;
  * — the org-wide audit log) is likewise withheld from `project_admin`: plan
  * `06 §1` frames the audit log as an org-admin console surface, not a
  * per-project one, and an org's audit trail spans every project under it.
+ * `mcp.read` (KAN-75) is granted only to roles that already hold a write
+ * permission gating the same data through the web app today (`project_admin`,
+ * `editor` — both carry `metrics.write`/`dashboards.write`, the closest thing
+ * this catalog has to a "can view" gate, since there is no separate
+ * `metrics.read`/`dashboards.read` permission). Deliberately withheld from
+ * `viewer`: despite the name, `viewer` carries zero permissions today (every
+ * permission-gated read surface in `apps/web` checks a *write* permission
+ * even to view, so a zero-permission `viewer` cannot see any project data
+ * through the web app at all) and is one of only two `INVITABLE_ROLES`,
+ * bindable at *org* scope with no project picker — granting it `mcp.read`
+ * would hand an org-wide invitee real new read access (query_metric,
+ * search_customers, ...) through a role whose entire documented purpose,
+ * and whose use throughout this codebase's own test suite as the
+ * "member with no permission" 403 fixture, is to grant nothing at all.
+ * Also withheld from `operator` (automation-only, no read permission today)
+ * and `ingest_only` (a write-only machine role).
  */
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   platform_admin: ALL_PERMISSIONS,
@@ -59,8 +75,9 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'automation.execute',
     'data.export',
     'plugin.install',
+    'mcp.read',
   ],
-  editor: ['metrics.write', 'dashboards.write', 'ai.use'],
+  editor: ['metrics.write', 'dashboards.write', 'ai.use', 'mcp.read'],
   operator: ['automation.approve', 'automation.execute'],
   viewer: [],
   ingest_only: ['ingest.write'],

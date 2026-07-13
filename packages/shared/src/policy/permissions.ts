@@ -21,6 +21,7 @@ export const PERMISSIONS = [
   'ai.use',
   'plugin.install',
   'audit.read',
+  'mcp.read',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];

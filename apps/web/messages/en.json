@@ -249,7 +249,32 @@
     "revokeError": "Couldn't revoke this key. Please try again.",
     "touchpointSnippetHeading": "Website tracking snippet",
     "touchpointSnippetIntro": "Paste this once, right before the closing body tag, on any page you want to track. It captures UTM parameters and ad-click ids at entry and attaches them to every event this key's project registers.",
-    "copySnippet": "Copy snippet"
+    "copySnippet": "Copy snippet",
+    "mcpConnectionsHeading": "MCP connections",
+    "mcpEndpointIntro": "Connect an MCP client (Claude Desktop, claude.ai, or a headless agent) to this project.",
+    "mcpEndpointLabel": "MCP server endpoint:",
+    "mcpApiKeyIntro": "For headless agents: mint a key above with the mcp.read scope and use it as a bearer token.",
+    "noMcpConnections": "No MCP connections yet.",
+    "mcpConnectionActiveLabel": "Connected",
+    "mcpConnectionPendingLabel": "Approved — waiting for the client to finish connecting",
+    "mcpConnectionRevokedLabel": "Revoked",
+    "mcpConnectionLastUsedLabel": "Last used {lastUsedAt}",
+    "mcpConnectionNeverUsedLabel": "Never used",
+    "mcpConnectionGrantedLabel": "Granted {createdAt}",
+    "revokeMcpConnection": "Revoke",
+    "revokeMcpConnectionError": "Couldn't revoke this connection. Please try again."
+  },
+  "McpConsent": {
+    "metaTitle": "Connect an MCP client",
+    "heading": "Connect an MCP client to GrowthOS",
+    "description": "An MCP client is requesting read access to one of your projects — it will be able to query metrics, cohorts, customer records, and insights on your behalf.",
+    "projectLabel": "Project",
+    "noEligibleProjects": "You don't have MCP read access to any project yet. Ask a project admin to grant you a role with mcp.read.",
+    "scopeReadDescription": "Read metrics, cohorts, customers, and insights",
+    "approve": "Approve",
+    "deny": "Cancel",
+    "invalidRequest": "This authorization request is invalid, expired, or was already used.",
+    "consentError": "Something went wrong approving this connection. Please try again."
   },
   "Hooks": {
     "metaTitle": "Inbound hooks",

@@ -26,7 +26,16 @@ export interface OrgSessionContext {
  * and server-rendered org pages resolve session -> access from, so the two
  * never disagree.
  */
-export async function resolveOrgSessionContext(session: DecodedIdToken): Promise<OrgSessionContext> {
+/**
+ * The `ensureFirestoreOrm -> ensureUserForFirebaseSession` prefix of
+ * {@link resolveOrgSessionContext}, split out for callers that only need the
+ * platform-wide `UserModel` behind a session — not every org they belong to
+ * plus every role binding across those orgs — so they don't pay for (and
+ * discard) an N-org membership/role-binding sweep just to read `user.id`
+ * (e.g. the KAN-75 MCP OAuth consent route, which resolves its own
+ * single-org permission check separately via `issueMcpAuthorizationCode`).
+ */
+export async function ensureUserForSession(session: DecodedIdToken): Promise<UserModel> {
   await ensureFirestoreOrm();
 
   // Google SSO always yields a verified email; email/password sign-up does
@@ -34,12 +43,16 @@ export async function resolveOrgSessionContext(session: DecodedIdToken): Promise
   // sendEmailVerification call). Callers that grant privileges based on
   // identity (e.g. accepting an org invite) must check `session.email_verified`
   // themselves — see EmailNotVerifiedError's doc comment for why.
-  const user = await ensureUserForFirebaseSession({
+  return ensureUserForFirebaseSession({
     firebaseUid: session.uid,
     email: session.email as string,
     displayName: session.name as string | undefined,
     photoUrl: session.picture as string | undefined,
   });
+}
+
+export async function resolveOrgSessionContext(session: DecodedIdToken): Promise<OrgSessionContext> {
+  const user = await ensureUserForSession(session);
 
   const memberships = await listMembershipsWithOrganizations(user.id);
   const activeOrgIds = memberships

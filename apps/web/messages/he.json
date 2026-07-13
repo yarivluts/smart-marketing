@@ -249,7 +249,32 @@
     "revokeError": "לא ניתן היה לבטל את המפתח. נסה שוב.",
     "touchpointSnippetHeading": "קטע מעקב לאתר",
     "touchpointSnippetIntro": "הדביקו קטע זה פעם אחת, ממש לפני תגית הסגירה של ה-body, בכל עמוד שברצונכם לעקוב אחריו. הקטע לוכד פרמטרי UTM ומזהי קליק ממודעות בעת הכניסה ומצרף אותם לכל אירוע שהפרויקט של מפתח זה רושם.",
-    "copySnippet": "העתקת הקטע"
+    "copySnippet": "העתקת הקטע",
+    "mcpConnectionsHeading": "חיבורי MCP",
+    "mcpEndpointIntro": "חברו לקוח MCP (Claude Desktop,‏ claude.ai, או סוכן ללא ממשק) לפרויקט זה.",
+    "mcpEndpointLabel": "כתובת שרת ה-MCP:",
+    "mcpApiKeyIntro": "לסוכנים ללא ממשק: צרו מפתח למעלה עם היקף ההרשאה mcp.read והשתמשו בו כטוקן גישה.",
+    "noMcpConnections": "אין עדיין חיבורי MCP.",
+    "mcpConnectionActiveLabel": "מחובר",
+    "mcpConnectionPendingLabel": "אושר — ממתין להשלמת החיבור על ידי הלקוח",
+    "mcpConnectionRevokedLabel": "בוטל",
+    "mcpConnectionLastUsedLabel": "שימוש אחרון {lastUsedAt}",
+    "mcpConnectionNeverUsedLabel": "מעולם לא נעשה בו שימוש",
+    "mcpConnectionGrantedLabel": "אושר בתאריך {createdAt}",
+    "revokeMcpConnection": "ביטול",
+    "revokeMcpConnectionError": "לא ניתן היה לבטל את החיבור. נסה שוב."
+  },
+  "McpConsent": {
+    "metaTitle": "חיבור לקוח MCP",
+    "heading": "חיבור לקוח MCP ל-GrowthOS",
+    "description": "לקוח MCP מבקש גישת קריאה לאחד הפרויקטים שלכם — הוא יוכל לשאול מדדים, קבוצות עוקבים, רשומות לקוחות ותובנות בשמכם.",
+    "projectLabel": "פרויקט",
+    "noEligibleProjects": "אין לכם עדיין גישת קריאה של MCP לאף פרויקט. בקשו ממנהל הפרויקט תפקיד עם הרשאת mcp.read.",
+    "scopeReadDescription": "קריאת מדדים, קבוצות עוקבים, לקוחות ותובנות",
+    "approve": "אישור",
+    "deny": "ביטול",
+    "invalidRequest": "בקשת ההרשאה הזו אינה תקפה, פגה תוקף, או שכבר נעשה בה שימוש.",
+    "consentError": "משהו השתבש באישור החיבור. נסה שוב."
   },
   "Hooks": {
     "metaTitle": "וֶבְּהוּקים נכנסים",
