@@ -1,4 +1,4 @@
-import { ENVIRONMENTS, type Role } from '@growthos/shared';
+import { ENVIRONMENTS, type PolicyBinding, type Role } from '@growthos/shared';
 import { EnvironmentModel } from '../models/environment.model';
 import { MembershipModel, type MembershipStatus } from '../models/membership.model';
 import { OrganizationModel } from '../models/organization.model';
@@ -154,6 +154,17 @@ export async function listRoleBindingsForUser(
     ),
   );
   return results.flat();
+}
+
+/** Adapts `listRoleBindingsForUser`'s Firestore-shaped `RoleBindingModel[]` result to the framework-agnostic `PolicyBinding[]` `@growthos/shared`'s `can()`/`evaluate()` consume — the one place this mapping is defined, reused by every caller (`apps/web`'s `session-context.ts`, `mcp-oauth.service.ts`, `apps/api`'s `mcp-act-authorization.ts`) instead of each re-implementing the same five-field rename. */
+export function toPolicyBindings(bindings: readonly RoleBindingModel[]): PolicyBinding[] {
+  return bindings.map((binding) => ({
+    principalType: binding.principal_type,
+    principalId: binding.principal_id,
+    role: binding.role,
+    scopeLevel: binding.scope_level,
+    scopeId: binding.scope_id,
+  }));
 }
 
 export interface OrgMemberSummary {

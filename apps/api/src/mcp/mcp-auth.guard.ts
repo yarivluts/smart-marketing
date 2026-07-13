@@ -1,6 +1,7 @@
 import type { IncomingMessage } from 'node:http';
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { authenticateApiKey, authenticateMcpAccessToken } from '@growthos/firebase-orm-models';
+import type { ApiKeyScope } from '@growthos/shared';
 
 /** The project/principal an MCP request authenticated against, regardless of which of the two credential kinds plan `12 §6.1` allows ("OAuth 2.1 flow for interactive clients, or a scoped API key ... for headless agents") was actually presented. */
 export interface McpAuthContext {
@@ -9,6 +10,18 @@ export interface McpAuthContext {
   principalKind: 'api_key' | 'oauth';
   /** Set only for `principalKind: 'oauth'` — the human who approved the connection; tool implementations don't need it today (the policy re-check already happened in the guard), but it's useful for audit/log lines a future story might add. */
   userId?: string;
+  /**
+   * Set only for `principalKind: 'api_key'` — the key's own full scope list
+   * (KAN-28). KAN-76's act tools (`propose_action`/`approve_action`/
+   * `create_goal`/`create_segment`) each require a specific permission
+   * beyond the connection-level `mcp.read` gate; for an API-key caller that
+   * permission is checked directly against this list (see
+   * `mcp-act-authorization.ts`) rather than re-deriving it from a human's
+   * role bindings, since a key has no granting human to check against.
+   */
+  scopes?: readonly ApiKeyScope[];
+  /** Set only for `principalKind: 'api_key'` — the key's own id (KAN-28), used as the audit-trail actor identifier for act tools an API key scope permits (e.g. `create_goal`/`create_segment` under `dashboards.write`), since a key has no user id of its own to attribute the action to. */
+  apiKeyId?: string;
 }
 
 /**
@@ -79,6 +92,8 @@ export class McpAuthGuard implements CanActivate {
         organizationId: apiKeyResult.value.organizationId,
         projectId: apiKeyResult.value.projectId,
         principalKind: 'api_key',
+        scopes: apiKeyResult.value.scopes,
+        apiKeyId: apiKeyResult.value.apiKey.id,
       };
       return true;
     }

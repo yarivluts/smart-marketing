@@ -21,10 +21,14 @@ import { type Permission } from './permissions';
  * included: it is itself already a read-only, least-privilege grant (the
  * same reasoning that keeps `metrics.write` grantable despite its name —
  * there is no separate `*.read` permission in the catalog for any of these
- * surfaces). `mcp.act` does not exist yet — the MCP server's act tools
- * (`propose_action`/`approve_action`, KAN-76) aren't built, so there is
- * nothing yet to withhold or grant; add it (withheld, mirroring
- * `automation.approve`/`automation.execute`) when that story lands.
+ * surfaces). KAN-76's MCP act tools (`propose_action`/`approve_action`/
+ * `create_goal`/`create_segment`) deliberately introduced no separate
+ * `mcp.act` permission — each act tool instead re-checks its own
+ * already-modeled permission (`automation.execute`/`automation.approve`/
+ * `dashboards.write`) via `apps/api/src/mcp/mcp-act-authorization.ts`'s
+ * `mcpCallerHasPermission`, so the withholding of `automation.approve`/
+ * `automation.execute` above already covers `propose_action`/
+ * `approve_action` for API keys with no new catalog entry needed.
  * `index.test.ts` pins this as a full partition of `PERMISSIONS` —
  * every permission is either here or in that withheld list, never neither
  * (silently un-grantable) nor both.

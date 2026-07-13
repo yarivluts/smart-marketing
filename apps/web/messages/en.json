@@ -79,6 +79,7 @@
     "projectPluginsLink": "Plugins",
     "projectBoardsLink": "Boards",
     "projectGoalsLink": "Goals",
+    "projectSegmentsLink": "Segments",
     "projectTvLink": "War-room TV"
   },
   "ProjectSwitcher": {
@@ -759,6 +760,30 @@
       "quota_exceeded": "Daily query quota reached",
       "query_error": "Couldn't load this goal's progress"
     }
+  },
+  "Segments": {
+    "metaTitle": "Segments",
+    "title": "Segments for {projectName}",
+    "segmentsHeading": "Segments",
+    "noSegments": "This project has no saved segments yet.",
+    "schemaLabel": "Entity: {schemaName}",
+    "filterCount": "{count, plural, one {# filter} other {# filters}}",
+    "createdByLabel": "Created {createdAt}",
+    "createHeading": "New segment",
+    "noEntitySchemasRegistered": "Register an entity schema first to create a segment.",
+    "nameLabel": "Name",
+    "namePlaceholder": "e.g. Paying, no demo, MRR > $200",
+    "schemaPickerLabel": "Entity",
+    "filtersLabel": "Filters",
+    "filterFieldLabel": "Field",
+    "filterFieldPlaceholder": "e.g. plan",
+    "filterOpLabel": "Operator",
+    "filterValueLabel": "Value",
+    "filterValuePlaceholder": "e.g. pro",
+    "addFilterButton": "Add filter",
+    "removeFilterButton": "Remove",
+    "createButton": "Create segment",
+    "createError": "Could not create the segment. Please try again."
   },
   "WinRules": {
     "metaTitle": "Win rules",

@@ -1,9 +1,9 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { can, err, ok, type PolicyBinding, type Result } from '@growthos/shared';
+import { can, err, ok, type Result } from '@growthos/shared';
 import { McpOAuthClientModel } from '../models/mcp-oauth-client.model';
 import { McpOAuthGrantModel } from '../models/mcp-oauth-grant.model';
 import { ProjectModel } from '../models/project.model';
-import { listRoleBindingsForUser } from './organization.service';
+import { listRoleBindingsForUser, toPolicyBindings } from './organization.service';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 
@@ -140,16 +140,6 @@ export async function requireRegisteredRedirectUri(clientId: string, redirectUri
     throw new InvalidMcpOAuthClientError();
   }
   return client;
-}
-
-function toPolicyBindings(bindings: Awaited<ReturnType<typeof listRoleBindingsForUser>>): PolicyBinding[] {
-  return bindings.map((binding) => ({
-    principalType: binding.principal_type,
-    principalId: binding.principal_id,
-    role: binding.role,
-    scopeLevel: binding.scope_level,
-    scopeId: binding.scope_id,
-  }));
 }
 
 /** Whether `userId` currently holds `mcp.read` in `organizationId` — re-derived fresh from Firestore on every call (no caching), the same "revocation is immediate" posture every other credential check in this package takes. Exported so `apps/web`'s consent route can gate the grant *before* minting a code, and reused internally by {@link authenticateMcpAccessToken} to re-check on every MCP tool call. */

@@ -66,6 +66,8 @@ export interface CreateGoalParams {
   rhythm: string;
   ownerPersonId: string;
   createdByUserId: string;
+  /** Defaults to `'user'` — every pre-KAN-76 caller is a real Firebase-session user (`apps/web`'s own route). KAN-76's `create_goal` MCP tool passes `'api_key'` when the caller authenticated with a machine key rather than a human OAuth grant, so the audit trail doesn't mislabel a key as a user. */
+  createdByActorType?: 'user' | 'api_key';
 }
 
 interface ValidatedGoalFields {
@@ -196,7 +198,7 @@ export async function createGoal(params: CreateGoalParams): Promise<GoalModel> {
     await recordAuditLogEntry({
       organizationId: params.organizationId,
       projectId: params.projectId,
-      actorType: 'user',
+      actorType: params.createdByActorType ?? 'user',
       actorId: params.createdByUserId,
       action: 'goal.create',
       targetType: 'goal',
