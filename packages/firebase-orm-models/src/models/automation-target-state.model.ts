@@ -47,4 +47,15 @@ export class AutomationTargetStateModel extends BaseModel {
 
   @Field({ is_required: false })
   public seeded_by_user_id?: string;
+
+  /**
+   * The KAN-27 `ResourceAttachmentModel` (a `credential`-kind connection)
+   * this target's write actions are gated against, if one was picked at seed
+   * time. Omitted entirely for a target with no linked connection — same
+   * ungated demo posture every target had before KAN-74, so existing/manual
+   * targets keep working unchanged. See `automation.service.ts`'s
+   * `resolveWriteTierViolation`.
+   */
+  @Field()
+  public resource_attachment_id?: string;
 }

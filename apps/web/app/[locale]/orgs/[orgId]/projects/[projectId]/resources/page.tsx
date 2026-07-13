@@ -14,6 +14,7 @@ import {
 } from '@/lib/orgs/queries';
 import { RequestAttachmentForm } from '@/components/orgs/request-attachment-form';
 import { DetachAttachmentButton } from '@/components/orgs/detach-attachment-button';
+import { WriteTierSelector } from '@/components/orgs/write-tier-selector';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -90,6 +91,9 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
                 ? ` (${attachment.scope_selection.join(', ')})`
                 : ''}
             </span>
+            {resourceKind === 'credential' && attachment.status === 'approved' ? (
+              <WriteTierSelector orgId={orgId} attachmentId={attachment.id} tier={attachment.write_tier} disabled={!canDetach} />
+            ) : null}
             {attachment.status === 'approved' && canDetach ? (
               <DetachAttachmentButton orgId={orgId} attachmentId={attachment.id} />
             ) : null}

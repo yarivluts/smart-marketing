@@ -7,11 +7,18 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import {
   getActiveAutomationGuardrailPolicy,
   getAutomationKillSwitchStatus,
+  listActiveAttachmentsForProject,
   listAutomationActionsForProject,
   listAutomationTargetStatesForProject,
   listOrgProjects,
+  listSharedCredentials,
 } from '@/lib/orgs/queries';
-import { toAutomationActionView, toAutomationGuardrailPolicyView, toAutomationTargetView } from '@/lib/orgs/automation-view';
+import {
+  toAutomationActionView,
+  toAutomationConnectionOptions,
+  toAutomationGuardrailPolicyView,
+  toAutomationTargetView,
+} from '@/lib/orgs/automation-view';
 import { AutomationKillSwitchPanel } from '@/components/orgs/automation-kill-switch-panel';
 import { AutomationGuardrailPolicyForm } from '@/components/orgs/automation-guardrail-policy-form';
 import { AutomationSeedTargetForm } from '@/components/orgs/automation-seed-target-form';
@@ -55,12 +62,14 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
   }
   const canApprove = can(bindings, principal, 'automation.approve', { orgId });
 
-  const [projects, killSwitchStatus, policy, targets, actions] = await Promise.all([
+  const [projects, killSwitchStatus, policy, targets, actions, activeAttachments, credentials] = await Promise.all([
     listOrgProjects(orgId),
     getAutomationKillSwitchStatus(orgId),
     getActiveAutomationGuardrailPolicy(orgId, projectId),
     listAutomationTargetStatesForProject(orgId, projectId),
     listAutomationActionsForProject(orgId, projectId),
+    listActiveAttachmentsForProject(orgId, projectId),
+    listSharedCredentials(orgId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -69,6 +78,9 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
 
   const t = await getTranslations('Automation');
   const targetViews = targets.map(toAutomationTargetView);
+  const connectionOptions = toAutomationConnectionOptions(activeAttachments, credentials);
+  const connectionById = new Map(connectionOptions.map((connection) => [connection.id, connection]));
+  const tierLabelKeys = { read: 'tierRead', optimize: 'tierOptimize', manage: 'tierManage' } as const;
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
@@ -90,12 +102,23 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
           <p className="text-sm text-muted-foreground">{t('targetsEmptyNote')}</p>
         ) : (
           <ul className="flex flex-col gap-1 text-sm">
-            {targetViews.map((target) => (
-              <li key={target.id}>{t('targetLine', { label: target.label, budget: target.dailyBudgetUsd })}</li>
-            ))}
+            {targetViews.map((target) => {
+              const connection = target.resourceAttachmentId ? connectionById.get(target.resourceAttachmentId) : undefined;
+              return (
+                <li key={target.id}>
+                  {t('targetLine', { label: target.label, budget: target.dailyBudgetUsd })}
+                  {connection ? (
+                    <span className="text-muted-foreground">
+                      {' '}
+                      {t('targetConnectionLine', { label: connection.label, tier: t(tierLabelKeys[connection.tier]) })}
+                    </span>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
-        <AutomationSeedTargetForm orgId={orgId} projectId={projectId} />
+        <AutomationSeedTargetForm orgId={orgId} projectId={projectId} connections={connectionOptions} />
       </section>
 
       <section className="flex flex-col gap-3">

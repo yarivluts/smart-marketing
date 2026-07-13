@@ -1,11 +1,14 @@
 import { OrgPersonModel } from '../models/org-person.model';
 import { ProjectModel } from '../models/project.model';
 import {
+  type ConnectionWriteTier,
+  isConnectionWriteTier,
   ResourceAttachmentModel,
   type ResourceKind,
 } from '../models/resource-attachment.model';
 import { ResourceTemplateModel, type ResourceTemplateType } from '../models/resource-template.model';
 import { type CredentialProvider, SharedCredentialModel } from '../models/shared-credential.model';
+import { recordAuditLogEntry } from './audit-log.service';
 
 export class ProjectNotFoundError extends Error {
   constructor() {
@@ -46,6 +49,20 @@ export class InvalidScopeSelectionError extends Error {
   constructor() {
     super("The requested scope selection is not a subset of the credential's available scopes.");
     this.name = 'InvalidScopeSelectionError';
+  }
+}
+
+export class AttachmentNotCredentialError extends Error {
+  constructor() {
+    super('A write tier only applies to a credential attachment.');
+    this.name = 'AttachmentNotCredentialError';
+  }
+}
+
+export class InvalidWriteTierError extends Error {
+  constructor() {
+    super("Write tier must be one of 'read', 'optimize', or 'manage'.");
+    this.name = 'InvalidWriteTierError';
   }
 }
 
@@ -196,6 +213,8 @@ export async function requestResourceAttachment(
   attachment.status = 'pending';
   attachment.scope_selection = params.resourceKind === 'credential' ? [...(params.scopeSelection ?? [])] : undefined;
   attachment.resource_version = params.resourceKind === 'template' ? (resource as ResourceTemplateModel).version : undefined;
+  // Every attachment starts at the safest tier — an org-resource-owner must explicitly raise it (KAN-74, plan `02 §3`).
+  attachment.write_tier = 'read';
   attachment.requested_by = params.requestedByUserId;
   attachment.requested_at = new Date().toISOString();
   attachment.setPathParams({ organization_id: params.organizationId });
@@ -285,4 +304,60 @@ export async function listActiveAttachmentsForProject(
     .where('project_id', '==', projectId)
     .where('status', '==', 'approved')
     .get();
+}
+
+export interface SetResourceAttachmentWriteTierParams {
+  organizationId: string;
+  attachmentId: string;
+  tier: ConnectionWriteTier;
+  actorId: string;
+}
+
+/**
+ * The org-resource-owner's write-tier selector for a connection (KAN-74,
+ * plan `02 §3`: Read/Optimize/Manage). Only meaningful for an `approved`
+ * `credential` attachment — a `pending`/`rejected`/`detached` one, or a
+ * `template`/`person` attachment, has no write capability to tier in the
+ * first place. Takes effect immediately: `automation.service.ts` always
+ * re-resolves the connection's current tier rather than caching it, so a
+ * downgrade blocks the very next propose/approve/execute call.
+ */
+export async function setResourceAttachmentWriteTier(
+  params: SetResourceAttachmentWriteTierParams,
+): Promise<ResourceAttachmentModel> {
+  const attachment = await loadAttachment(params.organizationId, params.attachmentId);
+  if (attachment.resource_kind !== 'credential') {
+    throw new AttachmentNotCredentialError();
+  }
+  if (attachment.status !== 'approved') {
+    throw new AttachmentNotApprovedError();
+  }
+  if (!isConnectionWriteTier(params.tier)) {
+    throw new InvalidWriteTierError();
+  }
+
+  const before = attachment.write_tier;
+  attachment.write_tier = params.tier;
+  attachment.write_tier_updated_at = new Date().toISOString();
+  attachment.write_tier_updated_by_user_id = params.actorId;
+  await attachment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: attachment.project_id,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'resource_attachment.write_tier_change',
+      targetType: 'resource_attachment',
+      targetId: attachment.id,
+      summary: `Set the connection's write tier to "${params.tier}"`,
+      before: { tier: before },
+      after: { tier: params.tier },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return attachment;
 }

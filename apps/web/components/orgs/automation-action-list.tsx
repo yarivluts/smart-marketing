@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { actionStatusLabelKey, violationLabelKey, type AutomationActionView } from '@/lib/orgs/automation-view';
+import { actionStatusLabelKey, diffFieldLabelKey, violationLabelKey, type AutomationActionView } from '@/lib/orgs/automation-view';
 
 export interface AutomationActionListProps {
   orgId: string;
@@ -98,9 +98,20 @@ export function AutomationActionList({ orgId, projectId, actions, canApprove }: 
             <span className="font-medium">{action.targetLabel}</span>
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium">{t(actionStatusLabelKey(action.status))}</span>
           </div>
-          <p className="text-muted-foreground">
-            {t('diffLine', { before: action.beforeDailyBudgetUsd, after: action.afterDailyBudgetUsd })}
-          </p>
+          <ul className="flex flex-col gap-0.5 text-muted-foreground">
+            {action.diffEntries.map((entry) => {
+              const labelKey = diffFieldLabelKey(entry.key);
+              return (
+                <li key={entry.key}>
+                  {t('diffRowLine', {
+                    label: labelKey ? t(labelKey) : entry.key,
+                    before: String(entry.before),
+                    after: String(entry.after),
+                  })}
+                </li>
+              );
+            })}
+          </ul>
           {action.guardrailViolations.length > 0 ? (
             <ul className="list-inside list-disc text-destructive">
               {action.guardrailViolations.map((violation, index) => (

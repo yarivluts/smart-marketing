@@ -9,6 +9,7 @@ import { DELETE as removeMember } from '@/app/api/orgs/[orgId]/members/[membersh
 import { POST as createCredential } from '@/app/api/orgs/[orgId]/resources/credentials/route';
 import { POST as requestAttachment } from '@/app/api/orgs/[orgId]/projects/[projectId]/resource-attachments/route';
 import { DELETE as detachAttachment, PATCH as decideAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/route';
+import { POST as setWriteTier } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/write-tier/route';
 import { GET as listApiKeys, POST as mintApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/route';
 import { DELETE as revokeApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]/route';
 import { GET as listSchemaDefs, POST as registerSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/schema-defs/route';
@@ -247,6 +248,38 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         }),
       () =>
         detachAttachment(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, attachmentId: FAKE_MEMBERSHIP_ID }),
+        }),
+    );
+  });
+
+  it('POST /api/orgs/[orgId]/resource-attachments/[attachmentId]/write-tier: org caller cannot see vs. fake org id (KAN-74)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-tier-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (write tier)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-tier-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (write tier)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const postFor = (orgId: string, attachmentId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/resource-attachments/${attachmentId}/write-tier`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier: 'manage' }),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        setWriteTier(postFor(orgB.id, FAKE_MEMBERSHIP_ID), {
+          params: Promise.resolve({ orgId: orgB.id, attachmentId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        setWriteTier(postFor(FAKE_ORG_ID, FAKE_MEMBERSHIP_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, attachmentId: FAKE_MEMBERSHIP_ID }),
         }),
     );

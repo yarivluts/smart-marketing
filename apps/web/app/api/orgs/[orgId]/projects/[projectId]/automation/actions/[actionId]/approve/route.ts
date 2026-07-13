@@ -1,5 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { AutomationActionInvalidStateError, AutomationActionNotFoundError, AutomationKillSwitchEngagedError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
+import {
+  AutomationActionInvalidStateError,
+  AutomationActionNotFoundError,
+  AutomationKillSwitchEngagedError,
+  InsufficientWriteTierError,
+  ProjectNotFoundError,
+} from '@growthos/firebase-orm-models';
 import { approveAutomationAction } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 
@@ -27,6 +33,9 @@ export async function POST(_request: NextRequest, { params }: RouteParams): Prom
     }
     if (err instanceof AutomationKillSwitchEngagedError) {
       return NextResponse.json({ error: 'kill_switch_engaged' }, { status: 409 });
+    }
+    if (err instanceof InsufficientWriteTierError) {
+      return NextResponse.json({ error: 'insufficient_write_tier' }, { status: 409 });
     }
     throw err;
   }

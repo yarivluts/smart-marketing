@@ -219,7 +219,12 @@
     "requestAttachment": "Request",
     "requestError": "Couldn't send that request. Please try again.",
     "detach": "Detach",
-    "detachError": "Couldn't detach this resource. Please try again."
+    "detachError": "Couldn't detach this resource. Please try again.",
+    "writeTierLabel": "Write tier",
+    "writeTierRead": "Read",
+    "writeTierOptimize": "Optimize",
+    "writeTierManage": "Manage",
+    "writeTierError": "Couldn't update the write tier. Please try again."
   },
   "ApiKeys": {
     "metaTitle": "API keys",
@@ -849,6 +854,7 @@
     "targetsHeading": "Automation targets",
     "targetsEmptyNote": "No automation targets have been seeded for this project yet.",
     "targetLine": "{label} — ${budget}/day",
+    "targetConnectionLine": "— Connection: {label} ({tier})",
     "seedTargetIdLabel": "Target id",
     "seedTargetLabelLabel": "Label",
     "seedTargetEnvironmentLabel": "Environment",
@@ -857,6 +863,12 @@
     "seedTargetInvalidBudgetError": "Initial daily budget must be a non-negative number.",
     "seedTargetFieldsRequiredError": "Target id, label, and environment are required.",
     "seedTargetError": "Couldn't seed the target. Please try again.",
+    "connectionLabel": "Connection",
+    "connectionNoneOption": "No connection (ungated demo target)",
+    "connectionOptionLabel": "{label} ({tier})",
+    "tierRead": "Read",
+    "tierOptimize": "Optimize",
+    "tierManage": "Manage",
     "proposeHeading": "Propose a budget change",
     "proposeNoTargetsNote": "Seed an automation target above before proposing a change.",
     "proposeTargetLabel": "Target",
@@ -867,7 +879,8 @@
     "proposeError": "Couldn't propose the change. Please try again.",
     "actionsHeading": "Action queue",
     "actionsEmptyNote": "No automation actions proposed for this project yet.",
-    "diffLine": "${before}/day → ${after}/day",
+    "diffFieldDailyBudgetUsd": "Daily budget",
+    "diffRowLine": "{label}: {before} → {after}",
     "failureReasonLine": "Execution failed: {reason}",
     "rollbackReasonLine": "Rolled back ({reason})",
     "approveButton": "Approve",
@@ -891,6 +904,7 @@
     "violationProtectedTarget": "Target is protected",
     "violationOutsideAllowedHours": "Outside the allowed hours window",
     "violationBlastRadius": "Daily action limit reached",
-    "violationAutomationPaused": "Automation is paused (kill switch engaged)"
+    "violationAutomationPaused": "Automation is paused (kill switch engaged)",
+    "violationInsufficientWriteTier": "The target's connection isn't approved at a write tier (Optimize or Manage) that allows this change"
   }
 }
