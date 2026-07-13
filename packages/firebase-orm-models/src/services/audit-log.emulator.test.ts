@@ -98,6 +98,43 @@ describe('recordAuditLogEntry: hash chain', () => {
     const result = await verifyAuditLogChainForOrg(organization.id);
     expect(result).toEqual({ valid: true, entryCount: 1 });
   });
+
+  it('round-trips client_type/client_id (KAN-77) and keeps the chain valid alongside entries that omit them', async () => {
+    const { owner, organization } = await setupProject('Client Identity Org');
+
+    await recordAuditLogEntry({
+      organizationId: organization.id,
+      actorType: 'api_key',
+      actorId: 'key-1',
+      action: 'mcp.tool_call',
+      targetType: 'mcp_tool',
+      targetId: 'list_metrics',
+      summary: 'MCP tool call: list_metrics',
+      clientType: 'mcp_api_key',
+      clientId: 'key-1',
+    });
+    // A second, ordinary entry with no client identity at all — the pre-existing shape every non-MCP
+    // audit call site still writes — must chain onto the first without either entry's hash changing.
+    const second = await recordAuditLogEntry({
+      organizationId: organization.id,
+      actorType: 'user',
+      actorId: owner.id,
+      action: 'test.no_client_identity',
+      targetType: 'test',
+      targetId: 'b',
+      summary: 's',
+    });
+    expect(second.client_type).toBeUndefined();
+    expect(second.client_id).toBeUndefined();
+
+    const result = await verifyAuditLogChainForOrg(organization.id);
+    expect(result).toEqual({ valid: true, entryCount: 2 });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const mcpEntry = entries.find((entry) => entry.action === 'mcp.tool_call');
+    expect(mcpEntry?.client_type).toBe('mcp_api_key');
+    expect(mcpEntry?.client_id).toBe('key-1');
+  });
 });
 
 describe('listAuditLogEntriesForOrg', () => {

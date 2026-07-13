@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { AuditLogEntryModel, type AuditActorType } from '../models/audit-log-entry.model';
+import { AuditLogEntryModel, type AuditActorType, type AuditClientType } from '../models/audit-log-entry.model';
 
 /** Same load-bounding reasoning as `listRecentIngestBatchesForProject` — bounds query cost until a real aggregation store exists. */
 export const DEFAULT_AUDIT_LOG_LIST_LIMIT = 200;
@@ -16,6 +16,8 @@ export interface RecordAuditLogEntryParams {
   summary: string;
   before?: Record<string, unknown>;
   after?: Record<string, unknown>;
+  clientType?: AuditClientType;
+  clientId?: string;
 }
 
 /** The subset of an entry's fields that its `entry_hash` is computed over — every persisted field except `entry_hash` itself. */
@@ -31,6 +33,8 @@ interface HashableAuditLogEntry {
   summary: string;
   before?: Record<string, unknown>;
   after?: Record<string, unknown>;
+  client_type?: AuditClientType;
+  client_id?: string;
   created_at: string;
   prev_entry_hash: string;
 }
@@ -68,6 +72,8 @@ export function buildHashableContent(input: {
   summary: string;
   before?: Record<string, unknown>;
   after?: Record<string, unknown>;
+  client_type?: AuditClientType;
+  client_id?: string;
   created_at: string;
   prev_entry_hash: string;
 }): HashableAuditLogEntry {
@@ -83,6 +89,8 @@ export function buildHashableContent(input: {
     summary: input.summary,
     ...(input.before !== undefined ? { before: input.before } : {}),
     ...(input.after !== undefined ? { after: input.after } : {}),
+    ...(input.client_type !== undefined ? { client_type: input.client_type } : {}),
+    ...(input.client_id !== undefined ? { client_id: input.client_id } : {}),
     created_at: input.created_at,
     prev_entry_hash: input.prev_entry_hash,
   };
@@ -134,6 +142,8 @@ export async function recordAuditLogEntry(params: RecordAuditLogEntryParams): Pr
     summary: params.summary,
     before: params.before,
     after: params.after,
+    client_type: params.clientType,
+    client_id: params.clientId,
     created_at: new Date().toISOString(),
     prev_entry_hash: latest[0]?.entry_hash ?? '',
   });
@@ -150,6 +160,8 @@ export async function recordAuditLogEntry(params: RecordAuditLogEntryParams): Pr
   entry.summary = content.summary;
   if (content.before !== undefined) entry.before = content.before;
   if (content.after !== undefined) entry.after = content.after;
+  if (content.client_type !== undefined) entry.client_type = content.client_type;
+  if (content.client_id !== undefined) entry.client_id = content.client_id;
   entry.created_at = content.created_at;
   entry.prev_entry_hash = content.prev_entry_hash;
   entry.entry_hash = computeEntryHash(content);

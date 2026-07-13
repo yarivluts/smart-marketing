@@ -90,3 +90,22 @@ export const defaultApiKeyRateLimiter: RateLimiter = new InMemoryTokenBucketRate
   capacity: DEFAULT_API_KEY_RATE_LIMIT_CAPACITY,
   refillPerSecond: DEFAULT_API_KEY_RATE_LIMIT_REFILL_PER_SECOND,
 });
+
+/**
+ * A separate, deliberately smaller budget for MCP tool calls (KAN-77 AC: "rate/token budgets per
+ * key"), kept in its own bucket namespace rather than sharing `defaultApiKeyRateLimiter`: an MCP
+ * connection is typically driven by an agent issuing one tool call per reasoning step rather than a
+ * bulk ingest/query client, so a much lower sustained rate is the right default, and an API key's
+ * MCP budget shouldn't compete with (or be silently drained by) the same key's ingest/metrics REST
+ * traffic sharing one bucket. 2 requests/second sustained, bursting up to 120 (a minute's headroom)
+ * — a placeholder pending real per-key MCP traffic data, same posture `defaultApiKeyRateLimiter`
+ * documents for its own numbers.
+ */
+export const DEFAULT_MCP_RATE_LIMIT_CAPACITY = 120;
+export const DEFAULT_MCP_RATE_LIMIT_REFILL_PER_SECOND = 2;
+
+/** The shared limiter `McpAuthGuard` consumes from by default, keyed per credential (API key id, or OAuth grant id) rather than per route — see this file's own doc comment for why MCP gets its own bucket namespace instead of reusing {@link defaultApiKeyRateLimiter}. */
+export const defaultMcpRateLimiter: RateLimiter = new InMemoryTokenBucketRateLimiter({
+  capacity: DEFAULT_MCP_RATE_LIMIT_CAPACITY,
+  refillPerSecond: DEFAULT_MCP_RATE_LIMIT_REFILL_PER_SECOND,
+});

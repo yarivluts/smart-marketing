@@ -12,13 +12,17 @@ import {
   ensureAutomationTargetSeeded,
   ensureUserForFirebaseSession,
   exchangeMcpAuthorizationCode,
+  InMemoryTokenBucketRateLimiter,
   issueMcpAuthorizationCode,
+  listAuditLogEntriesForOrg,
   mintApiKey,
   registerMcpOAuthClient,
   registerMetricDefinition,
   registerSchemaDefinition,
+  WinEventModel,
 } from '@growthos/firebase-orm-models';
 import { AppModule } from '../app.module';
+import { MCP_RATE_LIMITER } from './mcp-auth.guard';
 
 /**
  * Real Firestore-emulator-backed e2e coverage for KAN-75's MCP server —
@@ -59,6 +63,26 @@ function unique(prefix: string): string {
 
 function uniqueEmail(prefix: string): string {
   return `${unique(prefix)}@example.com`;
+}
+
+/** A minimal, real `WinEventModel` (Firestore-backed, so `list_insights` genuinely reads it back) for the KAN-77 cross-project isolation tests below. */
+async function seedWinEvent(organizationId: string, projectId: string, label: string): Promise<WinEventModel> {
+  const win = new WinEventModel();
+  win.organization_id = organizationId;
+  win.project_id = projectId;
+  win.environment_id = 'env-1';
+  win.win_rule_id = unique('rule');
+  win.win_rule_name = label;
+  win.win_type = 'generic';
+  win.schema_name = 'order_completed';
+  win.raw_record_id = unique('record');
+  win.client_id = unique('client');
+  win.payload = { label };
+  win.occurred_at = new Date().toISOString();
+  win.created_at = new Date().toISOString();
+  win.setPathParams({ organization_id: organizationId, project_id: projectId });
+  await win.save();
+  return win;
 }
 
 async function setupProjectWithKey(
@@ -393,5 +417,173 @@ describe('McpController (e2e)', () => {
         await client.close();
       }
     });
+  });
+
+  describe('KAN-77 cross-project isolation via MCP', () => {
+    it("list_insights never surfaces another project's win events — the AC's own \"project-A token cannot list/query anything of project B\"", async () => {
+      const projectA = await setupProjectWithKey('MCP Isolation Org A');
+      const projectB = await setupProjectWithKey('MCP Isolation Org B');
+      const winA = await seedWinEvent(projectA.organization.id, projectA.project.id, 'Project A win');
+      const winB = await seedWinEvent(projectB.organization.id, projectB.project.id, 'Project B win');
+
+      const clientA = await connectedClient(projectA.rawKey);
+      try {
+        const result = await clientA.callTool({ name: 'list_insights', arguments: {} });
+        expect(result.isError).not.toBe(true);
+        const body = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as { insights: Array<{ id: string }> };
+        const ids = body.insights.map((insight) => insight.id);
+        expect(ids).toContain(winA.id);
+        expect(ids).not.toContain(winB.id);
+      } finally {
+        await clientA.close();
+      }
+
+      const clientB = await connectedClient(projectB.rawKey);
+      try {
+        const result = await clientB.callTool({ name: 'list_insights', arguments: {} });
+        const body = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as { insights: Array<{ id: string }> };
+        const ids = body.insights.map((insight) => insight.id);
+        expect(ids).toContain(winB.id);
+        expect(ids).not.toContain(winA.id);
+      } finally {
+        await clientB.close();
+      }
+    });
+
+    it('no tool argument can override the credential-derived organizationId/projectId scope', async () => {
+      const projectA = await setupProjectWithKey('MCP Isolation Args Org A');
+      const projectB = await setupProjectWithKey('MCP Isolation Args Org B');
+      const winB = await seedWinEvent(projectB.organization.id, projectB.project.id, 'Project B win');
+
+      const clientA = await connectedClient(projectA.rawKey);
+      try {
+        // list_insights' own schema only declares "limit" — smuggled-in fields naming project B are
+        // never read by the handler, which resolves org/project from `auth` (the authenticated
+        // credential) alone, never from `args`.
+        const result = await clientA.callTool({
+          name: 'list_insights',
+          arguments: { limit: 10, organizationId: projectB.organization.id, projectId: projectB.project.id } as never,
+        });
+        expect(result.isError).not.toBe(true);
+        const body = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as { insights: Array<{ id: string }> };
+        expect(body.insights.map((insight) => insight.id)).not.toContain(winB.id);
+      } finally {
+        await clientA.close();
+      }
+    });
+  });
+
+  describe('KAN-77 audit logging: every tool call records the principal + client identity', () => {
+    it('an API-key tool call audits actor_type "api_key" with a matching client_id', async () => {
+      const { organization, rawKey } = await setupProjectWithKey('MCP Audit API Key Org');
+      const client = await connectedClient(rawKey);
+      try {
+        await client.callTool({ name: 'list_metrics', arguments: {} });
+      } finally {
+        await client.close();
+      }
+
+      const entries = await listAuditLogEntriesForOrg(organization.id);
+      const entry = entries.find((e) => e.action === 'mcp.tool_call' && e.target_id === 'list_metrics');
+      expect(entry).toBeTruthy();
+      expect(entry?.actor_type).toBe('api_key');
+      expect(entry?.client_type).toBe('mcp_api_key');
+      expect(entry?.client_id).toBe(entry?.actor_id);
+    });
+
+    it('an OAuth tool call audits the granting user as the principal and the OAuth client_id as a distinct client identity', async () => {
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
+      const { organization } = await createOrganizationWithOwner({ name: 'MCP Audit OAuth Org', ownerUserId: owner.id });
+      const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+      const accessToken = await mintOAuthAccessToken(organization.id, project.id, owner.id);
+
+      const client = await connectedClient(accessToken);
+      try {
+        await client.callTool({ name: 'list_insights', arguments: {} });
+      } finally {
+        await client.close();
+      }
+
+      const entries = await listAuditLogEntriesForOrg(organization.id);
+      const entry = entries.find((e) => e.action === 'mcp.tool_call' && e.target_id === 'list_insights');
+      expect(entry).toBeTruthy();
+      expect(entry?.actor_type).toBe('user');
+      expect(entry?.actor_id).toBe(owner.id);
+      expect(entry?.client_type).toBe('mcp_oauth');
+      expect(entry?.client_id).toBeTruthy();
+      expect(entry?.client_id).not.toBe(owner.id);
+    });
+
+    it('a permission-denied act tool attempt is still audited (summary marked as an error)', async () => {
+      const { organization, rawKey } = await setupProjectWithKey('MCP Audit Denied Org', ['mcp.read']);
+      const client = await connectedClient(rawKey);
+      try {
+        await client.callTool({
+          name: 'create_goal',
+          arguments: {
+            name: 'X',
+            metric_name: 'signups',
+            direction: 'maximize',
+            target_value: 1,
+            start_date: '2026-01-01',
+            deadline: '2026-02-01',
+            rhythm: 'even',
+            owner_person_id: 'does-not-matter',
+          },
+        });
+      } finally {
+        await client.close();
+      }
+
+      const entries = await listAuditLogEntriesForOrg(organization.id);
+      const entry = entries.find((e) => e.action === 'mcp.tool_call' && e.target_id === 'create_goal');
+      expect(entry).toBeTruthy();
+      expect(entry?.summary).toContain('error');
+    });
+  });
+});
+
+describe('McpController (e2e) — per-credential rate limiting (KAN-77)', () => {
+  // A dedicated app instance with a tiny rate-limit bucket overridden in, so this suite can trip a
+  // 429 in a handful of requests rather than needing the real default capacity — kept separate from
+  // the main `app`/`baseUrl` above the same way `IngestController`'s own rate-limit suite is, so this
+  // override never affects any other test's key.
+  let limitedApp: INestApplication;
+  let limitedBaseUrl: string;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(MCP_RATE_LIMITER)
+      .useValue(new InMemoryTokenBucketRateLimiter({ capacity: 1, refillPerSecond: 0.001 }))
+      .compile();
+    limitedApp = moduleRef.createNestApplication();
+    limitedApp.setGlobalPrefix('v1');
+    await limitedApp.init();
+    await limitedApp.listen(0);
+    const address = limitedApp.getHttpServer().address() as AddressInfo;
+    limitedBaseUrl = `http://127.0.0.1:${address.port}`;
+  });
+
+  afterAll(async () => {
+    await limitedApp.close();
+  });
+
+  it('rejects (429) once an MCP credential exhausts its bucket, with a Retry-After header', async () => {
+    const { rawKey } = await setupProjectWithKey('MCP Rate Limit Org');
+    const request = () =>
+      fetch(`${limitedBaseUrl}/v1/mcp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json, text/event-stream',
+          Authorization: `Bearer ${rawKey}`,
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+      });
+
+    expect((await request()).status).not.toBe(429); // capacity 1: the first request reaches the handler...
+    const limited = await request(); // ...the second finds the bucket already spent.
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('retry-after')).toBeTruthy();
   });
 });
