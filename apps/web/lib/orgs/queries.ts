@@ -11,6 +11,7 @@ import {
   getTrialPipelineSummary as getTrialPipelineSummaryInOrganization,
   listTrackingAlertsForProject as listTrackingAlertsForProjectInOrganization,
   type ApiKeySummary,
+  type McpOAuthGrantSummary,
   type BoardModel,
   type BoardTile,
   type EnvironmentModel,
@@ -33,6 +34,7 @@ import {
   listGoalsForProject as listGoalsForProjectInOrganization,
   listHookDeliveriesForProject as listHookDeliveriesForProjectInOrganization,
   listHookEndpointsForProject as listHookEndpointsForProjectInOrganization,
+  listMcpOAuthGrantsForProject as listMcpOAuthGrantsForProjectInOrganization,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
   listMetricsCatalogForProject as listMetricsCatalogForProjectInOrganization,
   listOrgMembersWithProfiles,
@@ -47,6 +49,7 @@ import {
   listSourcePluginRunsForInstall as listSourcePluginRunsForInstallInOrganization,
   listQueryCostLogEntriesForProject as listQueryCostLogEntriesForProjectInOrganization,
   listRecentIngestBatchesForProject as listRecentIngestBatchesForProjectInOrganization,
+  requireRegisteredRedirectUri as requireRegisteredRedirectUriInOrganization,
   listResourceTemplates as listResourceTemplatesInOrganization,
   listSchemaDefinitionsForProject as listSchemaDefinitionsForProjectInOrganization,
   listSharedCredentials as listSharedCredentialsInOrganization,
@@ -114,6 +117,12 @@ export async function listOrgProjects(organizationId: string): Promise<ProjectMo
   return listOrgProjectsForOrganization(organizationId);
 }
 
+/** Validates a `(client_id, redirect_uri)` pair against a registered MCP OAuth client (KAN-75) — throws `InvalidMcpOAuthClientError` otherwise. Used by the consent POST route before it builds any redirect through `redirect_uri`, so an unvalidated value can never become an open-redirect target. */
+export async function requireRegisteredMcpRedirectUri(clientId: string, redirectUri: string): Promise<void> {
+  await ensureFirestoreOrm();
+  await requireRegisteredRedirectUriInOrganization(clientId, redirectUri);
+}
+
 export async function listSharedCredentials(organizationId: string): Promise<SharedCredentialModel[]> {
   await ensureFirestoreOrm();
   return listSharedCredentialsInOrganization(organizationId);
@@ -161,6 +170,12 @@ export async function listEnvironmentsForProject(
 export async function listApiKeysForProject(organizationId: string, projectId: string): Promise<ApiKeySummary[]> {
   await ensureFirestoreOrm();
   return listApiKeysForProjectInOrganization(organizationId, projectId);
+}
+
+/** Every MCP OAuth connection granted for a project (KAN-75) — the Keys page's "MCP connections" section. */
+export async function listMcpOAuthGrantsForProject(organizationId: string, projectId: string): Promise<McpOAuthGrantSummary[]> {
+  await ensureFirestoreOrm();
+  return listMcpOAuthGrantsForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listHookEndpointsForProject(organizationId: string, projectId: string): Promise<HookEndpointModel[]> {

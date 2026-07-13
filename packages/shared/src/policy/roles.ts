@@ -41,6 +41,12 @@ const ALL_PERMISSIONS: readonly Permission[] = PERMISSIONS;
  * — the org-wide audit log) is likewise withheld from `project_admin`: plan
  * `06 §1` frames the audit log as an org-admin console surface, not a
  * per-project one, and an org's audit trail spans every project under it.
+ * `mcp.read` (KAN-75) is granted to every role that can already see a
+ * project's data through the web app (`project_admin`, `editor`, `viewer`)
+ * — the MCP surface is a different transport for the same read access, not
+ * a new privilege — but withheld from `operator` (an automation-only role
+ * with no other read permission today) and `ingest_only` (a write-only
+ * machine role).
  */
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   platform_admin: ALL_PERMISSIONS,
@@ -59,10 +65,11 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'automation.execute',
     'data.export',
     'plugin.install',
+    'mcp.read',
   ],
-  editor: ['metrics.write', 'dashboards.write', 'ai.use'],
+  editor: ['metrics.write', 'dashboards.write', 'ai.use', 'mcp.read'],
   operator: ['automation.approve', 'automation.execute'],
-  viewer: [],
+  viewer: ['mcp.read'],
   ingest_only: ['ingest.write'],
 };
 
