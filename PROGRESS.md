@@ -17,6 +17,92 @@ Template for each entry:
 
 ---
 
+## 2026-07-13 — E22.3 MCP isolation-suite coverage, audit logging, per-key rate limiting (KAN-77)
+
+- **Last completed:**
+  - **KAN-77**, done, merged as PR #64. Read PROGRESS.md/TASKS.md per the standing rule; the prior
+    entry's own "next step" pointed at KAN-77 as the natural unblocked pick — it hardens the KAN-75/76
+    MCP surface rather than extending it, and KAN-72/73 (Google/Meta Manage plugins) remain
+    practically blocked on KAN-43.
+  - On starting, found the branch `kan-77-mcp-isolation-audit-ratelimit` already existed on `origin`
+    with a complete implementation (1 commit, labeled "(WIP)" in its own message but substantively
+    finished) from an earlier run in this session that had never opened a PR or updated
+    PROGRESS.md/TASKS.md — picked it up rather than duplicating the work, same pattern as the last
+    several entries. The branch was already based directly on `main`'s actual tip (`ea468c7`, KAN-76),
+    so no rebase was needed.
+  - Independently reviewed the full diff (13 files, +569/-27) against the AC (plan `13 §168`:
+    "Project-A token cannot list/query anything of project B via MCP; all calls audited"):
+    - **Isolation-suite coverage**: `mcp-tool-isolation.spec.ts` — the MCP-shaped equivalent of
+      `route-isolation-guard.test.ts` (apps/web, KAN-26) — scans `mcp-tools.ts`/`mcp-act-tools.ts` for
+      every `server.registerTool(...)` call and fails if a new tool isn't listed in a maintained
+      `EXPECTED_TOOLS` inventory (with its isolation gate) or isn't wrapped in the new audit handler.
+      `mcp.controller.e2e.spec.ts` adds real Firestore-emulator-backed cross-project isolation cases: a
+      project-A credential's `list_insights` never surfaces project-B's win events, and a smuggled
+      `organizationId`/`projectId` tool argument is silently ignored (org/project always resolve from
+      the authenticated credential, never from tool args).
+    - **Audit logging (principal + client identity)**: a single `auditedToolHandler` wrap point around
+      every `server.registerTool` handler (read and act tools alike) records one `mcp.tool_call` audit
+      entry per call — success, tool-level error, or a thrown exception — reusing KAN-44's existing
+      tamper-evident hash-chain audit log as a deliberate *second*, MCP-specific record distinct from
+      KAN-76's own domain-specific `goal.create`/`segment.create`/... entries. `AuditLogEntryModel`
+      gains `client_type`/`client_id` to capture the connecting *client's* identity separate from the
+      *principal*: for an API-key call the two coincide, but for an OAuth call the principal is the
+      granting human while the client is the third-party application that human authorized
+      (`McpOAuthGrantModel`'s own `client_id`) — a `grantId`/`clientId` pair threaded through
+      `authenticateMcpAccessToken`/`McpAuthGuard`.
+    - **Rate/token budgets per key**: a new `defaultMcpRateLimiter` (2 req/s sustained, burst 120) in
+      its own bucket namespace separate from `defaultApiKeyRateLimiter`, so an MCP agent's tool-call
+      cadence never competes with the same key's REST ingest/metrics traffic. `McpAuthGuard` checks it
+      only after authentication succeeds (an invalid credential never spends a real bucket), bucketed
+      by API-key id or OAuth grant id (never `userId`, since one human can hold several MCP
+      connections), returning 429 + `Retry-After` on exhaustion.
+    - No admin UI needed — this story is internal hardening (test coverage, audit trail, rate
+      limiting) of the existing MCP surface, not new user-manageable data.
+  - Found no real defects during review — the implementation was already complete and correct; the
+    "(WIP)" commit label undersold it.
+  - Verified independently rather than trusting the branch's own state: ran the full suite from
+    scratch. `pnpm lint`/`pnpm typecheck`/`pnpm build` green across all packages (needed
+    `PIP_CERT`/`SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE`/`NODE_EXTRA_CA_CERTS` pointed at this sandbox's
+    proxy CA bundle for `packages/dbt-transform`'s pip venv and the Firestore-emulator jar download —
+    the same documented environment quirk prior entries have recorded). `packages/shared` 348/348;
+    `packages/firebase-orm-models` 659/659 (incl. the new `mcp-tool-isolation`/`mcp.controller.e2e`
+    isolation/audit/rate-limit cases); `apps/api` 104/104 (incl. new `mcp-auth.guard.spec.ts`
+    rate-limit cases); `apps/web` 852/852 unit + 19/22 e2e passing directly, the remaining 3
+    (`auth`, `boards`, `tv-pairing`) passing on Playwright's own retry — the same pre-existing
+    dev-server-timing flake category this file has repeatedly documented, none touching MCP/audit/
+    rate-limit code.
+  - Opened PR #64. First CI run failed on one unrelated pre-existing test
+    (`org-membership-flows.emulator.test.ts > removeOrgMember`, timed out at 30s under heavy
+    Firestore-emulator resource contention — the same `RESOURCE_EXHAUSTED: Received message larger
+    than max` pattern seen locally, which self-recovers via backoff rather than failing outright
+    locally) — nothing in this diff touches org-membership code. Re-ran the failed job via the GitHub
+    Actions API rather than assuming it was safe to merge on a red run; it came back green
+    (`conclusion: success`) with no code changes, confirming the flake diagnosis.
+    `mergeable_state: "clean"` on the green re-run, merged (squash) into `main`. Remote branch
+    deletion failed with the same HTTP 403 this sandbox's git remote returns for every prior feature
+    branch — merged and dead but not deleted; local branch deleted after confirming `main`
+    fast-forwarded to include it cleanly.
+- **In progress (exact stopping point):** none — KAN-77 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-78** (docs + example clients: Claude Desktop config, claude.ai connector setup,
+  headless-agent recipe) is the natural next pick — it's the last story in Epic E22 (MCP) and has no
+  outstanding blocker. **KAN-72/73** (Google/Meta Manage plugins) remain practically blocked on
+  **KAN-43**.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding) — gates KAN-72/73 specifically.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding) — same
+    warehouse-not-configured caveat noted in the last several entries.
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`) and PR #60 (`fix/arbel-admin-query-compat`) are still open and
+    untouched — out of scope for KAN-77, carried forward so they aren't lost.
+  - `apps/web/repro-tmp.mjs` (a leftover debug script noted in a prior entry) is still sitting in
+    `main`'s working tree, still out of scope for this run's own diff.
+
+---
+
 ## 2026-07-13 — E22.2 MCP act tools: propose_action/approve_action, create_goal, create_segment (KAN-76)
 
 - **Last completed:**
