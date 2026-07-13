@@ -374,7 +374,7 @@ export async function listGoalsForProject(organizationId: string, projectId: str
   return listGoalsForProjectInOrganization(organizationId, projectId);
 }
 
-/** A project's saved segments (KAN-76), newest-first — creation happens only via the MCP `create_segment` tool today; this page is the view/audit surface for what an agent has saved. */
+/** A project's saved segments (KAN-76), newest-first — created either by a human via this project's Segments page or by an agent via the MCP `create_segment` tool. */
 export async function listSegmentsForProject(organizationId: string, projectId: string): Promise<SegmentModel[]> {
   await ensureFirestoreOrm();
   return listSegmentsForProjectInOrganization(organizationId, projectId);
