@@ -47,14 +47,20 @@ describe('McpAuthGuard', () => {
   it('authenticates a live API key with the mcp.read scope, attaching principalKind "api_key"', async () => {
     mockAuthenticateApiKey.mockResolvedValue({
       ok: true,
-      value: { apiKey: {} as never, organizationId: 'org-1', projectId: 'proj-1', environmentId: 'env-1', scopes: ['mcp.read'] },
+      value: { apiKey: { id: 'key-1' } as never, organizationId: 'org-1', projectId: 'proj-1', environmentId: 'env-1', scopes: ['mcp.read'] },
     });
     const { context, request } = makeContext({ headers: { authorization: 'Bearer gos_live_ok' } });
 
     await expect(guard.canActivate(context)).resolves.toBe(true);
     expect(mockAuthenticateApiKey).toHaveBeenCalledWith('gos_live_ok', 'mcp.read');
     expect(mockAuthenticateMcpAccessToken).not.toHaveBeenCalled();
-    expect(request.mcpAuthContext).toEqual({ organizationId: 'org-1', projectId: 'proj-1', principalKind: 'api_key' });
+    expect(request.mcpAuthContext).toEqual({
+      organizationId: 'org-1',
+      projectId: 'proj-1',
+      principalKind: 'api_key',
+      scopes: ['mcp.read'],
+      apiKeyId: 'key-1',
+    });
   });
 
   it('rejects (403) a live API key that lacks the mcp.read scope, without falling through to OAuth', async () => {

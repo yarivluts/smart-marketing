@@ -79,6 +79,7 @@
     "projectPluginsLink": "תוספים",
     "projectBoardsLink": "לוחות מחוונים",
     "projectGoalsLink": "יעדים",
+    "projectSegmentsLink": "פלחים",
     "projectTvLink": "טלוויזיית חדר מלחמה"
   },
   "ProjectSwitcher": {
@@ -759,6 +760,15 @@
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",
       "query_error": "לא ניתן היה לטעון את התקדמות היעד"
     }
+  },
+  "Segments": {
+    "metaTitle": "פלחים",
+    "title": "פלחים עבור {projectName}",
+    "segmentsHeading": "פלחים",
+    "noSegments": "לפרויקט זה אין עדיין פלחים שמורים. בקש מסוכן בינה מלאכותית המחובר ב-MCP ליצור אחד באמצעות הכלי create_segment.",
+    "schemaLabel": "ישות: {schemaName}",
+    "filterCount": "{count, plural, one {מסנן #} other {# מסננים}}",
+    "createdByLabel": "נוצר {createdAt}"
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

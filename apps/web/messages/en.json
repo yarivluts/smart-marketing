@@ -79,6 +79,7 @@
     "projectPluginsLink": "Plugins",
     "projectBoardsLink": "Boards",
     "projectGoalsLink": "Goals",
+    "projectSegmentsLink": "Segments",
     "projectTvLink": "War-room TV"
   },
   "ProjectSwitcher": {
@@ -759,6 +760,15 @@
       "quota_exceeded": "Daily query quota reached",
       "query_error": "Couldn't load this goal's progress"
     }
+  },
+  "Segments": {
+    "metaTitle": "Segments",
+    "title": "Segments for {projectName}",
+    "segmentsHeading": "Segments",
+    "noSegments": "This project has no saved segments yet. Ask an MCP-connected AI agent to create one with the create_segment tool.",
+    "schemaLabel": "Entity: {schemaName}",
+    "filterCount": "{count, plural, one {# filter} other {# filters}}",
+    "createdByLabel": "Created {createdAt}"
   },
   "WinRules": {
     "metaTitle": "Win rules",

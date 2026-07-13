@@ -58,17 +58,17 @@ import type { McpAuthContext } from './mcp-auth.guard';
  * (`parseMetricQueryRequestBody` for the metric-query tools, manual field
  * checks for the rest) before touching Firestore/the warehouse.
  */
-function toolInputSchema(shape: Record<string, z.ZodTypeAny>): any {
+export function toolInputSchema(shape: Record<string, z.ZodTypeAny>): any {
   return shape;
 }
 
-type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+export type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
 
-function textResult(value: unknown): ToolResult {
+export function textResult(value: unknown): ToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
 }
 
-function errorResult(message: string): ToolResult {
+export function errorResult(message: string): ToolResult {
   return { content: [{ type: 'text', text: message }], isError: true };
 }
 

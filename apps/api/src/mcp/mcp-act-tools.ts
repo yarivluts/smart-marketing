@@ -1,0 +1,259 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- same TypeScript-compiler-limit reason `mcp-tools.ts`'s own top-of-file comment documents: every tool callback's `args` param is `any`, narrowed/validated by hand inside each handler. */
+import { z } from 'zod';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  approveAutomationAction,
+  AutomationActionInvalidStateError,
+  AutomationActionNotFoundError,
+  AutomationKillSwitchEngagedError,
+  AutomationTargetNotFoundError,
+  createGoal,
+  createSegment,
+  InsufficientWriteTierError,
+  InvalidAutomationActionError,
+  InvalidGoalError,
+  InvalidSegmentError,
+  ProjectNotFoundError,
+  proposeAutomationBudgetChangeAction,
+} from '@growthos/firebase-orm-models';
+import { errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
+import { mcpCallerHasPermission } from './mcp-act-authorization';
+import type { McpAuthContext } from './mcp-auth.guard';
+
+/**
+ * Registers KAN-76's act-tool surface (plan `13 §22.2`) on the same
+ * {@link McpServer}/{@link McpAuthContext} `registerMcpTools` (`mcp-tools.ts`)
+ * registers KAN-75's read tools on — see `mcp.controller.ts` for why both are
+ * called against one fresh per-request server instance.
+ *
+ * Every tool here calls the exact same `packages/firebase-orm-models`
+ * service function the equivalent `apps/web` route already calls
+ * (`proposeAutomationBudgetChangeAction`/`approveAutomationAction`/
+ * `createGoal`/`createSegment`) — no parallel mutation path, no duplicated
+ * business logic, audit logging included for free since it happens inside
+ * those service functions themselves.
+ *
+ * Unlike the read tools (gated once, at connection time, on `mcp.read`
+ * alone), each act tool additionally requires its own specific permission —
+ * `automation.execute`/`automation.approve` mirroring the web app's own
+ * `automation/actions` routes exactly, `dashboards.write` mirroring the
+ * `goals` route (KAN-76's own reasoning: `mcp.act` is deliberately *not*
+ * introduced as one blanket new permission — see this module's own PR
+ * description for why per-tool reuse of an already-modeled permission is a
+ * better fit than a new, coarser one). `mcpCallerHasPermission` checks this
+ * fresh on every call — see its own doc comment for the api_key-vs-oauth
+ * split.
+ */
+
+function describeActToolError(error: unknown): string {
+  if (error instanceof ProjectNotFoundError || error instanceof AutomationTargetNotFoundError || error instanceof AutomationActionNotFoundError) {
+    return 'Not found.';
+  }
+  if (
+    error instanceof InvalidAutomationActionError ||
+    error instanceof AutomationActionInvalidStateError ||
+    error instanceof AutomationKillSwitchEngagedError ||
+    error instanceof InsufficientWriteTierError
+  ) {
+    return error.message;
+  }
+  if (error instanceof InvalidGoalError || error instanceof InvalidSegmentError) {
+    return `Invalid: ${error.reasons.join('; ')}`;
+  }
+  throw error;
+}
+
+function insufficientPermissionMessage(auth: McpAuthContext, permission: string): string {
+  if (auth.principalKind === 'api_key') {
+    return `This API key does not carry the "${permission}" scope required for this tool.`;
+  }
+  return `This MCP connection's user does not currently hold "${permission}" for this project.`;
+}
+
+/** The audit-trail actor id to attribute an act-tool mutation to: the granting human for an OAuth connection, or the key's own id for an API-key one (a key has no user id of its own) — see `McpAuthContext.apiKeyId`'s own doc comment. */
+function actorId(auth: McpAuthContext): string {
+  return auth.userId ?? auth.apiKeyId ?? 'unknown-mcp-caller';
+}
+
+const proposeActionInputShape = {
+  target_id: z.string().min(1).describe('The seeded automation target id (see the project automation page).'),
+  after_daily_budget_usd: z.number().describe('The proposed new daily budget, in USD.'),
+};
+
+const approveActionInputShape = {
+  action_id: z.string().min(1).describe('The automation action id returned by propose_action, currently "awaiting_approval".'),
+};
+
+const createGoalInputShape = {
+  name: z.string().min(1),
+  metric_name: z.string().min(1).describe('Must be a currently registered and active metric (see list_metrics).'),
+  direction: z.string().describe('One of: maximize, minimize, range.'),
+  target_value: z.number().optional().describe('Required for maximize/minimize.'),
+  range_min: z.number().optional().describe('Required for range, together with range_max.'),
+  range_max: z.number().optional(),
+  start_date: z.string().describe('YYYY-MM-DD, inclusive.'),
+  deadline: z.string().describe('YYYY-MM-DD, inclusive, must be after start_date.'),
+  rhythm: z.string().describe('One of: even, work_week_weekend.'),
+  owner_person_id: z.string().min(1).describe('An id from the org people registry.'),
+};
+
+const createSegmentInputShape = {
+  name: z.string().min(1),
+  schema_name: z.string().min(1).describe('A registered and active entity schema name, e.g. "customer".'),
+  filters: z.unknown().describe('Array of { field, op, value } — op is one of =, !=, >, >=, <, <=, contains. ANDed together.'),
+};
+
+export function registerMcpActTools(server: McpServer, auth: McpAuthContext): void {
+  server.registerTool(
+    'propose_action',
+    {
+      title: 'Propose action (dry-run diff)',
+      description:
+        'Propose a simulated ad-campaign budget change for a seeded automation target — evaluates every guardrail and lands as "blocked" or "awaiting_approval", never executes anything by itself. Requires "automation.execute".',
+      inputSchema: toolInputSchema(proposeActionInputShape),
+    },
+    async (args: any): Promise<ToolResult> => {
+      if (!(await mcpCallerHasPermission(auth, 'automation.execute'))) {
+        return errorResult(insufficientPermissionMessage(auth, 'automation.execute'));
+      }
+      const { target_id: targetId, after_daily_budget_usd: afterDailyBudgetUsd } = args as {
+        target_id: string;
+        after_daily_budget_usd: number;
+      };
+      try {
+        const action = await proposeAutomationBudgetChangeAction({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          targetId,
+          afterDailyBudgetUsd,
+          requestedByUserId: actorId(auth),
+        });
+        return textResult({ id: action.id, status: action.status, guardrailViolations: action.guardrail_violations });
+      } catch (error) {
+        return errorResult(describeActToolError(error));
+      }
+    },
+  );
+
+  server.registerTool(
+    'approve_action',
+    {
+      title: 'Approve action',
+      description: 'Approve an "awaiting_approval" automation action so it can be executed. Requires "automation.approve", distinct from "automation.execute".',
+      inputSchema: toolInputSchema(approveActionInputShape),
+    },
+    async (args: any): Promise<ToolResult> => {
+      if (!(await mcpCallerHasPermission(auth, 'automation.approve'))) {
+        return errorResult(insufficientPermissionMessage(auth, 'automation.approve'));
+      }
+      const { action_id: actionId } = args as { action_id: string };
+      try {
+        const action = await approveAutomationAction({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          actionId,
+          approverId: actorId(auth),
+        });
+        return textResult({ id: action.id, status: action.status });
+      } catch (error) {
+        return errorResult(describeActToolError(error));
+      }
+    },
+  );
+
+  server.registerTool(
+    'create_goal',
+    {
+      title: 'Create goal',
+      description:
+        'Create a goal pinning a registered metric to a target (or range) and a deadline, with an owner and calendar rhythm. Requires "dashboards.write".',
+      inputSchema: toolInputSchema(createGoalInputShape),
+    },
+    async (args: any): Promise<ToolResult> => {
+      if (!(await mcpCallerHasPermission(auth, 'dashboards.write'))) {
+        return errorResult(insufficientPermissionMessage(auth, 'dashboards.write'));
+      }
+      const {
+        name,
+        metric_name: metricName,
+        direction,
+        target_value: targetValue,
+        range_min: rangeMin,
+        range_max: rangeMax,
+        start_date: startDate,
+        deadline,
+        rhythm,
+        owner_person_id: ownerPersonId,
+      } = args as {
+        name: string;
+        metric_name: string;
+        direction: string;
+        target_value?: number;
+        range_min?: number;
+        range_max?: number;
+        start_date: string;
+        deadline: string;
+        rhythm: string;
+        owner_person_id: string;
+      };
+      try {
+        const goal = await createGoal({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          name,
+          metricName,
+          direction,
+          ...(targetValue !== undefined ? { targetValue } : {}),
+          ...(rangeMin !== undefined ? { rangeMin } : {}),
+          ...(rangeMax !== undefined ? { rangeMax } : {}),
+          startDate,
+          deadline,
+          rhythm,
+          ownerPersonId,
+          createdByUserId: actorId(auth),
+        });
+        return textResult({
+          id: goal.id,
+          name: goal.name,
+          metricName: goal.metric_name,
+          direction: goal.direction,
+          deadline: goal.deadline,
+        });
+      } catch (error) {
+        return errorResult(describeActToolError(error));
+      }
+    },
+  );
+
+  server.registerTool(
+    'create_segment',
+    {
+      title: 'Create segment',
+      description:
+        'Save a named customer segment definition — an ANDed set of filter conditions over one registered entity schema (e.g. "paying, no demo, MRR > $200"). A definition only: no live member list is materialized yet. Requires "dashboards.write".',
+      inputSchema: toolInputSchema(createSegmentInputShape),
+    },
+    async (args: any): Promise<ToolResult> => {
+      if (!(await mcpCallerHasPermission(auth, 'dashboards.write'))) {
+        return errorResult(insufficientPermissionMessage(auth, 'dashboards.write'));
+      }
+      const { name, schema_name: schemaName, filters } = args as { name: string; schema_name: string; filters: unknown };
+      if (!Array.isArray(filters)) {
+        return errorResult('"filters" must be an array of { field, op, value } conditions.');
+      }
+      try {
+        const segment = await createSegment({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          name,
+          schemaName,
+          filters,
+          createdByUserId: actorId(auth),
+        });
+        return textResult({ id: segment.id, name: segment.name, schemaName: segment.schema_name, filters: segment.filters });
+      } catch (error) {
+        return errorResult(describeActToolError(error));
+      }
+    },
+  );
+}

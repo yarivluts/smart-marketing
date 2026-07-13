@@ -52,6 +52,7 @@ import {
   requireRegisteredRedirectUri as requireRegisteredRedirectUriInOrganization,
   listResourceTemplates as listResourceTemplatesInOrganization,
   listSchemaDefinitionsForProject as listSchemaDefinitionsForProjectInOrganization,
+  listSegmentsForProject as listSegmentsForProjectInOrganization,
   listSharedCredentials as listSharedCredentialsInOrganization,
   MembershipModel,
   OrganizationModel,
@@ -89,6 +90,7 @@ import {
   type ResourceTemplateModel,
   type Role,
   type SchemaDefModel,
+  type SegmentModel,
   type SharedCredentialModel,
   type TrackingAlertModel,
   type TrialPipelineOutcome,
@@ -370,6 +372,12 @@ export async function queryBoardTile(
 export async function listGoalsForProject(organizationId: string, projectId: string): Promise<GoalModel[]> {
   await ensureFirestoreOrm();
   return listGoalsForProjectInOrganization(organizationId, projectId);
+}
+
+/** A project's saved segments (KAN-76), newest-first — creation happens only via the MCP `create_segment` tool today; this page is the view/audit surface for what an agent has saved. */
+export async function listSegmentsForProject(organizationId: string, projectId: string): Promise<SegmentModel[]> {
+  await ensureFirestoreOrm();
+  return listSegmentsForProjectInOrganization(organizationId, projectId);
 }
 
 export async function getGoal(organizationId: string, projectId: string, goalId: string): Promise<GoalModel | null> {

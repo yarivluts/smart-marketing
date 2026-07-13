@@ -1,4 +1,5 @@
 import type { AddressInfo } from 'node:net';
+import { createHash, randomBytes } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -6,9 +7,16 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import {
   connectFirestoreOrm,
   createOrganizationWithOwner,
+  createOrgPerson,
   createProject,
+  ensureAutomationTargetSeeded,
   ensureUserForFirebaseSession,
+  exchangeMcpAuthorizationCode,
+  issueMcpAuthorizationCode,
   mintApiKey,
+  registerMcpOAuthClient,
+  registerMetricDefinition,
+  registerSchemaDefinition,
 } from '@growthos/firebase-orm-models';
 import { AppModule } from '../app.module';
 
@@ -53,7 +61,10 @@ function uniqueEmail(prefix: string): string {
   return `${unique(prefix)}@example.com`;
 }
 
-async function setupProjectWithKey(orgName: string, scopes: ('mcp.read' | 'ingest.write')[] = ['mcp.read']) {
+async function setupProjectWithKey(
+  orgName: string,
+  scopes: ('mcp.read' | 'ingest.write' | 'dashboards.write')[] = ['mcp.read'],
+) {
   const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
@@ -76,6 +87,43 @@ async function connectedClient(rawKey: string): Promise<Client> {
   });
   await client.connect(transport);
   return client;
+}
+
+function makePkcePair() {
+  const codeVerifier = randomBytes(32).toString('base64url');
+  const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
+  return { codeVerifier, codeChallenge };
+}
+
+/**
+ * Mints a real MCP OAuth access token for `organization`'s owner (who holds
+ * every permission, `ALL_PERMISSIONS`) — the only way KAN-76's
+ * `propose_action`/`approve_action` can ever succeed end to end, since
+ * `automation.execute`/`automation.approve` are permanently withheld from
+ * API key scopes (see `mcp-act-authorization.ts`'s own doc comment).
+ */
+async function mintOAuthAccessToken(organizationId: string, projectId: string, ownerId: string): Promise<string> {
+  const client = await registerMcpOAuthClient({ clientName: 'e2e act-tools client', redirectUris: ['https://client.example.com/callback'] });
+  const { codeVerifier, codeChallenge } = makePkcePair();
+  const { code } = await issueMcpAuthorizationCode({
+    clientId: client.id,
+    redirectUri: client.redirect_uris[0],
+    codeChallenge,
+    codeChallengeMethod: 'S256',
+    organizationId,
+    projectId,
+    grantedByUserId: ownerId,
+  });
+  const result = await exchangeMcpAuthorizationCode({
+    code,
+    clientId: client.id,
+    redirectUri: client.redirect_uris[0],
+    codeVerifier,
+  });
+  if (!result.ok) {
+    throw new Error(`Failed to exchange MCP authorization code: ${result.error.message}`);
+  }
+  return result.value.accessToken;
 }
 
 describe('McpController (e2e)', () => {
@@ -110,13 +158,26 @@ describe('McpController (e2e)', () => {
     expect(deleteRes.status).toBe(405);
   });
 
-  it('lists every KAN-75 read tool via a real MCP client', async () => {
+  it('lists every KAN-75 read tool plus KAN-76 act tool via a real MCP client', async () => {
     const { rawKey } = await setupProjectWithKey('List Tools Org');
     const client = await connectedClient(rawKey);
     try {
       const { tools } = await client.listTools();
       expect(tools.map((tool) => tool.name).sort()).toEqual(
-        ['compare_periods', 'decompose', 'describe_metric', 'list_insights', 'list_metrics', 'query_cohort', 'query_metric', 'search_customers'].sort(),
+        [
+          'approve_action',
+          'compare_periods',
+          'create_goal',
+          'create_segment',
+          'decompose',
+          'describe_metric',
+          'list_insights',
+          'list_metrics',
+          'propose_action',
+          'query_cohort',
+          'query_metric',
+          'search_customers',
+        ].sort(),
       );
     } finally {
       await client.close();
@@ -174,5 +235,163 @@ describe('McpController (e2e)', () => {
     } finally {
       await client.close();
     }
+  });
+
+  describe('KAN-76 act tools', () => {
+    it('propose_action/approve_action return a clean tool error for an API key — automation.execute/approve can never be a key scope', async () => {
+      const { rawKey } = await setupProjectWithKey('Act Tools Key Org');
+      const client = await connectedClient(rawKey);
+      try {
+        const proposeResult = await client.callTool({
+          name: 'propose_action',
+          arguments: { target_id: 'does-not-matter', after_daily_budget_usd: 110 },
+        });
+        expect(proposeResult.isError).toBe(true);
+        expect((proposeResult.content as Array<{ type: string; text: string }>)[0].text).toContain('automation.execute');
+
+        const approveResult = await client.callTool({ name: 'approve_action', arguments: { action_id: 'does-not-matter' } });
+        expect(approveResult.isError).toBe(true);
+        expect((approveResult.content as Array<{ type: string; text: string }>)[0].text).toContain('automation.approve');
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('create_goal/create_segment return a clean tool error for an API key lacking dashboards.write', async () => {
+      const { rawKey } = await setupProjectWithKey('Act Tools No Scope Org', ['mcp.read']);
+      const client = await connectedClient(rawKey);
+      try {
+        const goalResult = await client.callTool({
+          name: 'create_goal',
+          arguments: {
+            name: 'X',
+            metric_name: 'signups',
+            direction: 'maximize',
+            target_value: 100,
+            start_date: '2026-01-01',
+            deadline: '2026-02-01',
+            rhythm: 'even',
+            owner_person_id: 'does-not-matter',
+          },
+        });
+        expect(goalResult.isError).toBe(true);
+        expect((goalResult.content as Array<{ type: string; text: string }>)[0].text).toContain('dashboards.write');
+
+        const segmentResult = await client.callTool({
+          name: 'create_segment',
+          arguments: { name: 'X', schema_name: 'customer', filters: [{ field: 'plan', op: '=', value: 'pro' }] },
+        });
+        expect(segmentResult.isError).toBe(true);
+        expect((segmentResult.content as Array<{ type: string; text: string }>)[0].text).toContain('dashboards.write');
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('create_goal creates a real goal for an API key holding dashboards.write', async () => {
+      const { owner, organization, project, rawKey } = await setupProjectWithKey('Act Tools Create Goal Org', ['mcp.read', 'dashboards.write']);
+      await registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'signups',
+        definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [] } },
+        dimensions: [],
+        createdByUserId: owner.id,
+      });
+      const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({
+          name: 'create_goal',
+          arguments: {
+            name: 'Q3 signups',
+            metric_name: 'signups',
+            direction: 'maximize',
+            target_value: 1000,
+            start_date: '2026-07-01',
+            deadline: '2026-09-30',
+            rhythm: 'even',
+            owner_person_id: person.id,
+          },
+        });
+        expect(result.isError).not.toBe(true);
+        const body = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as { id: string; name: string };
+        expect(body.name).toBe('Q3 signups');
+        expect(body.id).toBeTruthy();
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('create_segment saves a real segment definition for an API key holding dashboards.write', async () => {
+      const { owner, organization, project, rawKey } = await setupProjectWithKey('Act Tools Create Segment Org', ['mcp.read', 'dashboards.write']);
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'entity',
+        name: 'customer',
+        fields: [
+          { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+          { name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
+        ],
+        createdByUserId: owner.id,
+      });
+
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({
+          name: 'create_segment',
+          arguments: { name: 'Pro customers', schema_name: 'customer', filters: [{ field: 'plan', op: '=', value: 'pro' }] },
+        });
+        expect(result.isError).not.toBe(true);
+        const body = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as { id: string; name: string };
+        expect(body.name).toBe('Pro customers');
+        expect(body.id).toBeTruthy();
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('propose_action then approve_action succeed end to end for an OAuth-authenticated org owner', async () => {
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
+      const { organization } = await createOrganizationWithOwner({ name: 'Act Tools OAuth Org', ownerUserId: owner.id });
+      const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+      const target = await ensureAutomationTargetSeeded({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: unique('campaign'),
+        targetType: 'campaign',
+        label: 'Summer Sale',
+        initialDailyBudgetUsd: 100,
+        seededByUserId: owner.id,
+      });
+      const accessToken = await mintOAuthAccessToken(organization.id, project.id, owner.id);
+
+      const client = await connectedClient(accessToken);
+      try {
+        const proposeResult = await client.callTool({
+          name: 'propose_action',
+          arguments: { target_id: target.id, after_daily_budget_usd: 110 },
+        });
+        expect(proposeResult.isError).not.toBe(true);
+        const proposed = JSON.parse((proposeResult.content as Array<{ type: string; text: string }>)[0].text) as {
+          id: string;
+          status: string;
+        };
+        expect(proposed.status).toBe('awaiting_approval');
+
+        const approveResult = await client.callTool({ name: 'approve_action', arguments: { action_id: proposed.id } });
+        expect(approveResult.isError).not.toBe(true);
+        const approved = JSON.parse((approveResult.content as Array<{ type: string; text: string }>)[0].text) as {
+          id: string;
+          status: string;
+        };
+        expect(approved.status).toBe('approved');
+      } finally {
+        await client.close();
+      }
+    });
   });
 });
