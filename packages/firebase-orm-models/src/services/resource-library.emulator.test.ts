@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   AttachmentNotApprovedError,
+  AttachmentNotCredentialError,
   AttachmentNotFoundError,
   AttachmentNotPendingError,
   createOrganizationWithOwner,
@@ -13,8 +14,10 @@ import {
   detachResource,
   ensureUserForFirebaseSession,
   InvalidScopeSelectionError,
+  InvalidWriteTierError,
   listActiveAttachmentsForProject,
   listAttachmentsForProject,
+  listAuditLogEntriesForOrg,
   listOrgPeople,
   listPendingAttachmentsForOrg,
   listResourceTemplates,
@@ -23,6 +26,7 @@ import {
   requestResourceAttachment,
   ResourceAttachmentModel,
   ResourceNotFoundError,
+  setResourceAttachmentWriteTier,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -346,6 +350,149 @@ describe('resource attachment lifecycle: request -> approve -> detach', () => {
 
     await expect(
       detachResource({ organizationId: organization.id, attachmentId: 'does-not-exist' }),
+    ).rejects.toThrow(AttachmentNotFoundError);
+  });
+});
+
+describe('connection write tier (KAN-74)', () => {
+  it('defaults every new attachment to the safe "read" tier', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Tier Default Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Default Tier Credential',
+      provider: 'google_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Some Project' });
+
+    const request = await requestResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      requestedByUserId: owner.id,
+      scopeSelection: ['act_1'],
+    });
+
+    expect(request.write_tier).toBe('read');
+  });
+
+  it("raises a credential connection's write tier once approved, and records a before/after audit log entry", async () => {
+    const { owner, organization } = await setupOrgWithOwner('Tier Set Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Manage Tier Credential',
+      provider: 'meta_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Some Project' });
+    const request = await requestResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      requestedByUserId: owner.id,
+      scopeSelection: ['act_1'],
+    });
+    await decideResourceAttachment({ organizationId: organization.id, attachmentId: request.id, decidedByUserId: owner.id, approve: true });
+
+    const updated = await setResourceAttachmentWriteTier({
+      organizationId: organization.id,
+      attachmentId: request.id,
+      tier: 'optimize',
+      actorId: owner.id,
+    });
+
+    expect(updated.write_tier).toBe('optimize');
+    expect(updated.write_tier_updated_by_user_id).toBe(owner.id);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'resource_attachment.write_tier_change');
+    expect(entry).toBeDefined();
+    expect(entry?.before).toEqual({ tier: 'read' });
+    expect(entry?.after).toEqual({ tier: 'optimize' });
+  });
+
+  it('rejects setting a write tier on a template/person attachment (only credentials carry write capability)', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Tier Non Credential Org');
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Some Rep', createdByUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Some Project' });
+    const request = await requestResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'person',
+      resourceId: person.id,
+      requestedByUserId: owner.id,
+    });
+    await decideResourceAttachment({ organizationId: organization.id, attachmentId: request.id, decidedByUserId: owner.id, approve: true });
+
+    await expect(
+      setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: request.id, tier: 'manage', actorId: owner.id }),
+    ).rejects.toThrow(AttachmentNotCredentialError);
+  });
+
+  it('rejects setting a write tier on an attachment that is not currently approved', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Tier Not Approved Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Pending Credential',
+      provider: 'google_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Some Project' });
+    const request = await requestResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      requestedByUserId: owner.id,
+      scopeSelection: ['act_1'],
+    });
+
+    await expect(
+      setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: request.id, tier: 'manage', actorId: owner.id }),
+    ).rejects.toThrow(AttachmentNotApprovedError);
+  });
+
+  it('rejects an invalid tier value', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Tier Invalid Value Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Some Credential',
+      provider: 'google_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Some Project' });
+    const request = await requestResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      requestedByUserId: owner.id,
+      scopeSelection: ['act_1'],
+    });
+    await decideResourceAttachment({ organizationId: organization.id, attachmentId: request.id, decidedByUserId: owner.id, approve: true });
+
+    await expect(
+      setResourceAttachmentWriteTier({
+        organizationId: organization.id,
+        attachmentId: request.id,
+        // @ts-expect-error deliberately invalid at the type level too, to prove the runtime check catches it
+        tier: 'super-manage',
+        actorId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidWriteTierError);
+  });
+
+  it('rejects setting a write tier on an attachment id that does not exist', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Tier Missing Attachment Org');
+
+    await expect(
+      setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: 'does-not-exist', tier: 'manage', actorId: owner.id }),
     ).rejects.toThrow(AttachmentNotFoundError);
   });
 });

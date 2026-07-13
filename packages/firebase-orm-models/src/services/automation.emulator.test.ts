@@ -8,20 +8,25 @@ import {
   AutomationTargetNotFoundError,
   createOrganizationWithOwner,
   createProject,
+  createSharedCredential,
+  decideResourceAttachment,
   disengageAutomationKillSwitch,
   engageAutomationKillSwitch,
   ensureAutomationTargetSeeded,
   ensureUserForFirebaseSession,
   executeAutomationAction,
   getAutomationKillSwitchStatus,
+  InsufficientWriteTierError,
   InvalidAutomationActionError,
   listAuditLogEntriesForOrg,
   listAutomationActionsForProject,
   listAutomationTargetStatesForProject,
   proposeAutomationBudgetChangeAction,
   rejectAutomationAction,
+  requestResourceAttachment,
   rollbackAutomationAction,
   setAutomationGuardrailPolicy,
+  setResourceAttachmentWriteTier,
   verifyAutomationAction,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -56,6 +61,49 @@ async function seedTarget(organizationId: string, projectId: string, seededByUse
     initialDailyBudgetUsd,
     seededByUserId,
   });
+}
+
+/** Seeds an approved credential connection at the given write tier and a target linked to it (KAN-74). */
+async function seedTargetWithConnection(
+  organizationId: string,
+  projectId: string,
+  ownerId: string,
+  tier: 'read' | 'optimize' | 'manage',
+  initialDailyBudgetUsd = 100,
+) {
+  const credential = await createSharedCredential({
+    organizationId,
+    name: 'Agency Google Ads MCC',
+    provider: 'google_ads',
+    availableScopes: ['act_1'],
+    createdByUserId: ownerId,
+  });
+  const attachment = await requestResourceAttachment({
+    organizationId,
+    projectId,
+    resourceKind: 'credential',
+    resourceId: credential.id,
+    requestedByUserId: ownerId,
+    scopeSelection: ['act_1'],
+  });
+  await decideResourceAttachment({ organizationId, attachmentId: attachment.id, decidedByUserId: ownerId, approve: true });
+  if (tier !== 'read') {
+    await setResourceAttachmentWriteTier({ organizationId, attachmentId: attachment.id, tier, actorId: ownerId });
+  }
+
+  const target = await ensureAutomationTargetSeeded({
+    organizationId,
+    projectId,
+    environmentId: 'live',
+    targetId: unique('campaign'),
+    targetType: 'campaign',
+    label: 'Summer Sale',
+    initialDailyBudgetUsd,
+    seededByUserId: ownerId,
+    resourceAttachmentId: attachment.id,
+  });
+
+  return { target, attachment };
 }
 
 describe('ensureAutomationTargetSeeded', () => {
@@ -524,5 +572,97 @@ describe('listAutomationActionsForProject', () => {
 
     const actions = await listAutomationActionsForProject(organization.id, project.id);
     expect(actions.map((action) => action.id)).toEqual([second.id, first.id]);
+  });
+});
+
+describe('write-tier gating (KAN-74)', () => {
+  it('blocks a proposal with an insufficient_write_tier violation when the linked connection is at the default "read" tier', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Tier Read Org');
+    const { target } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'read');
+
+    const action = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      afterDailyBudgetUsd: 110,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'insufficient_write_tier' })]));
+  });
+
+  it('allows a proposal to proceed once the connection is at the "optimize" tier', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Tier Optimize Org');
+    const { target } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'optimize');
+
+    const action = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      afterDailyBudgetUsd: 110,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('awaiting_approval');
+    expect(action.guardrail_violations).toEqual([]);
+  });
+
+  it('does not gate a target with no linked connection at all (pre-KAN-74 ungated demo posture)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Tier Ungated Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+
+    const action = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      afterDailyBudgetUsd: 110,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('awaiting_approval');
+  });
+
+  it('a tier downgrade after approval immediately blocks execution — revocation takes effect right away', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Tier Downgrade Execute Org');
+    const { target, attachment } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'manage');
+
+    const proposed = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      afterDailyBudgetUsd: 120,
+      requestedByUserId: owner.id,
+    });
+    expect(proposed.status).toBe('awaiting_approval');
+    const approved = await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id });
+    expect(approved.status).toBe('approved');
+
+    // Downgrade the connection back to "read" after approval, before execution.
+    await setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: attachment.id, tier: 'read', actorId: owner.id });
+
+    await expect(
+      executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, executedByUserId: owner.id }),
+    ).rejects.toThrow(InsufficientWriteTierError);
+  });
+
+  it('a tier downgrade after propose immediately blocks approval', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Tier Downgrade Approve Org');
+    const { target, attachment } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'optimize');
+
+    const proposed = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      afterDailyBudgetUsd: 110,
+      requestedByUserId: owner.id,
+    });
+    expect(proposed.status).toBe('awaiting_approval');
+
+    await setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: attachment.id, tier: 'read', actorId: owner.id });
+
+    await expect(
+      approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id }),
+    ).rejects.toThrow(InsufficientWriteTierError);
   });
 });

@@ -2,15 +2,30 @@ import { evaluateBudgetChangeGuardrails, type GuardrailViolation } from '@growth
 import { ProjectModel } from '../models/project.model';
 import { AutomationTargetStateModel } from '../models/automation-target-state.model';
 import { AutomationActionModel, type AutomationActionStatus } from '../models/automation-action.model';
+import { ResourceAttachmentModel } from '../models/resource-attachment.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { getActiveAutomationGuardrailPolicy, toPureGuardrailPolicy } from './automation-guardrail.service';
 import { isAutomationKillSwitchEngaged } from './automation-kill-switch.service';
 import { runWithRetryBackoff } from '../plugin-runtime/retry';
 import { defaultAutomationActionExecutor, type AutomationActionExecutor } from '../automation-runtime';
-import { AutomationActionInvalidStateError, AutomationActionNotFoundError, AutomationKillSwitchEngagedError, AutomationTargetNotFoundError, InvalidAutomationActionError } from './automation-errors';
+import {
+  AutomationActionInvalidStateError,
+  AutomationActionNotFoundError,
+  AutomationKillSwitchEngagedError,
+  AutomationTargetNotFoundError,
+  InsufficientWriteTierError,
+  InvalidAutomationActionError,
+} from './automation-errors';
 
-export { AutomationTargetNotFoundError, AutomationActionNotFoundError, AutomationActionInvalidStateError, AutomationKillSwitchEngagedError, InvalidAutomationActionError };
+export {
+  AutomationTargetNotFoundError,
+  AutomationActionNotFoundError,
+  AutomationActionInvalidStateError,
+  AutomationKillSwitchEngagedError,
+  InsufficientWriteTierError,
+  InvalidAutomationActionError,
+};
 
 /** Bounds how many of today's executed actions this reads to enforce the blast-radius guardrail — same reasoning as `checkProjectQueryQuota`'s own bound. */
 const DEFAULT_ACTION_LIST_LIMIT = 100;
@@ -79,6 +94,30 @@ export interface SeedAutomationTargetParams {
   label: string;
   initialDailyBudgetUsd: number;
   seededByUserId: string;
+  /**
+   * Optionally links this target to one of the project's approved
+   * `credential` connections (KAN-27/74) so its write actions are gated by
+   * that connection's current `write_tier`. Omit for an ungated demo target
+   * (the pre-KAN-74 default — no tier check ever applies to it).
+   */
+  resourceAttachmentId?: string;
+}
+
+/** Confirms `resourceAttachmentId` names an approved `credential` connection actually belonging to this project — never trust a caller-supplied id blindly, same posture `requireResourceInOrg` already established. */
+async function requireCredentialConnectionForProject(
+  organizationId: string,
+  projectId: string,
+  resourceAttachmentId: string,
+): Promise<void> {
+  const attachment = await ResourceAttachmentModel.init(resourceAttachmentId, { organization_id: organizationId });
+  if (
+    !attachment ||
+    attachment.project_id !== projectId ||
+    attachment.resource_kind !== 'credential' ||
+    attachment.status !== 'approved'
+  ) {
+    throw new InvalidAutomationActionError('resourceAttachmentId must be an approved credential connection for this project');
+  }
 }
 
 /**
@@ -91,6 +130,9 @@ export async function ensureAutomationTargetSeeded(params: SeedAutomationTargetP
   await requireProjectInOrg(params.organizationId, params.projectId);
   if (!Number.isFinite(params.initialDailyBudgetUsd) || params.initialDailyBudgetUsd < 0) {
     throw new InvalidAutomationActionError('initialDailyBudgetUsd must be a non-negative number');
+  }
+  if (params.resourceAttachmentId !== undefined) {
+    await requireCredentialConnectionForProject(params.organizationId, params.projectId, params.resourceAttachmentId);
   }
 
   const existing = await AutomationTargetStateModel.init(params.targetId, { organization_id: params.organizationId, project_id: params.projectId });
@@ -109,6 +151,7 @@ export async function ensureAutomationTargetSeeded(params: SeedAutomationTargetP
   target.seeded_at = now;
   target.updated_at = now;
   target.seeded_by_user_id = params.seededByUserId;
+  target.resource_attachment_id = params.resourceAttachmentId;
   target.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await target.save(params.targetId);
   return target;
@@ -135,6 +178,49 @@ async function countAutomationActionsExecutedToday(organizationId: string, proje
     .limit(limit + 1)
     .get();
   return executedToday.length;
+}
+
+/**
+ * Resolves whether `target`'s linked connection (if any) currently permits a
+ * budget-change mutation — `null` means either there's no linked connection
+ * (ungated) or the connection is approved at `optimize`/`manage`. Re-resolved
+ * fresh on every call (never cached on the target/action) so a tier
+ * downgrade takes effect immediately, per KAN-74's own AC.
+ */
+async function resolveWriteTierViolation(
+  organizationId: string,
+  projectId: string,
+  target: AutomationTargetStateModel,
+): Promise<GuardrailViolation | null> {
+  if (!target.resource_attachment_id) {
+    return null;
+  }
+  const attachment = await ResourceAttachmentModel.init(target.resource_attachment_id, { organization_id: organizationId });
+  const insufficient =
+    !attachment ||
+    attachment.project_id !== projectId ||
+    attachment.resource_kind !== 'credential' ||
+    attachment.status !== 'approved' ||
+    attachment.write_tier === 'read';
+  if (!insufficient) {
+    return null;
+  }
+  return {
+    type: 'insufficient_write_tier',
+    message: "This target's connection is not approved at a write tier (Optimize or Manage) that allows budget changes.",
+  };
+}
+
+/** Same check as {@link resolveWriteTierViolation}, but for a step (approve/execute) that must hard-fail rather than land the action as `blocked` — the guardrail-violation list is only ever written at propose time. */
+async function assertSufficientWriteTierForAction(organizationId: string, projectId: string, action: AutomationActionModel): Promise<void> {
+  const target = await AutomationTargetStateModel.init(action.target_id, { organization_id: organizationId, project_id: projectId });
+  if (!target || target.project_id !== projectId) {
+    return;
+  }
+  const violation = await resolveWriteTierViolation(organizationId, projectId, target);
+  if (violation) {
+    throw new InsufficientWriteTierError();
+  }
 }
 
 export interface ProposeAutomationBudgetChangeParams {
@@ -179,6 +265,11 @@ export async function proposeAutomationBudgetChangeAction(params: ProposeAutomat
 
   if (await isAutomationKillSwitchEngaged(params.organizationId)) {
     violations.push({ type: 'automation_paused', message: 'Automation is paused for this organization (kill switch engaged).' });
+  }
+
+  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target);
+  if (tierViolation) {
+    violations.push(tierViolation);
   }
 
   const before = { dailyBudgetUsd: target.daily_budget_usd };
@@ -235,6 +326,7 @@ export async function approveAutomationAction(params: ApproveAutomationActionPar
   if (await isAutomationKillSwitchEngaged(params.organizationId)) {
     throw new AutomationKillSwitchEngagedError();
   }
+  await assertSufficientWriteTierForAction(params.organizationId, params.projectId, action);
 
   action.status = 'approved';
   action.approved_by_user_id = params.approverId;
@@ -307,6 +399,7 @@ export async function executeAutomationAction(params: ExecuteAutomationActionPar
   if (await isAutomationKillSwitchEngaged(params.organizationId)) {
     throw new AutomationKillSwitchEngagedError();
   }
+  await assertSufficientWriteTierForAction(params.organizationId, params.projectId, action);
 
   const executor = params.executor ?? defaultAutomationActionExecutor;
   const before = action.before as { dailyBudgetUsd: number };

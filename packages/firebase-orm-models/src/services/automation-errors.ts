@@ -43,3 +43,10 @@ export class AutomationKillSwitchEngagedError extends Error {
     this.name = 'AutomationKillSwitchEngagedError';
   }
 }
+
+export class InsufficientWriteTierError extends Error {
+  constructor() {
+    super("This target's linked connection is not set to a write tier that allows this action.");
+    this.name = 'InsufficientWriteTierError';
+  }
+}

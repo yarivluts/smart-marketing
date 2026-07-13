@@ -39,6 +39,13 @@ export const GUARDRAIL_VIOLATION_TYPES = [
   'blast_radius',
   /** Not produced by {@link evaluateBudgetChangeGuardrails} itself (it's a pure function with no org-level kill-switch state) — reserved for `packages/firebase-orm-models`' `automation.service.ts` to append when the org's kill switch is engaged, so a blocked action's violation list always explains every reason it's blocked in one place. */
   'automation_paused',
+  /**
+   * Also reserved for `automation.service.ts` (KAN-74) — appended when the
+   * target's linked connection (`ResourceAttachmentModel.write_tier`, plan
+   * `02 §3`) is `read`, which never permits a budget-change mutation. A
+   * target with no linked connection isn't gated by this at all.
+   */
+  'insufficient_write_tier',
 ] as const;
 export type GuardrailViolationType = (typeof GUARDRAIL_VIOLATION_TYPES)[number];
 

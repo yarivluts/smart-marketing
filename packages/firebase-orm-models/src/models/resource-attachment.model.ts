@@ -20,6 +20,22 @@ export const RESOURCE_ATTACHMENT_STATUSES = ['pending', 'approved', 'rejected', 
 export type ResourceAttachmentStatus = (typeof RESOURCE_ATTACHMENT_STATUSES)[number];
 
 /**
+ * How much write access a `credential` attachment grants an ad-platform
+ * connection (KAN-74, plan `02 §3`): `read` (reports/structure/creatives —
+ * the safe default every attachment starts at), `optimize` (budgets, bid
+ * strategies/caps, pause/enable), `manage` (full campaign lifecycle). Only
+ * `optimize`/`manage` permit a KAN-71 automation action to mutate a target
+ * linked to this connection — see `automation.service.ts`'s
+ * `resolveWriteTierViolation`.
+ */
+export const CONNECTION_WRITE_TIERS = ['read', 'optimize', 'manage'] as const;
+export type ConnectionWriteTier = (typeof CONNECTION_WRITE_TIERS)[number];
+
+export function isConnectionWriteTier(value: string): value is ConnectionWriteTier {
+  return (CONNECTION_WRITE_TIERS as readonly string[]).includes(value);
+}
+
+/**
  * One project's request for (and, once decided, grant of) a slice of an org
  * resource — the join between `ProjectModel` and a library resource
  * (`SharedCredentialModel` / `ResourceTemplateModel` / `OrgPersonModel`),
@@ -82,4 +98,23 @@ export class ResourceAttachmentModel extends BaseModel {
 
   @Field()
   public detached_at?: string;
+
+  /**
+   * Meaningful only for `resource_kind === 'credential'` — every attachment
+   * (including `template`/`person`) still gets the safe `'read'` default at
+   * request time so the field is never undefined. An org-resource-owner
+   * (`resources.manage`) can raise or lower it any time after approval;
+   * lowering it takes effect immediately since every automation propose/
+   * approve/execute step re-resolves the connection's *current* tier rather
+   * than caching it (KAN-74's "tier downgrade immediately revokes
+   * capabilities" AC).
+   */
+  @Field({ is_required: true })
+  public write_tier!: ConnectionWriteTier;
+
+  @Field()
+  public write_tier_updated_at?: string;
+
+  @Field()
+  public write_tier_updated_by_user_id?: string;
 }
