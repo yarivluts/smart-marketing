@@ -79,13 +79,39 @@ export interface RegisterMcpOAuthClientParams {
   redirectUris: readonly string[];
 }
 
+/** Schemes that can execute script or render arbitrary content when navigated to — never a legitimate OAuth redirect target regardless of what `new URL(...)` happily parses. */
+const DANGEROUS_REDIRECT_URI_SCHEMES = new Set(['javascript:', 'data:', 'vbscript:', 'file:', 'about:']);
+const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+
+/**
+ * `POST /oauth/register` is public and unauthenticated (RFC 7591 dynamic
+ * client registration has no gate — any MCP client self-registers), so this
+ * is the only check standing between a caller and getting an arbitrary
+ * string accepted as a "registered redirect_uri" a future consenting user
+ * gets redirected to. `new URL(...)` not throwing is necessary but not
+ * sufficient — `new URL('javascript:...')` parses cleanly. Rejects the
+ * known script/content-executing schemes outright, and requires `https:`
+ * for every host except loopback (`http:` is only ever safe for a native
+ * app's own local redirect listener, per OAuth 2.1 §7.2's "loopback
+ * interface redirection" guidance for public clients) — a custom app-scheme
+ * redirect (e.g. `claude-desktop:`, `com.example.app:`) still passes, since
+ * those can't be navigated to as executable content the way the denied
+ * schemes can.
+ */
 function isValidRedirectUri(uri: string): boolean {
+  let parsed: URL;
   try {
-    new URL(uri);
-    return true;
+    parsed = new URL(uri);
   } catch {
     return false;
   }
+  if (DANGEROUS_REDIRECT_URI_SCHEMES.has(parsed.protocol)) {
+    return false;
+  }
+  if (parsed.protocol === 'http:' && !LOOPBACK_HOSTNAMES.has(parsed.hostname)) {
+    return false;
+  }
+  return true;
 }
 
 /** Dynamic client registration (RFC 7591-lite) — any MCP client (Claude Desktop, claude.ai, a custom agent) self-registers before its first `/oauth/authorize` redirect. Always a public client; see `McpOAuthClientModel`'s own doc comment for why no secret is issued. */
@@ -257,7 +283,25 @@ async function findGrantByAccessTokenHash(accessTokenHash: string): Promise<McpO
   return matches[0];
 }
 
-/** Exchanges a single-use authorization code for an access/refresh token pair (OAuth 2.1 §4.1.3), verifying PKCE (§4.1.3's mandatory `code_verifier` check) and that `client_id`/`redirect_uri` match exactly what the code was issued for. */
+/**
+ * Exchanges a single-use authorization code for an access/refresh token pair
+ * (OAuth 2.1 §4.1.3), verifying PKCE (§4.1.3's mandatory `code_verifier`
+ * check) and that `client_id`/`redirect_uri` match exactly what the code was
+ * issued for.
+ *
+ * Not transactional: the read-then-write on `code_redeemed_at` below (look
+ * up an unredeemed code, then save it as redeemed) has the same narrow
+ * concurrent-write race every other multi-step Firestore read/write in this
+ * package documents and accepts — this ORM's client-SDK-based API exposes no
+ * transaction primitive (see `claimTvPairing`'s doc comment in
+ * `tv-pairing.service.ts` for the fullest statement of this codebase-wide
+ * tradeoff). Two callers redeeming the exact same still-valid code within
+ * the same instant would race on which write wins; the losing caller's
+ * returned token pair would never authenticate. Low real-world likelihood
+ * (a code is single-use, 5-minute-lived, and only ever known to the one
+ * client that received the `/oauth/authorize` redirect) but a real gap, not
+ * a silent one — same posture as `refreshMcpAccessToken` below.
+ */
 export async function exchangeMcpAuthorizationCode(
   params: ExchangeMcpAuthorizationCodeParams,
 ): Promise<Result<McpOAuthTokenResult, McpOAuthTokenFailure>> {
@@ -295,7 +339,19 @@ export interface RefreshMcpAccessTokenParams {
   clientId: string;
 }
 
-/** Rotates both the access and refresh token together (OAuth 2.1 §4.3.1 recommends refresh-token rotation for public clients) — the presented `refreshToken` is invalidated the instant a new pair is minted, so a stolen-and-replayed refresh token can be used at most once before the legitimate client's next refresh silently invalidates it too (a detectable "refresh token reuse" signal a future story could alert on; not built here). */
+/**
+ * Rotates both the access and refresh token together (OAuth 2.1 §4.3.1
+ * recommends refresh-token rotation for public clients) — the presented
+ * `refreshToken` is invalidated the instant a new pair is minted, so a
+ * stolen-and-replayed refresh token can be used at most once before the
+ * legitimate client's next refresh silently invalidates it too (a
+ * detectable "refresh token reuse" signal a future story could alert on;
+ * not built here). Same not-transactional read-then-write caveat as
+ * {@link exchangeMcpAuthorizationCode} above — two concurrent refreshes of
+ * the exact same token would race on which write wins, so "used at most
+ * once" is a design intent this doc comment states honestly, not a
+ * guarantee enforced against true concurrent replay.
+ */
 export async function refreshMcpAccessToken(
   params: RefreshMcpAccessTokenParams,
 ): Promise<Result<McpOAuthTokenResult, McpOAuthTokenFailure>> {
@@ -390,11 +446,25 @@ export interface McpOAuthGrantSummary {
   createdAt: string;
   lastUsedAt?: string;
   revokedAt?: string;
-  /** Whether a code has ever actually been redeemed for an access token — a grant approved on the consent screen but never completed by the client (e.g. the user backed out, or the client crashed mid-flow) shows as "pending" rather than indistinguishable from a fully live connection. */
+  /**
+   * Whether this grant is currently usable: a code was redeemed for an
+   * access token at some point (not still "pending" — a grant approved on
+   * the consent screen but never completed by the client, e.g. the user
+   * backed out or the client crashed mid-flow), it isn't revoked, and its
+   * `refresh_token_expires_at` (the longer-lived of the two TTLs, so the
+   * one that actually determines whether the client can still recover a
+   * live access token via `refreshMcpAccessToken`) hasn't passed. Checked
+   * at read time, not maintained as a stored field, so a connection that
+   * silently expired a month ago (no refresh, no explicit revoke) shows up
+   * honestly as inactive rather than forever "connected" the moment
+   * `access_token_hash` was first set.
+   */
   isActive: boolean;
 }
 
 function toGrantSummary(grant: McpOAuthGrantModel): McpOAuthGrantSummary {
+  const now = new Date().toISOString();
+  const isLive = Boolean(grant.refresh_token_expires_at) && grant.refresh_token_expires_at! >= now;
   return {
     id: grant.id,
     clientId: grant.client_id,
@@ -403,7 +473,7 @@ function toGrantSummary(grant: McpOAuthGrantModel): McpOAuthGrantSummary {
     createdAt: grant.created_at,
     lastUsedAt: grant.last_used_at,
     revokedAt: grant.revoked_at,
-    isActive: Boolean(grant.access_token_hash) && !grant.revoked_at,
+    isActive: Boolean(grant.access_token_hash) && !grant.revoked_at && isLive,
   };
 }
 

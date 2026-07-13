@@ -79,6 +79,15 @@ describe('searchProjectCustomers', () => {
     expect(executor.calls[0].params.schemaName).toBe('lead');
   });
 
+  it('escapes LIKE wildcard metacharacters in the search term so % and _ match literally, not as wildcards', async () => {
+    const { organization, project } = await setupOrgWithProject('Search Customers Escaping Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: '50%_off\\deal', executor });
+
+    expect(executor.calls[0].params.likeQuery).toBe('%50\\%\\_off\\\\deal%');
+  });
+
   it('rejects an empty query without ever calling the executor', async () => {
     const { organization, project } = await setupOrgWithProject('Search Customers Empty Org');
     const executor = new FakeWarehouseQueryExecutor([]);

@@ -46,10 +46,23 @@ function extractBearerToken(headerValue: string | string[] | undefined): string 
  * `invalid_key` outcome (no such key at all — never `insufficient_scope`,
  * which means a *real* key was found and is definitively not this request's
  * credential kind either) falls through to trying it as an MCP OAuth access
- * token. `authenticateMcpAccessToken` re-derives the granting user's current
- * `mcp.read` permission on every call, so "MCP grants nothing the underlying
- * principal doesn't have" (plan `12 §6.1`) holds for both credential kinds
- * without this guard needing its own separate policy-engine call.
+ * token.
+ *
+ * The two credential kinds do *not* carry an identical revocation
+ * guarantee, despite both flowing into the same `McpAuthContext` shape:
+ * `authenticateMcpAccessToken` re-derives the granting *human's* current
+ * `mcp.read` permission on every call (plan `12 §6.1`'s "MCP grants nothing
+ * the underlying principal doesn't have"), so a role change or membership
+ * removal since the grant was issued takes effect on this request. An API
+ * key has no "granting human" to re-check against — `authenticateApiKey`
+ * only checks the key's own static `scopes` array and `revoked_at`, exactly
+ * like every other bearer-key-authenticated route in this app (KAN-28's own
+ * model: a key stays live until *someone* explicitly revokes *that key*,
+ * independent of whoever minted it). That's the existing, intentional API
+ * key security model this guard reuses unchanged, not a gap introduced
+ * here — but it does mean "MCP grants nothing the underlying principal
+ * doesn't have" is a live, per-request guarantee for OAuth-authenticated
+ * calls and a mint-time-only one for API-key-authenticated calls.
  */
 @Injectable()
 export class McpAuthGuard implements CanActivate {

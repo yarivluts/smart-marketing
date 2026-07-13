@@ -67,7 +67,11 @@ export class McpController {
     try {
       await server.connect(transport);
       await transport.handleRequest(request, response, request.body);
-    } catch {
+    } catch (error) {
+      // No structured logger exists in apps/api yet (KAN-20's observability baseline is still an
+      // unmerged, unreconciled PR — see PROGRESS.md) — console.error is the honest baseline until
+      // that lands, not a placeholder for something already wired in elsewhere in this app.
+      console.error('MCP request failed', error);
       writeJson(response, 500, { jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error.' }, id: null });
     }
   }

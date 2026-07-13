@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { InsufficientMcpReadPermissionError, InvalidMcpOAuthClientError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
-import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
+import { ensureUserForSession } from '@/lib/orgs/session-context';
 import { requireRegisteredMcpRedirectUri } from '@/lib/orgs/queries';
 import { issueMcpAuthorizationCode } from '@/lib/orgs/mutations';
 
@@ -71,7 +71,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return redirectWithOAuthParams(redirectUri, { error: 'invalid_request', state });
   }
 
-  const { user } = await resolveOrgSessionContext(session);
+  const user = await ensureUserForSession(session);
 
   try {
     const { code } = await issueMcpAuthorizationCode({

@@ -73,6 +73,11 @@ export interface CustomerSearchResult {
 const DEFAULT_CUSTOMER_SEARCH_LIMIT = 20;
 const MAX_CUSTOMER_SEARCH_LIMIT = 100;
 
+/** Escapes `LIKE`'s own wildcard metacharacters (`%`/`_`, with `\` as BigQuery's implicit default escape character) so a caller searching for a literal `%`/`_` — a real character in an email, a discount code, anything — gets a literal substring match instead of the wildcard silently matching "any characters"/"any single character" there. */
+function escapeLikePattern(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
+}
+
 function rowToCustomerResult(row: WarehouseRow): CustomerSearchResult {
   return {
     entityId: String(row.entity_id ?? ''),
@@ -95,7 +100,7 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
   const queryParams: Record<string, string> = {
     organizationId: params.organizationId,
     projectId: params.projectId,
-    likeQuery: `%${trimmedQuery}%`,
+    likeQuery: `%${escapeLikePattern(trimmedQuery)}%`,
   };
   if (params.schemaName) {
     filters.push('schema_name = @schemaName');

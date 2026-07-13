@@ -72,7 +72,21 @@ function errorResult(message: string): ToolResult {
   return { content: [{ type: 'text', text: message }], isError: true };
 }
 
-/** Maps the well-known failure modes every warehouse-backed tool can throw to a caller-readable message, the same set `MetricsController` already maps to HTTP statuses — an MCP tool call has no status code, just `isError` + text, so this collapses them to one place instead of repeating the same `instanceof` chain per tool. */
+/**
+ * Maps the well-known failure modes every warehouse-backed tool can throw to
+ * a caller-readable message, the same set `MetricsController` already maps
+ * to HTTP statuses — an MCP tool call has no status code, just `isError` +
+ * text, so this collapses them to one place instead of repeating the same
+ * `instanceof` chain per tool. Re-throws anything it doesn't recognize
+ * rather than returning a generic string: `McpServer`'s own `CallToolRequest`
+ * handler (`@modelcontextprotocol/sdk/server/mcp.js`) wraps every tool
+ * callback in its own top-level `try/catch` and converts *any* thrown error
+ * into a valid `isError: true` result carrying that error's own message —
+ * the same safety net `MetricsController`'s uncaught-`throw error` relies on
+ * Nest's global exception filter for. An unrecognized error here still
+ * reaches the caller as a real MCP tool error, it just skips this
+ * function's own caller-friendly message list.
+ */
 function describeMetricsError(error: unknown): string {
   if (error instanceof ProjectNotFoundError) {
     return 'Project not found.';
@@ -91,6 +105,33 @@ function describeMetricsError(error: unknown): string {
     return typeof response === 'string' ? response : ((response as { message?: string }).message ?? error.message);
   }
   throw error;
+}
+
+/**
+ * Shared body for `query_metric`/`compare_periods`/`decompose`: parse via
+ * `parseMetricQueryRequestBody`, run an optional tool-specific extra check
+ * (e.g. `compare_periods` requiring `time.compare`), then run the exact same
+ * `queryMetrics` call and response shape all three tools share. Factored out
+ * so the three `registerTool` calls below differ only in name/description/
+ * extra-validation, not in three independently-maintained copies of the
+ * parse-query-respond sequence.
+ */
+async function runMetricQueryTool(
+  auth: McpAuthContext,
+  args: unknown,
+  extraValidate?: (request: ReturnType<typeof parseMetricQueryRequestBody>) => string | undefined,
+): Promise<ToolResult> {
+  try {
+    const request = parseMetricQueryRequestBody(args);
+    const validationError = extraValidate?.(request);
+    if (validationError) {
+      return errorResult(validationError);
+    }
+    const result = await queryMetrics({ organizationId: auth.organizationId, projectId: auth.projectId, request });
+    return textResult({ series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
+  } catch (error) {
+    return errorResult(describeMetricsError(error));
+  }
 }
 
 /**
@@ -170,15 +211,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
         'Run a grounded query against one or more registered metrics for a date range — never generated numbers, always compiled from the metric registry and executed against the warehouse.',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
-    async (args: any) => {
-      try {
-        const request = parseMetricQueryRequestBody(args);
-        const result = await queryMetrics({ organizationId: auth.organizationId, projectId: auth.projectId, request });
-        return textResult({ series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
-      } catch (error) {
-        return errorResult(describeMetricsError(error));
-      }
-    },
+    async (args: any) => runMetricQueryTool(auth, args),
   );
 
   server.registerTool(
@@ -189,18 +222,10 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
         'Query one or more metrics with a period-over-period comparison ("time.compare": previous_period or previous_year, required) — the result series is split by a "period" column for "current" vs. "prior".',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
-    async (args: any) => {
-      try {
-        const request = parseMetricQueryRequestBody(args);
-        if (!request.time.compare) {
-          return errorResult('compare_periods requires "time.compare" to be "previous_period" or "previous_year".');
-        }
-        const result = await queryMetrics({ organizationId: auth.organizationId, projectId: auth.projectId, request });
-        return textResult({ series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
-      } catch (error) {
-        return errorResult(describeMetricsError(error));
-      }
-    },
+    async (args: any) =>
+      runMetricQueryTool(auth, args, (request) =>
+        request.time.compare ? undefined : 'compare_periods requires "time.compare" to be "previous_period" or "previous_year".',
+      ),
   );
 
   server.registerTool(
@@ -211,18 +236,10 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
         'Query a metric broken down by one or more dimensions ("dimensions", required, non-empty) — e.g. "what was CAC last week by channel".',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
-    async (args: any) => {
-      try {
-        const request = parseMetricQueryRequestBody(args);
-        if (!request.dimensions || request.dimensions.length === 0) {
-          return errorResult('decompose requires at least one entry in "dimensions".');
-        }
-        const result = await queryMetrics({ organizationId: auth.organizationId, projectId: auth.projectId, request });
-        return textResult({ series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
-      } catch (error) {
-        return errorResult(describeMetricsError(error));
-      }
-    },
+    async (args: any) =>
+      runMetricQueryTool(auth, args, (request) =>
+        request.dimensions && request.dimensions.length > 0 ? undefined : 'decompose requires at least one entry in "dimensions".',
+      ),
   );
 
   server.registerTool(

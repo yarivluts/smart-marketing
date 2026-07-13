@@ -6,6 +6,7 @@ import {
   refreshMcpAccessToken,
   registerMcpOAuthClient,
   requireRegisteredRedirectUri,
+  type McpOAuthTokenResult,
 } from '@growthos/firebase-orm-models';
 import { Public } from '../authz/public.decorator';
 import { apiBaseUrl, webAppUrl } from './mcp-oauth-urls';
@@ -25,6 +26,17 @@ import { apiBaseUrl, webAppUrl } from './mcp-oauth-urls';
  * client/PKCE/token mechanics via `@growthos/firebase-orm-models`'s
  * `mcp-oauth.service.ts`.
  */
+/** The OAuth token-response body shape (RFC 6749 §5.1) both `grant_type` branches of `token()` return. */
+function toTokenResponse(value: McpOAuthTokenResult) {
+  return {
+    access_token: value.accessToken,
+    token_type: 'Bearer',
+    expires_in: value.expiresInSeconds,
+    refresh_token: value.refreshToken,
+    scope: value.scope,
+  };
+}
+
 @Controller()
 @Public()
 export class McpOAuthController {
@@ -135,13 +147,7 @@ export class McpOAuthController {
       if (!result.ok) {
         throw new BadRequestException(result.error.message);
       }
-      return {
-        access_token: result.value.accessToken,
-        token_type: 'Bearer',
-        expires_in: result.value.expiresInSeconds,
-        refresh_token: result.value.refreshToken,
-        scope: result.value.scope,
-      };
+      return toTokenResponse(result.value);
     }
 
     if (grantType === 'refresh_token') {
@@ -153,13 +159,7 @@ export class McpOAuthController {
       if (!result.ok) {
         throw new BadRequestException(result.error.message);
       }
-      return {
-        access_token: result.value.accessToken,
-        token_type: 'Bearer',
-        expires_in: result.value.expiresInSeconds,
-        refresh_token: result.value.refreshToken,
-        scope: result.value.scope,
-      };
+      return toTokenResponse(result.value);
     }
 
     throw new BadRequestException('Unsupported grant_type — must be "authorization_code" or "refresh_token".');
