@@ -4,6 +4,7 @@ import {
   ensureUserForFirebaseSession,
   listMembershipsWithOrganizations,
   listRoleBindingsForUser,
+  toPolicyBindings,
   type UserModel,
   type UserOrgMembership,
 } from '@growthos/firebase-orm-models';
@@ -59,14 +60,7 @@ export async function resolveOrgSessionContext(session: DecodedIdToken): Promise
     .filter((membership) => membership.status !== 'invited')
     .map((membership) => membership.organizationId);
   const roleBindings = await listRoleBindingsForUser(user.id, activeOrgIds);
-
-  const bindings: PolicyBinding[] = roleBindings.map((binding) => ({
-    principalType: binding.principal_type,
-    principalId: binding.principal_id,
-    role: binding.role,
-    scopeLevel: binding.scope_level,
-    scopeId: binding.scope_id,
-  }));
+  const bindings = toPolicyBindings(roleBindings);
 
   return { user, memberships, bindings };
 }

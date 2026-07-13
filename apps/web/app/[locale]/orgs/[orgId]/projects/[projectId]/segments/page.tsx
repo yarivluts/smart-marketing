@@ -1,11 +1,13 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects, listSegmentsForProject } from '@/lib/orgs/queries';
+import { listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
 import { toSegmentSummaryView } from '@/lib/orgs/segment-view';
+import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -19,13 +21,11 @@ export async function generateMetadata({ params }: PageProps) {
 
 /**
  * A project's saved segments (KAN-76, E22.2, plan `13 §22.2`): every segment
- * definition an MCP-connected AI agent has created via `create_segment`,
- * newest-first. Read-only — there is no in-app creation form, since a
- * segment is created through the MCP act-tool surface, not this admin UI;
- * this page exists so a human can still see/audit what an agent saved, the
- * same "view surface for a machine-driven mutation" posture the ingest
- * health page's quarantine browser and the orchestration run history already
- * establish. Gated on `dashboards.write`, reusing the goals/boards features'
+ * definition created either by a human through this page's own form or by
+ * an MCP-connected AI agent via the `create_segment` act tool, newest-first
+ * — both paths call the same `createSegment` service function
+ * (`segment.service.ts`), so there is exactly one segment definition, not
+ * two. Gated on `dashboards.write`, reusing the goals/boards features'
  * permission (same reasoning `goals/page.tsx` documents for its own reuse).
  */
 export default async function SegmentsPage({ params }: PageProps): Promise<React.ReactElement> {
@@ -49,7 +49,13 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
     notFound();
   }
 
-  const segments = (await listSegmentsForProject(orgId, projectId)).map(toSegmentSummaryView);
+  // Only reached once `projectId` is confirmed to belong to this org — same
+  // reasoning `goals/page.tsx`'s own comment gives for `listGoalsForProject`.
+  const [segments, schemaDefs] = await Promise.all([
+    listSegmentsForProject(orgId, projectId).then((rows) => rows.map(toSegmentSummaryView)),
+    listSchemaDefinitionsForProject(orgId, projectId),
+  ]);
+  const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const t = await getTranslations('Segments');
 
   return (
@@ -75,6 +81,15 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
+        {entitySchemaNames.length === 0 ? (
+          <p className="text-xs text-muted-foreground">{t('noEntitySchemasRegistered')}</p>
+        ) : (
+          <CreateSegmentForm orgId={orgId} projectId={projectId} entitySchemaNames={entitySchemaNames} />
         )}
       </section>
     </main>

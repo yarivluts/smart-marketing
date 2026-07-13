@@ -56,6 +56,8 @@ import {
   createGoal as createGoalInOrganization,
   deleteGoal as deleteGoalInOrganization,
   type GoalModel,
+  createSegment as createSegmentInOrganization,
+  type SegmentModel,
   createWinRule as createWinRuleInOrganization,
   updateWinRule as updateWinRuleInOrganization,
   deleteWinRule as deleteWinRuleInOrganization,
@@ -788,6 +790,21 @@ export async function deleteGoal(
 ): Promise<void> {
   await ensureFirestoreOrm();
   return deleteGoalInOrganization(organizationId, projectId, goalId, deletedByUserId);
+}
+
+interface CreateSegmentInput {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  schemaName: string;
+  filters: readonly unknown[];
+  createdByUserId: string;
+}
+
+/** Creates a segment (KAN-76) via this app's own session-authenticated route — always `actorType: 'user'` (the service default), distinct from the MCP `create_segment` tool's API-key path. */
+export async function createSegment(input: CreateSegmentInput): Promise<SegmentModel> {
+  await ensureFirestoreOrm();
+  return createSegmentInOrganization(input);
 }
 
 interface CreateWinRuleInput {

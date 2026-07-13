@@ -1,17 +1,6 @@
-import { can, type Permission, type PolicyBinding } from '@growthos/shared';
-import { listRoleBindingsForUser } from '@growthos/firebase-orm-models';
+import { can, type Permission } from '@growthos/shared';
+import { listRoleBindingsForUser, toPolicyBindings } from '@growthos/firebase-orm-models';
 import type { McpAuthContext } from './mcp-auth.guard';
-
-/** Mirrors `mcp-oauth.service.ts`'s own private `toPolicyBindings` — kept local rather than imported/exported across the package boundary since it's a five-line adapter, not shared logic. */
-function toPolicyBindings(bindings: Awaited<ReturnType<typeof listRoleBindingsForUser>>): PolicyBinding[] {
-  return bindings.map((binding) => ({
-    principalType: binding.principal_type,
-    principalId: binding.principal_id,
-    role: binding.role,
-    scopeLevel: binding.scope_level,
-    scopeId: binding.scope_id,
-  }));
-}
 
 /**
  * Whether an authenticated MCP caller currently holds `permission` for its

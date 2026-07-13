@@ -11,6 +11,7 @@ import {
   GoalNotFoundError,
   InMemoryMetricQueryResultCache,
   InvalidGoalError,
+  listAuditLogEntriesForOrg,
   listGoalsForProject,
   ProjectNotFoundError,
   queryGoalProgress,
@@ -127,6 +128,32 @@ describe('createGoal', () => {
     expect(goal.range_min).toBe(20);
     expect(goal.range_max).toBe(40);
     expect(goal.rhythm).toBe('work_week_weekend');
+  });
+
+  it('audits the create as actor type "api_key" when createdByActorType is set (KAN-76 MCP create_goal tool path)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Audit Api Key Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Q3 signups',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: 'key-abc123',
+      createdByActorType: 'api_key',
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.target_id === goal.id);
+    expect(entry?.actor_type).toBe('api_key');
+    expect(entry?.actor_id).toBe('key-abc123');
   });
 
   it('rejects a project that does not belong to this org', async () => {

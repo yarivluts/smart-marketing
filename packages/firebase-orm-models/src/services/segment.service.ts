@@ -27,6 +27,8 @@ export interface CreateSegmentParams {
   schemaName: string;
   filters: readonly unknown[];
   createdByUserId: string;
+  /** Defaults to `'user'` — set to `'api_key'` when the caller authenticated with a machine key (KAN-76's MCP `create_segment` tool) rather than a human, so the audit trail doesn't mislabel a key as a user. */
+  createdByActorType?: 'user' | 'api_key';
 }
 
 /**
@@ -83,7 +85,7 @@ export async function createSegment(params: CreateSegmentParams): Promise<Segmen
     await recordAuditLogEntry({
       organizationId: params.organizationId,
       projectId: params.projectId,
-      actorType: 'user',
+      actorType: params.createdByActorType ?? 'user',
       actorId: params.createdByUserId,
       action: 'segment.create',
       targetType: 'segment',

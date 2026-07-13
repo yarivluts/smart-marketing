@@ -11,7 +11,7 @@ import {
   registerSchemaDefinition,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
-import { GET } from './route';
+import { GET, POST } from './route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -47,9 +47,17 @@ async function setupOrgProject(orgName: string) {
   return { ownerSession, owner, organization, project };
 }
 
-function segmentsRequest(orgId: string, projectId: string): { request: NextRequest; params: Promise<{ orgId: string; projectId: string }> } {
+function segmentsRequest(
+  orgId: string,
+  projectId: string,
+  body?: unknown,
+): { request: NextRequest; params: Promise<{ orgId: string; projectId: string }> } {
   return {
-    request: new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/segments`, { method: 'GET' }),
+    request: new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/segments`, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
     params: Promise.resolve({ orgId, projectId }),
   };
 }
@@ -131,5 +139,69 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/segments', () => {
     const body = (await response.json()) as { segments: Array<{ id: string; name: string; schemaName: string; filterCount: number }> };
     expect(body.segments).toHaveLength(1);
     expect(body.segments[0]).toMatchObject({ id: segment.id, name: 'Pro customers', schemaName: 'customer', filterCount: 1 });
+  });
+});
+
+describe('POST /api/orgs/[orgId]/projects/[projectId]/segments', () => {
+  it('rejects an unauthenticated caller', async () => {
+    getServerSessionMock.mockResolvedValue(null);
+    const { request, params } = segmentsRequest('org-1', 'project-1', { name: 'Segment' });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects a malformed request body (400, shape validation)', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Segment Create Shape Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = segmentsRequest(organization.id, project.id, { name: '   ' });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects a request whose business rules fail (unregistered entity schema) with 400 + reasons', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Segment Create Invalid Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = segmentsRequest(organization.id, project.id, {
+      name: 'Segment',
+      schemaName: 'does_not_exist',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string; reasons: string[] };
+    expect(body.error).toBe('invalid_segment');
+    expect(body.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('creates a segment, then lists it', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Segment Create Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'customer',
+      fields: [
+        { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+        { name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
+      ],
+      createdByUserId: owner.id,
+    });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = segmentsRequest(organization.id, project.id, {
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { segment: { id: string; name: string } };
+    expect(body.segment).toMatchObject({ name: 'Pro customers' });
+
+    const listResponse = await GET(segmentsRequest(organization.id, project.id).request, { params });
+    const listed = (await listResponse.json()) as { segments: Array<{ id: string }> };
+    expect(listed.segments).toHaveLength(1);
+    expect(listed.segments[0].id).toBe(body.segment.id);
   });
 });

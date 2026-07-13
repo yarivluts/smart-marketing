@@ -16,6 +16,7 @@ import {
   ProjectNotFoundError,
   proposeAutomationBudgetChangeAction,
 } from '@growthos/firebase-orm-models';
+import type { Permission } from '@growthos/shared';
 import { errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
@@ -75,6 +76,35 @@ function actorId(auth: McpAuthContext): string {
   return auth.userId ?? auth.apiKeyId ?? 'unknown-mcp-caller';
 }
 
+/** The audit-trail actor *type* to record alongside {@link actorId} — `createGoal`/`createSegment` write this straight onto their `recordAuditLogEntry` call, so an API-key-driven mutation is never mislabeled as a real human user in the audit log. */
+function actorType(auth: McpAuthContext): 'user' | 'api_key' {
+  return auth.principalKind === 'api_key' ? 'api_key' : 'user';
+}
+
+/**
+ * Shared body for every act tool: check `permission` fresh, then run
+ * `handler` and map any thrown error through {@link describeActToolError} —
+ * the same "auth check once, real work in a handler" factoring
+ * `runMetricQueryTool` (`mcp-tools.ts`) already established for the read
+ * tools, applied here to a per-tool permission instead of one shared
+ * `mcp.read` gate.
+ */
+async function runActTool<Args>(
+  auth: McpAuthContext,
+  permission: Permission,
+  args: unknown,
+  handler: (args: Args) => Promise<ToolResult>,
+): Promise<ToolResult> {
+  if (!(await mcpCallerHasPermission(auth, permission))) {
+    return errorResult(insufficientPermissionMessage(auth, permission));
+  }
+  try {
+    return await handler(args as Args);
+  } catch (error) {
+    return errorResult(describeActToolError(error));
+  }
+}
+
 const proposeActionInputShape = {
   target_id: z.string().min(1).describe('The seeded automation target id (see the project automation page).'),
   after_daily_budget_usd: z.number().describe('The proposed new daily budget, in USD.'),
@@ -91,8 +121,8 @@ const createGoalInputShape = {
   target_value: z.number().optional().describe('Required for maximize/minimize.'),
   range_min: z.number().optional().describe('Required for range, together with range_max.'),
   range_max: z.number().optional(),
-  start_date: z.string().describe('YYYY-MM-DD, inclusive.'),
-  deadline: z.string().describe('YYYY-MM-DD, inclusive, must be after start_date.'),
+  start_date: z.string().min(1).describe('YYYY-MM-DD, inclusive.'),
+  deadline: z.string().min(1).describe('YYYY-MM-DD, inclusive, must be after start_date.'),
   rhythm: z.string().describe('One of: even, work_week_weekend.'),
   owner_person_id: z.string().min(1).describe('An id from the org people registry.'),
 };
@@ -112,27 +142,17 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         'Propose a simulated ad-campaign budget change for a seeded automation target — evaluates every guardrail and lands as "blocked" or "awaiting_approval", never executes anything by itself. Requires "automation.execute".',
       inputSchema: toolInputSchema(proposeActionInputShape),
     },
-    async (args: any): Promise<ToolResult> => {
-      if (!(await mcpCallerHasPermission(auth, 'automation.execute'))) {
-        return errorResult(insufficientPermissionMessage(auth, 'automation.execute'));
-      }
-      const { target_id: targetId, after_daily_budget_usd: afterDailyBudgetUsd } = args as {
-        target_id: string;
-        after_daily_budget_usd: number;
-      };
-      try {
+    async (args: any) =>
+      runActTool(auth, 'automation.execute', args, async (a: { target_id: string; after_daily_budget_usd: number }) => {
         const action = await proposeAutomationBudgetChangeAction({
           organizationId: auth.organizationId,
           projectId: auth.projectId,
-          targetId,
-          afterDailyBudgetUsd,
+          targetId: a.target_id,
+          afterDailyBudgetUsd: a.after_daily_budget_usd,
           requestedByUserId: actorId(auth),
         });
         return textResult({ id: action.id, status: action.status, guardrailViolations: action.guardrail_violations });
-      } catch (error) {
-        return errorResult(describeActToolError(error));
-      }
-    },
+      }),
   );
 
   server.registerTool(
@@ -142,23 +162,16 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
       description: 'Approve an "awaiting_approval" automation action so it can be executed. Requires "automation.approve", distinct from "automation.execute".',
       inputSchema: toolInputSchema(approveActionInputShape),
     },
-    async (args: any): Promise<ToolResult> => {
-      if (!(await mcpCallerHasPermission(auth, 'automation.approve'))) {
-        return errorResult(insufficientPermissionMessage(auth, 'automation.approve'));
-      }
-      const { action_id: actionId } = args as { action_id: string };
-      try {
+    async (args: any) =>
+      runActTool(auth, 'automation.approve', args, async (a: { action_id: string }) => {
         const action = await approveAutomationAction({
           organizationId: auth.organizationId,
           projectId: auth.projectId,
-          actionId,
+          actionId: a.action_id,
           approverId: actorId(auth),
         });
         return textResult({ id: action.id, status: action.status });
-      } catch (error) {
-        return errorResult(describeActToolError(error));
-      }
-    },
+      }),
   );
 
   server.registerTool(
@@ -169,60 +182,48 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         'Create a goal pinning a registered metric to a target (or range) and a deadline, with an owner and calendar rhythm. Requires "dashboards.write".',
       inputSchema: toolInputSchema(createGoalInputShape),
     },
-    async (args: any): Promise<ToolResult> => {
-      if (!(await mcpCallerHasPermission(auth, 'dashboards.write'))) {
-        return errorResult(insufficientPermissionMessage(auth, 'dashboards.write'));
-      }
-      const {
-        name,
-        metric_name: metricName,
-        direction,
-        target_value: targetValue,
-        range_min: rangeMin,
-        range_max: rangeMax,
-        start_date: startDate,
-        deadline,
-        rhythm,
-        owner_person_id: ownerPersonId,
-      } = args as {
-        name: string;
-        metric_name: string;
-        direction: string;
-        target_value?: number;
-        range_min?: number;
-        range_max?: number;
-        start_date: string;
-        deadline: string;
-        rhythm: string;
-        owner_person_id: string;
-      };
-      try {
-        const goal = await createGoal({
-          organizationId: auth.organizationId,
-          projectId: auth.projectId,
-          name,
-          metricName,
-          direction,
-          ...(targetValue !== undefined ? { targetValue } : {}),
-          ...(rangeMin !== undefined ? { rangeMin } : {}),
-          ...(rangeMax !== undefined ? { rangeMax } : {}),
-          startDate,
-          deadline,
-          rhythm,
-          ownerPersonId,
-          createdByUserId: actorId(auth),
-        });
-        return textResult({
-          id: goal.id,
-          name: goal.name,
-          metricName: goal.metric_name,
-          direction: goal.direction,
-          deadline: goal.deadline,
-        });
-      } catch (error) {
-        return errorResult(describeActToolError(error));
-      }
-    },
+    async (args: any) =>
+      runActTool(
+        auth,
+        'dashboards.write',
+        args,
+        async (a: {
+          name: string;
+          metric_name: string;
+          direction: string;
+          target_value?: number;
+          range_min?: number;
+          range_max?: number;
+          start_date: string;
+          deadline: string;
+          rhythm: string;
+          owner_person_id: string;
+        }) => {
+          const goal = await createGoal({
+            organizationId: auth.organizationId,
+            projectId: auth.projectId,
+            name: a.name,
+            metricName: a.metric_name,
+            direction: a.direction,
+            ...(a.target_value !== undefined ? { targetValue: a.target_value } : {}),
+            ...(a.range_min !== undefined ? { rangeMin: a.range_min } : {}),
+            ...(a.range_max !== undefined ? { rangeMax: a.range_max } : {}),
+            startDate: a.start_date,
+            deadline: a.deadline,
+            rhythm: a.rhythm,
+            ownerPersonId: a.owner_person_id,
+            createdByUserId: actorId(auth),
+            createdByActorType: actorType(auth),
+          });
+          return textResult({
+            id: goal.id,
+            name: goal.name,
+            metricName: goal.metric_name,
+            direction: goal.direction,
+            deadline: goal.deadline,
+          });
+        },
+      ),
   );
 
   server.registerTool(
@@ -233,27 +234,21 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         'Save a named customer segment definition — an ANDed set of filter conditions over one registered entity schema (e.g. "paying, no demo, MRR > $200"). A definition only: no live member list is materialized yet. Requires "dashboards.write".',
       inputSchema: toolInputSchema(createSegmentInputShape),
     },
-    async (args: any): Promise<ToolResult> => {
-      if (!(await mcpCallerHasPermission(auth, 'dashboards.write'))) {
-        return errorResult(insufficientPermissionMessage(auth, 'dashboards.write'));
-      }
-      const { name, schema_name: schemaName, filters } = args as { name: string; schema_name: string; filters: unknown };
-      if (!Array.isArray(filters)) {
-        return errorResult('"filters" must be an array of { field, op, value } conditions.');
-      }
-      try {
+    async (args: any) =>
+      runActTool(auth, 'dashboards.write', args, async (a: { name: string; schema_name: string; filters: unknown }) => {
+        if (!Array.isArray(a.filters)) {
+          return errorResult('"filters" must be an array of { field, op, value } conditions.');
+        }
         const segment = await createSegment({
           organizationId: auth.organizationId,
           projectId: auth.projectId,
-          name,
-          schemaName,
-          filters,
+          name: a.name,
+          schemaName: a.schema_name,
+          filters: a.filters,
           createdByUserId: actorId(auth),
+          createdByActorType: actorType(auth),
         });
         return textResult({ id: segment.id, name: segment.name, schemaName: segment.schema_name, filters: segment.filters });
-      } catch (error) {
-        return errorResult(describeActToolError(error));
-      }
-    },
+      }),
   );
 }

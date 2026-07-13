@@ -6,6 +6,7 @@ import {
   createSegment,
   ensureUserForFirebaseSession,
   InvalidSegmentError,
+  listAuditLogEntriesForOrg,
   listSegmentsForProject,
   ProjectNotFoundError,
   registerSchemaDefinition,
@@ -75,6 +76,45 @@ describe('createSegment', () => {
       { field: 'mrr_usd', op: '>', value: 200 },
     ]);
     expect(segment.created_by).toBe(owner.id);
+  });
+
+  it('audits the create as actor type "user" by default', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Audit User Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.target_id === segment.id);
+    expect(entry?.actor_type).toBe('user');
+    expect(entry?.actor_id).toBe(owner.id);
+  });
+
+  it('audits the create as actor type "api_key" when createdByActorType is set (KAN-76 MCP create_segment tool path)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Audit Api Key Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: 'key-abc123',
+      createdByActorType: 'api_key',
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.target_id === segment.id);
+    expect(entry?.actor_type).toBe('api_key');
+    expect(entry?.actor_id).toBe('key-abc123');
   });
 
   it('rejects a project that does not belong to this org', async () => {
