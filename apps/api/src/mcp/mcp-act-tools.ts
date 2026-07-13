@@ -17,7 +17,7 @@ import {
   proposeAutomationBudgetChangeAction,
 } from '@growthos/firebase-orm-models';
 import type { Permission } from '@growthos/shared';
-import { errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
+import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
 import type { McpAuthContext } from './mcp-auth.guard';
 
@@ -142,7 +142,7 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         'Propose a simulated ad-campaign budget change for a seeded automation target — evaluates every guardrail and lands as "blocked" or "awaiting_approval", never executes anything by itself. Requires "automation.execute".',
       inputSchema: toolInputSchema(proposeActionInputShape),
     },
-    async (args: any) =>
+    auditedToolHandler(auth, 'propose_action', async (args: any) =>
       runActTool(auth, 'automation.execute', args, async (a: { target_id: string; after_daily_budget_usd: number }) => {
         const action = await proposeAutomationBudgetChangeAction({
           organizationId: auth.organizationId,
@@ -153,6 +153,7 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         });
         return textResult({ id: action.id, status: action.status, guardrailViolations: action.guardrail_violations });
       }),
+    ),
   );
 
   server.registerTool(
@@ -162,7 +163,7 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
       description: 'Approve an "awaiting_approval" automation action so it can be executed. Requires "automation.approve", distinct from "automation.execute".',
       inputSchema: toolInputSchema(approveActionInputShape),
     },
-    async (args: any) =>
+    auditedToolHandler(auth, 'approve_action', async (args: any) =>
       runActTool(auth, 'automation.approve', args, async (a: { action_id: string }) => {
         const action = await approveAutomationAction({
           organizationId: auth.organizationId,
@@ -172,6 +173,7 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         });
         return textResult({ id: action.id, status: action.status });
       }),
+    ),
   );
 
   server.registerTool(
@@ -182,7 +184,7 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         'Create a goal pinning a registered metric to a target (or range) and a deadline, with an owner and calendar rhythm. Requires "dashboards.write".',
       inputSchema: toolInputSchema(createGoalInputShape),
     },
-    async (args: any) =>
+    auditedToolHandler(auth, 'create_goal', async (args: any) =>
       runActTool(
         auth,
         'dashboards.write',
@@ -224,6 +226,7 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
           });
         },
       ),
+    ),
   );
 
   server.registerTool(
@@ -234,7 +237,7 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         'Save a named customer segment definition — an ANDed set of filter conditions over one registered entity schema (e.g. "paying, no demo, MRR > $200"). A definition only: no live member list is materialized yet. Requires "dashboards.write".',
       inputSchema: toolInputSchema(createSegmentInputShape),
     },
-    async (args: any) =>
+    auditedToolHandler(auth, 'create_segment', async (args: any) =>
       runActTool(auth, 'dashboards.write', args, async (a: { name: string; schema_name: string; filters: unknown }) => {
         if (!Array.isArray(a.filters)) {
           return errorResult('"filters" must be an array of { field, op, value } conditions.');
@@ -250,5 +253,6 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
         });
         return textResult({ id: segment.id, name: segment.name, schemaName: segment.schema_name, filters: segment.filters });
       }),
+    ),
   );
 }

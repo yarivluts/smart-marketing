@@ -377,6 +377,10 @@ export interface McpOAuthPrincipal {
   projectId: string;
   userId: string;
   scope: string;
+  /** The granted `McpOAuthGrantModel` id — the audit-trail "client identity" key for this connection (KAN-77), distinct from `userId` (the granting human, i.e. the principal). */
+  grantId: string;
+  /** The registered `McpOAuthClientModel` id the grant was issued to — which third-party application this human authorized, not who authorized it. */
+  clientId: string;
 }
 
 export type McpAccessTokenAuthFailureReason = 'invalid_token' | 'insufficient_permission';
@@ -417,6 +421,8 @@ export async function authenticateMcpAccessToken(rawToken: string): Promise<Resu
     projectId: grant.project_id,
     userId: grant.granted_by_user_id,
     scope: grant.scope,
+    grantId: grant.id,
+    clientId: grant.client_id,
   });
 }
 

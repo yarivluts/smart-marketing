@@ -269,6 +269,8 @@ describe('authenticateMcpAccessToken', () => {
       expect(result.value.projectId).toBe(project.id);
       expect(result.value.userId).toBe(owner.id);
       expect(result.value.scope).toBe(MCP_READ_SCOPE);
+      expect(result.value.clientId).toBe(client.id);
+      expect(result.value.grantId).toBeTruthy();
     }
   });
 

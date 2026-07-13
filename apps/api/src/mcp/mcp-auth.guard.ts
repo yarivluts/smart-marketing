@@ -1,7 +1,20 @@
-import type { IncomingMessage } from 'node:http';
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
-import { authenticateApiKey, authenticateMcpAccessToken } from '@growthos/firebase-orm-models';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Optional,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { authenticateApiKey, authenticateMcpAccessToken, defaultMcpRateLimiter, type RateLimiter } from '@growthos/firebase-orm-models';
 import type { ApiKeyScope } from '@growthos/shared';
+
+/** DI token for the {@link RateLimiter} `McpAuthGuard` consumes — see `McpModule`'s provider for the shared default, and this guard's own constructor for the fallback used when nothing provides it (e.g. constructing the guard directly in a unit test). */
+export const MCP_RATE_LIMITER = 'MCP_RATE_LIMITER';
 
 /** The project/principal an MCP request authenticated against, regardless of which of the two credential kinds plan `12 §6.1` allows ("OAuth 2.1 flow for interactive clients, or a scoped API key ... for headless agents") was actually presented. */
 export interface McpAuthContext {
@@ -22,6 +35,10 @@ export interface McpAuthContext {
   scopes?: readonly ApiKeyScope[];
   /** Set only for `principalKind: 'api_key'` — the key's own id (KAN-28), used as the audit-trail actor identifier for act tools an API key scope permits (e.g. `create_goal`/`create_segment` under `dashboards.write`), since a key has no user id of its own to attribute the action to. */
   apiKeyId?: string;
+  /** Set only for `principalKind: 'oauth'` — the grant's own id (KAN-77), used as this connection's rate-limit bucket key and audit-trail "client identity" target, distinct from `userId` (the granting human, i.e. the principal). */
+  grantId?: string;
+  /** Set only for `principalKind: 'oauth'` — the registered `McpOAuthClientModel` id the grant was issued to (KAN-77's "client identity" AC): which third-party application this human authorized, not who authorized it. */
+  clientId?: string;
 }
 
 /**
@@ -76,9 +93,19 @@ function extractBearerToken(headerValue: string | string[] | undefined): string 
  * here — but it does mean "MCP grants nothing the underlying principal
  * doesn't have" is a live, per-request guarantee for OAuth-authenticated
  * calls and a mint-time-only one for API-key-authenticated calls.
+ *
+ * Also enforces a per-credential rate/token budget (KAN-77 AC: "rate/token budgets per key"),
+ * mirroring `ApiKeyAuthGuard`'s own "check after auth succeeds, 429 + Retry-After" posture — checked
+ * after, not before, so an unrecognized or scope-lacking credential never spends a real connection's
+ * budget. Bucketed by `apiKeyId` for an API-key caller or `grantId` for an OAuth caller (never by
+ * `userId`: one human can hold several MCP connections, each with its own budget) — see
+ * `defaultMcpRateLimiter`'s own doc comment for why this is a separate bucket namespace from
+ * `defaultApiKeyRateLimiter`.
  */
 @Injectable()
 export class McpAuthGuard implements CanActivate {
+  constructor(@Optional() @Inject(MCP_RATE_LIMITER) private readonly rateLimiter: RateLimiter = defaultMcpRateLimiter) {}
+
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<McpAuthenticatedRequest>();
     const rawToken = extractBearerToken(request.headers['authorization']);
@@ -95,6 +122,7 @@ export class McpAuthGuard implements CanActivate {
         scopes: apiKeyResult.value.scopes,
         apiKeyId: apiKeyResult.value.apiKey.id,
       };
+      this.enforceRateLimit(context, `api_key:${apiKeyResult.value.apiKey.id}`);
       return true;
     }
     if (apiKeyResult.error.reason === 'insufficient_scope') {
@@ -108,7 +136,10 @@ export class McpAuthGuard implements CanActivate {
         projectId: oauthResult.value.projectId,
         principalKind: 'oauth',
         userId: oauthResult.value.userId,
+        grantId: oauthResult.value.grantId,
+        clientId: oauthResult.value.clientId,
       };
+      this.enforceRateLimit(context, `oauth_grant:${oauthResult.value.grantId}`);
       return true;
     }
     if (oauthResult.error.reason === 'insufficient_permission') {
@@ -116,5 +147,14 @@ export class McpAuthGuard implements CanActivate {
     }
 
     throw new UnauthorizedException('Invalid bearer credential.');
+  }
+
+  private enforceRateLimit(context: ExecutionContext, rateLimitKey: string): void {
+    const result = this.rateLimiter.consume(rateLimitKey);
+    if (!result.allowed) {
+      const response = context.switchToHttp().getResponse<ServerResponse>();
+      response.setHeader('Retry-After', String(result.retryAfterSeconds));
+      throw new HttpException('Rate limit exceeded for this MCP connection.', HttpStatus.TOO_MANY_REQUESTS);
+    }
   }
 }

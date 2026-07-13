@@ -11,6 +11,7 @@ import {
   ProjectQueryQuotaExceededError,
   queryMetrics,
   queryProjectCohortRetention,
+  recordAuditLogEntry,
   searchProjectCustomers,
   WarehouseNotConfiguredError,
 } from '@growthos/firebase-orm-models';
@@ -70,6 +71,63 @@ export function textResult(value: unknown): ToolResult {
 
 export function errorResult(message: string): ToolResult {
   return { content: [{ type: 'text', text: message }], isError: true };
+}
+
+/**
+ * Appends one audit-log entry for a single MCP tool call (KAN-77 AC: "every tool call lands in the
+ * audit log with the principal + client identity") — every tool, read or act, goes through this one
+ * function via {@link auditedToolHandler} rather than each call site building its own entry, so "every
+ * call" actually means every call including permission-denied and thrown-error ones, not just the
+ * mutations that already happened to call `recordAuditLogEntry` themselves (KAN-76's act tools do,
+ * via `goal.service.ts`/`segment.service.ts`/`automation.service.ts` — this entry is a deliberate
+ * *second*, MCP-specific record of the call itself, distinct from those tools' own domain-specific
+ * `goal.create`/`segment.create`/... entries, the same "access log alongside the domain audit trail"
+ * split most APM/audit systems draw).
+ *
+ * Best-effort (swallows its own failure) for the same reason every other secondary audit write in
+ * this codebase is: a failure to log a call must never turn an otherwise-successful (or already-
+ * failed) tool call into a different outcome for the caller.
+ */
+async function recordMcpToolCallAudit(auth: McpAuthContext, toolName: string, outcome: { isError: boolean }): Promise<void> {
+  try {
+    await recordAuditLogEntry({
+      organizationId: auth.organizationId,
+      projectId: auth.projectId,
+      actorType: auth.principalKind === 'api_key' ? 'api_key' : 'user',
+      actorId: (auth.principalKind === 'api_key' ? auth.apiKeyId : auth.userId) ?? 'unknown-mcp-caller',
+      action: 'mcp.tool_call',
+      targetType: 'mcp_tool',
+      targetId: toolName,
+      summary: `MCP tool call: ${toolName}${outcome.isError ? ' (error)' : ''}`,
+      clientType: auth.principalKind === 'api_key' ? 'mcp_api_key' : 'mcp_oauth',
+      clientId: auth.principalKind === 'api_key' ? auth.apiKeyId : auth.clientId,
+    });
+  } catch {
+    // Best-effort — see this function's own doc comment.
+  }
+}
+
+/**
+ * Wraps a tool callback so every invocation — success, tool error (`isError: true`), or a thrown
+ * exception — records exactly one {@link recordMcpToolCallAudit} entry before the result (or
+ * exception) reaches the caller. The single wrap point every `registerTool` call in this file and
+ * `mcp-act-tools.ts` goes through, so no individual tool has to remember to audit itself.
+ */
+export function auditedToolHandler<Args>(
+  auth: McpAuthContext,
+  toolName: string,
+  handler: (args: Args) => Promise<ToolResult>,
+): (args: Args) => Promise<ToolResult> {
+  return async (args: Args) => {
+    let isError = true;
+    try {
+      const result = await handler(args);
+      isError = result.isError ?? false;
+      return result;
+    } finally {
+      await recordMcpToolCallAudit(auth, toolName, { isError });
+    }
+  };
 }
 
 /**
@@ -180,10 +238,10 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       description: "List every metric registered in this project's active metric catalog, with lineage.",
       inputSchema: {},
     },
-    async () => {
+    auditedToolHandler(auth, 'list_metrics', async () => {
       const metrics = await listMetricsCatalogForProject(auth.organizationId, auth.projectId);
       return textResult({ metrics });
-    },
+    }),
   );
 
   server.registerTool(
@@ -193,14 +251,14 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       description: 'Get the full definition (aggregation/formula, dimensions, lineage) of one registered metric by name.',
       inputSchema: toolInputSchema(describeMetricInputShape),
     },
-    async (args: any) => {
+    auditedToolHandler(auth, 'describe_metric', async (args: any) => {
       const name = String((args as { name: unknown }).name);
       const detail = await getMetricCatalogDetail(auth.organizationId, auth.projectId, name);
       if (!detail) {
         return errorResult(`No metric named "${name}" is registered and active in this project.`);
       }
       return textResult(detail);
-    },
+    }),
   );
 
   server.registerTool(
@@ -211,7 +269,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
         'Run a grounded query against one or more registered metrics for a date range — never generated numbers, always compiled from the metric registry and executed against the warehouse.',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
-    async (args: any) => runMetricQueryTool(auth, args),
+    auditedToolHandler(auth, 'query_metric', async (args: any) => runMetricQueryTool(auth, args)),
   );
 
   server.registerTool(
@@ -222,10 +280,11 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
         'Query one or more metrics with a period-over-period comparison ("time.compare": previous_period or previous_year, required) — the result series is split by a "period" column for "current" vs. "prior".',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
-    async (args: any) =>
+    auditedToolHandler(auth, 'compare_periods', async (args: any) =>
       runMetricQueryTool(auth, args, (request) =>
         request.time.compare ? undefined : 'compare_periods requires "time.compare" to be "previous_period" or "previous_year".',
       ),
+    ),
   );
 
   server.registerTool(
@@ -236,10 +295,11 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
         'Query a metric broken down by one or more dimensions ("dimensions", required, non-empty) — e.g. "what was CAC last week by channel".',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
-    async (args: any) =>
+    auditedToolHandler(auth, 'decompose', async (args: any) =>
       runMetricQueryTool(auth, args, (request) =>
         request.dimensions && request.dimensions.length > 0 ? undefined : 'decompose requires at least one entry in "dimensions".',
       ),
+    ),
   );
 
   server.registerTool(
@@ -249,7 +309,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       description: 'Query the signup-month x period-number retention matrix (cohort engine v1). Omit cohort_month to get every cohort, newest first.',
       inputSchema: toolInputSchema(cohortInputShape),
     },
-    async (args: any) => {
+    auditedToolHandler(auth, 'query_cohort', async (args: any) => {
       const { cohort_month: cohortMonth, limit } = args as { cohort_month?: string; limit?: number };
       try {
         const rows = await queryProjectCohortRetention({ organizationId: auth.organizationId, projectId: auth.projectId, cohortMonth, limit });
@@ -257,7 +317,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       } catch (error) {
         return errorResult(describeMetricsError(error));
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -267,7 +327,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       description: "Substring-search this project's customer/entity records (Customer 360) by id or property value.",
       inputSchema: toolInputSchema(searchCustomersInputShape),
     },
-    async (args: any) => {
+    auditedToolHandler(auth, 'search_customers', async (args: any) => {
       const { query, schema_name: schemaName, limit } = args as { query: string; schema_name?: string; limit?: number };
       try {
         const results = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, query, schemaName, limit });
@@ -275,7 +335,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       } catch (error) {
         return errorResult(describeMetricsError(error));
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -285,10 +345,10 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       description: 'List recent noteworthy findings for this project: active tracking-broke alerts and fired win-rule events, newest first.',
       inputSchema: toolInputSchema(listInsightsInputShape),
     },
-    async (args: any) => {
+    auditedToolHandler(auth, 'list_insights', async (args: any) => {
       const { limit } = args as { limit?: number };
       const insights = await listProjectInsights({ organizationId: auth.organizationId, projectId: auth.projectId, limit });
       return textResult({ insights });
-    },
+    }),
   );
 }

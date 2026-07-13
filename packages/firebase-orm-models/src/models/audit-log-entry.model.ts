@@ -10,6 +10,17 @@ export const AUDIT_ACTOR_TYPES = ['user', 'service_account', 'api_key', 'system'
 export type AuditActorType = (typeof AUDIT_ACTOR_TYPES)[number];
 
 /**
+ * The connecting *client's* identity, distinct from `actor_type`/`actor_id` (KAN-77 AC: "every
+ * [MCP] tool call lands in the audit log with the principal + client identity"). For an MCP API-key
+ * call the key already fully identifies both the principal and the client, so `client_id` mirrors
+ * `actor_id`; for an MCP OAuth call the *principal* is the granting human (`actor_id`) but the
+ * *client* is the third-party application that human authorized (the grant's own `client_id`) —
+ * a distinct piece of information `actor_id` alone can't recover. Undefined for every non-MCP entry.
+ */
+export const AUDIT_CLIENT_TYPES = ['mcp_api_key', 'mcp_oauth'] as const;
+export type AuditClientType = (typeof AUDIT_CLIENT_TYPES)[number];
+
+/**
  * One append-only audit record (KAN-44, plan `13 §E6.2`: "every config/key/
  * role/schema change"; `06 §1`/`§7`: "who/what/when/before/after"). Org-scoped
  * rather than project-scoped since an org's audit trail spans both org-level
@@ -68,6 +79,14 @@ export class AuditLogEntryModel extends BaseModel {
   /** A snapshot of the changed fields after the action, when there's a meaningful "after" (omitted for pure deletions). */
   @Field({ is_required: false })
   public after?: Record<string, unknown>;
+
+  /** Set only when this action was performed through a channel with its own distinct client identity (currently: MCP) — see {@link AuditClientType}'s own doc comment. */
+  @Field({ is_required: false })
+  public client_type?: AuditClientType;
+
+  /** The client's own id — an `ApiKeyModel` id (`client_type: 'mcp_api_key'`) or an `McpOAuthClientModel` id (`client_type: 'mcp_oauth'`). Undefined whenever `client_type` is. */
+  @Field({ is_required: false })
+  public client_id?: string;
 
   @Field({ is_required: true })
   public created_at!: string;
