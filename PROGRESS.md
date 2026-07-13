@@ -17,6 +17,70 @@ Template for each entry:
 
 ---
 
+## 2026-07-13 — E22.1 MCP server: Streamable HTTP, OAuth 2.1 + scoped keys, read tools (KAN-75)
+
+- **Last completed:**
+  - **KAN-75**, done, merged as PR #62. Read PROGRESS.md/TASKS.md per the standing rule; the prior
+    entry's own "next step" flagged KAN-75..78 (Epic E22, MCP server) as worth a look next since
+    KAN-72/73 (Google/Meta Manage plugins) are effectively blocked on KAN-43 (`needs-human`) even
+    though `TASKS.md` doesn't formally say so.
+  - On starting, found the branch `kan-75-mcp-server` already existed on `origin` with a complete
+    implementation commit (`db00653`) from an earlier run that had never opened a PR or updated
+    PROGRESS.md/TASKS.md — picked it up rather than duplicating the work. Independently reviewed the
+    full diff (36 files: `POST /v1/mcp` Streamable HTTP transport scoped to one org/project per bearer
+    credential — a new `mcp.read` API-key scope or a self-contained OAuth 2.1 authorization-code+PKCE
+    flow built on this app's own Firebase Auth sessions; `list_metrics`/`describe_metric`/
+    `query_metric`/`compare_periods`/`decompose` reusing the exact KAN-42 `parseMetricQueryRequestBody`
+    + `queryMetrics` pipeline; new `query_cohort`/`search_customers` hand-written SQL against the
+    `entities`/`fact_cohort_retention` dbt tables; `list_insights` fanning out to existing tracking-alert/
+    win-rule reads; an "MCP connections" section on the project Keys page) and ran the full check suite
+    per-package (running the whole monorepo suite at once hit the same pre-existing Firestore-emulator
+    resource-contention pattern KAN-74's entry already documented — not a regression, confirmed by
+    rerunning each failing suite alone and having it pass clean).
+  - While finishing that verification, a **second commit** (`d98fa6a`) landed on the same branch from
+    the same originating session, doing its own 8-angle self-review and fixing real issues before I
+    could open a PR myself — including one privilege-escalation bug I had read past in my own pass:
+    `viewer` (zero permissions today, one of only two org-scope-invitable roles) had been granted
+    `mcp.read` on a false "already sees this data through the web app" premise. Also fixed:
+    `POST /oauth/register` accepting `javascript:`/`data:` redirect URIs (only checked `new URL(...)`
+    didn't throw), the admin connections list never checking `refresh_token_expires_at` (a silently
+    expired grant showed as "Connected" forever), and `search_customers` not escaping `LIKE`'s own
+    `%`/`_` wildcards. Re-verified all four affected suites green after that commit too
+    (`packages/shared` 330, `firebase-orm-models` 650, `apps/api` 87, `apps/web` unit 838) plus
+    `pnpm lint && pnpm typecheck && pnpm build`.
+  - Opened PR #62 (attempted first, got a 422 "PR already exists" — the same session had already
+    opened it moments earlier); confirmed GitHub Actions CI green on the exact head commit and
+    `mergeable_state: "clean"", then merged (squash) into `main`. Remote branch deletion failed with
+    the same documented HTTP 403 as every prior feature branch in this sandbox —
+    `kan-75-mcp-server` is merged and dead but not deleted.
+  - `query_funnel` deliberately not built — no `fact_funnel_*` dbt model or query path exists anywhere
+    in this codebase yet; documented as a follow-up rather than faked.
+- **In progress (exact stopping point):** none — KAN-75 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-76** (Act tools: `propose_action`/`approve_action`, `create_goal`,
+  `create_segment`) is now unblocked — it builds directly on this story's MCP transport/auth guard and
+  on KAN-71's automation action pipeline. **KAN-72/73** (Google/Meta Manage plugins) remain
+  practically blocked on **KAN-43**. **KAN-77** (MCP isolation-suite coverage + audit logging + rate/
+  token budgets per key) and **KAN-78** (docs + example clients) are natural follow-ons once KAN-76
+  lands. Worth a human call on whether to formally mark KAN-72/73 `blocked-by` KAN-43 in `TASKS.md`
+  (raised by the last two entries running).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding) — gates KAN-72/73 specifically.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding) — also means
+    every MCP tool that queries the warehouse (`query_metric`/`compare_periods`/`decompose`/
+    `query_cohort`/`search_customers`) correctly returns a tool error (`WarehouseNotConfiguredError`)
+    rather than real data today, same as the existing `POST /v1/metrics/query` REST endpoint.
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`) and PR #60 (`fix/arbel-admin-query-compat`) are still open and
+    untouched — out of scope for KAN-75, carried forward so they aren't lost.
+  - `apps/web/repro-tmp.mjs` (a leftover debug script noted in a prior entry) is still sitting in
+    `main`'s working tree, still out of scope for this run's own diff.
+
+---
+
 ## 2026-07-13 — E21.4 Admin: write-tier selector, guardrail policy editor, action-history diff (KAN-74)
 
 - **Last completed:**
