@@ -110,7 +110,7 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
                   {connection ? (
                     <span className="text-muted-foreground">
                       {' '}
-                      — {t('targetConnectionLine', { label: connection.label, tier: t(tierLabelKeys[connection.tier]) })}
+                      {t('targetConnectionLine', { label: connection.label, tier: t(tierLabelKeys[connection.tier]) })}
                     </span>
                   ) : null}
                 </li>

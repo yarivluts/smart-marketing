@@ -854,7 +854,7 @@
     "targetsHeading": "יעדי אוטומציה",
     "targetsEmptyNote": "עדיין לא הוגדרו יעדי אוטומציה עבור פרויקט זה.",
     "targetLine": "{label} — ${budget} ליום",
-    "targetConnectionLine": "חיבור: {label} ({tier})",
+    "targetConnectionLine": "— חיבור: {label} ({tier})",
     "seedTargetIdLabel": "מזהה יעד",
     "seedTargetLabelLabel": "תווית",
     "seedTargetEnvironmentLabel": "סביבה",

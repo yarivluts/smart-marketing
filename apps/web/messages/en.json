@@ -854,7 +854,7 @@
     "targetsHeading": "Automation targets",
     "targetsEmptyNote": "No automation targets have been seeded for this project yet.",
     "targetLine": "{label} — ${budget}/day",
-    "targetConnectionLine": "Connection: {label} ({tier})",
+    "targetConnectionLine": "— Connection: {label} ({tier})",
     "seedTargetIdLabel": "Target id",
     "seedTargetLabelLabel": "Label",
     "seedTargetEnvironmentLabel": "Environment",
