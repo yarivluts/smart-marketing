@@ -17,6 +17,66 @@ Template for each entry:
 
 ---
 
+## 2026-07-13 — E22.2 MCP act tools: propose_action/approve_action, create_goal, create_segment (KAN-76)
+
+- **Last completed:**
+  - **KAN-76**, done, merged as PR #63. Read PROGRESS.md/TASKS.md per the standing rule; the prior
+    entry's own "next step" pointed at KAN-76 as the natural unblocked pick, since it builds directly
+    on KAN-75's MCP transport/auth guard and KAN-71's automation action pipeline.
+  - On starting, found the branch `kan-76-mcp-act-tools` already existed on `origin` with a complete
+    implementation (3 commits, including its own 4-angle self-review round) from an earlier run in
+    this session that had opened PR #63 but not yet merged it or updated PROGRESS.md/TASKS.md —
+    picked it up rather than duplicating the work, same pattern as the last several entries.
+  - Independently reviewed the full diff (33 files): `mcp-act-authorization.ts`'s
+    `mcpCallerHasPermission` (API-key callers checked against their own static `scopes`, OAuth
+    callers re-derived live from the granting human's current role bindings via `can()`);
+    `mcp-act-tools.ts`'s four tools (`propose_action`/`approve_action`/`create_goal`/
+    `create_segment`), each calling the exact same service function the equivalent `apps/web` route
+    already calls, gated on its own already-modeled permission rather than a new blanket `mcp.act`;
+    the new minimal `SegmentModel`/`createSegment` (a saved ANDed filter definition, no query
+    executor yet — deliberately out of scope, a separate Phase-2 epic per the gap-analysis doc); the
+    `toPolicyBindings()` dedup pulling a third copy of the same `RoleBindingModel`→`PolicyBinding`
+    mapper into one place; the new Segments admin page (list + create form), gated on
+    `dashboards.write`, symmetric with the existing Goals page.
+  - Found one real (minor) issue during review: `queries.ts`'s `listSegmentsForProject` doc comment
+    claimed segment creation only happened via the MCP tool, but the self-review commit had already
+    added a human-facing create route — fixed the stale comment before merging.
+  - Verified independently rather than trusting the PR's own claimed test plan: ran
+    `pnpm lint`/`typecheck`/`build` clean across all 6 packages (needed `PIP_CERT`/
+    `NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt` for `packages/dbt-transform`'s pip venv and the
+    Firestore-emulator jar download — the same documented sandbox-only TLS wrinkle prior entries have
+    hit); `packages/shared` 348/348; `packages/firebase-orm-models` 641+23 passing (two emulator
+    suites flaked under full-suite resource contention, both confirmed green in isolation — the same
+    documented pattern, not a regression); `apps/api` 92/92 including the new
+    `mcp.controller.e2e.spec.ts` act-tool coverage; `apps/web` unit suite green, 19 e2e passed with 1
+    failure + 2 flaky retries in `boards`/`auth`/`ingest-health` specs — none touching goals/segments/
+    automation/MCP, consistent with the sandbox flakiness this file has documented repeatedly. Waited
+    for GitHub Actions CI to go green on the exact head commit (`00c2e98`, after pushing my own fix)
+    and confirmed `mergeable_state: "clean"` before merging (squash).
+  - Remote branch deletion failed with the same documented HTTP 403 as every prior feature branch in
+    this sandbox — `kan-76-mcp-act-tools` is merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-76 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-77** (MCP surface in the isolation test suite + audit logging of principal +
+  client identity + rate/token budgets per key) is the natural next pick — it hardens the KAN-75/76
+  MCP surface rather than extending it further. **KAN-78** (docs + example clients) is a good
+  follow-on once KAN-77 lands. **KAN-72/73** (Google/Meta Manage plugins) remain practically blocked
+  on **KAN-43**.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding) — gates KAN-72/73 specifically.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding) — same
+    warehouse-not-configured caveat noted in the last several entries.
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`) and PR #60 (`fix/arbel-admin-query-compat`) are still open and
+    untouched — out of scope for KAN-76, carried forward so they aren't lost.
+  - `apps/web/repro-tmp.mjs` (a leftover debug script noted in a prior entry) is still sitting in
+    `main`'s working tree, still out of scope for this run's own diff.
+
+---
+
 ## 2026-07-13 — E22.1 MCP server: Streamable HTTP, OAuth 2.1 + scoped keys, read tools (KAN-75)
 
 - **Last completed:**
