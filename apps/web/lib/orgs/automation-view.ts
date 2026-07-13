@@ -4,7 +4,10 @@ import type {
   AutomationGuardrailPolicyConfig,
   AutomationKillSwitchStatus,
   AutomationTargetStateModel,
+  ConnectionWriteTier,
   GuardrailViolationType,
+  ResourceAttachmentModel,
+  SharedCredentialModel,
 } from '@growthos/firebase-orm-models';
 
 /** A plain, serializable projection of a project's effective automation guardrail policy — client components can only ever receive plain data across the RSC boundary, same reasoning as `toProjectCostQuotaView`. */
@@ -40,6 +43,7 @@ export interface AutomationTargetView {
   label: string;
   dailyBudgetUsd: number;
   environmentId: string;
+  resourceAttachmentId?: string;
 }
 
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
@@ -49,15 +53,58 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     label: target.label,
     dailyBudgetUsd: target.daily_budget_usd,
     environmentId: target.environment_id,
+    ...(target.resource_attachment_id !== undefined ? { resourceAttachmentId: target.resource_attachment_id } : {}),
   };
+}
+
+/** One of a project's approved `credential` connections (KAN-27), for the seed-target form's KAN-74 connection picker. */
+export interface AutomationConnectionOption {
+  id: string;
+  label: string;
+  tier: ConnectionWriteTier;
+}
+
+/** Labels each approved credential attachment with its credential's own name — the project may only ever see its own attachment's `write_tier`, never another project's slice of the same shared credential. */
+export function toAutomationConnectionOptions(
+  attachments: readonly ResourceAttachmentModel[],
+  credentials: readonly SharedCredentialModel[],
+): AutomationConnectionOption[] {
+  const credentialNameById = new Map(credentials.map((credential) => [credential.id, credential.name]));
+  return attachments
+    .filter((attachment) => attachment.resource_kind === 'credential')
+    .map((attachment) => ({
+      id: attachment.id,
+      label: credentialNameById.get(attachment.resource_id) ?? attachment.resource_id,
+      tier: attachment.write_tier,
+    }));
+}
+
+/** One row of an action's before/after diff — generic over any action type's payload shape, not just today's single `dailyBudgetUsd` field (KAN-74's "every action browsable with diff" AC). */
+export interface AutomationActionDiffEntry {
+  key: string;
+  before: unknown;
+  after: unknown;
+}
+
+function toDiffEntries(before: Record<string, unknown>, after: Record<string, unknown>): AutomationActionDiffEntry[] {
+  const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
+  return keys.map((key) => ({ key, before: before[key], after: after[key] }));
+}
+
+/** The `Automation` translation key for a known diff field name — `undefined` for a field this codebase hasn't labeled yet (a future action type's own field), in which case the raw key is shown as-is rather than blocking the whole diff row. */
+const DIFF_FIELD_LABEL_KEYS: Record<string, string> = {
+  dailyBudgetUsd: 'diffFieldDailyBudgetUsd',
+};
+
+export function diffFieldLabelKey(key: string): string | undefined {
+  return DIFF_FIELD_LABEL_KEYS[key];
 }
 
 export interface AutomationActionView {
   id: string;
   targetId: string;
   targetLabel: string;
-  beforeDailyBudgetUsd: number;
-  afterDailyBudgetUsd: number;
+  diffEntries: AutomationActionDiffEntry[];
   status: AutomationActionStatus;
   guardrailViolations: { type: GuardrailViolationType; message: string }[];
   proposedAt: string;
@@ -71,8 +118,7 @@ export function toAutomationActionView(action: AutomationActionModel): Automatio
     id: action.id,
     targetId: action.target_id,
     targetLabel: action.target_label,
-    beforeDailyBudgetUsd: (action.before as { dailyBudgetUsd: number }).dailyBudgetUsd,
-    afterDailyBudgetUsd: (action.after as { dailyBudgetUsd: number }).dailyBudgetUsd,
+    diffEntries: toDiffEntries(action.before, action.after),
     status: action.status,
     guardrailViolations: action.guardrail_violations,
     proposedAt: action.proposed_at,
@@ -107,6 +153,7 @@ const VIOLATION_LABEL_KEYS: Record<GuardrailViolationType, string> = {
   outside_allowed_hours: 'violationOutsideAllowedHours',
   blast_radius: 'violationBlastRadius',
   automation_paused: 'violationAutomationPaused',
+  insufficient_write_tier: 'violationInsufficientWriteTier',
 };
 
 export function violationLabelKey(type: GuardrailViolationType): string {

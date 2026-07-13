@@ -5,24 +5,34 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { AutomationConnectionOption } from '@/lib/orgs/automation-view';
 
 export interface AutomationSeedTargetFormProps {
   orgId: string;
   projectId: string;
+  /** The project's approved credential connections (KAN-27/74) — picking one gates this target's future write actions on that connection's current write tier. */
+  connections: AutomationConnectionOption[];
 }
+
+const TIER_LABEL_KEYS: Record<AutomationConnectionOption['tier'], string> = {
+  read: 'tierRead',
+  optimize: 'tierOptimize',
+  manage: 'tierManage',
+};
 
 /**
  * Seeds a new simulated automation target — the buildable-today stand-in for
  * "connect a real ad account and pick a campaign" until KAN-72/73 exist (see
  * `AutomationTargetStateModel`'s own doc comment).
  */
-export function AutomationSeedTargetForm({ orgId, projectId }: AutomationSeedTargetFormProps): React.ReactElement {
+export function AutomationSeedTargetForm({ orgId, projectId, connections }: AutomationSeedTargetFormProps): React.ReactElement {
   const t = useTranslations('Automation');
   const router = useRouter();
   const [targetId, setTargetId] = useState('');
   const [label, setLabel] = useState('');
   const [environmentId, setEnvironmentId] = useState('live');
   const [initialDailyBudgetUsd, setInitialDailyBudgetUsd] = useState('100');
+  const [resourceAttachmentId, setResourceAttachmentId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,6 +61,7 @@ export function AutomationSeedTargetForm({ orgId, projectId }: AutomationSeedTar
           targetType: 'campaign',
           label: label.trim(),
           initialDailyBudgetUsd: parsedBudget,
+          resourceAttachmentId: resourceAttachmentId.length > 0 ? resourceAttachmentId : undefined,
         }),
       });
       if (!response.ok) {
@@ -96,6 +107,24 @@ export function AutomationSeedTargetForm({ orgId, projectId }: AutomationSeedTar
           value={initialDailyBudgetUsd}
           onChange={(event) => setInitialDailyBudgetUsd(event.target.value)}
         />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor="seed-target-connection">
+          {t('connectionLabel')}
+        </label>
+        <select
+          id="seed-target-connection"
+          value={resourceAttachmentId}
+          onChange={(event) => setResourceAttachmentId(event.target.value)}
+          className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+        >
+          <option value="">{t('connectionNoneOption')}</option>
+          {connections.map((connection) => (
+            <option key={connection.id} value={connection.id}>
+              {t('connectionOptionLabel', { label: connection.label, tier: t(TIER_LABEL_KEYS[connection.tier]) })}
+            </option>
+          ))}
+        </select>
       </div>
       <Button type="submit" disabled={submitting}>
         {t('seedTargetButton')}

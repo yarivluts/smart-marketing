@@ -107,12 +107,14 @@ import {
   type OrgPersonModel,
   type TestRunFieldMappingResult,
   type ProjectCostQuotaModel,
+  type ConnectionWriteTier,
   type ResourceAttachmentModel,
   type ResourceKind,
   type ResourceTemplateModel,
   type ResourceTemplateType,
   type SchemaDefModel,
   type SchemaFieldInput,
+  setResourceAttachmentWriteTier as setResourceAttachmentWriteTierInOrganization,
   type SharedCredentialModel,
   type TrackingAlertCheckResult,
   claimTvPairing as claimTvPairingInOrganization,
@@ -283,6 +285,20 @@ interface DetachResourceInput {
 export async function detachResource(input: DetachResourceInput): Promise<ResourceAttachmentModel> {
   await ensureFirestoreOrm();
   return detachResourceInOrganization(input);
+}
+
+interface SetResourceAttachmentWriteTierInput {
+  organizationId: string;
+  attachmentId: string;
+  tier: ConnectionWriteTier;
+  actorId: string;
+}
+
+export async function setResourceAttachmentWriteTier(
+  input: SetResourceAttachmentWriteTierInput,
+): Promise<ResourceAttachmentModel> {
+  await ensureFirestoreOrm();
+  return setResourceAttachmentWriteTierInOrganization(input);
 }
 
 interface MintApiKeyInput {
@@ -915,6 +931,7 @@ interface SeedAutomationTargetInput {
   label: string;
   initialDailyBudgetUsd: number;
   seededByUserId: string;
+  resourceAttachmentId?: string;
 }
 
 export async function ensureAutomationTargetSeeded(input: SeedAutomationTargetInput): Promise<AutomationTargetStateModel> {

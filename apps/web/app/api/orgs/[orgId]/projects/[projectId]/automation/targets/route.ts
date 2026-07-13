@@ -44,11 +44,12 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     targetType?: unknown;
     label?: unknown;
     initialDailyBudgetUsd?: unknown;
+    resourceAttachmentId?: unknown;
   }>(request);
   if (parsed.error) {
     return parsed.error;
   }
-  const { targetId, environmentId, targetType, label, initialDailyBudgetUsd } = parsed.body;
+  const { targetId, environmentId, targetType, label, initialDailyBudgetUsd, resourceAttachmentId } = parsed.body;
   if (typeof targetId !== 'string' || targetId.trim().length === 0) {
     return NextResponse.json({ error: 'target_id_required' }, { status: 400 });
   }
@@ -64,6 +65,9 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
   if (typeof initialDailyBudgetUsd !== 'number') {
     return NextResponse.json({ error: 'initial_daily_budget_usd_required' }, { status: 400 });
   }
+  if (resourceAttachmentId !== undefined && (typeof resourceAttachmentId !== 'string' || resourceAttachmentId.trim().length === 0)) {
+    return NextResponse.json({ error: 'invalid_resource_attachment_id' }, { status: 400 });
+  }
 
   try {
     const target = await ensureAutomationTargetSeeded({
@@ -75,6 +79,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       label: label.trim(),
       initialDailyBudgetUsd,
       seededByUserId: user.id,
+      resourceAttachmentId: typeof resourceAttachmentId === 'string' ? resourceAttachmentId : undefined,
     });
     return NextResponse.json({ id: target.id, dailyBudgetUsd: target.daily_budget_usd }, { status: 201 });
   } catch (err) {
@@ -82,7 +87,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       return NextResponse.json({ error: 'not_found' }, { status: 404 });
     }
     if (err instanceof InvalidAutomationActionError) {
-      return NextResponse.json({ error: 'invalid_initial_daily_budget_usd' }, { status: 400 });
+      return NextResponse.json({ error: 'invalid_request' }, { status: 400 });
     }
     throw err;
   }

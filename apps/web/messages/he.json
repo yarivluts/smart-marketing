@@ -219,7 +219,12 @@
     "requestAttachment": "בקשת צירוף",
     "requestError": "לא ניתן היה לשלוח את הבקשה. נסה שוב.",
     "detach": "ניתוק",
-    "detachError": "לא ניתן היה לנתק את המשאב. נסה שוב."
+    "detachError": "לא ניתן היה לנתק את המשאב. נסה שוב.",
+    "writeTierLabel": "רמת הרשאת כתיבה",
+    "writeTierRead": "קריאה בלבד",
+    "writeTierOptimize": "אופטימיזציה",
+    "writeTierManage": "ניהול מלא",
+    "writeTierError": "לא ניתן היה לעדכן את רמת הרשאת הכתיבה. נסה שוב."
   },
   "ApiKeys": {
     "metaTitle": "מפתחות API",
@@ -849,6 +854,7 @@
     "targetsHeading": "יעדי אוטומציה",
     "targetsEmptyNote": "עדיין לא הוגדרו יעדי אוטומציה עבור פרויקט זה.",
     "targetLine": "{label} — ${budget} ליום",
+    "targetConnectionLine": "חיבור: {label} ({tier})",
     "seedTargetIdLabel": "מזהה יעד",
     "seedTargetLabelLabel": "תווית",
     "seedTargetEnvironmentLabel": "סביבה",
@@ -857,6 +863,12 @@
     "seedTargetInvalidBudgetError": "התקציב היומי ההתחלתי חייב להיות מספר לא שלילי.",
     "seedTargetFieldsRequiredError": "יש למלא מזהה יעד, תווית וסביבה.",
     "seedTargetError": "לא ניתן היה להגדיר את היעד. נסה שוב.",
+    "connectionLabel": "חיבור",
+    "connectionNoneOption": "ללא חיבור (יעד הדגמה ללא הגבלה)",
+    "connectionOptionLabel": "{label} ({tier})",
+    "tierRead": "קריאה בלבד",
+    "tierOptimize": "אופטימיזציה",
+    "tierManage": "ניהול מלא",
     "proposeHeading": "הצעת שינוי תקציב",
     "proposeNoTargetsNote": "הגדר יעד אוטומציה למעלה לפני הצעת שינוי.",
     "proposeTargetLabel": "יעד",
@@ -867,7 +879,8 @@
     "proposeError": "לא ניתן היה להציע את השינוי. נסה שוב.",
     "actionsHeading": "תור פעולות",
     "actionsEmptyNote": "עדיין לא הוצעו פעולות אוטומציה עבור פרויקט זה.",
-    "diffLine": "${before} ליום ← ${after} ליום",
+    "diffFieldDailyBudgetUsd": "תקציב יומי",
+    "diffRowLine": "{label}: {before} ← {after}",
     "failureReasonLine": "הביצוע נכשל: {reason}",
     "rollbackReasonLine": "בוצע rollback ({reason})",
     "approveButton": "אשר",
@@ -891,6 +904,7 @@
     "violationProtectedTarget": "היעד מוגן",
     "violationOutsideAllowedHours": "מחוץ לחלון השעות המותרות",
     "violationBlastRadius": "מגבלת הפעולות היומית הושגה",
-    "violationAutomationPaused": "האוטומציה מושהית (מתג החירום הופעל)"
+    "violationAutomationPaused": "האוטומציה מושהית (מתג החירום הופעל)",
+    "violationInsufficientWriteTier": "החיבור של היעד אינו מאושר ברמת הרשאה (אופטימיזציה או ניהול מלא) המאפשרת שינוי זה"
   }
 }
