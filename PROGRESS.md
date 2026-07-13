@@ -17,6 +17,99 @@ Template for each entry:
 
 ---
 
+## 2026-07-13 — E21.4 Admin: write-tier selector, guardrail policy editor, action-history diff (KAN-74)
+
+- **Last completed:**
+  - **KAN-74**, done, merged as PR #61. Read PROGRESS.md/TASKS.md per the standing rule; the prior
+    entry's own "next step" pointed at KAN-74 as the natural next unblocked pick over KAN-72/73
+    (both need real Google/Meta API access still gated on KAN-43). Checked for a parallel-run
+    collision first — no open PR touched KAN-74 (found an unrelated, still-open PR #60 fixing an
+    `@arbel/firebase-orm` admin-query compatibility bug, left untouched, out of scope).
+  - Research pass first established what KAN-71 already delivered (the guardrail policy editor and
+    an action queue with a single-field before/after line) vs. what was genuinely missing: no
+    write-tier concept existed anywhere in the data model, and the action queue's "diff" was one
+    hardcoded `dailyBudgetUsd` line, not a generalizable view.
+  - **`packages/firebase-orm-models`**:
+    - `ResourceAttachmentModel` (KAN-27's project↔credential join) gains `write_tier:
+      'read' | 'optimize' | 'manage'` (plan `02 §3`), defaulting every new attachment to the safest
+      `read` tier; `write_tier_updated_at`/`write_tier_updated_by_user_id` track the last change.
+    - `resource-library.service.ts`'s new `setResourceAttachmentWriteTier` — credential-kind and
+      `approved`-only, best-effort audit-logged (`resource_attachment.write_tier_change`,
+      before/after) the same way `setAutomationGuardrailPolicy` already is.
+    - `AutomationTargetStateModel` (KAN-71) gains an optional `resource_attachment_id`, settable at
+      seed time. `automation.service.ts`'s new `resolveWriteTierViolation` re-resolves the linked
+      connection's *current* tier on every call (never cached) — `proposeAutomationBudgetChangeAction`
+      adds a new `insufficient_write_tier` guardrail violation when the tier is `read`;
+      `approveAutomationAction`/`executeAutomationAction` both hard-fail
+      (`InsufficientWriteTierError`) on the same check, so a downgrade blocks the very next
+      approve/execute call, not just future proposals — the AC's "tier downgrade immediately revokes
+      capabilities" made concrete and tested. A target with no linked connection stays ungated
+      (backward compatible with every existing demo target).
+    - `packages/shared`'s `GUARDRAIL_VIOLATION_TYPES` gains `insufficient_write_tier`.
+    - 12 new Firestore-emulator tests: default-to-`read` on attachment creation, tier set + audit-log
+      before/after, rejecting a non-credential/non-approved/invalid-tier set, propose
+      blocked-at-`read`/allowed-at-`optimize`, and both downgrade-after-propose-blocks-approve and
+      downgrade-after-approve-blocks-execute.
+  - **`apps/web`**:
+    - New `WriteTierSelector` on the project Resources page — a Read/Optimize/Manage `<select>` per
+      approved credential attachment, gated on `resources.manage` (same permission as detach).
+    - The automation page's seed-target form gained an optional connection picker (sourced from the
+      project's active credential attachments); the target list shows the linked connection + tier
+      when one exists.
+    - `automation-view.ts`'s `AutomationActionView` replaced the hardcoded
+      `beforeDailyBudgetUsd`/`afterDailyBudgetUsd` fields with a generic `diffEntries` list (union of
+      `before`/`after` keys), and `AutomationActionList` now renders it as a real diff table — this is
+      the "action-history UI with before/after" half of the AC, generalized past the one field/action
+      type that exists today so a future KAN-72/73 action type (creative swap, pause/enable) doesn't
+      need the view layer touched again.
+    - New `en`/`he` translation keys throughout (write tier labels, connection picker, diff-row
+      template, the new violation type) — no hard-coded strings, no Hebrew outside the resource
+      files.
+  - **Self-review before merge:** found and fixed a real bug — the approve/execute API routes didn't
+    map the new `InsufficientWriteTierError` to a response, which would have surfaced as an uncaught
+    500 the first time a tier downgrade actually blocked a call in the real UI (both now return 409
+    `insufficient_write_tier`, mirroring the existing kill-switch-engaged mapping). Also fixed an
+    `eslint react/jsx-no-literals` hit (a literal em-dash placed directly in JSX) by folding it into
+    the translation string instead.
+  - New `isolation.test.ts` (KAN-26 non-enumeration) scenario for the write-tier route; the
+    filesystem-scanning `route-isolation-guard.test.ts` needed no exemption entry since the new route
+    already calls `requireOrgPermission`.
+  - `pnpm lint && pnpm typecheck && pnpm build && pnpm test` all green locally across the full
+    monorepo (apps/api: 61 tests; `packages/firebase-orm-models`: 623 tests; apps/web: 837 unit
+    tests + 22 Playwright e2e tests) before opening the PR.
+  - CI needed two `rerun_failed_jobs` retries before going green — attempt 1 timed out on
+    `models.emulator.test.ts` (a file untouched by this diff) with a Firestore-emulator
+    `RESOURCE_EXHAUSTED`/gRPC-parsing-error cascade; attempt 2 passed that but then hit 4 unrelated
+    Playwright e2e specs (`auth`/`boards`/`ingest-health`/`tv-pairing`, none of which this diff
+    touches) failing on tight 5s timing assertions, 3 of which Playwright itself flagged "flaky"
+    (passed on retry). Both look like CI-runner resource contention rather than a real regression —
+    the exact same commit had passed 100% locally moments earlier — and attempt 3 went fully green.
+  - PR #61 merged (squash) into `main`. Remote branch deletion failed with the same documented
+    HTTP 403 as every prior feature branch in this sandbox — `kan-74-automation-write-tier` is
+    merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-74 is fully delivered, tested, reviewed, and
+  merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the remaining `todo` stories are **KAN-72** (Google Ads Manage plugin) and
+  **KAN-73** (Meta Manage plugin) — both need real OAuth apps/API access still gated on **KAN-43**
+  (`needs-human`, still outstanding), so likely `needs-human`/`blocked-by` in practice even though
+  `TASKS.md` doesn't formally mark them that way yet. **KAN-75..78** (MCP server, Epic E22) are the
+  only other sprint-3+ stories left and don't have a stated dependency on KAN-72/73 landing first per
+  the epic ordering — worth a look next, or a human call on whether to formally mark KAN-72/73
+  `blocked-by` KAN-43 in `TASKS.md` now that this run has hit the same wall KAN-71's entry predicted.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still
+    outstanding) — gates KAN-72/73 specifically.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+  - PR #52 (`fix/admin-static-imports`) and PR #60 (`fix/arbel-admin-query-compat`) are still open and
+    untouched — out of scope for KAN-74, carried forward so they aren't lost.
+  - `apps/web/repro-tmp.mjs` (a leftover debug script noted in a prior entry) is still sitting in
+    `main`'s working tree, still out of scope for this run's own diff.
+
+---
+
 ## 2026-07-12 — E21.1 Automation-service action pipeline (KAN-71)
 
 - **Last completed:**
