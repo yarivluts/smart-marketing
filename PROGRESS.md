@@ -17,6 +17,93 @@ Template for each entry:
 
 ---
 
+## 2026-07-14 — E22.4 MCP docs + example clients (KAN-78)
+
+- **Last completed:**
+  - **KAN-78**, done, merged as PR #65 (branch `kan-78-mcp-docs-examples`). Read PROGRESS.md/TASKS.md
+    per the standing rule; the prior entry's own "next step" pointed at KAN-78 as the natural unblocked
+    pick — the last story in Epic E22 (MCP), no outstanding blocker, since KAN-72/73 (Google/Meta
+    Manage plugins) remain practically blocked on KAN-43.
+  - Read the real KAN-75/76/77 implementation first (`apps/api/src/mcp/mcp-tools.ts`,
+    `mcp-act-tools.ts`, `mcp-auth.guard.ts`, `mcp.controller.ts`, `mcp-oauth.controller.ts`, the Keys
+    page's existing "MCP connections" section) rather than writing docs from the plan sketch alone —
+    the actual server deviates from plan `12 §6.1`'s original `/{org}/{project}` URL sketch (it's a
+    flat `/v1/mcp`, org/project resolved from the credential instead), and the actual tool surface
+    (12 tools, confirmed against `mcp.controller.e2e.spec.ts`'s own exact-list assertion) omits
+    `query_funnel`/`list_segments`/`get_goals`/`get_anomalies`/`ingest_events` from the original plan
+    table — the doc describes what's actually built, not the aspirational sketch, flagging the one gap
+    (`query_funnel`) explicitly as a follow-up.
+  - Delivered `docs/mcp/README.md`: a connect-in-under-10-minutes guide (the story's own AC) covering
+    Claude Desktop (native OAuth remote-connector flow plus an `mcp-remote`-bridged API-key fallback
+    for older builds), claude.ai custom connectors, and a headless-agent API-key recipe, plus a full
+    tool reference table (permissions per tool), a safety/limits section (isolation, audit logging,
+    the real 2 req/s-sustained/120-burst rate limit pulled from
+    `packages/firebase-orm-models/src/rate-limit/token-bucket.ts`'s actual constants, not a guess), and
+    a troubleshooting table (401/403/429/405). Two example `claude_desktop_config.json` files
+    (`claude-desktop-config.oauth.example.json`, `claude-desktop-config.api-key.example.json`),
+    validated as parseable JSON.
+  - Delivered a new runnable, tested workspace package, `packages/mcp-headless-example`: real
+    `@modelcontextprotocol/sdk` `Client`/`StreamableHTTPClientTransport` usage
+    (`connectGrowthOsMcpClient`) — the same classes `apps/api/src/mcp/mcp.controller.e2e.spec.ts` uses
+    to test the server itself, not a hand-rolled JSON-RPC client — plus `fetchWeeklyMetricDigest`, the
+    plan's own `12 §6` example ("every Monday my agent pulls last week's CAC ...") minus the
+    memo-drafting, and a `growthos-mcp-weekly-digest` CLI entry point (`bin`, reads
+    `GROWTHOS_MCP_URL`/`GROWTHOS_MCP_API_KEY`/`GROWTHOS_MCP_METRIC`/`GROWTHOS_MCP_DAYS` from the
+    environment). `ToolCaller` is a narrow duck-typed interface (not the full SDK `Client` type) so
+    unit tests exercise the digest/date-window/error-mapping logic with a plain fake instead of a real
+    MCP connection; `asToolCaller()` bridges a real `Client` to it, isolating the one unavoidable
+    `as unknown as ...` cast (the SDK's own `callTool` return type is a wider union that doesn't
+    structurally narrow to `ToolCaller` — documented inline) to a single, obviously-correct spot.
+  - No admin UI needed — this story is documentation + a standalone example package, not new
+    user-manageable product data (same posture KAN-77 and KAN-38/KAN-39 already established for
+    internal/external tooling stories).
+  - Self-review before merge (independent pass over the diff): confirmed the tool-reference table and
+    permission requirements against the actual source rather than the plan doc, confirmed the rate
+    limit numbers against the real constants, confirmed both example JSON files parse, confirmed
+    `pnpm build`'s `tsc` output actually preserves the `cli.ts` shebang in the emitted `dist/cli.js`
+    (TypeScript's hashbang support) since the file is wired as a `package.json` `bin` entry. Found no
+    defects requiring a fix.
+  - Full `pnpm build && pnpm lint && pnpm typecheck && pnpm test` green across all 8 packages
+    (needed `PIP_CERT`/`SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE`/`NODE_EXTRA_CA_CERTS` pointed at this
+    sandbox's proxy CA bundle for `packages/dbt-transform`'s pip venv and the Firestore-emulator jar
+    download — the same documented environment quirk prior entries have recorded, plus one transient
+    TLS retry that self-resolved on a second attempt). `packages/shared` 348/348;
+    `packages/mcp-headless-example` 8/8 (new); `packages/tracking-sdk` 21/21;
+    `packages/firebase-orm-models` 659/659 (the same documented `RESOURCE_EXHAUSTED` self-recovering
+    flake under full-suite emulator contention noted in the last several entries, not a new issue);
+    `apps/api` 104/104 across 12 suites; `apps/web` 852/852 unit + 22/22 e2e (2 flaky —
+    `auth.spec.ts`/`ingest-health.spec.ts`'s own `toHaveURL` dev-server-timing race — passing on
+    Playwright's own retry, the exact pre-existing flake category this file has repeatedly documented,
+    neither touching MCP/docs code). Overall `turbo run test`: 11/11 tasks successful.
+  - Opened PR #65, confirmed CI green on the head commit, `mergeable_state: "clean"`, merged (squash)
+    into `main`. Remote branch deletion failed with the same documented HTTP 403 this sandbox's git
+    remote returns for every prior feature branch — merged and dead but not deleted; local branch
+    deleted after confirming `main` fast-forwarded to include it cleanly.
+- **In progress (exact stopping point):** none — KAN-78 is fully delivered, tested, reviewed, and
+  merged. This closes out every story in Epic E22 (MCP).
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** every remaining `todo`/`in-progress` story is either `needs-human` or genuinely
+  `blocked-by` an unfinished blocker — **KAN-72/73** (Google/Meta Manage plugins, blocked-by KAN-43),
+  **KAN-18** (needs-human, GCP/Firebase project), **KAN-20** (in-progress, needs a human or an
+  explicitly-instructed run to reconcile the three unmerged observability PRs). A future run should
+  re-check whether KAN-43/KAN-18 have landed (unblocking KAN-72/73 and the various "buildable-today
+  stand-in" follow-ups scattered across earlier entries); if not, the most useful unblocked work is
+  picking up one of the still-open carried-forward PRs (#52, #60) or the KAN-20 reconciliation itself,
+  since no new sprint-ordered `todo` story remains without a blocker.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding) — gates KAN-72/73.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding) — gates the
+    various warehouse/BigQuery/Redis/real-KMS "buildable-today stand-in" follow-ups noted across many
+    earlier entries.
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still outstanding.
+  - PR #52 (`fix/admin-static-imports`) and PR #60 (`fix/arbel-admin-query-compat`) are still open and
+    untouched — out of scope for KAN-78, carried forward so they aren't lost.
+  - `apps/web/repro-tmp.mjs` (a leftover debug script noted in a prior entry) is still sitting in
+    `main`'s working tree, still out of scope for this run's own diff.
+
+---
+
 ## 2026-07-13 — E22.3 MCP isolation-suite coverage, audit logging, per-key rate limiting (KAN-77)
 
 - **Last completed:**
