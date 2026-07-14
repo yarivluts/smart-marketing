@@ -17,6 +17,56 @@ Template for each entry:
 
 ---
 
+## 2026-07-14 — No unblocked story (re-check, no change)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Re-verified every sprint-ordered
+    `todo`/`in-progress` story is still genuinely blocked, unchanged from the prior entry:
+    **KAN-72/73** (Google/Meta Manage plugins) practically depend on **KAN-43** (needs-human,
+    still outstanding — long-lead Google Ads dev token + Meta Marketing API review), remaining
+    **KAN-18**-gated stories are blocked on GCP/Firebase provisioning (still needs-human), and
+    **KAN-20** still needs a human to pick between the three unmerged observability PRs.
+  - Checked open PRs via the GitHub API: still exactly #2/#3/#5 (the KAN-20 duplicates, unchanged
+    titles/branches/base SHAs since the prior entry) — nothing new opened, nothing closed.
+    Confirmed local `main` is in sync with `origin/main` (`ca704d4`, the prior entry's own commit)
+    and the working tree is clean.
+  - Considered picking back up the CI emulator-suite flake investigation the prior entry left open
+    (per-test reconnect-on-`RESOURCE_EXHAUSTED` instead of vitest's whole-test retry). Read
+    `firestore-connection.ts`/`test-utils/emulator.ts`/`vitest.config.ts` to scope it: the global
+    ORM connection (`FirestoreOrmRepository.initGlobalConnection`) and each emulator test file's
+    Firebase app are set up once per file (via a per-file `appName`), so a real fix would need a
+    custom per-test retry wrapper that tears down and re-initializes that specific app/channel on a
+    caught `RESOURCE_EXHAUSTED` before retrying — a genuine change to shared test infrastructure
+    used by 40+ emulator test files, not verifiable against the CI-specific severity from this
+    sandbox (the prior entry's own investigation notes this sandbox's reproduction rate is
+    unreliable evidence either way). Declined to attempt it this run: the prior entry already
+    flagged this as "harder and riskier... treat as its own scoped investigation," and a background
+    run gambling on an unverified change to shared test plumbing (with no live-CI feedback loop
+    available mid-run) is a worse risk/reward trade than leaving it documented for a run — or a
+    human — that can dedicate a full cycle to it and watch real CI attempts.
+  - Did not send a notification: nothing changed since the prior entry, and the same **KAN-43**/
+    **KAN-18**/KAN-20-reconciliation blockers have already been surfaced to the repo owner in
+    earlier entries.
+- **In progress (exact stopping point):** none — this was a confirmation pass with no code, branch,
+  or PR changes.
+- **Blocked + why:** nothing blocking the next code task, but there is still no unblocked
+  sprint-ordered story to pick — same blockers as the prior entry (see below).
+- **Next step:** unchanged — re-check whether **KAN-43** or **KAN-18** have landed next run
+  (unblocking KAN-72/73 and the various "buildable-today stand-in" follow-ups). If not, remaining
+  unblocked work is the **KAN-20** reconciliation itself (if a run is explicitly instructed to make
+  that judgment call), or the CI emulator-suite flake fix sketched above and in the prior entry
+  (scope it as its own dedicated investigation, ideally by a run/human that can observe live CI
+  attempts rather than only this sandbox).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding) — gates KAN-72/73.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding) — gates the
+    various warehouse/BigQuery/Redis/real-KMS "buildable-today stand-in" follow-ups.
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+
+---
+
 ## 2026-07-14 — No unblocked story; investigated + ruled out a speculative CI-flake fix
 
 - **Last completed:**
