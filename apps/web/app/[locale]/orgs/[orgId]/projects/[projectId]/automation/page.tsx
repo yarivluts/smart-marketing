@@ -23,6 +23,8 @@ import { AutomationKillSwitchPanel } from '@/components/orgs/automation-kill-swi
 import { AutomationGuardrailPolicyForm } from '@/components/orgs/automation-guardrail-policy-form';
 import { AutomationSeedTargetForm } from '@/components/orgs/automation-seed-target-form';
 import { AutomationProposeActionForm } from '@/components/orgs/automation-propose-action-form';
+import { AutomationProposeCampaignDraftForm } from '@/components/orgs/automation-propose-campaign-draft-form';
+import { AutomationActivateCampaignButton } from '@/components/orgs/automation-activate-campaign-button';
 import { AutomationActionList } from '@/components/orgs/automation-action-list';
 
 type PageProps = Readonly<{
@@ -81,6 +83,7 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
   const connectionOptions = toAutomationConnectionOptions(activeAttachments, credentials);
   const connectionById = new Map(connectionOptions.map((connection) => [connection.id, connection]));
   const tierLabelKeys = { read: 'tierRead', optimize: 'tierOptimize', manage: 'tierManage' } as const;
+  const campaignStatusLabelKeys = { paused: 'campaignStatusPaused', enabled: 'campaignStatusEnabled', removed: 'campaignStatusRemoved' } as const;
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
@@ -105,13 +108,21 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
             {targetViews.map((target) => {
               const connection = target.resourceAttachmentId ? connectionById.get(target.resourceAttachmentId) : undefined;
               return (
-                <li key={target.id}>
-                  {t('targetLine', { label: target.label, budget: target.dailyBudgetUsd })}
-                  {connection ? (
-                    <span className="text-muted-foreground">
-                      {' '}
-                      {t('targetConnectionLine', { label: connection.label, tier: t(tierLabelKeys[connection.tier]) })}
-                    </span>
+                <li key={target.id} className="flex flex-wrap items-center gap-2">
+                  <span>
+                    {t('targetLine', { label: target.label, budget: target.dailyBudgetUsd })}
+                    {connection ? (
+                      <span className="text-muted-foreground">
+                        {' '}
+                        {t('targetConnectionLine', { label: connection.label, tier: t(tierLabelKeys[connection.tier]) })}
+                      </span>
+                    ) : null}
+                    {target.campaignStatus ? (
+                      <span className="text-muted-foreground"> {t('targetCampaignStatusLine', { status: t(campaignStatusLabelKeys[target.campaignStatus]) })}</span>
+                    ) : null}
+                  </span>
+                  {target.campaignStatus === 'paused' ? (
+                    <AutomationActivateCampaignButton orgId={orgId} projectId={projectId} targetId={target.id} />
                   ) : null}
                 </li>
               );
@@ -124,6 +135,15 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('proposeHeading')}</h2>
         <AutomationProposeActionForm orgId={orgId} projectId={projectId} targets={targetViews} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('proposeDraftHeading')}</h2>
+        <AutomationProposeCampaignDraftForm
+          orgId={orgId}
+          projectId={projectId}
+          targets={targetViews.filter((target) => !target.campaignResourceName)}
+        />
       </section>
 
       <section className="flex flex-col gap-3">

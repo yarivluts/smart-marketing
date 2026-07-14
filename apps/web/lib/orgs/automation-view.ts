@@ -4,6 +4,7 @@ import type {
   AutomationGuardrailPolicyConfig,
   AutomationKillSwitchStatus,
   AutomationTargetStateModel,
+  CampaignStatus,
   ConnectionWriteTier,
   GuardrailViolationType,
   ResourceAttachmentModel,
@@ -44,6 +45,8 @@ export interface AutomationTargetView {
   dailyBudgetUsd: number;
   environmentId: string;
   resourceAttachmentId?: string;
+  campaignResourceName?: string;
+  campaignStatus?: CampaignStatus;
 }
 
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
@@ -54,6 +57,8 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     dailyBudgetUsd: target.daily_budget_usd,
     environmentId: target.environment_id,
     ...(target.resource_attachment_id !== undefined ? { resourceAttachmentId: target.resource_attachment_id } : {}),
+    ...(target.campaign_resource_name !== undefined ? { campaignResourceName: target.campaign_resource_name } : {}),
+    ...(target.campaign_status !== undefined ? { campaignStatus: target.campaign_status } : {}),
   };
 }
 
@@ -86,14 +91,26 @@ export interface AutomationActionDiffEntry {
   after: unknown;
 }
 
+/** A `campaignDraft` diff value is a whole {@link CampaignDraft} object — `String(...)` on it would render `[object Object]`, so it gets a compact human summary instead. Every other diff field's value is a plain string/number/undefined, which `String(...)` already renders sensibly. */
+function formatDiffValue(key: string, value: unknown): unknown {
+  if (key !== 'campaignDraft' || typeof value !== 'object' || value === null) {
+    return value;
+  }
+  const draft = value as { campaignName?: unknown; dailyBudgetUsd?: unknown; adGroups?: unknown[] };
+  const adGroupCount = Array.isArray(draft.adGroups) ? draft.adGroups.length : 0;
+  return `"${String(draft.campaignName)}" ($${String(draft.dailyBudgetUsd)}/day, ${adGroupCount} ad group(s))`;
+}
+
 function toDiffEntries(before: Record<string, unknown>, after: Record<string, unknown>): AutomationActionDiffEntry[] {
   const keys = Array.from(new Set([...Object.keys(before), ...Object.keys(after)]));
-  return keys.map((key) => ({ key, before: before[key], after: after[key] }));
+  return keys.map((key) => ({ key, before: formatDiffValue(key, before[key]), after: formatDiffValue(key, after[key]) }));
 }
 
 /** The `Automation` translation key for a known diff field name — `undefined` for a field this codebase hasn't labeled yet (a future action type's own field), in which case the raw key is shown as-is rather than blocking the whole diff row. */
 const DIFF_FIELD_LABEL_KEYS: Record<string, string> = {
   dailyBudgetUsd: 'diffFieldDailyBudgetUsd',
+  campaignDraft: 'diffFieldCampaignDraft',
+  status: 'diffFieldCampaignStatus',
 };
 
 export function diffFieldLabelKey(key: string): string | undefined {

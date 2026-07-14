@@ -1,6 +1,15 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
 
 /**
+ * `paused`/`enabled`/`removed` mirror a real Google Ads campaign's own
+ * status vocabulary (KAN-72) — Google Ads has no hard delete, only a
+ * `REMOVED` status, so "rolling back a creation" and "deleting a campaign"
+ * are the same terminal state.
+ */
+export const CAMPAIGN_STATUSES = ['paused', 'enabled', 'removed'] as const;
+export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
+
+/**
  * A buildable-today stand-in for "the live state of one ad-platform object
  * (campaign/ad group/ad) as reported by the platform's own API" — until
  * KAN-72/KAN-73 (Google/Meta Manage-tier plugins) exist to read/write a real
@@ -58,4 +67,33 @@ export class AutomationTargetStateModel extends BaseModel {
    */
   @Field()
   public resource_attachment_id?: string;
+
+  /**
+   * Set once a `campaign_draft_create` action (KAN-72) has executed against
+   * this target — the real ad platform's own resource name/id for the
+   * campaign it created (e.g. Google Ads' `customers/{id}/campaigns/{id}`).
+   * Absent for a target seeded to represent a pre-existing live campaign
+   * (its `target_id` *is* the resource name in that case — see this model's
+   * own class doc comment) or one that hasn't had a creation action executed
+   * yet.
+   */
+  @Field()
+  public campaign_resource_name?: string;
+
+  /**
+   * The ad platform's own budget-resource name backing
+   * {@link campaign_resource_name} (Google Ads models a campaign's budget as
+   * a separate `CampaignBudget` resource, not a plain field on the campaign
+   * itself) — only ever set alongside `campaign_resource_name` by a
+   * `campaign_draft_create` execution. A `budget_change` action against a
+   * target with no known budget resource name (e.g. one seeded to represent
+   * a pre-existing campaign this plugin didn't create) isn't supported yet —
+   * see `GoogleAdsAutomationActionExecutor`'s own doc comment.
+   */
+  @Field()
+  public campaign_budget_resource_name?: string;
+
+  /** Set alongside {@link campaign_resource_name} by `campaign_draft_create`/`campaign_activation` executions; a target with no campaign created yet has this unset. */
+  @Field()
+  public campaign_status?: CampaignStatus;
 }

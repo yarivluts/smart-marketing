@@ -22,12 +22,15 @@ import {
   listAutomationActionsForProject,
   listAutomationTargetStatesForProject,
   proposeAutomationBudgetChangeAction,
+  proposeCampaignActivationAction,
+  proposeCampaignDraftCreateAction,
   rejectAutomationAction,
   requestResourceAttachment,
   rollbackAutomationAction,
   setAutomationGuardrailPolicy,
   setResourceAttachmentWriteTier,
   verifyAutomationAction,
+  type CampaignDraft,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -104,6 +107,27 @@ async function seedTargetWithConnection(
   });
 
   return { target, attachment };
+}
+
+function campaignDraft(overrides: Partial<CampaignDraft> = {}): CampaignDraft {
+  return {
+    campaignName: 'Winning Themes',
+    advertisingChannelType: 'SEARCH',
+    dailyBudgetUsd: 25,
+    adGroups: [
+      {
+        name: 'Ad Group 1',
+        keywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+        negativeKeywords: [{ text: 'free', matchType: 'BROAD' }],
+        responsiveSearchAd: {
+          headlines: ['Buy Blue Widgets', 'Best Widgets Online', 'Widgets For Less'],
+          descriptions: ['Free shipping on all widgets.', 'Order today, ships tomorrow.'],
+          finalUrl: 'https://example.com/widgets',
+        },
+      },
+    ],
+    ...overrides,
+  };
 }
 
 describe('ensureAutomationTargetSeeded', () => {
@@ -664,5 +688,229 @@ describe('write-tier gating (KAN-74)', () => {
     await expect(
       approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id }),
     ).rejects.toThrow(InsufficientWriteTierError);
+  });
+});
+
+describe('proposeCampaignDraftCreateAction / proposeCampaignActivationAction (KAN-72)', () => {
+  it('proposes a clean campaign draft as awaiting_approval with the dry-run diff', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Draft Clean Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+    const draft = campaignDraft();
+
+    const action = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('awaiting_approval');
+    expect(action.action_type).toBe('campaign_draft_create');
+    expect(action.before).toEqual({});
+    expect(action.after).toEqual({ campaignDraft: draft });
+    expect(action.guardrail_violations).toEqual([]);
+  });
+
+  it('rejects an invalid draft (too few RSA headlines) before touching guardrails', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Draft Invalid Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+    const draft = campaignDraft();
+    draft.adGroups[0].responsiveSearchAd.headlines = ['Only One'];
+
+    await expect(
+      proposeCampaignDraftCreateAction({ organizationId: organization.id, projectId: project.id, targetId: target.id, draft, requestedByUserId: owner.id }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('blocks a draft that exceeds the absolute spend ceiling', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Draft Ceiling Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+    await setAutomationGuardrailPolicy({
+      organizationId: organization.id,
+      projectId: project.id,
+      maxDailyBudgetChangePct: null,
+      spendCeilingUsd: 10,
+      protectedTargetIds: [],
+      allowedHours: null,
+      maxActionsPerDay: null,
+      maxGuardedMetricRegressionPct: null,
+      setByUserId: owner.id,
+    });
+
+    const action = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: campaignDraft({ dailyBudgetUsd: 25 }),
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual([expect.objectContaining({ type: 'spend_ceiling' })]);
+  });
+
+  it('requires the "manage" write tier specifically — "optimize" is not enough', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Draft Optimize Org');
+    const { target } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'optimize');
+
+    const action = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'insufficient_write_tier' })]));
+  });
+
+  it('allows a draft to proceed at the "manage" write tier', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Draft Manage Org');
+    const { target } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'manage');
+
+    const action = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('awaiting_approval');
+  });
+
+  it('refuses to propose a second draft against a target that already has a campaign', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Draft Twice Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+    const first = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: first.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: first.id, executedByUserId: owner.id });
+
+    await expect(
+      proposeCampaignDraftCreateAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        draft: campaignDraft(),
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('executes a campaign draft creation end to end, then rolls it back — the full lifecycle plus rollback restoring "no campaign"', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Draft Lifecycle Org');
+    const target = await seedTarget(organization.id, project.id, owner.id, 0);
+    const draft = campaignDraft({ dailyBudgetUsd: 40 });
+
+    const proposed = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft,
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id });
+    const executed = await executeAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      executedByUserId: owner.id,
+    });
+    expect(executed.status).toBe('executed');
+
+    const [afterExecute] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(afterExecute.campaign_status).toBe('paused');
+    expect(afterExecute.campaign_resource_name).toBeTruthy();
+    expect(afterExecute.daily_budget_usd).toBe(40);
+
+    const rolledBack = await rollbackAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      reason: 'manual',
+      actorId: owner.id,
+    });
+    expect(rolledBack.status).toBe('rolled_back');
+
+    const [afterRollback] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(afterRollback.campaign_status).toBe('removed');
+  });
+
+  it('activates an already-created paused campaign, then rolls the activation back to paused', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Activation Lifecycle Org');
+    const target = await seedTarget(organization.id, project.id, owner.id, 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, executedByUserId: owner.id });
+
+    const activation = await proposeCampaignActivationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      requestedByUserId: owner.id,
+    });
+    expect(activation.status).toBe('awaiting_approval');
+    expect(activation.action_type).toBe('campaign_activation');
+    expect(activation.before).toEqual({ status: 'paused' });
+    expect(activation.after).toEqual({ status: 'enabled' });
+
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: activation.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: activation.id, executedByUserId: owner.id });
+
+    const [afterActivate] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(afterActivate.campaign_status).toBe('enabled');
+
+    await rollbackAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: activation.id, reason: 'manual', actorId: owner.id });
+
+    const [afterRollback] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(afterRollback.campaign_status).toBe('paused');
+  });
+
+  it('refuses to propose an activation for a target with no campaign created yet', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Activation No Campaign Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeCampaignActivationAction({ organizationId: organization.id, projectId: project.id, targetId: target.id, requestedByUserId: owner.id }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('requires the "manage" write tier for activation too — "optimize" is not enough', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Activation Optimize Org');
+    const { target, attachment } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'manage');
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, executedByUserId: owner.id });
+
+    await setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: attachment.id, tier: 'optimize', actorId: owner.id });
+
+    const activation = await proposeCampaignActivationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      requestedByUserId: owner.id,
+    });
+    expect(activation.status).toBe('blocked');
+    expect(activation.guardrail_violations).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'insufficient_write_tier' })]));
   });
 });

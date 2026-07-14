@@ -1,14 +1,20 @@
-import { evaluateBudgetChangeGuardrails, type GuardrailViolation } from '@growthos/shared';
+import { evaluateBudgetChangeGuardrails, evaluateCampaignActivationGuardrails, evaluateCampaignCreationGuardrails, type GuardrailViolation } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import { AutomationTargetStateModel } from '../models/automation-target-state.model';
-import { AutomationActionModel, type AutomationActionStatus } from '../models/automation-action.model';
-import { ResourceAttachmentModel } from '../models/resource-attachment.model';
+import { AutomationActionModel, type AutomationActionStatus, type AutomationActionType } from '../models/automation-action.model';
+import { ResourceAttachmentModel, type ConnectionWriteTier } from '../models/resource-attachment.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { getActiveAutomationGuardrailPolicy, toPureGuardrailPolicy } from './automation-guardrail.service';
 import { isAutomationKillSwitchEngaged } from './automation-kill-switch.service';
 import { runWithRetryBackoff } from '../plugin-runtime/retry';
-import { defaultAutomationActionExecutor, type AutomationActionExecutor } from '../automation-runtime';
+import {
+  defaultAutomationActionExecutor,
+  validateCampaignDraft,
+  InvalidCampaignDraftError,
+  type AutomationActionExecutor,
+  type CampaignDraft,
+} from '../automation-runtime';
 import {
   AutomationActionInvalidStateError,
   AutomationActionNotFoundError,
@@ -44,6 +50,40 @@ async function loadAction(organizationId: string, projectId: string, actionId: s
     throw new AutomationActionNotFoundError();
   }
   return action;
+}
+
+async function loadTargetForAction(organizationId: string, projectId: string, targetId: string): Promise<AutomationTargetStateModel> {
+  const target = await AutomationTargetStateModel.init(targetId, { organization_id: organizationId, project_id: projectId });
+  if (!target || target.project_id !== projectId) {
+    throw new AutomationTargetNotFoundError(targetId);
+  }
+  return target;
+}
+
+/** `campaign_draft_create`/`campaign_activation` (KAN-72) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
+const MANAGE_ONLY_ACTION_TYPES: ReadonlySet<AutomationActionType> = new Set(['campaign_draft_create', 'campaign_activation']);
+
+function minimumWriteTierForActionType(actionType: AutomationActionType): ConnectionWriteTier {
+  return MANAGE_ONLY_ACTION_TYPES.has(actionType) ? 'manage' : 'optimize';
+}
+
+/** A short human phrase for an action's `action_type`, reused across every audit-log summary so none of them stay hardcoded to "the budget change" for the two KAN-72 action types. */
+function actionSummaryVerb(actionType: AutomationActionType): string {
+  if (actionType === 'campaign_draft_create') {
+    return 'the new campaign draft';
+  }
+  if (actionType === 'campaign_activation') {
+    return 'the campaign activation';
+  }
+  return 'the budget change';
+}
+
+const WRITE_TIER_RANK: Record<ConnectionWriteTier, number> = { read: 0, optimize: 1, manage: 2 };
+
+/** The `target_id` a given action was proposed against — lets a caller (KAN-72's `apps/web` execute/rollback routes) resolve the right `AutomationActionExecutor` for the action's target before invoking `executeAutomationAction`/`rollbackAutomationAction`, without duplicating `loadAction`'s own not-found/cross-project checks. */
+export async function getAutomationActionTargetId(organizationId: string, projectId: string, actionId: string): Promise<string> {
+  const action = await loadAction(organizationId, projectId, actionId);
+  return action.target_id;
 }
 
 async function requireStatus(action: AutomationActionModel, expected: AutomationActionStatus, attemptedTransition: string): Promise<void> {
@@ -182,15 +222,17 @@ async function countAutomationActionsExecutedToday(organizationId: string, proje
 
 /**
  * Resolves whether `target`'s linked connection (if any) currently permits a
- * budget-change mutation — `null` means either there's no linked connection
- * (ungated) or the connection is approved at `optimize`/`manage`. Re-resolved
- * fresh on every call (never cached on the target/action) so a tier
- * downgrade takes effect immediately, per KAN-74's own AC.
+ * mutation requiring at least `minimumTier` — `null` means either there's no
+ * linked connection (ungated) or the connection is approved at a tier that
+ * meets or exceeds `minimumTier`. Re-resolved fresh on every call (never
+ * cached on the target/action) so a tier downgrade takes effect immediately,
+ * per KAN-74's own AC.
  */
 async function resolveWriteTierViolation(
   organizationId: string,
   projectId: string,
   target: AutomationTargetStateModel,
+  minimumTier: ConnectionWriteTier,
 ): Promise<GuardrailViolation | null> {
   if (!target.resource_attachment_id) {
     return null;
@@ -201,13 +243,16 @@ async function resolveWriteTierViolation(
     attachment.project_id !== projectId ||
     attachment.resource_kind !== 'credential' ||
     attachment.status !== 'approved' ||
-    attachment.write_tier === 'read';
+    WRITE_TIER_RANK[attachment.write_tier] < WRITE_TIER_RANK[minimumTier];
   if (!insufficient) {
     return null;
   }
   return {
     type: 'insufficient_write_tier',
-    message: "This target's connection is not approved at a write tier (Optimize or Manage) that allows budget changes.",
+    message:
+      minimumTier === 'manage'
+        ? "This target's connection is not approved at the Manage write tier required to create or activate a campaign."
+        : "This target's connection is not approved at a write tier (Optimize or Manage) that allows budget changes.",
   };
 }
 
@@ -217,7 +262,7 @@ async function assertSufficientWriteTierForAction(organizationId: string, projec
   if (!target || target.project_id !== projectId) {
     return;
   }
-  const violation = await resolveWriteTierViolation(organizationId, projectId, target);
+  const violation = await resolveWriteTierViolation(organizationId, projectId, target, minimumWriteTierForActionType(action.action_type));
   if (violation) {
     throw new InsufficientWriteTierError();
   }
@@ -267,7 +312,7 @@ export async function proposeAutomationBudgetChangeAction(params: ProposeAutomat
     violations.push({ type: 'automation_paused', message: 'Automation is paused for this organization (kill switch engaged).' });
   }
 
-  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target);
+  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target, 'optimize');
   if (tierViolation) {
     violations.push(tierViolation);
   }
@@ -311,6 +356,177 @@ export async function proposeAutomationBudgetChangeAction(params: ProposeAutomat
   return action;
 }
 
+export interface ProposeCampaignDraftCreateActionParams {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  draft: CampaignDraft;
+  requestedByUserId: string;
+  now?: Date;
+}
+
+/**
+ * KAN-72's dry-run-diff step for a brand-new campaign — plan `02 §3`'s "the
+ * AI drafts a new search campaign from your winning themes; you approve; it
+ * goes live". `target` must already be seeded (via `ensureAutomationTargetSeeded`,
+ * same as `budget_change`) but must not have a campaign created against it
+ * yet, so a target only ever gets one `campaign_draft_create` in its
+ * lifetime.
+ */
+export async function proposeCampaignDraftCreateAction(params: ProposeCampaignDraftCreateActionParams): Promise<AutomationActionModel> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  try {
+    validateCampaignDraft(params.draft);
+  } catch (error) {
+    if (error instanceof InvalidCampaignDraftError) {
+      throw new InvalidAutomationActionError(error.message);
+    }
+    throw error;
+  }
+
+  const target = await loadTargetForAction(params.organizationId, params.projectId, params.targetId);
+  if (target.campaign_resource_name) {
+    throw new InvalidAutomationActionError('this target already has a campaign created — propose a budget_change or campaign_activation action instead');
+  }
+
+  const now = params.now ?? new Date();
+  const policy = await getActiveAutomationGuardrailPolicy(params.organizationId, params.projectId);
+  const actionsExecutedToday =
+    policy.maxActionsPerDay !== null
+      ? await countAutomationActionsExecutedToday(params.organizationId, params.projectId, now, policy.maxActionsPerDay)
+      : 0;
+
+  const violations: GuardrailViolation[] = evaluateCampaignCreationGuardrails(
+    toPureGuardrailPolicy(policy),
+    { targetId: params.targetId, dailyBudgetUsd: params.draft.dailyBudgetUsd },
+    { nowUtc: now, actionsExecutedToday },
+  );
+
+  if (await isAutomationKillSwitchEngaged(params.organizationId)) {
+    violations.push({ type: 'automation_paused', message: 'Automation is paused for this organization (kill switch engaged).' });
+  }
+
+  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target, 'manage');
+  if (tierViolation) {
+    violations.push(tierViolation);
+  }
+
+  const before = {};
+  const after = { campaignDraft: params.draft };
+  const status: AutomationActionStatus = violations.length > 0 ? 'blocked' : 'awaiting_approval';
+
+  const action = new AutomationActionModel();
+  action.organization_id = params.organizationId;
+  action.project_id = params.projectId;
+  action.environment_id = target.environment_id;
+  action.action_type = 'campaign_draft_create';
+  action.target_id = params.targetId;
+  action.target_label = target.label;
+  action.before = before;
+  action.after = after;
+  action.status = status;
+  action.guardrail_violations = violations;
+  action.requested_by_user_id = params.requestedByUserId;
+  action.proposed_at = now.toISOString();
+  action.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await action.save();
+
+  await auditBestEffort({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: target.environment_id,
+    actorType: 'user',
+    actorId: params.requestedByUserId,
+    action: 'automation_action.propose',
+    targetId: action.id,
+    summary:
+      status === 'blocked'
+        ? `Proposed a new campaign draft "${params.draft.campaignName}" for "${target.label}" — blocked by ${violations.length} guardrail(s)`
+        : `Proposed a new campaign draft "${params.draft.campaignName}" for "${target.label}"`,
+    before,
+    after,
+  });
+
+  return action;
+}
+
+export interface ProposeCampaignActivationActionParams {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  requestedByUserId: string;
+  now?: Date;
+}
+
+/** KAN-72's dry-run-diff step for activating an already-created, still-paused campaign (plan `02 §3`'s "... you approve; it goes live"). */
+export async function proposeCampaignActivationAction(params: ProposeCampaignActivationActionParams): Promise<AutomationActionModel> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const target = await loadTargetForAction(params.organizationId, params.projectId, params.targetId);
+  if (!target.campaign_resource_name || target.campaign_status !== 'paused') {
+    throw new InvalidAutomationActionError('this target has no paused campaign to activate');
+  }
+
+  const now = params.now ?? new Date();
+  const policy = await getActiveAutomationGuardrailPolicy(params.organizationId, params.projectId);
+  const actionsExecutedToday =
+    policy.maxActionsPerDay !== null
+      ? await countAutomationActionsExecutedToday(params.organizationId, params.projectId, now, policy.maxActionsPerDay)
+      : 0;
+
+  const violations: GuardrailViolation[] = evaluateCampaignActivationGuardrails(
+    toPureGuardrailPolicy(policy),
+    { targetId: params.targetId },
+    { nowUtc: now, actionsExecutedToday },
+  );
+
+  if (await isAutomationKillSwitchEngaged(params.organizationId)) {
+    violations.push({ type: 'automation_paused', message: 'Automation is paused for this organization (kill switch engaged).' });
+  }
+
+  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target, 'manage');
+  if (tierViolation) {
+    violations.push(tierViolation);
+  }
+
+  const before = { status: 'paused' };
+  const after = { status: 'enabled' };
+  const status: AutomationActionStatus = violations.length > 0 ? 'blocked' : 'awaiting_approval';
+
+  const action = new AutomationActionModel();
+  action.organization_id = params.organizationId;
+  action.project_id = params.projectId;
+  action.environment_id = target.environment_id;
+  action.action_type = 'campaign_activation';
+  action.target_id = params.targetId;
+  action.target_label = target.label;
+  action.before = before;
+  action.after = after;
+  action.status = status;
+  action.guardrail_violations = violations;
+  action.requested_by_user_id = params.requestedByUserId;
+  action.proposed_at = now.toISOString();
+  action.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await action.save();
+
+  await auditBestEffort({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: target.environment_id,
+    actorType: 'user',
+    actorId: params.requestedByUserId,
+    action: 'automation_action.propose',
+    targetId: action.id,
+    summary:
+      status === 'blocked'
+        ? `Proposed activating the campaign for "${target.label}" — blocked by ${violations.length} guardrail(s)`
+        : `Proposed activating the campaign for "${target.label}"`,
+    before,
+    after,
+  });
+
+  return action;
+}
+
 export interface ApproveAutomationActionParams {
   organizationId: string;
   projectId: string;
@@ -341,7 +557,7 @@ export async function approveAutomationAction(params: ApproveAutomationActionPar
     actorId: params.approverId,
     action: 'automation_action.approve',
     targetId: action.id,
-    summary: `Approved the budget change for "${action.target_label}"`,
+    summary: `Approved ${actionSummaryVerb(action.action_type)} for "${action.target_label}"`,
   });
 
   return action;
@@ -374,7 +590,7 @@ export async function rejectAutomationAction(params: RejectAutomationActionParam
     actorId: params.rejectedByUserId,
     action: 'automation_action.reject',
     targetId: action.id,
-    summary: `Rejected the budget change for "${action.target_label}"`,
+    summary: `Rejected ${actionSummaryVerb(action.action_type)} for "${action.target_label}"`,
   });
 
   return action;
@@ -402,22 +618,10 @@ export async function executeAutomationAction(params: ExecuteAutomationActionPar
   await assertSufficientWriteTierForAction(params.organizationId, params.projectId, action);
 
   const executor = params.executor ?? defaultAutomationActionExecutor;
-  const before = action.before as { dailyBudgetUsd: number };
-  const after = action.after as { dailyBudgetUsd: number };
+  const executionSummaryVerb = actionSummaryVerb(action.action_type);
 
   try {
-    const { attempts } = await runWithRetryBackoff(
-      () =>
-        executor.executeBudgetChange({
-          organizationId: params.organizationId,
-          projectId: params.projectId,
-          environmentId: action.environment_id,
-          targetId: action.target_id,
-          beforeDailyBudgetUsd: before.dailyBudgetUsd,
-          afterDailyBudgetUsd: after.dailyBudgetUsd,
-        }),
-      EXECUTE_RETRY_OPTIONS,
-    );
+    const attempts = await executeActionByType(executor, action, params.organizationId, params.projectId);
     action.status = 'executed';
     action.executed_at = new Date().toISOString();
     action.execute_attempts = attempts;
@@ -431,9 +635,9 @@ export async function executeAutomationAction(params: ExecuteAutomationActionPar
       actorId: params.executedByUserId,
       action: 'automation_action.execute',
       targetId: action.id,
-      summary: `Executed the budget change for "${action.target_label}"`,
-      before,
-      after,
+      summary: `Executed ${executionSummaryVerb} for "${action.target_label}"`,
+      before: action.before,
+      after: action.after,
     });
   } catch (error) {
     action.status = 'failed';
@@ -449,11 +653,70 @@ export async function executeAutomationAction(params: ExecuteAutomationActionPar
       actorId: params.executedByUserId,
       action: 'automation_action.execute_failed',
       targetId: action.id,
-      summary: `Failed to execute the budget change for "${action.target_label}": ${action.failure_reason}`,
+      summary: `Failed to execute ${executionSummaryVerb} for "${action.target_label}": ${action.failure_reason}`,
     });
   }
 
   return action;
+}
+
+/** Dispatches an approved action's execution to the right `AutomationActionExecutor` method for its `action_type`, wrapped in the shared retry/backoff — returns how many attempts it took. */
+async function executeActionByType(
+  executor: AutomationActionExecutor,
+  action: AutomationActionModel,
+  organizationId: string,
+  projectId: string,
+): Promise<number> {
+  if (action.action_type === 'budget_change') {
+    const before = action.before as { dailyBudgetUsd: number };
+    const after = action.after as { dailyBudgetUsd: number };
+    const { attempts } = await runWithRetryBackoff(
+      () =>
+        executor.executeBudgetChange({
+          organizationId,
+          projectId,
+          environmentId: action.environment_id,
+          targetId: action.target_id,
+          beforeDailyBudgetUsd: before.dailyBudgetUsd,
+          afterDailyBudgetUsd: after.dailyBudgetUsd,
+        }),
+      EXECUTE_RETRY_OPTIONS,
+    );
+    return attempts;
+  }
+
+  if (action.action_type === 'campaign_draft_create') {
+    const after = action.after as { campaignDraft: CampaignDraft };
+    const { attempts } = await runWithRetryBackoff(
+      () =>
+        executor.executeCampaignDraftCreate({
+          organizationId,
+          projectId,
+          environmentId: action.environment_id,
+          targetId: action.target_id,
+          draft: after.campaignDraft,
+        }),
+      EXECUTE_RETRY_OPTIONS,
+    );
+    return attempts;
+  }
+
+  const target = await loadTargetForAction(organizationId, projectId, action.target_id);
+  if (!target.campaign_resource_name) {
+    throw new InvalidAutomationActionError('this target has no campaign resource name to activate');
+  }
+  const { attempts } = await runWithRetryBackoff(
+    () =>
+      executor.executeCampaignActivation({
+        organizationId,
+        projectId,
+        environmentId: action.environment_id,
+        targetId: action.target_id,
+        campaignResourceName: target.campaign_resource_name as string,
+      }),
+    EXECUTE_RETRY_OPTIONS,
+  );
+  return attempts;
 }
 
 export interface RollbackAutomationActionParams {
@@ -479,17 +742,7 @@ export async function rollbackAutomationAction(params: RollbackAutomationActionP
   }
 
   const executor = params.executor ?? defaultAutomationActionExecutor;
-  const before = action.before as { dailyBudgetUsd: number };
-  const after = action.after as { dailyBudgetUsd: number };
-
-  await executor.rollbackBudgetChange({
-    organizationId: params.organizationId,
-    projectId: params.projectId,
-    environmentId: action.environment_id,
-    targetId: action.target_id,
-    beforeDailyBudgetUsd: before.dailyBudgetUsd,
-    afterDailyBudgetUsd: after.dailyBudgetUsd,
-  });
+  await rollbackActionByType(executor, action, params.organizationId, params.projectId);
 
   action.status = 'rolled_back';
   action.rolled_back_at = new Date().toISOString();
@@ -499,6 +752,8 @@ export async function rollbackAutomationAction(params: RollbackAutomationActionP
   }
   await action.save();
 
+  const rollbackSummaryVerb = actionSummaryVerb(action.action_type);
+
   await auditBestEffort({
     organizationId: params.organizationId,
     projectId: params.projectId,
@@ -507,12 +762,58 @@ export async function rollbackAutomationAction(params: RollbackAutomationActionP
     actorId: params.actorId ?? 'automation-verify-worker',
     action: 'automation_action.rollback',
     targetId: action.id,
-    summary: `Rolled back the budget change for "${action.target_label}" (${params.reason})`,
-    before: after,
-    after: before,
+    summary: `Rolled back ${rollbackSummaryVerb} for "${action.target_label}" (${params.reason})`,
+    before: action.after,
+    after: action.before,
   });
 
   return action;
+}
+
+/** Dispatches a rollback to the right `AutomationActionExecutor` method for the action's `action_type`. */
+async function rollbackActionByType(
+  executor: AutomationActionExecutor,
+  action: AutomationActionModel,
+  organizationId: string,
+  projectId: string,
+): Promise<void> {
+  if (action.action_type === 'budget_change') {
+    const before = action.before as { dailyBudgetUsd: number };
+    const after = action.after as { dailyBudgetUsd: number };
+    await executor.rollbackBudgetChange({
+      organizationId,
+      projectId,
+      environmentId: action.environment_id,
+      targetId: action.target_id,
+      beforeDailyBudgetUsd: before.dailyBudgetUsd,
+      afterDailyBudgetUsd: after.dailyBudgetUsd,
+    });
+    return;
+  }
+
+  const target = await loadTargetForAction(organizationId, projectId, action.target_id);
+  if (!target.campaign_resource_name) {
+    throw new InvalidAutomationActionError('this target has no campaign resource name to roll back');
+  }
+
+  if (action.action_type === 'campaign_draft_create') {
+    await executor.rollbackCampaignDraftCreate({
+      organizationId,
+      projectId,
+      environmentId: action.environment_id,
+      targetId: action.target_id,
+      campaignResourceName: target.campaign_resource_name,
+    });
+    return;
+  }
+
+  await executor.rollbackCampaignActivation({
+    organizationId,
+    projectId,
+    environmentId: action.environment_id,
+    targetId: action.target_id,
+    campaignResourceName: target.campaign_resource_name,
+  });
 }
 
 export interface VerifyAutomationActionParams {
@@ -569,6 +870,7 @@ export async function verifyAutomationAction(params: VerifyAutomationActionParam
       projectId: params.projectId,
       actionId: params.actionId,
       reason: 'guardrail_regression',
+      executor: params.executor,
     });
   }
 
@@ -587,7 +889,7 @@ export async function verifyAutomationAction(params: VerifyAutomationActionParam
     actorId: params.verifiedByUserId,
     action: 'automation_action.verify',
     targetId: action.id,
-    summary: `Verified the budget change for "${action.target_label}"`,
+    summary: `Verified ${actionSummaryVerb(action.action_type)} for "${action.target_label}"`,
   });
 
   return action;

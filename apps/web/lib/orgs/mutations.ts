@@ -8,12 +8,17 @@ import {
   type AutomationGuardrailPolicyModel,
   type AutomationKillSwitchStatus,
   type AutomationTargetStateModel,
+  type CampaignDraft,
   disengageAutomationKillSwitch as disengageAutomationKillSwitchInOrganization,
   engageAutomationKillSwitch as engageAutomationKillSwitchInOrganization,
   ensureAutomationTargetSeeded as ensureAutomationTargetSeededInOrganization,
   executeAutomationAction as executeAutomationActionInOrganization,
+  getAutomationActionTargetId as getAutomationActionTargetIdInOrganization,
   proposeAutomationBudgetChangeAction as proposeAutomationBudgetChangeActionInOrganization,
+  proposeCampaignActivationAction as proposeCampaignActivationActionInOrganization,
+  proposeCampaignDraftCreateAction as proposeCampaignDraftCreateActionInOrganization,
   rejectAutomationAction as rejectAutomationActionInOrganization,
+  resolveAutomationActionExecutorForTarget as resolveAutomationActionExecutorForTargetInOrganization,
   rollbackAutomationAction as rollbackAutomationActionInOrganization,
   setAutomationGuardrailPolicy as setAutomationGuardrailPolicyInOrganization,
   verifyAutomationAction as verifyAutomationActionInOrganization,
@@ -1003,6 +1008,31 @@ export async function proposeAutomationBudgetChangeAction(input: ProposeAutomati
   return proposeAutomationBudgetChangeActionInOrganization(input);
 }
 
+interface ProposeCampaignDraftCreateInput {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  draft: CampaignDraft;
+  requestedByUserId: string;
+}
+
+export async function proposeCampaignDraftCreateAction(input: ProposeCampaignDraftCreateInput): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return proposeCampaignDraftCreateActionInOrganization(input);
+}
+
+interface ProposeCampaignActivationInput {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  requestedByUserId: string;
+}
+
+export async function proposeCampaignActivationAction(input: ProposeCampaignActivationInput): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return proposeCampaignActivationActionInOrganization(input);
+}
+
 export async function approveAutomationAction(
   organizationId: string,
   projectId: string,
@@ -1028,9 +1058,12 @@ export async function executeAutomationAction(
   projectId: string,
   actionId: string,
   executedByUserId: string,
+  kms?: KmsProvider,
 ): Promise<AutomationActionModel> {
   await ensureFirestoreOrm();
-  return executeAutomationActionInOrganization({ organizationId, projectId, actionId, executedByUserId });
+  const targetId = await getAutomationActionTargetIdInOrganization(organizationId, projectId, actionId);
+  const executor = await resolveAutomationActionExecutorForTargetInOrganization(organizationId, projectId, targetId, kms);
+  return executeAutomationActionInOrganization({ organizationId, projectId, actionId, executedByUserId, executor });
 }
 
 interface VerifyAutomationActionInput {
@@ -1040,11 +1073,16 @@ interface VerifyAutomationActionInput {
   verifiedByUserId: string;
   guardedMetricBefore?: number;
   guardedMetricAfter?: number;
+  kms?: KmsProvider;
 }
 
+/** Resolves the same real-vs-simulated executor `execute`/`rollback` do — verify's own auto-rollback-on-regression path needs it too (KAN-72), so a regression on a real Google Ads campaign actually rolls back the live campaign, not just the Firestore stand-in. */
 export async function verifyAutomationAction(input: VerifyAutomationActionInput): Promise<AutomationActionModel> {
   await ensureFirestoreOrm();
-  return verifyAutomationActionInOrganization(input);
+  const { kms, ...rest } = input;
+  const targetId = await getAutomationActionTargetIdInOrganization(input.organizationId, input.projectId, input.actionId);
+  const executor = await resolveAutomationActionExecutorForTargetInOrganization(input.organizationId, input.projectId, targetId, kms);
+  return verifyAutomationActionInOrganization({ ...rest, executor });
 }
 
 export async function rollbackAutomationAction(
@@ -1052,7 +1090,10 @@ export async function rollbackAutomationAction(
   projectId: string,
   actionId: string,
   actorId: string,
+  kms?: KmsProvider,
 ): Promise<AutomationActionModel> {
   await ensureFirestoreOrm();
-  return rollbackAutomationActionInOrganization({ organizationId, projectId, actionId, reason: 'manual', actorId });
+  const targetId = await getAutomationActionTargetIdInOrganization(organizationId, projectId, actionId);
+  const executor = await resolveAutomationActionExecutorForTargetInOrganization(organizationId, projectId, targetId, kms);
+  return rollbackAutomationActionInOrganization({ organizationId, projectId, actionId, reason: 'manual', actorId, executor });
 }

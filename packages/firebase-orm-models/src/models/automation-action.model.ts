@@ -25,8 +25,18 @@ export const AUTOMATION_ACTION_STATUSES = [
 ] as const;
 export type AutomationActionStatus = (typeof AUTOMATION_ACTION_STATUSES)[number];
 
-/** `budget_change` is the only type this story implements (the AC's own "simulated budget change" example) — a future Manage-tier action (creative swap, pause/enable) is a pure additive value. */
-export const AUTOMATION_ACTION_TYPES = ['budget_change'] as const;
+/**
+ * `budget_change` is KAN-71's own "simulated budget change" example.
+ * `campaign_draft_create` (KAN-72) proposes creating a brand-new paused
+ * Search campaign (campaign + ad group + RSA ad + keywords/negatives) —
+ * `before`/`after` for this type are `{}`/`{ campaignDraft: CampaignDraft }`.
+ * `campaign_activation` (KAN-72) flips an already-created campaign from
+ * paused to enabled — `before`/`after` are `{ status: 'paused' }`/
+ * `{ status: 'enabled' }`. Both are Manage-tier-only (see
+ * `automation.service.ts`'s `resolveWriteTierViolation`), unlike
+ * `budget_change` which Optimize already permits.
+ */
+export const AUTOMATION_ACTION_TYPES = ['budget_change', 'campaign_draft_create', 'campaign_activation'] as const;
 export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
 
 export type AutomationRollbackReason = 'manual' | 'guardrail_regression';
@@ -54,7 +64,7 @@ export class AutomationActionModel extends BaseModel {
   @Field({ is_required: true })
   public target_label!: string;
 
-  /** The dry-run diff (KAN-71's "dry-run diff" AC) — `{ dailyBudgetUsd: number }` for the one action type implemented today. */
+  /** The dry-run diff (KAN-71's "dry-run diff" AC) — shape depends on `action_type`, see {@link AUTOMATION_ACTION_TYPES}'s own doc comment. */
   @Field({ is_required: true })
   public before!: Record<string, unknown>;
 
