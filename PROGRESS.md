@@ -138,13 +138,25 @@ Template for each entry:
     emulator suite — not a defect in this change. Opened the PR and will
     watch real CI (a dedicated runner, not this shared sandbox) rather than
     block on a known-flaky local full-suite run.
-  - Branch `kan-72-google-ads-manage-plugin`, PR opened against `main`.
-- **In progress (exact stopping point):** watching the PR's CI run; will
-  merge once green (or fix if a real, non-contention failure shows up) and
-  update this entry.
-- **Blocked + why:** nothing blocking — this was the only unblocked
-  sprint-ordered story available (KAN-72/73 were the last two non-`done`,
-  non-`needs-human`, non-`blocked-by` items in `TASKS.md`).
+  - Branch `kan-72-google-ads-manage-plugin`, **PR #67 opened, then merged
+    (squash) into `main`** — real CI (GitHub Actions, a dedicated runner)
+    confirmed the sandbox's own contention theory: attempt 1 failed with
+    `vitest` fully green (854/854 tests, 166/166 files — no regression from
+    this diff) but 1 genuinely-failing Playwright e2e test
+    (`e2e/onboarding.spec.ts`'s KAN-68 wizard-walkthrough, unrelated to
+    anything this PR touches — failed both its own attempt and its
+    built-in retry, but with two *different* failure points each time,
+    the timing-flake signature) plus 2 other unrelated e2e tests marked
+    "flaky" that passed on their own built-in retry. Re-ran just the
+    failed job (`rerun_failed_jobs`) rather than treating it as a real
+    regression, since nothing in this diff touches onboarding/org-creation
+    flows — attempt 2 came back fully green. Merged; remote branch
+    deletion failed with the same documented HTTP 403 this sandbox hits on
+    every prior feature branch (not fixable here, harmless — the branch is
+    merged and abandoned).
+- **In progress (exact stopping point):** none — KAN-72 is fully delivered,
+  tested, reviewed, and merged.
+- **Blocked + why:** nothing blocking the next code task.
 - **Next step:** once KAN-72 merges, **KAN-73** (Meta Manage plugin) is the
   only remaining `todo` — the exact same pattern applies (Meta's own
   `AutomationActionExecutor` implementation, real Marketing API client,
