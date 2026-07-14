@@ -17,6 +17,106 @@ Template for each entry:
 
 ---
 
+## 2026-07-14 — KAN-72 follow-up review: negativeKeywords crash fix (PR #68)
+
+- **Last completed:**
+  - Picked up this run by reading `PROGRESS.md`/`TASKS.md` per the standing
+    rule and found **PR #67** (KAN-72, Google Ads Manage plugin) already
+    open from a parallel run, still in its "watching CI" stopping point.
+    Rather than duplicate that work, independently reviewed it: checked out
+    the branch in a worktree, ran `pnpm lint`/`typecheck`/`build`/targeted
+    tests locally (all green; `packages/dbt-transform`'s own build needed a
+    copied-over `.venv` to work around this sandbox's proxy/SSL blocking
+    live `pip` — a known, already-documented environment limitation, not a
+    PR defect), and dispatched a dedicated review subagent against the
+    diff.
+  - The review subagent found one real bug and two minor issues before I
+    could push a fix, **PR #67 was merged by someone else** (a human or
+    another concurrent run) — so the bug landed on `main` unfixed. Per
+    CLAUDE.md's git-workflow rule for an already-merged designated branch,
+    treated this as a fresh follow-up rather than reopening #67: branched
+    `kan-72-followup-fixes` off the new `main` tip, reapplied the same
+    fixes, and opened **PR #68**:
+    1. **Bug (reachable from untrusted input):** `validateCampaignDraft`'s
+       `negativeKeywords` guard (`packages/firebase-orm-models/src/automation-runtime/campaign-draft.ts`)
+       used `adGroup.negativeKeywords ?? []`, which only substitutes on
+       `null`/`undefined` — a non-array value (e.g. a string) in the
+       untrusted request body the `campaign-drafts` route casts to
+       `CampaignDraft` hit an unhandled `TypeError` (500) instead of the
+       clean 400 the sibling `keywords` field already gets via
+       `Array.isArray`. This is exactly the crash class KAN-72's own
+       self-review claimed to have fixed "at every nesting level" — it
+       hadn't, for this one field. Fixed with the same `Array.isArray`
+       guard pattern, plus a regression test.
+    2. **Executor ordering:** `GoogleAdsAutomationActionExecutor`'s
+       `rollbackCampaignDraftCreate`/`executeCampaignActivation`/
+       `rollbackCampaignActivation` called the real Google Ads mutation
+       *before* `loadTarget(input)`, unlike every other method on the
+       class. Reordered so a missing/invalid target is caught before a
+       live campaign's state changes — defense in depth for KAN-73, which
+       will likely mirror this executor's shape.
+    3. **UX inconsistency:** `AutomationActivateCampaignButton` didn't
+       check `response.ok` or surface an error on a failed propose call,
+       unlike the sibling campaign-draft form. Added the same inline-error
+       pattern, `proposeActivateError` translation keys (en/he), and a new
+       component test.
+  - Re-verified after the fixes: full `packages/firebase-orm-models`
+    emulator suite (712/712, incl. the `google-ads/` suite) and `apps/web`'s
+    `lib/orgs/isolation.test.ts` (21/21, incl. both KAN-72 isolation
+    scenarios) green against the fixed code, plus `pnpm lint`/`typecheck`/
+    `build` green across all packages in a fresh worktree off the new
+    `main`. PR #68's real CI (lint/typecheck/test/build) came back green
+    (~14.5 min). No open review comments. Merged (squash) into `main`.
+    Remote branch deletion for both `kan-72-google-ads-manage-plugin` (#67)
+    and `kan-72-followup-fixes` (#68) failed with this sandbox's
+    already-documented git-remote HTTP 403 — both merged and dead, not
+    deleted; a human with direct repo access can clean them up.
+  - `TASKS.md`'s KAN-72 row was already marked `done` by the session that
+    merged #67 — left as-is (still accurate); no TASKS.md change needed for
+    the follow-up fix itself.
+- **In progress (exact stopping point):** none — KAN-72 (incl. this
+  follow-up fix) is fully delivered, tested, reviewed, and merged. Did not
+  start KAN-73 this run: reviewing/fixing/merging #68 consumed the bulk of
+  this run's budget, and KAN-73 (Meta Manage plugin) is comparable in scope
+  to KAN-72 itself (real Marketing API client, guardrails, executor, admin
+  UI, tests) — better started fresh by the next run than half-finished
+  here.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **KAN-73** (E21.3 Meta Manage plugin) is now the only
+  remaining sprint-ordered `todo` — the same "buildable-today stand-in"
+  pattern KAN-72 just established applies directly: a real Meta Marketing
+  API client + OAuth2/long-lived-token credential flow (real code, tested
+  against a fake HTTP client — a live test account still needs KAN-43),
+  a `MetaAutomationActionExecutor` implementing KAN-71's
+  `AutomationActionExecutor` interface (creation/edit/creative-upload/
+  audience-creation action types, resolved via
+  `resolveAutomationActionExecutorForTarget`'s existing per-provider
+  branch pattern), and an admin UI extension of the existing automation
+  page. **Learn from this run's finding:** when validating an untrusted
+  cast (`as CampaignDraft`-style) request body, grep for every `?? []`/
+  optional-chaining spot and confirm each one is paired with an explicit
+  `Array.isArray`/type guard, not just the ones covered by the obvious
+  test cases — a self-review pass that adds tests for the fields it
+  remembers to check isn't the same as covering every field. After KAN-73,
+  every remaining backlog item is `needs-human`/`blocked-by` again unless
+  KAN-18/KAN-43 land or a run is explicitly told to reconcile KAN-20's
+  three unmerged observability PRs (#2/#3/#5, still open, unchanged).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API
+    review (LONG LEAD, still outstanding). Now that both KAN-72's and
+    (once built) KAN-73's plugin code will be real and tested, a human
+    obtaining real Google Ads + Meta test accounts/dev tokens would let a
+    future run close the "E2E on a real test account" half of both ACs.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still
+    outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs
+    (#2/#3/#5) — still outstanding, unchanged.
+  - Delete the dead `kan-72-google-ads-manage-plugin` and
+    `kan-72-followup-fixes` branches on GitHub (this sandbox's git remote
+    rejects branch deletion with an HTTP 403).
+
+---
+
 ## 2026-07-14 — E21.2 Google Ads Manage plugin (KAN-72)
 
 - **Last completed:**
