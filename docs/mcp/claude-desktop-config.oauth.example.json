@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "growthos": {
+      "type": "http",
+      "url": "https://api.growthos.app/v1/mcp"
+    }
+  }
+}

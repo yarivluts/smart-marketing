@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "growthos": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://api.growthos.app/v1/mcp", "--header", "Authorization:Bearer ${GROWTHOS_MCP_API_KEY}"],
+      "env": {
+        "GROWTHOS_MCP_API_KEY": "gos_live_replace-with-a-key-minted-on-the-project-keys-page"
+      }
+    }
+  }
+}
