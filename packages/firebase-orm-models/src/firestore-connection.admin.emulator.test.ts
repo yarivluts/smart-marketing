@@ -44,4 +44,22 @@ describe('connectFirestoreOrmAdmin (admin-SDK path, emulator)', () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it('runs where-queries through the admin connection (client SDK present)', async () => {
+    // Regression guard for the patched @arbel/firebase-orm bug: with the
+    // client SDK importable (as in apps/web), the ORM's module-level query
+    // functions lock onto the client implementations at import time, and
+    // running them against an admin ref crashed with
+    // `_freezeSettings is not a function`. The patch forces admin-mode query
+    // functions inside initializeAdminApp.
+    const slug = `admin-query-${Math.random().toString(36).slice(2)}`;
+    const org = new OrganizationModel();
+    org.name = 'Admin Query Org';
+    org.slug = slug;
+    await org.save();
+
+    const matches = await OrganizationModel.query().where('slug', '==', slug).get();
+    expect(matches).toHaveLength(1);
+    expect(matches[0].name).toBe('Admin Query Org');
+  });
 });

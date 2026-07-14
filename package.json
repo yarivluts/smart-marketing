@@ -23,6 +23,9 @@
   "pnpm": {
     "overrides": {
       "zod": "^3.25.0"
+    },
+    "patchedDependencies": {
+      "@arbel/firebase-orm@1.9.97": "patches/@arbel__firebase-orm@1.9.97.patch"
     }
   }
 }
