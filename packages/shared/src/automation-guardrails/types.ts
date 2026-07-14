@@ -25,6 +25,27 @@ export interface ProposedBudgetChange {
   afterDailyBudgetUsd: number;
 }
 
+/**
+ * A proposed campaign-draft-creation action (KAN-72) — no "before" budget
+ * exists yet (nothing has been created), so unlike {@link ProposedBudgetChange}
+ * there is no percentage-change guardrail to evaluate, only the ones that
+ * still make sense for a first-time creation (protected target, absolute
+ * spend ceiling, allowed hours, blast radius).
+ */
+export interface ProposedCampaignCreation {
+  targetId: string;
+  dailyBudgetUsd: number;
+}
+
+/**
+ * A proposed campaign-activation action (KAN-72, paused -> enabled) — no
+ * budget number is involved at all, only the non-budget guardrails
+ * (protected target, allowed hours, blast radius).
+ */
+export interface ProposedCampaignActivation {
+  targetId: string;
+}
+
 export interface GuardrailEvaluationContext {
   nowUtc: Date;
   /** How many automation actions this project has already executed today (UTC calendar day) — the blast-radius counter. */
