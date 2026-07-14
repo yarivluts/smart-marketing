@@ -17,6 +17,158 @@ Template for each entry:
 
 ---
 
+## 2026-07-14 — E21.2 Google Ads Manage plugin (KAN-72)
+
+- **Last completed:**
+  - Broke a long streak (~15 prior entries) of "KAN-72/73 practically blocked
+    on KAN-43" by attempting the same "buildable-today stand-in" pattern
+    every other OAuth/dev-token-gated integration in this codebase already
+    uses (Stripe keys, GA4 Data API, KAN-71's own `AutomationActionExecutor`
+    seam explicitly written *for* KAN-72/73 to implement against). Real
+    Google Ads API access is impossible without KAN-43's dev-token approval,
+    but the plugin's *code* doesn't need a live account to be real and
+    tested — same posture KAN-49's `StripeHttpApiClient` established.
+  - Extended KAN-71's automation action pipeline (`packages/firebase-orm-models`)
+    with two new, additive action types alongside `budget_change`:
+    - `campaign_draft_create` — proposes a brand-new, always-paused Search
+      campaign (one ad group, one Responsive Search Ad, keywords/negatives),
+      matching plan `02 §3`'s own E2E illustration ("the AI drafts a new
+      search campaign... you approve; it goes live").
+    - `campaign_activation` — flips an already-created paused campaign to
+      enabled, closing the loop plan `13 §E21.2`'s own AC describes
+      ("created paused, approved, activated, rolled back").
+    - Both are gated at the **Manage** write tier specifically (stricter
+      than `budget_change`'s Optimize-or-Manage) — `resolveWriteTierViolation`
+      now takes a `minimumTier` param instead of a hardcoded "not read"
+      check.
+    - `packages/shared/src/automation-guardrails`: two new pure guardrail
+      evaluators (`evaluateCampaignCreationGuardrails`,
+      `evaluateCampaignActivationGuardrails`), refactored to share the
+      protected-target/spend-ceiling/allowed-hours/blast-radius checks with
+      the existing budget-change evaluator — deliberately *not* reusing the
+      max-%-change guardrail for creation (no "before" budget exists yet;
+      reusing it as-is would make it fire unconditionally for any nonzero
+      budget once that guardrail is configured, a real bug I caught before
+      shipping it).
+  - `packages/firebase-orm-models/src/plugin-runtime/google-ads/`: a real
+    Google Ads REST API v17 client (`GoogleAdsHttpApiClient` — OAuth2
+    refresh-token exchange, `campaignBudgets`/`campaigns`/`adGroups`/
+    `adGroupAds`/`adGroupCriteria` mutate calls), `parseGoogleAdsCredentialSecret`
+    (the vault secret shape, reusing KAN-27/29's existing Resource Library
+    credential flow — `google_ads` was already a valid `CredentialProvider`),
+    `GoogleAdsAutomationActionExecutor` (implements the full
+    `AutomationActionExecutor` interface, incl. `budget_change` against a
+    campaign this plugin itself created), and a `type: action` plugin
+    manifest registered through the existing KAN-46 Plugin Registry
+    (`scopes: [action:execute]`).
+  - `resolveAutomationActionExecutorForTarget` (`automation-executor-resolver.service.ts`):
+    resolves the real Google Ads executor when a target's linked connection
+    is an approved, *installed* `provider: 'google_ads'` credential,
+    otherwise falls back to the existing `SimulatedAdAccountExecutor` — kept
+    out of `automation.service.ts` itself so that module stays
+    provider-agnostic, called from `apps/web`'s execute/rollback/verify
+    mutation wrappers (KMS resolved best-effort, same posture the
+    `plugins/[installId]/run` route already uses for Stripe/GA4).
+  - **Self-review caught two real bugs before merge:**
+    1. `verifyAutomationAction`'s `executor` param was declared but never
+       actually forwarded to its internal auto-rollback-on-regression call —
+       a latent gap since KAN-71 (harmless while only a simulated executor
+       existed, but would have silently rolled back only the Firestore
+       stand-in — not a real Google Ads campaign — on a guardrail-regression
+       auto-rollback). Fixed: forwarded through, plus wired the verify route
+       to resolve the executor the same way execute/rollback do.
+    2. `validateCampaignDraft`'s nested-object validation
+       (`adGroup.responsiveSearchAd.headlines` etc.) would throw an
+       unhandled `TypeError` — not a clean `InvalidAutomationActionError` —
+       on a malformed ad group/keyword entry in an untrusted request body
+       (the `campaign-drafts` route does an unsafe `draft as CampaignDraft`
+       cast of arbitrary JSON). Fixed with `isRecord`/`Array.isArray` guards
+       at every nesting level, with regression tests proving a `null`/
+       non-object entry now yields a clean 400 instead of a 500.
+    3. Also fixed every audit-log summary that was still hardcoded to "the
+       budget change" (`approveAutomationAction`/`rejectAutomationAction`/
+       `verifyAutomationAction`) — harmless before this story (only one
+       action type existed) but actively wrong for the two new ones;
+       factored into one shared `actionSummaryVerb(actionType)` helper.
+  - Admin UI: a "Propose a new campaign draft" form (campaign name/budget/ad
+    group/final URL/headlines/descriptions/keywords/negatives, newline-
+    separated textareas rather than a dynamic-array widget — kept the scope
+    tractable) and a "Propose activation" button per paused-campaign target,
+    both on the existing project automation page; the existing generic
+    action-queue diff view renders both new action types' before/after with
+    no changes needed beyond two new `DIFF_FIELD_LABEL_KEYS` entries and a
+    campaign-draft-specific value formatter (a raw `CampaignDraft` object
+    would otherwise render as `[object Object]`). New `en`/`he` translation
+    keys, no hard-coded strings, no Hebrew in code files.
+  - Tests: `packages/shared` guardrail unit tests (10 new), `packages/firebase-orm-models`
+    unit tests for the Google Ads API client (fake `fetch`), campaign-draft
+    validation (incl. the malformed-input regression tests above),
+    credential-secret parsing, and manifest parsing; Firestore-emulator
+    tests for the full propose -> approve -> execute -> rollback lifecycle
+    of both new action types (incl. Manage-tier-specific write-tier
+    strictness), the `GoogleAdsAutomationActionExecutor` against a real
+    target model + fake API client, and `resolveAutomationActionExecutorForTarget`'s
+    every branch (no connection, wrong provider, plugin not installed, no
+    secret set, fully configured). New `apps/web` isolation-test scenarios
+    for both new propose routes (KAN-26 non-enumeration posture).
+  - Explicitly out of scope, documented rather than silently dropped:
+    Performance Max campaigns (structurally different "asset group" model,
+    not RSA/keywords — `advertisingChannelType` only ever validates as
+    `'SEARCH'`), editing an already-created ad group's keywords/creative
+    after the fact, and audience attach (the plan's own E21.2 table mentions
+    it; the KAN-72 ticket summary doesn't). A `budget_change` action against
+    a Google-Ads-linked target seeded manually (not via this plugin's own
+    `campaign_draft_create`) isn't supported yet — `GoogleAdsBudgetResourceUnknownError` —
+    since Google Ads models a campaign's budget as a separate resource a
+    manually-seeded target has no record of; a real fix needs a GAQL lookup,
+    noted as a follow-up rather than built speculatively.
+  - `pnpm build && pnpm lint && pnpm typecheck` all green. `pnpm test` green
+    per-package when run in isolation (`packages/shared` 359/359,
+    `packages/firebase-orm-models` 711/711, `apps/web`'s new/changed test
+    files individually verified) — the one full monorepo `pnpm test` attempt
+    in this sandbox hit widespread 30s timeouts across `apps/web`'s
+    `isolation.test.ts` (18 failures, spanning many *pre-existing* KAN-27/
+    30/31/40/44/54/60/67/71 scenarios I never touched, not just the 2 new
+    KAN-72 ones) — confirmed by re-running that file alone
+    (`firebase emulators:exec ... vitest run lib/orgs/isolation.test.ts`):
+    21/21 passed in 41s. This is resource contention from this sandbox
+    running the whole monorepo's parallel emulator-heavy test tasks at once,
+    the same class of (if not literally the same) flake this file's own
+    prior entries have documented extensively for `packages/firebase-orm-models`'
+    emulator suite — not a defect in this change. Opened the PR and will
+    watch real CI (a dedicated runner, not this shared sandbox) rather than
+    block on a known-flaky local full-suite run.
+  - Branch `kan-72-google-ads-manage-plugin`, PR opened against `main`.
+- **In progress (exact stopping point):** watching the PR's CI run; will
+  merge once green (or fix if a real, non-contention failure shows up) and
+  update this entry.
+- **Blocked + why:** nothing blocking — this was the only unblocked
+  sprint-ordered story available (KAN-72/73 were the last two non-`done`,
+  non-`needs-human`, non-`blocked-by` items in `TASKS.md`).
+- **Next step:** once KAN-72 merges, **KAN-73** (Meta Manage plugin) is the
+  only remaining `todo` — the exact same pattern applies (Meta's own
+  `AutomationActionExecutor` implementation, real Marketing API client,
+  keys/OAuth deferred pending KAN-43's Meta app review). After that, every
+  remaining backlog item is `needs-human`/`blocked-by` again unless KAN-18/
+  KAN-43 land or a run is explicitly told to reconcile KAN-20's three
+  unmerged PRs.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API
+    review (LONG LEAD, still outstanding). Now that KAN-72's code is real
+    and tested (not just simulated), a human obtaining a real Google Ads
+    test account + dev token would let a future run close the "E2E on a
+    real test account" half of this AC that's still necessarily deferred.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still
+    outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs
+    (#2/#3/#5) — still outstanding.
+  - Obtaining a real Google Ads OAuth refresh token + developer token (once
+    KAN-43 lands) to actually exercise `GoogleAdsHttpApiClient` against a
+    live account — everything today is verified against a fake API client
+    plus the real OAuth2/mutate-call shape, not a live Google Ads response.
+
+---
+
 ## 2026-07-14 — No unblocked story (re-check, no change)
 
 - **Last completed:**
