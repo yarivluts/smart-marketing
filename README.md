@@ -23,7 +23,9 @@ pnpm dev                 # run web (:3000) + api (:3001) in dev
 | `packages/shared` | Cross-cutting TypeScript types + helpers |
 | `packages/firebase-orm-models` | The **only** sanctioned Firestore access layer (wraps `@arbel/firebase-orm`) |
 | `packages/eslint-config` | Shared flat ESLint config |
+| `packages/mcp-headless-example` | Runnable example: a headless agent talking to GrowthOS over MCP |
 | `docs/plan` | The GrowthOS product + architecture plan (15 docs) |
+| `docs/mcp` | Connect an MCP client (Claude Desktop, claude.ai, a headless agent) to GrowthOS — see [`docs/mcp/README.md`](./docs/mcp/README.md) |
 
 ## How the build proceeds
 
