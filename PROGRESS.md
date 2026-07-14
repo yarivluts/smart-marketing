@@ -17,6 +17,71 @@ Template for each entry:
 
 ---
 
+## 2026-07-14 — No unblocked story; investigated + ruled out a speculative CI-flake fix
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Re-confirmed every sprint-ordered
+    `todo`/`in-progress` story is still genuinely blocked, unchanged from the prior entry:
+    **KAN-72/73** (Google/Meta Manage plugins) depend on **KAN-43** (needs-human, still
+    outstanding), remaining **KAN-18**-gated stories are blocked on GCP/Firebase provisioning
+    (still needs-human), and **KAN-20** still needs a human to pick between the three unmerged
+    observability PRs. Checked open PRs via the GitHub API — still exactly #2/#3/#5 (the KAN-20
+    duplicates), nothing new opened since the prior entry, PR #22 (already closed last entry)
+    confirmed gone.
+  - With no unblocked KAN story available, picked up the one concrete lead the prior entry left
+    for a future run: the `packages/firebase-orm-models` emulator suite's recurring CI flakiness
+    (RESOURCE_EXHAUSTED backoff on a Firestore `Listen` stream, hitting a different single test
+    each time, requiring up to 4 full CI attempts to land an unrelated one-line PR). Tried the
+    prior entry's own suggestion — capping vitest's thread pool (`poolOptions.threads.maxThreads:
+    2`, down from the default of 4 matching this sandbox's/CI's core count) to reduce concurrent
+    load on the single shared local emulator instance.
+  - **Verified this against a real baseline before considering shipping it**: ran the package's
+    full `pnpm test` (real local Firestore emulator, not mocked) once on unmodified `main`
+    (660/660 green, 64s wall time) and once with the `maxThreads: 2` cap applied (659/660 — one
+    test, `engagement-pack.emulator.test.ts`'s "partially idempotent" case, failed all 4
+    attempts — `retry: 3` plus the initial try — each timing out at exactly the 30s ceiling, with
+    the same `RESOURCE_EXHAUSTED: Received message larger than max (537396242 vs 4194304)`
+    gRPC-stream-corruption signature the existing code comment already documents; wall time blew
+    out to 5m20s, ~5x slower).
+  - **Conclusion: did not ship the change.** The cap didn't prevent the flake it was meant to fix
+    — reproducing it even at reduced concurrency is real evidence against "too many concurrent
+    emulator connections" being the (sole) root cause, contradicting my own hypothesis before
+    trying it — while imposing a clear, measurable 5x wall-clock cost on every future test run.
+    Shipping a speculative fix with a proven cost and disproven benefit would be worse than the
+    status quo. Discarded the branch (`chore/emulator-test-concurrency`) without opening a PR —
+    nothing to review or merge.
+  - **Recording this so a future run doesn't re-attempt the identical fix**: the failure mode is
+    a corrupted/oversized gRPC `Listen` stream message, not simple resource contention — thread
+    concurrency isn't the lever. A real fix likely needs to address the retry logic
+    itself: `retry: 3` reruns the whole test, but the corrupted channel evidently isn't torn down
+    and re-established between retries within the same worker (all 4 attempts hit the identical
+    30000ms ceiling), so the retry is very likely not getting a fresh connection the way
+    `connectToFirestoreEmulator`'s own initial-warmup retry does. Worth a future look: whether
+    per-test (not just per-suite) Firestore app/channel teardown-and-reconnect on a caught
+    RESOURCE_EXHAUSTED would actually clear it, versus just re-running the same broken stream.
+  - This sandbox reproduced the flake on the very first `maxThreads: 2` run despite historical
+    entries noting this sandbox "rarely reproduces the CI-specific severity" — worth noting the
+    reproduction bar may be lower than previously assumed, though still only n=1 either way.
+- **In progress (exact stopping point):** none — this was an investigation with a negative result,
+  cleanly concluded (no branch, no PR, no TASKS.md change).
+- **Blocked + why:** nothing blocking the next code task, but there is still no unblocked
+  sprint-ordered story to pick — unchanged blockers, see below.
+- **Next step:** unchanged — re-check whether **KAN-43** or **KAN-18** have landed next run
+  (unblocking KAN-72/73 and the various "buildable-today stand-in" follow-ups). If not, remaining
+  unblocked work is the **KAN-20** reconciliation itself (if a run is explicitly instructed to make
+  that judgment call), or a real fix for the emulator-suite flake along the reconnect-on-retry line
+  sketched above (harder and riskier than the concurrency-cap idea this entry ruled out — treat as
+  its own scoped investigation, not a quick follow-up).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding) — gates KAN-72/73.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding) — gates the
+    various warehouse/BigQuery/Redis/real-KMS "buildable-today stand-in" follow-ups.
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+
+---
+
 ## 2026-07-14 — Housekeeping: closed stale PR #22, removed leftover debug script (PR #66)
 
 - **Last completed:**
