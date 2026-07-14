@@ -950,6 +950,7 @@
     "proposeDraftInvalidBudgetError": "Daily budget must be a positive number.",
     "proposeDraftError": "Couldn't propose the campaign draft. Please try again.",
     "proposeActivateButton": "Propose activation",
+    "proposeActivateError": "Couldn't propose the activation. Please try again.",
     "actionsHeading": "Action queue",
     "actionsEmptyNote": "No automation actions proposed for this project yet.",
     "diffFieldDailyBudgetUsd": "Daily budget",

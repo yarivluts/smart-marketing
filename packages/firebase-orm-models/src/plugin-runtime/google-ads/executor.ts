@@ -95,24 +95,24 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
   }
 
   async rollbackCampaignDraftCreate(input: AutomationCampaignDraftRollbackInput): Promise<void> {
-    await this.apiClient.setCampaignStatus(this.customerId, input.campaignResourceName, 'REMOVED');
     const target = await loadTarget(input);
+    await this.apiClient.setCampaignStatus(this.customerId, input.campaignResourceName, 'REMOVED');
     target.campaign_status = 'removed';
     target.updated_at = new Date().toISOString();
     await target.save();
   }
 
   async executeCampaignActivation(input: AutomationCampaignActivationExecutionInput): Promise<void> {
-    await this.apiClient.setCampaignStatus(this.customerId, input.campaignResourceName, 'ENABLED');
     const target = await loadTarget(input);
+    await this.apiClient.setCampaignStatus(this.customerId, input.campaignResourceName, 'ENABLED');
     target.campaign_status = 'enabled';
     target.updated_at = new Date().toISOString();
     await target.save();
   }
 
   async rollbackCampaignActivation(input: AutomationCampaignActivationExecutionInput): Promise<void> {
-    await this.apiClient.setCampaignStatus(this.customerId, input.campaignResourceName, 'PAUSED');
     const target = await loadTarget(input);
+    await this.apiClient.setCampaignStatus(this.customerId, input.campaignResourceName, 'PAUSED');
     target.campaign_status = 'paused';
     target.updated_at = new Date().toISOString();
     await target.save();

@@ -86,9 +86,13 @@ function validateAdGroup(adGroup: CampaignDraftAdGroup, index: number, reasons: 
     adGroup.keywords.forEach((keyword, keywordIndex) => validateKeyword(keyword, `${fieldPath}.keywords[${keywordIndex}]`, reasons));
   }
 
-  (adGroup.negativeKeywords ?? []).forEach((keyword, keywordIndex) =>
-    validateKeyword(keyword, `${fieldPath}.negativeKeywords[${keywordIndex}]`, reasons),
-  );
+  if (adGroup.negativeKeywords !== undefined && !Array.isArray(adGroup.negativeKeywords)) {
+    reasons.push(`${fieldPath}.negativeKeywords must be an array when present.`);
+  } else {
+    (adGroup.negativeKeywords ?? []).forEach((keyword, keywordIndex) =>
+      validateKeyword(keyword, `${fieldPath}.negativeKeywords[${keywordIndex}]`, reasons),
+    );
+  }
 }
 
 /**

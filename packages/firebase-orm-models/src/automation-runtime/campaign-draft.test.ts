@@ -107,6 +107,12 @@ describe('validateCampaignDraft', () => {
     expect(() => validateCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
   });
 
+  it('rejects a non-array negativeKeywords without throwing an unhandled error', () => {
+    const draft = validDraft();
+    (draft.adGroups[0] as unknown as { negativeKeywords: unknown }).negativeKeywords = 'free';
+    expect(() => validateCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
+  });
+
   it('collects every violation at once rather than failing on the first', () => {
     const draft = validDraft({ campaignName: '', dailyBudgetUsd: -1 });
     try {
