@@ -950,6 +950,7 @@
     "proposeDraftInvalidBudgetError": "התקציב היומי חייב להיות מספר חיובי.",
     "proposeDraftError": "לא ניתן היה להציע את טיוטת הקמפיין. נסה שוב.",
     "proposeActivateButton": "הצע הפעלה",
+    "proposeActivateError": "לא ניתן היה להציע את ההפעלה. נסה שוב.",
     "actionsHeading": "תור פעולות",
     "actionsEmptyNote": "עדיין לא הוצעו פעולות אוטומציה עבור פרויקט זה.",
     "diffFieldDailyBudgetUsd": "תקציב יומי",

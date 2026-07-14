@@ -16,15 +16,21 @@ export function AutomationActivateCampaignButton({ orgId, projectId, targetId }:
   const t = useTranslations('Automation');
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleClick(): Promise<void> {
     setSubmitting(true);
+    setError(null);
     try {
-      await fetch(`/api/orgs/${orgId}/projects/${projectId}/automation/actions/campaign-activations`, {
+      const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/automation/actions/campaign-activations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetId }),
       });
+      if (!response.ok) {
+        setError(t('proposeActivateError'));
+        return;
+      }
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -32,8 +38,15 @@ export function AutomationActivateCampaignButton({ orgId, projectId, targetId }:
   }
 
   return (
-    <Button type="button" size="sm" variant="outline" disabled={submitting} onClick={handleClick}>
-      {t('proposeActivateButton')}
-    </Button>
+    <div className="flex items-center gap-3">
+      <Button type="button" size="sm" variant="outline" disabled={submitting} onClick={handleClick}>
+        {t('proposeActivateButton')}
+      </Button>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
