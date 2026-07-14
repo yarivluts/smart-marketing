@@ -17,6 +17,78 @@ Template for each entry:
 
 ---
 
+## 2026-07-14 — Carried-forward fix: @arbel/firebase-orm admin-query patch (PR #60)
+
+- **Last completed:**
+  - Read PROGRESS.md/TASKS.md per the standing rule. Every sprint-ordered `todo`/`in-progress` story
+    is genuinely blocked: **KAN-72/73** (Google/Meta Manage plugins) on **KAN-43** (needs-human, still
+    outstanding), **KAN-18**-gated stories on **KAN-18** (needs-human, still outstanding), **KAN-20**
+    on a human (or explicit instruction) picking between the three unmerged observability PRs. The
+    prior entry's own "next step" pointed at the carried-forward PRs (#52, #60) as the most useful
+    unblocked work. **PR #52** turned out to already be merged directly by the repo owner (outside
+    this run) — nothing left to do there. Picked up **PR #60** (`fix/arbel-admin-query-compat`,
+    already implemented and CI-green from an earlier run, never reviewed/merged) instead of starting
+    new work, same pattern this file has used for other carried-forward branches.
+  - **What PR #60 does:** a `pnpm patch` on `@arbel/firebase-orm@1.9.97` fixing a real correctness bug
+    — `initializeAdminApp` never re-installed the admin-mode query implementations when the client SDK
+    was importable (always true in `apps/web`), so `query`/`where`/`or` stayed locked onto the
+    client-SDK versions; those client versions built `QueryConstraint` objects without the `type` tag
+    the ORM's own `getCurrentQueryArray()` filters on, so `where(...)` constraints were silently
+    dropped from admin-side queries, and running one crashed with `_freezeSettings is not a function`.
+    The patch (1) forces `setupAdminSDKQueryCompatibility()` inside `initializeAdminApp` (cjs+esm) and
+    (2) adds the missing `type: 'where'`/`type: 'or'` tags. Adds a regression test exercising a
+    `.where(...)` query through the admin connection.
+  - Independently verified before merging (this PR predates a human review): checked out the branch
+    in an isolated worktree, confirmed `pnpm install` applies the patch cleanly and the patched
+    `require`/`type` markers are present in the installed `dist/{cjs,esm}` files, then ran the full
+    gate — `pnpm lint && pnpm typecheck` green; `pnpm test` green across `packages/shared` (dbt
+    build/tests, 104/104), `packages/firebase-orm-models` (Firestore-emulator suite incl. the new
+    regression test), and `apps/web`/`apps/api`, with the one exception below.
+  - **`apps/web`'s Playwright e2e suite showed 3 non-flaky failures** on the patched branch
+    (`boards.spec.ts` KAN-60, `metric-defs.spec.ts` KAN-40, `resource-library.spec.ts` KAN-27) plus 5
+    already-documented flakes. Rather than assume the patch caused them, ran the same 3 specs against
+    unpatched `main` (`a6755a5`) in an isolated checkout as a control — **identical 3 failures
+    reproduced** (same specs, same `getByLabel('Email')` sign-up-page timeout for
+    `resource-library.spec.ts`), confirming this is pre-existing sandbox flakiness (dev-server-timing
+    races under this sandbox's resource contention, the same category this file has repeatedly
+    documented for `auth.spec.ts`/`ingest-health.spec.ts`) and not a regression from the patch. Real
+    GitHub Actions CI for this exact commit (`c93094c`) had already run green
+    (`lint · typecheck · test · build`, completed 2026-07-14T08:13:39Z) before this review, consistent
+    with the sandbox-only nature of the e2e flake.
+  - This sandbox needed the same environment quirks prior entries have documented to get a clean run:
+    `PIP_CERT`/`SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE`/`NODE_EXTRA_CA_CERTS` pointed at the proxy CA
+    bundle for the dbt Python venv, plus (newly noted) `NODE_USE_ENV_PROXY=1` for the Firestore
+    emulator jar download (Node's built-in `fetch`/undici doesn't read `HTTPS_PROXY` without it on
+    this Node version) — worth carrying forward in future entries since the emulator jar isn't cached
+    anywhere in this sandbox and has to be re-downloaded per fresh checkout.
+  - Merged PR #60 (squash) into `main` (`7cc7a95`). Remote branch deletion failed with the same
+    documented HTTP 403 this sandbox's git remote returns for every prior feature branch — merged and
+    dead but not deleted, same as the many prior entries note.
+- **In progress (exact stopping point):** none — PR #60 is fully reviewed, verified, and merged. No
+  TASKS.md story maps to this fix (it's an infra/dependency patch, not a KAN-numbered story), so
+  TASKS.md is unchanged.
+- **Blocked + why:** nothing blocking the next code task, but there is no unblocked sprint-ordered
+  story left to pick — see next step.
+- **Next step:** every remaining `todo`/`in-progress` TASKS.md story is genuinely blocked (see above).
+  A future run should re-check whether **KAN-43** or **KAN-18** have landed (unblocking KAN-72/73 and
+  the various "buildable-today stand-in" follow-ups). If not, remaining unblocked work is: (a) **PR
+  #22** (`kan-33-progress-followup`) — a stale documentation-only PR from 2026-07-07 fixing a since
+  long-scrolled-past PROGRESS.md wording issue; likely worth closing as superseded rather than merging
+  given how far PROGRESS.md has moved on, but that's a judgment call for whoever picks it up next; (b)
+  the **KAN-20** reconciliation itself, if a run is explicitly instructed to make that judgment call.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding) — gates KAN-72/73.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding) — gates the
+    various warehouse/BigQuery/Redis/real-KMS "buildable-today stand-in" follow-ups.
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still outstanding.
+  - PR #22 (stale KAN-33 PROGRESS.md wording fix) — still open, likely worth a human decision to close
+    as superseded rather than merge.
+  - `apps/web/repro-tmp.mjs` (a leftover debug script noted in a prior entry) is still sitting in
+    `main`'s working tree, still out of scope for this run's own diff.
+
+---
+
 ## 2026-07-14 — E22.4 MCP docs + example clients (KAN-78)
 
 - **Last completed:**
