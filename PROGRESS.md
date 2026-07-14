@@ -17,6 +17,80 @@ Template for each entry:
 
 ---
 
+## 2026-07-14 — Housekeeping: closed stale PR #22, removed leftover debug script (PR #66)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Re-confirmed every sprint-ordered
+    `todo`/`in-progress` story is still genuinely blocked, unchanged from the prior entry:
+    **KAN-72/73** (Google/Meta Manage plugins) practically depend on **KAN-43** (Google Ads dev
+    token + Meta Marketing API approval, still `needs-human`), remaining **KAN-18**-gated stories
+    are blocked on GCP/Firebase provisioning (still `needs-human`), and **KAN-20** still needs a
+    human to pick between the three unmerged observability PRs (#2/#3/#5, unchanged). Checked
+    open PRs via the GitHub API to confirm nothing new had landed since the prior entry — only
+    #2/#3/#5 (KAN-20 duplicates) and #22 (the stale PROGRESS.md wording fix the prior entry
+    flagged) were open.
+  - **Closed PR #22** as superseded (commented with reasoning, then closed without merging): it
+    only corrected wording in one historical KAN-33 paragraph from 2026-07-07, and `PROGRESS.md`
+    has since grown by ~5,000 lines/dozens of entries — the diff no longer applies cleanly against
+    current `main` (37+ commits behind) and the paragraph it touches has no value for a future run
+    picking up work.
+  - **Delivered and merged PR #66** (`chore/remove-leftover-repro-script`): deleted
+    `apps/web/repro-tmp.mjs`, a one-off Playwright debug script (committed in #47) flagged as a
+    leftover in several prior entries but left out of scope of those runs' diffs. Verified nothing
+    references it (`grep -r repro-tmp` across the repo, only this file's own journal text). Not a
+    KAN-numbered story — no admin UI implication, no tests needed (pure deletion of an unused
+    script).
+  - Full local gate green before opening the PR: `pnpm lint`/`pnpm typecheck`/`pnpm build` all
+    green on the first pass across all 8 packages; `pnpm test` needed two isolated retries
+    (`packages/firebase-orm-models`'s Firestore-emulator suite hit the documented `RESOURCE_EXHAUSTED`
+    self-recovering flake under full-suite emulator contention — 660/660 passed on retry) before a
+    clean full run (11/11 turbo tasks, only 2 pre-existing flaky Playwright specs —
+    `auth.spec.ts`/`ingest-health.spec.ts` — passing on Playwright's own retry, the same
+    long-documented category prior entries record).
+  - **Real GitHub Actions CI for this PR needed 4 attempts to go green** — new information worth
+    recording since it's more severe than prior entries' local-only flake notes: attempts 1-3 each
+    failed on a *different single test* timing out at exactly 30000ms
+    (`src/services/mcp-oauth.emulator.test.ts`, then `lib/orgs/isolation.test.ts`, then
+    `src/services/board.emulator.test.ts`), each with a `RESOURCE_EXHAUSTED` Firestore-emulator
+    backoff logged nearby — the same signature as the already-documented local flake, but hitting
+    the CI runner itself rather than just this sandbox. Re-ran the failed job via
+    `actions_run_trigger`/`rerun_failed_jobs` each time (never re-ran blindly without first reading
+    the job log to confirm it was a distinct test, not a repeat failure, which would have signaled
+    a real regression from this PR's diff). Attempt 4 passed clean (~20 min wall time, no
+    failures). Confirmed `mergeable_state: "clean"` before merging (squash) into `main`
+    (`c662734`). Remote branch deletion failed with the same HTTP 403 this sandbox's git remote
+    returns for every prior feature branch (not a GitHub permissions issue) — merged and dead but
+    not deleted; the local branch was deleted.
+  - **Worth flagging for a future story**: this is the first time the flake has been severe enough
+    to require *four* full CI attempts (~90 min of CI wall time) to land a one-line diff. Prior
+    entries treated this as background noise (a single local retry usually sufficed); recurring
+    single-test 30s timeouts under `RESOURCE_EXHAUSTED` Firestore-emulator backoff, hitting a
+    different test each time, suggests the `packages/firebase-orm-models` emulator suite's real
+    concurrency/isolation (or the CI runner's resource limits for it) may be worth a dedicated look
+    — e.g. sharding the emulator suite, raising `testTimeout` for emulator tests specifically, or
+    tuning vitest's worker/thread count against the runner's actual resource ceiling — rather than
+    always treating it as a one-off to retry past. Not fixed here since it's out of scope for a
+    one-line cleanup PR and no KAN story owns test infra tuning.
+- **In progress (exact stopping point):** none — both PR #22 and PR #66 are fully resolved
+  (closed / merged). No TASKS.md story maps to either (PR #22 was a documentation-only revert
+  candidate, PR #66 is repo hygiene), so `TASKS.md` is unchanged.
+- **Blocked + why:** nothing blocking the next code task, but there is still no unblocked
+  sprint-ordered story to pick — same blockers as the prior entry (see below).
+- **Next step:** unchanged from the prior entry — re-check whether **KAN-43** or **KAN-18** have
+  landed next run (unblocking KAN-72/73 and the various "buildable-today stand-in" follow-ups). If
+  not, remaining unblocked work is the **KAN-20** reconciliation itself (picking one of PRs
+  #2/#3/#5 and closing the others), if a run is explicitly instructed to make that judgment call,
+  or a dedicated look at the CI emulator-suite flakiness flagged above.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding) — gates KAN-72/73.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding) — gates the
+    various warehouse/BigQuery/Redis/real-KMS "buildable-today stand-in" follow-ups.
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs (#2/#3/#5) — still
+    outstanding.
+
+---
+
 ## 2026-07-14 — Carried-forward fix: @arbel/firebase-orm admin-query patch (PR #60)
 
 - **Last completed:**
