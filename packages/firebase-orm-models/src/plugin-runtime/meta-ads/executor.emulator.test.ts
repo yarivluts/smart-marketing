@@ -9,11 +9,11 @@ import {
   listAutomationTargetStatesForProject,
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
-import type { GoogleAdsApiClient, GoogleAdsCreateCampaignDraftResult } from './api-client';
-import { GoogleAdsAutomationActionExecutor, GoogleAdsBudgetResourceUnknownError, GoogleAdsWrongPlatformCampaignDraftError } from './executor';
+import type { MetaAdsApiClient } from './api-client';
+import { MetaAdsBudgetResourceUnknownError, MetaAdsWrongPlatformCampaignDraftError, MetaAutomationActionExecutor } from './executor';
 
 beforeAll(async () => {
-  await connectToFirestoreEmulator('google-ads-executor-tests');
+  await connectToFirestoreEmulator('meta-ads-executor-tests');
 });
 
 function unique(prefix: string): string {
@@ -31,44 +31,38 @@ async function setupOrgWithProject(orgName: string) {
   return { owner, organization, project };
 }
 
-const CREATE_RESULT: GoogleAdsCreateCampaignDraftResult = {
-  campaignResourceName: 'customers/999/campaigns/1',
-  campaignBudgetResourceName: 'customers/999/campaignBudgets/1',
-  adGroupResourceNames: ['customers/999/adGroups/1'],
-  adResourceNames: ['customers/999/adGroupAds/1'],
-};
-
-function fakeApiClient(overrides: Partial<GoogleAdsApiClient> = {}): GoogleAdsApiClient {
+function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiClient {
   return {
-    createCampaignDraft: vi.fn().mockResolvedValue(CREATE_RESULT),
-    setCampaignBudgetAmount: vi.fn().mockResolvedValue(undefined),
-    setCampaignStatus: vi.fn().mockResolvedValue(undefined),
+    createCampaign: vi.fn().mockResolvedValue({ campaignId: 'campaign-1' }),
+    createAdSet: vi.fn().mockResolvedValue({ adSetId: 'adset-1' }),
+    createAdCreative: vi.fn().mockResolvedValue({ creativeId: 'creative-1' }),
+    createAd: vi.fn().mockResolvedValue({ adId: 'ad-1' }),
+    setDailyBudgetCents: vi.fn().mockResolvedValue(undefined),
+    setObjectStatus: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
 
-const DRAFT: GoogleAdsCampaignDraft = {
-  platform: 'google_ads',
-  campaignName: 'Winning Themes',
-  advertisingChannelType: 'SEARCH',
+const DRAFT: MetaCampaignDraft = {
+  platform: 'meta',
+  campaignName: 'Summer Sale',
+  objective: 'OUTCOME_TRAFFIC',
   dailyBudgetUsd: 25,
-  adGroups: [
+  adSets: [
     {
-      name: 'Ad Group 1',
-      keywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
-      negativeKeywords: [],
-      responsiveSearchAd: {
-        headlines: ['Buy Blue Widgets', 'Best Widgets Online', 'Widgets For Less'],
-        descriptions: ['Free shipping on all widgets.', 'Order today, ships tomorrow.'],
-        finalUrl: 'https://example.com/widgets',
+      name: 'Ad Set 1',
+      targeting: { countries: ['US'], ageMin: 18, ageMax: 45 },
+      ad: {
+        name: 'Ad 1',
+        creative: { primaryText: 'Big summer savings.', headline: 'Blue Widgets Sale', linkUrl: 'https://example.com/widgets' },
       },
     },
   ],
 };
 
-describe('GoogleAdsAutomationActionExecutor', () => {
-  it('creates a campaign draft, storing the real resource names on the target', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Create Org');
+describe('MetaAutomationActionExecutor', () => {
+  it('creates a campaign draft via campaign -> ad set -> creative -> ad, in order, storing resource names on the target', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor Create Org');
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
       projectId: project.id,
@@ -80,7 +74,7 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       seededByUserId: owner.id,
     });
     const apiClient = fakeApiClient();
-    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
 
     const result = await executor.executeCampaignDraftCreate({
       organizationId: organization.id,
@@ -90,18 +84,38 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       draft: DRAFT,
     });
 
-    expect(result).toEqual({ campaignResourceName: CREATE_RESULT.campaignResourceName });
-    expect(apiClient.createCampaignDraft).toHaveBeenCalledWith('999', DRAFT);
+    expect(result).toEqual({ campaignResourceName: 'campaign-1' });
+    expect(apiClient.createCampaign).toHaveBeenCalledWith('999', { name: 'Summer Sale', objective: 'OUTCOME_TRAFFIC', dailyBudgetCents: 2500 });
+    expect(apiClient.createAdSet).toHaveBeenCalledWith('999', {
+      campaignId: 'campaign-1',
+      name: 'Ad Set 1',
+      targeting: { countries: ['US'], ageMin: 18, ageMax: 45 },
+    });
+    expect(apiClient.createAdCreative).toHaveBeenCalledWith('999', {
+      pageId: 'page-1',
+      primaryText: 'Big summer savings.',
+      headline: 'Blue Widgets Sale',
+      linkUrl: 'https://example.com/widgets',
+    });
+    expect(apiClient.createAd).toHaveBeenCalledWith('999', { adSetId: 'adset-1', creativeId: 'creative-1', name: 'Ad 1' });
+
+    const createCampaignOrder = (apiClient.createCampaign as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    const createAdSetOrder = (apiClient.createAdSet as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    const createAdCreativeOrder = (apiClient.createAdCreative as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    const createAdOrder = (apiClient.createAd as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    expect(createCampaignOrder).toBeLessThan(createAdSetOrder);
+    expect(createAdSetOrder).toBeLessThan(createAdCreativeOrder);
+    expect(createAdCreativeOrder).toBeLessThan(createAdOrder);
 
     const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
-    expect(reloaded.campaign_resource_name).toBe(CREATE_RESULT.campaignResourceName);
-    expect(reloaded.campaign_budget_resource_name).toBe(CREATE_RESULT.campaignBudgetResourceName);
+    expect(reloaded.campaign_resource_name).toBe('campaign-1');
+    expect(reloaded.campaign_budget_resource_name).toBe('campaign-1');
     expect(reloaded.campaign_status).toBe('paused');
     expect(reloaded.daily_budget_usd).toBe(25);
   });
 
-  it('rolls back a campaign draft creation by setting the campaign REMOVED', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Rollback Create Org');
+  it('rolls back a campaign draft creation by deleting the campaign', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor Rollback Create Org');
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
       projectId: project.id,
@@ -113,7 +127,7 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       seededByUserId: owner.id,
     });
     const apiClient = fakeApiClient();
-    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
     await executor.executeCampaignDraftCreate({ organizationId: organization.id, projectId: project.id, environmentId: 'live', targetId: target.id, draft: DRAFT });
 
     await executor.rollbackCampaignDraftCreate({
@@ -121,16 +135,16 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       projectId: project.id,
       environmentId: 'live',
       targetId: target.id,
-      campaignResourceName: CREATE_RESULT.campaignResourceName,
+      campaignResourceName: 'campaign-1',
     });
 
-    expect(apiClient.setCampaignStatus).toHaveBeenCalledWith('999', CREATE_RESULT.campaignResourceName, 'REMOVED');
+    expect(apiClient.setObjectStatus).toHaveBeenCalledWith('campaign-1', 'DELETED');
     const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
     expect(reloaded.campaign_status).toBe('removed');
   });
 
   it('activates and rolls back activation', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Activation Org');
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor Activation Org');
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
       projectId: project.id,
@@ -142,7 +156,7 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       seededByUserId: owner.id,
     });
     const apiClient = fakeApiClient();
-    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
     await executor.executeCampaignDraftCreate({ organizationId: organization.id, projectId: project.id, environmentId: 'live', targetId: target.id, draft: DRAFT });
 
     await executor.executeCampaignActivation({
@@ -150,9 +164,9 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       projectId: project.id,
       environmentId: 'live',
       targetId: target.id,
-      campaignResourceName: CREATE_RESULT.campaignResourceName,
+      campaignResourceName: 'campaign-1',
     });
-    expect(apiClient.setCampaignStatus).toHaveBeenCalledWith('999', CREATE_RESULT.campaignResourceName, 'ENABLED');
+    expect(apiClient.setObjectStatus).toHaveBeenCalledWith('campaign-1', 'ACTIVE');
     let [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
     expect(reloaded.campaign_status).toBe('enabled');
 
@@ -161,15 +175,15 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       projectId: project.id,
       environmentId: 'live',
       targetId: target.id,
-      campaignResourceName: CREATE_RESULT.campaignResourceName,
+      campaignResourceName: 'campaign-1',
     });
-    expect(apiClient.setCampaignStatus).toHaveBeenCalledWith('999', CREATE_RESULT.campaignResourceName, 'PAUSED');
+    expect(apiClient.setObjectStatus).toHaveBeenCalledWith('campaign-1', 'PAUSED');
     [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
     expect(reloaded.campaign_status).toBe('paused');
   });
 
   it('changes and rolls back a budget on a campaign this plugin created', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Budget Org');
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor Budget Org');
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
       projectId: project.id,
@@ -181,7 +195,7 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       seededByUserId: owner.id,
     });
     const apiClient = fakeApiClient();
-    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
     await executor.executeCampaignDraftCreate({ organizationId: organization.id, projectId: project.id, environmentId: 'live', targetId: target.id, draft: DRAFT });
 
     const result = await executor.executeBudgetChange({
@@ -193,7 +207,7 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       afterDailyBudgetUsd: 50,
     });
     expect(result).toEqual({ actualDailyBudgetUsd: 50 });
-    expect(apiClient.setCampaignBudgetAmount).toHaveBeenCalledWith('999', CREATE_RESULT.campaignBudgetResourceName, 50);
+    expect(apiClient.setDailyBudgetCents).toHaveBeenCalledWith('campaign-1', 5000);
 
     await executor.rollbackBudgetChange({
       organizationId: organization.id,
@@ -203,11 +217,11 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       beforeDailyBudgetUsd: 25,
       afterDailyBudgetUsd: 50,
     });
-    expect(apiClient.setCampaignBudgetAmount).toHaveBeenCalledWith('999', CREATE_RESULT.campaignBudgetResourceName, 25);
+    expect(apiClient.setDailyBudgetCents).toHaveBeenCalledWith('campaign-1', 2500);
   });
 
-  it('throws GoogleAdsBudgetResourceUnknownError for a budget change against a target this plugin never created', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('GAds Executor No Budget Resource Org');
+  it('throws MetaAdsBudgetResourceUnknownError for a budget change against a target this plugin never created', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor No Budget Resource Org');
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
       projectId: project.id,
@@ -218,7 +232,7 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       initialDailyBudgetUsd: 100,
       seededByUserId: owner.id,
     });
-    const executor = new GoogleAdsAutomationActionExecutor(fakeApiClient(), '999');
+    const executor = new MetaAutomationActionExecutor(fakeApiClient(), '999', 'page-1');
 
     await expect(
       executor.executeBudgetChange({
@@ -229,11 +243,11 @@ describe('GoogleAdsAutomationActionExecutor', () => {
         beforeDailyBudgetUsd: 100,
         afterDailyBudgetUsd: 120,
       }),
-    ).rejects.toBeInstanceOf(GoogleAdsBudgetResourceUnknownError);
+    ).rejects.toBeInstanceOf(MetaAdsBudgetResourceUnknownError);
   });
 
-  it('throws GoogleAdsWrongPlatformCampaignDraftError for a platform: "meta" draft (KAN-73 cross-provider isolation)', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Wrong Platform Org');
+  it('throws MetaAdsWrongPlatformCampaignDraftError for a platform: "google_ads" draft (KAN-73 cross-provider isolation)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor Wrong Platform Org');
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
       projectId: project.id,
@@ -245,17 +259,22 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       seededByUserId: owner.id,
     });
     const apiClient = fakeApiClient();
-    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
-    const metaDraft: MetaCampaignDraft = {
-      platform: 'meta',
-      campaignName: 'Meta Campaign',
-      objective: 'OUTCOME_TRAFFIC',
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+    const googleDraft: GoogleAdsCampaignDraft = {
+      platform: 'google_ads',
+      campaignName: 'Google Campaign',
+      advertisingChannelType: 'SEARCH',
       dailyBudgetUsd: 25,
-      adSets: [
+      adGroups: [
         {
-          name: 'Ad Set 1',
-          targeting: { countries: ['US'], ageMin: 18, ageMax: 45 },
-          ad: { name: 'Ad 1', creative: { primaryText: 'Hello', headline: 'Hi', linkUrl: 'https://example.com' } },
+          name: 'Ad Group 1',
+          keywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+          negativeKeywords: [],
+          responsiveSearchAd: {
+            headlines: ['Buy Blue Widgets', 'Best Widgets Online', 'Widgets For Less'],
+            descriptions: ['Free shipping on all widgets.', 'Order today, ships tomorrow.'],
+            finalUrl: 'https://example.com/widgets',
+          },
         },
       ],
     };
@@ -266,9 +285,9 @@ describe('GoogleAdsAutomationActionExecutor', () => {
         projectId: project.id,
         environmentId: 'live',
         targetId: target.id,
-        draft: metaDraft,
+        draft: googleDraft,
       }),
-    ).rejects.toBeInstanceOf(GoogleAdsWrongPlatformCampaignDraftError);
-    expect(apiClient.createCampaignDraft).not.toHaveBeenCalled();
+    ).rejects.toBeInstanceOf(MetaAdsWrongPlatformCampaignDraftError);
+    expect(apiClient.createCampaign).not.toHaveBeenCalled();
   });
 });

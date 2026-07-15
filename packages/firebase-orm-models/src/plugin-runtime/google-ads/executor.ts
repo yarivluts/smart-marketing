@@ -22,6 +22,22 @@ export class GoogleAdsBudgetResourceUnknownError extends Error {
   }
 }
 
+/**
+ * A `campaign_draft_create` action reached `GoogleAdsAutomationActionExecutor`
+ * with a `platform: 'meta'` draft (KAN-73) — should never happen if
+ * `resolveAutomationActionExecutorForTarget` resolved the right executor for
+ * the target's linked credential, but this is defense in depth, not the only
+ * check: cross-provider isolation must hold even if a caller wires the wrong
+ * executor to a target directly (e.g. a future test, or a bug in the
+ * resolver).
+ */
+export class GoogleAdsWrongPlatformCampaignDraftError extends Error {
+  constructor() {
+    super('GoogleAdsAutomationActionExecutor can only execute a campaign draft with platform: "google_ads".');
+    this.name = 'GoogleAdsWrongPlatformCampaignDraftError';
+  }
+}
+
 interface TargetLookup {
   organizationId: string;
   projectId: string;
@@ -42,12 +58,15 @@ async function loadTarget(input: TargetLookup): Promise<AutomationTargetStateMod
 /**
  * The real Google Ads `AutomationActionExecutor` (KAN-72) — the seam
  * `automation-runtime/executor.ts`'s own doc comment names as what KAN-72
- * implements "for real". Resolved per-target by
- * `resolveAutomationActionExecutorForTarget` (`services/automation-executor-resolver.service.ts`)
- * whenever a target's linked connection (`ResourceAttachmentModel`) is a
- * `provider: 'google_ads'` credential; falls back to
- * `SimulatedAdAccountExecutor` for every other target, same as before this
- * story existed.
+ * (and its Meta sibling, `MetaAutomationActionExecutor`, KAN-73) implements
+ * "for real". Resolved per-target by `resolveAutomationActionExecutorForTarget`
+ * (`services/automation-executor-resolver.service.ts`) whenever a target's
+ * linked connection (`ResourceAttachmentModel`) is a `provider: 'google_ads'`
+ * credential; falls back to `SimulatedAdAccountExecutor` for every other
+ * target, same as before this story existed. `executeCampaignDraftCreate`
+ * guards `input.draft.platform === 'google_ads'` before narrowing — defense
+ * in depth so a `platform: 'meta'` draft can never reach the Google Ads API
+ * client even if the resolver ever mis-wires an executor.
  */
 export class GoogleAdsAutomationActionExecutor implements AutomationActionExecutor {
   constructor(
@@ -84,6 +103,9 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
   ): Promise<AutomationCampaignDraftCreateExecutionResult> {
     validateCampaignDraft(input.draft);
     const target = await loadTarget(input);
+    if (input.draft.platform !== 'google_ads') {
+      throw new GoogleAdsWrongPlatformCampaignDraftError();
+    }
     const result = await this.apiClient.createCampaignDraft(this.customerId, input.draft);
     target.campaign_resource_name = result.campaignResourceName;
     target.campaign_budget_resource_name = result.campaignBudgetResourceName;

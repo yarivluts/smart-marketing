@@ -6,6 +6,8 @@ import {
   AutomationTargetNotFoundError,
   GoogleAdsCredentialConfigError,
   GoogleAdsPluginNotInstalledError,
+  MetaAdsCredentialConfigError,
+  MetaPluginNotInstalledError,
   InsufficientWriteTierError,
   InvalidAutomationActionError,
   ProjectNotFoundError,
@@ -26,7 +28,9 @@ interface RouteParams {
  * inside the service call). KAN-72: resolves a real
  * `GoogleAdsAutomationActionExecutor` when the target is linked to an
  * installed Google Ads Manage connection, otherwise the simulated executor
- * every target used before this story — see `resolveAutomationActionExecutorForTarget`.
+ * every target used before this story. KAN-73: the same resolution for a
+ * `MetaAutomationActionExecutor` under the parallel Meta Manage connection
+ * condition — see `resolveAutomationActionExecutorForTarget`.
  */
 export async function POST(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, actionId } = await params;
@@ -68,6 +72,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams): Prom
     }
     if (err instanceof GoogleAdsCredentialConfigError) {
       return NextResponse.json({ error: 'google_ads_credential_not_configured', reason: err.reason }, { status: 409 });
+    }
+    if (err instanceof MetaPluginNotInstalledError) {
+      return NextResponse.json({ error: 'meta_plugin_not_installed' }, { status: 409 });
+    }
+    if (err instanceof MetaAdsCredentialConfigError) {
+      return NextResponse.json({ error: 'meta_ads_credential_not_configured', reason: err.reason }, { status: 409 });
     }
     if (err instanceof InvalidAutomationActionError) {
       return NextResponse.json({ error: 'invalid_action' }, { status: 400 });
