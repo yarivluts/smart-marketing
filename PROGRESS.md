@@ -17,6 +17,117 @@ Template for each entry:
 
 ---
 
+## 2026-07-15 — E21.3 Meta Manage plugin (KAN-73): parallel-PR collision, reviewed PR #69, merged
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. **KAN-73** (Meta
+    Manage plugin) was the only remaining sprint-ordered `todo` (per the
+    prior entry's own "next step"), so implemented it independently from
+    scratch on branch `kan-73-meta-manage-plugin`: a real Meta Graph API
+    HTTP client (JSON-body variant), `meta_ads` credential parsing, a
+    `MetaAutomationActionExecutor`, and — since Meta's audience-targeted ad
+    structure doesn't fit Google Ads' keyword-targeted `CampaignDraft` type
+    — a new additive `meta_campaign_draft_create` action type (own propose/
+    execute/rollback wiring in `automation.service.ts`, own admin form).
+    Full local verification green: `pnpm lint`/`typecheck`/`build`, plus the
+    complete `packages/firebase-orm-models` emulator suite (78 files/755
+    tests) and `apps/web`'s `isolation.test.ts`/`route-isolation-guard.test.ts`
+    (24/24) all passed.
+  - Before pushing, discovered **origin already had a `kan-73-meta-manage-plugin`
+    branch and an open PR #69** from a parallel session — the exact collision
+    KAN-72's own follow-up entry (PROGRESS.md, 2026-07-14) described and
+    handled. Per that precedent, did **not** force-push a competing branch:
+    reviewed PR #69 independently instead.
+  - PR #69 took a materially better-designed approach than my own: rather
+    than a parallel `meta_campaign_draft_create` action type, it generalized
+    `CampaignDraft` itself into a `platform`-discriminated union
+    (`GoogleAdsCampaignDraft | MetaCampaignDraft`), so KAN-71's *existing*
+    `campaign_draft_create`/`campaign_activation` action types and dispatch
+    serve both platforms with **zero changes to `automation.service.ts`** —
+    strictly less new surface area than my own diff, and a cleaner fit with
+    KAN-71's original "provider picks the executor, not the action type"
+    design intent. It also unified the admin UI into one form with a
+    platform toggle (mine duplicated a whole second form) and used a more
+    granular, arguably more realistic `MetaAdsApiClient` interface
+    (form-encoded POST bodies, matching Meta's own classic Graph API
+    convention, plus a method per object type rather than one
+    `createCampaignDraft` orchestrator).
+  - Independently verified PR #69 in a worktree at its head commit before
+    trusting it: `pnpm install`, then `build`/`typecheck`/`lint` for
+    `packages/shared`, `packages/firebase-orm-models`, and `apps/web` — all
+    green. Full `packages/firebase-orm-models` emulator suite: 771/772
+    passed, one failure (`audit-log.emulator.test.ts`'s membership
+    role-granted/removed case, a 30s timeout) — re-ran that file alone and
+    it passed in 2.6s (14/14), confirming the sandbox's own
+    extensively-documented RESOURCE_EXHAUSTED contention flake (see every
+    prior KAN-72-era entry), not a real regression. Real CI (GitHub Actions)
+    on PR #69 was already green (`lint · typecheck · test · build`,
+    ~18 min) with no open review comments. Read every new/changed file
+    (`campaign-draft.ts`'s platform dispatch, `meta-campaign-draft.ts`'s
+    validation, `meta-ads/executor.ts`, `meta-ads/api-client.ts`, the
+    resolver's new `meta_ads` branch, the unified propose form) — all
+    correctly guard against the exact `?? []` vs. `Array.isArray` untrusted-cast
+    bug class the KAN-72 follow-up (PR #68) found and fixed, explicitly
+    called out in their own doc comments. No correctness issues found.
+    Squash-merged PR #69.
+  - My own parallel implementation (branch `kan-73-meta-manage-plugin`,
+    local commit only, never pushed) is superseded and discarded — deleted
+    the local branch after merging PR #69 and hard-reset `main` to
+    `origin/main`. Updated `TASKS.md`'s KAN-73 row to `done`, crediting PR #69.
+  - Environment notes reconfirmed, not new: `packages/dbt-transform`'s
+    `pnpm build`/`test` still can't reach PyPI through this sandbox's
+    proxy/SSL (pre-existing, documented, unrelated to this change — verified
+    unaffected packages/tasks directly rather than via a monorepo-wide
+    `turbo run` that insists on building it too). Git commit signing
+    (`commit.gpgsign=true`, `gpg.format=ssh`) has no usable key configured in
+    this sandbox (`~/.ssh/commit_signing_key.pub` is a 0-byte file) — moot
+    here since the local branch was never pushed, but flagging as the same
+    class of sandbox-infrastructure gap as the git-remote HTTP 403 prior
+    entries document, in case a future run hits it on a branch it does need
+    to push.
+- **In progress (exact stopping point):** none — KAN-73 is fully delivered
+  (via PR #69), reviewed, and merged into `main`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** every remaining backlog item is now `needs-human`/`blocked-by`:
+  **KAN-72/73** (both now done) no longer gate anything; the only open
+  `todo`/`in-progress` rows are **KAN-18** (GCP/Firebase provisioning,
+  `needs-human`), **KAN-19** (partially done, preview/staging deploy needs
+  KAN-18), **KAN-20** (reconcile 3 unmerged observability PRs — #2/#3/#5,
+  still open/unchanged), and **KAN-43**/human-action-queue items. A future
+  run should re-check whether KAN-18/KAN-43 have landed, or pick up the
+  KAN-20 reconciliation if explicitly asked to. Also worth a human's
+  attention: this run and its predecessor both independently discovered
+  parallel-session collisions on the *same* branch name for consecutive
+  stories (KAN-72's PR #67, KAN-73's PR #69) — if multiple scheduled runs
+  are firing concurrently often enough to keep colliding, tightening the
+  cadence (per the bootstrap entry's own "every 1-2 hours, not more
+  frequent" recommendation) would cut down on this wasted duplicate work.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API
+    review (LONG LEAD, still outstanding). Both KAN-72's and KAN-73's
+    plugin code are now real and tested against fake clients; a human
+    obtaining real Google Ads + Meta test accounts/dev tokens would let a
+    future run close the "E2E on a real test account" half of both ACs, and
+    unblock KAN-50/KAN-51 (Google/Meta *read*-side plugins, currently
+    `blocked-by` KAN-43).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still
+    outstanding).
+  - **KAN-20** — reconcile the three unmerged observability-baseline PRs
+    (#2/#3/#5) — still outstanding.
+  - Delete the dead `kan-72-google-ads-manage-plugin`/`kan-72-followup-fixes`
+    branches (still flagged from the prior entry) — this sandbox's git
+    remote rejects branch deletion with an HTTP 403, a human with direct
+    repo access can clean these up alongside the now also-dead, merged
+    `kan-73-meta-manage-plugin` branch.
+  - Consider setting up commit-signing key material for this sandbox
+    (`~/.ssh/commit_signing_key.pub` is currently empty) if verified
+    commits from scheduled runs matter — not blocking today since every
+    push so far has gone through the sandbox's own separate git-remote HTTP
+    403 workaround path (squash-merge via the GitHub API, not a direct
+    `git push` of a signed commit to `main`).
+
+---
+
 ## 2026-07-14 — KAN-72 follow-up review: negativeKeywords crash fix (PR #68)
 
 - **Last completed:**
