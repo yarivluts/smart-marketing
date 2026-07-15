@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-07-15 — Independent re-verification of KAN-73 (PR #69, already merged by a parallel run)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule and picked KAN-73 (Meta Manage plugin) as
+    the next unblocked story, same conclusion the parallel session that actually delivered it also
+    reached. Found **PR #69** already open on `kan-73-meta-manage-plugin` (created earlier the same
+    day). Rather than duplicate the implementation, independently verified it in a worktree:
+    - `pnpm lint`/`typecheck`/`build` green across all packages (needed the same two known sandbox
+      workarounds prior entries document: deleting a stale `packages/dbt-transform/.venv` so it
+      re-provisions cleanly through the proxy's CA bundle instead of hitting a misleading
+      self-signed-cert error, and `curl`-fetching the Firestore emulator JAR directly into
+      `~/.cache/firebase/emulators/` since `firebase-tools`' own downloader flaked the same
+      documented way it always does in this sandbox).
+    - `packages/firebase-orm-models`'s full emulator suite: 772/772 tests green (78/78 files).
+    - Full `pnpm test`: two apparent e2e failures (`orgs.spec.ts`'s invite test, `tv-pairing.spec.ts`)
+      turned out to be an artifact of my own first re-run attempt (ran `playwright test` directly
+      without the `firebase emulators:exec ... auth,firestore` wrapper the `test` script uses, so
+      every auth-dependent flow had no emulator to sign up against) — re-ran correctly with the
+      emulators up and both passed. The one genuine remaining flake,
+      `e2e/boards.spec.ts`'s KAN-60 "layout survives a reload" case, is the exact same pre-existing,
+      already-documented-in-the-PR-description flake (reproduces identically on a clean `main`
+      checkout, unrelated to any automation/ad-platform code).
+    - Dispatched an independent review subagent against the full diff (`git diff
+      origin/main...origin/kan-73-meta-manage-plugin`), focused on the specific bug class a KAN-72
+      follow-up (PR #68) had found and fixed (`?? []` vs `Array.isArray` on untrusted array fields),
+      cross-provider isolation, and executor rollback ordering. Also read the key files directly
+      myself (`meta-campaign-draft.ts`, `campaign-draft.ts`'s dispatch, both executors, the
+      resolver, the API client, credential-secret parsing, en/he translations). Found no bugs: every
+      nested Meta validator uses `isRecord`/`Array.isArray` guards consistently (no bare `?? []`
+      anywhere); `loadTarget` is called before any live mutation in every executor method on both
+      the Google and Meta sides; cross-provider isolation holds by construction (the resolver
+      branches once on `credential.provider` before either branch runs, plus a defense-in-depth
+      `platform` discriminant check newly added symmetrically to *both* executors); all new UI
+      strings go through `next-intl` with real en/he translations; no raw Firebase SDK usage
+      anywhere in the diff. One pre-existing (not newly introduced) quality gap noted but not
+      fixed: `apps/web/lib/orgs/automation-view.ts`'s `formatDiffValue` composes a diff-summary
+      string with hardcoded English words ("Meta", "ad set(s)", and the pre-existing "ad group(s)"
+      for Google) outside `next-intl` — not caught by the `react/jsx-no-literals` lint rule since
+      it's a non-JSX `.ts` file. Worth a small follow-up (move the pluralized summary into a
+      translation key with ICU params) but not a regression from this PR and not a blocker.
+    - Real GitHub Actions CI (lint/typecheck/test/build) came back green (~18.5 min) independently
+      of my local run.
+  - By the time all of the above finished, the PR had already been reviewed and merged by a
+    parallel session (commit `4a973be`, PR #69 merged at 12:00:25Z — my own session's container was
+    restarted mid-run, losing a chunk of wall-clock time to the parallel session). `TASKS.md`'s
+    KAN-73 row was already updated to `done` by that session. No further action needed — this
+    entry exists only to record that a second, fully independent verification pass (different
+    review methodology, same diff) reached the same "no bugs, safe to merge" conclusion, giving
+    higher confidence in the merge than either pass alone.
+- **In progress (exact stopping point):** none — KAN-73 is fully delivered, tested, independently
+  double-reviewed, and merged.
+- **Blocked + why:** unchanged from the prior two entries — the entire remaining backlog is either
+  `done`, gated on KAN-18/KAN-43 (both `needs-human`), or is KAN-20's three-way duplicate-PR
+  reconciliation (needs a human decision, not new information). Re-checked `TASKS.md` after this
+  run's work landed and confirmed nothing new became unblocked.
+- **Next step:** unchanged — a future run should re-check whether KAN-18 or KAN-43 have landed, or
+  pick up the KAN-20 reconciliation once a human explicitly asks for it.
+- **Waiting on human:** unchanged from the prior entry — KAN-43 (Google Ads dev token / Meta
+  Marketing API review), KAN-18 (GCP/Firebase provisioning), KAN-20 (pick one of PR #2/#3/#5 and
+  close the other two), and the long-standing stale-branch cleanup this sandbox's git remote still
+  can't do itself.
+
 ## 2026-07-15 — No-unblocked-story re-check (run 2)
 
 - **Last completed:**
