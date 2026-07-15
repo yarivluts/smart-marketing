@@ -17,6 +17,42 @@ Template for each entry:
 
 ---
 
+## 2026-07-15 — No-unblocked-story re-check (run 4)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Re-verified `TASKS.md` (KAN-17..KAN-78):
+    unchanged — everything is `done` except **KAN-18** (`needs-human`), **KAN-19**/**KAN-20**
+    (`in-progress`, gated on the same two human decisions), **KAN-43** (`needs-human`), and
+    **KAN-50**/**KAN-51** (`blocked-by` KAN-43). No new `todo` row.
+  - Checked GitHub directly: `origin/main` is at `e0f5d67` (only PROGRESS.md-journal commits since
+    KAN-73/PR #69 merged — no new code). Open PRs are still exactly **#2, #3, #5**, the same
+    three-way KAN-20 duplicate first flagged 2026-07-04; confirmed by re-reading all three PR
+    bodies directly via the GitHub API rather than trusting the file — same branches, same SHAs
+    referenced in the last entry, no new commits pushed to any of them.
+  - Checked the sandbox for KAN-18 infra signals (`FIREBASE_*`/`GOOGLE_APPLICATION_CREDENTIALS`/
+    `SENTRY_DSN`/`OTEL_EXPORTER_OTLP_ENDPOINT` env vars, `.env*` files) — none present, same as
+    every prior check. KAN-43 has no in-run-verifiable signal; treating as still outstanding.
+  - No code changes this run. Not sending a user notification: this is the fourth consecutive run
+    reaching the identical conclusion with no new information — the human has already been notified
+    of the KAN-20 three-way duplicate and the KAN-18/KAN-43 blockers in prior entries, and nothing
+    has changed since.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** unchanged — the entire remaining backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision, not
+  new information).
+- **Next step:** unchanged — a future run should re-check whether KAN-18 or KAN-43 have landed
+  (would unblock KAN-19's staging-deploy half, or KAN-50/KAN-51), or pick up the KAN-20
+  reconciliation the moment a human explicitly asks for it. Given four consecutive idle runs, a
+  human may want to slow the scheduled-run cadence until KAN-18/KAN-43/KAN-20 are resolved, since
+  there is no further code work available until then.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Delete the long list of stale merged/dead branches on GitHub — this sandbox's git remote still
+    rejects branch deletion (documented in every prior entry).
+
 ## 2026-07-15 — No-unblocked-story re-check (run 3)
 
 - **Last completed:**
