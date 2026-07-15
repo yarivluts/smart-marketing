@@ -152,6 +152,7 @@ export * from './services/automation-kill-switch.service';
 export * from './services/automation.service';
 export * from './automation-runtime';
 export * from './services/google-ads-plugin.service';
+export * from './services/meta-ads-plugin.service';
 export * from './services/automation-executor-resolver.service';
 export * from './services/mcp-oauth.service';
 export * from './services/mcp-tools.service';

@@ -1,11 +1,8 @@
-import type { CampaignDraft, CampaignDraftAdGroup, CampaignDraftKeyword } from './executor';
+import type { CampaignDraft, CampaignDraftAdGroup, CampaignDraftKeyword, GoogleAdsCampaignDraft, MetaCampaignDraft } from './executor';
+import { InvalidCampaignDraftError } from './invalid-campaign-draft-error';
+import { validateMetaCampaignDraft } from './meta-campaign-draft';
 
-export class InvalidCampaignDraftError extends Error {
-  constructor(public readonly reasons: readonly string[]) {
-    super(`Invalid campaign draft: ${reasons.join('; ')}`);
-    this.name = 'InvalidCampaignDraftError';
-  }
-}
+export { InvalidCampaignDraftError };
 
 const KEYWORD_MATCH_TYPES = ['EXACT', 'PHRASE', 'BROAD'] as const;
 const MAX_HEADLINE_LENGTH = 30;
@@ -15,7 +12,7 @@ const MAX_HEADLINES = 15;
 const MIN_DESCRIPTIONS = 2;
 const MAX_DESCRIPTIONS = 4;
 
-function isHttpUrl(value: string): boolean {
+export function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
     return url.protocol === 'http:' || url.protocol === 'https:';
@@ -24,7 +21,7 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -86,26 +83,36 @@ function validateAdGroup(adGroup: CampaignDraftAdGroup, index: number, reasons: 
     adGroup.keywords.forEach((keyword, keywordIndex) => validateKeyword(keyword, `${fieldPath}.keywords[${keywordIndex}]`, reasons));
   }
 
+  // `negativeKeywords ?? []` would only substitute on `null`/`undefined` — a
+  // non-array value (e.g. a string) in an untrusted request body must still
+  // be tolerated here, the exact bug class a KAN-72 follow-up run found and
+  // fixed for this same field (see PROGRESS.md).
   if (adGroup.negativeKeywords !== undefined && !Array.isArray(adGroup.negativeKeywords)) {
     reasons.push(`${fieldPath}.negativeKeywords must be an array when present.`);
   } else {
-    (adGroup.negativeKeywords ?? []).forEach((keyword, keywordIndex) =>
+    (Array.isArray(adGroup.negativeKeywords) ? adGroup.negativeKeywords : []).forEach((keyword, keywordIndex) =>
       validateKeyword(keyword, `${fieldPath}.negativeKeywords[${keywordIndex}]`, reasons),
     );
   }
 }
 
 /**
- * Validates a {@link CampaignDraft} against Google Ads' own real-world Search
- * campaign limits (RSA headline/description counts and lengths, keyword text
- * length) — collects every violation before throwing (the same "report every
- * reason at once" posture `parsePluginManifest`/`validateFields` use) rather
- * than failing on the first, so a caller fixing a rejected draft doesn't have
- * to resubmit once per mistake. Performance Max isn't supported yet (see
- * `CampaignDraft`'s own doc comment), so `advertisingChannelType` is
- * currently typed to only ever be `'SEARCH'`.
+ * Validates a {@link GoogleAdsCampaignDraft} against Google Ads' own
+ * real-world Search campaign limits (RSA headline/description counts and
+ * lengths, keyword text length) — collects every violation before throwing
+ * (the same "report every reason at once" posture `parsePluginManifest`/
+ * `validateFields` use) rather than failing on the first, so a caller fixing
+ * a rejected draft doesn't have to resubmit once per mistake. Performance Max
+ * isn't supported yet (see `GoogleAdsCampaignDraft`'s own doc comment), so
+ * `advertisingChannelType` is currently typed to only ever be `'SEARCH'`.
+ * Tolerates a malformed/untrusted-cast request body at every nesting level —
+ * see `validateAdGroup`'s own doc comment.
  */
-export function validateCampaignDraft(draft: CampaignDraft): void {
+export function validateGoogleAdsCampaignDraft(draft: GoogleAdsCampaignDraft): void {
+  if (!isRecord(draft)) {
+    throw new InvalidCampaignDraftError(['draft must be an object.']);
+  }
+
   const reasons: string[] = [];
 
   if (typeof draft.campaignName !== 'string' || draft.campaignName.trim().length === 0) {
@@ -126,4 +133,32 @@ export function validateCampaignDraft(draft: CampaignDraft): void {
   if (reasons.length > 0) {
     throw new InvalidCampaignDraftError(reasons);
   }
+}
+
+/**
+ * Validates a {@link CampaignDraft} by dispatching on its `platform`
+ * discriminant (KAN-73) — `'google_ads'` (or a missing `platform`, which
+ * defaults to `'google_ads'` for backward compatibility with callers that
+ * predate this field) goes to {@link validateGoogleAdsCampaignDraft};
+ * `'meta'` goes to `validateMetaCampaignDraft` (`meta-campaign-draft.ts`).
+ * `draft` is typed as the validated union, but at runtime this is validating
+ * an arbitrary caller-supplied JSON body cast to that type (the
+ * `campaign-drafts` route's `draft as CampaignDraft`) — a non-object `draft`
+ * or an unrecognized `platform` value reports a clean `InvalidCampaignDraftError`
+ * (-> 400) rather than throwing an unhandled exception (-> 500), the same bug
+ * class a KAN-72 follow-up run found and fixed for `negativeKeywords`.
+ */
+export function validateCampaignDraft(draft: CampaignDraft): void {
+  if (!isRecord(draft)) {
+    throw new InvalidCampaignDraftError(['draft must be an object.']);
+  }
+  const platform = (draft as { platform?: unknown }).platform;
+  if (platform === 'meta') {
+    validateMetaCampaignDraft(draft as unknown as MetaCampaignDraft);
+    return;
+  }
+  if (platform !== undefined && platform !== 'google_ads') {
+    throw new InvalidCampaignDraftError([`platform must be "google_ads" or "meta" (got ${JSON.stringify(platform)}).`]);
+  }
+  validateGoogleAdsCampaignDraft(draft as unknown as GoogleAdsCampaignDraft);
 }

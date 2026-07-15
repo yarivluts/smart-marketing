@@ -1,4 +1,4 @@
-import type { CampaignDraft } from '../../automation-runtime';
+import type { GoogleAdsCampaignDraft } from '../../automation-runtime';
 
 export class GoogleAdsApiError extends Error {
   constructor(
@@ -38,7 +38,7 @@ export interface GoogleAdsCreateCampaignDraftResult {
  */
 export interface GoogleAdsApiClient {
   /** Creates a whole paused Search campaign (budget + campaign + ad group(s) + RSA ad(s) + keywords/negatives) in one call — see `GoogleAdsHttpApiClient`'s own doc comment for why this isn't a single atomic Google Ads mutate request. */
-  createCampaignDraft(customerId: string, draft: CampaignDraft): Promise<GoogleAdsCreateCampaignDraftResult>;
+  createCampaignDraft(customerId: string, draft: GoogleAdsCampaignDraft): Promise<GoogleAdsCreateCampaignDraftResult>;
   setCampaignBudgetAmount(customerId: string, campaignBudgetResourceName: string, dailyBudgetUsd: number): Promise<void>;
   setCampaignStatus(customerId: string, campaignResourceName: string, status: GoogleAdsCampaignStatus): Promise<void>;
 }
@@ -127,7 +127,7 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
     return (await response.json()) as MutateResult;
   }
 
-  async createCampaignDraft(customerId: string, draft: CampaignDraft): Promise<GoogleAdsCreateCampaignDraftResult> {
+  async createCampaignDraft(customerId: string, draft: GoogleAdsCampaignDraft): Promise<GoogleAdsCreateCampaignDraftResult> {
     const budgetResult = await this.mutate(customerId, 'campaignBudgets', [
       { create: { name: `${draft.campaignName} Budget`, amountMicros: usdToMicros(draft.dailyBudgetUsd), deliveryMethod: 'STANDARD' } },
     ]);

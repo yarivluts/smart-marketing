@@ -27,14 +27,23 @@ export type AutomationActionStatus = (typeof AUTOMATION_ACTION_STATUSES)[number]
 
 /**
  * `budget_change` is KAN-71's own "simulated budget change" example.
- * `campaign_draft_create` (KAN-72) proposes creating a brand-new paused
- * Search campaign (campaign + ad group + RSA ad + keywords/negatives) —
+ * `campaign_draft_create` proposes creating a brand-new paused campaign —
  * `before`/`after` for this type are `{}`/`{ campaignDraft: CampaignDraft }`.
- * `campaign_activation` (KAN-72) flips an already-created campaign from
- * paused to enabled — `before`/`after` are `{ status: 'paused' }`/
- * `{ status: 'enabled' }`. Both are Manage-tier-only (see
- * `automation.service.ts`'s `resolveWriteTierViolation`), unlike
- * `budget_change` which Optimize already permits.
+ * `campaign_activation` flips an already-created campaign from paused to
+ * enabled — `before`/`after` are `{ status: 'paused' }`/`{ status: 'enabled' }`.
+ * Both are Manage-tier-only (see `automation.service.ts`'s
+ * `resolveWriteTierViolation`), unlike `budget_change` which Optimize
+ * already permits.
+ *
+ * These three action types are provider-agnostic by design — `action_type`
+ * never says "google_ads" or "meta". KAN-72 (`GoogleAdsAutomationActionExecutor`)
+ * drives all three for a target linked to a `provider: 'google_ads'`
+ * credential; KAN-73 (`MetaAutomationActionExecutor`) drives the same three
+ * for a target linked to a `provider: 'meta_ads'` credential — see
+ * `CampaignDraft`'s own `platform`-discriminated-union doc comment
+ * (`automation-runtime/executor.ts`) for how `campaign_draft_create` stays
+ * one action type across both platforms' structurally different campaign
+ * shapes.
  */
 export const AUTOMATION_ACTION_TYPES = ['budget_change', 'campaign_draft_create', 'campaign_activation'] as const;
 export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];

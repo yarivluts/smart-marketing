@@ -7,3 +7,4 @@ export * from './ga4';
 export * from './saas-metric-pack';
 export * from './engagement-pack';
 export * from './google-ads';
+export * from './meta-ads';

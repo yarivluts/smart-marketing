@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CampaignDraft } from '../../automation-runtime';
+import type { GoogleAdsCampaignDraft } from '../../automation-runtime';
 import { GoogleAdsApiError, GoogleAdsHttpApiClient, type GoogleAdsApiClientOptions } from './api-client';
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
@@ -16,7 +16,8 @@ const OPTIONS: GoogleAdsApiClientOptions = {
 
 const TOKEN_RESPONSE = { access_token: 'access-token-1', expires_in: 3600 };
 
-const DRAFT: CampaignDraft = {
+const DRAFT: GoogleAdsCampaignDraft = {
+  platform: 'google_ads',
   campaignName: 'Winning Themes',
   advertisingChannelType: 'SEARCH',
   dailyBudgetUsd: 25,

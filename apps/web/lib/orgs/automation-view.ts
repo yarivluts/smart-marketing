@@ -91,14 +91,29 @@ export interface AutomationActionDiffEntry {
   after: unknown;
 }
 
-/** A `campaignDraft` diff value is a whole {@link CampaignDraft} object — `String(...)` on it would render `[object Object]`, so it gets a compact human summary instead. Every other diff field's value is a plain string/number/undefined, which `String(...)` already renders sensibly. */
+/**
+ * A `campaignDraft` diff value is a whole {@link CampaignDraft} object —
+ * `String(...)` on it would render `[object Object]`, so it gets a compact
+ * human summary instead. Every other diff field's value is a plain
+ * string/number/undefined, which `String(...)` already renders sensibly.
+ * `CampaignDraft` is a `platform`-discriminated union (KAN-73): a Google Ads
+ * draft's `adGroups` is `undefined` on a Meta draft (and vice versa for
+ * `adSets`), which would silently degrade to "0 ad group(s)" for a Meta
+ * draft if left unbranched — so this branches on `platform` explicitly
+ * rather than relying on that degradation.
+ */
 function formatDiffValue(key: string, value: unknown): unknown {
   if (key !== 'campaignDraft' || typeof value !== 'object' || value === null) {
     return value;
   }
-  const draft = value as { campaignName?: unknown; dailyBudgetUsd?: unknown; adGroups?: unknown[] };
+  const draft = value as { campaignName?: unknown; dailyBudgetUsd?: unknown; platform?: unknown; adGroups?: unknown[]; adSets?: unknown[] };
+  const nameAndBudget = `"${String(draft.campaignName)}" ($${String(draft.dailyBudgetUsd)}/day`;
+  if (draft.platform === 'meta') {
+    const adSetCount = Array.isArray(draft.adSets) ? draft.adSets.length : 0;
+    return `${nameAndBudget}, Meta, ${adSetCount} ad set(s))`;
+  }
   const adGroupCount = Array.isArray(draft.adGroups) ? draft.adGroups.length : 0;
-  return `"${String(draft.campaignName)}" ($${String(draft.dailyBudgetUsd)}/day, ${adGroupCount} ad group(s))`;
+  return `${nameAndBudget}, ${adGroupCount} ad group(s))`;
 }
 
 function toDiffEntries(before: Record<string, unknown>, after: Record<string, unknown>): AutomationActionDiffEntry[] {

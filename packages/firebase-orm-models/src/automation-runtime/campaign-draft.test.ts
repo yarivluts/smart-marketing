@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { CampaignDraft } from './executor';
+import type { CampaignDraft, GoogleAdsCampaignDraft } from './executor';
 import { InvalidCampaignDraftError, validateCampaignDraft } from './campaign-draft';
 
-function validDraft(overrides: Partial<CampaignDraft> = {}): CampaignDraft {
+function validDraft(overrides: Partial<GoogleAdsCampaignDraft> = {}): GoogleAdsCampaignDraft {
   return {
+    platform: 'google_ads',
     campaignName: 'Winning Themes',
     advertisingChannelType: 'SEARCH',
     dailyBudgetUsd: 25,
@@ -38,7 +39,7 @@ describe('validateCampaignDraft', () => {
 
   it('rejects Performance Max (not supported yet)', () => {
     expect(() =>
-      validateCampaignDraft(validDraft({ advertisingChannelType: 'PERFORMANCE_MAX' as CampaignDraft['advertisingChannelType'] })),
+      validateCampaignDraft(validDraft({ advertisingChannelType: 'PERFORMANCE_MAX' as GoogleAdsCampaignDraft['advertisingChannelType'] })),
     ).toThrow(InvalidCampaignDraftError);
   });
 
@@ -78,7 +79,7 @@ describe('validateCampaignDraft', () => {
 
   it('rejects an unknown keyword match type', () => {
     const draft = validDraft();
-    draft.adGroups[0].keywords[0] = { text: 'blue widgets', matchType: 'FUZZY' as CampaignDraft['adGroups'][0]['keywords'][0]['matchType'] };
+    draft.adGroups[0].keywords[0] = { text: 'blue widgets', matchType: 'FUZZY' as GoogleAdsCampaignDraft['adGroups'][0]['keywords'][0]['matchType'] };
     expect(() => validateCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
   });
 
@@ -91,13 +92,16 @@ describe('validateCampaignDraft', () => {
   it('rejects a malformed ad group entry (e.g. from an untrusted request body) without throwing an unhandled error', () => {
     const draft = validDraft();
     // Simulates the campaign-drafts route's unsafe `draft as CampaignDraft` cast of an arbitrary JSON body.
-    draft.adGroups = [null as unknown as CampaignDraft['adGroups'][0], 'not-an-object' as unknown as CampaignDraft['adGroups'][0]];
+    draft.adGroups = [
+      null as unknown as GoogleAdsCampaignDraft['adGroups'][0],
+      'not-an-object' as unknown as GoogleAdsCampaignDraft['adGroups'][0],
+    ];
     expect(() => validateCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
   });
 
   it('rejects a malformed keyword entry without throwing an unhandled error', () => {
     const draft = validDraft();
-    draft.adGroups[0].keywords = [null as unknown as CampaignDraft['adGroups'][0]['keywords'][0]];
+    draft.adGroups[0].keywords = [null as unknown as GoogleAdsCampaignDraft['adGroups'][0]['keywords'][0]];
     expect(() => validateCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
   });
 
@@ -123,5 +127,36 @@ describe('validateCampaignDraft', () => {
       const reasons = (error as InvalidCampaignDraftError).reasons;
       expect(reasons.length).toBeGreaterThanOrEqual(2);
     }
+  });
+
+  describe('platform dispatch (KAN-73)', () => {
+    it('defaults a missing platform field to google_ads, for backward compatibility', () => {
+      const draft = validDraft();
+      delete (draft as Partial<GoogleAdsCampaignDraft>).platform;
+      expect(() => validateCampaignDraft(draft)).not.toThrow();
+    });
+
+    it('rejects an unrecognized platform value without throwing an unhandled error', () => {
+      const draft = { ...validDraft(), platform: 'tiktok' } as unknown as CampaignDraft;
+      expect(() => validateCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
+    });
+
+    it('rejects a non-object draft without throwing an unhandled error', () => {
+      expect(() => validateCampaignDraft(null as unknown as CampaignDraft)).toThrow(InvalidCampaignDraftError);
+      expect(() => validateCampaignDraft('not-an-object' as unknown as CampaignDraft)).toThrow(InvalidCampaignDraftError);
+      expect(() => validateCampaignDraft([] as unknown as CampaignDraft)).toThrow(InvalidCampaignDraftError);
+    });
+
+    it('dispatches a platform: "meta" draft to the Meta validator', () => {
+      const metaDraft: CampaignDraft = {
+        platform: 'meta',
+        campaignName: 'Meta Campaign',
+        objective: 'OUTCOME_TRAFFIC',
+        dailyBudgetUsd: 10,
+        adSets: [],
+      };
+      // adSets: [] is invalid for Meta (mirrors "adGroups must have at least one"), proving dispatch actually happened.
+      expect(() => validateCampaignDraft(metaDraft)).toThrow(InvalidCampaignDraftError);
+    });
   });
 });

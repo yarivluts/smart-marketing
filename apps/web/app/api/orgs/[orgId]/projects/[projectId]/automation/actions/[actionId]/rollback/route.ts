@@ -5,6 +5,8 @@ import {
   AutomationTargetNotFoundError,
   GoogleAdsCredentialConfigError,
   GoogleAdsPluginNotInstalledError,
+  MetaAdsCredentialConfigError,
+  MetaPluginNotInstalledError,
   InvalidAutomationActionError,
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
@@ -48,6 +50,12 @@ export async function POST(_request: NextRequest, { params }: RouteParams): Prom
     }
     if (err instanceof GoogleAdsCredentialConfigError) {
       return NextResponse.json({ error: 'google_ads_credential_not_configured', reason: err.reason }, { status: 409 });
+    }
+    if (err instanceof MetaPluginNotInstalledError) {
+      return NextResponse.json({ error: 'meta_plugin_not_installed' }, { status: 409 });
+    }
+    if (err instanceof MetaAdsCredentialConfigError) {
+      return NextResponse.json({ error: 'meta_ads_credential_not_configured', reason: err.reason }, { status: 409 });
     }
     if (err instanceof InvalidAutomationActionError) {
       return NextResponse.json({ error: 'invalid_action' }, { status: 400 });
