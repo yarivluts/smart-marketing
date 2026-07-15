@@ -17,6 +17,38 @@ Template for each entry:
 
 ---
 
+## 2026-07-15 — No-unblocked-story re-check (run 5)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Re-verified `TASKS.md` (KAN-17..KAN-78):
+    unchanged — everything is `done` except **KAN-18** (`needs-human`), **KAN-19**/**KAN-20**
+    (`in-progress`, gated on the same two human decisions), **KAN-43** (`needs-human`), and
+    **KAN-50**/**KAN-51** (`blocked-by` KAN-43). Confirmed with a direct grep for `| todo |` rows:
+    none exist.
+  - Checked GitHub directly: local `HEAD` matched `origin/main` at `c806cb7` already (only
+    PROGRESS.md-journal commits since KAN-73/PR #69 merged — no new code). Open PRs are still
+    exactly **#2, #3, #5**, same branches/SHAs as every prior check back to 2026-07-04 — no new
+    commits pushed to any of them since.
+  - No code changes this run. Not sending a user notification: this is the fifth consecutive run
+    reaching the identical conclusion with no new information (same 3 open PRs, same two
+    `needs-human` blockers) — nothing has changed since the last entry.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** unchanged — the entire remaining backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision, not
+  new information).
+- **Next step:** unchanged — a future run should re-check whether KAN-18 or KAN-43 have landed
+  (would unblock KAN-19's staging-deploy half, or KAN-50/KAN-51), or pick up the KAN-20
+  reconciliation the moment a human explicitly asks for it. Given five consecutive idle runs, a
+  human likely wants to slow the scheduled-run cadence (or pause it) until KAN-18/KAN-43/KAN-20 are
+  resolved, since there is no further code work available until then.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Delete the long list of stale merged/dead branches on GitHub — this sandbox's git remote still
+    rejects branch deletion (documented in every prior entry).
+
 ## 2026-07-15 — No-unblocked-story re-check (run 4)
 
 - **Last completed:**
