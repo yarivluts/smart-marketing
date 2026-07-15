@@ -17,6 +17,39 @@ Template for each entry:
 
 ---
 
+## 2026-07-15 — No-unblocked-story re-check (run 2)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule and re-verified the prior run's own
+    conclusion that every remaining backlog row is `done`, `needs-human`, or `blocked-by` an
+    unfinished story — nothing has changed since the last entry.
+  - Checked GitHub directly rather than trusting the file alone: `main` is at `4a973be` (KAN-73
+    merged), and the only open PRs are still **#2, #3, #5** — the same three-way duplicate KAN-20
+    (observability baseline) implementations flagged in every prior entry since 2026-07-04. No new
+    PRs, no new branches with unmerged work beyond the already-documented stale branch list.
+  - Checked the sandbox environment for any sign **KAN-18** (GCP/Firebase provisioning) had
+    landed — no `FIREBASE_*`/`GOOGLE_APPLICATION_CREDENTIALS`/project-id env vars, no `.env` files.
+    Still `needs-human`, unresolved. **KAN-43** (Google Ads dev token / Meta Marketing API
+    applications) has no way to verify from in-run; treating as still outstanding per `TASKS.md`.
+  - Left **KAN-20** untouched again: reconciling 3 independent implementations (raw OTel SDK vs.
+    `@sentry/nestjs`, api-only vs. api+web scope) is a design judgment call, not a mechanical "pick
+    the next task" — every prior run reached the same conclusion and explicitly deferred it to a
+    human sign-off. Re-litigating that call every run without new information would just churn.
+  - No code changes this run — nothing unblocked to implement.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** the entire actionable backlog is either delivered, gated on KAN-18/KAN-43
+  (both `needs-human`), or is KAN-20's reconciliation (needs a human decision, not new information).
+- **Next step:** unchanged from the prior entry — a future run should re-check whether KAN-18 or
+  KAN-43 have landed (would unblock KAN-19's staging deploy half, or KAN-50/KAN-51), or pick up the
+  KAN-20 reconciliation the moment a human is explicitly told to do it.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Delete the long list of stale merged/dead branches on GitHub — this sandbox's git remote still
+    rejects branch deletion (documented in every prior entry).
+
 ## 2026-07-15 — E21.3 Meta Manage plugin (KAN-73): parallel-PR collision, reviewed PR #69, merged
 
 - **Last completed:**
