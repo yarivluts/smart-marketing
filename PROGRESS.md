@@ -17,6 +17,42 @@ Template for each entry:
 
 ---
 
+## 2026-07-16 — No-unblocked-story re-check (run 13)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Re-verified `TASKS.md` (KAN-17..KAN-78):
+    unchanged — everything is `done` except **KAN-18** (`needs-human`), **KAN-19**/**KAN-20**
+    (`in-progress`, gated on the same two human decisions), **KAN-43** (`needs-human`), and
+    **KAN-50**/**KAN-51** (`blocked-by` KAN-43). No `todo` row exists.
+  - Checked GitHub directly via the MCP `github` tools: open PRs are still exactly **#2, #3, #5**,
+    same head SHAs (`b741bf5`, `f6a18c0`, `40a7c30`) and same `created_at`/`updated_at` timestamps as
+    every prior check back to 2026-07-04 (12+ days, zero new commits pushed to any of them).
+  - Checked the sandbox for KAN-18 infra signals (`FIREBASE_*`/`GOOGLE_APPLICATION_CREDENTIALS`/
+    `SENTRY_DSN`/`OTEL_EXPORTER_OTLP_ENDPOINT`/`GCP`/`BIGQUERY` env vars) — none present, same as every
+    prior check. KAN-43 has no in-run-verifiable signal; treating as still outstanding.
+  - No code changes this run. Not sending a user notification: this is the thirteenth consecutive run
+    reaching the identical conclusion (same 3 open PRs, same two `needs-human` blockers) with zero new
+    information since run 6's bundled notification — a repeat would just be noise, and runs 9-12
+    already recommended slowing the cadence without a change, so repeating that recommendation again
+    would itself be more noise.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** unchanged — the entire remaining backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision, not new
+  information).
+- **Next step:** unchanged — a future run should re-check whether KAN-18 or KAN-43 have landed (would
+  unblock KAN-19's staging-deploy half, or KAN-50/KAN-51), or pick up the KAN-20 reconciliation the
+  moment a human explicitly asks for it. Only notify again once something has actually changed (a PR
+  update, an infra signal, or a human decision) rather than on every re-check.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding, 12+ days since first flagged).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding, 12+
+    days since first flagged).
+  - The scheduled-run cadence has now produced thirteen consecutive no-op runs. Recommend pausing the
+    routine (or widening its interval) until KAN-18, KAN-43, or the KAN-20 reconciliation decision
+    actually moves — this note won't repeat again unless something changes.
+
 ## 2026-07-16 — No-unblocked-story re-check (run 12)
 
 - **Last completed:**
