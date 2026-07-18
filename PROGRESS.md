@@ -17,6 +17,84 @@ Template for each entry:
 
 ---
 
+## 2026-07-18 — Production hotfix triage: PR #70 (KAN-20/backlog still all done/blocked, run 26)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` backlog is unchanged from run
+    25: everything `done` except **KAN-18** (`needs-human`), **KAN-19**/**KAN-20** (`in-progress`),
+    **KAN-43** (`needs-human`), **KAN-50**/**KAN-51** (`blocked-by` KAN-43). No `todo` row.
+  - Checking GitHub PRs (not just the 3 stale KAN-20 ones runs 6-25 tracked) surfaced something
+    new: **PR #70**, opened ~4h before this run by the repo owner (co-authored by a separate Claude
+    Opus session), titled "Harden arbel admin-query patch: globalThis hook, mid-file hunks". Its
+    description explains **a live production incident**: PR #60 (merged 2026-07-13, this session's
+    own prior work) patched `@arbel/firebase-orm`'s admin-SDK query functions, but that patch was
+    silently dropped by a cold Docker/webpack build on Cloud Run (`exports.X =` got tree-shaken,
+    and a separate EOF-append hunk was silently dropped by pnpm's patch-apply from a file with no
+    trailing newline) — crashing every real deploy with `__setupAdminSDKQueryCompatibility is not a
+    function`. PR #70 reworks the patch to register the setup function on
+    `globalThis.__arbelOrmInternals` (a bundler-proof side effect) instead of a plain export, and
+    also fixes a second real bug the harder repro surfaced: the admin shim's `collectionGroup()`
+    only accepted the admin SDK's one-arg call shape, but `getFirestoreQuery` calls it with the
+    client SDK's two-arg shape `(firestore, collectionId)` — crashing collection-group queries (e.g.
+    `listMembershipsForUser`, used by `/api/orgs/context`) with `collectionId.indexOf is not a
+    function`. Diff is scoped tightly: `patches/@arbel__firebase-orm@1.9.97.patch`, a regression
+    test in `firestore-connection.admin.emulator.test.ts`, and the `pnpm-lock.yaml` hash bump.
+  - PR #70's CI was red, but **not from this diff**: `pull_request_read get_files` confirms it
+    touches only the patch file + one emulator test + lockfile — nothing near the failing tests.
+    The failure was 2 failed + 4 flaky Playwright `apps/web` e2e specs (`ingest-health`,
+    `metric-defs`, `schema-registry`, `boards`, `orgs`, `auth` — all failing on a URL-pattern
+    mismatch: clicking a nav link left the browser on `/en/orgs/ID?project=ID` instead of
+    navigating to the expected `/en/orgs/ID/projects/ID/...` path). Cross-checked against **prior**
+    CI runs on `main` for **unrelated** commits (this session's own PROGRESS.md-only "no-op" commits
+    from runs 18-25): found the same CI workflow has been failing on roughly 40% of recent runs,
+    each time on a *different* flaky test (e2e URL routing in one, a `meta-ads/executor.emulator
+    .test.ts` 30s timeout in another) — i.e. **pre-existing, unrelated test-suite flakiness that
+    nobody has been watching**, not a PR #70 regression. Runs 6-25 never looked at this because they
+    only re-checked the 3 KAN-20 PRs' timestamps, not CI health on `main`.
+  - Triggered `rerun_failed_jobs` on PR #70's CI run (29644592301) rather than deep-diving the
+    flaky-test root cause in this run — the diff itself is clearly correct and scoped, and getting a
+    live-outage fix merged is higher priority than root-causing test flakiness in the same run. If
+    it comes back green, this run merges PR #70 and deletes its branch (same standing policy as any
+    other PR); if it's still red, will actually investigate rather than re-run blindly again.
+  - Also updated **KAN-18** in `TASKS.md`: PR #70's description references a real Cloud Run deploy
+    hitting this crash, which means GCP/Firebase infra likely already exists outside this sandbox —
+    contradicting the "needs-human, still outstanding" status this session has repeated for 25 runs
+    (that status was only ever based on the *sandbox's own* env vars, which can't see external
+    deploys). Left the row `needs-human` but flagged it as possibly stale pending human confirmation
+    rather than unilaterally flipping it — the sandbox still has zero direct evidence (no
+    `FIREBASE_*`/`GOOGLE_APPLICATION_CREDENTIALS`/etc. env vars here).
+  - Sent a push notification — this is genuinely new information (a live incident + its fix + a
+    stale infra-status assumption + an unwatched CI-flakiness trend), not a repeat of the last 25
+    silent/rare-reminder no-op cycles.
+  - **Mid-run mistake, corrected:** ran `git reset --hard origin/main` to sync the sandbox's detached
+    HEAD back to `main` while these edits were still uncommitted, which discarded them; re-applied
+    both edits from scratch immediately after (verified against this file's own content, no data
+    was silently lost since this recovery happened before ending the run). Lesson for future runs:
+    commit (or at least `git stash`) before any `reset --hard`/`checkout` in this sandbox, per
+    CLAUDE.md's git-safety guidance — don't repeat this.
+- **In progress (exact stopping point):** waiting on PR #70's re-triggered CI run
+  (github.com/yarivluts/smart-marketing/actions/runs/29644592301) to finish. If green: merge PR #70
+  into `main`, delete branch `fix/arbel-patch-robust-globalthis`, update this entry. If still red on
+  the same unrelated tests: leave PR #70 open (it's already correct and mergeable once CI
+  cooperates — do not merge on red), and consider whether the e2e URL-routing failure specifically
+  (not the emulator timeout) is a real regression worth fixing in this run, since it's now blocking
+  a live-incident fix rather than just being background noise.
+- **Blocked + why:** the KAN backlog itself is still fully blocked exactly as runs 6-25 documented
+  (KAN-18/KAN-43 `needs-human`, KAN-20 needs a human pick between PR #2/#3/#5). This run's actual
+  work is the out-of-band PR #70 triage above, not a KAN story.
+- **Next step:** check PR #70's CI; merge if green. Separately, a human should (a) confirm whether
+  KAN-18 is actually done now (real GCP/Cloud Run infra exists) and update `TASKS.md` accordingly —
+  this could unblock KAN-19's staging-deploy half, and (b) decide whether the CI flakiness pattern
+  (multiple different tests failing intermittently across otherwise-unrelated commits) is worth a
+  dedicated stabilization pass, since it's now provably blocking real, urgent PRs, not just
+  theoretical.
+- **Waiting on human:**
+  - Confirm KAN-18 status (see above) — the "still outstanding" label may now be wrong.
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Consider a CI-stabilization pass for the intermittent e2e/emulator test failures on `main`.
+
 ## 2026-07-18 — No-unblocked-story re-check (run 25)
 
 - **Last completed:**
