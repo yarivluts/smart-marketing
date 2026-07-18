@@ -1,22 +1,38 @@
 diff --git a/dist/cjs/admin.js b/dist/cjs/admin.js
-index b390fe4bab594a790b9dd68d927e5f9e71d77214..b3be3588aa96937e5b8909e6e9c210656577e70a 100644
+index b390fe4bab594a790b9dd68d927e5f9e71d77214..604baccf7b466a5dba2dd4ca105d34494aca3f06 100644
 --- a/dist/cjs/admin.js
 +++ b/dist/cjs/admin.js
-@@ -172,6 +172,9 @@ async function initializeAdminApp(adminApp, key = repository_1.FirestoreOrmRepos
+@@ -172,6 +172,12 @@ async function initializeAdminApp(adminApp, key = repository_1.FirestoreOrmRepos
          const repository = new repository_1.FirestoreOrmRepository(connection);
          // Setup Admin SDK compatibility wrapper
          setupAdminSDKWrapper(connection, repository);
 +        // PATCH(growthos): force admin-mode query functions even if the client
-+        // SDK was loaded first (see query.js patch note).
-+        require('./query').__setupAdminSDKQueryCompatibility();
++        // SDK was loaded first (see query.js patch note). Registered on
++        // globalThis at query.js evaluation, which __exportStar above forces.
++        if (globalThis.__arbelOrmInternals && globalThis.__arbelOrmInternals.setupAdminSDKQueryCompatibility) {
++            globalThis.__arbelOrmInternals.setupAdminSDKQueryCompatibility();
++        }
          // Mark as ready immediately for Admin SDK
          repository_1.FirestoreOrmRepository.isReady = true;
          // Register it in the global connections
 diff --git a/dist/cjs/query.js b/dist/cjs/query.js
-index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..6532207fa78f5861a1515e09cabeb9aeab8b059d 100644
+index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..35b28fa518b2e046e1cd11c92ebe622f7150e0c3 100644
 --- a/dist/cjs/query.js
 +++ b/dist/cjs/query.js
-@@ -91,6 +91,11 @@ function setupAdminSDKQueryCompatibility() {
+@@ -71,6 +71,12 @@ function isAdminFirestore(firestore) {
+ /**
+  * Setup Admin SDK compatibility for query functions
+  */
++// PATCH(growthos): expose the admin query setup via globalThis so the admin
++// entry can force admin mode after the client SDK loaded first. A globalThis
++// side-effect survives bundler CJS-exports tree-shaking (a plain exports.X
++// assignment appended here was dropped by webpack in fresh builds), and the
++// registration runs unconditionally at module evaluation.
++(globalThis.__arbelOrmInternals || (globalThis.__arbelOrmInternals = {})).setupAdminSDKQueryCompatibility = setupAdminSDKQueryCompatibility;
+ function setupAdminSDKQueryCompatibility() {
+     console.log("Setting up Admin SDK query compatibility");
+     endAt = ((...values) => ({
+@@ -91,6 +97,11 @@ function setupAdminSDKQueryCompatibility() {
      }));
      onSnapshot = ((query, callback) => query.onSnapshot(callback));
      or = ((...queries) => ({
@@ -28,7 +44,7 @@ index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..6532207fa78f5861a1515e09cabeb9ae
          apply: (ref) => {
              console.warn("OR queries not directly supported in Admin SDK - using first query only");
              return queries.length > 0 ? queries[0].apply(ref) : ref;
-@@ -126,6 +131,9 @@ function setupAdminSDKQueryCompatibility() {
+@@ -126,13 +137,22 @@ function setupAdminSDKQueryCompatibility() {
          apply: (ref) => ref.startAt(...values)
      }));
      where = ((field, op, value) => ({
@@ -37,42 +53,51 @@ index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..6532207fa78f5861a1515e09cabeb9ae
 +        type: 'where',
          apply: (ref) => ref.where(field, op, value)
      }));
-     collectionGroup = ((collectionId) => {
-@@ -680,3 +688,9 @@ class Query {
+-    collectionGroup = ((collectionId) => {
++    collectionGroup = ((...args) => {
++        // PATCH(growthos): getFirestoreQuery calls this with the CLIENT SDK's
++        // two-arg signature collectionGroup(firestore, collectionId); the admin
++        // shim only expected (collectionId) and passed a Firestore instance to
++        // firestore.collectionGroup(), crashing with
++        // `collectionId.indexOf is not a function`. Accept both call shapes.
++        const collectionId = typeof args[0] === 'string' ? args[0] : args[1];
+         const connection = repository_1.FirestoreOrmRepository.getGlobalConnection();
+         const firestore = connection.getFirestore();
+         return firestore.collectionGroup(collectionId);
+-    });
++        });
  }
- exports.Query = Query;
- //# sourceMappingURL=query.js.map
-+// PATCH(growthos): initializeAdminApp never re-installed the admin query
-+// functions when the client SDK loaded first (lazyLoadFirestoreImports runs
-+// at import time with no connection yet and locks in client-SDK query/where,
-+// crashing later with `_freezeSettings is not a function` on admin refs).
-+// Expose the setup so the admin entry can force admin mode.
-+exports.__setupAdminSDKQueryCompatibility = setupAdminSDKQueryCompatibility;
-\ No newline at end of file
+ /**
+  * Setup Client SDK compatibility for query functions
 diff --git a/dist/esm/admin.js b/dist/esm/admin.js
-index b35b2fdc56e1b810575490feaeddb815613f2bf5..2f9e8cbda56a3e5ede58c38dd27be6abb720b6ad 100644
+index b35b2fdc56e1b810575490feaeddb815613f2bf5..b38b1b4e48eea36ed263b3ea83bbf6a2b0b38a0f 100644
 --- a/dist/esm/admin.js
 +++ b/dist/esm/admin.js
-@@ -1,3 +1,4 @@
-+import { __setupAdminSDKQueryCompatibility } from './query.js';
- /**
-  * Admin SDK-specific functionality for Firebase ORM
-  * This module should only be imported in Node.js environments
-@@ -132,6 +133,9 @@ export async function initializeAdminApp(adminApp, key = FirestoreOrmRepository.
+@@ -132,6 +132,10 @@ export async function initializeAdminApp(adminApp, key = FirestoreOrmRepository.
          const repository = new FirestoreOrmRepository(connection);
          // Setup Admin SDK compatibility wrapper
          setupAdminSDKWrapper(connection, repository);
-+        // PATCH(growthos): force admin-mode query functions even if the client
-+        // SDK was loaded first (see query.js patch note).
-+        __setupAdminSDKQueryCompatibility();
++        // PATCH(growthos): force admin-mode query functions (see query.js note).
++        if (globalThis.__arbelOrmInternals && globalThis.__arbelOrmInternals.setupAdminSDKQueryCompatibility) {
++            globalThis.__arbelOrmInternals.setupAdminSDKQueryCompatibility();
++        }
          // Mark as ready immediately for Admin SDK
          FirestoreOrmRepository.isReady = true;
          // Register it in the global connections
 diff --git a/dist/esm/query.js b/dist/esm/query.js
-index d7976dd33dc08bf8c54726d983beddf30a441762..1ea52bd51e8972d6ae7ef3242c8651fece5e66f5 100644
+index d7976dd33dc08bf8c54726d983beddf30a441762..daf09b8baa1ed8de1ce016332b7f45678adc95ce 100644
 --- a/dist/esm/query.js
 +++ b/dist/esm/query.js
-@@ -55,6 +55,11 @@ function setupAdminSDKQueryCompatibility() {
+@@ -35,6 +35,8 @@ function isAdminFirestore(firestore) {
+ /**
+  * Setup Admin SDK compatibility for query functions
+  */
++// PATCH(growthos): see cjs/query.js note.
++(globalThis.__arbelOrmInternals || (globalThis.__arbelOrmInternals = {})).setupAdminSDKQueryCompatibility = setupAdminSDKQueryCompatibility;
+ function setupAdminSDKQueryCompatibility() {
+     console.log("Setting up Admin SDK query compatibility");
+     endAt = ((...values) => ({
+@@ -55,6 +57,11 @@ function setupAdminSDKQueryCompatibility() {
      }));
      onSnapshot = ((query, callback) => query.onSnapshot(callback));
      or = ((...queries) => ({
@@ -84,7 +109,7 @@ index d7976dd33dc08bf8c54726d983beddf30a441762..1ea52bd51e8972d6ae7ef3242c8651fe
          apply: (ref) => {
              console.warn("OR queries not directly supported in Admin SDK - using first query only");
              return queries.length > 0 ? queries[0].apply(ref) : ref;
-@@ -90,6 +95,9 @@ function setupAdminSDKQueryCompatibility() {
+@@ -90,13 +97,22 @@ function setupAdminSDKQueryCompatibility() {
          apply: (ref) => ref.startAt(...values)
      }));
      where = ((field, op, value) => ({
@@ -93,8 +118,23 @@ index d7976dd33dc08bf8c54726d983beddf30a441762..1ea52bd51e8972d6ae7ef3242c8651fe
 +        type: 'where',
          apply: (ref) => ref.where(field, op, value)
      }));
-     collectionGroup = ((collectionId) => {
-@@ -643,3 +651,5 @@ export class Query {
+-    collectionGroup = ((collectionId) => {
++    collectionGroup = ((...args) => {
++        // PATCH(growthos): getFirestoreQuery calls this with the CLIENT SDK's
++        // two-arg signature collectionGroup(firestore, collectionId); the admin
++        // shim only expected (collectionId) and passed a Firestore instance to
++        // firestore.collectionGroup(), crashing with
++        // `collectionId.indexOf is not a function`. Accept both call shapes.
++        const collectionId = typeof args[0] === 'string' ? args[0] : args[1];
+         const connection = FirestoreOrmRepository.getGlobalConnection();
+         const firestore = connection.getFirestore();
+         return firestore.collectionGroup(collectionId);
+-    });
++        });
+ }
+ /**
+  * Setup Client SDK compatibility for query functions
+@@ -643,3 +659,5 @@ export class Query {
      }
  }
  //# sourceMappingURL=query.js.map

@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { connectFirestoreOrmAdmin, OrganizationModel } from './index';
+import { connectFirestoreOrmAdmin, MembershipModel, OrganizationModel } from './index';
 
 /**
  * Exercises the Admin-SDK connection path (`connectFirestoreOrmAdmin`) — the
@@ -61,5 +61,31 @@ describe('connectFirestoreOrmAdmin (admin-SDK path, emulator)', () => {
     const matches = await OrganizationModel.query().where('slug', '==', slug).get();
     expect(matches).toHaveLength(1);
     expect(matches[0].name).toBe('Admin Query Org');
+  });
+
+  it('runs collection-group queries through the admin connection', async () => {
+    // Regression guard for the second patched @arbel/firebase-orm admin bug:
+    // getFirestoreQuery calls collectionGroup with the client SDK's two-arg
+    // signature (firestore, collectionId), but the admin shim expected only
+    // (collectionId) and passed a Firestore instance into
+    // firestore.collectionGroup(), crashing with
+    // `collectionId.indexOf is not a function`. This is the exact shape of
+    // /api/orgs/context's memberships-by-user lookup (listMembershipsForUser).
+    const org = new OrganizationModel();
+    org.name = 'Admin CG Org';
+    org.slug = `admin-cg-${Math.random().toString(36).slice(2)}`;
+    await org.save();
+
+    const userId = `cg-user-${Math.random().toString(36).slice(2)}`;
+    const membership = new MembershipModel();
+    membership.setPathParams('organization_id', org.id);
+    membership.user_id = userId;
+    membership.organization_id = org.id;
+    membership.role = 'owner';
+    await membership.save();
+
+    const matches = await MembershipModel.collectionQuery().where('user_id', '==', userId).get();
+    expect(matches).toHaveLength(1);
+    expect(matches[0].organization_id).toBe(org.id);
   });
 });
