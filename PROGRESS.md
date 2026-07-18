@@ -72,22 +72,28 @@ Template for each entry:
     was silently lost since this recovery happened before ending the run). Lesson for future runs:
     commit (or at least `git stash`) before any `reset --hard`/`checkout` in this sandbox, per
     CLAUDE.md's git-safety guidance — don't repeat this.
-- **In progress (exact stopping point):** waiting on PR #70's re-triggered CI run
-  (github.com/yarivluts/smart-marketing/actions/runs/29644592301) to finish. If green: merge PR #70
-  into `main`, delete branch `fix/arbel-patch-robust-globalthis`, update this entry. If still red on
-  the same unrelated tests: leave PR #70 open (it's already correct and mergeable once CI
-  cooperates — do not merge on red), and consider whether the e2e URL-routing failure specifically
-  (not the emulator timeout) is a real regression worth fixing in this run, since it's now blocking
-  a live-incident fix rather than just being background noise.
+- **Update (same run, after the scheduled check-in fired):** the re-triggered CI run came back
+  green — `lint · typecheck · test · build` completed `success` at 16:33 UTC (the same rerun,
+  no further flakiness on retry, consistent with this being pre-existing test-suite flakiness and
+  not a defect in PR #70's actual diff). Confirmed `mergeable_state: "clean"`. Merged **PR #70**
+  into `main` via squash (commit `a5ca9c7`) — the live Cloud Run production crash
+  (`__setupAdminSDKQueryCompatibility is not a function`) now has its fix on `main`. Attempted to
+  delete branch `fix/arbel-patch-robust-globalthis` via `git push origin --delete`; the sandbox's
+  git remote rejected it with the same HTTP 403 this session has hit before on branch deletes (see
+  the KAN-24 entry) — harmless, low-priority cleanup a human (or a future run with different git
+  permissions) can do via the GitHub UI.
+- **In progress (exact stopping point):** none — PR #70 is merged, `main` is green. The KAN backlog
+  itself remains exactly as documented below (all `done`/`needs-human`/`blocked-by`, no `todo`).
 - **Blocked + why:** the KAN backlog itself is still fully blocked exactly as runs 6-25 documented
   (KAN-18/KAN-43 `needs-human`, KAN-20 needs a human pick between PR #2/#3/#5). This run's actual
-  work is the out-of-band PR #70 triage above, not a KAN story.
-- **Next step:** check PR #70's CI; merge if green. Separately, a human should (a) confirm whether
-  KAN-18 is actually done now (real GCP/Cloud Run infra exists) and update `TASKS.md` accordingly —
-  this could unblock KAN-19's staging-deploy half, and (b) decide whether the CI flakiness pattern
-  (multiple different tests failing intermittently across otherwise-unrelated commits) is worth a
-  dedicated stabilization pass, since it's now provably blocking real, urgent PRs, not just
-  theoretical.
+  work was the out-of-band PR #70 triage above, not a KAN story.
+- **Next step:** a human should (a) confirm whether KAN-18 is actually done now (real GCP/Cloud Run
+  infra evidently exists, since PR #70 was fixing a real Cloud Run crash) and update `TASKS.md`
+  accordingly — this could unblock KAN-19's staging-deploy half; (b) decide whether the CI flakiness
+  pattern (multiple different tests failing intermittently across otherwise-unrelated commits, ~40%
+  of recent runs) is worth a dedicated stabilization pass — it already blocked one live-incident
+  fix's CI this run and will keep doing so; (c) optionally delete the now-merged
+  `fix/arbel-patch-robust-globalthis` branch (sandbox git remote 403'd on this run's attempt).
 - **Waiting on human:**
   - Confirm KAN-18 status (see above) — the "still outstanding" label may now be wrong.
   - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
