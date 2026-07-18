@@ -17,6 +17,70 @@ Template for each entry:
 
 ---
 
+## 2026-07-18 — CI-flakiness triage (new signature, transient): no unblocked story (run 28)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` is unchanged from runs 25-27:
+    everything `done` except **KAN-18** (`needs-human`, flagged possibly-stale), **KAN-19**/**KAN-20**
+    (`in-progress`), **KAN-43** (`needs-human`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43). No
+    `todo` row — nothing to pick up as a KAN story this cycle.
+  - Verified local `main` matches `origin/main` at `28fe751` (run 27's commit); open PRs are still
+    exactly **#2, #3, #5** (the three unreconciled KAN-20 implementations), same as every check since
+    2026-07-04 — no new backlog movement.
+  - Per runs 26/27's own recommendation to watch CI health on `main` (not just the stale KAN-20 PRs),
+    found that the CI run on run 27's own doc-only commit (`28fe751`, run id `29653383750`) had
+    **failed** at 17:09 UTC — after run 27 had already ended and reported CI green, so run 27 never
+    saw this. Root-caused the failure: `Test` step failed in `@growthos/firebase-orm-models` with
+    `Error: Hook timed out in 60000ms` in `src/plugin-runtime/saas-metric-pack/saas-metric-pack
+    .emulator.test.ts`, preceded throughout the run by a growing series of `RESOURCE_EXHAUSTED:
+    Received message larger than max` errors from the shared Firestore emulator's `Listen` gRPC
+    stream (message size climbing 455MB -> 537MB -> 2.2GB -> 3.4GB as the run progressed) — i.e. a
+    new, distinct flaky-test signature from the two runs 26 already knew about (e2e URL-routing
+    mismatches, a `meta-ads/executor.emulator.test.ts` 30s timeout).
+  - Investigated whether this is a real regression: `grep`'d this package's own `src/` for
+    `onSnapshot`/realtime-listener usage that could explain a growing snapshot payload accumulating
+    across the whole `firebase emulators:exec ... "vitest run"` run (all ~78 test files share one
+    live Firestore emulator instance with no data reset between files) — found none; the vendored
+    `@arbel/firebase-orm` library has an `onMode()`/`.on()` realtime-listener API but nothing in this
+    repo's own code calls it. Installed deps (`pnpm install`, clean) and attempted a local repro by
+    running `pnpm test` directly inside `packages/firebase-orm-models` — this failed for an unrelated
+    reason (`@growthos/shared` wasn't built first since I bypassed the turbo dependency graph, not a
+    real repro) and I did not pursue a full `pnpm build && pnpm test` from repo root given the time
+    already spent; treating the repro attempt as inconclusive rather than exonerating, and leaving the
+    "what actually emits `Listen` traffic on this suite" question open for whoever does the
+    stabilization pass runs 26/27 already recommended.
+  - Re-triggered the failed job (`rerun_failed_jobs` on run `29653383750`) rather than treating this
+    as blocking, consistent with run 26's own precedent for this class of failure. Watched it to
+    completion via two scheduled check-ins: attempt 2's `Test` step passed and the full run finished
+    **`success`** at 19:31 UTC — confirms this was transient flakiness, not a regression introduced by
+    anything on `main`, and needed no code fix.
+  - Did **not** send a push notification: nothing here is new information the repo owner needs to act
+    on right now (no code changed, nothing is actually broken on `main`, the backlog is unchanged) —
+    it's one more data point for the CI-stabilization pass runs 26/27 already flagged as worth doing,
+    now with a specific new symptom (growing Firestore emulator message size in this package's
+    emulator suite) recorded here for whoever picks that up.
+- **In progress (exact stopping point):** none — no code changes this run; `main` is green at
+  `28fe751` (both attempts of run `29653383750` now resolved, second attempt green).
+- **Blocked + why:** unchanged — the entire remaining backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision). No new
+  blocker introduced by this run.
+- **Next step:** unchanged from runs 26/27, plus a concrete lead for the CI-stabilization pass: (a) a
+  human should confirm whether KAN-18 is actually done now (PR #70 evidence); (b) a human should pick
+  one of PR #2/#3/#5 for KAN-20 and close the other two; (c) whoever runs the CI-stabilization pass
+  should start with `packages/firebase-orm-models`'s single shared Firestore-emulator-instance-per-
+  package-test-run design (`firebase emulators:exec --only firestore "vitest run"`, no per-file data
+  reset) as the likely amplifier — even without finding the exact `Listen`-stream call site, an
+  emulator data reset between test files (or splitting the suite across multiple emulator instances)
+  would keep any given listener's snapshot payload bounded regardless of root cause.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still open from runs 26/27).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Consider the CI-stabilization pass runs 26/27 recommended — this run adds a specific lead (shared-
+    emulator data accumulation across `packages/firebase-orm-models`'s test run) rather than new
+    urgency.
+
 ## 2026-07-18 — Post-hotfix re-check: no unblocked story, PR #70 merge holding (run 27)
 
 - **Last completed:**
