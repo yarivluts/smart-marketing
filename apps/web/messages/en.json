@@ -39,7 +39,15 @@
   "DashboardPage": {
     "title": "Dashboard",
     "welcome": "Welcome back, {email}",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "organizationsHeading": "Your organizations",
+    "createOrganization": "Create organization",
+    "createFirstOrganization": "Create your first organization",
+    "loadingOrganizations": "Loading your organizations…",
+    "noOrganizations": "You're not a member of any organization yet. Create one to start setting up projects, boards, and data sources.",
+    "roleLabel": "Role: {role}",
+    "pendingInvites": "You have {count, plural, one {# pending invite} other {# pending invites}}",
+    "allOrganizations": "View all organizations"
   },
   "OrgsPage": {
     "title": "Your organizations",

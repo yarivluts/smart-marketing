@@ -39,7 +39,15 @@
   "DashboardPage": {
     "title": "לוח בקרה",
     "welcome": "ברוך שובך, {email}",
-    "signOut": "התנתקות"
+    "signOut": "התנתקות",
+    "organizationsHeading": "הארגונים שלך",
+    "createOrganization": "יצירת ארגון",
+    "createFirstOrganization": "צרו את הארגון הראשון שלכם",
+    "loadingOrganizations": "טוען את הארגונים שלך…",
+    "noOrganizations": "אינך חבר/ה באף ארגון עדיין. צרו ארגון כדי להתחיל להגדיר פרויקטים, לוחות ומקורות נתונים.",
+    "roleLabel": "תפקיד: {role}",
+    "pendingInvites": "יש לך {count, plural, one {הזמנה ממתינה אחת} other {# הזמנות ממתינות}}",
+    "allOrganizations": "לכל הארגונים"
   },
   "OrgsPage": {
     "title": "הארגונים שלך",
