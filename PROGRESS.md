@@ -17,6 +17,28 @@ Template for each entry:
 
 ---
 
+## 2026-07-18 — Interactive session: cloud deployment fixed end-to-end + dashboard entry point (PRs #47, #51, #52, #60, #70, #71)
+
+- **Last completed:** The deployed Cloud Run system (project `growthos-g2w84`, web-dev/web-prod +
+  api-dev/api-prod) now works end-to-end, browser-verified on both environments: sign-in →
+  dashboard → `/api/orgs/context` 200 → orgs page, zero console/network errors. Seven stacked
+  issues fixed: missing `NEXT_PUBLIC_*` Firebase config at build time (#51-adjacent build args),
+  server-side Firestore via Admin SDK instead of the rules-blocked client SDK
+  (`connectFirestoreOrmAdmin`, #47), standalone tracing of `firebase-admin` (#52), two
+  `@arbel/firebase-orm` admin-mode bugs fixed via `pnpm patch` — query functions locked onto the
+  client SDK (#60, hardened in #70 after the patch was silently dropped in Docker + tree-shaken by
+  webpack; now a `globalThis` hook) and the `collectionGroup` shim rejecting the client two-arg
+  call shape (#70) — plus Firestore COLLECTION_GROUP index exemptions created for
+  `memberships.user_id`, `hook_endpoints.hook_id`, `api_keys.hashed_secret`. Both fixes were also
+  PR'd upstream (yarivluts/firebase-orm#121); once merged/published the local patch can be
+  dropped. Dashboard upgraded from a bare placeholder to an org-navigation entry point (#71).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** nothing.
+- **Next step:** deployed web images are built per-env with build args (see
+  `deploy/cloudbuild.web.yaml`); rebuild + `gcloud run deploy` after merges that should ship.
+- **Waiting on human:** merge upstream firebase-orm#121 and publish 1.9.98, then remove
+  `patches/@arbel__firebase-orm@1.9.97.patch`.
+
 ## 2026-07-18 — CI-flakiness triage (new signature, transient): no unblocked story (run 28)
 
 - **Last completed:**
