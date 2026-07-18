@@ -16,7 +16,7 @@ index b390fe4bab594a790b9dd68d927e5f9e71d77214..604baccf7b466a5dba2dd4ca105d3449
          repository_1.FirestoreOrmRepository.isReady = true;
          // Register it in the global connections
 diff --git a/dist/cjs/query.js b/dist/cjs/query.js
-index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..ed446f9f8da5b2276bebbc586f904f3826114307 100644
+index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..35b28fa518b2e046e1cd11c92ebe622f7150e0c3 100644
 --- a/dist/cjs/query.js
 +++ b/dist/cjs/query.js
 @@ -71,6 +71,12 @@ function isAdminFirestore(firestore) {
@@ -44,7 +44,7 @@ index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..ed446f9f8da5b2276bebbc586f904f38
          apply: (ref) => {
              console.warn("OR queries not directly supported in Admin SDK - using first query only");
              return queries.length > 0 ? queries[0].apply(ref) : ref;
-@@ -126,6 +137,9 @@ function setupAdminSDKQueryCompatibility() {
+@@ -126,13 +137,22 @@ function setupAdminSDKQueryCompatibility() {
          apply: (ref) => ref.startAt(...values)
      }));
      where = ((field, op, value) => ({
@@ -53,7 +53,22 @@ index dbcbf3825b19267ca2b77561f86c5fa5bf23a6f4..ed446f9f8da5b2276bebbc586f904f38
 +        type: 'where',
          apply: (ref) => ref.where(field, op, value)
      }));
-     collectionGroup = ((collectionId) => {
+-    collectionGroup = ((collectionId) => {
++    collectionGroup = ((...args) => {
++        // PATCH(growthos): getFirestoreQuery calls this with the CLIENT SDK's
++        // two-arg signature collectionGroup(firestore, collectionId); the admin
++        // shim only expected (collectionId) and passed a Firestore instance to
++        // firestore.collectionGroup(), crashing with
++        // `collectionId.indexOf is not a function`. Accept both call shapes.
++        const collectionId = typeof args[0] === 'string' ? args[0] : args[1];
+         const connection = repository_1.FirestoreOrmRepository.getGlobalConnection();
+         const firestore = connection.getFirestore();
+         return firestore.collectionGroup(collectionId);
+-    });
++        });
+ }
+ /**
+  * Setup Client SDK compatibility for query functions
 diff --git a/dist/esm/admin.js b/dist/esm/admin.js
 index b35b2fdc56e1b810575490feaeddb815613f2bf5..b38b1b4e48eea36ed263b3ea83bbf6a2b0b38a0f 100644
 --- a/dist/esm/admin.js
@@ -70,7 +85,7 @@ index b35b2fdc56e1b810575490feaeddb815613f2bf5..b38b1b4e48eea36ed263b3ea83bbf6a2
          FirestoreOrmRepository.isReady = true;
          // Register it in the global connections
 diff --git a/dist/esm/query.js b/dist/esm/query.js
-index d7976dd33dc08bf8c54726d983beddf30a441762..afcd2294e2ac5280d3c1783b0a0ceadac84f578e 100644
+index d7976dd33dc08bf8c54726d983beddf30a441762..daf09b8baa1ed8de1ce016332b7f45678adc95ce 100644
 --- a/dist/esm/query.js
 +++ b/dist/esm/query.js
 @@ -35,6 +35,8 @@ function isAdminFirestore(firestore) {
@@ -94,7 +109,7 @@ index d7976dd33dc08bf8c54726d983beddf30a441762..afcd2294e2ac5280d3c1783b0a0ceada
          apply: (ref) => {
              console.warn("OR queries not directly supported in Admin SDK - using first query only");
              return queries.length > 0 ? queries[0].apply(ref) : ref;
-@@ -90,6 +97,9 @@ function setupAdminSDKQueryCompatibility() {
+@@ -90,13 +97,22 @@ function setupAdminSDKQueryCompatibility() {
          apply: (ref) => ref.startAt(...values)
      }));
      where = ((field, op, value) => ({
@@ -103,8 +118,23 @@ index d7976dd33dc08bf8c54726d983beddf30a441762..afcd2294e2ac5280d3c1783b0a0ceada
 +        type: 'where',
          apply: (ref) => ref.where(field, op, value)
      }));
-     collectionGroup = ((collectionId) => {
-@@ -643,3 +653,5 @@ export class Query {
+-    collectionGroup = ((collectionId) => {
++    collectionGroup = ((...args) => {
++        // PATCH(growthos): getFirestoreQuery calls this with the CLIENT SDK's
++        // two-arg signature collectionGroup(firestore, collectionId); the admin
++        // shim only expected (collectionId) and passed a Firestore instance to
++        // firestore.collectionGroup(), crashing with
++        // `collectionId.indexOf is not a function`. Accept both call shapes.
++        const collectionId = typeof args[0] === 'string' ? args[0] : args[1];
+         const connection = FirestoreOrmRepository.getGlobalConnection();
+         const firestore = connection.getFirestore();
+         return firestore.collectionGroup(collectionId);
+-    });
++        });
+ }
+ /**
+  * Setup Client SDK compatibility for query functions
+@@ -643,3 +659,5 @@ export class Query {
      }
  }
  //# sourceMappingURL=query.js.map
