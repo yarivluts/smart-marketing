@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-07-18 — Post-hotfix re-check: no unblocked story, PR #70 merge holding (run 27)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` is unchanged from the end of
+    run 26: everything `done` except **KAN-18** (`needs-human`, flagged possibly-stale),
+    **KAN-19**/**KAN-20** (`in-progress`), **KAN-43** (`needs-human`), and **KAN-50**/**KAN-51**
+    (`blocked-by` KAN-43). No `todo` row.
+  - Verified the sandbox's local `main` matches `origin/main` at `5a480d6` (run 26's own
+    PROGRESS.md-recording commit) — nothing landed on `main` between run 26 ending and this run
+    starting.
+  - Confirmed run 26's headline action held up: **PR #70**'s merge commit (`a5ca9c7`) is on `main`,
+    and the most recent CI run on `main` (`29652403900`, at HEAD `5a480d6`) is `success` — the
+    production hotfix is live and stable, no regression surfaced since.
+  - Re-checked GitHub directly: open PRs are still exactly **#2, #3, #5** (the three unreconciled
+    KAN-20 implementations), same head SHAs and same `created_at` as every check back to 2026-07-04
+    — zero new commits, zero new PRs beyond the now-merged #70. No new backlog movement to act on.
+  - Retried deleting the merged `fix/arbel-patch-robust-globalthis` branch (run 26 left this as a
+    loose end after a 403); still 403s from this sandbox's git remote permissions. Confirmed
+    harmless — GitHub allows a merged PR's branch to be deleted from the UI regardless, so this is
+    still just cleanup a human (or a future run with different permissions) can do, not a blocker.
+  - No code changes this run — there was nothing new to act on beyond confirming run 26's fix is
+    holding. Did **not** send a push notification: nothing changed since run 26's own notification
+    a few hours ago (same PR #70 story, now just confirmed stable), consistent with the standing
+    "only notify on new information" policy from runs 9-26.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** unchanged — the entire remaining backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision).
+- **Next step:** unchanged from run 26: (a) a human should confirm whether KAN-18 is actually done
+  now given PR #70's evidence of a real Cloud Run deploy existing outside this sandbox; (b) a human
+  should pick one of PR #2/#3/#5 for KAN-20 and close the other two; (c) optionally delete the
+  now-merged `fix/arbel-patch-robust-globalthis` branch via the GitHub UI (sandbox git remote can't).
+  A future run should keep watching CI health on `main` (not just the 3 stale KAN-20 PRs), since
+  that's what surfaced PR #70's real incident this cycle.
+- **Waiting on human:**
+  - Confirm KAN-18 status (real GCP/Cloud Run infra evidently exists per PR #70; sandbox still has
+    no direct evidence of its own).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+
 ## 2026-07-18 — Production hotfix triage: PR #70 (KAN-20/backlog still all done/blocked, run 26)
 
 - **Last completed:**
