@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { collection, connectFirestoreEmulator, getDocs, getFirestore } from 'firebase/firestore';
+import { collection, connectFirestoreEmulator, getDocs, initializeFirestore } from 'firebase/firestore';
 import { FirestoreOrmRepository } from '@arbel/firebase-orm';
 
 /**
@@ -19,7 +19,20 @@ function delay(ms: number): Promise<void> {
 
 export async function connectToFirestoreEmulator(appName: string): Promise<void> {
   const app = initializeApp({ apiKey: 'fake-api-key', projectId: EMULATOR_PROJECT_ID }, appName);
-  const firestore = getFirestore(app);
+  // The client SDK's default gRPC transport multiplexes every read (even a
+  // one-shot `getDocs()`) as a "target" on one shared `Listen` stream per
+  // Firestore instance. With 40+ of these emulator test files — each
+  // issuing many reads across many concurrently-running files against one
+  // shared emulator — accumulated/replayed target state on that stream grew
+  // without bound over a run (observed climbing from hundreds of MB to
+  // multiple GB), eventually tripping gRPC's 4MB `RESOURCE_EXHAUSTED` limit
+  // and failing whichever test happened to be watching at the time.
+  // `experimentalForceLongPolling` switches the transport to plain HTTP
+  // long-polling (one request per read, nothing multiplexed/accumulated) —
+  // the SDK's own `FirestoreSettings` docs point network-reliability
+  // workarounds like this one at
+  // https://github.com/firebase/firebase-js-sdk/issues/1674.
+  const firestore = initializeFirestore(app, { experimentalForceLongPolling: true });
   connectFirestoreEmulator(firestore, EMULATOR_HOST, EMULATOR_PORT);
   await FirestoreOrmRepository.initGlobalConnection(firestore);
 

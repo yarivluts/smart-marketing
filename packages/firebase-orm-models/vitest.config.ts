@@ -14,6 +14,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // Closes every Firebase app a test file opened once that file's tests
+    // finish — see the file itself for why this matters (a real, previously
+    // unfixed cause of growing-then-fatal RESOURCE_EXHAUSTED emulator
+    // errors across a full `vitest run`).
+    setupFiles: ['./src/test-utils/firestore-emulator-cleanup.ts'],
     // The emulator suite (models.emulator.test.ts) hits a real local Firestore
     // emulator; its client SDK occasionally has to ride out an internal
     // backoff/retry cycle after a transient emulator-connection hiccup, which
@@ -22,12 +27,13 @@ export default defineConfig({
     // costs nothing in the common case.
     testTimeout: 30_000,
     hookTimeout: 30_000,
-    // The local Firestore emulator's gRPC channel occasionally corrupts a
-    // freshly-opened watch stream (a known emulator/client-SDK interaction,
-    // not something under this package's control) — surfaces as a bogus
-    // RESOURCE_EXHAUSTED error. A same-process retry reliably gets a clean
-    // stream on the next attempt; unaffected (unit) tests never fail once,
-    // so this never masks a real assertion failure.
+    // `firestore-emulator-cleanup.ts` (above) fixed the *unbounded* growth in
+    // outgoing message size that made RESOURCE_EXHAUSTED fatal across a full
+    // run, but a handful of emulator test files can still legitimately run
+    // concurrently (vitest's thread pool), so a brief spike + backoff/retry
+    // on a freshly-opened watch stream remains possible. A same-process retry
+    // reliably gets a clean stream on the next attempt; unaffected (unit)
+    // tests never fail once, so this never masks a real assertion failure.
     retry: 3,
   },
 });
