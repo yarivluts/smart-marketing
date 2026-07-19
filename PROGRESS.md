@@ -17,6 +17,63 @@ Template for each entry:
 
 ---
 
+## 2026-07-19 — No action taken: concurrent session already fixing a live CI-red regression (run 33)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 32: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43).
+  - Unlike runs 28-32, `main` was **not** green this cycle: the GitHub Actions run triggered by
+    run 32's own docs-only commit (`ca6ba70`) came back `completed`/`failure` — the known
+    `packages/firebase-orm-models` Firestore-emulator `RESOURCE_EXHAUSTED` flake (upstream
+    `firebase/firebase-tools#8654`) that PR #72 (run 30) had reduced but not eliminated.
+  - Found this was **already being actively fixed by a different, concurrently-running scheduled
+    session** at the moment this run checked: PR #73
+    (`kan-19-ci-emulator-backoff-timeout`, KAN-19) was open, correctly root-caused (the emulator's
+    corrupted-message bug self-heals via the client SDK's own backoff if given enough wall-clock
+    time — the fix raises `testTimeout`/`hookTimeout` to 120s and lowers `retry` to 1 in both
+    `packages/firebase-orm-models/vitest.config.ts` and `apps/web/vitest.config.ts`, plus a
+    follow-up commit absorbing a separate, pre-existing Playwright e2e cold-compile flake via
+    `expect: { timeout: 15_000 }` + `retries: 2`), and — confirmed via `actions_list` on that
+    branch — that other session pushed a new commit and had CI `in_progress` at the moment this
+    run checked (run 262 on the branch's prior commit had itself failed on the e2e flake; run 263
+    was mid-flight fixing that too).
+  - Reviewed PR #73's diff: config-only changes (test/CI timeouts + comments explaining the
+    upstream bug), no production code touched, well-justified. Deliberately did **not** push any
+    commits to that branch, did not open a competing PR for the same problem, and did not merge
+    PR #73 myself — it was still being actively iterated on by the other session at the moment of
+    checking, and merging out from under an in-flight push risks losing their next fix or racing
+    their own merge. This is a genuine two-scheduled-runs-overlapping case, not a stale/abandoned
+    PR.
+  - Confirmed the three KAN-20 duplicate PRs (#2/#3/#5) are unchanged since 2026-07-04 — still
+    waiting on the same human reconciliation decision runs 26-32 already flagged.
+  - Made no code changes and did not touch `main` other than this docs-only PROGRESS.md commit.
+    No push notification sent: main's CI failure is a known, transient, already-being-fixed flake
+    with an active in-flight PR, not new information the user needs to act on.
+- **In progress (exact stopping point):** none from this run. PR #73 (owned by the other session)
+  was last observed with CI run 263 `in_progress` on commit `76ee3ff`.
+- **Blocked + why:** nothing new — same as run 32 (KAN-18/KAN-43 `needs-human`, KAN-20
+  reconciliation needs a human decision). Additionally, this run intentionally stood down from
+  the one live actionable item (main's CI-red state) because another session already owned it.
+- **Next step:** a future run should check PR #73's status first: if merged and `main` is green
+  again, this cadence-collision episode is fully resolved and no further action is needed beyond
+  the existing human-queue items below. If PR #73 is still open with green CI and no further
+  activity, a future run should review it fresh and merge it (same bar as any other PR: lint/
+  typecheck/test/build green, diff reviewed). If it's gone stale/abandoned, treat KAN-19's CI-red
+  state as unblocked work again.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete the merged `kan-ci-firestore-emulator-listen-leak` branch (git remote 403 from this
+    sandbox).
+  - Consider whether the scheduled-routine cadence is tight enough to cause two runs to overlap in
+    the same window (this run and PR #73's author both appear to have been active around
+    2026-07-19 18:00-19:00Z) — not itself a bug, but worth a human's awareness if it recurs often.
+
 ## 2026-07-19 — No unblocked work found; confirmed main green, backlog state unchanged (run 32)
 
 - **Last completed:**
