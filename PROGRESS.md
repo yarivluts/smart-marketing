@@ -17,6 +17,62 @@ Template for each entry:
 
 ---
 
+## 2026-07-19 — Post-PR#71 CI check: transient e2e flake confirmed, no unblocked story (run 29)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` is unchanged from run 28:
+    everything `done` except **KAN-18** (`needs-human`, flagged possibly-stale), **KAN-19**/**KAN-20**
+    (`in-progress`), **KAN-43** (`needs-human`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43). No
+    `todo` row — nothing to pick up as a KAN story this cycle.
+  - Confirmed the sandbox's local `main` matches `origin/main` at `a2319d8` — the interactive session
+    logged just above this entry (PRs #47/#51/#52/#60/#70/#71, real Cloud Run deploy fixed end-to-end)
+    is the latest work on the branch; nothing new landed between it ending and this run starting.
+    Open PRs are still exactly **#2, #3, #5** (the three unreconciled KAN-20 implementations), same as
+    every check since 2026-07-04.
+  - Checked CI health on `main` (not just the stale KAN-20 PRs, per runs 26-28's own standing
+    recommendation) and found the CI run on `a2319d8` (`29660605522`, triggered by PR #71's merge) had
+    **failed** at 05:25 UTC on its `Test` step: all 868 vitest unit tests passed, but 2 of 22 Playwright
+    e2e specs failed — `auth.spec.ts` ("lets a new user sign up, land on the dashboard, and sign out")
+    hit a `toHaveURL` timeout on the first attempt but passed on Playwright's own retry (reported as
+    `flaky`, not `failed`); `boards.spec.ts` ("an org owner builds a board...") failed both the original
+    attempt and its retry, but for **two different assertions** each time (first: stuck on
+    `/projects/new` instead of navigating to `/projects/{id}/onboarding`; retry: a `heading('Revenue')`
+    not becoming visible after a later save-settings step) — a different-failure-each-time signature
+    consistent with generic timing flakiness, not a deterministic bug.
+  - Ruled out PR #71 (the only new commit on `main` since run 28's last green check) as the cause before
+    treating this as flakiness: its diff (`git show 42e664d --stat`) touches only
+    `dashboard-content.tsx` + its test + `en.json`/`he.json` — nothing on the project-creation/
+    onboarding-routing path the failing test exercises.
+  - Triggered `rerun_failed_jobs` on the failed run (`29660605522`) and scheduled a self check-in
+    (`send_later`, ~18 min) to confirm the outcome rather than blocking this run on a ~15-minute e2e
+    suite. The check-in confirmed **attempt 3 passed clean** (`conclusion: success`) — both previously
+    failing specs passed, no code changes needed. `main` is green again at `a2319d8`.
+  - Did **not** send a push notification: the rerun confirmed transient flakiness (not a regression),
+    and the backlog state (fully blocked on KAN-18/KAN-20/KAN-43, all needing a human decision) is
+    unchanged from runs 26-28's own reporting — nothing new here the repo owner needs to act on right
+    now, consistent with the standing "only notify on new information" policy.
+- **In progress (exact stopping point):** none — no code changes this run; `main` confirmed green at
+  `a2319d8` after the rerun.
+- **Blocked + why:** unchanged — the entire remaining backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision). No new
+  blocker introduced by this run.
+- **Next step:** unchanged from runs 26-28: (a) a human should confirm whether KAN-18 is actually done
+  now — even stronger evidence than PR #70: the interactive session logged above confirms a real,
+  browser-verified end-to-end Cloud Run deployment (project `growthos-g2w84`) across dev/prod for both
+  `apps/web` and `apps/api`; (b) a human should pick one of PR #2/#3/#5 for KAN-20 and close the other
+  two; (c) the CI-stabilization pass runs 26-28 recommended is still worth doing — this run adds one
+  more data point (a `boards.spec.ts` e2e flake with a different failing assertion each attempt) to the
+  existing evidence of general e2e timing flakiness, still not root-caused.
+- **Waiting on human:**
+  - Confirm KAN-18 status — real GCP/Cloud Run infra evidently exists and now has a *verified working*
+    deployment (not just an incident report) per the interactive session logged above.
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch` (carried over from the interactive session above).
+  - Consider the CI-stabilization pass (shared-emulator/e2e-timing flakiness) runs 26-28 recommended.
+
 ## 2026-07-18 — Interactive session: cloud deployment fixed end-to-end + dashboard entry point (PRs #47, #51, #52, #60, #70, #71)
 
 - **Last completed:** The deployed Cloud Run system (project `growthos-g2w84`, web-dev/web-prod +
