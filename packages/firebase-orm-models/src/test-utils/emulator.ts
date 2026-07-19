@@ -28,10 +28,10 @@ export async function connectToFirestoreEmulator(appName: string): Promise<void>
   // multiple GB), eventually tripping gRPC's 4MB `RESOURCE_EXHAUSTED` limit
   // and failing whichever test happened to be watching at the time.
   // `experimentalForceLongPolling` switches the transport to plain HTTP
-  // long-polling (one request per read, nothing multiplexed/accumulated),
-  // which is the documented workaround for exactly this class of issue —
-  // see https://github.com/firebase/firebase-js-sdk/issues/1674 and
-  // https://github.com/firebase/firebase-js-sdk/issues/6013.
+  // long-polling (one request per read, nothing multiplexed/accumulated) —
+  // the SDK's own `FirestoreSettings` docs point network-reliability
+  // workarounds like this one at
+  // https://github.com/firebase/firebase-js-sdk/issues/1674.
   const firestore = initializeFirestore(app, { experimentalForceLongPolling: true });
   connectFirestoreEmulator(firestore, EMULATOR_HOST, EMULATOR_PORT);
   await FirestoreOrmRepository.initGlobalConnection(firestore);
