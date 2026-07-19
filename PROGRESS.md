@@ -17,6 +17,43 @@ Template for each entry:
 
 ---
 
+## 2026-07-19 — No unblocked work found; confirmed main green, backlog state unchanged (run 32)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` is unchanged from run 31:
+    everything `done` except **KAN-18** (`needs-human`, flagged possibly-stale), **KAN-19**/**KAN-20**
+    (`in-progress`), **KAN-43** (`needs-human`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43). No
+    `todo` row — nothing to pick up as a KAN story this cycle.
+  - Confirmed local `main` matches `origin/main` exactly at `05879fc` (run 31's own PROGRESS.md
+    commit) — no new commits landed since run 31 ended.
+  - Checked open PRs: still exactly **#2, #3, #5**, the same three unreconciled KAN-20
+    implementations, unchanged since 2026-07-04 (no new activity, no new comments).
+  - Checked GitHub Actions on `main`: the latest run (triggered by run 31's own `05879fc` commit) is
+    `completed`/`success`. `main` is green.
+  - Concluded there is genuinely no unblocked task and no new state to act on — this is the same
+    finding runs 28-31 already reported. Made no code changes and did not open a PR (nothing to
+    review or merge). Did not send a push notification: nothing changed since the last report, per
+    the standing "only notify on new information" policy.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** unchanged — the entire remaining backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision).
+- **Next step:** unchanged from run 31: (a) a human confirms whether KAN-18 is actually done now
+  (real, browser-verified Cloud Run deployment logged 2026-07-18); (b) a human picks one of
+  PR #2/#3/#5 for KAN-20 and closes the other two; (c) delete the already-merged
+  `kan-ci-firestore-emulator-listen-leak` branch on GitHub (sandbox git remote 403 blocks this from
+  a run). Future runs should keep skipping this cycle (no-op, no new PROGRESS.md entry needed) until
+  one of these human actions unblocks new work — re-checking every run only adds noise once the
+  state has been re-confirmed this many times running.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete the merged `kan-ci-firestore-emulator-listen-leak` branch (git remote 403 from this
+    sandbox).
+
 ## 2026-07-19 — No unblocked work found; confirmed main green, backlog state unchanged (run 31)
 
 - **Last completed:**
