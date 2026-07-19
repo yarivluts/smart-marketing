@@ -17,6 +17,65 @@ Template for each entry:
 
 ---
 
+## 2026-07-19 — Merged CI-stability fix for the Firestore emulator Listen-stream leak (PR #72, run 30)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` is unchanged: everything `done`
+    except **KAN-18** (`needs-human`, flagged possibly-stale), **KAN-19**/**KAN-20** (`in-progress`),
+    **KAN-43** (`needs-human`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43) — no `todo` row, so no
+    KAN story to pick up this cycle, same as run 29.
+  - Found an open, unmerged **PR #72** (`kan-ci-firestore-emulator-listen-leak`, branched off run 29's
+    own commit `2b13211`) that a run between run 29 and this one had already authored: the real root
+    cause of the `RESOURCE_EXHAUSTED`/growing-`Listen`-stream flakiness runs 26-29 kept observing but
+    never root-caused (43 `*.emulator.test.ts` files each open their own never-closed Firebase app
+    against one shared emulator instance; the client SDK's gRPC transport multiplexes every read, not
+    just `onSnapshot` listeners, onto one `Listen` stream per instance, so open-instance count grew
+    unboundedly over a run). Two compounding fixes: a new vitest `setupFiles` hook
+    (`firestore-emulator-cleanup.ts`) that closes every Firebase app a test file opened as soon as
+    that file's tests finish, plus switching the emulator test connection to
+    `initializeFirestore(..., { experimentalForceLongPolling: true })` (a documented SDK workaround for
+    exactly this multiplexed-stream failure mode). This wasn't a KAN story — pure CI-infra hardening —
+    so it's correctly absent from `TASKS.md`.
+  - Verified rather than trusted the PR's own claims before merging: confirmed GitHub Actions CI was
+    green on the PR's head commit; then, independently, `git checkout`'d the branch locally and ran the
+    full gate myself — `pnpm lint` (green), `pnpm typecheck` (green), `pnpm build` (7/7 tasks green),
+    and `pnpm test` twice (once directly against `packages/firebase-orm-models`: 78/78 files, 773/773
+    tests, both times — still saw `RESOURCE_EXHAUSTED` messages climbing as high as 3.7GB but, exactly
+    as the PR describes, no longer fatal within the retry/timeout budget; once as a full monorepo run:
+    all 11 turbo tasks green — `apps/api` 12/12 suites, `apps/web` 170/170 unit + 19/22 e2e clean with
+    3 flaky-then-pass-on-retry specs matching the *already-documented*, pre-existing e2e timing
+    flakiness from runs 26-29 (`auth.spec.ts`, `ingest-health.spec.ts`, `resource-library.spec.ts` — a
+    diff touching zero `apps/web` files can't have caused a `apps/web` e2e regression), `packages/shared`
+    359/359, `dbt-transform` 104/104, `tracking-sdk` 21/21, `mcp-headless-example` 8/8). Reviewed the
+    3-file diff itself (46 insertions, 8 deletions) — small, well-explained, test-harness-only, no
+    production connection path touched.
+  - Merged **PR #72** into `main` (squash, `cc8e8aa`). Branch deletion failed with the same sandbox
+    git-remote HTTP 403 seen after KAN-24's PR #7 merge (not a real GitHub permissions issue) — the
+    branch `kan-ci-firestore-emulator-listen-leak` is merged and dead but not deleted; a human with
+    direct repo access, or a future run, can delete it.
+- **In progress (exact stopping point):** none — PR #72 is fully merged and verified; `main` is green
+  at `cc8e8aa`. No new KAN story became unblocked by this fix (it's orthogonal infra hardening).
+- **Blocked + why:** unchanged — the entire remaining KAN backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision).
+- **Next step:** (a) a human should confirm whether KAN-18 is actually done now (real, browser-verified
+  Cloud Run deployment per the 2026-07-18 interactive session logged above); (b) a human should pick one
+  of PR #2/#3/#5 for KAN-20 and close the other two; (c) delete the merged `kan-ci-firestore-emulator-
+  listen-leak` branch on GitHub when convenient (sandbox git remote rejects the delete with a 403); (d)
+  keep watching CI health on `main`, not just open PRs — this fix should eliminate the specific
+  `RESOURCE_EXHAUSTED`-cascade failure mode runs 26/28/29 hit, but the *separate*, already-documented
+  e2e URL-routing timing flakiness (`auth.spec.ts`/`boards.spec.ts`/`ingest-health.spec.ts`/
+  `resource-library.spec.ts`, always passing on retry) is still unfixed and still worth a dedicated
+  stabilization pass if it keeps recurring.
+- **Waiting on human:**
+  - Confirm KAN-18 status — real GCP/Cloud Run infra evidently exists and has a verified working
+    deployment (2026-07-18 interactive session).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch` (carried over from the 2026-07-18 interactive session).
+  - Delete the merged `kan-ci-firestore-emulator-listen-leak` branch (git remote 403 from this sandbox).
+
 ## 2026-07-19 — Post-PR#71 CI check: transient e2e flake confirmed, no unblocked story (run 29)
 
 - **Last completed:**
