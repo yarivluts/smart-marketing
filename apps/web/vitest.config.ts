@@ -18,14 +18,20 @@ export default defineConfig({
     include: ['**/*.test.{ts,tsx}'],
     exclude: ['node_modules', '.next'],
     // lib/orgs/*.test.ts hit a real local Firestore emulator (KAN-25), same
-    // as packages/firebase-orm-models' emulator suite — its client SDK's
-    // gRPC channel occasionally corrupts a freshly-opened watch stream
-    // (RESOURCE_EXHAUSTED), a known emulator/client-SDK interaction outside
-    // this repo's control. Same mitigation as that package's vitest.config.ts:
-    // a longer ceiling plus same-process retries reliably ride it out; tests
-    // that never hit the emulator finish in milliseconds regardless.
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
-    retry: 3,
+    // as packages/firebase-orm-models' emulator suite — a confirmed,
+    // unresolved upstream bug (firebase/firebase-tools#8654) where rapid
+    // Listen-stream attach/detach cycles against the emulator can make it
+    // echo back a corrupted, wildly-oversized message, tripping the client
+    // SDK's 4MB RESOURCE_EXHAUSTED limit. Every occurrence self-heals via
+    // the client SDK's own internal backoff given enough wall-clock time on
+    // that one call; a short testTimeout cuts that off mid-backoff, and
+    // retrying reruns the test body (more attach/detach cycles) instead of
+    // waiting out the existing backoff. Same fix as that package's
+    // vitest.config.ts, verified there against repeated full-suite runs:
+    // a long enough ceiling to let a hit clear inside one attempt, with
+    // retry as a last-resort safety net rather than the primary mechanism.
+    testTimeout: 120_000,
+    hookTimeout: 120_000,
+    retry: 1,
   },
 });
