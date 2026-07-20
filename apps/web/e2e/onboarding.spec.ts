@@ -25,10 +25,15 @@ async function createOrganization(page: Page, name: string): Promise<string> {
 
 test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> starter board (KAN-68)', () => {
   test('a new org owner walks the whole wizard end to end', async ({ page }) => {
-    // Installing the SaaS metric pack registers 22 metric definitions sequentially — the same
-    // real-write budget `pack/route.test.ts` and `metric-pack-dispatch.emulator.test.ts` both raise
-    // their own timeout for.
-    test.setTimeout(120_000);
+    // Installing the SaaS metric pack registers 22 metric definitions sequentially against the same
+    // Firestore emulator every other suite in this CI run shares — the same real-write budget
+    // `packages/firebase-orm-models`'s emulator tests get from their 120s package-wide `testTimeout`
+    // (raised by KAN-19/PR #73 for exactly this documented gRPC `RESOURCE_EXHAUSTED` backoff). This
+    // step previously waited only 60s for the pack-install response, which a real CI run (2026-07-20,
+    // workflow run 29745281389) wasn't enough for — the backoff pushed the wait past 60s, and every
+    // one of Playwright's 2 retries then failed too (the emulator was still recovering). Match the
+    // 120s ceiling here and give the whole test enough total budget to cover it.
+    test.setTimeout(180_000);
     await signUp(page, uniqueEmail('onboarding-owner'));
     const orgId = await createOrganization(page, 'Onboarding E2E Org');
 
@@ -44,7 +49,7 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     // Step 1: pick the built-in SaaS/marketing metric pack.
     await expect(page.getByRole('heading', { name: 'Pick a starting point' })).toBeVisible();
     await page.getByRole('button', { name: /SaaS & Marketing Metrics/ }).click();
-    await expect(page.getByRole('heading', { name: 'Connect a data source' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'Connect a data source' })).toBeVisible({ timeout: 120_000 });
 
     // Step 2: mint an ingest.write key ("push your own data"), then continue.
     await page.getByLabel('Name').fill('Website snippet');
