@@ -17,6 +17,71 @@ Template for each entry:
 
 ---
 
+## 2026-07-20 — Fixed the recurring turbo/proxy-env build failure at the config level (PR #74, run 36)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 35: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43). Checked open PRs
+    (still only **#2**/**#3**/**#5**, the same three unreconciled KAN-20 implementations) and
+    confirmed `main`'s last CI run green, per run 35 — no backlog work or human decision unblocked
+    since yesterday, so this run had no KAN story to pick up.
+  - Instead of another no-op confirmation, went after a real recurring problem visible in this
+    file's own history: at least 10+ prior runs (see e.g. run 34's entry, and the many "proxy" hits
+    across 2026-07) hit `pip`'s `SSLError: CERTIFICATE_VERIFY_FAILED: self-signed certificate in
+    certificate chain` while `packages/dbt-transform`'s self-provisioning Python venv tried to
+    install `dbt-core`/`dbt-duckdb` through this sandbox's TLS-intercepting proxy, and every one of
+    them worked around it by hand for that one session (manually exporting `SSL_CERT_FILE`/
+    `REQUESTS_CA_BUNDLE`/etc. before running `pnpm build`/`pnpm test`) rather than fixing it in the
+    repo — so it silently recurred every fresh run. Run 34's own entry even correctly diagnosed why:
+    "turbo doesn't pass ad-hoc shell-exported env vars through to task subprocesses by default" —
+    but that diagnosis was never turned into a committed fix.
+  - Root-caused it properly this run: turbo's default "strict" env mode strips almost the entire
+    ambient environment before spawning a task. Verified empirically — dumped `process.env` from
+    inside `@growthos/dbt-transform`'s build task invoked directly via `pnpm run build` (proxy/CA
+    vars present) vs. the identical task invoked via `turbo run build` (every proxy/CA var absent;
+    only a small npm/pnpm/node-related allowlist survives). Reproduced the resulting failure
+    deterministically (3 turbo failures / 4 direct successes in a row, alternating, identical shell
+    env each time) before committing to the fix, and confirmed the exact same class of latent risk
+    exists for `firebase-tools`' Firestore/Auth emulator jar download in
+    `@growthos/firebase-orm-models#test`.
+  - Fix: added `globalPassThroughEnv` to `turbo.json` (`HTTPS_PROXY`/`https_proxy`/`HTTP_PROXY`/
+    `http_proxy`/`NO_PROXY`/`no_proxy`/`PIP_CERT`/`SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE`/
+    `CURL_CA_BUNDLE`/`NODE_EXTRA_CA_CERTS`/`GIT_SSL_CAINFO`/`NODE_USE_ENV_PROXY`) — these reach
+    every task's spawned process without affecting turbo's cache key (unlike `env`, which would
+    invalidate the cache whenever proxy config changes, which never affects build output). No-op in
+    real GitHub Actions CI, where none of these vars exist.
+  - Not a KAN story (this is build-tooling reliability, not backlog product work), so no `TASKS.md`
+    change and no admin-surface/i18n/Firestore-access implications — a 15-line, single-file,
+    additive-only config diff.
+  - `pnpm lint && pnpm typecheck && pnpm build && pnpm test` all green from a cold `.venv` (dbt
+    provisioning succeeded through the proxy on the first try) — full monorepo, including 868 web
+    unit/component tests and all 22 Playwright e2e specs against real Firebase Auth/Firestore
+    emulators. Self-reviewed the diff (config-only, no logic) before merging; no findings.
+  - Branch `fix-turbo-proxy-env-passthrough`, PR #74, merged into `main` (squash). Remote branch
+    deletion failed with the same HTTP 403 from this sandbox's git remote that prior runs have
+    repeatedly hit (not a GitHub permissions issue) — merged and dead but not deleted; local branch
+    ref removed. A human with direct repo access can delete it on GitHub.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+- **Blocked + why:** the KAN backlog itself is unchanged from run 35 — nothing there is unblocked.
+- **Next step:** next run should still check `TASKS.md`/open PRs first per the standing rule; if
+  still nothing unblocked, this run's pattern (fix a recurring environment/tooling paper-cut
+  instead of another no-op confirmation) is a reasonable model to repeat, but check this file first
+  for whether the same paper-cut has already been fixed.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    16 days unreconciled).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete the merged `fix-turbo-proxy-env-passthrough`, `kan-19-ci-emulator-backoff-timeout`, and
+    `kan-ci-firestore-emulator-listen-leak` branches (git remote 403 from this sandbox on all
+    three, across multiple runs now).
+
+---
+
 ## 2026-07-20 — No unblocked work found; confirmed main green after run 34's merge (run 35)
 
 - **Last completed:**
