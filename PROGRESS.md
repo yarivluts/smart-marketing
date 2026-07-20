@@ -17,6 +17,67 @@ Template for each entry:
 
 ---
 
+## 2026-07-20 — Fixed CI-red on main: stale 60s per-test emulator timeouts undercut KAN-19's 120s fix (PR #75, run 37)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 36: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43). Checked open PRs:
+    still only **#2**/**#3**/**#5** (the same three unreconciled KAN-20 implementations, now 16+
+    days old), no new human decision to act on.
+  - Before repeating another no-op confirmation, checked GitHub Actions directly (rather than
+    trusting run 36's own "all green" self-report) and found **main was actually CI-red**: the
+    workflow run for run 36's own merge commit (`7dd84d9`, run #270) failed in
+    `@growthos/firebase-orm-models#test` — `metric-pack-dispatch.emulator.test.ts`'s reinstall test
+    hit `Test timed out in 60000ms`. Also found run 35's own PROGRESS.md commit (`d1c498e`, run
+    #267) had silently failed CI too, unnoticed at the time (run 35 checked a different, unrelated
+    commit's run and reported main green without checking its own).
+  - Root-caused: this is the exact `RESOURCE_EXHAUSTED` self-heal-backoff failure mode PR #73
+    (run 34, KAN-19) fixed by raising `packages/firebase-orm-models/vitest.config.ts`'s
+    package-wide `testTimeout`/`hookTimeout` to 120s. But four of the heaviest emulator tests
+    (17-44 sequential Firestore round-trips each: metric-pack registration + board seeding, across
+    `metric-pack-dispatch.emulator.test.ts`, `onboarding.emulator.test.ts`,
+    `default-boards.emulator.test.ts`, `saas-metric-pack.emulator.test.ts`) had their own **per-test**
+    `60_000` timeout override predating #73, from when the package default was still 30s. Vitest
+    uses the more specific (per-test) timeout when both are set, so these four tests never actually
+    got #73's benefit and kept the old 60s ceiling — which a recurring backoff can exceed, exactly
+    as it did on `main`'s current head.
+  - Fix: removed all ten stale `60_000` override call sites across the four files so these tests
+    inherit the package's 120s default like every other emulator test. Test-timing config only, no
+    logic change — not a KAN story (CI/test-infra reliability, same category as PR #72/#73), so no
+    `TASKS.md` change and no admin-surface/i18n/Firestore-access-layer implications.
+  - Verified independently rather than trusting the diff alone: ran the previously-failing test in
+    isolation against a real local Firestore emulator — it hit a `RESOURCE_EXHAUSTED` backoff
+    mid-run and self-healed within ~35s, comfortably inside the 120s ceiling. Then ran the full
+    `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — all green (11/11 turbo test tasks,
+    including apps/web's 22 Playwright e2e specs against real Firebase Auth/Firestore emulators; 7/7
+    build tasks).
+  - Branch `fix-kan-19-emulator-test-timeout-override`, PR #75, CI green
+    (`https://github.com/yarivluts/smart-marketing/actions/runs/29738959336`), no review comments,
+    merged into `main` (squash) as `b1a4157`. Remote branch deletion failed with the same HTTP 403
+    from this sandbox's git remote that prior runs have repeatedly hit (not a GitHub permissions
+    issue) — merged and dead but not deleted; local branch ref removed.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+  `main` is confirmed CI-green again as of `b1a4157`.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked.
+- **Next step:** next run should still check `TASKS.md`/open PRs first per the standing rule; if
+  still nothing unblocked, **check the actual GitHub Actions run for `main`'s current head directly**
+  before assuming it's green — this run found two prior runs' self-reported "green" checks had
+  missed a real CI-red state on the commit they were reporting on.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    16+ days unreconciled).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete the merged `fix-kan-19-emulator-test-timeout-override` and
+    `fix-turbo-proxy-env-passthrough` branches (git remote 403 from this sandbox on both, across
+    multiple runs now).
+
+---
+
 ## 2026-07-20 — Fixed the recurring turbo/proxy-env build failure at the config level (PR #74, run 36)
 
 - **Last completed:**
