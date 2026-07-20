@@ -43,7 +43,7 @@ describe('ensureSaasMetricPackDefaultBoardsSeeded', () => {
       expect(saved, `expected board "${defaultBoard.name}" to exist`).toBeDefined();
       expect(saved?.tiles).toEqual(defaultBoard.tiles);
     }
-  }, 60_000); // pack registration (17 metrics) + 3 board creates + 3 tile saves — see saas-metric-pack.emulator.test.ts's own timeout note
+  });
 
   it('is idempotent: a second call seeds nothing new and creates no duplicate boards', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Idempotent Default Boards Org');
@@ -56,7 +56,7 @@ describe('ensureSaasMetricPackDefaultBoardsSeeded', () => {
 
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards).toHaveLength(3);
-  }, 60_000);
+  });
 
   it('leaves a human-renamed-to-match board completely untouched, and still seeds the other two', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Pre-existing Board Org');
@@ -73,7 +73,7 @@ describe('ensureSaasMetricPackDefaultBoardsSeeded', () => {
     const marketing = boards.find((board) => board.name === 'Marketing');
     expect(marketing?.id).toBe(preExisting.id);
     expect(marketing?.tiles).toEqual([]); // left exactly as the human created it — no tiles clobbered in
-  }, 60_000);
+  });
 
   it('is isolated per project: seeding in one project leaves a sibling project untouched', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Isolation Boards Org');
@@ -84,5 +84,5 @@ describe('ensureSaasMetricPackDefaultBoardsSeeded', () => {
 
     const otherProjectBoards = await listBoardsForProject(organization.id, otherProject.id);
     expect(otherProjectBoards).toHaveLength(0);
-  }, 60_000);
+  });
 });

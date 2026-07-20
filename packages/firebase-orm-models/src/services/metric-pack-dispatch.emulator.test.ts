@@ -70,7 +70,7 @@ describe('installPluginAndProvisionBuiltins', () => {
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
     expect(boards.every((board) => board.tiles.length > 0)).toBe(true);
-  }, 60_000); // twenty-two sequential metric registrations — see saas-metric-pack.emulator.test.ts's own timeout note
+  });
 
   it('installing an unrelated plugin registers no metrics and seeds no boards, behaving exactly like the generic installPlugin', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Unrelated Org');
@@ -124,7 +124,7 @@ describe('installPluginAndProvisionBuiltins', () => {
 
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards).toHaveLength(3);
-  }, 60_000); // two full twenty-two-metric passes (install + reinstall)
+  });
 
   it('registers no metrics and seeds no boards when the install itself is rejected (scope consent mismatch)', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Dispatch Rejected Install Org');
