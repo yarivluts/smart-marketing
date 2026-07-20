@@ -17,6 +17,41 @@ Template for each entry:
 
 ---
 
+## 2026-07-20 — No unblocked work found; confirmed main green after run 39's fix (run 40)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 39: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`, both blocked on human decisions), and **KAN-50**/**KAN-51**
+    (`blocked-by` KAN-43).
+  - Checked open PRs: still exactly **#2**/**#3**/**#5**, the same three unreconciled KAN-20
+    implementations (now 16+ days old), no new human decision to act on.
+  - Per run 37/39's lesson (don't trust a prior run's self-reported "green" — verify the actual
+    current `origin/main` HEAD's own CI run), fetched `origin/main` directly (`8de0739`, run 39's
+    PROGRESS.md-only commit) and queried GitHub Actions for its workflow run: `29759159683`
+    (run #277), `completed`/`success`, matching the fetched HEAD exactly.
+  - No code change made — there was nothing unblocked to work on and main's own head is confirmed
+    CI-green, not just an earlier commit.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+  `main` remains CI-green at `8de0739`.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked.
+- **Next step:** next run should still check `TASKS.md`/open PRs first per the standing rule, and
+  verify the actual GitHub Actions run for `main`'s current head directly (not just trust the last
+  entry in this file) before assuming green.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    16+ days unreconciled).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete previously-merged branches still lingering on the remote (git remote 403 from this
+    sandbox across multiple runs now; no `delete_branch`-equivalent tool available via the GitHub
+    MCP server either).
+
+---
+
 ## 2026-07-20 — Fixed CI-red on main: onboarding e2e's pack-install wait undercut KAN-19's 120s ceiling (PR #76, run 39)
 
 - **Last completed:**
