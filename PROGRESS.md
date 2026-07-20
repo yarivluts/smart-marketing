@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-07-20 — Merged CI-stability fix for the Firestore emulator RESOURCE_EXHAUSTED backoff (PR #73, run 34)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 33: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43).
+  - Followed up on run 33's own next step: **PR #73** (`kan-19-ci-emulator-backoff-timeout`,
+    KAN-19) was still open, CI-green on its own head commit since 2026-07-19 19:11Z, and had seen
+    no further activity from the other session in the ~10 hours since — genuinely idle, not still
+    being iterated on. Reviewed it fresh: a small (3-file, 60/-26 line), well-justified,
+    config-only diff raising `testTimeout`/`hookTimeout` to 120s and lowering `retry` to 1 in
+    `packages/firebase-orm-models/vitest.config.ts` and `apps/web/vitest.config.ts` so the
+    Firestore emulator's documented upstream `RESOURCE_EXHAUSTED` bug
+    (firebase/firebase-tools#8654) gets enough wall-clock time to self-heal via the client SDK's
+    own backoff instead of being cut off mid-recovery and retried into a fresh attach/detach cycle.
+  - Verified independently rather than trusting the PR's own report or its CI run: checked out the
+    branch locally and ran the full gate myself. `pnpm lint` and `pnpm typecheck` were green
+    immediately. `pnpm build` and `pnpm test` initially failed on two **sandbox-only** issues
+    unrelated to this PR's diff (neither is a real code problem, and neither needed a code change
+    to fix):
+    1. `packages/dbt-transform`'s self-provisioning Python venv couldn't `pip install dbt-core`
+       through this sandbox's TLS-intercepting proxy (`self-signed certificate in certificate
+       chain`) — pip needed `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE` pointed at
+       `/root/.ccr/ca-bundle.crt` (turbo doesn't pass ad-hoc shell-exported env vars through to
+       task subprocesses by default, so these had to be set on the `pnpm build`/`pnpm test`
+       invocation itself, not just exported beforehand).
+    2. `packages/firebase-orm-models`'s emulator-jar downloader (`firebase-tools`) hung fetching
+       from `storage.googleapis.com` — Node's built-in `fetch`/`undici` on Node ≥22.21 doesn't read
+       `HTTPS_PROXY` unless `NODE_USE_ENV_PROXY=1` is set (confirmed via the proxy's own
+       `/__agentproxy/status` README).
+    With both env vars set, a full `pnpm build` (7/7 tasks) and `pnpm test` (11/11 tasks) ran
+    clean: `dbt-transform` 104/104 dbt tests, `firebase-orm-models` 773/773 (repeatedly hitting the
+    exact `RESOURCE_EXHAUSTED` errors this PR targets, each one clearing within the raised
+    timeout — direct, real confirmation the fix works, not just an absence of failures),
+    `apps/web` 868/868 unit tests **and all 22/22 Playwright e2e specs green with zero flakes**
+    (better than the PR's own report of a handful of flaky-then-pass e2e specs — nothing to flag).
+  - Merged **PR #73** into `main` (squash, `9cd644f`). Branch deletion failed with the same
+    sandbox git-remote HTTP 403 seen after every prior branch merge in this repo's history (not a
+    real GitHub permissions issue, and no MCP tool exposes branch deletion either) — the branch
+    `kan-19-ci-emulator-backoff-timeout` is merged and dead but not deleted.
+- **In progress (exact stopping point):** none — PR #73 is fully merged and independently verified;
+  `main` is green at `9cd644f`. Did not change KAN-19's `in-progress` status in `TASKS.md` — this
+  fix (like PR #72 before it) is CI-infra hardening, not new scope against KAN-19's own AC (preview
+  + staging deploy still need infra / KAN-18).
+- **Blocked + why:** unchanged — the remaining KAN backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision).
+- **Next step:** a future run should (a) confirm `main`'s next GitHub Actions run off `9cd644f` is
+  green (this run's own local, from-scratch reproduction was fully green, so it should be, but
+  hasn't been directly observed on the hosted runner yet); (b) if it's clean, this closes out the
+  CI-red episode runs 32-34 tracked — no need for further action there; (c) otherwise pick the next
+  unblocked sprint-1 `todo`, of which there currently are none — the backlog is fully exhausted
+  down to the `needs-human`/`blocked-by`/KAN-20-reconciliation items below.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete the merged `kan-19-ci-emulator-backoff-timeout` and `kan-ci-firestore-emulator-listen-leak`
+    branches (git remote 403 from this sandbox on both, across multiple runs now).
+
 ## 2026-07-19 — No action taken: concurrent session already fixing a live CI-red regression (run 33)
 
 - **Last completed:**
