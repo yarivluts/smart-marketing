@@ -17,6 +17,42 @@ Template for each entry:
 
 ---
 
+## 2026-07-20 — No unblocked work found; confirmed main green after run 34's merge (run 35)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` is unchanged from run 34: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43).
+  - Followed up on run 34's own next step (a): confirmed GitHub Actions on `main`. The run
+    triggered by run 34's merge commit (`9cd644f`, PR #73) shows `cancelled` — expected, since
+    run 34's own follow-up PROGRESS.md commit (`001ce83`) superseded it on the branch before it
+    finished, which GitHub cancels automatically. The run triggered by that follow-up commit
+    (`001ce83`, run id `29719368760`) is `completed`/`success`. So `main` is confirmed green on
+    its current head — closes out the CI-red episode runs 32-34 tracked; no further action needed
+    there.
+  - Checked open PRs: still only **#2**, **#3**, **#5**, all three independent KAN-20
+    implementations, unchanged since 2026-07-04 (16 days) and still explicitly flagged (by run 4
+    and every run since) as needing a human decision rather than a run picking unilaterally.
+  - Local `main` fast-forwarded to `origin/main` at `001ce83` (was on a detached-HEAD checkout of
+    the same commit at session start; no divergence).
+- **In progress (exact stopping point):** none — this is a clean, no-op confirmation run.
+- **Blocked + why:** unchanged — the remaining KAN backlog is either delivered, gated on
+  KAN-18/KAN-43 (both `needs-human`), or is KAN-20's reconciliation (needs a human decision).
+- **Next step:** none outstanding beyond the waiting-on-human items below. A future run should
+  just re-check `TASKS.md`/open PRs for anything new before repeating this no-op pattern.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    16 days unreconciled).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete the merged `kan-19-ci-emulator-backoff-timeout` and `kan-ci-firestore-emulator-listen-leak`
+    branches (git remote 403 from this sandbox on both, across multiple runs now).
+
+---
+
 ## 2026-07-20 — Merged CI-stability fix for the Firestore emulator RESOURCE_EXHAUSTED backoff (PR #73, run 34)
 
 - **Last completed:**
