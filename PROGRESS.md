@@ -17,6 +17,71 @@ Template for each entry:
 
 ---
 
+## 2026-07-20 — Fixed CI-red on main: onboarding e2e's pack-install wait undercut KAN-19's 120s ceiling (PR #76, run 39)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 38: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43). Checked open PRs:
+    still only **#2**/**#3**/**#5** (the same three unreconciled KAN-20 implementations, now 16+
+    days old), no new human decision to act on.
+  - Per run 37's own lesson (don't trust a prior run's self-reported "green" without checking the
+    actual current HEAD), fetched `origin/main` directly and queried GitHub Actions for **its own
+    commit** (not an older one) — and this time it mattered: run 38's PROGRESS.md-only commit
+    (`21542a4`) had a **failing** CI run (workflow run `29745281389`), which run 38 never checked
+    because it only verified an *earlier* commit (`e1697dc4`) before making its own. `main` had
+    been silently CI-red for ~2 hours.
+  - Root-caused: `lint`/`typecheck`/all 868 vitest tests were green; the failure was Playwright's
+    `e2e/onboarding.spec.ts` (KAN-68 wizard walkthrough) — failed on the first attempt *and* both
+    automatic retries. The first attempt hit the extensively-documented Firestore-emulator gRPC
+    `RESOURCE_EXHAUSTED` backoff (this file has 30+ prior entries on this exact upstream flake)
+    while the SaaS metric pack's 22 sequential metric-definition writes were in flight — but that
+    step only waited **60s** for the pack-install response, well under the **120s** ceiling
+    KAN-19/PR #73 already established package-wide for this same backoff in the
+    `packages/firebase-orm-models` vitest emulator suites. The retries then failed too, most likely
+    because the shared local emulator was still recovering.
+  - Fix (`apps/web/e2e/onboarding.spec.ts`): raised the "Connect a data source" step wait from 60s
+    to 120s to match KAN-19's ceiling, and the test's own `setTimeout` from 120s to 180s so the
+    rest of the wizard still has headroom afterward. Test-timing config only, no logic/product
+    change — not a KAN story (CI/test-infra reliability, same category as PR #72/#73/#75), so no
+    `TASKS.md` change and no admin-surface/i18n/Firestore-access-layer implications.
+  - Verified by reproducing the underlying flake locally against a real Firestore/Auth emulator
+    pair (had to `pnpm build` the whole monorepo first — the sandbox's workspace packages weren't
+    pre-built for direct `firebase emulators:exec` runs): one local run hit the same
+    `RESOURCE_EXHAUSTED` backoff on the first attempt and failed, but with the raised budget the
+    automatic retry then **passed** (1.7m — previously would have exceeded the old 120s test-wide
+    ceiling and failed like it did in CI). A second clean local run passed on the first attempt
+    (26.8s, no retry needed).
+  - Full `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green locally (11/11 turbo
+    test tasks incl. all 22 Playwright e2e specs and 868 vitest tests; 7/7 build tasks). Self-
+    reviewed the diff (a minimal, scoped, comment-documented timing change) before opening the PR —
+    no findings.
+  - Branch `kan-19-onboarding-e2e-timeout`, PR #76, CI green
+    (`https://github.com/yarivluts/smart-marketing/actions/runs/29757486871`), no review comments,
+    merged into `main` (squash) as `ea98143`. Remote branch deletion failed with the same HTTP 403
+    from this sandbox's git remote that prior runs have repeatedly hit (not a GitHub permissions
+    issue) — merged and dead but not deleted; local branch ref removed.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+  `main` is confirmed CI-green again as of `ea98143`.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked.
+- **Next step:** next run should still check `TASKS.md`/open PRs first per the standing rule; if
+  still nothing unblocked, **always check GitHub Actions for the actual current `origin/main` HEAD**
+  (not an earlier commit) before assuming green — this is now the second time a run's own
+  PROGRESS.md-only commit went CI-red after the run had only verified an older commit.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    16+ days unreconciled).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete the merged `kan-19-onboarding-e2e-timeout` and other previously-merged branches still
+    lingering on the remote (git remote 403 from this sandbox across multiple runs now; no
+    `delete_branch`-equivalent tool available via the GitHub MCP server either).
+
+---
+
 ## 2026-07-20 — No unblocked work found; confirmed main green after run 37's fix (run 38)
 
 - **Last completed:**
