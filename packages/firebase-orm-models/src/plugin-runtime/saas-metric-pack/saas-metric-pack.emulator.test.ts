@@ -57,7 +57,7 @@ describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
     organizationId = organization.id;
     projectId = project.id;
     await ensureSaasMetricPackRegistered(organizationId, projectId, owner.id);
-  }, 60_000); // twenty-two sequential registerMetricDefinition round-trips (existence check + save + audit log each) — see vitest.config.ts's own note on this package's emulator timing
+  });
 
   async function activeMetric(name: string): Promise<MetricDefModel | null> {
     return getActiveMetricDefinition(organizationId, projectId, name);
@@ -216,7 +216,7 @@ describe('ensureSaasMetricPackRegistered — idempotency and isolation', () => {
     const adSpend = await getActiveMetricDefinition(organization.id, project.id, 'ad_spend');
     expect(adSpend?.dimensions).toEqual(['region']);
     expect(adSpend?.version).toBe(1);
-  }, 60_000);
+  });
 
   it('is idempotent: a second call registers nothing new and creates no duplicate versions', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Idempotent Org');
@@ -229,7 +229,7 @@ describe('ensureSaasMetricPackRegistered — idempotency and isolation', () => {
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
     expect(defs).toHaveLength(22);
     expect(defs.every((def) => def.version === 1)).toBe(true);
-  }, 60_000); // two full twenty-two-metric passes — see the first test's own timeout note
+  });
 
   it('is isolated per project: registering in one project leaves a sibling project untouched', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Isolation Org');
@@ -239,5 +239,5 @@ describe('ensureSaasMetricPackRegistered — idempotency and isolation', () => {
 
     const metricInOtherProject = await getActiveMetricDefinition(organization.id, otherProject.id, 'ad_spend');
     expect(metricInOtherProject).toBeNull();
-  }, 60_000);
+  });
 });

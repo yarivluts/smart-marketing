@@ -91,7 +91,7 @@ describe('selectOnboardingMetricPack', () => {
 
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
-  }, 60_000); // the pack's own twenty-two sequential metric registrations, same timeout note as metric-pack-dispatch.emulator.test.ts
+  });
 
   it('is idempotent against a pack already installed (e.g. the wizard step retried)', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Onboarding Pack Retry Org');
