@@ -17,6 +17,75 @@ Template for each entry:
 
 ---
 
+## 2026-07-23 — No unblocked work found; CI red on main turned out to be the known emulator flake, confirmed green on re-run (run 58)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 57: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`, both blocked on human decisions), and **KAN-50**/**KAN-51**
+    (`blocked-by` KAN-43).
+  - Checked open PRs: still exactly **#2**/**#3**/**#5**, the same three unreconciled KAN-20
+    implementations, same SHAs, no new activity.
+  - Checked `origin/main`'s actual current-HEAD CI run directly via the GitHub Actions API (per
+    run 57's own reminder to do this, not just trust the last PROGRESS.md entry) and found it
+    **failed** — a first since this pattern of runs started: `main` HEAD `351e6d4` (run 57's own
+    PROGRESS.md-only commit) had a red `Test` step. Since that commit touches only `PROGRESS.md`,
+    a real regression from it was structurally impossible, so treated this as a signal to
+    diagnose, not to panic-notify.
+  - Pulled the job logs: the failure was `saas-metric-pack.emulator.test.ts` hitting two 120s
+    test timeouts, preceded by a cascade of Firestore-emulator `Listen`-stream `RESOURCE_EXHAUSTED`
+    errors reporting absurd message sizes (1.9GB/2.9GB/537MB against a 4MB gRPC max) — this is the
+    **exact, extensively pre-documented upstream Firestore-emulator flake** this file has 30+ prior
+    entries on (see PR #73 and runs 26-29 for the deepest root-cause digs), not a new failure mode.
+  - Ran the full local verification suite fresh to independently corroborate: `pnpm install
+    --frozen-lockfile`, `pnpm lint`, `pnpm typecheck`, `pnpm build` all green. `pnpm test`: every
+    package green (1990+ tests: 868 in `apps/web` vitest, 773 in `firebase-orm-models`, 359 in
+    `shared`, 104/104 dbt tests, all `apps/api` jest suites) **except** `apps/web`'s Playwright e2e
+    layer, where 2 of 22 specs hit the same known flake under local resource contention —
+    `schema-registry.spec.ts` recovered on Playwright's own retry #1 (the usual pattern), but
+    `resource-library.spec.ts` exhausted all 3 attempts this time (a new escalation in severity,
+    same root cause: each attempt failed at a different, unrelated point — an "Add credential"
+    visibility timeout, then a signup-redirect timeout on retry #1 — consistent with emulator/host
+    resource pressure, not a consistent code-level regression).
+  - To get a clean, directly-comparable signal (not just local-environment-contention-flavored
+    evidence), re-triggered the **exact same CI run** (`rerun_failed_jobs` on run `30003534431`,
+    same commit, same runner class) rather than waiting for the next commit to produce a new run.
+    Watched it to completion (~16 min): **fully green** — lint/typecheck/test/build all passed,
+    including the two Playwright specs that were unreliable locally. This is the strongest
+    available evidence the `main` codebase itself is sound and the original failure was
+    infrastructure noise, not a merge-worthy regression.
+  - No code change made — there was nothing unblocked to work on, and the CI redness that
+    triggered the deeper-than-usual investigation this run resolved to "confirmed non-issue,"
+    consistent with every prior occurrence of this flake in this file.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+  `main` is CI-green at `351e6d4` (confirmed via a successful re-run of the same commit's workflow
+  run, not just a fresh commit's own first attempt).
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked.
+- **Next step:** next run should still check `TASKS.md`/open PRs first per the standing rule, and
+  verify the actual GitHub Actions run for `main`'s current head directly before assuming green —
+  but per this run's finding, a single red `Test` step on a doc-only commit is not itself cause for
+  alarm; check the failure signature against the extensively-documented `RESOURCE_EXHAUSTED`
+  Firestore-emulator flake pattern in this file before treating it as a regression, and a
+  `rerun_failed_jobs` re-run (or fresh local `pnpm test`) is enough to confirm one way or the other.
+  If this flake's severity keeps escalating (this run: a spec exhausting all 3 Playwright retries,
+  not just needing 1) it may eventually warrant its own follow-up story (e.g. splitting the
+  Playwright e2e suite across more/lighter-weight CI shards, or raising retry count) rather than
+  continuing to treat every occurrence as free-standing noise — worth a human call if it recurs
+  with this severity again.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    unreconciled since 2026-07-04, now 19+ days).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete previously-merged branches still lingering on the remote (git remote 403 from this
+    sandbox across multiple runs now; no `delete_branch`-equivalent tool available via the GitHub
+    MCP server either).
+
+---
+
 ## 2026-07-23 — No unblocked work found; confirmed main green (run 57)
 
 - **Last completed:**
