@@ -17,6 +17,51 @@ Template for each entry:
 
 ---
 
+## 2026-07-26 — No unblocked work found; state unchanged since run 84's fix (run 85)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 84: no
+    `todo` row anywhere in the Stories table (confirmed via a direct grep, not just re-reading the
+    summary) — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/**KAN-20**
+    (`in-progress`, both blocked on human decisions), and **KAN-50**/**KAN-51** (`blocked-by`
+    KAN-43).
+  - Checked open PRs directly via the GitHub MCP server: still exactly **#2**/**#3**/**#5**
+    (SHAs `b741bf5`/`f6a18c0`/`40a7c30`), same `updated_at` (2026-07-04) as every run since run 60 —
+    the three unreconciled KAN-20 implementations, no new activity in 22 days.
+  - Checked the actual CI result for `main`'s current head (per the standing rule established at
+    run 82, not assuming green): fetched `origin/main`, fast-forwarded local `main` from `87d33c1`
+    to `e920308` (run 84's own merge of PR #77, the Firestore emulator teardown fix). Workflow run
+    `30213723369` for that head is `completed`/`success`. No CI issue to investigate this run.
+  - Listed all remote branches: still just the same long tail of already-merged, undeletable
+    branches (git remote 403 on every delete attempt across many runs, no `delete_branch`-equivalent
+    tool on the GitHub MCP server) plus the three unmerged KAN-20 branches (`feat/`, `feature/`,
+    `kan-20-observability-baseline`) — nothing new, no other in-flight work from a parallel session.
+  - No code change made — nothing unblocked to pick up, and nothing about the repo's state has
+    moved since run 84. Per the standing practice established at run 60 (and followed through run
+    82's "don't spend the user's attention on repeat confirmations"), **no push notification sent**:
+    the KAN-20/KAN-18/KAN-43 blockers are unchanged and already surfaced, and this run's own CI
+    check came back clean, so there is nothing new to alert on.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+  `main` is at `e920308`, CI green.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked.
+- **Next step:** next run should still check `TASKS.md`/open PRs and the actual CI result for
+  `main`'s current head first, per the standing rule. Only send a fresh notification if something
+  has actually changed (a human acted on KAN-18/KAN-20/KAN-43, or new backlog movement appears) —
+  otherwise keep logging silently here.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding, 22+ days).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding, 22+ days).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    unreconciled since 2026-07-04, now 22 days).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete previously-merged branches still lingering on the remote (git remote 403 from this
+    sandbox across multiple runs now; no `delete_branch`-equivalent tool available via the GitHub
+    MCP server either).
+
+---
+
 ## 2026-07-26 — Fixed a real, recurring CI flake: Firestore emulator teardown race (run 84)
 
 - **Last completed:**
