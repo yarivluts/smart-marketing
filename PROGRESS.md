@@ -17,6 +17,78 @@ Template for each entry:
 
 ---
 
+## 2026-07-26 — Fixed a real, recurring CI flake: Firestore emulator teardown race (run 84)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 83: still no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`, both blocked on human decisions), and **KAN-50**/**KAN-51**
+    (`blocked-by` KAN-43). Open PRs still exactly **#2**/**#3**/**#5** (KAN-20, unchanged since
+    2026-07-04, now 22 days).
+  - Per run 83's own "next step," checked the actual CI result for `main`'s head instead of
+    assuming green, and found it had moved: `origin/main` was at `8dbe255` (run 83's own
+    flake-confirmation follow-up commit), and **that commit's own CI run (`30208454492`) had
+    failed** — a second `FIRESTORE (11.10.0) INTERNAL ASSERTION FAILED: Unexpected state (ID:
+    27ce)` unhandled rejection, this time surfacing in `metric-pack-dispatch.emulator.test.ts`
+    (run 83's occurrence was in `google-ads/executor.emulator.test.ts` — a different file, same
+    signature, zero source changes between the two). This is exactly the threshold run 83 itself
+    flagged as worth treating as real: the same signature recurring across a clean rerun on
+    identical code, in a different file each time, points at a genuine teardown-timing bug rather
+    than one-off bad luck.
+  - Investigated instead of re-running-and-hoping: found
+    `packages/firebase-orm-models/src/test-utils/firestore-emulator-cleanup.ts`'s `afterAll` hook
+    (added earlier for a different, already-solved problem — accumulated open gRPC streams
+    tripping `RESOURCE_EXHAUSTED`) closes every test file's Firebase app via `deleteApp()` alone.
+    `deleteApp()` doesn't wait for the Firestore watch stream to close first, so a watch-change
+    message already in flight when the app is torn down can land on a half-closed client and trip
+    the SDK's own `hardAssert` in its watch-change deserializer (`fromWatchChange`/
+    `fromResourceName`) — exactly the assertion ID and call stack seen in both failures. This also
+    explains why the failure always got attributed to whichever *unrelated* test file happened to
+    be running when it fired, rather than the file whose app was actually mid-teardown.
+  - **Fix (branch `fix-firestore-emulator-teardown-flake`, PR #77):** call `terminate(getFirestore(app))`
+    — which gracefully closes the network/watch stream and waits for it, per the Firebase SDK's own
+    recommended teardown order — before `deleteApp(app)`, for every app in the shared cleanup hook.
+    One file changed, `.catch(() => undefined)` kept on both calls so a stray already-terminated app
+    still doesn't fail the hook.
+  - Verified before opening the PR: `pnpm build && pnpm lint && pnpm typecheck` green;
+    `packages/firebase-orm-models`'s own emulator-backed test command — 773/773 green, no unhandled
+    rejection; full root `pnpm test` — 11/11 tasks green including `apps/web`'s Playwright e2e suite
+    against real Firebase emulators (~14 min total).
+  - Self-reviewed the diff before opening the PR (small, single-file, no issues found). Opened PR
+    #77, watched CI (green in ~15 min, run `30212900318`), no review comments, merged (squash) into
+    `main` at `3015807`.
+  - Branch `fix-firestore-emulator-teardown-flake` could not be deleted: `git push origin --delete`
+    hit the same `403` this sandbox has hit on every prior attempt at deleting a merged branch, and
+    there is still no `delete_branch`-equivalent tool on the GitHub MCP server. Left it undeleted,
+    same as every prior run's unresolved branches.
+  - Honest caveat carried into this fix: the flake occurred roughly twice across 84 runs, so a
+    clean local/CI pass doesn't prove `terminate()` eliminates it outright — it's the SDK-recommended
+    mitigation for the exact race the stack trace shows, not a reproduced-and-confirmed-fixed bug.
+    If the identical `(ID: 27ce)` signature recurs after this fix, the next step is a per-test-file
+    audit for a listener that needs its own explicit teardown beyond the app-level `terminate()`.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+  `main` is at `3015807`, CI green.
+- **Blocked + why:** the KAN backlog itself is still unchanged from run 60 — nothing there is
+  unblocked. This run's work was a CI-health fix outside the KAN numbering, not backlog progress.
+- **Next step:** next run picks up the standing routine — check `TASKS.md`/open PRs and the actual
+  CI result for `main`'s head first. Additionally, watch for a *third* occurrence of the
+  `(ID: 27ce)` Firestore assertion signature specifically; if it recurs even after this fix, escalate
+  to a deeper per-file listener audit rather than assuming the mitigation didn't work from a single
+  recurrence (flakes of this rarity need more than one post-fix data point either way).
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding, 22+ days).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding, 22+ days).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    unreconciled since 2026-07-04, now 22 days).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete previously-merged branches still lingering on the remote, including the one this run
+    added (git remote 403 from this sandbox across multiple runs now; no `delete_branch`-equivalent
+    tool available via the GitHub MCP server either).
+
+---
+
 ## 2026-07-26 — No unblocked work found; main CI red for the first time in 22 days (run 83)
 
 - **Last completed:**
