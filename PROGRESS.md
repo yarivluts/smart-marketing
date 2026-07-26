@@ -44,31 +44,34 @@ Template for each entry:
     a bad state under CI resource contention rather than a real regression (no source file changed
     since run 58's exhaustive verification, and 15+ identical-code runs before this one were clean).
   - To get a fresh, real signal rather than guess, pushed this entry (a normal docs-only commit,
-    same pattern every run uses) and let it retrigger CI on the new HEAD — see the follow-up note
-    below on what that run showed, before this entry's push completes this run.
-  - No code change made — there was still nothing unblocked in the backlog to pick up.
+    same pattern every run uses) and let it retrigger CI on the new HEAD.
+  - **Follow-up (same run, ~20min later):** workflow run `30207662606` for the retriggering commit
+    `bdac959` completed **`success`** in ~18min (15:11-15:29) — back to the normal duration and a
+    clean pass, all 773 tests green. This confirms the flake theory: run 82's `30203505244` failure
+    was a one-off Firestore JS SDK emulator flake (a `FIRESTORE INTERNAL ASSERTION FAILED` thrown
+    from the SDK's own watch-stream deserializer, not our code), not a real regression — no source
+    file has changed across any of this. Re-checked `TASKS.md` and open PRs again at the same time:
+    both still identical to the top of this entry, no human action landed in the last 20 minutes.
+    Per the standing "don't spend the user's attention on repeat confirmations" rule established at
+    run 60, **no push notification sent** — the one open question this run raised (was the CI
+    failure a fluke or a recurring problem?) is now answered "fluke," so there's nothing new to
+    alert on.
+  - No code change made beyond the two PROGRESS.md entries — there was still nothing unblocked in
+    the backlog to pick up.
 - **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
-- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked. The CI
-  failure above is not a backlog item and, on the evidence gathered, looks like a one-off Firestore
-  JS SDK emulator flake rather than a regression — but it's flagged to the human below since it's
-  the first red main CI run in 22+ days and deserves eyes rather than being silently assumed-flaky
-  forever.
-- **Next step:** next run should re-verify the CI result for `main`'s new HEAD (this run's own
-  commit) first. If it's green, this was a one-off flake — no action needed beyond noting it here.
-  If it fails again with the same `executor.emulator.test.ts` / Firestore internal-assertion
-  signature, that's no longer a coincidence and should be investigated as a real flaky-test
-  problem (e.g. the emulator test's realtime listener not being torn down cleanly, or a resource
-  ceiling in the CI runner) — likely worth an explicit retry/backoff or listener-cleanup fix in
-  that test file. Otherwise, keep checking `TASKS.md`/open PRs first per the standing rule.
+  `main` is at `bdac959`, CI green.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked.
+- **Next step:** keep checking `TASKS.md`/open PRs and the actual CI result for `main`'s head first,
+  per the standing rule. If the same `executor.emulator.test.ts` / Firestore internal-assertion
+  signature ever recurs, treat it as a real flaky-test problem worth fixing (e.g. a realtime
+  Firestore listener not being torn down cleanly between tests) rather than assuming-flaky forever
+  — but a single occurrence followed by a clean rerun on identical code is not that yet.
 - **Waiting on human:**
   - Confirm KAN-18 status (still outstanding, 22+ days).
   - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
     outstanding, 22+ days).
   - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
     unreconciled since 2026-07-04, now 22 days).
-  - **New:** be aware `main`'s CI went red once (run 82's commit, workflow run `30203505244`) —
-    looks like a Firestore-emulator test flake, not a code regression; see above. Worth a look if
-    it recurs.
   - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
     `patches/@arbel__firebase-orm@1.9.97.patch`.
   - Delete previously-merged branches still lingering on the remote (git remote 403 from this
