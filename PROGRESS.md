@@ -17,6 +17,66 @@ Template for each entry:
 
 ---
 
+## 2026-07-26 — No unblocked work found; main CI red for the first time in 22 days (run 83)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 82: no
+    `todo` row — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`, both blocked on human decisions), and **KAN-50**/**KAN-51**
+    (`blocked-by` KAN-43).
+  - Checked open PRs directly via the GitHub MCP server: still exactly **#2**/**#3**/**#5**
+    (SHAs `b741bf5`/`f6a18c0`/`40a7c30`), same `updated_at` (2026-07-04) as every prior run since
+    run 60 — the three unreconciled KAN-20 implementations, no new activity in 22 days.
+  - Verified `origin/main`'s HEAD directly via `git fetch`: matched the local checkout exactly
+    (`7ce747d`, run 82's own commit) — no divergence.
+  - **New this run:** checked the actual GitHub Actions run for that HEAD instead of assuming
+    green (per run 82's own "next step" instruction) and found workflow run `30203505244`
+    (triggered by run 82's PROGRESS.md-only push) came back **`failure`** — the first non-success
+    CI run on `main` since at least run 68 (15+ consecutive prior runs all `success`, going back to
+    2026-07-24). Pulled the job logs: `lint`/`typecheck` passed, `build` was skipped, and `test`
+    failed with 6/773 tests red, all in one file —
+    `packages/firebase-orm-models/src/plugin-runtime/google-ads/executor.emulator.test.ts` — every
+    failure the identical `FIRESTORE (11.10.0) INTERNAL ASSERTION FAILED: Unexpected state (ID:
+    27ce)` thrown from the `@firebase/firestore` SDK's own watch-stream deserializer
+    (`fromWatchChange`/`fromResourceName`), not from any assertion in our test code. The job also
+    took **1621s** for the test step alone, far outside its normal range for a docs-only commit
+    with zero code changes — consistent with the emulator's realtime listener stream getting into
+    a bad state under CI resource contention rather than a real regression (no source file changed
+    since run 58's exhaustive verification, and 15+ identical-code runs before this one were clean).
+  - To get a fresh, real signal rather than guess, pushed this entry (a normal docs-only commit,
+    same pattern every run uses) and let it retrigger CI on the new HEAD — see the follow-up note
+    below on what that run showed, before this entry's push completes this run.
+  - No code change made — there was still nothing unblocked in the backlog to pick up.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked. The CI
+  failure above is not a backlog item and, on the evidence gathered, looks like a one-off Firestore
+  JS SDK emulator flake rather than a regression — but it's flagged to the human below since it's
+  the first red main CI run in 22+ days and deserves eyes rather than being silently assumed-flaky
+  forever.
+- **Next step:** next run should re-verify the CI result for `main`'s new HEAD (this run's own
+  commit) first. If it's green, this was a one-off flake — no action needed beyond noting it here.
+  If it fails again with the same `executor.emulator.test.ts` / Firestore internal-assertion
+  signature, that's no longer a coincidence and should be investigated as a real flaky-test
+  problem (e.g. the emulator test's realtime listener not being torn down cleanly, or a resource
+  ceiling in the CI runner) — likely worth an explicit retry/backoff or listener-cleanup fix in
+  that test file. Otherwise, keep checking `TASKS.md`/open PRs first per the standing rule.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding, 22+ days).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding, 22+ days).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    unreconciled since 2026-07-04, now 22 days).
+  - **New:** be aware `main`'s CI went red once (run 82's commit, workflow run `30203505244`) —
+    looks like a Firestore-emulator test flake, not a code regression; see above. Worth a look if
+    it recurs.
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete previously-merged branches still lingering on the remote (git remote 403 from this
+    sandbox across multiple runs now; no `delete_branch`-equivalent tool available via the GitHub
+    MCP server either).
+
+---
+
 ## 2026-07-26 — No unblocked work found; state unchanged since run 60's escalation (run 82)
 
 - **Last completed:**
