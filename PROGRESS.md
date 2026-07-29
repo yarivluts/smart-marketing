@@ -17,6 +17,45 @@ Template for each entry:
 
 ---
 
+## 2026-07-29 — No unblocked work found; state unchanged since run 106 (run 107)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Grepped `TASKS.md`'s Stories table for
+    `| todo |` — zero matches, unchanged from run 106. Everything is `done` except **KAN-18**/
+    **KAN-43** (`needs-human`), **KAN-19**/**KAN-20** (`in-progress`, both blocked on human
+    decisions), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43).
+  - Local checkout was again left in a detached-HEAD state from a prior run's snapshot;
+    fast-forwarded onto `origin/main` via `git checkout main && git pull` — clean fast-forward
+    (`87d33c1..1277d83`), no conflicts.
+  - Checked open PRs via the GitHub MCP server: still exactly **#2**/**#3**/**#5** (same SHAs
+    `b741bf5`/`f6a18c0`/`40a7c30`, same 2026-07-04 `created_at`/`updated_at`) — the three
+    unreconciled KAN-20 implementations, unchanged since run 60.
+  - Verified the actual CI result for `main`'s current head (`1277d83`, run 106's own commit)
+    rather than assuming green: the `ci.yml` workflow run for that SHA is `completed`/`success`.
+  - No code change made — nothing unblocked to pick up, nothing about the repo's state has moved
+    since run 106. Per the standing practice (established at run 60), **no push notification
+    sent**: the KAN-18/KAN-20/KAN-43 blockers are unchanged and already surfaced, and CI is green.
+- **In progress (exact stopping point):** none — clean stopping point. `main` is at `1277d83`
+  before this entry's own commit, CI green.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked.
+- **Next step:** next run should still check `TASKS.md`/open PRs and the actual CI result for
+  `main`'s current head first, per the standing rule. Only send a fresh notification if something
+  has actually changed (a human acted on KAN-18/KAN-20/KAN-43, or new backlog movement appears) —
+  otherwise keep logging silently here.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding, 25+ days).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding, 25+ days).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    unreconciled since 2026-07-04, now 25 days).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete previously-merged branches still lingering on the remote (git remote 403 from this
+    sandbox across multiple runs now; no `delete_branch`-equivalent tool available via the GitHub
+    MCP server either).
+
+---
+
 ## 2026-07-29 — No unblocked work found; state unchanged since run 105 (run 106)
 
 - **Last completed:**
