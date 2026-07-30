@@ -17,6 +17,74 @@ Template for each entry:
 
 ---
 
+## 2026-07-30 — No unblocked work found; main CI red on run 114's own commit, investigated (run 115)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md` unchanged from run 114: zero
+    `todo` rows — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`, both blocked on human decisions), and **KAN-50**/**KAN-51**
+    (`blocked-by` KAN-43).
+  - Checked open PRs via the GitHub MCP server: still exactly **#2**/**#3**/**#5** (same SHAs
+    `b741bf5`/`f6a18c0`/`40a7c30`), unchanged since run 60 — the three unreconciled KAN-20
+    implementations.
+  - Local checkout was again a stale detached-HEAD sandbox snapshot (also briefly investigated an
+    apparent history-divergence red flag — `git merge-base` couldn't find common ancestry between
+    the local chain and some cached older commit SHAs from `git log --all`; turned out to be a false
+    alarm, this is a **shallow clone** (`git rev-parse --is-shallow-repository` → true, only ~50
+    commits fetched), not lost work or a force-push). Reset local `main` to `origin/main` (`ea52a30`,
+    run 114) via `git checkout -B main origin/main`.
+  - **New this run:** checked the actual GitHub Actions run for `main`'s head instead of assuming
+    green (the standing instruction from run 113/114's own "next step") and found it had moved: run
+    114's own docs-only commit (`ea52a30`) triggered workflow run `30545865934`, which came back
+    **`failure`** — the first non-success CI run since run 82/84 (30+ consecutive prior runs green).
+    `lint`/`typecheck` passed, `build` was skipped, `test` failed. Pulled the job logs: the failure
+    was in `packages/firebase-orm-models/src/plugin-runtime/engagement-pack/engagement-pack.emulator.test.ts`
+    (`ensureEngagementPackRegistered — idempotency and isolation > is isolated per project`),
+    preceded by `@firebase/firestore` `RESOURCE_EXHAUSTED: Received message larger than max
+    (3533549011 vs 4194304)` (a nonsensical corrupted-size value) and a `FIRESTORE INTERNAL
+    ASSERTION FAILED: Unexpected state (ID: ca9) CONTEXT: {"pendingResponses":-1}` unhandled
+    rejection thrown from the SDK's own watch-stream deserializer — not from any assertion in our
+    test code, and on a commit that only touched `PROGRESS.md` (zero source changes).
+  - This is the same **documented, already-investigated flake class**: the 2026-07-14 entry ("No
+    unblocked story; investigated + ruled out a speculative CI-flake fix") reproduced the identical
+    `RESOURCE_EXHAUSTED: Received message larger than max (... vs 4194304)` signature in this exact
+    file (`engagement-pack.emulator.test.ts`) and concluded it's a corrupted/oversized gRPC `Listen`
+    stream, not simple thread contention — a real fix needs reconnect-on-retry logic, which no run
+    has attempted yet (scoped as its own investigation, harder than PR #77's teardown-ordering fix
+    for the *different* `(ID: 27ce)` assertion signature from runs 83/84). Run 83/84's playbook
+    (single red run → retrigger with a normal docs-only commit → treat a same-signature *recurrence*
+    as real, a clean rerun as confirmation of "fluke") applies directly here.
+  - Per that playbook, pushed this entry (a normal docs-only commit, same pattern every run uses) to
+    retrigger CI on a fresh HEAD rather than guessing.
+  - No code change made beyond this PROGRESS.md entry — still nothing unblocked in the backlog to
+    pick up, and the CI flake is already fully diagnosed from the 2026-07-14 investigation with a
+    known, scoped-but-unbuilt fix path (reconnect-on-`RESOURCE_EXHAUSTED` retry) rather than an open
+    question.
+- **In progress (exact stopping point):** none — clean stopping point pending this commit's own CI
+  result.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked. The emulator
+  flake is a known, previously-scoped fix (not blocking anything) rather than a new blocker.
+- **Next step:** next run should check this commit's own CI result first. If green, that's a third
+  data point supporting "known rare flake, not a regression" — no notification needed, same "don't
+  spend the user's attention on repeat confirmations" rule as run 60/83. If a *third* occurrence of
+  the `RESOURCE_EXHAUSTED (... vs 4194304)` / `engagement-pack.emulator.test.ts` signature shows up
+  again soon, that's worth escalating to actually building the reconnect-on-retry fix the 2026-07-14
+  entry scoped out, rather than re-deferring indefinitely. Otherwise keep checking `TASKS.md`/open
+  PRs and the actual CI result for `main`'s head first, per the standing rule.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding, 28+ days).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding, 28+ days).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    unreconciled since 2026-07-04, now 26 days).
+  - Merge upstream `yarivluts/firebase-orm#121` and publish `1.9.98`, then remove
+    `patches/@arbel__firebase-orm@1.9.97.patch`.
+  - Delete previously-merged branches still lingering on the remote (git remote 403 from this
+    sandbox across multiple runs now; no `delete_branch`-equivalent tool available via the GitHub
+    MCP server either).
+
+---
+
 ## 2026-07-30 — No unblocked work found; state unchanged since run 113 (run 114)
 
 - **Last completed:**
