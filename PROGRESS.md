@@ -60,17 +60,24 @@ Template for each entry:
     pick up, and the CI flake is already fully diagnosed from the 2026-07-14 investigation with a
     known, scoped-but-unbuilt fix path (reconnect-on-`RESOURCE_EXHAUSTED` retry) rather than an open
     question.
-- **In progress (exact stopping point):** none — clean stopping point pending this commit's own CI
-  result.
+  - **Follow-up (same run, ~18min later):** workflow run `30555712307` for the retriggering commit
+    `ac8a286` completed **`success`** (Test finished 15:16:12→15:30:35Z, ~14min, within normal range;
+    Build green too). This is the second clean rerun on effectively identical code confirming the
+    run-114 failure was the known, already-diagnosed `engagement-pack.emulator.test.ts`
+    `RESOURCE_EXHAUSTED` flake, not a regression. Re-checked `TASKS.md` and open PRs again at the
+    same time: still zero `todo` rows and still exactly PRs #2/#3/#5 (KAN-20), no human action landed
+    in the interim. Per the standing "don't spend the user's attention on repeat confirmations" rule
+    (established run 60, applied at run 83), **no push notification sent** — the one open question
+    this run raised (was the CI failure a fluke or a recurring problem?) is answered "fluke."
+- **In progress (exact stopping point):** none — clean stopping point. `main` is at `ac8a286`, CI
+  green.
 - **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked. The emulator
   flake is a known, previously-scoped fix (not blocking anything) rather than a new blocker.
-- **Next step:** next run should check this commit's own CI result first. If green, that's a third
-  data point supporting "known rare flake, not a regression" — no notification needed, same "don't
-  spend the user's attention on repeat confirmations" rule as run 60/83. If a *third* occurrence of
-  the `RESOURCE_EXHAUSTED (... vs 4194304)` / `engagement-pack.emulator.test.ts` signature shows up
-  again soon, that's worth escalating to actually building the reconnect-on-retry fix the 2026-07-14
-  entry scoped out, rather than re-deferring indefinitely. Otherwise keep checking `TASKS.md`/open
-  PRs and the actual CI result for `main`'s head first, per the standing rule.
+- **Next step:** keep checking `TASKS.md`/open PRs and the actual CI result for `main`'s head first,
+  per the standing rule. If the `RESOURCE_EXHAUSTED (... vs 4194304)` / `engagement-pack.emulator.test.ts`
+  signature recurs a third time, treat it as worth escalating to actually building the
+  reconnect-on-retry fix the 2026-07-14 entry scoped out, rather than re-deferring indefinitely — but
+  two rare occurrences with clean reruns is not that yet.
 - **Waiting on human:**
   - Confirm KAN-18 status (still outstanding, 28+ days).
   - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
