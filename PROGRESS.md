@@ -17,6 +17,48 @@ Template for each entry:
 
 ---
 
+## 2026-07-31 — No unblocked work found; state unchanged since run 117 (run 118)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table has zero
+    `| todo |` rows (confirmed via grep), unchanged from run 117. Everything is `done` except
+    **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/**KAN-20** (`in-progress`, both blocked on
+    human decisions), and **KAN-50**/**KAN-51** (`blocked-by` KAN-43).
+  - Local checkout was again a stale detached-HEAD sandbox snapshot (local `main` pinned at run 61,
+    far behind `origin/main`). Fetched `origin/main` and reset local `main` to match
+    (`git branch -f main origin/main && git checkout main`) — confirmed `origin/main`'s head is
+    `5dbc3bf` (run 117's own commit), matching the sandbox's detached HEAD exactly, so no divergent
+    history to reconcile this time.
+  - Checked open PRs via the GitHub MCP server: still exactly **#2**/**#3**/**#5** (same SHAs
+    `b741bf5`/`f6a18c0`/`40a7c30`, same 2026-07-04 `created_at`/`updated_at`) — the three
+    unreconciled KAN-20 implementations, unchanged since run 60.
+  - Verified the actual CI result for `main`'s current head (`5dbc3bf`, run 117's commit) rather
+    than assuming green: workflow run `30573564501` is `completed`/`success`.
+  - Checked the environment for any sign KAN-18 (GCP/Firebase project provisioning) has landed
+    since the last check — no GCP/Firebase/Sentry/OTel/Redis/BigQuery env vars present, no `.env`
+    file. Still nothing to flip KAN-18 off `needs-human`.
+  - No code change made — nothing unblocked to pick up, nothing about the repo's state has moved
+    since run 117. Per the standing practice (established run 60), no push notification sent: the
+    KAN-18/KAN-20/KAN-43 blockers are unchanged and already surfaced, and CI is green.
+- **In progress (exact stopping point):** none — clean stopping point. `main` is at `5dbc3bf`
+  before this entry's own commit, CI green.
+- **Blocked + why:** the KAN backlog itself is unchanged — nothing there is unblocked.
+- **Next step:** next run should still check `TASKS.md`/open PRs and the actual CI result for
+  `main`'s current head first, per the standing rule. Only send a fresh notification if something
+  has actually changed (a human acted on KAN-18/KAN-20/KAN-43, or new backlog movement appears) —
+  otherwise keep logging silently here.
+- **Waiting on human:**
+  - Confirm KAN-18 status (still outstanding, 29+ days).
+  - **KAN-43** — submit Google Ads dev token + Meta app / Marketing API review (LONG LEAD, still
+    outstanding, 29+ days).
+  - **KAN-20** — decide which of PR #2/#3/#5 to keep and close the other two (still outstanding,
+    unreconciled since 2026-07-04, now 27 days).
+  - Delete previously-merged branches still lingering on the remote (git remote 403 from this
+    sandbox across multiple runs now; no `delete_branch`-equivalent tool available via the GitHub
+    MCP server either).
+
+---
+
 ## 2026-07-30 — No unblocked work found; state unchanged since run 116 (run 117)
 
 - **Last completed:**
