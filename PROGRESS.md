@@ -17,6 +17,47 @@ Template for each entry:
 
 ---
 
+## 2026-08-02 — No unblocked work found; re-flagging cadence to the repo owner (run 138)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows — everything `done` except **KAN-18**/**KAN-43** (`needs-human`), **KAN-19**/
+    **KAN-20** (`in-progress`, both blocked on a human decision), and **KAN-50**/**KAN-51**
+    (`blocked-by` KAN-43). Unchanged from run 137.
+  - Checked open PRs via the GitHub MCP server: still exactly **#2**/**#3**/**#5** (same SHAs
+    `b741bf5`/`f6a18c0`/`40a7c30`), the three unreconciled KAN-20 implementations, now **29 days**
+    old (opened 2026-07-04).
+  - No code change made — nothing unblocked to pick up.
+  - Run 60 (2026-07-23) already sent a push notification flagging this exact blocker and suggesting
+    the cadence be reduced until a human acts. That was **10 days and 78 runs ago**
+    (`grep -c '(no unblocked work' PROGRESS.md` shows the vast majority of runs 61-137 found the
+    identical state). Checked `list_triggers`: the routine (`trig_0167iEpHg2iBmtYXXno9GEr2`,
+    "GrowthOS autonomous build") is still firing every 2 hours (`0 5-19/2 * * *`), unchanged since
+    run 60's suggestion. Given the KAN-43 item was explicitly "LONG LEAD - submit in week 1" and is
+    now nearly a month overdue with no sign of action, and per the routine's own notification policy
+    (silence when nothing actionable changed, but flag when a genuinely time-sensitive, still-unactioned
+    item persists), sent a second push notification — this one also naming the cron schedule directly
+    and recommending the human either act on the three blockers or explicitly pause/slow the routine.
+- **In progress (exact stopping point):** none — nothing was started.
+- **Blocked + why:** the only remaining backlog items are `needs-human` (KAN-18, KAN-43) or
+  `blocked-by`/`in-progress` pending a human decision (KAN-19, KAN-20, KAN-50, KAN-51). There is no
+  unblocked `todo` row for a scheduled run to pick up.
+- **Next step:** unchanged from every run since ~60 — a human needs to either (a) resolve KAN-20 by
+  picking one of PR #2/#3/#5 and closing the rest, or explicitly instruct a run to reconcile it, and
+  (b) action KAN-18 (GCP/Firebase project + billing + secrets) and KAN-43 (Google Ads/Meta API
+  applications) to unblock the infra-dependent backlog. Until either happens, future scheduled runs
+  will keep finding the same "no unblocked work" state.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, now 29
+    days old.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, was
+    supposed to be submitted "week 1") — still outstanding, ~29 days overdue.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+  - Consider pausing or slowing the `GrowthOS autonomous build` trigger (every 2h, 5-19 UTC) until
+    one of the above is actioned, to stop spending runs on repeat confirmation of the same state.
+
+---
+
 ## 2026-08-02 — No unblocked work found; state unchanged since run 136 (run 137)
 
 - **Last completed:**
