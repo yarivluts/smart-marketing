@@ -17,6 +17,44 @@ Template for each entry:
 
 ---
 
+## 2026-08-02 — No unblocked work found; state unchanged since run 135 (run 136)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows (`grep -oE '\| (todo|in-progress|done|needs-human|blocked-by) \|' TASKS.md | sort
+    | uniq -c` → 56 `done`, 2 `in-progress` (KAN-19, KAN-20), 2 `needs-human` (KAN-18, KAN-43), 2
+    `blocked-by` (KAN-50, KAN-51)), unchanged from run 135.
+  - Local checkout was again a stale detached-HEAD sandbox snapshot; `git fetch origin main`
+    confirmed `origin/main` matched exactly (`49698bf`, run 135's own commit) — no divergent history
+    to reconcile.
+  - Checked open PRs via the GitHub MCP server: still exactly **#2**/**#3**/**#5** (same SHAs
+    `b741bf5`/`f6a18c0`/`40a7c30`, same `created_at`/`updated_at` timestamps from 2026-07-04) — the
+    three unreconciled KAN-20 implementations, unchanged since run 60, now 29 days old.
+  - Checked the environment for any sign KAN-18 (GCP/Firebase project provisioning) has landed since
+    the last check — no GCP/Firebase/Google/Sentry/OTel/Redis/BigQuery/Meta/Ads env vars present, no
+    `.env` file, no `firebase` CLI on PATH. Still nothing to flip KAN-18 off `needs-human`.
+  - No code change made — nothing unblocked to pick up, nothing about the repo's state has moved
+    since run 135. Per the standing practice (established run 60), no push notification sent: state
+    is unchanged, not newly blocked.
+- **In progress (exact stopping point):** none — nothing was started.
+- **Blocked + why:** the only remaining backlog items are `needs-human` (KAN-18, KAN-43) or
+  `blocked-by`/`in-progress` pending a human decision (KAN-19, KAN-20, KAN-50, KAN-51). There is no
+  unblocked `todo` row for a scheduled run to pick up.
+- **Next step:** unchanged from every run since ~60 — a human needs to either (a) resolve KAN-20 by
+  picking one of PR #2/#3/#5 and closing the rest, or explicitly instruct a run to reconcile it, and
+  (b) action KAN-18 (GCP/Firebase project + billing + secrets) and KAN-43 (Google Ads/Meta API
+  applications) to unblock the infra-dependent backlog. Until either happens, future scheduled runs
+  will keep finding the same "no unblocked work" state — consider pausing or reducing the cadence of
+  this routine until a human has acted on one of the two.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, now 29
+    days old.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets — still outstanding.
+
+---
+
 ## 2026-08-02 — No unblocked work found; state unchanged since run 134 (run 135)
 
 - **Last completed:**
