@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-08-04 — E0.2 GCP infra Terraform-ized (KAN-18, run 150)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Found `TASKS.md`'s KAN-18 row had been
+    corrected by an interactive session yesterday (commit `f2d6b61`, human-confirmed): real GCP infra
+    already exists for project `growthos-g2w84` (Cloud Run x4, Firestore, Artifact Registry, Secret
+    Manager), moving KAN-18 from `needs-human` to `in-progress`. This sandbox still has no `gcloud`/
+    `firebase` CLI and no real GCP credentials (only inert `CLOUDSDK_PROXY_*` env vars), so applying
+    anything against the real project remains out of reach here — same constraint every prior run
+    hit.
+  - Found **PR #78** (`kan-18-terraform-iac`), already open against the current `main`
+    (`f2d6b61`) from an earlier run today: `infra/terraform/` covering exactly the resources
+    above (4 `google_cloud_run_v2_service`, the Artifact Registry repo, the default Firestore
+    database, the 2 Secret Manager secret containers) — deliberately **not applied**, with
+    `infra/terraform/README.md` documenting the `terraform import` commands a human needs to run
+    first, and explicitly *not* modeling IAM invoker bindings or Firestore collection-group index
+    exemptions (no credentials to read them back accurately). A new CI job runs `terraform fmt
+    -check`/`validate` (no credentials needed) alongside the existing `pnpm lint/typecheck/test/
+    build`; both were green (`mergeable_state: clean`).
+  - Independently reviewed the full diff: resource definitions match the documented real infra
+    1:1, `ignore_changes` on the Cloud Run services correctly avoids fighting `deploy/
+    cloudbuild.*.yaml`'s own `gcloud run deploy` step over the container image, `prevent_destroy`
+    guards the one Firestore database every model in `@growthos/firebase-orm-models` depends on,
+    and no secret values or state are committed. One pre-existing rough edge, already flagged
+    in-code via a `TODO(human)` comment (not introduced by this review): `firestore_location_id`
+    defaults to `me-west1`, which the same comment admits needs confirming against the real
+    database before import — appropriately left for a human with real credentials rather than
+    guessed. No other correctness bugs found; nothing to fix.
+  - Squash-merged PR #78 into `main` (`0300309`). Remote branch deletion failed with the same
+    HTTP 403 from this sandbox's git remote seen in every prior run's cleanup attempt — merged and
+    dead but not deleted (`kan-18-terraform-iac`).
+  - No push notification sent: this is normal, expected backlog progress (a PR reviewed and
+    merged), not a change to the three blockers already flagged to the human at run 138 two days
+    ago (KAN-20 PR reconciliation, KAN-43 applications, KAN-18's remaining BigQuery/Pub/Sub/Redis/
+    staging/import-plan scope) — none of which moved this run.
+- **In progress (exact stopping point):** none — this is a clean, self-contained stopping point.
+- **Blocked + why:** `TASKS.md` still has zero `todo` rows (56 `done`, 3 `in-progress` — KAN-18/19/
+  20, 1 `needs-human` — KAN-43, 2 `blocked-by` — KAN-50/51). KAN-18's remaining scope (running the
+  `terraform import`/`plan` from the merged PR, then BigQuery/Pub/Sub/Redis/a staging environment)
+  needs real GCP credentials and human design decisions this sandbox can't make blind. KAN-19's
+  remaining scope (preview/staging deploy wiring) needs a GCP service-account secret in GitHub
+  Actions — also human/secrets territory. KAN-20 needs a human to pick between PR #2/#3/#5.
+- **Next step:** same as every run since ~60 — a human needs to (a) pick a KAN-20 PR and close the
+  other two, (b) run the KAN-18 Terraform import + plan against real credentials and decide on
+  BigQuery/Pub/Sub/Redis/staging shape, and (c) submit the KAN-43 Google Ads/Meta applications.
+  Until one of those lands, future scheduled runs will keep finding no unblocked `todo` work,
+  though — as this run showed — a human (or another session with real credentials) actively
+  chipping away at KAN-18/19/20's `in-progress` notes can still produce mergeable PRs a scheduled
+  run should review and merge even without a `todo` row to point at.
+- **Waiting on human:**
+  - Decide which KAN-20 PR to keep (#2, #3, or #5) and close the others — still outstanding, now a
+    month old.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding, ~30 days overdue.
+  - **KAN-18** — run `terraform import`/`plan` from the newly-merged `infra/terraform/` against
+    real credentials, then decide BigQuery/Pub/Sub/Redis/staging-environment shape.
+  - Optional: delete the merged `kan-18-terraform-iac` branch (403'd from this sandbox), and the
+    long-stale `kan-20-observability-baseline`/`feature/kan-20-observability-baseline`/
+    `feat/kan-20-observability-baseline` branches once KAN-20 is reconciled.
+
+---
+
 ## 2026-08-03 — No unblocked work found; state unchanged since run 148 (run 149)
 
 - **Last completed:**
