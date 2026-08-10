@@ -17,6 +17,7 @@
     "@growthos/shared": "workspace:*",
     "@growthos/tracking-sdk": "workspace:*",
     "@radix-ui/react-slot": "^1.1.1",
+    "@sentry/nextjs": "^10.63.0",
     "class-variance-authority": "^0.7.1",
     "client-only": "^0.0.1",
     "clsx": "^2.1.1",

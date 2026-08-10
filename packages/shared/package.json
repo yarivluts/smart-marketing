@@ -8,6 +8,15 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./observability": {
+      "types": "./dist/observability/index.d.ts",
+      "default": "./dist/observability/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "observability": ["dist/observability/index.d.ts"]
     }
   },
   "scripts": {
@@ -17,7 +26,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "yaml": "^2.6.1"
+    "yaml": "^2.6.1",
+    "pino": "^10.3.1"
   },
   "devDependencies": {
     "@growthos/eslint-config": "workspace:*",

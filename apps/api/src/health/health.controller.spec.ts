@@ -19,5 +19,6 @@ describe('HealthController', () => {
     expect(health.status).toBe('ok');
     expect(health.service).toBe('@growthos/api');
     expect(health.environments).toContain('prod');
+    expect(health.uptimeSeconds).toBeGreaterThanOrEqual(0);
   });
 });

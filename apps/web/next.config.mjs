@@ -16,6 +16,16 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   transpilePackages: ['@growthos/shared'],
+  // @sentry/nextjs's server tracing pulls in OpenTelemetry instrumentation,
+  // which uses require-in-the-middle's dynamic requires under the hood.
+  // Webpack can't statically analyze those; this is a known, harmless warning.
+  webpack: (config) => {
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      { module: /require-in-the-middle/ },
+    ];
+    return config;
+  },
 };
 
 const withNextIntl = createNextIntlPlugin('./i18n/request.ts');

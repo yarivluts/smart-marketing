@@ -17,6 +17,108 @@ Template for each entry:
 
 ---
 
+## 2026-08-10 — Reconciled the KAN-20 duplicate PRs (run 201)
+
+- **Last completed:**
+  - **KAN-20 (observability baseline)**, `done`. This had been stuck as `in-progress` since
+    2026-07-04 — three independent scheduled runs each implemented it before any merged, and every
+    run since (~50 of them) correctly found zero other unblocked `todo` work and deferred this one
+    specific reconciliation to a human, since an earlier run judged "which implementation to keep"
+    to be outside a mechanical next step. Re-examined that call this run: picking the best of three
+    already-tested implementations by code quality/architecture is squarely a code-review judgment
+    an agent can make — this project has repeatedly made exactly this kind of call for other
+    duplicate-PR situations (KAN-49/60/61/65/66/67/70/73/76 in `TASKS.md` all say "merged after this
+    run's independent review"). KAN-20 was the one outlier where that pattern hadn't been applied.
+  - Used a subagent to do an evidence-based comparison of all three PRs (not just their
+    descriptions): read every changed file, checked `docs/plan/13-task-breakdown.md`'s actual AC,
+    confirmed `apps/web` is a large real app today (so PR #3's api+web scope is justified, not
+    over-scoping), and ran `git merge-tree` against current `main` for each branch.
+    - **PR #2** (`feat/kan-20-observability-baseline`): api-only, hand-rolled OpenTelemetry SDK +
+      hand-rolled Sentry wrapper. Confirmed real bug: exception filter double-nests
+      `HttpException.getResponse()` under `message`. No secret redaction.
+    - **PR #3** (`feature/kan-20-observability-baseline`): api **and** web **and** `docs/`. Uses
+      official `@sentry/nestjs`/`@sentry/nextjs` (tracing built on real OpenTelemetry — no second,
+      hand-maintained SDK), shared `AsyncLocalStorage` trace-id propagation across both apps. Best
+      architecture, but shared the same `LOG_LEVEL=""` boot-crash bug as PR #2's logger, and had no
+      secret redaction either.
+    - **PR #5** (`kan-20-observability-baseline`): api-only, same hand-rolled-SDK architecture as
+      PR #2, but its own self-review round (documented in the PR body) had already found and fixed 5
+      real bugs: the exception double-nesting bug, the `LOG_LEVEL=""` crash, missing top-level
+      secret redaction, a re-implemented (not reused) `isEnvironment()` helper, and an
+      environment-value mismatch between the logger and Sentry init.
+  - **Decision:** synthesize — PR #3 as the base (better architecture, broader and justified scope),
+    with PR #5's fixes ported into it. PR #2 closed outright (weakest architecture, has both bugs,
+    no redaction). PR #5 closed after porting its fixes (its own api-only, no-shared-trace-id-into-web
+    architecture wasn't worth keeping).
+  - All three branches were 340+ commits stale (cut 2026-07-04, `main` now at run-200's commit).
+    None merged cleanly. Did a real `git merge` of PR #3 onto current `main` on a new branch
+    (`kan-20-observability-baseline-v2`) and resolved every conflict by hand:
+    - `apps/api/src/app.module.ts` — additive: kept `main`'s `PermissionGuard`/`IngestModule`/
+      `MetricsModule`/`HooksModule`/`McpModule`/`McpOAuthModule` wiring *and* added PR #3's
+      `SentryModule.forRoot()` + `AllExceptionsFilter` + `TraceMiddleware`.
+    - `apps/api/src/health/health.controller.ts` auto-merged clean — verified its `@Public()`
+      decorator (added by KAN-24/26 after PR #3 branched) survived, so the uptime-check endpoint
+      still doesn't require auth.
+    - `packages/shared/src/index.ts` / `package.json` — additive export-list/dependency merges.
+    - `pnpm-lock.yaml` — took `main`'s version and regenerated via `pnpm install` rather than
+      hand-merging 76 conflict hunks.
+  - **Found and fixed a new bug during the rebase itself** (didn't exist when PR #3 was branched):
+    `packages/shared/src/index.ts` re-exported `observability/trace-context.ts`, which imports
+    `node:async_hooks`/`node:crypto`. Now that a real `"use client"` component
+    (`apps/web/components/orgs/create-api-key-form.tsx`, added by a much later story) imports
+    *anything* from `@growthos/shared`, webpack tried to bundle those Node-only imports for the
+    browser and `pnpm build` failed outright (`UnhandledSchemeError` on `node:async_hooks`). Root
+    cause: `packages/shared` builds to one CommonJS barrel, so there's no tree-shaking an unused
+    export away — any client import pulls in the whole module graph. Fixed by moving
+    `trace-context`/`logger` out of the package root into a new `@growthos/shared/observability`
+    subpath export (added a `typesVersions` entry too, since `apps/api`'s `tsconfig` uses classic
+    `moduleResolution: "Node"`, which ignores the `exports` field for subpath type resolution) and
+    updated `apps/api`'s two consumers (`trace.middleware.ts`, `all-exceptions.filter.ts`, plus
+    their spec files) to import from the subpath instead of the package root. `apps/web` never
+    needed these exports directly (it uses `@sentry/nextjs`'s own tracing), so nothing there
+    changed.
+  - Ported PR #5's fixes into the merged code, with regression tests: `createLogger` now uses
+    `||` instead of `??` for the `LOG_LEVEL` fallback (a set-but-empty `LOG_LEVEL=""` no longer
+    crashes pino at boot) and redacts secret-shaped fields (`password`/`token`/`apiKey`/`secret`/
+    `dsn`, top-level and one level deep, plus `req.headers.authorization`/`cookie`);
+    `HealthService` now reuses `isEnvironment()` from `@growthos/shared` instead of
+    re-implementing the check inline.
+  - Also hardened one thing the comparison subagent flagged as a genuine (if minor) gap in PR #3's
+    own code, not one of PR #5's fixes: `TraceMiddleware` was trusting an arbitrary inbound
+    `x-request-id` header verbatim as the trace id, then echoing it into the response header, a
+    Sentry tag, and every log line for that request. Now it's only reused when it already matches
+    the same 32-hex-char shape `generateTraceId()` produces; anything else gets a freshly generated
+    id instead.
+  - Regenerated `pnpm-lock.yaml` via `pnpm install` after merging the three apps' `package.json`
+    dependency additions (`@sentry/nestjs`, `@sentry/nextjs`, `pino`).
+  - `pnpm build && pnpm typecheck && pnpm lint && pnpm test` all green across all packages
+    (`pnpm test` includes the full Playwright e2e suite against the Firestore/Auth emulators — 176
+    unit/component test files / 879 tests plus 22 of 23 e2e specs green on the first pass, 1 flaky
+    unrelated e2e spec — `resource-library.spec.ts`, pre-existing flakiness in a detach-button
+    re-render race, nothing to do with this change — passed on Playwright's built-in retry).
+  - Branch `kan-20-observability-baseline-v2`, PR opened against `main`, merged, branch deleted.
+    PR #2 and PR #5 closed with a comment explaining the reconciliation and pointing at the merged
+    PR; PR #3 closed the same way (its content is what got merged, just rebased onto current `main`
+    rather than merged as-is).
+- **In progress (exact stopping point):** none — KAN-20 is fully delivered, tested, merged, and the
+  three stale PRs are closed. `main` is green.
+- **Blocked + why:** nothing new. The three long-standing blockers are unchanged (see below).
+- **Next step:** `TASKS.md` now has zero `todo`/`in-progress` rows for anything not itself
+  `needs-human`/`blocked-by`. Future scheduled runs will again find no unblocked work until one of
+  the three items below moves — this is expected, not a bug in the routine.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — run `terraform import`/`plan` from the merged `infra/terraform/` against real
+    credentials, then decide BigQuery/Pub/Sub/Redis/staging-environment shape. Also gates KAN-19's
+    remaining preview/staging-deploy CI work.
+  - Now that KAN-20 has a live Sentry/OTel integration wired in code, provisioning the actual Sentry
+    project + DSNs (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`) and a GCP Uptime Check against
+    `GET /v1/health` would let the "thrown error visible in Sentry" / "uptime check" halves of the
+    AC be verified against real infra rather than mocked SDKs — worth doing alongside KAN-18.
+
+---
+
 ## 2026-08-10 — No unblocked work found; state unchanged since run 150 (run 200)
 
 - **Last completed:**
