@@ -17,6 +17,49 @@ Template for each entry:
 
 ---
 
+## 2026-08-10 — No unblocked work found; state unchanged since run 201 (run 202)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table has zero
+    `| todo |` rows (`grep -oE '\| (todo|in-progress|done|needs-human|blocked-by) \|' TASKS.md | sort
+    | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19), 1 `needs-human` (KAN-43), 2 `blocked-by`
+    (KAN-50/51)) — unchanged from run 201, which merged KAN-20 (the last `in-progress` story that
+    was actually mechanically actionable) and closed out its three stale duplicate PRs.
+  - Checked open PRs (`list_pull_requests`, state=open): none — zero open PRs in the repo. The
+    KAN-20 reconciliation from run 201 closed out the last ones.
+  - `git fetch origin main` + `git rev-parse HEAD origin/main` confirmed the local checkout fast-forwards
+    cleanly to `origin/main` (`ed16f58`, run 201's merge commit) with no divergence.
+  - Checked the environment for GCP/Firebase credentials (`GOOGLE_APPLICATION_CREDENTIALS`,
+    `FIREBASE_*`, `GCP_*`) — none present, so KAN-18's remaining Terraform-import/BigQuery/Pub/Sub/
+    Redis/staging work still cannot be attempted from a sandboxed run, and KAN-19's remaining
+    preview/staging-deploy CI work stays blocked behind it.
+  - No push notification sent: nothing changed since run 201's own notification (KAN-20 merged) and
+    the three long-standing blockers (KAN-43 applications, KAN-18 infra provisioning, KAN-19's
+    infra-gated remainder) are unchanged. Per the routine's own notification policy, a repeat
+    "still blocked, still nothing new" ping would just be noise.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** `TASKS.md` has zero `todo` rows; the two remaining `in-progress` rows
+  (KAN-18/KAN-19) and the `needs-human`/`blocked-by` rows (KAN-43, KAN-50, KAN-51) all need either
+  real GCP/Firebase credentials, an external application submission, or both — none of which a
+  sandboxed run can supply.
+- **Next step:** unchanged — a human needs to (a) run the KAN-18 Terraform import + plan (see
+  `infra/terraform/README.md`) against real credentials and decide on BigQuery/Pub/Sub/Redis/
+  staging shape, and (b) submit the KAN-43 Google Ads/Meta applications. Once KAN-18 lands, KAN-19's
+  remaining preview/staging-deploy CI work and KAN-20's Sentry-project/DSN provisioning become
+  actionable too; once KAN-43 lands, KAN-50/51 unblock. Until one of those moves, future scheduled
+  runs will keep finding no unblocked `todo` work — expected, not a bug in the routine.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — run `terraform import`/`plan` from the merged `infra/terraform/` against real
+    credentials, then decide BigQuery/Pub/Sub/Redis/staging-environment shape. Also gates KAN-19's
+    remaining preview/staging-deploy CI work.
+  - Provision the actual Sentry project + DSNs (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`) and a GCP
+    Uptime Check against `GET /v1/health` (KAN-20's code landed in run 201; this is the real-infra
+    half) — worth doing alongside KAN-18.
+
+---
+
 ## 2026-08-10 — Reconciled the KAN-20 duplicate PRs (run 201)
 
 - **Last completed:**
