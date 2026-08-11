@@ -17,6 +17,52 @@ Template for each entry:
 
 ---
 
+## 2026-08-11 — No unblocked work found; state unchanged since run 208 (run 209)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows (`grep -oE '\| (todo|in-progress|done|needs-human|blocked-by) \|' TASKS.md | sort
+    | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19), 1 `needs-human` (KAN-43), 2 `blocked-by`
+    (KAN-50/51)) — unchanged from run 208.
+  - Checked open PRs (`list_pull_requests`, state=open): none.
+  - Found the local checkout's `main` branch was stale (`3de6cde`, dating back to around run 200),
+    while `HEAD` itself was detached at `798b4da` (run 208's commit, matching `origin/main`) — a
+    leftover from how a prior session's container was initialized, not evidence of drift. Fast-
+    forwarded local `main` to `origin/main` (`798b4da`) with `git merge --ff-only`; no divergent
+    local commits existed, so this was a clean, non-destructive fast-forward. Re-verified the
+    `todo`-row count and KAN-18/19/43/50/51 line contents after the fast-forward to make sure the
+    "no work" conclusion wasn't an artifact of reading the stale branch — confirmed identical.
+  - Checked the environment for GCP/Firebase credentials (`GOOGLE_APPLICATION_CREDENTIALS`,
+    `FIREBASE_*`, `GCP_*`, `SENTRY_DSN`) — none present, so KAN-18's remaining Terraform-import/
+    BigQuery/Pub/Sub/Redis/staging work still cannot be attempted from a sandboxed run, and KAN-19's
+    remaining preview/staging-deploy CI work stays blocked behind it.
+  - No push notification sent: nothing changed since run 208, and the same long-standing blockers
+    (KAN-43 applications, KAN-18 infra provisioning, KAN-19's infra-gated remainder) are unchanged.
+    Per the routine's own notification policy, a repeat "still blocked, still nothing new" ping would
+    just be noise.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** `TASKS.md` has zero `todo` rows; the two remaining `in-progress` rows
+  (KAN-18/KAN-19) and the `needs-human`/`blocked-by` rows (KAN-43, KAN-50, KAN-51) all need either
+  real GCP/Firebase credentials, an external application submission, or both — none of which a
+  sandboxed run can supply.
+- **Next step:** unchanged — a human needs to (a) run the KAN-18 Terraform import + plan (see
+  `infra/terraform/README.md`) against real credentials and decide on BigQuery/Pub/Sub/Redis/
+  staging shape, and (b) submit the KAN-43 Google Ads/Meta applications. Once KAN-18 lands, KAN-19's
+  remaining preview/staging-deploy CI work becomes actionable too; once KAN-43 lands, KAN-50/51
+  unblock. Until one of those moves, future scheduled runs will keep finding no unblocked `todo`
+  work — expected, not a bug in the routine.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — run `terraform import`/`plan` from the merged `infra/terraform/` against real
+    credentials, then decide BigQuery/Pub/Sub/Redis/staging-environment shape. Also gates KAN-19's
+    remaining preview/staging-deploy CI work.
+  - Provision the actual Sentry project + DSNs (`SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`) and a GCP
+    Uptime Check against `GET /v1/health` (KAN-20's code landed in run 201; this is the real-infra
+    half) — worth doing alongside KAN-18.
+
+---
+
 ## 2026-08-11 — No unblocked work found; state unchanged since run 207 (run 208)
 
 - **Last completed:**
