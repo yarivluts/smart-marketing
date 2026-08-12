@@ -16,6 +16,8 @@ export interface BoardGridEditorProps {
   initialTiles: BoardTileRow[];
   metricCatalog: MetricCatalogEntryRow[];
   renderViews: Record<string, TileRenderView>;
+  /** Passed straight through to every tile — see `BoardTileViewProps`. */
+  sessionReplayUrlTemplate?: string;
 }
 
 function newTileId(): string {
@@ -263,7 +265,15 @@ function TileEditCard({ tile, metricCatalog, draggable, onChange, onRemove, onDr
  * Firestore until "Save layout" replaces the board's whole `tiles` array in
  * one write (see `saveBoardTiles`'s own doc comment for why).
  */
-export function BoardGridEditor({ orgId, projectId, boardId, initialTiles, metricCatalog, renderViews }: BoardGridEditorProps): React.ReactElement {
+export function BoardGridEditor({
+  orgId,
+  projectId,
+  boardId,
+  initialTiles,
+  metricCatalog,
+  renderViews,
+  sessionReplayUrlTemplate,
+}: BoardGridEditorProps): React.ReactElement {
   const t = useTranslations('Boards');
   const router = useRouter();
   const [mode, setMode] = useState<'view' | 'edit'>('view');
@@ -420,7 +430,11 @@ export function BoardGridEditor({ orgId, projectId, boardId, initialTiles, metri
               >
                 <span className="text-sm font-medium">{tile.title || t(`tileType.${tile.type}`)}</span>
                 <div className="flex-1">
-                  <BoardTileView tile={tile} view={renderViews[tile.id] ?? { kind: 'unavailable', reason: 'query_error', message: tile.id }} />
+                  <BoardTileView
+                    tile={tile}
+                    view={renderViews[tile.id] ?? { kind: 'unavailable', reason: 'query_error', message: tile.id }}
+                    sessionReplayUrlTemplate={sessionReplayUrlTemplate}
+                  />
                 </div>
               </div>
             ),

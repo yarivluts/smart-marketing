@@ -1,13 +1,24 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { buildSessionReplayLink } from '@growthos/shared';
 import type { TileFreshness, TileRenderView, TimeSeries } from '@/lib/orgs/board-view';
 import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
 
 export interface BoardTileViewProps {
   tile: BoardTileRow;
   view: TileRenderView;
+  /** The project's session-replay deep-link template, if configured — turns landing-page table cells into links to that page's recordings. */
+  sessionReplayUrlTemplate?: string;
 }
+
+/**
+ * Dimension columns whose values are landing-page URLs, and so are worth
+ * deep-linking into a session-replay tool. Matched by column name because a
+ * table tile's rendered columns are its dimension names (see
+ * `buildTileRenderView`); only the landing-page pack registers this one.
+ */
+const LANDING_PAGE_COLUMNS = new Set(['landing_page']);
 
 const SERIES_COLOR_CLASSES = ['bg-primary', 'bg-blue-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500', 'bg-violet-500'];
 
@@ -200,7 +211,13 @@ function BarChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_se
   );
 }
 
-function TableView({ view }: { view: Extract<TileRenderView, { kind: 'table' }> }): React.ReactElement {
+function TableView({
+  view,
+  sessionReplayUrlTemplate,
+}: {
+  view: Extract<TileRenderView, { kind: 'table' }>;
+  sessionReplayUrlTemplate?: string;
+}): React.ReactElement {
   const t = useTranslations('Boards');
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('tableEmpty')}</p>;
@@ -220,11 +237,29 @@ function TableView({ view }: { view: Extract<TileRenderView, { kind: 'table' }> 
         <tbody>
           {view.rows.map((row, index) => (
             <tr key={index}>
-              {view.columns.map((column) => (
-                <td key={column} className="border-b border-input px-2 py-1 tabular-nums">
-                  {row[column] ?? ''}
-                </td>
-              ))}
+              {view.columns.map((column) => {
+                const value = row[column] ?? '';
+                const replayLink = LANDING_PAGE_COLUMNS.has(column)
+                  ? buildSessionReplayLink(sessionReplayUrlTemplate, String(value))
+                  : null;
+                return (
+                  <td key={column} className="border-b border-input px-2 py-1 tabular-nums">
+                    {replayLink ? (
+                      <a
+                        href={replayLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={t('sessionReplayLinkTitle')}
+                        className="underline underline-offset-2 hover:text-primary"
+                      >
+                        {value}
+                      </a>
+                    ) : (
+                      value
+                    )}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
@@ -327,7 +362,7 @@ function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }
 }
 
 /** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel) plus KAN-62's `heatmap` and KAN-63's `histogram`, plus a per-tile degraded state instead of the whole board failing. A `freshness` badge (KAN-69) floats in the tile's top-right corner for every kind except `unavailable`, which has no queried data to attach one to. Both consumers of this component (the board detail page's grid and the TV war-room rotation, `tv-rotation-screen.tsx`) get the badge for free — there's no TV-specific rendering fork to keep in sync. */
-export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactElement {
+export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTileViewProps): React.ReactElement {
   const t = useTranslations('Boards');
 
   const content = (() => {
@@ -339,7 +374,7 @@ export function BoardTileView({ tile, view }: BoardTileViewProps): React.ReactEl
       case 'time_series':
         return view.chart === 'line' ? <LineChartView view={view} /> : <BarChartView view={view} />;
       case 'table':
-        return <TableView view={view} />;
+        return <TableView view={view} sessionReplayUrlTemplate={sessionReplayUrlTemplate} />;
       case 'funnel':
         return <FunnelView view={view} />;
       case 'heatmap':

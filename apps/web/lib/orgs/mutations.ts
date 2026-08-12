@@ -98,6 +98,8 @@ import {
   type HookDeliveryStatus,
   setHookEndpointSigningSecret as setHookEndpointSigningSecretInOrganization,
   setProjectCostQuota as setProjectCostQuotaInOrganization,
+  setProjectSessionReplayUrlTemplate as setProjectSessionReplayUrlTemplateInOrganization,
+  type ProjectModel,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   type MappingSuggestion,
   suggestFieldMappingRules as suggestFieldMappingRulesInOrganization,
@@ -598,6 +600,20 @@ interface SetProjectCostQuotaInput {
 export async function setProjectCostQuota(input: SetProjectCostQuotaInput): Promise<ProjectCostQuotaModel> {
   await ensureFirestoreOrm();
   return setProjectCostQuotaInOrganization(input);
+}
+
+interface SetProjectSessionReplayUrlTemplateInput {
+  organizationId: string;
+  projectId: string;
+  template?: string;
+  setByUserId: string;
+}
+
+export async function setProjectSessionReplayUrlTemplate(
+  input: SetProjectSessionReplayUrlTemplateInput,
+): Promise<ProjectModel> {
+  await ensureFirestoreOrm();
+  return setProjectSessionReplayUrlTemplateInOrganization(input);
 }
 
 interface CheckTrackingAlertsInput {

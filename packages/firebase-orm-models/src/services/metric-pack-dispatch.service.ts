@@ -1,6 +1,11 @@
 import type { PluginInstallModel } from '../models/plugin-install.model';
 import { ensureSaasMetricPackDefaultBoardsSeeded, ensureSaasMetricPackRegistered, SAAS_METRIC_PACK_PLUGIN_ID } from '../plugin-runtime/saas-metric-pack';
 import { ensureEngagementPackRegistered, ENGAGEMENT_PACK_PLUGIN_ID } from '../plugin-runtime/engagement-pack';
+import {
+  ensureLandingPagePackDefaultBoardsSeeded,
+  ensureLandingPagePackRegistered,
+  LANDING_PAGE_PACK_PLUGIN_ID,
+} from '../plugin-runtime/landing-page-pack';
 import { installPlugin, type InstallPluginParams } from './plugin-registry.service';
 
 /**
@@ -62,6 +67,9 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
     await ensureSaasMetricPackDefaultBoardsSeeded(params.organizationId, params.projectId, params.installedByUserId);
   } else if (install.plugin_id === ENGAGEMENT_PACK_PLUGIN_ID) {
     await ensureEngagementPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
+  } else if (install.plugin_id === LANDING_PAGE_PACK_PLUGIN_ID) {
+    await ensureLandingPagePackRegistered(params.organizationId, params.projectId, params.installedByUserId);
+    await ensureLandingPagePackDefaultBoardsSeeded(params.organizationId, params.projectId, params.installedByUserId);
   }
 
   return install;

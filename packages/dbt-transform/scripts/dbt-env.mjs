@@ -47,12 +47,34 @@ function isAlreadyProvisioned() {
   return readFileSync(provisionedMarkerPath, 'utf8').trim() === requirementsHash();
 }
 
+/**
+ * The interpreter used to create the venv, resolved via PATH rather than a
+ * hardcoded location. Debian/Ubuntu (incl. this repo's CI image) ships
+ * `python3` but not always a plain `python` alias; Windows installs (and
+ * the python.org installer generally) ship `python` but frequently no
+ * `python3` at all — trying only the former made `pnpm test` in this
+ * package unrunnable on Windows with a bare `spawnSync python3 ENOENT`.
+ * Probes both and uses whichever answers, so neither platform needs a
+ * manual alias.
+ */
+function resolvePythonCommand() {
+  const candidates = isWindows ? ['python', 'python3'] : ['python3', 'python'];
+  for (const candidate of candidates) {
+    const probe = spawnSync(candidate, ['--version'], { stdio: 'ignore' });
+    if (!probe.error && probe.status === 0) {
+      return candidate;
+    }
+  }
+  throw new Error(
+    `[dbt-transform] no Python interpreter found on PATH (tried: ${candidates.join(', ')}). ` +
+      'Install Python 3.11+ and re-run.',
+  );
+}
+
 function provisionVenv() {
   console.log('[dbt-transform] provisioning a local Python venv with dbt-core + dbt-duckdb...');
   if (!existsSync(venvPython)) {
-    // Resolved via PATH, not a hardcoded location — Debian/Ubuntu (incl. this
-    // repo's CI image) ships `python3` but not always a plain `python` alias.
-    runInherit('python3', ['-m', 'venv', venvDir]);
+    runInherit(resolvePythonCommand(), ['-m', 'venv', venvDir]);
   }
   runInherit(venvPython, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'pip']);
   runInherit(venvPython, ['-m', 'pip', 'install', '--quiet', '-r', requirementsPath]);
