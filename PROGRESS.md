@@ -17,6 +17,38 @@ Template for each entry:
 
 ---
 
+## 2026-08-13 — Landing page performance, phases 1-2 (interactive session, PR #80)
+
+- **Last completed:** Shipped the first slice of "which landing page converts best, in which
+  campaign?", deployed to dev+prod and browser-verified. (a) dbt: `fact_attribution` now carries
+  `landing_page` from the *crediting* touchpoint (KAN-57 captured it; attribution dropped it), and
+  a new `fact_landing_page_performance` reports visitors + last-touch conversions per
+  (day x page x campaign x channel), full-outer-joined so zero-conversion pages stay visible —
+  118/118 dbt tests green incl. two new ones, with `proj_11` fixtures encoding the real question.
+  (b) New built-in **Landing Page Performance** metric pack (`lp_visitors`, `lp_conversions`,
+  `lp_conversion_rate` as a ratio-of-sums) — the first pack whose aggregation table actually
+  exists in dbt rather than plan `04 §1`'s aspirational schema — seeding one default board that
+  ends in the landing-page x campaign table. (c) Session replay integrated, not built: projects
+  carry an optional deep-link **template** (`{landing_page}`) so a landing-page row links to that
+  page's recordings in Clarity/Hotjar/FullStory; validated through the same builder the renderer
+  uses, which rejects non-http(s) schemes. Admin page + API route + en/he strings.
+  Also fixed two breakages that were already on `main`: `@growthos/shared` used `node:` builtins
+  without `@types/node` (clean-install `pnpm build` failed), and `dbt-env.mjs` probed only
+  `python3` (dbt unrunnable on Windows).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** nothing.
+- **Next step (deliberately not built):** phase 3 — traffic-shift recommendations through the
+  existing automation pipeline (KAN-71's dry-run -> approve -> execute -> rollback). Held back on
+  purpose until phase 1 has run on real traffic, since optimizing on a few days of a
+  high-variance, delayed-conversion metric would be optimizing noise. Note the two documented
+  modeling caveats in `fact_landing_page_performance.sql` before building it: last-touch-only
+  crediting, and conversion-time (not landing-time) dating.
+- **Waiting on human:** the built-in packs (SaaS, Engagement, and now Landing Page) are still
+  paste-the-YAML to install — no UI surfaces their manifests. Worth a story if pack
+  discoverability matters. To use this feature: register + install the pack, put the tracking
+  snippet on the landing pages, and set a session-replay template.
+
+
 ## 2026-08-12 — No unblocked work found; state unchanged since run 219 (run 220)
 
 - **Last completed:**
