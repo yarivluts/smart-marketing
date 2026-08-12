@@ -26,6 +26,9 @@ ui-debug.log
 !.env.example
 *.local
 
+# Local scratch verification scripts (browser repro runs)
+apps/web/repro-tmp.mjs
+
 # Logs
 *.log
 npm-debug.log*

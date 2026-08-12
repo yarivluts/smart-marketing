@@ -103,6 +103,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
           initialTiles={board.tiles}
           metricCatalog={metricCatalog}
           renderViews={renderViews}
+          sessionReplayUrlTemplate={project.session_replay_url_template}
         />
       </section>
     </main>

@@ -145,6 +145,11 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
                     {t('projectCostGuardrailsLink')}
                   </Link>
                 ) : null}
+                {canManageProjects ? (
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/session-replay`}>
+                    {t('projectSessionReplayLink')}
+                  </Link>
+                ) : null}
                 {canManagePlugins ? (
                   <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/plugins`}>
                     {t('projectPluginsLink')}

@@ -88,7 +88,8 @@
     "projectBoardsLink": "Boards",
     "projectGoalsLink": "Goals",
     "projectSegmentsLink": "Segments",
-    "projectTvLink": "War-room TV"
+    "projectTvLink": "War-room TV",
+    "projectSessionReplayLink": "Session replay"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -714,7 +715,8 @@
       "warehouse_not_configured": "Warehouse not configured yet",
       "quota_exceeded": "Daily query quota reached",
       "query_error": "Couldn't load this tile"
-    }
+    },
+    "sessionReplayLinkTitle": "Open the session recordings for this landing page"
   },
   "Goals": {
     "metaTitle": "Goals",
@@ -1014,5 +1016,16 @@
     "violationBlastRadius": "Daily action limit reached",
     "violationAutomationPaused": "Automation is paused (kill switch engaged)",
     "violationInsufficientWriteTier": "The target's connection isn't approved at a write tier (Optimize or Manage) that allows this change"
+  },
+  "SessionReplaySettings": {
+    "metaTitle": "Session replay",
+    "title": "Session replay — {projectName}",
+    "intro": "Point this project at your session-replay / heatmap tool (Microsoft Clarity, Hotjar, FullStory, ...). Landing-page rows on your boards will then link straight to the recordings for that page.",
+    "templateLabel": "Deep-link URL template",
+    "templatePlaceholder": "https://clarity.microsoft.com/projects/view/PROJECT/impressions?Url={landing_page}",
+    "templateHelp": "Paste a URL from your replay tool. {landing_page} is replaced with the page URL. Leave empty to show no link.",
+    "save": "Save",
+    "saved": "Saved.",
+    "saveError": "Could not save the template. Check that it is an http(s) URL."
   }
 }

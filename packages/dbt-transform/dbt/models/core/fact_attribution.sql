@@ -26,6 +26,15 @@
 -- still gets one row per model, labeled `channel_id = 'unattributed'`, so a
 -- channel breakdown's denominator (every conversion) is never silently
 -- short by the numerator (only conversions with captured marketing entry).
+--
+-- `landing_page` is the crediting touchpoint's own captured entry URL
+-- (KAN-57's tracker emits it alongside `channel`/`utm_*`). Unlike
+-- `channel_id` it is NOT coalesced to a placeholder: a touchpoint captured
+-- before the tracker sent the field, or one landed by a source that never
+-- had a landing page (a server-side conversion import), genuinely has no
+-- landing page, and `fact_landing_page_performance` — the model that
+-- actually reports on this column — buckets those under its own explicit
+-- `(unknown)` label rather than having every consumer here re-derive one.
 
 with touchpoints as (
     select
@@ -36,6 +45,7 @@ with touchpoints as (
         entity_id as anon_id,
         coalesce(properties ->> 'channel', 'unknown') as channel_id,
         properties ->> 'utm_campaign' as campaign_id,
+        properties ->> 'landing_page' as landing_page,
         occurred_at
     from {{ ref('events') }}
     where event_type = 'touchpoint'
@@ -70,6 +80,7 @@ candidate_touchpoints as (
         t.touchpoint_event_id,
         t.channel_id,
         t.campaign_id,
+        t.landing_page,
         t.occurred_at as touched_at
     from conversions c
     inner join {{ ref('bridge_identity') }} bi
@@ -120,7 +131,7 @@ attributed as (
     select
         organization_id, project_id, environment_id, conversion_event_id,
         customer_id, conversion_event, converted_at,
-        'first_touch' as model, channel_id, campaign_id
+        'first_touch' as model, channel_id, campaign_id, landing_page
     from first_touch_winners
 
     union all
@@ -128,7 +139,7 @@ attributed as (
     select
         organization_id, project_id, environment_id, conversion_event_id,
         customer_id, conversion_event, converted_at,
-        'last_touch' as model, channel_id, campaign_id
+        'last_touch' as model, channel_id, campaign_id, landing_page
     from last_touch_winners
 ),
 
@@ -137,7 +148,8 @@ unattributed as (
     select
         c.organization_id, c.project_id, c.environment_id, c.conversion_event_id,
         c.customer_id, c.conversion_event, c.occurred_at as converted_at,
-        m.model, 'unattributed' as channel_id, cast(null as varchar) as campaign_id
+        m.model, 'unattributed' as channel_id, cast(null as varchar) as campaign_id,
+        cast(null as varchar) as landing_page
     from conversions c
     cross join (values ('first_touch'), ('last_touch')) as m(model)
     left join attributed a
@@ -170,5 +182,6 @@ select
     model,
     channel_id,
     campaign_id,
+    landing_page,
     1.0 as credit
 from final

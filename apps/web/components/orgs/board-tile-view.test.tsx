@@ -233,3 +233,48 @@ describe('BoardTileView', () => {
     });
   });
 });
+
+describe('BoardTileView landing-page session-replay links', () => {
+  const LP_VIEW: TileRenderView = {
+    kind: 'table',
+    isEmpty: false,
+    columns: ['landing_page', 'campaign_id', 'lp_conversion_rate'],
+    rows: [{ landing_page: 'https://example.com/lp-a', campaign_id: 'summer_search', lp_conversion_rate: '0.66' }],
+    freshness: undefined,
+  } as unknown as TileRenderView;
+
+  function renderLpTable(sessionReplayUrlTemplate?: string) {
+    return render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <BoardTileView
+          tile={tile({ type: 'table', metricNames: ['lp_conversion_rate'], dimensions: ['landing_page', 'campaign_id'] })}
+          view={LP_VIEW}
+          sessionReplayUrlTemplate={sessionReplayUrlTemplate}
+        />
+      </NextIntlClientProvider>,
+    );
+  }
+
+  it('links a landing-page cell to that page in the configured replay tool', () => {
+    renderLpTable('https://clarity.example/imp?Url={landing_page}');
+    const link = screen.getByRole('link', { name: 'https://example.com/lp-a' });
+    expect(link).toHaveAttribute('href', `https://clarity.example/imp?Url=${encodeURIComponent('https://example.com/lp-a')}`);
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+  });
+
+  it('renders plain text when no template is configured', () => {
+    renderLpTable(undefined);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getByText('https://example.com/lp-a')).toBeInTheDocument();
+  });
+
+  it('never links a non-landing-page column', () => {
+    renderLpTable('https://clarity.example/imp?Url={landing_page}');
+    expect(screen.queryByRole('link', { name: 'summer_search' })).not.toBeInTheDocument();
+  });
+
+  it('renders no link for an unsafe template scheme', () => {
+    renderLpTable('javascript:alert(1)');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+});

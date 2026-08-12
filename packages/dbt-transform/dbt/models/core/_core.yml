@@ -100,6 +100,11 @@ models:
       - name: channel_id
         tests:
           - not_null
+      - name: landing_page
+        description: >
+          The crediting touchpoint's captured entry URL, or null when that
+          touchpoint carried none (and always null for `unattributed`
+          rows). Deliberately not coalesced here — see the model's doc comment.
       - name: credit
         tests:
           - not_null
@@ -183,5 +188,46 @@ models:
         tests:
           - not_null
       - name: customer_count
+        tests:
+          - not_null
+
+  - name: fact_landing_page_performance
+    description: >
+      Visitors and last-touch attributed conversions per
+      (day x landing page x campaign x channel) — the grain a
+      "which landing page converts best in which campaign?" board queries.
+      See the model's own doc comment for why conversions are last-touch
+      only, and for the conversion-time dating caveat on short ranges.
+    columns:
+      - name: landing_page_performance_key
+        description: Composite (org, project, env, activity_date, landing_page, campaign_id, channel_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: organization_id
+        tests:
+          - not_null
+      - name: project_id
+        tests:
+          - not_null
+      - name: environment_id
+        tests:
+          - not_null
+      - name: activity_date
+        tests:
+          - not_null
+      - name: landing_page
+        tests:
+          - not_null
+      - name: campaign_id
+        tests:
+          - not_null
+      - name: channel_id
+        tests:
+          - not_null
+      - name: visitors
+        tests:
+          - not_null
+      - name: conversions
         tests:
           - not_null

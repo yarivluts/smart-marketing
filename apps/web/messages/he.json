@@ -88,7 +88,8 @@
     "projectBoardsLink": "לוחות מחוונים",
     "projectGoalsLink": "יעדים",
     "projectSegmentsLink": "פלחים",
-    "projectTvLink": "טלוויזיית חדר מלחמה"
+    "projectTvLink": "טלוויזיית חדר מלחמה",
+    "projectSessionReplayLink": "הקלטות סשן"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -714,7 +715,8 @@
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",
       "query_error": "לא ניתן היה לטעון אריח זה"
-    }
+    },
+    "sessionReplayLinkTitle": "צפייה בהקלטות של דף הנחיתה הזה"
   },
   "Goals": {
     "metaTitle": "יעדים",
@@ -1014,5 +1016,16 @@
     "violationBlastRadius": "מגבלת הפעולות היומית הושגה",
     "violationAutomationPaused": "האוטומציה מושהית (מתג החירום הופעל)",
     "violationInsufficientWriteTier": "החיבור של היעד אינו מאושר ברמת הרשאה (אופטימיזציה או ניהול מלא) המאפשרת שינוי זה"
+  },
+  "SessionReplaySettings": {
+    "metaTitle": "הקלטות סשן",
+    "title": "הקלטות סשן — {projectName}",
+    "intro": "חברו את הפרויקט לכלי ההקלטות/heatmap שלכם (Microsoft Clarity, Hotjar, FullStory ועוד). שורות של דפי נחיתה בלוחות יקשרו ישירות להקלטות של אותו דף.",
+    "templateLabel": "תבנית קישור",
+    "templatePlaceholder": "https://clarity.microsoft.com/projects/view/PROJECT/impressions?Url={landing_page}",
+    "templateHelp": "הדביקו כתובת מתוך כלי ההקלטות שלכם. ‏{landing_page} יוחלף בכתובת הדף. השאירו ריק כדי לא להציג קישור.",
+    "save": "שמירה",
+    "saved": "נשמר.",
+    "saveError": "שמירת התבנית נכשלה. ודאו שזו כתובת http(s) תקינה."
   }
 }

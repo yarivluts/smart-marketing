@@ -20,3 +20,4 @@ export * from './win-rules';
 export * from './product-analytics';
 export * from './automation-guardrails';
 export * from './segments';
+export * from './session-replay/link';
