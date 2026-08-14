@@ -20,7 +20,7 @@ export function isOnboardingStep(value: string): value is OnboardingStep {
 }
 
 /** The built-in metric packs the wizard's "pick a vertical" step offers, plus `custom` (skip installing any pack — plan `10 §2.6`'s own "or custom/hybrid"). */
-export const ONBOARDING_PACK_KEYS = ['saas_marketing', 'engagement', 'custom'] as const;
+export const ONBOARDING_PACK_KEYS = ['saas_marketing', 'engagement', 'landing_page', 'custom'] as const;
 export type OnboardingPackKey = (typeof ONBOARDING_PACK_KEYS)[number];
 
 export function isOnboardingPackKey(value: string): value is OnboardingPackKey {

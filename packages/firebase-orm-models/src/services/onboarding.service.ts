@@ -7,25 +7,26 @@ import {
   type OnboardingSourceConnectionMethod,
   type OnboardingStep,
 } from '../models/onboarding-state.model';
-import { SAAS_METRIC_PACK_PLUGIN_ID, SAAS_METRIC_PACK_MANIFEST_YAML } from '../plugin-runtime/saas-metric-pack';
-import { ENGAGEMENT_PACK_PLUGIN_ID, ENGAGEMENT_PACK_MANIFEST_YAML } from '../plugin-runtime/engagement-pack';
+import { SAAS_METRIC_PACK_PLUGIN_ID } from '../plugin-runtime/saas-metric-pack';
+import { ENGAGEMENT_PACK_PLUGIN_ID } from '../plugin-runtime/engagement-pack';
+import { LANDING_PAGE_PACK_PLUGIN_ID } from '../plugin-runtime/landing-page-pack';
 import { ProjectNotFoundError } from './resource-library.service';
 import { activeSchemaNamesForKind, listSchemaDefinitionsForProject } from './schema-registry.service';
 import { recordAuditLogEntry } from './audit-log.service';
-import { installPluginAndProvisionBuiltins } from './metric-pack-dispatch.service';
-import { getLatestPluginManifestVersion, registerPluginManifest, PluginAlreadyInstalledError } from './plugin-registry.service';
+import { installBuiltinMetricPack } from './metric-pack-dispatch.service';
+import { PluginAlreadyInstalledError } from './plugin-registry.service';
 import { recordActivationEvent } from './product-analytics.service';
 
-/** One built-in metric pack the wizard's "pick a vertical" step can install (plan `10 §2.6` step 1). `custom` (skip installing any pack) has no entry here — it's handled as a special case in {@link selectOnboardingMetricPack}. */
+/** One built-in metric pack the wizard's "pick a vertical" step can install (plan `10 §2.6` step 1). `custom` (skip installing any pack) has no entry here — it's handled as a special case in {@link selectOnboardingMetricPack}. Pairs a wizard-facing `packKey` with the plugin id `installBuiltinMetricPack` (the same one-click, no-YAML path a project's Plugins page now also uses — see `metric-pack-dispatch.service.ts`) actually installs. */
 interface OnboardingPackDefinition {
   packKey: Exclude<OnboardingPackKey, 'custom'>;
   pluginId: string;
-  manifestYaml: string;
 }
 
 const ONBOARDING_METRIC_PACKS: readonly OnboardingPackDefinition[] = [
-  { packKey: 'saas_marketing', pluginId: SAAS_METRIC_PACK_PLUGIN_ID, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML },
-  { packKey: 'engagement', pluginId: ENGAGEMENT_PACK_PLUGIN_ID, manifestYaml: ENGAGEMENT_PACK_MANIFEST_YAML },
+  { packKey: 'saas_marketing', pluginId: SAAS_METRIC_PACK_PLUGIN_ID },
+  { packKey: 'engagement', pluginId: ENGAGEMENT_PACK_PLUGIN_ID },
+  { packKey: 'landing_page', pluginId: LANDING_PAGE_PACK_PLUGIN_ID },
 ];
 
 /** The wizard's own read-only pack catalog — `apps/web` renders one card per entry, keyed by `packKey` for its own translation strings (no hard-coded display text lives in this package, per CLAUDE.md). */
@@ -135,11 +136,11 @@ export interface SelectOnboardingMetricPackParams {
 
 /**
  * The wizard's "pick a vertical/metric pack" step (plan `10 §2.6` step 1). For a real built-in pack,
- * registers its manifest into the org's Plugin Registry (KAN-46) if it isn't already, then installs +
- * provisions it into this project via `installPluginAndProvisionBuiltins` (KAN-59/61/63's own "install
- * registers metrics, seeds default boards" flow) — the exact same path an admin would go through by
- * hand on the org/project plugin pages, just driven by the wizard instead. `custom` records the
- * selection and moves on without installing anything (plan's own "or custom/hybrid").
+ * installs it one-click via `installBuiltinMetricPack` (registers the manifest into the org's Plugin
+ * Registry, KAN-46, if it isn't already, then installs + provisions it — KAN-59/61/63's own "install
+ * registers metrics, seeds default boards" flow) — the exact same path a project's Plugins page now
+ * also offers outside the wizard, just driven by wizard state instead. `custom` records the selection
+ * and moves on without installing anything (plan's own "or custom/hybrid").
  *
  * Idempotent against a plugin the wizard (or a human) already installed: `PluginAlreadyInstalledError`
  * is swallowed, since the metrics/boards it would have provisioned already exist from that earlier
@@ -158,23 +159,11 @@ export async function selectOnboardingMetricPack(params: SelectOnboardingMetricP
       throw new InvalidOnboardingSelectionError(`Unknown onboarding pack key "${params.packKey}".`);
     }
 
-    let registered = await getLatestPluginManifestVersion(params.organizationId, definition.pluginId);
-    if (!registered) {
-      registered = await registerPluginManifest({
-        organizationId: params.organizationId,
-        manifestYaml: definition.manifestYaml,
-        registeredByUserId: params.userId,
-      });
-    }
-
     try {
-      await installPluginAndProvisionBuiltins({
+      await installBuiltinMetricPack({
         organizationId: params.organizationId,
         projectId: params.projectId,
         pluginId: definition.pluginId,
-        version: registered.version,
-        consentedScopes: registered.scopes,
-        config: {},
         installedByUserId: params.userId,
       });
     } catch (error) {

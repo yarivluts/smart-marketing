@@ -42,7 +42,7 @@ async function setupOrgWithProject(orgName: string) {
 describe('listOnboardingMetricPacks', () => {
   it('lists the built-in packs the wizard offers, without the "custom" escape hatch', () => {
     const packs = listOnboardingMetricPacks();
-    expect(packs.map((pack) => pack.packKey).sort()).toEqual(['engagement', 'saas_marketing']);
+    expect(packs.map((pack) => pack.packKey).sort()).toEqual(['engagement', 'landing_page', 'saas_marketing']);
   });
 });
 
@@ -107,6 +107,25 @@ describe('selectOnboardingMetricPack', () => {
     expect(second.selected_pack_key).toBe('engagement');
     const installs = await listPluginInstallsForProject(organization.id, project.id);
     expect(installs.filter((install) => install.plugin_id === 'com.growthos.engagement-pack')).toHaveLength(1);
+  });
+
+  it('installing the Landing Page Performance pack provisions its metrics + board (KAN-79 follow-up: one-click, no YAML)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Onboarding Landing Page Org');
+
+    const state = await selectOnboardingMetricPack({
+      organizationId: organization.id,
+      projectId: project.id,
+      userId: owner.id,
+      packKey: 'landing_page',
+    });
+
+    expect(state.selected_pack_key).toBe('landing_page');
+    expect(state.selected_plugin_id).toBe('com.growthos.landing-page-pack');
+
+    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+    expect(defs.map((def) => def.name).sort()).toEqual(['lp_conversion_rate', 'lp_conversions', 'lp_visitors']);
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards.map((board) => board.name)).toEqual(['Landing page performance']);
   });
 
   it('"custom" records the selection and advances the step without installing anything', async () => {
