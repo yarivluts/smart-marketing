@@ -164,7 +164,9 @@
     "setGoalLink": "Set a goal",
     "warRoomLink": "Turn on the war room",
     "finishButton": "Finish",
-    "doneMessage": "You're all set!"
+    "doneMessage": "You're all set!",
+    "packLandingPageTitle": "Landing Page Performance",
+    "packLandingPageDescription": "Track conversion per landing page across campaigns."
   },
   "Invite": {
     "title": "Organization invite",
@@ -621,7 +623,19 @@
     "sourceRunStatusRunning": "Running",
     "sourceRunStatusSucceeded": "Succeeded",
     "sourceRunStatusFailed": "Failed",
-    "sourceRunCursorFromScratch": "from scratch"
+    "sourceRunCursorFromScratch": "from scratch",
+    "builtinPacksHeading": "Built-in packs",
+    "builtinPacksIntro": "One-click install for the metric packs this platform ships — no manifest to paste, no config to fill in.",
+    "builtinPackInstallButton": "Install",
+    "builtinPackInstalling": "Installing…",
+    "builtinPackInstallError": "Could not install this pack. Please try again.",
+    "allBuiltinPacksInstalled": "Every built-in pack is already installed in this project.",
+    "builtinPackSaasTitle": "SaaS & Marketing Metrics",
+    "builtinPackSaasDescription": "Ad spend, signups, CAC, MRR, and a signup-to-paying funnel.",
+    "builtinPackEngagementTitle": "Engagement Pack",
+    "builtinPackEngagementDescription": "DAU/WAU/MAU, stickiness, and activity histograms.",
+    "builtinPackLandingPageTitle": "Landing Page Performance",
+    "builtinPackLandingPageDescription": "Visitors and conversion rate per landing page x campaign x channel."
   },
   "Boards": {
     "metaTitle": "Boards",

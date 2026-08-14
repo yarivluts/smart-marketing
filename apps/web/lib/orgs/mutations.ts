@@ -70,6 +70,7 @@ import {
   type WinRuleModel,
   type HookEndpointModel,
   type HookSignatureMode,
+  installBuiltinMetricPack as installBuiltinMetricPackInOrganization,
   installPluginAndProvisionBuiltins as installPluginInOrganization,
   saveBoardTiles as saveBoardTilesInOrganization,
   updateBoardSettings as updateBoardSettingsInOrganization,
@@ -675,6 +676,19 @@ interface InstallPluginInput {
 export async function installPlugin(input: InstallPluginInput): Promise<PluginInstallModel> {
   await ensureFirestoreOrm();
   return installPluginInOrganization(input);
+}
+
+interface InstallBuiltinMetricPackInput {
+  organizationId: string;
+  projectId: string;
+  pluginId: string;
+  installedByUserId: string;
+}
+
+/** One-click install for a built-in metric pack — see `installBuiltinMetricPack`'s own doc comment (`metric-pack-dispatch.service.ts`) for why this never needs a manifest version, consented scopes, or config from the caller. */
+export async function installBuiltinMetricPack(input: InstallBuiltinMetricPackInput): Promise<PluginInstallModel> {
+  await ensureFirestoreOrm();
+  return installBuiltinMetricPackInOrganization(input);
 }
 
 interface PluginInstallLifecycleInput {

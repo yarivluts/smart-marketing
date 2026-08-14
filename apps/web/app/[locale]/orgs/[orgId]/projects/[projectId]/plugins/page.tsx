@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
+  builtinMetricPacks,
   listEnvironmentsForProject,
   listOrgProjects,
   listPluginInstallsForProject,
@@ -20,6 +21,7 @@ import {
   toPluginManifestView,
   toSourcePluginRunView,
 } from '@/lib/orgs/plugin-view';
+import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 import { InstallPluginForm } from '@/components/orgs/install-plugin-form';
 import { PluginHealthSummary } from '@/components/orgs/plugin-health-summary';
 import { PluginInstallList } from '@/components/orgs/plugin-install-list';
@@ -36,13 +38,16 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's installed plugins (KAN-46, plan `08 §4`): browse a gallery of
- * installable plugins and install one (a config form rendered from its
- * `config_schema`, behind a scope-consent screen — KAN-48, plan `13 §E7.3`),
- * enable/disable/uninstall existing installs, and — for an active
- * `source`-type install — see its runtime health-at-a-glance plus full run
- * history (KAN-47/KAN-48). Gated on `plugin.install`, the same permission
- * the org-level registry page (`.../orgs/:orgId/plugins`) uses.
+ * A project's installed plugins (KAN-46, plan `08 §4`): a one-click gallery
+ * of this platform's built-in metric packs (no manifest YAML, no scope
+ * consent, no config — see `InstallBuiltinPackSection`) above a browsable
+ * gallery of every org-registered manifest, installable behind a config form
+ * rendered from its `config_schema` and a scope-consent screen (KAN-48, plan
+ * `13 §E7.3`) — the path a third-party or hand-pasted-built-in manifest
+ * still goes through. Also: enable/disable/uninstall existing installs, and
+ * — for an active `source`-type install — its runtime health-at-a-glance
+ * plus full run history (KAN-47/KAN-48). Gated on `plugin.install`, the same
+ * permission the org-level registry page (`.../orgs/:orgId/plugins`) uses.
  */
 export default async function ProjectPluginsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -76,6 +81,7 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
   // uninstalled first (installPlugin's own PluginAlreadyInstalledError) — filtered out here rather
   // than left for the form to discover via a failed submit.
   const installableManifests = manifestViews.filter((manifest) => !hasActiveInstall(installViews, manifest.pluginId));
+  const installableBuiltinPacks = builtinMetricPacks().filter((pack) => !hasActiveInstall(installViews, pack.pluginId));
 
   // Only an active install of a `source`-type manifest has a runnable sync (KAN-47) — a disabled/
   // uninstalled install, or one of any other plugin type, has nothing to trigger here.
@@ -96,6 +102,12 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('builtinPacksHeading')}</h2>
+        <p className="text-sm text-muted-foreground">{t('builtinPacksIntro')}</p>
+        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installableBuiltinPacks} />
+      </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('installHeading')}</h2>

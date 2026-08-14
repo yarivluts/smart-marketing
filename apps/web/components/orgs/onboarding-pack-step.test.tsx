@@ -13,6 +13,7 @@ vi.mock('@/i18n/navigation', () => ({
 const PACKS = [
   { packKey: 'saas_marketing' as const, pluginId: 'com.growthos.saas-marketing-metrics' },
   { packKey: 'engagement' as const, pluginId: 'com.growthos.engagement-pack' },
+  { packKey: 'landing_page' as const, pluginId: 'com.growthos.landing-page-pack' },
 ];
 
 function renderStep(): void {
@@ -53,6 +54,20 @@ describe('OnboardingPackStep', () => {
       expect(fetch).toHaveBeenCalledWith(
         '/api/orgs/org-1/projects/project-1/onboarding/pack',
         expect.objectContaining({ body: JSON.stringify({ packKey: 'custom' }) }),
+      ),
+    );
+  });
+
+  it('selecting the Landing Page Performance pack posts its packKey', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ state: { step: 'sources' } }) } as Response);
+    renderStep();
+
+    fireEvent.click(screen.getByRole('button', { name: /Landing Page Performance/ }));
+
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/orgs/org-1/projects/project-1/onboarding/pack',
+        expect.objectContaining({ body: JSON.stringify({ packKey: 'landing_page' }) }),
       ),
     );
   });

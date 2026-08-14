@@ -1,12 +1,22 @@
 import type { PluginInstallModel } from '../models/plugin-install.model';
-import { ensureSaasMetricPackDefaultBoardsSeeded, ensureSaasMetricPackRegistered, SAAS_METRIC_PACK_PLUGIN_ID } from '../plugin-runtime/saas-metric-pack';
-import { ensureEngagementPackRegistered, ENGAGEMENT_PACK_PLUGIN_ID } from '../plugin-runtime/engagement-pack';
+import {
+  ensureSaasMetricPackDefaultBoardsSeeded,
+  ensureSaasMetricPackRegistered,
+  SAAS_METRIC_PACK_MANIFEST_YAML,
+  SAAS_METRIC_PACK_PLUGIN_ID,
+} from '../plugin-runtime/saas-metric-pack';
+import {
+  ensureEngagementPackRegistered,
+  ENGAGEMENT_PACK_MANIFEST_YAML,
+  ENGAGEMENT_PACK_PLUGIN_ID,
+} from '../plugin-runtime/engagement-pack';
 import {
   ensureLandingPagePackDefaultBoardsSeeded,
   ensureLandingPagePackRegistered,
+  LANDING_PAGE_PACK_MANIFEST_YAML,
   LANDING_PAGE_PACK_PLUGIN_ID,
 } from '../plugin-runtime/landing-page-pack';
-import { installPlugin, type InstallPluginParams } from './plugin-registry.service';
+import { getLatestPluginManifestVersion, installPlugin, registerPluginManifest, type InstallPluginParams } from './plugin-registry.service';
 
 /**
  * The one "install" entry point every caller (apps/web's install route,
@@ -73,4 +83,88 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
   }
 
   return install;
+}
+
+export class UnknownBuiltinMetricPackError extends Error {
+  constructor(pluginId: string) {
+    super(`"${pluginId}" is not one of this platform's built-in metric packs.`);
+    this.name = 'UnknownBuiltinMetricPackError';
+  }
+}
+
+interface BuiltinMetricPackCatalogEntry {
+  pluginId: string;
+  manifestYaml: string;
+}
+
+/**
+ * Every metric pack this codebase ships, keyed by the plugin id its own
+ * manifest declares. The one place that pairs a built-in pack's id with its
+ * manifest text — `selectOnboardingMetricPack` (the wizard's "pick a pack"
+ * step) keeps its own smaller list because it's also keyed by
+ * `OnboardingPackKey`, a fixed 3-value union the wizard's UI renders fixed
+ * cards for; this one is keyed by plugin id alone; so it can grow with the
+ * plugin-runtime directory without the wizard needing a code change too.
+ */
+const BUILTIN_METRIC_PACKS: readonly BuiltinMetricPackCatalogEntry[] = [
+  { pluginId: SAAS_METRIC_PACK_PLUGIN_ID, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML },
+  { pluginId: ENGAGEMENT_PACK_PLUGIN_ID, manifestYaml: ENGAGEMENT_PACK_MANIFEST_YAML },
+  { pluginId: LANDING_PAGE_PACK_PLUGIN_ID, manifestYaml: LANDING_PAGE_PACK_MANIFEST_YAML },
+];
+
+/**
+ * The built-in pack catalog for a project's Plugins page to render install
+ * cards from — pluginId only, no manifest text and no display copy: per
+ * CLAUDE.md, no hard-coded UI strings live in this package, so `apps/web`
+ * keys its own translated title/description off `pluginId` the same way
+ * `onboarding-pack-step.tsx` already keys off `packKey`.
+ */
+export function listBuiltinMetricPacks(): ReadonlyArray<{ pluginId: string }> {
+  return BUILTIN_METRIC_PACKS.map(({ pluginId }) => ({ pluginId }));
+}
+
+export interface InstallBuiltinMetricPackParams {
+  organizationId: string;
+  projectId: string;
+  pluginId: string;
+  installedByUserId: string;
+}
+
+/**
+ * The one-click path a project's Plugins page (and the onboarding wizard,
+ * via `selectOnboardingMetricPack`) uses to install a built-in pack: a human
+ * never sees or pastes its `plugin.yaml` text. Registers the manifest into
+ * the org's Plugin Registry first if no version of it is registered yet —
+ * the exact same "register once, every project in the org can then install
+ * it" model a hand-pasted manifest already has (KAN-46) — then installs +
+ * provisions it via {@link installPluginAndProvisionBuiltins}.
+ *
+ * Every built-in pack ships with an empty `config_schema` (none of them is a
+ * source connector needing credentials), so `config: {}` here is always
+ * correct — the same value `selectOnboardingMetricPack` has always passed.
+ */
+export async function installBuiltinMetricPack(params: InstallBuiltinMetricPackParams): Promise<PluginInstallModel> {
+  const definition = BUILTIN_METRIC_PACKS.find((candidate) => candidate.pluginId === params.pluginId);
+  if (!definition) {
+    throw new UnknownBuiltinMetricPackError(params.pluginId);
+  }
+
+  let registered = await getLatestPluginManifestVersion(params.organizationId, definition.pluginId);
+  if (!registered) {
+    registered = await registerPluginManifest({
+      organizationId: params.organizationId,
+      manifestYaml: definition.manifestYaml,
+      registeredByUserId: params.installedByUserId,
+    });
+  }
+
+  return installPluginAndProvisionBuiltins({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    pluginId: definition.pluginId,
+    version: registered.version,
+    consentedScopes: registered.scopes,
+    config: {},
+    installedByUserId: params.installedByUserId,
+  });
 }

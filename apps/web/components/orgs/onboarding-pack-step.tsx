@@ -19,6 +19,7 @@ export interface OnboardingPackStepProps {
 const PACK_LABEL_KEYS: Record<Exclude<OnboardingPackKey, 'custom'>, { title: string; description: string }> = {
   saas_marketing: { title: 'packSaasMarketingTitle', description: 'packSaasMarketingDescription' },
   engagement: { title: 'packEngagementTitle', description: 'packEngagementDescription' },
+  landing_page: { title: 'packLandingPageTitle', description: 'packLandingPageDescription' },
 };
 
 /** The wizard's "pick a vertical/metric pack" step (plan `10 §2.6` step 1). */
@@ -55,7 +56,7 @@ export function OnboardingPackStep({ orgId, projectId, packs }: OnboardingPackSt
           {t('genericError')}
         </p>
       ) : null}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {packs.map((pack) => {
           const labels = PACK_LABEL_KEYS[pack.packKey];
           return (
@@ -81,7 +82,7 @@ export function OnboardingPackStep({ orgId, projectId, packs }: OnboardingPackSt
           <span className="text-sm text-muted-foreground">{t('packCustomDescription')}</span>
         </button>
       </div>
-      {submittingKey === 'saas_marketing' || submittingKey === 'engagement' ? (
+      {submittingKey !== null && submittingKey !== 'custom' ? (
         <p className="text-sm text-muted-foreground">{t('packInstalling')}</p>
       ) : null}
     </div>

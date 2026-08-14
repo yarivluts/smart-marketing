@@ -6,13 +6,18 @@ import {
   ensureUserForFirebaseSession,
   ENGAGEMENT_PACK_MANIFEST_YAML,
   ENGAGEMENT_PACK_PLUGIN_ID,
+  getLatestPluginManifestVersion,
+  installBuiltinMetricPack,
   installPluginAndProvisionBuiltins,
+  LANDING_PAGE_PACK_PLUGIN_ID,
   listBoardsForProject,
+  listBuiltinMetricPacks,
   listMetricDefinitionsForProject,
   PluginScopeConsentMismatchError,
   registerPluginManifest,
   SAAS_METRIC_PACK_MANIFEST_YAML,
   SAAS_METRIC_PACK_PLUGIN_ID,
+  UnknownBuiltinMetricPackError,
   uninstallPlugin,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -169,5 +174,92 @@ describe('installPluginAndProvisionBuiltins', () => {
     // No default-boards story exists for this pack (unlike KAN-61's SaaS-pack boards).
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards).toHaveLength(0);
+  });
+});
+
+describe('listBuiltinMetricPacks', () => {
+  it('lists every built-in pack this codebase ships, keyed by plugin id only (no display text, per CLAUDE.md)', () => {
+    const pluginIds = listBuiltinMetricPacks().map((pack) => pack.pluginId);
+    expect(pluginIds).toEqual([SAAS_METRIC_PACK_PLUGIN_ID, ENGAGEMENT_PACK_PLUGIN_ID, LANDING_PAGE_PACK_PLUGIN_ID]);
+  });
+});
+
+describe('installBuiltinMetricPack', () => {
+  it('registers the manifest with no prior registration, installs, and provisions — a human never pastes YAML', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Builtin One-Click Org');
+
+    expect(await getLatestPluginManifestVersion(organization.id, SAAS_METRIC_PACK_PLUGIN_ID)).toBeNull();
+
+    const install = await installBuiltinMetricPack({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
+      installedByUserId: owner.id,
+    });
+
+    expect(install.status).toBe('installed');
+    expect(await getLatestPluginManifestVersion(organization.id, SAAS_METRIC_PACK_PLUGIN_ID)).not.toBeNull();
+    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+    expect(defs).toHaveLength(22);
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
+  });
+
+  it('reuses an already-registered manifest instead of registering a second version', async () => {
+    const { owner, organization, project: firstProject } = await setupOrgWithProject('Builtin Reuse Manifest Org');
+    await installBuiltinMetricPack({
+      organizationId: organization.id,
+      projectId: firstProject.id,
+      pluginId: ENGAGEMENT_PACK_PLUGIN_ID,
+      installedByUserId: owner.id,
+    });
+    const registeredAfterFirst = await getLatestPluginManifestVersion(organization.id, ENGAGEMENT_PACK_PLUGIN_ID);
+
+    const { project: secondProject } = await createProject({ organizationId: organization.id, name: 'Second Website' });
+    await installBuiltinMetricPack({
+      organizationId: organization.id,
+      projectId: secondProject.id,
+      pluginId: ENGAGEMENT_PACK_PLUGIN_ID,
+      installedByUserId: owner.id,
+    });
+    const registeredAfterSecond = await getLatestPluginManifestVersion(organization.id, ENGAGEMENT_PACK_PLUGIN_ID);
+
+    // Same manifest doc — not a freshly-registered duplicate version.
+    expect(registeredAfterSecond?.id).toBe(registeredAfterFirst?.id);
+    const secondDefs = await listMetricDefinitionsForProject(organization.id, secondProject.id);
+    expect(secondDefs).toHaveLength(5);
+  });
+
+  it('installs the Landing Page Performance pack one-click, seeding its metrics and board', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Builtin Landing Page Org');
+
+    const install = await installBuiltinMetricPack({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: LANDING_PAGE_PACK_PLUGIN_ID,
+      installedByUserId: owner.id,
+    });
+
+    expect(install.status).toBe('installed');
+    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+    expect(defs.map((def) => def.name).sort()).toEqual(['lp_conversion_rate', 'lp_conversions', 'lp_visitors']);
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards.map((board) => board.name)).toEqual(['Landing page performance']);
+  });
+
+  it('rejects an unknown plugin id rather than silently no-op-ing', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Builtin Unknown Pack Org');
+
+    await expect(
+      installBuiltinMetricPack({
+        organizationId: organization.id,
+        projectId: project.id,
+        pluginId: 'com.example.not-a-real-pack',
+        installedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(UnknownBuiltinMetricPackError);
+
+    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+    expect(defs).toHaveLength(0);
   });
 });

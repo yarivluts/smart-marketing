@@ -41,6 +41,7 @@ import {
   listOrchestrationRunsForProject as listOrchestrationRunsForProjectInOrganization,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
+  listBuiltinMetricPacks,
   listOnboardingMetricPacks,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
   listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
@@ -432,6 +433,11 @@ export async function getOnboardingState(organizationId: string, projectId: stri
 /** The built-in metric packs the onboarding wizard's "pick a vertical" step offers — a pure catalog, no Firestore read needed. */
 export function onboardingMetricPacks(): ReturnType<typeof listOnboardingMetricPacks> {
   return listOnboardingMetricPacks();
+}
+
+/** Every built-in metric pack this platform ships (SaaS, Engagement, Landing Page) — the catalog a project's Plugins page renders one-click install cards from. A pure catalog, no Firestore read needed — same shape as {@link onboardingMetricPacks}, just not keyed by the wizard's fixed `packKey` union. */
+export function builtinMetricPacks(): ReturnType<typeof listBuiltinMetricPacks> {
+  return listBuiltinMetricPacks();
 }
 
 /** An AI-proposed funnel step order for a project's already-registered event schemas (KAN-68 AC). */

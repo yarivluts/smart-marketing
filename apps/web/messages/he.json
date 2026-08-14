@@ -164,7 +164,9 @@
     "setGoalLink": "הגדירו יעד",
     "warRoomLink": "הפעילו את חדר המלחמה",
     "finishButton": "סיום",
-    "doneMessage": "הכול מוכן!"
+    "doneMessage": "הכול מוכן!",
+    "packLandingPageTitle": "ביצועי דפי נחיתה",
+    "packLandingPageDescription": "מדדו אחוז המרה לכל דף נחיתה על פני קמפיינים."
   },
   "Invite": {
     "title": "הזמנה לארגון",
@@ -621,7 +623,19 @@
     "sourceRunStatusRunning": "רץ",
     "sourceRunStatusSucceeded": "הצליח",
     "sourceRunStatusFailed": "נכשל",
-    "sourceRunCursorFromScratch": "מההתחלה"
+    "sourceRunCursorFromScratch": "מההתחלה",
+    "builtinPacksHeading": "חבילות מובנות",
+    "builtinPacksIntro": "התקנה בלחיצה אחת לחבילות המדדים שהפלטפורמה מספקת — בלי להדביק מניפסט ובלי טופס הגדרות.",
+    "builtinPackInstallButton": "התקנה",
+    "builtinPackInstalling": "מתקין…",
+    "builtinPackInstallError": "התקנת החבילה נכשלה. נסו שוב.",
+    "allBuiltinPacksInstalled": "כל החבילות המובנות כבר מותקנות בפרויקט הזה.",
+    "builtinPackSaasTitle": "מדדי SaaS ושיווק",
+    "builtinPackSaasDescription": "הוצאות פרסום, הרשמות, CAC, MRR, ומשפך הרשמה-לתשלום.",
+    "builtinPackEngagementTitle": "חבילת מעורבות",
+    "builtinPackEngagementDescription": "DAU/WAU/MAU, יחס דביקות, והיסטוגרמות פעילות.",
+    "builtinPackLandingPageTitle": "ביצועי דפי נחיתה",
+    "builtinPackLandingPageDescription": "מבקרים ואחוז המרה לכל דף נחיתה x קמפיין x ערוץ."
   },
   "Boards": {
     "metaTitle": "לוחות מחוונים",
