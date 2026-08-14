@@ -17,6 +17,31 @@ Template for each entry:
 
 ---
 
+## 2026-08-13 — One-click built-in pack install (interactive session, PR #81)
+
+- **Last completed:** Closed the gap the previous entry flagged: built-in metric packs (SaaS,
+  Engagement, Landing Page) required hand-pasting raw `plugin.yaml` text to install. New
+  `installBuiltinMetricPack`/`listBuiltinMetricPacks` (`metric-pack-dispatch.service.ts`)
+  register-if-needed-then-install a pack from just its `pluginId` — no manifest text, no
+  scope-consent screen, no config form (every built-in pack has an empty `config_schema`). New
+  `POST .../projects/:id/plugins/builtin` route + `InstallBuiltinPackSection` puts one-click
+  install cards on every project's Plugins page, above the existing paste-a-manifest gallery
+  (kept, for third-party plugins). `onboarding.service.ts`'s `selectOnboardingMetricPack` now
+  calls the same shared function instead of duplicating the register-then-install logic, and the
+  onboarding wizard's "pick a vertical" step now also offers Landing Page Performance (it was
+  simply missing from `ONBOARDING_PACK_KEYS` since it postdated that list). 26 new/updated tests
+  green in CI (emulator-backed service + route tests, component tests). Deployed to dev+prod and
+  browser-verified: clicking "Landing Page Performance" on a fresh project registered its 3
+  metrics and seeded its 6-tile board with zero page reload/errors, and the card correctly
+  disappeared from the installable list afterward.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** nothing.
+- **Next step:** none picked — see prior entries for the standing backlog (KAN-18/19 in-progress,
+  KAN-43 needs-human, KAN-50/51 blocked-by KAN-43).
+- **Waiting on human:** nothing new from this change. Standing items unchanged (KAN-43 API
+  approvals; reconcile the 3 unmerged KAN-20 observability PRs per run 220's note below).
+
+
 ## 2026-08-14 — No unblocked work found; state unchanged since PR #80 (run 228)
 
 - **Last completed:**
