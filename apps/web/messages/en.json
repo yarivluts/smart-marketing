@@ -166,7 +166,8 @@
     "finishButton": "Finish",
     "doneMessage": "You're all set!",
     "packLandingPageTitle": "Landing Page Performance",
-    "packLandingPageDescription": "Track conversion per landing page across campaigns."
+    "packLandingPageDescription": "Track conversion per landing page across campaigns.",
+    "sourceStepPushYourOwnIntro": "Works right now, no plugin setup needed — mint a key below and start sending events immediately."
   },
   "Invite": {
     "title": "Organization invite",
