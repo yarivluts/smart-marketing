@@ -166,7 +166,8 @@
     "finishButton": "סיום",
     "doneMessage": "הכול מוכן!",
     "packLandingPageTitle": "ביצועי דפי נחיתה",
-    "packLandingPageDescription": "מדדו אחוז המרה לכל דף נחיתה על פני קמפיינים."
+    "packLandingPageDescription": "מדדו אחוז המרה לכל דף נחיתה על פני קמפיינים.",
+    "sourceStepPushYourOwnIntro": "עובד מיד, בלי צורך בהתקנת plugin — צרו מפתח למטה והתחילו לשלוח אירועים."
   },
   "Invite": {
     "title": "הזמנה לארגון",

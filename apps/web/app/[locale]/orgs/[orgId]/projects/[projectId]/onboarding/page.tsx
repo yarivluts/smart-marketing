@@ -26,6 +26,7 @@ import { OnboardingFunnelStep } from '@/components/orgs/onboarding-funnel-step';
 import { CompleteOnboardingButton } from '@/components/orgs/complete-onboarding-button';
 import { InstallPluginForm } from '@/components/orgs/install-plugin-form';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
+import { Button } from '@/components/ui/button';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -107,7 +108,21 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
   );
 }
 
-/** The "connect a first source" step's own sub-tree (KAN-68 AC, plan `10 §2.6` step 2) — kept in its own async component so the page body above stays a flat step switch. */
+/**
+ * The "connect a first source" step's own sub-tree (KAN-68 AC, plan `10 §2.6`
+ * step 2) — kept in its own async component so the page body above stays a
+ * flat step switch.
+ *
+ * A brand-new org has zero registered source manifests, so every first-run
+ * visitor hits the `installableSourceManifests.length === 0` branch. That
+ * empty state's link to the org plugin registry was previously plain inline
+ * text easy to read past as a caveat rather than a next step (found via
+ * dogfooding QA); it's a real `Button` now. The "push your own data" path
+ * below it — equally valid, and the one that actually works with zero setup
+ * — gets its own one-line callout for the same reason: without it, a
+ * first-time user reads the plugin dead end as *the* path and the API-key
+ * form as an unlabeled afterthought, when it's the faster of the two.
+ */
 async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: string }): Promise<React.ReactElement> {
   const t = await getTranslations('Onboarding');
 
@@ -137,12 +152,12 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
         {connectedSourceInstall ? (
           <p className="text-sm text-muted-foreground">{t('sourceStepPluginConnected', { pluginId: connectedSourceInstall.pluginId })}</p>
         ) : installableSourceManifests.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {t('sourceStepNoManifests')}{' '}
-            <Link className="underline" href={`/orgs/${orgId}/plugins`}>
-              {t('sourceStepNoManifestsLink')}
-            </Link>
-          </p>
+          <div className="flex flex-col items-start gap-2 rounded-md border border-input p-3">
+            <p className="text-sm text-muted-foreground">{t('sourceStepNoManifests')}</p>
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/orgs/${orgId}/plugins`}>{t('sourceStepNoManifestsLink')}</Link>
+            </Button>
+          </div>
         ) : (
           <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableSourceManifests} />
         )}
@@ -150,6 +165,7 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
 
       <div className="flex flex-col gap-3">
         <h3 className="font-medium">{t('sourceStepPushYourOwnHeading')}</h3>
+        <p className="text-sm text-muted-foreground">{t('sourceStepPushYourOwnIntro')}</p>
         {environmentOptions.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('sourceStepNoEnvironments')}</p>
         ) : (

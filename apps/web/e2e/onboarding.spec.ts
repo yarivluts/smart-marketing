@@ -51,6 +51,13 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await page.getByRole('button', { name: /SaaS & Marketing Metrics/ }).click();
     await expect(page.getByRole('heading', { name: 'Connect a data source' })).toBeVisible({ timeout: 120_000 });
 
+    // A brand-new org has no source manifests registered yet, so the empty-state CTA must be a real,
+    // visible button linking to the org's plugin registry — not buried inline text a first-time user
+    // reads past (found via dogfooding QA, 2026-08-16: "no link/button to the pack registry").
+    const registryLink = page.getByRole('link', { name: 'Register one from the plugin registry' });
+    await expect(registryLink).toBeVisible();
+    await expect(registryLink).toHaveAttribute('href', `/en/orgs/${orgId}/plugins`);
+
     // Step 2: mint an ingest.write key ("push your own data"), then continue.
     await page.getByLabel('Name').fill('Website snippet');
     await page.getByRole('checkbox', { name: 'ingest.write' }).check();
