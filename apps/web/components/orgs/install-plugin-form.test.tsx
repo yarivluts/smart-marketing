@@ -79,12 +79,16 @@ describe('InstallPluginForm', () => {
     expect(screen.queryByLabelText(/shop_domain/)).not.toBeInTheDocument();
   });
 
-  it('requires the consent checkbox before submitting', async () => {
+  it('disables the install button until the consent checkbox is checked', () => {
     renderForm();
     fireEvent.change(screen.getByLabelText(/shop_domain/), { target: { value: 'my-shop' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Install plugin' }));
+    expect(screen.getByRole('button', { name: 'Install plugin' })).toBeDisabled();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('You must approve the requested scopes before installing.');
+    fireEvent.click(screen.getByLabelText("I've reviewed and approve these scopes"));
+    expect(screen.getByRole('button', { name: 'Install plugin' })).toBeEnabled();
+
+    fireEvent.click(screen.getByLabelText("I've reviewed and approve these scopes"));
+    expect(screen.getByRole('button', { name: 'Install plugin' })).toBeDisabled();
     expect(fetch).not.toHaveBeenCalled();
   });
 
