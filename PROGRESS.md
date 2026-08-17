@@ -17,6 +17,43 @@ Template for each entry:
 
 ---
 
+## 2026-08-17 — No unblocked TASKS.md work; state unchanged since run 250
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows (`grep -oE '\| (todo|in-progress|done|needs-human|blocked-by) \|' TASKS.md | sort
+    | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19, both infra-gated), 1 `needs-human` (KAN-43),
+    2 `blocked-by` (KAN-50/51, blocked on KAN-43)) — unchanged since run 250.
+  - `git status` on `main` was clean and up to date with `origin/main` (no detached-HEAD leftover
+    this time). `list_pull_requests` (state=open) returned zero open PRs — PR #83 (in flight during
+    run 250) has since merged and nothing new is open.
+  - Re-checked the environment for GCP/Firebase credentials
+    (`GOOGLE_APPLICATION_CREDENTIALS`/`FIREBASE_*`/`GCP_*`/`SENTRY_DSN`) and for `gcloud`/`firebase`
+    on `PATH`: still none present, so KAN-18's remaining Terraform-import/BigQuery/Pub/Sub/Redis/
+    staging work and KAN-19's remaining preview/staging-deploy CI work stay blocked behind a human
+    with real infra credentials, same as every prior run.
+  - Did not attempt to check the Windows-local session-relay inbox
+    (`C:\Users\yariv\.claude\session-relay\smart-marketing-to-A.md`) referenced by the two entries
+    above — that path is on the account owner's machine, not reachable from this sandboxed
+    environment.
+- **In progress (exact stopping point):** none — nothing to start; no code changes made this run.
+- **Blocked + why:** every remaining backlog item is `done`, infra-gated (`in-progress`
+  KAN-18/KAN-19), `needs-human` (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/KAN-51). No
+  headless-runnable `todo` work exists in `TASKS.md`.
+- **Next step:** keep polling on the configured cadence. The moment a human unblocks KAN-18 (real
+  GCP/Firebase credentials) or KAN-43 (Google Ads/Meta approvals land), re-check `TASKS.md` — KAN-19's
+  preview/staging CI and KAN-50/KAN-51 become pickable at that point. Until then, each run should stay
+  cheap: confirm no new `todo`, no stray open PRs, no credential changes, and record it.
+- **Waiting on human:** unchanged —
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (or provide credentials to this
+    environment) — still outstanding; gates KAN-19's remaining CI work and KAN-50/KAN-51 transitively.
+  - Decide which KAN-20 PR to keep note is stale/resolved (KAN-20 shows `done` in `TASKS.md`); no
+    action needed there.
+
+---
+
 ## 2026-08-17 — Could not reproduce session B's RTL date-field-order report; second unverifiable QA claim
 
 - **Last completed:**
