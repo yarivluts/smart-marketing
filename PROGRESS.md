@@ -17,6 +17,57 @@ Template for each entry:
 
 ---
 
+## 2026-08-17 — No unblocked TASKS.md work; two more PRs in flight from the same concurrent live session
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows (`grep -oE '\| (todo|in-progress|done|needs-human|blocked-by) \|' TASKS.md | sort
+    | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19, both infra-gated), 1 `needs-human` (KAN-43),
+    2 `blocked-by` (KAN-50/51, blocked on KAN-43)) — unchanged since the prior entry.
+  - Local checkout started `HEAD` detached again (container-init leftover), pointed at
+    `43c85a5` = `origin/main` already. Fast-forwarded local `main` cleanly (`git checkout main && git
+    merge --ff-only origin/main`), pulling in PR #84 and PR #85 (merged since the prior run) plus the
+    builtin-pack-install work; no commits lost, no force-push.
+  - Checked open PRs (`list_pull_requests`, state=open): **two**, both created in the ~13 minutes
+    before this run started (18:56 and 18:59 UTC vs. this run's ~19:08 UTC start) — PR #86 ("fix:
+    webhook/ingest/MCP endpoints unreachable in deployed environments" — apps/api never bootstrapped
+    its Firestore ORM connection outside of tests, plus three `NEXT_PUBLIC_*_API_URL` build args never
+    wired through the Docker/Cloud Build pipeline) and PR #87 ("fix: surface field-mapping validation
+    reasons instead of a generic error"). Both bodies open with "Two independent bugs behind session
+    B's ... report" / reference the same relay-driven QA loop documented in earlier entries. `list_sessions`
+    confirmed both belong to `session_01JLFWLinu6Rre5n3s8NBDJK` ("עבודה קבועה עם Jira"), which was
+    `connection_status: connected` with `updated_at` **one minute before this check** and its
+    `current_branches` pointed at PR #87's own branch (`fix/field-mapping-validation-error-surfacing`)
+    — i.e. actively mid-turn on this exact repo right now, not idle. Per the standing posture (a PR
+    this fresh with its owning session still connected and working is not abandonment, regardless of
+    CI/mergeable state), deliberately left both alone rather than merging out from under a live session.
+  - Re-checked the environment for GCP/Firebase credentials (`GOOGLE_APPLICATION_CREDENTIALS`,
+    `FIREBASE_*`, `GCP_*`, `SENTRY_DSN`) and for `gcloud`/`firebase` CLIs on `PATH` — still none
+    present, so KAN-18's remaining Terraform-import/BigQuery/Pub/Sub/Redis/staging work and KAN-19's
+    remaining preview/staging-deploy CI work stay blocked behind a human with real infra credentials.
+  - No push notification sent: nothing here needs the account owner's attention right now — the
+    TASKS.md blocker is the same one flagged repeatedly for dozens of runs, and PR #86/#87 are being
+    actively driven by the owner's own live, connected session.
+- **In progress (exact stopping point):** none — nothing to start; no code changes made this run.
+- **Blocked + why:** every remaining backlog item is `done`, infra-gated (`in-progress` KAN-18/19),
+  `needs-human` (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/KAN-51). No headless-runnable
+  `todo` work exists in `TASKS.md`.
+- **Next step:** keep polling on the configured cadence. If PR #86/#87 are still open and their owning
+  session (`session_01JLFWLinu6Rre5n3s8NBDJK`) is gone or long-idle (hours, not minutes) on a future
+  run, treat them as abandoned-with-passing-checks and pick them up (independent diff review, then
+  merge) the same way run 250's PR #83 was eventually handled. Once a human unblocks KAN-18 (real GCP/
+  Firebase credentials) or KAN-43 (Google Ads/Meta approvals), re-check `TASKS.md` — KAN-19's preview/
+  staging CI and KAN-50/KAN-51 become pickable at that point.
+- **Waiting on human:** unchanged —
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (or provide credentials to this
+    environment) — still outstanding; gates KAN-19's remaining CI work and KAN-50/KAN-51 transitively.
+  - PR #86 and PR #87 — currently owned by a live, connected interactive session; no action needed
+    unless a future run finds them abandoned.
+
+---
+
 ## 2026-08-17 — No unblocked TASKS.md work; two PRs in flight from a concurrent live session
 
 - **Last completed:**
