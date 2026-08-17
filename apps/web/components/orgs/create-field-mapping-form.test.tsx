@@ -89,6 +89,29 @@ describe('CreateFieldMappingForm', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 
+  it('surfaces the server\'s specific validation reasons for an invalid rule set, instead of a generic error', async () => {
+    // Previously any non-`target_schema_not_registered` failure fell back to the bare, generic
+    // `createError` message even though the API returns exactly what's wrong (found via session-B
+    // dogfooding QA, 2026-08-17: a real 400 body with concrete field-name reasons was discarded).
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      json: async () => ({
+        error: 'invalid_rules',
+        reasons: ['Field "landing_page" is not valid for kind "entity" (expected one of id, or "attributes.<name>").', 'Required field "id" has no mapping rule.'],
+      }),
+    } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
+    fireEvent.change(screen.getByLabelText('Target schema'), { target: { value: 'order_completed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create mapping' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Field "landing_page" is not valid for kind "entity" (expected one of id, or "attributes.<name>"). Required field "id" has no mapping rule.',
+    );
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it('merges an applied suggestion into the rule editor without clobbering an existing rule for a different field', async () => {
     vi.mocked(fetch).mockImplementation(async (input) => {
       if (String(input).endsWith('/field-mappings/suggest')) {
