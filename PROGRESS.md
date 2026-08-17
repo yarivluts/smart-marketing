@@ -17,6 +17,59 @@ Template for each entry:
 
 ---
 
+## 2026-08-17 — No unblocked TASKS.md work; PR #83 in flight from a concurrent live session (run 250)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows (`grep -oE '\| (todo|in-progress|done|needs-human|blocked-by) \|' TASKS.md | sort
+    | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19), 1 `needs-human` (KAN-43), 2 `blocked-by`
+    (KAN-50/51)) — unchanged since run 249.
+  - Local checkout again started `HEAD` detached (container-init leftover) at `60653c9` (PR #82,
+    merged since run 249). `git fetch origin main` confirmed `origin/main` was genuinely at
+    `60653c9` — only a stale local ref (`main` was at `939077f`, run 227), no real divergence or
+    unpushed work. Fast-forwarded local `main` via `git checkout main && git merge --ff-only
+    origin/main`; no commits lost, no force-push to the remote.
+  - Checked open PRs (`list_pull_requests`, state=open): **one** — PR #83 ("fix: source-plugin
+    install crash (missing Firestore index) + consent-button gating"), opened minutes before this
+    run started (`created_at` 13:38 UTC) by a live, currently-`RUNNING` session on this same repo/
+    branch (`fix/source-plugin-install-crash`, confirmed via `list_sessions`) with its CI actively
+    `in_progress` at check time. This is a real production bug fix (missing Firestore composite
+    index causing a 500 on the Plugins page after installing a source-type plugin, plus a sibling
+    index gap in the KAN-36 tracking-alert query, plus a disabled-until-consented UX fix) discovered
+    outside this routine's TASKS.md loop — not a stalled/abandoned PR. Deliberately left it alone:
+    reviewing/merging a PR another live session is actively pushing to and running CI on would risk
+    racing that session's own commits/merge. Not this run's task to pick up per CLAUDE.md's
+    "PRs you created are yours to drive" posture — this one isn't ours.
+  - Checked the environment for GCP/Firebase credentials (`GOOGLE_APPLICATION_CREDENTIALS`,
+    `FIREBASE_*`, `GCP_*`, `SENTRY_DSN`) and for `gcloud`/`firebase` CLIs on `PATH` — none present, so
+    KAN-18's remaining Terraform-import/BigQuery/Pub/Sub/Redis/staging work still cannot be
+    attempted from a sandboxed run, and KAN-19's remaining preview/staging-deploy CI work stays
+    blocked behind it.
+  - No push notification sent: the only state change this run (PR #83) is a real bug already caught
+    and actively being fixed by another live session — not something needing the account owner's
+    attention right now. The `todo`-backlog blocker itself is unchanged from runs 60/138/213-249,
+    already flagged repeatedly.
+- **In progress (exact stopping point):** none for this run's own scope.
+- **Blocked + why:** `TASKS.md` has zero `todo` rows; the two remaining `in-progress` rows
+  (KAN-18/KAN-19) and the `needs-human`/`blocked-by` rows (KAN-43, KAN-50, KAN-51) all need either
+  real GCP/Firebase credentials, an external application submission, or both — none of which a
+  sandboxed run can supply.
+- **Next step:** unchanged on the backlog side — a human needs to (a) run the KAN-18 Terraform import
+  + plan against real credentials and decide BigQuery/Pub/Sub/Redis/staging shape, and (b) submit the
+  KAN-43 Google Ads/Meta applications. Separately, PR #83 should be reviewed/merged by whichever
+  session opened it (or a human) once its CI finishes — a future scheduled run should check whether
+  it's still open and, if abandoned/stalled with green CI, pick it up then.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — run `terraform import`/`plan` from the merged `infra/terraform/` against real
+    credentials, then decide BigQuery/Pub/Sub/Redis/staging-environment shape. Also gates KAN-19's
+    remaining preview/staging-deploy CI work.
+  - **PR #83** — in flight from a concurrent live session at the time of this run; no action needed
+    unless a later run finds it still open and stalled.
+
+---
+
 ## 2026-08-16 — No unblocked work found; state unchanged since PR #81 (run 249)
 
 - **Last completed:**
