@@ -93,6 +93,15 @@ Template for each entry:
   against (real browser? correct URL? actually reloading?).
 - **Waiting on human:** nothing new beyond the standing items below. The session-B reliability
   question is flagged for awareness, not blocking any code work.
+- **Update (same run, later):** both open questions resolved via the relay, no longer a concern.
+  RTL: session B re-measured with `getBoundingClientRect` (rather than eyeballing a screenshot) and
+  retracted the report — their numbers matched mine exactly (Start rightmost, then End, then
+  Resolution, then Compare). Traffic gap: session B explained they're an interactive agent session
+  that only issues browser requests while actively running a turn, with real idle time between turns
+  (matching this session's own wall-clock-jump notices) — not a testing artifact, and the plugins
+  crash they reported during that window was independently confirmed by the matching root cause found
+  in PR #83 below regardless. Session-B reliability is no longer in question; both retractions were
+  self-initiated and matched independent verification.
 
 ---
 
