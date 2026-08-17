@@ -264,7 +264,7 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
               {error}
             </p>
           ) : null}
-          <Button type="submit" disabled={submitting}>
+          <Button type="submit" disabled={submitting || !consented}>
             {t('installButton')}
           </Button>
         </form>
