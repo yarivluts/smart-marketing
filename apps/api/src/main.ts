@@ -6,8 +6,13 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { RequestMethod } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { connectFirestoreOrmForApi } from './firestore-orm.bootstrap';
 
 async function bootstrap(): Promise<void> {
+  // Every controller here touches Firestore via a `BaseModel` subclass — connect once, up front,
+  // rather than leaving it for the first request to discover the ORM was never initialized.
+  await connectFirestoreOrmForApi();
+
   // `rawBody: true` preserves the exact request bytes on `request.rawBody` alongside the parsed
   // `request.body` — KAN-53's hook receiver needs the untouched bytes for HMAC signature
   // verification, since a re-serialized JSON body would compute a different (and wrong) digest.

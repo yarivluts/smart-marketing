@@ -2,7 +2,7 @@
 # NEXT_PUBLIC_* config is inlined at build time, so each environment gets its own image.
 # Usage:
 #   gcloud builds submit --config deploy/cloudbuild.web.yaml \
-#     --substitutions _IMAGE=<image>,_FIREBASE_API_KEY=...,_FIREBASE_AUTH_DOMAIN=...,_FIREBASE_PROJECT_ID=...,_FIREBASE_APP_ID=...,_API_URL=... .
+#     --substitutions _IMAGE=<image>,_FIREBASE_API_KEY=...,_FIREBASE_AUTH_DOMAIN=...,_FIREBASE_PROJECT_ID=...,_FIREBASE_APP_ID=...,_INGEST_API_URL=...,_HOOK_API_URL=...,_MCP_API_URL=... .
 steps:
   - name: gcr.io/cloud-builders/docker
     args:
@@ -18,7 +18,11 @@ steps:
       - '--build-arg'
       - 'NEXT_PUBLIC_FIREBASE_APP_ID=${_FIREBASE_APP_ID}'
       - '--build-arg'
-      - 'NEXT_PUBLIC_API_URL=${_API_URL}'
+      - 'NEXT_PUBLIC_INGEST_API_URL=${_INGEST_API_URL}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_HOOK_API_URL=${_HOOK_API_URL}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_MCP_API_URL=${_MCP_API_URL}'
       - '-t'
       - '${_IMAGE}'
       - '.'
@@ -32,4 +36,6 @@ substitutions:
   _FIREBASE_AUTH_DOMAIN: ''
   _FIREBASE_PROJECT_ID: ''
   _FIREBASE_APP_ID: ''
-  _API_URL: ''
+  _INGEST_API_URL: ''
+  _HOOK_API_URL: ''
+  _MCP_API_URL: ''
