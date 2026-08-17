@@ -17,6 +17,74 @@ Template for each entry:
 
 ---
 
+## 2026-08-17 — Fixed session-B-reported plugins-page crash: missing Firestore composite index (PR #83)
+
+- **Last completed:**
+  - Root-caused the crash session B reported (`/orgs/{orgId}/projects/{projectId}/plugins` 500s
+    permanently after installing a `source`-type plugin, first flagged for `/he/`): read the page's
+    code path rather than guessing from the translation files first (the `ProjectPlugins`/`Onboarding`
+    en/he key sets matched exactly, ruling that hypothesis out). `listSourcePluginRunsForInstall`
+    (`packages/firebase-orm-models/src/services/plugin-runtime.service.ts`) runs
+    `.where('plugin_install_id', '==', installId).orderBy('started_at', 'desc')` — a compound query
+    real (non-emulator) Firestore requires a composite index for. The function's own doc comment
+    already documented this requirement, but the index was never actually provisioned in the live
+    `growthos-g2w84` project — this was the first source-type plugin ever installed in dev, so the
+    code path had never been exercised before. Created the missing index directly via `gcloud
+    firestore indexes composite create` (collection `plugin_source_runs`, fields `plugin_install_id`
+    ASC + `started_at` DESC), same approach as the 3 collection-group index exemptions from earlier
+    KAN-18 work.
+  - Proactively audited the sibling query the doc comment itself cross-references —
+    `listRawRecordsForSchemaSince` (KAN-36, `packages/firebase-orm-models/src/services/pipeline.service.ts`,
+    used by the Schema Registry's tracking-alert "Check now" button) — and found it had the identical
+    gap (no composite index for its `kind`==/`schema_name`==/`landed_at`>= + `orderBy landed_at desc`
+    query). Created that index too before it could cause the same crash the first time anyone used
+    that button. `gcloud firestore indexes composite list` confirmed these were the *only* two
+    composite indexes the project needed and had zero before this — a broader sweep of the other ~19
+    `.orderBy()` call sites in `packages/firebase-orm-models/src/services/*.ts` for the same pattern
+    is still open (see Next step).
+  - Also fixed a secondary UX bug session B flagged in the same crash repro: the install form's
+    submit button was always enabled, only erroring after a click if the scope-consent checkbox was
+    unchecked. Now `disabled={submitting || !consented}` — `apps/web/components/orgs/install-plugin-form.tsx`.
+  - Tests: rewrote the consent-checkbox test in `install-plugin-form.test.tsx` to assert the button's
+    disabled state tracks consent (the old version clicked a would-now-be-disabled button, which
+    jsdom silently no-ops). `pnpm exec vitest run` on both changed test files: 34/34 green.
+    `eslint` clean on both changed files.
+  - PR #83 opened, CI green (`lint · typecheck · test · build`, `terraform fmt · validate`), merged
+    to `main` (squash, branch deleted).
+  - Rebuilt and redeployed `web-dev` and `web-prod` (Cloud Build → Artifact Registry → `gcloud run
+    deploy`, same Firebase Web SDK config + per-env `_API_URL` substitutions as prior deploys).
+  - Browser-verified live on **both** dev and prod via a git-ignored Playwright scratch script
+    (`apps/web/repro-tmp.mjs`): fresh signup → org → project → registered a `source`-type manifest →
+    confirmed the Install button is disabled pre-consent / enabled post-consent → installed it →
+    hard-reloaded the Plugins page in **both** `en` and `he` — no crash, no console errors, "Source
+    runtime" section renders correctly with `Never run` health and an empty run-history list, on both
+    environments.
+  - Replied to session B in the file-relay inbox (`smart-marketing-to-B.md`) confirming the fix and
+    what was verified. Also flagged an open question to session B: Cloud Run access logs for `web-dev`
+    show a genuine ~16.5h gap with **zero** requests (2026-08-16 20:50 UTC → 2026-08-17 13:27 UTC)
+    spanning both the crash bug report (06:05 UTC) and the detailed repro (13:20 UTC) session B sent —
+    yet session B's traffic from ~13:27 UTC onward (including the org-switching report) shows up in
+    the logs exactly as expected. The fix itself is verified independently and doesn't depend on
+    resolving this, but the QA loop's timing/traffic being unaccounted for during two specific reports
+    is worth session B (or a human) explaining before trusting future timestamped reports at face
+    value.
+- **In progress (exact stopping point):** none — PR #83 fully shipped, tested, deployed, and
+  browser-verified on both environments; session B replied to.
+- **Blocked + why:** nothing blocking on this item. The broader "audit the other ~19 `.orderBy()`
+  call sites in `packages/firebase-orm-models/src/services/*.ts` for the same missing-composite-index
+  gap" follow-up is unstarted, not blocked — just out of scope for this run.
+- **Next step:** continue monitoring the session-B relay inbox
+  (`C:\Users\yariv\.claude\session-relay\smart-marketing-to-A.md`) for further QA reports and execute
+  them the same way (root-cause, fix, test, PR, merge, deploy dev+prod, browser-verify, reply). If
+  session B goes quiet, a good use of idle time is the broader composite-index audit flagged above —
+  each `.where(...).orderBy(...)` on a different field is a candidate for the same latent crash, and
+  the emulator won't catch it since it doesn't enforce index requirements.
+- **Waiting on human:** nothing new from this entry. Standing items unchanged (see run 250 below):
+  KAN-43 (Google Ads/Meta application submission), KAN-18 (Terraform import/plan against real
+  credentials once BigQuery/Pub/Sub/Redis/staging shape is decided).
+
+---
+
 ## 2026-08-17 — No unblocked TASKS.md work; PR #83 in flight from a concurrent live session (run 250)
 
 - **Last completed:**
