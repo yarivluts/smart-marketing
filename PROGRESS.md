@@ -17,6 +17,60 @@ Template for each entry:
 
 ---
 
+## 2026-08-17 — No unblocked TASKS.md work; two PRs in flight from a concurrent live session
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows (`grep -oE '\| (todo|in-progress|done|needs-human|blocked-by) \|' TASKS.md | sort
+    | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19, both infra-gated), 1 `needs-human` (KAN-43),
+    2 `blocked-by` (KAN-50/51, blocked on KAN-43)) — unchanged since the prior entry.
+  - Local checkout started `HEAD` detached again (container-init leftover), 31 commits behind
+    `origin/main`. `git fetch origin main` confirmed `origin/main` was genuinely ahead (real merges
+    landed since, incl. PR #83 and builtin-pack-install work) — fast-forwarded local `main` via
+    `git checkout main && git merge --ff-only origin/main`; no commits lost, no force-push.
+  - Checked open PRs (`list_pull_requests`, state=open): **two** — PR #84 ("fix: dashboard briefly
+    shows 'no organizations' right after login", an auth-state/session-cookie race fix) and PR #85
+    ("fix: audit-log summary quotes get bidi-reordered under RTL"), created 16:26 and 16:39 UTC
+    respectively (this run started ~17:12 UTC, so 30-45 min old). Both `mergeable_state: clean`, both
+    CI green (`lint · typecheck · test · build` + `terraform fmt · validate`, both jobs `success`).
+    Both are on branches owned by `session_01JLFWLinu6Rre5n3s8NBDJK` ("עבודה קבועה עם Jira"), a
+    `connected` interactive VSCode session on this same account, currently `IDLE` between turns (not
+    `RUNNING`) but clearly active moments ago and likely to resume — both PR bodies have an unchecked
+    "Post-merge: browser-verify ... on dev" checklist item, implying the *same* session plans to
+    merge and verify itself. Per the "PRs you created are yours to drive, others are not this run's
+    to touch mid-flight" posture (and the precedent set by run 250 leaving PR #83 alone under
+    identical circumstances), deliberately left both alone rather than merging out from under an
+    active session. This is a different situation from the KAN-20-style "3 duplicate PRs stale for
+    ~50 runs" case where picking up truly abandoned work was appropriate — 30-45 minutes with a still-
+    connected owning session is not abandonment.
+  - Checked the environment for GCP/Firebase credentials (`GOOGLE_APPLICATION_CREDENTIALS`,
+    `FIREBASE_*`, `GCP_*`, `SENTRY_DSN`) and for `gcloud`/`firebase` CLIs on `PATH` — still none
+    present, so KAN-18's remaining Terraform-import/BigQuery/Pub/Sub/Redis/staging work still cannot
+    be attempted from a sandboxed run, and KAN-19's remaining preview/staging-deploy CI work stays
+    blocked behind it.
+  - No push notification sent: nothing here needs the account owner's attention right now — the
+    TASKS.md blocker is the same one flagged repeatedly for dozens of runs, and PR #84/#85 are being
+    driven by the owner's own live, connected session (they're already at the keyboard for that one).
+- **In progress (exact stopping point):** none — nothing to start; no code changes made this run.
+- **Blocked + why:** every remaining backlog item is `done`, infra-gated (`in-progress` KAN-18/19),
+  `needs-human` (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/KAN-51). No headless-runnable
+  `todo` work exists in `TASKS.md`.
+- **Next step:** keep polling on the configured cadence. If PR #84/#85 are still open and the owning
+  session (`session_01JLFWLinu6Rre5n3s8NBDJK`) is gone or long-idle (hours, not minutes) on a future
+  run, treat them as abandoned-with-green-CI and pick them up (independent diff review, then merge)
+  the same way run 250's PR #83 was eventually handled. Once a human unblocks KAN-18 (real GCP/
+  Firebase credentials) or KAN-43 (Google Ads/Meta approvals), re-check `TASKS.md` — KAN-19's preview/
+  staging CI and KAN-50/KAN-51 become pickable at that point.
+- **Waiting on human:** unchanged —
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (or provide credentials to this
+    environment) — still outstanding; gates KAN-19's remaining CI work and KAN-50/KAN-51 transitively.
+  - PR #84 and PR #85 — clean/green, currently owned by a live interactive session; no action needed
+    unless a future run finds them abandoned.
+
+---
+
 ## 2026-08-17 — No unblocked TASKS.md work; state unchanged since run 250
 
 - **Last completed:**
