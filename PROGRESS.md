@@ -17,6 +17,48 @@ Template for each entry:
 
 ---
 
+## 2026-08-17 — Could not reproduce session B's RTL date-field-order report; second unverifiable QA claim
+
+- **Last completed:**
+  - Investigated session B's report that the board Settings panel's date-range fields read in the
+    wrong order under `/he/` (claimed right-to-left reading order: Compare-to, Resolution, End-date,
+    Start-date — i.e. reversed from the intended Start-then-End order). Checked the codebase first:
+    no RTL-specific CSS exists anywhere (`grep` for `row-reverse`/`rtl:`/`[dir=` across `apps/web`
+    found nothing), and `board-settings-form.tsx` doesn't set `flex-direction` explicitly — it relies
+    on the browser's standard `dir`-aware flex layout.
+  - Rather than trust that absence-of-cause meant no bug, empirically measured the *actual* rendered
+    order live on dev: signed up fresh, built an org/project/board via onboarding, loaded the board's
+    `/he/` Settings panel, and read `getBoundingClientRect()` for the four field elements at both a
+    1280px desktop viewport and a 375px mobile one (narrow enough to force the row to wrap). At both
+    widths, Start-date rendered rightmost (read first in RTL) and End-date to its left, matching DOM/
+    semantic order — the opposite of what session B described. A screenshot at 375px visually confirms
+    it: "תאריך התחלה" (Start) on the right showing 19/07/2026, "תאריך סיום" (End) on the left showing
+    17/08/2026.
+  - Did **not** ship a speculative fix for a bug that couldn't be reproduced — replied to session B
+    in the relay inbox with the exact measurements, the screenshot description, and a request for
+    their browser/viewport and a screenshot, since the fix can't be verified without first
+    reproducing the actual symptom.
+  - This is the **second** consecutive session-B report that didn't hold up under independent
+    verification, after the ~16.5h Cloud Run traffic gap flagged in the entry below (spanning two of
+    session B's earlier timestamped reports). Both replies are now pending session B's response. This
+    doesn't retroactively cast doubt on the plugins-crash fix (PR #83, below) — that one was root-
+    caused independently by reading the actual failing code path, not by trusting session B's
+    narrative — but the QA-relay loop's reliability as a *source of new bug reports* is now genuinely
+    in question and worth the account owner's attention if it keeps happening.
+- **In progress (exact stopping point):** none — investigation complete, replies sent, no code change
+  needed (or possible) without a reproducible symptom.
+- **Blocked + why:** blocked on session B (or a human) providing enough detail to reproduce the RTL
+  claim, if it's real.
+- **Next step:** keep monitoring the relay inbox. If session B replies with reproduction detail
+  (browser, viewport, screenshot) that shows a real bug, re-investigate with that specific
+  configuration. If no reply arrives and further reports keep failing to reproduce, that's worth
+  surfacing to the account owner as a reason to double-check what session B is actually testing
+  against (real browser? correct URL? actually reloading?).
+- **Waiting on human:** nothing new beyond the standing items below. The session-B reliability
+  question is flagged for awareness, not blocking any code work.
+
+---
+
 ## 2026-08-17 — Fixed session-B-reported plugins-page crash: missing Firestore composite index (PR #83)
 
 - **Last completed:**
