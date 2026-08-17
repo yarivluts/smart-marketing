@@ -39,7 +39,7 @@ const OrgContext = createContext<OrgContextValue>({
  * consumer sees the same data without each page re-fetching it.
  */
 export function OrgProvider({ children }: { children: ReactNode }): React.ReactElement {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, sessionSyncing } = useAuth();
   const [data, setData] = useState<OrgContextResponse>(EMPTY_RESPONSE);
   const [loading, setLoading] = useState(true);
 
@@ -59,9 +59,15 @@ export function OrgProvider({ children }: { children: ReactNode }): React.ReactE
   }, [user]);
 
   useEffect(() => {
-    if (authLoading) return;
+    // `sessionSyncing` covers the gap between Firebase's client auth state
+    // settling (which flips `authLoading` false) and the server-side session
+    // cookie actually being confirmed set — see `AuthContextValue.sessionSyncing`'s
+    // own doc comment. Fetching before that cookie exists returns an
+    // unauthenticated-looking empty result that then sticks around with
+    // nothing to trigger a re-fetch.
+    if (authLoading || sessionSyncing) return;
     void refresh();
-  }, [authLoading, refresh]);
+  }, [authLoading, sessionSyncing, refresh]);
 
   const value = useMemo<OrgContextValue>(() => ({ ...data, loading, refresh }), [data, loading, refresh]);
 

@@ -45,7 +45,7 @@ function fakeUser(overrides: Partial<User> = {}): User {
 }
 
 function Probe(): React.ReactElement {
-  const { user, loading, signUpWithEmail, signInWithEmail, signInWithGoogle, signOut } = useAuth();
+  const { user, loading, sessionSyncing, signUpWithEmail, signInWithEmail, signInWithGoogle, signOut } = useAuth();
   const [error, setError] = useState<string | null>(null);
 
   function run(action: () => Promise<void>): () => void {
@@ -58,6 +58,7 @@ function Probe(): React.ReactElement {
   return (
     <div>
       <span data-testid="loading">{String(loading)}</span>
+      <span data-testid="session-syncing">{String(sessionSyncing)}</span>
       <span data-testid="user">{user?.email ?? 'none'}</span>
       <span data-testid="error">{error ?? 'none'}</span>
       <button onClick={run(() => signUpWithEmail('a@b.com', 'password123'))}>sign-up</button>
@@ -169,6 +170,39 @@ describe('AuthProvider / useAuth', () => {
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith('/api/auth/session', expect.objectContaining({ method: 'POST' })),
     );
+  });
+
+  it('keeps sessionSyncing true until the session cookie POST resolves, even though the auth-state listener fires immediately', async () => {
+    // The regression this guards: `signInWithEmailAndPassword` resolving fires `onAuthStateChanged`
+    // (settling `loading`) independently of and before `establishSessionOrRollBack`'s own cookie
+    // round-trip finishes. A consumer gated only on `loading` (like `OrgProvider`) can fetch
+    // session-gated data before the cookie exists and get back an empty, unauthenticated-looking
+    // result that then never gets refetched (found via session-B dogfooding QA, 2026-08-17: dashboard
+    // briefly claims "no organizations" for a user who owns two, right after login).
+    let resolveCookiePost!: (value: { ok: boolean }) => void;
+    const cookiePost = new Promise<{ ok: boolean }>((resolve) => {
+      resolveCookiePost = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn().mockReturnValue(cookiePost));
+    signInMock.mockImplementation(async () => {
+      // Mirrors the real SDK: the auth-state listener fires as a side effect of the sign-in call
+      // resolving, before our own code gets to await the cookie sync.
+      authStateCallback(fakeUser());
+      return { user: fakeUser() };
+    });
+    const user = userEvent.setup();
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await user.click(screen.getByText('sign-in'));
+
+    await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'));
+    expect(screen.getByTestId('session-syncing')).toHaveTextContent('true');
+
+    resolveCookiePost({ ok: true });
+    await waitFor(() => expect(screen.getByTestId('session-syncing')).toHaveTextContent('false'));
   });
 
   it('syncs the session cookie for a Google-federated sign-in', async () => {

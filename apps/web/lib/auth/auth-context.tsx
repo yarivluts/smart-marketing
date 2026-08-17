@@ -16,6 +16,17 @@ import { getFirebaseAuth } from '@/lib/firebase/client';
 export interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  /**
+   * True for the span of a sign-in/sign-up call during which the Firebase
+   * client has already updated its auth state (so `user`/`loading` look
+   * settled) but the server-side session cookie hasn't been confirmed yet —
+   * `onAuthStateChanged` fires as soon as `signInWithEmailAndPassword`/etc.
+   * resolve, independently of and before `establishSessionOrRollBack`'s own
+   * cookie round-trip finishes. A consumer that fetches session-gated data
+   * (like `OrgProvider`) as soon as `loading` goes false can race ahead of
+   * the cookie and see an unauthenticated response. Gate on this too.
+   */
+  sessionSyncing: boolean;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -62,6 +73,7 @@ async function establishSessionOrRollBack(user: User): Promise<void> {
 export function AuthProvider({ children }: { children: ReactNode }): React.ReactElement {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionSyncing, setSessionSyncing] = useState(false);
 
   useEffect(() => {
     const auth = getFirebaseAuth();
@@ -75,29 +87,45 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
     () => ({
       user,
       loading,
+      sessionSyncing,
       async signUpWithEmail(email, password) {
-        const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
-        // Unlike Google SSO, Firebase never marks an email/password account's
-        // email verified on its own — and org invites are only safe to accept
-        // once it is (see EmailNotVerifiedError). Best-effort: a delivery
-        // failure here shouldn't block sign-up itself.
-        await sendEmailVerification(credential.user).catch(() => undefined);
-        await establishSessionOrRollBack(credential.user);
+        setSessionSyncing(true);
+        try {
+          const credential = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
+          // Unlike Google SSO, Firebase never marks an email/password account's
+          // email verified on its own — and org invites are only safe to accept
+          // once it is (see EmailNotVerifiedError). Best-effort: a delivery
+          // failure here shouldn't block sign-up itself.
+          await sendEmailVerification(credential.user).catch(() => undefined);
+          await establishSessionOrRollBack(credential.user);
+        } finally {
+          setSessionSyncing(false);
+        }
       },
       async signInWithEmail(email, password) {
-        const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
-        await establishSessionOrRollBack(credential.user);
+        setSessionSyncing(true);
+        try {
+          const credential = await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+          await establishSessionOrRollBack(credential.user);
+        } finally {
+          setSessionSyncing(false);
+        }
       },
       async signInWithGoogle() {
-        const credential = await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
-        await establishSessionOrRollBack(credential.user);
+        setSessionSyncing(true);
+        try {
+          const credential = await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
+          await establishSessionOrRollBack(credential.user);
+        } finally {
+          setSessionSyncing(false);
+        }
       },
       async signOut() {
         await firebaseSignOut(getFirebaseAuth());
         await syncSessionCookie(null);
       },
     }),
-    [user, loading],
+    [user, loading, sessionSyncing],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
