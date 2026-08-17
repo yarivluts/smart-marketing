@@ -1,10 +1,16 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import '../globals.css';
 import { routing, getDirection, type AppLocale } from '@/i18n/routing';
 import { AppProviders } from '@/lib/providers/app-providers';
+
+// Intercom-style clean, geometric sans — self-hosted via next/font (no runtime request to
+// fonts.googleapis.com, so it works the same in every environment including offline CI/emulator
+// runs), exposed as a CSS variable so tailwind.config.ts's `fontFamily.sans` can pick it up.
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans', display: 'swap' });
 
 export function generateStaticParams(): Array<{ locale: AppLocale }> {
   return routing.locales.map((locale) => ({ locale }));
@@ -31,8 +37,8 @@ export default async function LocaleLayout({ children, params }: LayoutProps): P
   setRequestLocale(locale);
 
   return (
-    <html lang={locale} dir={getDirection(locale)}>
-      <body className="min-h-screen antialiased">
+    <html lang={locale} dir={getDirection(locale)} className={inter.variable}>
+      <body className="min-h-screen font-sans antialiased">
         <NextIntlClientProvider>
           <AppProviders>{children}</AppProviders>
         </NextIntlClientProvider>

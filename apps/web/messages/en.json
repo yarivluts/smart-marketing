@@ -14,6 +14,14 @@
     "en": "English",
     "he": "Hebrew"
   },
+  "AppShell": {
+    "brandName": "GrowthOS",
+    "dataSection": "Data",
+    "automationSection": "Automation",
+    "settingsSection": "Settings",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
   "Auth": {
     "emailLabel": "Email",
     "passwordLabel": "Password",
