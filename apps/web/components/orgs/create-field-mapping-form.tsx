@@ -104,8 +104,14 @@ export function CreateFieldMappingForm({
         }),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(body?.error === 'target_schema_not_registered' ? t('targetSchemaNotRegisteredError') : t('createError'));
+        const body = (await response.json().catch(() => null)) as { error?: string; reasons?: string[] } | null;
+        if (body?.error === 'target_schema_not_registered') {
+          setError(t('targetSchemaNotRegisteredError'));
+        } else if (body?.reasons?.length) {
+          setError(body.reasons.join(' '));
+        } else {
+          setError(t('createError'));
+        }
         return;
       }
       setName('');
