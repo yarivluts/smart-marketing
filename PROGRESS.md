@@ -17,6 +17,74 @@ Template for each entry:
 
 ---
 
+## 2026-08-18 — Diagnosed + fixed PR #88's CI, merged it (no unblocked TASKS.md work)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows (57 `done`, 2 `in-progress` KAN-18/19 infra-gated, 1 `needs-human` KAN-43, 2
+    `blocked-by` KAN-50/51) — unchanged. Fast-forwarded local `main` to `origin/main` (37 commits,
+    pulled in PR #86/#87).
+  - Only open PR: **#88** ("Intercom-inspired design + persistent app navigation shell", a
+    user-requested redesign, not a KAN story). At the time this run checked it (09:10 UTC), the
+    owning session (`session_01JLFWLinu6Rre5n3s8NBDJK`) had been idle since 05:23 UTC — **~3h47m**,
+    across two consecutive prior-run checks with zero movement (same CI run, same session
+    `updated_at`) — crossing this file's own established "hours not minutes" abandonment bar for
+    the first time on this PR, so this run picked it up.
+  - Pulled the failed CI job's logs directly (`get_job_logs`, not a local repro) and found the same
+    two bugs a same-day concurrent run independently diagnosed (see the entry immediately below,
+    which the timeline shows was racing this run, not the other way around — its "the owning
+    session pushed its own equivalent fix" was actually this run's push, misattributed since it
+    landed on the owning session's own PR branch): (1) `OrgLayout`/`ProjectLayout` built
+    `AppShellNavItem.icon` as a raw lucide-react component *reference* (a function) and passed it
+    as a prop from a server layout into the client `AppShell` — React's server/client boundary
+    can't serialize a function, crashing every page the new nav shell wrapped before it rendered,
+    explaining all 17 e2e failures; (2) once that was fixed far enough to render, the sidebar's
+    "Home" link used the org's own display name as its accessible text, and since every e2e
+    fixture org is named `"<Feature> E2E Org"`, Playwright's case-insensitive substring name
+    matching made that link also satisfy `getByRole('link', { name: 'Schema registry' })` etc. —
+    7 more e2e specs failed on a strict-mode violation on the *next* CI run after the first fix.
+  - Fixed both directly on the PR's own branch (`AppShellNavItem.icon` now takes a pre-rendered
+    element, `cloneElement`'d by `NavLink`/the mobile tab bar to apply their own size, instead of a
+    bare component type; the Home nav item gets a fixed translated `AppShell.homeLink` label
+    instead of `membership.organizationName`), verified `pnpm build`/`pnpm lint`/`pnpm typecheck`
+    plus the touched vitest suites green locally (the full `firebase emulators:exec` suite
+    couldn't run in this sandbox — Firestore emulator JAR download fails here, same longstanding
+    KAN-18 network-credential gap noted in every prior entry), pushed both commits directly to
+    `feat/intercom-style-design-nav-shell`, and let the PR's own CI (which does have a working
+    emulator) confirm green end to end across two re-runs (first re-run: RSC fix alone still had
+    the 7 Home-link collisions; second re-run with both fixes: fully green, `mergeable_state:
+    clean`, zero unresolved review comments).
+  - Self-reviewed the PR's full diff (not just this run's fix) per CLAUDE.md before merging — design
+    tokens, `Button`/`Input`/new `Card` primitive, `globals.css`, both locale message files (en/he
+    stay in parity, no hard-coded strings, no Hebrew outside `messages/he.json`) — no further issues
+    found. Merged via squash (`feat: Intercom-inspired design + persistent app navigation shell
+    (#88)`, commit `95528f8`).
+  - Could not delete the merged branch: this sandbox's local `git push --delete` gets a 403 from
+    the git proxy, and the attached GitHub MCP server doesn't expose a delete-ref tool. Left
+    `feat/intercom-style-design-nav-shell` in place (merged, inert) — worth a human `git push
+    origin --delete feat/intercom-style-design-nav-shell` when convenient, not urgent.
+  - No push notification sent: this was routine PR upkeep with no TASKS.md-tracked work involved,
+    and it resolved cleanly without needing the account owner's input.
+- **In progress (exact stopping point):** none — PR #88 is merged, `main` is up to date locally and
+  matches `origin/main` (`95528f8`).
+- **Blocked + why:** every remaining backlog item is `done`, infra-gated (KAN-18/19), `needs-human`
+  (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/51). No headless-runnable `todo` work exists.
+- **Next step:** keep polling on the configured cadence. When multiple scheduled runs can overlap
+  in wall-clock time (this run and the one below it both worked PR #88's CI within roughly the same
+  half hour), prefer re-fetching immediately before pushing and rebasing onto any new remote commits
+  over force-pushing — this run's pushes succeeded cleanly, but a future overlap may not be so lucky.
+  Once a human unblocks KAN-18 or KAN-43, re-check `TASKS.md`.
+- **Waiting on human:** unchanged, plus one new small item —
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (or provide credentials to this
+    environment) — still outstanding; gates KAN-19's remaining CI work and KAN-50/KAN-51
+    transitively.
+  - Delete the now-merged `feat/intercom-style-design-nav-shell` branch (this run's sandbox lacked
+    push-delete permission on `origin`) — cosmetic only, not blocking anything.
+
+---
+
 ## 2026-08-18 — No unblocked TASKS.md work; independently diagnosed + raced on fixing PR #88's CI, other session won
 
 - **Last completed:**
