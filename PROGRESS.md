@@ -17,6 +17,44 @@ Template for each entry:
 
 ---
 
+## 2026-08-18 — No unblocked TASKS.md work; vault key ring question still pending human answer (scheduled routine check, run 6)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Local checkout started `HEAD` detached
+    (container-init leftover); checked out `main` and fast-forwarded to `origin/main` (`b44b996`)
+    cleanly.
+  - Re-verified `TASKS.md`'s Stories table: `grep -oE '\| (todo|in-progress|done|needs-human|
+    blocked-by) \|' TASKS.md | sort | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19, both
+    infra-gated), 1 `needs-human` (KAN-43), 2 `blocked-by` (KAN-50/51, blocked on KAN-43) — zero
+    `todo` rows, unchanged from the previous entry.
+  - Checked open PRs (`list_pull_requests`, state=open) and open issues: both empty. Nothing in
+    flight from a concurrent session.
+  - Checked on the vault-key-ring go-ahead this run's own previous entry flagged as forwarded to the
+    account owner: found the actual interactive session holding that question
+    (`session_014kgJRyqpZPDNUt7Anp9Gwu`, a separate VS Code Remote Control session, not this
+    scheduled one) — it's still sitting in `SESSION_STATUS_REQUIRES_ACTION` with the
+    `AskUserQuestion` pending, unanswered. No new PR/issue activity and no new commits beyond what
+    was already recorded, so none of the four forwarded product/scope questions have visible answers
+    either. Nothing new to act on.
+  - No code changes made — nothing unblocked to work on. No push notification sent (the blocker is
+    the same one already surfaced to the account owner in the prior entry; nothing new to report).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** every remaining backlog item is `done`, infra-gated (KAN-18/19), `needs-human`
+  (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/51). The vault key ring go-ahead
+  (`session_014kgJRyqpZPDNUt7Anp9Gwu`) and the four forwarded product/scope questions are still
+  unanswered.
+- **Next step:** keep polling on the configured cadence. Once the account owner answers the vault
+  key ring question (in that session, not this one) or any of the four product questions, or
+  unblocks KAN-18/KAN-43, re-check `TASKS.md` and pick up from there.
+- **Waiting on human:** unchanged —
+  - Vault key ring go-ahead (pending in `session_014kgJRyqpZPDNUt7Anp9Gwu`).
+  - The four forwarded product questions (KAN-18 ETA/BigQuery warehouse decision, reports-beyond-
+    dashboards scope, viewer-role board-visibility intent, win-feed persistence intent).
+  - Standing: **KAN-43** (Google Ads/Meta application submission) and **KAN-18** proper (Terraform
+    import/plan against real credentials, then BigQuery/Pub/Sub/Redis/staging shape decision).
+
+---
+
 ## 2026-08-18 — Intercom-style redesign + nav shell (PR #88/89), plus PRs #86/#87 finally deployed
 
 - **Last completed:**
