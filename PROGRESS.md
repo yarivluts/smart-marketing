@@ -17,6 +17,45 @@ Template for each entry:
 
 ---
 
+## 2026-08-18 — No unblocked TASKS.md work; PR #89 in flight from a concurrent/live session (scheduled routine check, run 5)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Local checkout again started `HEAD`
+    detached (container-init leftover); checked out `main` and fast-forwarded to `origin/main`
+    (`2eecb28`) cleanly.
+  - Re-verified `TASKS.md`'s Stories table: `grep -oE '\| (todo|in-progress|done|needs-human|
+    blocked-by) \|' TASKS.md | sort | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19, both
+    infra-gated), 1 `needs-human` (KAN-43), 2 `blocked-by` (KAN-50/51, blocked on KAN-43) — zero
+    `todo` rows, unchanged from the previous entry.
+  - Checked open PRs: **#89** ("fix: nav shell crashes every project page in production (React
+    #130)"), authored directly by `yarivluts` (not a KAN story) — a genuine production hotfix
+    (React error #130 crash on every `/orgs/:orgId/projects/:id/*` page in the deployed build,
+    caused by `AppShellNavItem.icon` carrying a function reference across the RSC server/client
+    boundary; fixed by switching to a string key into a client-side icon lookup table). Two commits,
+    the latest pushed ~1 minute before this run checked (18:56:44Z), CI (`run 535`) still
+    `in_progress` at check time. This is unambiguously a live/concurrent session actively driving
+    the fix (author is the account owner, commit messages describe verifying against a real
+    deployed build via Playwright, i.e. an environment this headless run doesn't have) — left it
+    alone per this file's established "don't touch PRs with recent, non-abandoned activity"
+    precedent. No push notification sent: the user is already the one authoring/driving this PR
+    live, so there's nothing new for them to learn from this routine check.
+  - No code changes made — nothing unblocked in TASKS.md to work on.
+- **In progress (exact stopping point):** none (this run). PR #89 is in progress from another
+  session, not this one.
+- **Blocked + why:** every TASKS.md backlog item is `done`, infra-gated (KAN-18/19), `needs-human`
+  (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/51). No headless-runnable `todo` work exists.
+- **Next step:** keep polling on the configured cadence. If PR #89 is still open and idle for
+  "hours not minutes" on a future check (per this file's established abandonment bar), investigate
+  and finish driving it to green/merged. Once a human unblocks KAN-18 or KAN-43, re-check `TASKS.md`.
+- **Waiting on human:** unchanged —
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (or provide credentials to this
+    environment) — still outstanding; gates KAN-19's remaining CI work and KAN-50/KAN-51
+    transitively.
+
+---
+
 ## 2026-08-18 — No unblocked TASKS.md work; state unchanged (scheduled routine check, run 4)
 
 - **Last completed:**
