@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
   ensureUserForFirebaseSession,
@@ -52,7 +53,16 @@ export async function ensureUserForSession(session: DecodedIdToken): Promise<Use
   });
 }
 
-export async function resolveOrgSessionContext(session: DecodedIdToken): Promise<OrgSessionContext> {
+/**
+ * Wrapped in React's `cache()` — see {@link getServerSession}'s own doc
+ * comment for why request-level memoization matters here specifically (a
+ * layout and the page it wraps both resolving this independently doubled
+ * concurrent Firestore traffic and triggered gRPC stream corruption in CI).
+ * Relies on `getServerSession()` also being cached so every caller within one
+ * request passes the *same* `session` object reference — `cache()` keys an
+ * object argument by reference, not deep equality.
+ */
+export const resolveOrgSessionContext = cache(async (session: DecodedIdToken): Promise<OrgSessionContext> => {
   const user = await ensureUserForSession(session);
 
   const memberships = await listMembershipsWithOrganizations(user.id);
@@ -63,4 +73,4 @@ export async function resolveOrgSessionContext(session: DecodedIdToken): Promise
   const bindings = toPolicyBindings(roleBindings);
 
   return { user, memberships, bindings };
-}
+});

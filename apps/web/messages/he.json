@@ -14,6 +14,15 @@
     "en": "אנגלית",
     "he": "עברית"
   },
+  "AppShell": {
+    "brandName": "GrowthOS",
+    "homeLink": "בית",
+    "dataSection": "נתונים",
+    "automationSection": "אוטומציה",
+    "settingsSection": "הגדרות",
+    "openMenu": "פתיחת תפריט",
+    "closeMenu": "סגירת תפריט"
+  },
   "Auth": {
     "emailLabel": "אימייל",
     "passwordLabel": "סיסמה",

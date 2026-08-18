@@ -15,6 +15,18 @@ const config: Config = {
       screens: { '2xl': '1400px' },
     },
     extend: {
+      fontFamily: {
+        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+      },
+      boxShadow: {
+        // A soft, diffused shadow scale (low-opacity, large blur, minimal spread) rather than
+        // Tailwind's default harsher/darker shadows — the "floating card" look Intercom's panels
+        // use. Tinted toward the brand blue instead of pure black for a warmer, on-brand feel.
+        soft: '0 1px 2px 0 hsl(234 30% 20% / 0.04), 0 2px 8px -2px hsl(234 30% 20% / 0.06)',
+        'soft-md': '0 2px 4px 0 hsl(234 30% 20% / 0.04), 0 8px 24px -4px hsl(234 30% 20% / 0.08)',
+        'soft-lg': '0 4px 8px 0 hsl(234 30% 20% / 0.04), 0 16px 40px -8px hsl(234 30% 20% / 0.12)',
+        glow: '0 0 0 1px hsl(var(--primary) / 0.05), 0 8px 24px -4px hsl(var(--primary) / 0.25)',
+      },
       colors: {
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',

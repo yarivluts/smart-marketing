@@ -2,7 +2,6 @@ import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can, isEnvironment, type Environment } from '@growthos/shared';
 import { Link } from '@/i18n/navigation';
-import { OrgSwitcher } from '@/components/orgs/org-switcher';
 import { ProjectSwitcher } from '@/components/orgs/project-switcher';
 import { EnvBadge } from '@/components/orgs/env-badge';
 import { MembersList } from '@/components/orgs/members-list';
@@ -57,7 +56,6 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
   const canManageSchemas = can(bindings, principal, 'schema.write', { orgId });
   const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId });
   const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
-  const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
 
@@ -65,25 +63,7 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">{membership.organizationName}</h1>
-        <div className="flex items-center gap-4">
-          <Link className="text-sm underline" href={`/orgs/${orgId}/resources`}>
-            {t('resourceLibraryLink')}
-          </Link>
-          {canViewAuditLog ? (
-            <Link className="text-sm underline" href={`/orgs/${orgId}/audit-log`}>
-              {t('auditLogLink')}
-            </Link>
-          ) : null}
-          {canManagePlugins ? (
-            <Link className="text-sm underline" href={`/orgs/${orgId}/plugins`}>
-              {t('pluginRegistryLink')}
-            </Link>
-          ) : null}
-          <OrgSwitcher memberships={memberships} currentOrgId={orgId} />
-        </div>
-      </div>
+      <h1 className="text-3xl font-bold tracking-tight">{membership.organizationName}</h1>
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between">

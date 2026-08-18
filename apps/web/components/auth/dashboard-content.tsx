@@ -6,6 +6,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useOrgContext } from '@/lib/orgs/org-context';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 
 export function DashboardContent(): React.ReactElement | null {
   const t = useTranslations('DashboardPage');
@@ -57,25 +58,27 @@ export function DashboardContent(): React.ReactElement | null {
         {orgsLoading ? (
           <p className="text-muted-foreground">{t('loadingOrganizations')}</p>
         ) : activeMemberships.length === 0 ? (
-          <div className="flex flex-col items-start gap-3 rounded-lg border p-6">
+          <Card className="bg-brand-wash flex flex-col items-start gap-3 p-6">
             <p className="text-muted-foreground">{t('noOrganizations')}</p>
             <Button asChild>
               <Link href="/orgs/new">{t('createFirstOrganization')}</Link>
             </Button>
-          </div>
+          </Card>
         ) : (
           <ul className="flex flex-col gap-2">
             {activeMemberships.map((membership) => (
               <li key={membership.membershipId}>
-                <Link
-                  href={`/orgs/${membership.organizationId}`}
-                  className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-accent"
-                >
-                  <span className="font-medium">{membership.organizationName}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {t('roleLabel', { role: membership.role })}
-                  </span>
-                </Link>
+                <Card asChild>
+                  <Link
+                    href={`/orgs/${membership.organizationId}`}
+                    className="flex items-center justify-between p-4 hover:-translate-y-0.5 hover:shadow-soft-md"
+                  >
+                    <span className="font-medium">{membership.organizationName}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {t('roleLabel', { role: membership.role })}
+                    </span>
+                  </Link>
+                </Card>
               </li>
             ))}
           </ul>

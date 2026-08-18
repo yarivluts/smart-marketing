@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
   getActiveAutomationGuardrailPolicy as getActiveAutomationGuardrailPolicyInOrganization,
@@ -115,10 +116,17 @@ export async function listOrgMembers(organizationId: string): Promise<OrgMemberS
   return listOrgMembersWithProfiles(organizationId);
 }
 
-export async function listOrgProjects(organizationId: string): Promise<ProjectModel[]> {
+/**
+ * Wrapped in React's `cache()` — the project-level nav shell's `layout.tsx`
+ * and every project `page.tsx` it wraps each call this independently for the
+ * same request. See `getServerSession`'s own doc comment for why that
+ * duplication matters here specifically (concurrent-request gRPC stream
+ * corruption against the Firestore emulator, found via PR #88's CI run).
+ */
+export const listOrgProjects = cache(async (organizationId: string): Promise<ProjectModel[]> => {
   await ensureFirestoreOrm();
   return listOrgProjectsForOrganization(organizationId);
-}
+});
 
 /** Validates a `(client_id, redirect_uri)` pair against a registered MCP OAuth client (KAN-75) — throws `InvalidMcpOAuthClientError` otherwise. Used by the consent POST route before it builds any redirect through `redirect_uri`, so an unvalidated value can never become an open-redirect target. */
 export async function requireRegisteredMcpRedirectUri(clientId: string, redirectUri: string): Promise<void> {
