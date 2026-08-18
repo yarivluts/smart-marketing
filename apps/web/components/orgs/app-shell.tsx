@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { Menu, X, type LucideIcon } from 'lucide-react';
+import { cloneElement, useState, type ReactElement, type ReactNode } from 'react';
+import { Menu, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -9,7 +9,14 @@ import { cn } from '@/lib/utils';
 export interface AppShellNavItem {
   href: string;
   label: string;
-  icon: LucideIcon;
+  /**
+   * A pre-rendered icon element (e.g. `<Home aria-hidden="true" />`), not a
+   * component reference — every nav item is built in a server layout and
+   * `AppShell` is a client component, and React's server/client boundary
+   * cannot serialize a function (which a component reference is) as a prop.
+   * `NavLink`/the mobile tab bar `cloneElement` this to apply their own size.
+   */
+  icon: ReactElement<{ className?: string; 'aria-hidden'?: string }>;
 }
 
 export interface AppShellNavSection {
@@ -46,7 +53,6 @@ function bestMatchingHref(pathname: string, hrefs: readonly string[]): string | 
 }
 
 function NavLink({ item, active, onClick }: { item: AppShellNavItem; active: boolean; onClick?: () => void }): React.ReactElement {
-  const Icon = item.icon;
   return (
     <Link
       href={item.href}
@@ -56,7 +62,7 @@ function NavLink({ item, active, onClick }: { item: AppShellNavItem; active: boo
         active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent/10 hover:text-foreground',
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+      {cloneElement(item.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': 'true' })}
       <span className="truncate">{item.label}</span>
     </Link>
   );
@@ -142,7 +148,6 @@ export function AppShell({ switchers, sections, mobileTabItems, children }: AppS
       {mobileTabItems.length > 0 ? (
         <nav className="fixed inset-x-0 bottom-0 z-20 flex items-stretch justify-around border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
           {mobileTabItems.map((item) => {
-            const Icon = item.icon;
             const active = item.href === activeHref;
             return (
               <Link
@@ -153,7 +158,7 @@ export function AppShell({ switchers, sections, mobileTabItems, children }: AppS
                   active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                <Icon className="h-5 w-5" aria-hidden="true" />
+                {cloneElement(item.icon, { className: 'h-5 w-5', 'aria-hidden': 'true' })}
                 <span className="truncate">{item.label}</span>
               </Link>
             );

@@ -44,10 +44,10 @@ export default async function OrgLayout({ children, params }: LayoutProps): Prom
   const [t, tShell] = await Promise.all([getTranslations('OrgDetailPage'), getTranslations('AppShell')]);
 
   const items: AppShellNavItem[] = [
-    { href: `/orgs/${orgId}`, label: membership.organizationName, icon: Home },
-    { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: FolderOpen },
-    ...(canViewAuditLog ? [{ href: `/orgs/${orgId}/audit-log`, label: t('auditLogLink'), icon: ShieldCheck }] : []),
-    ...(canManagePlugins ? [{ href: `/orgs/${orgId}/plugins`, label: t('pluginRegistryLink'), icon: Puzzle }] : []),
+    { href: `/orgs/${orgId}`, label: membership.organizationName, icon: <Home /> },
+    { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: <FolderOpen /> },
+    ...(canViewAuditLog ? [{ href: `/orgs/${orgId}/audit-log`, label: t('auditLogLink'), icon: <ShieldCheck /> }] : []),
+    ...(canManagePlugins ? [{ href: `/orgs/${orgId}/plugins`, label: t('pluginRegistryLink'), icon: <Puzzle /> }] : []),
   ];
 
   return (

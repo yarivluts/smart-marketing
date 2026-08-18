@@ -15,8 +15,8 @@ vi.mock('@/i18n/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
 
-const homeItem: AppShellNavItem = { href: '/orgs/org-1', label: 'Home', icon: Home };
-const boardsItem: AppShellNavItem = { href: '/orgs/org-1/projects/p1/boards', label: 'Boards', icon: LayoutGrid };
+const homeItem: AppShellNavItem = { href: '/orgs/org-1', label: 'Home', icon: <Home /> };
+const boardsItem: AppShellNavItem = { href: '/orgs/org-1/projects/p1/boards', label: 'Boards', icon: <LayoutGrid /> };
 
 function renderShell(pathname: string): void {
   mockUsePathname.mockReturnValue(pathname);

@@ -87,39 +87,39 @@ export default async function ProjectLayout({ children, params }: LayoutProps): 
   const insightsItems: AppShellNavItem[] = [
     ...(canManageBoards
       ? [
-          { href: `${base}/boards`, label: t('projectBoardsLink'), icon: LayoutGrid },
-          { href: `${base}/goals`, label: t('projectGoalsLink'), icon: Target },
-          { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: Users },
-          { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: Trophy },
-          { href: `${base}/tv`, label: t('projectTvLink'), icon: Tv },
+          { href: `${base}/boards`, label: t('projectBoardsLink'), icon: <LayoutGrid /> },
+          { href: `${base}/goals`, label: t('projectGoalsLink'), icon: <Target /> },
+          { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: <Users /> },
+          { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: <Trophy /> },
+          { href: `${base}/tv`, label: t('projectTvLink'), icon: <Tv /> },
         ]
       : []),
   ];
 
   const dataItems: AppShellNavItem[] = [
-    ...(canManageSchemas ? [{ href: `${base}/schema-defs`, label: t('projectSchemaRegistryLink'), icon: Database }] : []),
-    ...(canManageMetrics ? [{ href: `${base}/metric-defs`, label: t('projectMetricRegistryLink'), icon: BarChart3 }] : []),
+    ...(canManageSchemas ? [{ href: `${base}/schema-defs`, label: t('projectSchemaRegistryLink'), icon: <Database /> }] : []),
+    ...(canManageMetrics ? [{ href: `${base}/metric-defs`, label: t('projectMetricRegistryLink'), icon: <BarChart3 /> }] : []),
     ...(canViewIngestHealth
       ? [
-          { href: `${base}/ingest-health`, label: t('projectIngestHealthLink'), icon: Activity },
-          { href: `${base}/hooks`, label: t('projectHooksLink'), icon: Webhook },
-          { href: `${base}/field-mappings`, label: t('projectFieldMappingsLink'), icon: GitBranch },
+          { href: `${base}/ingest-health`, label: t('projectIngestHealthLink'), icon: <Activity /> },
+          { href: `${base}/hooks`, label: t('projectHooksLink'), icon: <Webhook /> },
+          { href: `${base}/field-mappings`, label: t('projectFieldMappingsLink'), icon: <GitBranch /> },
         ]
       : []),
   ];
 
   const automationItems: AppShellNavItem[] = [
-    ...(canManagePlugins ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: Puzzle }] : []),
-    ...(canRunAutomation ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: Bot }] : []),
+    ...(canManagePlugins ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: <Puzzle /> }] : []),
+    ...(canRunAutomation ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: <Bot /> }] : []),
   ];
 
   const settingsItems: AppShellNavItem[] = [
-    { href: `${base}/resources`, label: t('projectResourcesLink'), icon: FolderOpen },
-    ...(canManageKeys ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: KeyRound }] : []),
+    { href: `${base}/resources`, label: t('projectResourcesLink'), icon: <FolderOpen /> },
+    ...(canManageKeys ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: <KeyRound /> }] : []),
     ...(canManageProjects
       ? [
-          { href: `${base}/cost-guardrails`, label: t('projectCostGuardrailsLink'), icon: Gauge },
-          { href: `${base}/session-replay`, label: t('projectSessionReplayLink'), icon: Video },
+          { href: `${base}/cost-guardrails`, label: t('projectCostGuardrailsLink'), icon: <Gauge /> },
+          { href: `${base}/session-replay`, label: t('projectSessionReplayLink'), icon: <Video /> },
         ]
       : []),
   ];
