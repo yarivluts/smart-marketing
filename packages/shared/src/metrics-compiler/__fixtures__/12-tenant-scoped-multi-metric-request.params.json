@@ -1,0 +1,7 @@
+{
+  "time_start_current": "2026-04-01",
+  "time_end_current": "2026-04-02",
+  "tenant_organization_id": "org-1",
+  "tenant_project_id": "project-1",
+  "filter_new_paying_0": "first_charge"
+}

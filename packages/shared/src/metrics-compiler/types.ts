@@ -75,6 +75,28 @@ export interface MetricQueryRequest {
   time: MetricQueryTimeRange;
 }
 
+/**
+ * The requesting org/project, compiled into every leaf aggregation's
+ * `WHERE` clause as `organization_id = @tenant_org AND project_id =
+ * @tenant_project` (KAN-18 tenant-isolation fix). Every dbt-built core/fact
+ * table carries both columns; without this, a single shared BigQuery
+ * warehouse would sum every tenant's rows together. Deliberately a
+ * *separate* parameter to `compileMetricQuery`, not a field on
+ * `MetricQueryRequest` — `MetricQueryRequest` is the caller-supplied query
+ * shape (ultimately deserialized from an HTTP body in `apps/api`'s
+ * `POST /metrics/query`), and tenant identity must come only from the
+ * caller's own trusted session/API-key context, never from request input.
+ *
+ * Found during the KAN-18 warehouse-integration scoping (2026-08-18) —
+ * never actually exploitable in production, since every environment has
+ * only ever queried `NotConfiguredWarehouseQueryExecutor` (a real BigQuery
+ * executor has never gone live), but must be fixed before one does.
+ */
+export interface CompilerTenant {
+  organizationId: string;
+  projectId: string;
+}
+
 /** A bind-parameter value — an array only ever backs an `in` filter's `IN UNNEST(@param)`. */
 export type CompilerParamValue = string | readonly string[];
 
