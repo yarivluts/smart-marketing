@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { Home, LayoutGrid } from 'lucide-react';
 import { AppShell, type AppShellNavItem } from './app-shell';
 import messages from '../../messages/en.json';
 
@@ -15,8 +14,8 @@ vi.mock('@/i18n/navigation', () => ({
   usePathname: () => mockUsePathname(),
 }));
 
-const homeItem: AppShellNavItem = { href: '/orgs/org-1', label: 'Home', icon: <Home /> };
-const boardsItem: AppShellNavItem = { href: '/orgs/org-1/projects/p1/boards', label: 'Boards', icon: <LayoutGrid /> };
+const homeItem: AppShellNavItem = { href: '/orgs/org-1', label: 'Home', icon: 'Home' };
+const boardsItem: AppShellNavItem = { href: '/orgs/org-1/projects/p1/boards', label: 'Boards', icon: 'LayoutGrid' };
 
 function renderShell(pathname: string): void {
   mockUsePathname.mockReturnValue(pathname);

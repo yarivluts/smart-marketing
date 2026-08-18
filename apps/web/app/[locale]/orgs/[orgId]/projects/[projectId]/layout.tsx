@@ -1,25 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
-import {
-  Activity,
-  BarChart3,
-  Bot,
-  Database,
-  FolderOpen,
-  GitBranch,
-  Gauge,
-  KeyRound,
-  LayoutGrid,
-  Puzzle,
-  Target,
-  Trophy,
-  Tv,
-  Users,
-  Video,
-  Webhook,
-} from 'lucide-react';
 import { can } from '@growthos/shared';
-import { AppShell, type AppShellNavItem, type AppShellNavSection } from '@/components/orgs/app-shell';
+import {
+  AppShell,
+  type AppShellNavItem,
+  type AppShellNavSection,
+} from '@/components/orgs/app-shell';
 import { ProjectSwitcher } from '@/components/orgs/project-switcher';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
@@ -44,7 +30,10 @@ type LayoutProps = Readonly<{
  * the same relative sub-route across projects would need the switcher
  * rebuilt to accept a "current sub-path" and isn't done here.
  */
-export default async function ProjectLayout({ children, params }: LayoutProps): Promise<React.ReactElement> {
+export default async function ProjectLayout({
+  children,
+  params,
+}: LayoutProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
   setRequestLocale(locale);
 
@@ -74,6 +63,7 @@ export default async function ProjectLayout({ children, params }: LayoutProps): 
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
   const canRunAutomation = can(bindings, principal, 'automation.execute', { orgId });
+  const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
 
   const [t, tAutomation, tWinRules, tShell] = await Promise.all([
     getTranslations('OrgDetailPage'),
@@ -84,61 +74,137 @@ export default async function ProjectLayout({ children, params }: LayoutProps): 
 
   const base = `/orgs/${orgId}/projects/${projectId}`;
 
+  // Org-level destinations (Home/Resources/Audit log/Plugin registry) — the org-only pages
+  // (`orgs/[orgId]/page.tsx` etc.) render their own equivalent shell via `OrgShell`, but a project
+  // page needs its own copy of these too since `layout.tsx` files nest: this layout is the *only*
+  // shell-provider for anything under `projects/[projectId]/*` (see `OrgShell`'s doc comment for why
+  // stacking a second full `AppShell` here would double the chrome instead of extending it).
+  const orgItems: AppShellNavItem[] = [
+    { href: `/orgs/${orgId}`, label: tShell('homeLink'), icon: 'Home' },
+    { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: 'FolderOpen' },
+    ...(canViewAuditLog
+      ? [
+          {
+            href: `/orgs/${orgId}/audit-log`,
+            label: t('auditLogLink'),
+            icon: 'ShieldCheck' as const,
+          },
+        ]
+      : []),
+    ...(canManagePlugins
+      ? [
+          {
+            href: `/orgs/${orgId}/plugins`,
+            label: t('pluginRegistryLink'),
+            icon: 'Puzzle' as const,
+          },
+        ]
+      : []),
+  ];
+
   const insightsItems: AppShellNavItem[] = [
     ...(canManageBoards
       ? [
-          { href: `${base}/boards`, label: t('projectBoardsLink'), icon: <LayoutGrid /> },
-          { href: `${base}/goals`, label: t('projectGoalsLink'), icon: <Target /> },
-          { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: <Users /> },
-          { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: <Trophy /> },
-          { href: `${base}/tv`, label: t('projectTvLink'), icon: <Tv /> },
+          { href: `${base}/boards`, label: t('projectBoardsLink'), icon: 'LayoutGrid' as const },
+          { href: `${base}/goals`, label: t('projectGoalsLink'), icon: 'Target' as const },
+          { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: 'Users' as const },
+          { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },
+          { href: `${base}/tv`, label: t('projectTvLink'), icon: 'Tv' as const },
         ]
       : []),
   ];
 
   const dataItems: AppShellNavItem[] = [
-    ...(canManageSchemas ? [{ href: `${base}/schema-defs`, label: t('projectSchemaRegistryLink'), icon: <Database /> }] : []),
-    ...(canManageMetrics ? [{ href: `${base}/metric-defs`, label: t('projectMetricRegistryLink'), icon: <BarChart3 /> }] : []),
+    ...(canManageSchemas
+      ? [
+          {
+            href: `${base}/schema-defs`,
+            label: t('projectSchemaRegistryLink'),
+            icon: 'Database' as const,
+          },
+        ]
+      : []),
+    ...(canManageMetrics
+      ? [
+          {
+            href: `${base}/metric-defs`,
+            label: t('projectMetricRegistryLink'),
+            icon: 'BarChart3' as const,
+          },
+        ]
+      : []),
     ...(canViewIngestHealth
       ? [
-          { href: `${base}/ingest-health`, label: t('projectIngestHealthLink'), icon: <Activity /> },
-          { href: `${base}/hooks`, label: t('projectHooksLink'), icon: <Webhook /> },
-          { href: `${base}/field-mappings`, label: t('projectFieldMappingsLink'), icon: <GitBranch /> },
+          {
+            href: `${base}/ingest-health`,
+            label: t('projectIngestHealthLink'),
+            icon: 'Activity' as const,
+          },
+          { href: `${base}/hooks`, label: t('projectHooksLink'), icon: 'Webhook' as const },
+          {
+            href: `${base}/field-mappings`,
+            label: t('projectFieldMappingsLink'),
+            icon: 'GitBranch' as const,
+          },
         ]
       : []),
   ];
 
   const automationItems: AppShellNavItem[] = [
-    ...(canManagePlugins ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: <Puzzle /> }] : []),
-    ...(canRunAutomation ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: <Bot /> }] : []),
+    ...(canManagePlugins
+      ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: 'Puzzle' as const }]
+      : []),
+    ...(canRunAutomation
+      ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: 'Bot' as const }]
+      : []),
   ];
 
   const settingsItems: AppShellNavItem[] = [
-    { href: `${base}/resources`, label: t('projectResourcesLink'), icon: <FolderOpen /> },
-    ...(canManageKeys ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: <KeyRound /> }] : []),
+    { href: `${base}/resources`, label: t('projectResourcesLink'), icon: 'FolderOpen' },
+    ...(canManageKeys
+      ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: 'KeyRound' as const }]
+      : []),
     ...(canManageProjects
       ? [
-          { href: `${base}/cost-guardrails`, label: t('projectCostGuardrailsLink'), icon: <Gauge /> },
-          { href: `${base}/session-replay`, label: t('projectSessionReplayLink'), icon: <Video /> },
+          {
+            href: `${base}/cost-guardrails`,
+            label: t('projectCostGuardrailsLink'),
+            icon: 'Gauge' as const,
+          },
+          {
+            href: `${base}/session-replay`,
+            label: t('projectSessionReplayLink'),
+            icon: 'Video' as const,
+          },
         ]
       : []),
   ];
 
   const sections: AppShellNavSection[] = [
+    { items: orgItems },
     { items: insightsItems },
     { heading: tShell('dataSection'), items: dataItems },
     { heading: tShell('automationSection'), items: automationItems },
     { heading: tShell('settingsSection'), items: settingsItems },
   ].filter((section) => section.items.length > 0);
 
-  const mobileTabItems = [...insightsItems.slice(0, 3), ...automationItems.slice(0, 1), ...settingsItems.slice(0, 1)].slice(0, 5);
+  const mobileTabItems = [
+    ...insightsItems.slice(0, 3),
+    ...automationItems.slice(0, 1),
+    ...settingsItems.slice(0, 1),
+  ].slice(0, 5);
 
   return (
     <AppShell
       switchers={
         <>
           <span className="truncate px-3 text-sm font-semibold">{project.name}</span>
-          <ProjectSwitcher orgId={orgId} projects={projects} currentProjectId={projectId} currentEnv="dev" />
+          <ProjectSwitcher
+            orgId={orgId}
+            projects={projects}
+            currentProjectId={projectId}
+            currentEnv="dev"
+          />
         </>
       }
       sections={sections}

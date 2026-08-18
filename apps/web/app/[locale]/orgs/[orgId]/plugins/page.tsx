@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { OrgShell } from '@/components/orgs/org-shell';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -26,7 +27,9 @@ export async function generateMetadata({ params }: PageProps) {
  * Installing a registered manifest into a project happens on the
  * project-scoped Plugins page (`.../projects/:projectId/plugins`).
  */
-export default async function PluginRegistryPage({ params }: PageProps): Promise<React.ReactElement> {
+export default async function PluginRegistryPage({
+  params,
+}: PageProps): Promise<React.ReactElement> {
   const { locale, orgId } = await params;
   setRequestLocale(locale);
 
@@ -47,39 +50,49 @@ export default async function PluginRegistryPage({ params }: PageProps): Promise
   const t = await getTranslations('PluginRegistry');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
+    <OrgShell locale={locale} orgId={orgId}>
+      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('registerHeading')}</h2>
-        <RegisterPluginManifestForm orgId={orgId} />
-      </section>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">{t('registerHeading')}</h2>
+          <RegisterPluginManifestForm orgId={orgId} />
+        </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('registeredHeading')}</h2>
-        {families.length === 0 ? (
-          <p className="text-muted-foreground">{t('noManifests')}</p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {families.map((family) => (
-              <li key={family.pluginId} className="flex flex-col gap-2 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{family.displayName}</span>
-                  <span className="text-xs text-muted-foreground">{family.pluginId}</span>
-                </div>
-                <ul className="flex flex-col gap-1">
-                  {family.versions.map((version) => (
-                    <li key={version.id} className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                      <span>{t('versionLine', { version: version.version, type: version.type })}</span>
-                      <span>{t('scopesLine', { scopes: version.scopes.join(', ') })}</span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </main>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">{t('registeredHeading')}</h2>
+          {families.length === 0 ? (
+            <p className="text-muted-foreground">{t('noManifests')}</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {families.map((family) => (
+                <li
+                  key={family.pluginId}
+                  className="flex flex-col gap-2 rounded-md border border-input px-3 py-2 text-sm"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium">{family.displayName}</span>
+                    <span className="text-xs text-muted-foreground">{family.pluginId}</span>
+                  </div>
+                  <ul className="flex flex-col gap-1">
+                    {family.versions.map((version) => (
+                      <li
+                        key={version.id}
+                        className="flex items-center justify-between gap-3 text-xs text-muted-foreground"
+                      >
+                        <span>
+                          {t('versionLine', { version: version.version, type: version.type })}
+                        </span>
+                        <span>{t('scopesLine', { scopes: version.scopes.join(', ') })}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </main>
+    </OrgShell>
   );
 }
