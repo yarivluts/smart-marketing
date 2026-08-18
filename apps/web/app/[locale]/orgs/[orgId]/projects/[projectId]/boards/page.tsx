@@ -21,11 +21,12 @@ export async function generateMetadata({ params }: PageProps) {
 
 /**
  * A project's dashboard boards (KAN-60, plan `13 §E11.2`, `10 §2.2`): every
- * board created in this project, plus a form to create a new (empty) one —
- * tiles are added from the board's own grid editor. Gated on
- * `dashboards.write` for the whole page, the same "whole feature, not just
- * mutation, is admin-only" posture every other project admin surface in
- * this codebase uses.
+ * board created in this project, plus (for `dashboards.write` holders only) a
+ * form to create a new (empty) one — tiles are added from the board's own
+ * grid editor. Gated on `dashboards.read` for the page itself (`viewer`
+ * included — KAN-60 follow-up, session-B dogfooding QA 2026-08-18: a viewer
+ * couldn't see board data at all, only write-capable roles could reach this
+ * page); the create form is separately gated on `dashboards.write` below.
  */
 export default async function BoardsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -38,9 +39,12 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId })) {
+  const principal = { type: 'user' as const, id: user.id };
+  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || can(bindings, principal, 'dashboards.write', { orgId });
+  if (!membership || !canViewBoards) {
     notFound();
   }
+  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
 
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -80,10 +84,12 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
-        <CreateBoardForm orgId={orgId} projectId={projectId} />
-      </section>
+      {canManageBoards ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
+          <CreateBoardForm orgId={orgId} projectId={projectId} />
+        </section>
+      ) : null}
     </main>
   );
 }

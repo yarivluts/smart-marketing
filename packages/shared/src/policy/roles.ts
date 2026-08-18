@@ -44,19 +44,26 @@ const ALL_PERMISSIONS: readonly Permission[] = PERMISSIONS;
  * `mcp.read` (KAN-75) is granted only to roles that already hold a write
  * permission gating the same data through the web app today (`project_admin`,
  * `editor` — both carry `metrics.write`/`dashboards.write`, the closest thing
- * this catalog has to a "can view" gate, since there is no separate
- * `metrics.read`/`dashboards.read` permission). Deliberately withheld from
- * `viewer`: despite the name, `viewer` carries zero permissions today (every
- * permission-gated read surface in `apps/web` checks a *write* permission
- * even to view, so a zero-permission `viewer` cannot see any project data
- * through the web app at all) and is one of only two `INVITABLE_ROLES`,
- * bindable at *org* scope with no project picker — granting it `mcp.read`
- * would hand an org-wide invitee real new read access (query_metric,
- * search_customers, ...) through a role whose entire documented purpose,
- * and whose use throughout this codebase's own test suite as the
- * "member with no permission" 403 fixture, is to grant nothing at all.
- * Also withheld from `operator` (automation-only, no read permission today)
- * and `ingest_only` (a write-only machine role).
+ * this catalog has to a "can view" gate for most surfaces, since there is no
+ * separate `metrics.read` permission — `dashboards.read` is the one
+ * exception, see below). Deliberately withheld from `viewer` even though it
+ * now carries `dashboards.read`: `viewer` is one of only two
+ * `INVITABLE_ROLES`, bindable at *org* scope with no project picker —
+ * granting it `mcp.read` would hand an org-wide invitee real new read access
+ * (query_metric, search_customers, ...) across every metric/customer surface,
+ * not just the board-viewing access `dashboards.read` narrowly grants. Also
+ * withheld from `operator` (automation-only, no read permission today) and
+ * `ingest_only` (a write-only machine role).
+ *
+ * `dashboards.read` exists solely so `viewer` can view board data (found via
+ * session-B dogfooding QA, 2026-08-18: a `viewer` got a 404 on a board that
+ * worked fine for every write-capable role — every other permission-gated
+ * read surface in `apps/web` still checks a *write* permission even to view,
+ * so `viewer` still can't see anything else through the web app; this is a
+ * narrow, board-specific exception, not a general read/write split across
+ * the whole catalog). Granted alongside `dashboards.write` wherever that's
+ * already granted (`project_admin`, `editor`) so write-capable roles don't
+ * need both permissions checked separately to view what they can also edit.
  */
 export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
   platform_admin: ALL_PERMISSIONS,
@@ -71,15 +78,16 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'ingest.write',
     'metrics.write',
     'dashboards.write',
+    'dashboards.read',
     'automation.approve',
     'automation.execute',
     'data.export',
     'plugin.install',
     'mcp.read',
   ],
-  editor: ['metrics.write', 'dashboards.write', 'ai.use', 'mcp.read'],
+  editor: ['metrics.write', 'dashboards.write', 'dashboards.read', 'ai.use', 'mcp.read'],
   operator: ['automation.approve', 'automation.execute'],
-  viewer: [],
+  viewer: ['dashboards.read'],
   ingest_only: ['ingest.write'],
 };
 

@@ -20,8 +20,11 @@ import { type Permission } from './permissions';
  * tooling. `mcp.read` (KAN-75 — the MCP server's read-tool surface) is
  * included: it is itself already a read-only, least-privilege grant (the
  * same reasoning that keeps `metrics.write` grantable despite its name —
- * there is no separate `*.read` permission in the catalog for any of these
- * surfaces). KAN-76's MCP act tools (`propose_action`/`approve_action`/
+ * there is no separate `*.read` permission in the catalog for most of these
+ * surfaces; `dashboards.read` is the one exception, added for the `viewer`
+ * role's board-viewing access, and is included here for the identical
+ * least-privilege reason `mcp.read` is: strictly weaker than the
+ * already-grantable `dashboards.write`). KAN-76's MCP act tools (`propose_action`/`approve_action`/
  * `create_goal`/`create_segment`) deliberately introduced no separate
  * `mcp.act` permission — each act tool instead re-checks its own
  * already-modeled permission (`automation.execute`/`automation.approve`/
@@ -38,6 +41,7 @@ export const API_KEY_SCOPES = [
   'schema.write',
   'metrics.write',
   'dashboards.write',
+  'dashboards.read',
   'data.export',
   'ai.use',
   'mcp.read',

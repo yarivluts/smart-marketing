@@ -18,6 +18,8 @@ export interface BoardGridEditorProps {
   renderViews: Record<string, TileRenderView>;
   /** Passed straight through to every tile — see `BoardTileViewProps`. */
   sessionReplayUrlTemplate?: string;
+  /** True for a `dashboards.read`-only viewer: hides the "Edit layout" button (and therefore edit mode entirely) but leaves the always-rendered view-mode tile data untouched. */
+  readOnly?: boolean;
 }
 
 function newTileId(): string {
@@ -273,6 +275,7 @@ export function BoardGridEditor({
   metricCatalog,
   renderViews,
   sessionReplayUrlTemplate,
+  readOnly = false,
 }: BoardGridEditorProps): React.ReactElement {
   const t = useTranslations('Boards');
   const router = useRouter();
@@ -371,9 +374,11 @@ export function BoardGridEditor({
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{t('tilesHeading')}</h2>
         {mode === 'view' ? (
-          <Button type="button" variant="outline" onClick={() => setMode('edit')}>
-            {t('editLayoutButton')}
-          </Button>
+          readOnly ? null : (
+            <Button type="button" variant="outline" onClick={() => setMode('edit')}>
+              {t('editLayoutButton')}
+            </Button>
+          )
         ) : (
           <div className="flex items-center gap-2">
             {metricCatalog.length === 0 ? <span className="text-xs text-muted-foreground">{t('noMetricsRegistered')}</span> : null}
