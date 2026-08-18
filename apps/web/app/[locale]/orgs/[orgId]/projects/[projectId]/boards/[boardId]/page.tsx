@@ -33,8 +33,10 @@ export async function generateMetadata({ params }: PageProps) {
  * filters), and its tile grid — view mode shows every tile's already-queried
  * data (fetched here, server-side, one `queryBoardTile` call per tile, in
  * parallel), edit mode hands off to `BoardGridEditor`'s client-side
- * add/move/resize/remove + "Save layout". Gated on `dashboards.write`, same
- * posture as the boards list page.
+ * add/move/resize/remove + "Save layout". Gated on `dashboards.read` to view
+ * (`viewer` included — see the boards list page's own doc comment for why);
+ * the settings form, delete button, and grid editor's edit affordances are
+ * separately gated on `dashboards.write` below.
  */
 export default async function BoardDetailPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId, boardId } = await params;
@@ -47,9 +49,12 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId })) {
+  const principal = { type: 'user' as const, id: user.id };
+  const canViewBoard = can(bindings, principal, 'dashboards.read', { orgId }) || can(bindings, principal, 'dashboards.write', { orgId });
+  if (!membership || !canViewBoard) {
     notFound();
   }
+  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
 
   // `freshness` (KAN-69): one project-wide badge shared by every tile on
   // this board — see `resolveBoardFreshness`'s own doc comment for why a
@@ -79,21 +84,23 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
     <main className="container mx-auto flex max-w-5xl flex-col gap-8 py-16">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">{board.name}</h1>
-        <DeleteBoardButton orgId={orgId} projectId={projectId} boardId={boardId} />
+        {canManageBoards ? <DeleteBoardButton orgId={orgId} projectId={projectId} boardId={boardId} /> : null}
       </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('settingsHeading')}</h2>
-        <BoardSettingsForm
-          orgId={orgId}
-          projectId={projectId}
-          boardId={boardId}
-          initialName={boardView.name}
-          initialDateRange={boardView.dateRange}
-          initialCompare={boardView.compare}
-          initialGlobalFilters={boardView.globalFilters}
-        />
-      </section>
+      {canManageBoards ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">{t('settingsHeading')}</h2>
+          <BoardSettingsForm
+            orgId={orgId}
+            projectId={projectId}
+            boardId={boardId}
+            initialName={boardView.name}
+            initialDateRange={boardView.dateRange}
+            initialCompare={boardView.compare}
+            initialGlobalFilters={boardView.globalFilters}
+          />
+        </section>
+      ) : null}
 
       <section>
         <BoardGridEditor
@@ -104,6 +111,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
           metricCatalog={metricCatalog}
           renderViews={renderViews}
           sessionReplayUrlTemplate={project.session_replay_url_template}
+          readOnly={!canManageBoards}
         />
       </section>
     </main>

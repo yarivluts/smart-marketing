@@ -62,6 +62,7 @@ export default async function ProjectLayout({
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
   const canRunAutomation = can(bindings, principal, 'automation.execute', { orgId });
   const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
 
@@ -103,9 +104,12 @@ export default async function ProjectLayout({
   ];
 
   const insightsItems: AppShellNavItem[] = [
+    // `dashboards.read` gates Boards on its own (a `viewer` should see this) — Goals/Segments/
+    // Win rules/War-room TV still gate on the write permission only, unchanged: only Boards was
+    // asked to become viewer-visible (session-B dogfooding QA, 2026-08-18), not the whole section.
+    ...(canViewBoards ? [{ href: `${base}/boards`, label: t('projectBoardsLink'), icon: 'LayoutGrid' as const }] : []),
     ...(canManageBoards
       ? [
-          { href: `${base}/boards`, label: t('projectBoardsLink'), icon: 'LayoutGrid' as const },
           { href: `${base}/goals`, label: t('projectGoalsLink'), icon: 'Target' as const },
           { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: 'Users' as const },
           { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },

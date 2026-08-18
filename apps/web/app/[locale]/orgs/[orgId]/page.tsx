@@ -62,6 +62,7 @@ export default async function OrgDetailPage({
   const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
 
   const t = await getTranslations('OrgDetailPage');
 
@@ -170,7 +171,7 @@ export default async function OrgDetailPage({
                       {t('projectPluginsLink')}
                     </Link>
                   ) : null}
-                  {canManageBoards ? (
+                  {canViewBoards ? (
                     <Link
                       className="text-sm underline"
                       href={`/orgs/${orgId}/projects/${currentProjectId}/boards`}

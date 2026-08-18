@@ -42,7 +42,11 @@ const renderViews: Record<string, TileRenderView> = {
   'tile-2': { kind: 'big_number', value: 40, isEmpty: false, freshness: null },
 };
 
-function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile], catalog: MetricCatalogEntryRow[] = metricCatalog): void {
+function renderEditor(
+  tiles: BoardTileRow[] = [adSpendTile, signupsTile],
+  catalog: MetricCatalogEntryRow[] = metricCatalog,
+  readOnly = false,
+): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <BoardGridEditor
@@ -52,6 +56,7 @@ function renderEditor(tiles: BoardTileRow[] = [adSpendTile, signupsTile], catalo
         initialTiles={tiles}
         metricCatalog={catalog}
         renderViews={renderViews}
+        readOnly={readOnly}
       />
     </NextIntlClientProvider>,
   );
@@ -74,6 +79,16 @@ describe('BoardGridEditor', () => {
   it('shows the empty state when there are no tiles', () => {
     renderEditor([]);
     expect(screen.getByText('This board has no tiles yet. Click "Edit layout" to add one.')).toBeInTheDocument();
+  });
+
+  it('a dashboards.read-only viewer still sees every tile\'s data, but gets no "Edit layout" button (and so no way into edit mode at all)', () => {
+    // Regression: a viewer previously couldn't reach this board at all (404 at the page level) —
+    // now that the page lets them in, the component itself must not offer any write affordance
+    // (found via session-B dogfooding QA, 2026-08-18).
+    renderEditor([adSpendTile, signupsTile], metricCatalog, true);
+    expect(screen.getByText('Ad spend')).toBeInTheDocument();
+    expect(screen.getByText('100')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit layout' })).not.toBeInTheDocument();
   });
 
   it('switches to edit mode, showing an editable title input per tile', () => {

@@ -14,6 +14,7 @@ export const PERMISSIONS = [
   'ingest.write',
   'metrics.write',
   'dashboards.write',
+  'dashboards.read',
   'automation.approve',
   'automation.execute',
   'data.export',
