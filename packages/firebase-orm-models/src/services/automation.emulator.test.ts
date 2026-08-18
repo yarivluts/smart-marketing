@@ -398,6 +398,64 @@ describe('executeAutomationAction / rollbackAutomationAction / verifyAutomationA
     ).rejects.toThrow(AutomationActionInvalidStateError);
   });
 
+  it('no state-machine entry point can reach "executed" except executeAutomationAction on an approved action — the manual-approval invariant', async () => {
+    // Real ad spend is only ever touched once a human has clicked Approve. This test sweeps every
+    // transition function against a freshly-proposed (awaiting_approval) and a blocked action and
+    // asserts none of them can advance straight to "executed", skipping approval. A future change
+    // that loosens `requireStatus` in `executeAutomationAction` (e.g. to also accept
+    // "awaiting_approval") would be caught here even though the two narrower tests above
+    // ("refuses to execute...", "refuses to approve a blocked action") wouldn't necessarily catch
+    // every such regression on their own.
+    const { owner, organization, project } = await setupOrgWithProject('Invariant Sweep Org');
+    const target = await seedTarget(organization.id, project.id, owner.id, 100);
+    const awaitingApproval = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      afterDailyBudgetUsd: 110,
+      requestedByUserId: owner.id,
+    });
+    expect(awaitingApproval.status).toBe('awaiting_approval');
+
+    await setAutomationGuardrailPolicy({
+      organizationId: organization.id,
+      projectId: project.id,
+      maxDailyBudgetChangePct: null,
+      spendCeilingUsd: null,
+      protectedTargetIds: [target.id],
+      allowedHours: null,
+      maxActionsPerDay: null,
+      maxGuardedMetricRegressionPct: null,
+      setByUserId: owner.id,
+    });
+    const blocked = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      afterDailyBudgetUsd: 105,
+      requestedByUserId: owner.id,
+    });
+    expect(blocked.status).toBe('blocked');
+
+    for (const action of [awaitingApproval, blocked]) {
+      await expect(
+        executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: action.id, executedByUserId: owner.id }),
+      ).rejects.toThrow(AutomationActionInvalidStateError);
+      await expect(
+        rollbackAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: action.id, reason: 'manual', actorId: owner.id }),
+      ).rejects.toThrow(AutomationActionInvalidStateError);
+      await expect(
+        verifyAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: action.id }),
+      ).rejects.toThrow(AutomationActionInvalidStateError);
+    }
+
+    // Confirm the one legitimate path still works: approve, then execute reaches "executed".
+    const approved = await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: awaitingApproval.id, approverId: owner.id });
+    expect(approved.status).toBe('approved');
+    const executed = await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: approved.id, executedByUserId: owner.id });
+    expect(executed.status).toBe('executed');
+  });
+
   it('rolls back an executed action, restoring the target’s prior budget', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Manual Rollback Org');
     const target = await seedTarget(organization.id, project.id, owner.id, 100);
