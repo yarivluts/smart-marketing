@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Merged PRs #92/#93 (concurrent session's work); shipped KAN-18 phase 2 slice (BigQueryWarehouseQueryExecutor); PR #94 open
+
+- **Last completed:**
+  - Found this session's local `main` ref stale (pointing at an old commit, 50 commits diverged
+    each way from `origin/main` — a container-init artifact, not real local work). Reset it to
+    `origin/main` via `git checkout -B main origin/main`; nothing lost, `origin/main` already had
+    the real history.
+  - **PRs #92 and #93** — both opened by a concurrent session (`yarivluts` via the Claude Code
+    footer) minutes before this run started, both green (lint·typecheck·test·build +
+    terraform fmt·validate) and `mergeable_state: clean`, no human actively driving either at
+    check time (the one related pending `AskUserQuestion` in another session was an unrelated,
+    still-unanswered KAN-18-apply question, not a live edit in progress). Reviewed both diffs
+    before merging — clean, well-tested, consistent with codebase conventions. **Merged both**
+    (squash): #92 (win-event history list, KAN-65 follow-up) and #93 (KAN-18 phase 1: BigQuery
+    terraform scaffolding + metric-compiler tenant-isolation fix — see the prior entry for detail).
+  - **KAN-18 phase 2, PR #94**: since `TASKS.md` has zero `todo` rows (57 done, KAN-18/19
+    in-progress/infra-gated, KAN-43 needs-human, KAN-50/51 blocked-by KAN-43) and PR #93's own
+    description scoped KAN-18's remaining work explicitly at Yariv's request ("own driving it
+    forward"), picked up the next self-contained, no-live-infra-required slice: a **real
+    `BigQueryWarehouseQueryExecutor`**.
+    - `packages/firebase-orm-models/src/warehouse/bigquery-query-executor.ts`: implements
+      `WarehouseQueryExecutor` against a narrow injectable `BigQueryQueryClient` interface (one
+      `query()` method) rather than the `@google-cloud/bigquery` SDK directly — same
+      "inject the client interface, not the SDK" convention the Stripe/Google Ads/Meta
+      integrations already use, so tests need no real GCP project/credentials. Runs the
+      compiler's (KAN-41) SQL string as-is with `compiled.params` passed straight through as
+      BigQuery named params (the compiler already emits `@param` placeholders for this — zero
+      translation needed). Unwraps BigQuery's `{value: '...'}`-shaped `DATE`/`TIMESTAMP` values
+      and `bigint` counts down to the plain `string | number | null` `WarehouseRow` shape every
+      view-mapper already expects. `createRealBigQueryClient()` wraps the real SDK for
+      production use.
+    - `packages/firebase-orm-models/src/warehouse/query-executor.ts`: `defaultWarehouseQueryExecutor`
+      is now resolved once at module load via `resolveWarehouseQueryExecutorFromEnv()` — reads
+      `GOOGLE_CLOUD_PROJECT`/`GCLOUD_PROJECT` (the same project-id env vars
+      `@google-cloud/bigquery` itself already recognizes for ADC) plus new
+      `GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_LOCATION`, falling back to the existing
+      `NotConfiguredWarehouseQueryExecutor` when either is unset (every environment today,
+      including CI) — **no call site changes**, all 4 existing consumers
+      (`queryMetrics`/`mcp-tools.service.ts` x2/`trial-pipeline.service.ts`) keep working
+      unmodified.
+    - Added `@google-cloud/bigquery` as a real dependency of `packages/firebase-orm-models`.
+    - New tests: `bigquery-query-executor.test.ts` (6 cases — SQL/params/dataset/location
+      pass-through, `defaultDataset.projectId`/`location` omitted when unset, DATE/TIMESTAMP/
+      bigint/null normalization, `createRealBigQueryClient` construction against a mocked SDK);
+      extended `query-executor.test.ts` with `readWarehouseEnvConfig`/
+      `resolveWarehouseQueryExecutorFromEnv` cases (missing project id, missing dataset, both
+      configured → real executor instance).
+    - Deliberately out of scope (queued as further KAN-18 follow-up per PR #93's own plan): the
+      `RawRecordModel` → BigQuery export job, and porting `dbt-transform`'s DuckDB SQL to
+      BigQuery's dialect.
+  - **Verification:** `packages/firebase-orm-models` suite green (807/807, Firestore emulator);
+    `pnpm lint && pnpm typecheck && pnpm build` green across every package. Full `pnpm test`
+    surfaced 16 failures, all in `apps/web/lib/orgs/isolation.test.ts` (`RESOURCE_EXHAUSTED`/
+    120s-timeout under sustained emulator load) — this is the pre-existing, documented "known
+    flake, mitigated, not root-caused" gRPC-watch-stream issue (see the 2026-07-04 KAN-22 entry),
+    not a regression: this PR touches nothing in `apps/web` or org-isolation routes, only
+    `packages/firebase-orm-models/src/warehouse/*`. Re-ran that one file alone against a fresh
+    emulator: 21/21 passed clean, confirming the flake, not a real failure.
+  - Opened **PR #94** (`kan-18-bigquery-warehouse-executor` → `main`), subscribed to its PR
+    activity, and scheduled a ~20-minute self check-in to merge once CI is green.
+- **In progress (exact stopping point):** PR #94 open, CI running at end of this entry (both
+  checks were `in_progress` at last look). A scheduled check-in will merge it once green (or fix
+  and re-push if something fails) — see Next step.
+- **Blocked + why:** nothing new. Standing blockers unchanged (see below).
+- **Next step:** once PR #94 is green, merge + delete the branch. Then either continue KAN-18
+  phase 3 (the `RawRecordModel`→BigQuery export job, or the dbt `bigquery` profile target/SQL
+  dialect port — both still scoped in PR #93's description) or re-check `TASKS.md`/open PRs for
+  anything a concurrent session has since posted.
+- **Waiting on human:**
+  - `terraform apply` (or equivalent) for `infra/terraform/bigquery.tf` (PR #93) — still
+    outstanding; everything built in PR #94 stays inert until this exists and a deploy sets
+    `GOOGLE_CLOUD_PROJECT`/`GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_LOCATION`.
+  - Standing: **KAN-43** (Google Ads/Meta application submission), the vault key ring
+    (`GROWTHOS_VAULT_KEYS`) go-ahead, and the Redis/Memorystore cost decision.
+
+---
+
 ## 2026-08-18/19 — Shipped viewer-board fix, automation-invariant test, win-feed history; scoped + started KAN-18
 
 - **Last completed:**
