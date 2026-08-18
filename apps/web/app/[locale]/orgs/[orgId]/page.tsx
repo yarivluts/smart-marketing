@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can, isEnvironment, type Environment } from '@growthos/shared';
 import { Link } from '@/i18n/navigation';
+import { OrgShell } from '@/components/orgs/org-shell';
 import { ProjectSwitcher } from '@/components/orgs/project-switcher';
 import { EnvBadge } from '@/components/orgs/env-badge';
 import { MembersList } from '@/components/orgs/members-list';
@@ -29,7 +30,10 @@ export async function generateMetadata({ params }: PageProps) {
  * non-enumeration principle applies even before that story builds it out
  * everywhere else.
  */
-export default async function OrgDetailPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
+export default async function OrgDetailPage({
+  params,
+  searchParams,
+}: PageProps): Promise<React.ReactElement> {
   const { locale, orgId } = await params;
   const { project: projectIdParam, env: envParam } = await searchParams;
   setRequestLocale(locale);
@@ -62,110 +66,154 @@ export default async function OrgDetailPage({ params, searchParams }: PageProps)
   const t = await getTranslations('OrgDetailPage');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{membership.organizationName}</h1>
+    <OrgShell locale={locale} orgId={orgId}>
+      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
+        <h1 className="text-3xl font-bold tracking-tight">{membership.organizationName}</h1>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{t('projectsHeading')}</h2>
-          {canManageProjects ? (
-            <Link className="text-sm underline" href={`/orgs/${orgId}/projects/new`}>
-              {t('newProject')}
-            </Link>
-          ) : null}
-        </div>
-        {projects.length === 0 ? (
-          <p className="text-muted-foreground">{t('noProjects')}</p>
-        ) : (
-          <>
-            <ProjectSwitcher
-              orgId={orgId}
-              projects={projects}
-              currentProjectId={currentProjectId}
-              currentEnv={currentEnv}
-            />
-            {currentProjectId ? (
-              <div className="flex items-center gap-4">
-                <EnvBadge orgId={orgId} projectId={currentProjectId} currentEnv={currentEnv} />
-                <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/resources`}>
-                  {t('projectResourcesLink')}
-                </Link>
-                {canManageKeys ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/keys`}>
-                    {t('projectKeysLink')}
-                  </Link>
-                ) : null}
-                {canManageSchemas ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/schema-defs`}>
-                    {t('projectSchemaRegistryLink')}
-                  </Link>
-                ) : null}
-                {canManageMetrics ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/metric-defs`}>
-                    {t('projectMetricRegistryLink')}
-                  </Link>
-                ) : null}
-                {canViewIngestHealth ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/ingest-health`}>
-                    {t('projectIngestHealthLink')}
-                  </Link>
-                ) : null}
-                {canViewIngestHealth ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/hooks`}>
-                    {t('projectHooksLink')}
-                  </Link>
-                ) : null}
-                {canViewIngestHealth ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/field-mappings`}>
-                    {t('projectFieldMappingsLink')}
-                  </Link>
-                ) : null}
-                {canManageProjects ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/cost-guardrails`}>
-                    {t('projectCostGuardrailsLink')}
-                  </Link>
-                ) : null}
-                {canManageProjects ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/session-replay`}>
-                    {t('projectSessionReplayLink')}
-                  </Link>
-                ) : null}
-                {canManagePlugins ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/plugins`}>
-                    {t('projectPluginsLink')}
-                  </Link>
-                ) : null}
-                {canManageBoards ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/boards`}>
-                    {t('projectBoardsLink')}
-                  </Link>
-                ) : null}
-                {canManageBoards ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/goals`}>
-                    {t('projectGoalsLink')}
-                  </Link>
-                ) : null}
-                {canManageBoards ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/segments`}>
-                    {t('projectSegmentsLink')}
-                  </Link>
-                ) : null}
-                {canManageBoards ? (
-                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/tv`}>
-                    {t('projectTvLink')}
-                  </Link>
-                ) : null}
-              </div>
+        <section className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold">{t('projectsHeading')}</h2>
+            {canManageProjects ? (
+              <Link className="text-sm underline" href={`/orgs/${orgId}/projects/new`}>
+                {t('newProject')}
+              </Link>
             ) : null}
-          </>
-        )}
-      </section>
+          </div>
+          {projects.length === 0 ? (
+            <p className="text-muted-foreground">{t('noProjects')}</p>
+          ) : (
+            <>
+              <ProjectSwitcher
+                orgId={orgId}
+                projects={projects}
+                currentProjectId={currentProjectId}
+                currentEnv={currentEnv}
+              />
+              {currentProjectId ? (
+                <div className="flex items-center gap-4">
+                  <EnvBadge orgId={orgId} projectId={currentProjectId} currentEnv={currentEnv} />
+                  <Link
+                    className="text-sm underline"
+                    href={`/orgs/${orgId}/projects/${currentProjectId}/resources`}
+                  >
+                    {t('projectResourcesLink')}
+                  </Link>
+                  {canManageKeys ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/keys`}
+                    >
+                      {t('projectKeysLink')}
+                    </Link>
+                  ) : null}
+                  {canManageSchemas ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/schema-defs`}
+                    >
+                      {t('projectSchemaRegistryLink')}
+                    </Link>
+                  ) : null}
+                  {canManageMetrics ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/metric-defs`}
+                    >
+                      {t('projectMetricRegistryLink')}
+                    </Link>
+                  ) : null}
+                  {canViewIngestHealth ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/ingest-health`}
+                    >
+                      {t('projectIngestHealthLink')}
+                    </Link>
+                  ) : null}
+                  {canViewIngestHealth ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/hooks`}
+                    >
+                      {t('projectHooksLink')}
+                    </Link>
+                  ) : null}
+                  {canViewIngestHealth ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/field-mappings`}
+                    >
+                      {t('projectFieldMappingsLink')}
+                    </Link>
+                  ) : null}
+                  {canManageProjects ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/cost-guardrails`}
+                    >
+                      {t('projectCostGuardrailsLink')}
+                    </Link>
+                  ) : null}
+                  {canManageProjects ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/session-replay`}
+                    >
+                      {t('projectSessionReplayLink')}
+                    </Link>
+                  ) : null}
+                  {canManagePlugins ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/plugins`}
+                    >
+                      {t('projectPluginsLink')}
+                    </Link>
+                  ) : null}
+                  {canManageBoards ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/boards`}
+                    >
+                      {t('projectBoardsLink')}
+                    </Link>
+                  ) : null}
+                  {canManageBoards ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/goals`}
+                    >
+                      {t('projectGoalsLink')}
+                    </Link>
+                  ) : null}
+                  {canManageBoards ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/segments`}
+                    >
+                      {t('projectSegmentsLink')}
+                    </Link>
+                  ) : null}
+                  {canManageBoards ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/tv`}
+                    >
+                      {t('projectTvLink')}
+                    </Link>
+                  ) : null}
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('membersHeading')}</h2>
-        <MembersList orgId={orgId} members={members} canManageMembers={canManageMembers} />
-        {canManageMembers ? <InviteMemberForm orgId={orgId} /> : null}
-      </section>
-    </main>
+        <section className="flex flex-col gap-3">
+          <h2 className="text-lg font-semibold">{t('membersHeading')}</h2>
+          <MembersList orgId={orgId} members={members} canManageMembers={canManageMembers} />
+          {canManageMembers ? <InviteMemberForm orgId={orgId} /> : null}
+        </section>
+      </main>
+    </OrgShell>
   );
 }
