@@ -17,6 +17,54 @@ Template for each entry:
 
 ---
 
+## 2026-08-18 — No unblocked TASKS.md work; human actively driving PRs #90-92 live (scheduled routine check, run 7)
+
+- **Last completed:**
+  - Re-verified `TASKS.md`'s Stories table: same as every prior check this cycle — 57 `done`, 2
+    `in-progress` (KAN-18/19, both infra-gated), 1 `needs-human` (KAN-43), 2 `blocked-by`
+    (KAN-50/51, blocked on KAN-43) — zero `todo` rows.
+  - Found this session's local git checkout had a stale, unrelated local `main` branch (50 commits
+    diverged each way from `origin/main`, no common ancestor — `git merge-base` returned nothing,
+    an old container-local ref predating a history change upstream, last consistent with the state
+    around PR #79/#80). Confirmed its unique commits (KAN-20 reconcile, PR #80 landing-page perf)
+    are already superseded by what's on `origin/main` today (both referenced as done/delivered
+    further up this log) — nothing was lost. Reset the local `main` ref to `origin/main` with
+    `git checkout -B main origin/main`; this is a local-only container artifact, not pushed anywhere.
+  - Checked GitHub directly (no open issues) and found **three open PRs (#90, #91, #92)**, all
+    authored by `yarivluts` directly (Claude Code footer, not this routine) within the ~15 minutes
+    before this run started, answering exactly the product questions the prior run's entry forwarded:
+    - **#90** ("let viewer role view boards") — new `dashboards.read` permission, granted to
+      `viewer`/`project_admin`/`editor`; boards list/detail pages and nav split into
+      view-vs-manage gates; `BoardGridEditor` gained a `readOnly` prop. Reviewed the diff while
+      investigating (clean, consistent with the codebase's existing permission-catalog
+      conventions, tests added) — found it had **already been merged** (by `yarivluts`,
+      `21:20:57Z`) by the time I checked, so no action needed from this run.
+    - **#91** ("exhaustive manual-approval invariant sweep" for automation) and **#92**
+      ("persisted win history alongside the live feed") were still open with CI in progress at
+      check time.
+  - Confirmed via `get_session` that the interactive VS Code session holding the previously-pending
+    vault-key-ring `AskUserQuestion` (`session_014kgJRyqpZPDNUt7Anp9Gwu`) is now `IDLE`/connected
+    (not stuck awaiting an answer anymore) and was updated at `21:10:58Z` — the account owner is
+    live in that session right now, which lines up with #90/#91/#92 landing minutes apart. Since a
+    human is actively driving this work in real time, did not touch #91/#92 myself to avoid racing
+    a live session merging its own PRs (as it just did with #90) — nothing here needs surfacing to
+    the account owner, who is already at the keyboard.
+  - No code changes made. No push notification sent (nothing actionable for an *away* user — the
+    account owner is present and actively working).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** every `TASKS.md` row is `done`, infra-gated (KAN-18/19), `needs-human`
+  (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/51). No blocker changed this run beyond
+  the vault-key-ring/product-question thread now visibly being worked live by the account owner.
+- **Next step:** keep polling on the configured cadence. Once PRs #91/#92 land (or stall) and the
+  account owner's live session finishes, re-check `TASKS.md`/open PRs for anything left over.
+- **Waiting on human:** unchanged in substance, but now visibly in progress —
+  - Vault key ring go-ahead and the four forwarded product questions: the account owner appears to
+    be actively answering these live (PRs #90/#91/#92); no longer purely idle-waiting.
+  - Standing: **KAN-43** (Google Ads/Meta application submission) and **KAN-18** proper (Terraform
+    import/plan against real credentials, then BigQuery/Pub/Sub/Redis/staging shape decision).
+
+---
+
 ## 2026-08-18 — No unblocked TASKS.md work; vault key ring question still pending human answer (scheduled routine check, run 6)
 
 - **Last completed:**
