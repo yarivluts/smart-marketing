@@ -16,6 +16,7 @@
   },
   "AppShell": {
     "brandName": "GrowthOS",
+    "homeLink": "Home",
     "dataSection": "Data",
     "automationSection": "Automation",
     "settingsSection": "Settings",
