@@ -8,6 +8,7 @@ import {
   type CompilerFilter,
   type CompilerMetricDefinition,
   type CompilerParamValue,
+  type CompilerTenant,
   type CompiledMetricQuery,
   type MetricCatalog,
   type MetricQueryRequest,
@@ -107,6 +108,7 @@ function buildLeafCte(
   queryFilters: readonly CompilerFilter[],
   period: Period,
   grain: TimeGrain,
+  tenant: CompilerTenant | undefined,
   params: Record<string, CompilerParamValue>,
 ): LeafCte {
   const cteName = `leaf_${leafName}_${period.suffix}`;
@@ -121,6 +123,11 @@ function buildLeafCte(
   params[endParam] = period.window.end;
 
   const whereClauses = [`${timeColumnSql} >= @${startParam}`, `${timeColumnSql} <= @${endParam}`];
+  if (tenant) {
+    params.tenant_organization_id = tenant.organizationId;
+    params.tenant_project_id = tenant.projectId;
+    whereClauses.push(`${quoteIdentifier('organization_id')} = @tenant_organization_id`, `${quoteIdentifier('project_id')} = @tenant_project_id`);
+  }
   agg.filters.forEach((filter, index) => whereClauses.push(emitFilterClause(filter, `filter_${leafName}_${index}`, params)));
   queryFilters.forEach((filter, index) => whereClauses.push(emitFilterClause(filter, `qfilter_${index}`, params)));
 
@@ -191,8 +198,15 @@ function emitFormulaAst(catalog: MetricCatalog, node: FormulaAstNode, resolving:
  * "buildable today" scope every other compiler-shaped story in this repo
  * has taken; a real join-aware version is future work once dbt (KAN-37)
  * exists to build that mart.
+ *
+ * `tenant`, when provided, adds an `organization_id = ... AND project_id =
+ * ...` predicate to every leaf aggregation — see {@link CompilerTenant}'s
+ * own doc comment for why this is real caller-trusted context and not a
+ * field on `request`. Optional only so unit fixtures that don't care about
+ * tenant scoping don't all need updating; `compileMetricQueryForProject`
+ * (the only production caller) always passes it.
  */
-export function compileMetricQuery(catalog: MetricCatalog, request: MetricQueryRequest): CompiledMetricQuery {
+export function compileMetricQuery(catalog: MetricCatalog, request: MetricQueryRequest, tenant?: CompilerTenant): CompiledMetricQuery {
   const metricNames = [...new Set(request.metrics)];
   if (metricNames.length === 0) {
     throw new MetricCompilerError('A query must request at least one metric.');
@@ -231,7 +245,7 @@ export function compileMetricQuery(catalog: MetricCatalog, request: MetricQueryR
       if (!aggregation) {
         throw new MetricCompilerError(`Metric "${leafName}" has no aggregation to compile.`);
       }
-      return buildLeafCte(leafName, aggregation, dimensions, request.filters ?? [], period, request.time.grain, params);
+      return buildLeafCte(leafName, aggregation, dimensions, request.filters ?? [], period, request.time.grain, tenant, params);
     });
     cteBlocks.push(...leaves.map((leaf) => leaf.sql));
 

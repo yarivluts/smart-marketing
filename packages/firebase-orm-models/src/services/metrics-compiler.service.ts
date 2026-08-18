@@ -112,7 +112,7 @@ export async function compileMetricQueryForProject(params: CompileMetricQueryFor
   await requireProjectInOrg(params.organizationId, params.projectId);
 
   const { catalog, definitionRefs } = await resolveCatalog(params.organizationId, params.projectId, params.request.metrics);
-  const compiled = compileMetricQuery(catalog, params.request);
+  const compiled = compileMetricQuery(catalog, params.request, { organizationId: params.organizationId, projectId: params.projectId });
 
   return { ...compiled, definitionRefs };
 }

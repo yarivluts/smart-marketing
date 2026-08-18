@@ -52,7 +52,14 @@ describe('compileMetricQueryForProject', () => {
 
     expect(compiled.sql).toContain('SUM(`reporting_spend`)');
     expect(compiled.sql).toContain('`fact_ad_spend`');
-    expect(compiled.params).toEqual({ time_start_current: '2026-01-01', time_end_current: '2026-01-07' });
+    // `tenant_organization_id`/`tenant_project_id` (KAN-18 tenant-isolation fix): `compileMetricQueryForProject`
+    // always compiles in the requesting org/project as a bind param — see `CompilerTenant`'s own doc comment.
+    expect(compiled.params).toEqual({
+      time_start_current: '2026-01-01',
+      time_end_current: '2026-01-07',
+      tenant_organization_id: organization.id,
+      tenant_project_id: project.id,
+    });
     expect(compiled.definitionRefs).toEqual({ ad_spend: 'metric:ad_spend@v1' });
   });
 

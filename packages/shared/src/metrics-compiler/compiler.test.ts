@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compileMetricQuery } from './compiler';
-import { MetricCompilerError, type MetricQueryRequest } from './types';
+import { MetricCompilerError, type CompilerTenant, type MetricQueryRequest } from './types';
 import { buildTestCatalog } from './__fixtures__/test-catalog';
 
 /**
@@ -21,9 +21,9 @@ function loadGolden(caseName: string): { sql: string; params: Record<string, unk
   return { sql, params };
 }
 
-function expectGolden(caseName: string, request: MetricQueryRequest): void {
+function expectGolden(caseName: string, request: MetricQueryRequest, tenant?: CompilerTenant): void {
   const catalog = buildTestCatalog();
-  const compiled = compileMetricQuery(catalog, request);
+  const compiled = compileMetricQuery(catalog, request, tenant);
   const golden = loadGolden(caseName);
   expect(compiled.sql).toBe(golden.sql);
   expect(compiled.params).toEqual(golden.params);
@@ -105,6 +105,22 @@ describe('compileMetricQuery — golden-file SQL tests', () => {
       filters: [{ field: 'channel', operator: 'in', value: 'google,meta,tiktok' }],
       time: { start: '2026-05-01', end: '2026-05-01', grain: 'day' },
     });
+  });
+
+  it('11: a tenant compiles an organization_id + project_id predicate into the leaf CTE (KAN-18 tenant-isolation fix — a shared BigQuery warehouse must never sum another tenant\'s rows in)', () => {
+    expectGolden(
+      '11-tenant-scoped-simple-aggregation-day',
+      { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      { organizationId: 'org-1', projectId: 'project-1' },
+    );
+  });
+
+  it('12: the tenant predicate is compiled into every leaf CTE of a multi-metric request, not just the first', () => {
+    expectGolden(
+      '12-tenant-scoped-multi-metric-request',
+      { metrics: ['ad_spend', 'new_paying'], dimensions: ['channel'], time: { start: '2026-04-01', end: '2026-04-02', grain: 'day' } },
+      { organizationId: 'org-1', projectId: 'project-1' },
+    );
   });
 });
 
