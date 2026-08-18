@@ -17,6 +17,35 @@ Template for each entry:
 
 ---
 
+## 2026-08-18 — No unblocked TASKS.md work; state unchanged (scheduled routine check, run 4)
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. Local checkout again started `HEAD`
+    detached (container-init leftover); checked out `main` and fast-forwarded to `origin/main`
+    (`ed155fc`) cleanly.
+  - Re-verified `TASKS.md`'s Stories table: `grep -oE '\| (todo|in-progress|done|needs-human|
+    blocked-by) \|' TASKS.md | sort | uniq -c` → 57 `done`, 2 `in-progress` (KAN-18/19, both
+    infra-gated), 1 `needs-human` (KAN-43), 2 `blocked-by` (KAN-50/51, blocked on KAN-43) — zero
+    `todo` rows, unchanged from the previous entry.
+  - Checked open PRs (`list_pull_requests`, state=open): none. Checked remote branches
+    (`git branch -a`): only `main`. Nothing in flight from a concurrent session.
+  - No code changes made — nothing unblocked to work on. No push notification sent (nothing new
+    to report — same state as the last several runs).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** every remaining backlog item is `done`, infra-gated (KAN-18/19), `needs-human`
+  (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/51). No headless-runnable `todo` work exists.
+- **Next step:** keep polling on the configured cadence. Once a human unblocks KAN-18 (GCP/Firebase
+  project + billing + secrets) or KAN-43 (Google Ads/Meta API approvals), re-check `TASKS.md` — that
+  unblocks KAN-19's remaining CI/deploy work and KAN-50/KAN-51 respectively.
+- **Waiting on human:** unchanged —
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (or provide credentials to this
+    environment) — still outstanding; gates KAN-19's remaining CI work and KAN-50/KAN-51
+    transitively.
+
+---
+
 ## 2026-08-18 — No unblocked TASKS.md work; state unchanged (scheduled routine check, run 3)
 
 - **Last completed:**
