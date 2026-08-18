@@ -17,6 +17,78 @@ Template for each entry:
 
 ---
 
+## 2026-08-18 — No unblocked TASKS.md work; independently diagnosed + raced on fixing PR #88's CI, other session won
+
+- **Last completed:**
+  - Read `PROGRESS.md`/`TASKS.md` per the standing rule. `TASKS.md`'s Stories table still has zero
+    `| todo |` rows (57 `done`, 2 `in-progress` KAN-18/19 infra-gated, 1 `needs-human` KAN-43, 2
+    `blocked-by` KAN-50/51) — unchanged. Fast-forwarded local `main` to `origin/main` (pulled in
+    PR #86/#87, merged since the prior entry).
+  - Only open PR: **#88** ("Intercom-inspired design + persistent app navigation shell"), a
+    user-requested redesign authored directly by `yarivluts` (not a KAN story), pushed by
+    `session_01JLFWLinu6Rre5n3s8NBDJK`. At the time this run checked it, it had been open ~8.5
+    hours with CI red (`lint · typecheck · test · build` failing) and the owning session idle since
+    *before* that CI run even finished — a materially different situation from every prior
+    "PR still in flight, leave it alone" entry in this file, so per the established "hours not
+    minutes + idle" precedent this run investigated it as likely-abandoned.
+  - Diagnosed the CI failure by checking out the branch and reproducing locally (built
+    `packages/shared`/`firebase-orm-models`/`tracking-sdk` first, then ran the real
+    `firebase emulators:exec ... playwright test` — CI's job log tail alone only showed the
+    Playwright failure summary, not the actual server error). Found two real bugs in the PR's new
+    `AppShell` nav-shell layouts: (1) `OrgLayout`/`ProjectLayout` (server components) built nav
+    items with `icon: SomeLucideComponent` — a component *reference*, which cannot cross the RSC
+    server->client boundary as a prop ("Only plain objects can be passed to Client Components"),
+    crashing every page wrapped in the new shell before it ever rendered — explains all 17 e2e
+    failures (every spec that creates an org and then checks the page rendered); (2) once fixed
+    far enough to render, the sidebar's "Home" nav link used the org's own display name as its
+    link text, and since every e2e fixture org is named `"<Feature> E2E Org"`, Playwright's
+    case-insensitive substring name matching made that link also satisfy `getByRole('link', {
+    name: 'Schema registry' })` etc., causing a strict-mode violation on click.
+  - Fixed both (icon-name-string lookup map in `AppShell` instead of passing component
+    references; a fixed translated "Home" label instead of the org name), verified
+    `tsc --noEmit`, `eslint`, the full `vitest` suite (911/911, properly wrapped in
+    `firebase emulators:exec`), all 17 previously-failing e2e specs (all green — one `keys.spec.ts`
+    flake passed on the suite's own built-in retry, unrelated to this fix), and a production
+    `next build`, all green. Committed on a local branch tracking PR #88's branch and went to push.
+  - **Push raced the owning session**: `git push` was rejected (`fetch first`) — while this run
+    was verifying, `session_01JLFWLinu6Rre5n3s8NBDJK` had come back active and pushed its own fix
+    for the *exact same* two bugs (commits `0b2900d`/`a2f7437`, same root causes, different
+    technique — pre-rendered+cloned icon elements instead of an icon-name lookup map). Rebased
+    onto their commits to re-verify nothing else was broken (clean rebase, all checks re-confirmed
+    green), then — since their fix was already equivalent, already pushed, and CI on their version
+    is now green (`mergeable_state: clean`) — discarded this run's now-redundant local commit
+    rather than pushing a conflicting/duplicate one. Deleted the local review branch; `main` is
+    clean and matches `origin/main`.
+  - Left PR #88 itself alone (didn't merge): the owning session is clearly active right now
+    (pushed within the hour and its PR body's own checklist has an unchecked "Post-merge:
+    browser-verify on dev" item implying it intends to merge and verify itself) — same
+    "still connected and working is not abandonment" posture as every prior entry about this
+    session's PRs, now additionally confirmed by direct observation (it raced this run's own
+    push).
+  - No push notification sent: nothing here needs the account owner's attention — no TASKS.md
+    work exists, and PR #88's CI is green and being driven by the owner's own live session.
+- **In progress (exact stopping point):** none — no code changes landed by this run (superseded by
+  the owning session's own equivalent fix, verified before being discarded).
+- **Blocked + why:** every remaining backlog item is `done`, infra-gated (KAN-18/19), `needs-human`
+  (KAN-43), or transitively `blocked-by` KAN-43 (KAN-50/51). No headless-runnable `todo` work exists.
+- **Next step:** keep polling on the configured cadence. If a future run finds an open PR stalled
+  for hours with CI red and its owning session genuinely idle (not just between turns), the
+  "diagnose, fix, verify all checks, push" playbook from this run is the template — but always
+  re-fetch immediately before pushing (this run's own push got raced) and prefer rebasing onto
+  any new remote commits over force-pushing over them. Once a human unblocks KAN-18 or KAN-43,
+  re-check `TASKS.md`.
+- **Waiting on human:** unchanged —
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (or provide credentials to this
+    environment) — still outstanding; gates KAN-19's remaining CI work and KAN-50/KAN-51
+    transitively.
+  - PR #88 — CI green, `mergeable_state: clean`, owned by a live, connected interactive session
+    that appears to intend merging it itself; no action needed unless a future run finds it
+    abandoned.
+
+---
+
 ## 2026-08-18 — No unblocked TASKS.md work; one PR in flight from a concurrent live session (CI currently red)
 
 - **Last completed:**
