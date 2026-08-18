@@ -17,6 +17,82 @@ Template for each entry:
 
 ---
 
+## 2026-08-18/19 — Shipped viewer-board fix, automation-invariant test, win-feed history; scoped + started KAN-18
+
+- **Last completed:**
+  - **PR #90** ("let viewer role view boards, not just editors") — `dashboards.read` permission
+    added, granted to `viewer`/`project_admin`/`editor`; boards list/detail pages, project-nav
+    Boards link, and org-home Boards quick-link split into `canViewBoards` (read-or-write) vs
+    `canManageBoards` (write-only) gates; `BoardGridEditor` gained a `readOnly` prop. Fixes
+    session-B's finding: viewers hit a 404 on `/boards/{id}` even though they should only be
+    blocked from editing. **Merged.**
+  - **PR #91** ("exhaustive manual-approval invariant sweep") — audited the automation
+    action-queue state machine end to end per Yariv's explicit decision that automation must
+    *always* require manual approval, never auto-execute even within guardrails. Confirmed the
+    invariant already held (`executeAutomationAction` hard-requires a prior human-set `approved`
+    status; no cron/webhook/auto-execute path exists anywhere; RBAC has no service-account/API-key
+    bypass). Added a regression test sweeping every transition function against an
+    `awaiting_approval` and a `blocked` action, asserting none can reach `executed` except via the
+    real approve→execute path. **Merged.** Independently confirmed live by session-B, who exercised
+    the real chain (target → guardrail-block → guardrail-clean → approve → separate execute step →
+    plugin-not-installed 409) end to end.
+  - Investigated session-B's "Automation connection dropdown doesn't list a secret-set credential"
+    report — **not a bug**: the dropdown only lists *approved, write-tier-assigned resource
+    attachments* (KAN-27/74's consent flow), not every credential-with-secret in the org, by
+    design. Relayed the exact 4-step flow (request attachment → org approves → set write tier)
+    to session B, who ran it and confirmed it works end to end.
+  - **PR #92** ("persisted win history alongside the live feed") — Yariv's answer to session-B's
+    finding that the win feed is broadcast-only (SSE, no persistence) and misses wins if nobody has
+    the page open live. Turned out the backend (`WinEventModel` persistence,
+    `listRecentWinEventsForProject`) was already fully built and even re-exported through
+    `apps/web/lib/orgs/queries.ts` — it just had no UI caller. Added `WinEventHistoryList`, wired
+    above `LiveWinFeed` on the win-rules page. Open, CI in progress at end of run.
+  - **PR #93** ("KAN-18 phase 1: BigQuery infra scaffolding + metric-compiler tenant isolation") —
+    Yariv's explicit ask ("he wants you to own driving it forward ... investigate what it needs and
+    provision if it's within your access"). Ran a deep code-level investigation (see the PR
+    description for the full scoped plan: dataset/table provisioning, a
+    `BigQueryWarehouseQueryExecutor`, a `RawRecordModel`→BigQuery export, porting
+    `dbt-transform`'s DuckDB SQL to BigQuery's dialect). Shipped the two safe, self-contained
+    pieces: (1) `infra/terraform/bigquery.tf` declaring `growthos_raw`/`growthos_core` datasets +
+    a `raw_records` table, fmt/validate-clean but **not applied** — a direct `bq mk`/`gcloud`
+    provisioning attempt against the real project was blocked by this environment's own safety
+    controls (creating live cloud infra is treated as sensitive regardless of cost — BigQuery
+    storage/query cost here is near-zero, unlike Redis's standing charge); needs a human or an
+    explicitly-authorized run to `terraform apply` it. (2) A tenant-isolation fix in the metric
+    compiler (`packages/shared/src/metrics-compiler`) — `compileMetricQuery` compiled zero tenant
+    scoping into its SQL; never actually exploitable (every environment has only ever queried
+    `NotConfiguredWarehouseQueryExecutor`), but a real shared-BigQuery executor would have summed
+    every org/project's rows together the moment it went live. Fixed with an optional
+    `CompilerTenant` param (deliberately not a field on the HTTP-reachable `MetricQueryRequest`)
+    that `compileMetricQueryForProject` always passes now. Open, CI in progress at end of run.
+- **In progress (exact stopping point):** PR #92 and #93 both open, CI running. KAN-18's remaining
+  scope (steps 2-5 of the plan in PR #93's description: real BigQuery dataset/table actually
+  created, a `RawRecordModel`→BigQuery export job, `BigQueryWarehouseQueryExecutor` +
+  `defaultWarehouseQueryExecutor` env-driven factory swap, `dbt-transform`'s `bigquery` profile
+  target + the ~7-file DuckDB→BigQuery SQL dialect port) is fully scoped (exact file paths/line
+  numbers/interface signatures recorded in the PR #93 description and this run's agent transcript)
+  but not yet built — a substantial follow-up, easily another full PR or two.
+- **Blocked + why:** `infra/terraform/bigquery.tf` needs `terraform apply` (or the underlying
+  `bq mk` equivalent) run by a human or an explicitly-authorized session — this run's attempt to
+  provision it directly was blocked by the auto-mode safety classifier as a live-infra-creation
+  action, the same class of block hit earlier this run's vault-key-ring generation (which *was*
+  later completed once explicit authorization existed via a different natural tool). Everything
+  downstream of KAN-18 phase 1 (the BigQuery executor, the export job, dbt's BigQuery target) is
+  gated on the dataset/table actually existing, so real warehouse data is still blocked on this.
+- **Next step:** once #92/#93 are green, merge + deploy + live-verify both (win history: post a
+  win via curl with the page closed, reload, confirm it's listed; KAN-18: none of it is
+  user-visible yet — the tenant-scoping fix and terraform file are inert until an executor exists).
+  Then either continue KAN-18 phase 2 (build the executor/export/dbt-port scoped above) or move to
+  whatever session B/Yariv flags next.
+- **Waiting on human:**
+  - `terraform apply` (or equivalent) for `infra/terraform/bigquery.tf` — see Blocked above.
+  - Standing: **KAN-43** (Google Ads/Meta application submission), and a cost decision on
+    Redis/Memorystore (needs a VPC + Serverless VPC Access connector + a continuous per-instance
+    charge — deliberately not provisioned given the project's small stated budget; the in-memory
+    `MetricQueryResultCache` stand-in works fine for a single-instance deployment in the meantime).
+
+---
+
 ## 2026-08-18 — No unblocked TASKS.md work; human actively driving PRs #90-92 live (scheduled routine check, run 7)
 
 - **Last completed:**
