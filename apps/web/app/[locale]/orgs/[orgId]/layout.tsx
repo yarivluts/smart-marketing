@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
-import { Building2, FolderOpen, Home, Puzzle, ShieldCheck } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 import { can } from '@growthos/shared';
 import { AppShell, type AppShellNavItem } from '@/components/orgs/app-shell';
 import { OrgSwitcher } from '@/components/orgs/org-switcher';
@@ -44,10 +44,10 @@ export default async function OrgLayout({ children, params }: LayoutProps): Prom
   const [t, tShell] = await Promise.all([getTranslations('OrgDetailPage'), getTranslations('AppShell')]);
 
   const items: AppShellNavItem[] = [
-    { href: `/orgs/${orgId}`, label: tShell('homeLink'), icon: <Home /> },
-    { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: <FolderOpen /> },
-    ...(canViewAuditLog ? [{ href: `/orgs/${orgId}/audit-log`, label: t('auditLogLink'), icon: <ShieldCheck /> }] : []),
-    ...(canManagePlugins ? [{ href: `/orgs/${orgId}/plugins`, label: t('pluginRegistryLink'), icon: <Puzzle /> }] : []),
+    { href: `/orgs/${orgId}`, label: tShell('homeLink'), icon: 'Home' },
+    { href: `/orgs/${orgId}/resources`, label: t('resourceLibraryLink'), icon: 'FolderOpen' },
+    ...(canViewAuditLog ? [{ href: `/orgs/${orgId}/audit-log`, label: t('auditLogLink'), icon: 'ShieldCheck' as const }] : []),
+    ...(canManagePlugins ? [{ href: `/orgs/${orgId}/plugins`, label: t('pluginRegistryLink'), icon: 'Puzzle' as const }] : []),
   ];
 
   return (

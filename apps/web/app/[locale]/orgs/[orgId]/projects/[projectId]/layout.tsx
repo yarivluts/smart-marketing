@@ -1,23 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
-import {
-  Activity,
-  BarChart3,
-  Bot,
-  Database,
-  FolderOpen,
-  GitBranch,
-  Gauge,
-  KeyRound,
-  LayoutGrid,
-  Puzzle,
-  Target,
-  Trophy,
-  Tv,
-  Users,
-  Video,
-  Webhook,
-} from 'lucide-react';
 import { can } from '@growthos/shared';
 import { AppShell, type AppShellNavItem, type AppShellNavSection } from '@/components/orgs/app-shell';
 import { ProjectSwitcher } from '@/components/orgs/project-switcher';
@@ -87,39 +69,39 @@ export default async function ProjectLayout({ children, params }: LayoutProps): 
   const insightsItems: AppShellNavItem[] = [
     ...(canManageBoards
       ? [
-          { href: `${base}/boards`, label: t('projectBoardsLink'), icon: <LayoutGrid /> },
-          { href: `${base}/goals`, label: t('projectGoalsLink'), icon: <Target /> },
-          { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: <Users /> },
-          { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: <Trophy /> },
-          { href: `${base}/tv`, label: t('projectTvLink'), icon: <Tv /> },
+          { href: `${base}/boards`, label: t('projectBoardsLink'), icon: 'LayoutGrid' as const },
+          { href: `${base}/goals`, label: t('projectGoalsLink'), icon: 'Target' as const },
+          { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: 'Users' as const },
+          { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },
+          { href: `${base}/tv`, label: t('projectTvLink'), icon: 'Tv' as const },
         ]
       : []),
   ];
 
   const dataItems: AppShellNavItem[] = [
-    ...(canManageSchemas ? [{ href: `${base}/schema-defs`, label: t('projectSchemaRegistryLink'), icon: <Database /> }] : []),
-    ...(canManageMetrics ? [{ href: `${base}/metric-defs`, label: t('projectMetricRegistryLink'), icon: <BarChart3 /> }] : []),
+    ...(canManageSchemas ? [{ href: `${base}/schema-defs`, label: t('projectSchemaRegistryLink'), icon: 'Database' as const }] : []),
+    ...(canManageMetrics ? [{ href: `${base}/metric-defs`, label: t('projectMetricRegistryLink'), icon: 'BarChart3' as const }] : []),
     ...(canViewIngestHealth
       ? [
-          { href: `${base}/ingest-health`, label: t('projectIngestHealthLink'), icon: <Activity /> },
-          { href: `${base}/hooks`, label: t('projectHooksLink'), icon: <Webhook /> },
-          { href: `${base}/field-mappings`, label: t('projectFieldMappingsLink'), icon: <GitBranch /> },
+          { href: `${base}/ingest-health`, label: t('projectIngestHealthLink'), icon: 'Activity' as const },
+          { href: `${base}/hooks`, label: t('projectHooksLink'), icon: 'Webhook' as const },
+          { href: `${base}/field-mappings`, label: t('projectFieldMappingsLink'), icon: 'GitBranch' as const },
         ]
       : []),
   ];
 
   const automationItems: AppShellNavItem[] = [
-    ...(canManagePlugins ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: <Puzzle /> }] : []),
-    ...(canRunAutomation ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: <Bot /> }] : []),
+    ...(canManagePlugins ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: 'Puzzle' as const }] : []),
+    ...(canRunAutomation ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: 'Bot' as const }] : []),
   ];
 
   const settingsItems: AppShellNavItem[] = [
-    { href: `${base}/resources`, label: t('projectResourcesLink'), icon: <FolderOpen /> },
-    ...(canManageKeys ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: <KeyRound /> }] : []),
+    { href: `${base}/resources`, label: t('projectResourcesLink'), icon: 'FolderOpen' },
+    ...(canManageKeys ? [{ href: `${base}/keys`, label: t('projectKeysLink'), icon: 'KeyRound' as const }] : []),
     ...(canManageProjects
       ? [
-          { href: `${base}/cost-guardrails`, label: t('projectCostGuardrailsLink'), icon: <Gauge /> },
-          { href: `${base}/session-replay`, label: t('projectSessionReplayLink'), icon: <Video /> },
+          { href: `${base}/cost-guardrails`, label: t('projectCostGuardrailsLink'), icon: 'Gauge' as const },
+          { href: `${base}/session-replay`, label: t('projectSessionReplayLink'), icon: 'Video' as const },
         ]
       : []),
   ];

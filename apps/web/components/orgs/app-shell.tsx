@@ -1,22 +1,75 @@
 'use client';
 
-import { cloneElement, useState, type ReactElement, type ReactNode } from 'react';
-import { Menu, X } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import {
+  Activity,
+  BarChart3,
+  Bot,
+  Building2,
+  Database,
+  FolderOpen,
+  GitBranch,
+  Gauge,
+  Home,
+  KeyRound,
+  LayoutGrid,
+  Menu,
+  Puzzle,
+  ShieldCheck,
+  Target,
+  Trophy,
+  Tv,
+  Users,
+  Video,
+  Webhook,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
 
+/**
+ * Every icon a nav item can reference, keyed by name rather than passed as a
+ * component reference or a pre-rendered element. A plain function component
+ * (or an element whose `type` is one) can't cross the server->client RSC
+ * boundary — `layout.tsx` (server) building nav items with `icon: <Home />`
+ * and this ('use client') file later `cloneElement`-ing them looks fine and
+ * even passes `next dev` (what CI's e2e suite runs against), but crashes for
+ * real with React error #130 ("element type is invalid... got undefined")
+ * under an actual production build, since a bare lucide-react component has
+ * no client-reference registration for the bundler to reconstruct it from.
+ * A string key is trivially serializable, so the layouts pass one of these
+ * names and only this client file ever touches the actual icon components.
+ */
+const ICONS = {
+  Activity,
+  BarChart3,
+  Bot,
+  Building2,
+  Database,
+  FolderOpen,
+  GitBranch,
+  Gauge,
+  Home,
+  KeyRound,
+  LayoutGrid,
+  Puzzle,
+  ShieldCheck,
+  Target,
+  Trophy,
+  Tv,
+  Users,
+  Video,
+  Webhook,
+} satisfies Record<string, LucideIcon>;
+
+export type AppShellIconName = keyof typeof ICONS;
+
 export interface AppShellNavItem {
   href: string;
   label: string;
-  /**
-   * A pre-rendered icon element (e.g. `<Home aria-hidden="true" />`), not a
-   * component reference — every nav item is built in a server layout and
-   * `AppShell` is a client component, and React's server/client boundary
-   * cannot serialize a function (which a component reference is) as a prop.
-   * `NavLink`/the mobile tab bar `cloneElement` this to apply their own size.
-   */
-  icon: ReactElement<{ className?: string; 'aria-hidden'?: string }>;
+  icon: AppShellIconName;
 }
 
 export interface AppShellNavSection {
@@ -53,6 +106,7 @@ function bestMatchingHref(pathname: string, hrefs: readonly string[]): string | 
 }
 
 function NavLink({ item, active, onClick }: { item: AppShellNavItem; active: boolean; onClick?: () => void }): React.ReactElement {
+  const Icon = ICONS[item.icon];
   return (
     <Link
       href={item.href}
@@ -62,7 +116,7 @@ function NavLink({ item, active, onClick }: { item: AppShellNavItem; active: boo
         active ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-accent/10 hover:text-foreground',
       )}
     >
-      {cloneElement(item.icon, { className: 'h-4 w-4 shrink-0', 'aria-hidden': 'true' })}
+      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="truncate">{item.label}</span>
     </Link>
   );
@@ -148,6 +202,7 @@ export function AppShell({ switchers, sections, mobileTabItems, children }: AppS
       {mobileTabItems.length > 0 ? (
         <nav className="fixed inset-x-0 bottom-0 z-20 flex items-stretch justify-around border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
           {mobileTabItems.map((item) => {
+            const Icon = ICONS[item.icon];
             const active = item.href === activeHref;
             return (
               <Link
@@ -158,7 +213,7 @@ export function AppShell({ switchers, sections, mobileTabItems, children }: AppS
                   active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                {cloneElement(item.icon, { className: 'h-5 w-5', 'aria-hidden': 'true' })}
+                <Icon className="h-5 w-5" aria-hidden="true" />
                 <span className="truncate">{item.label}</span>
               </Link>
             );
