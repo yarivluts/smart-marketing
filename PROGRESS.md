@@ -17,6 +17,87 @@ Template for each entry:
 
 ---
 
+## 2026-08-18 — Intercom-style redesign + nav shell (PR #88/89), plus PRs #86/#87 finally deployed
+
+- **Last completed:**
+  - **Design system + navigation shell** (user-requested: "make it look like Intercom," then
+    "build a persistent nav shell" after confirming none existed): new blue-to-violet brand palette,
+    soft-tinted neutrals, 0.5rem→1rem radius, a diffused shadow scale, Inter typeface, gradient CTA
+    buttons, and a new `Card` primitive (`globals.css`, `tailwind.config.ts`, `button.tsx`,
+    `input.tsx`, `card.tsx` — all cascade app-wide via CSS custom properties). New `AppShell`
+    (`components/orgs/app-shell.tsx`): desktop sidebar, mobile top bar + slide-down menu + bottom tab
+    bar, wired via `ProjectLayout` (`projects/[projectId]/layout.tsx`) for ~20 project pages and a
+    new `OrgShell` component (deliberately **not** a `layout.tsx` — see below) for the 4 org-only
+    pages. PR #88, merged.
+  - **Two production-only crashes found post-merge, both fixed and live-verified (PR #89):**
+    1. React error #130 on every project page: `AppShellNavItem.icon` started as a `LucideIcon`
+       component reference (a concurrent session's earlier fix attempt changed it to a pre-rendered
+       `ReactElement` + client-side `cloneElement`) — both still crash in a real production build,
+       since a plain function component crossing the server→client RSC boundary inside a data
+       structure (not consumed opaquely as a children slot) has no client-reference registration for
+       the bundler to reconstruct it from. `next dev` (what CI's e2e suite runs against) never
+       surfaces this — only a real `next build` does, which is why CI stayed green through both
+       broken attempts. Fixed by making `icon` a string key into an `ICONS` lookup table defined
+       inside the client component — only a string ever crosses the boundary now, and the
+       `AppShellIconName` union makes regressing back a compile error.
+    2. Doubled shell on every project page (two stacked mobile headers, wrong bottom-tab-bar items):
+       `orgs/[orgId]/layout.tsx` nests around *every* descendant route including
+       `projects/[projectId]/*`, so it and `ProjectLayout` each independently rendered a full
+       `AppShell`. Fixed by deleting the org-level `layout.tsx` entirely and moving its logic to
+       `OrgShell`, a plain component the 4 org-only pages call directly (not a Next.js special file,
+       so it never auto-nests); `ProjectLayout` gained its own "Home/Resources/Audit log/Plugin
+       registry" section so project pages don't lose those links.
+    - Neither crash was catchable by `tsc`, `eslint`, or the vitest suite (all passed both broken
+      versions) — only found by deploying to web-dev and driving it with a real Playwright session
+      against the actual production build, which is what caught the crash both times. This is now
+      the second time this session a "works in dev/CI, breaks in a real prod build" class of bug
+      slipped past every automated gate — worth remembering for any future App Router/RSC work.
+  - **PR #86 (webhook/ingest/MCP connectivity) and #87 (field-mapping error surfacing)** had been
+    merged earlier but never actually deployed until this run's combined dev+prod deploy — verified
+    live just now: a real webhook endpoint's receive URL is the correct host and a POST to it returns
+    202 (was 500/localhost before).
+  - **Full live verification pass, both dev and prod, this run:** fresh signup→org→project on each;
+    confirmed login-race fix (no false "no organizations" flash), webhook delivery (202 accepted),
+    field-mappings page loads clean, and all 5 spot-checked project pages (boards/plugins/goals/
+    automation/cost-guardrails) load with no crash on both desktop and mobile viewport.
+  - **Session-B QA loop, this run:** relayed a comprehensive status reply covering all of the above,
+    plus answered two concrete questions with real code findings — the `data.export` API key scope
+    exists in `packages/shared/src/policy/api-key-scopes.ts` but has zero consumers anywhere in the
+    codebase (a placeholder, not a hidden feature); the `vault_not_configured` 500 session B hit
+    setting a Resource Library credential's secret is a real infra gap (`GROWTHOS_VAULT_KEYS` was
+    never provisioned in dev/prod, same class of issue as KAN-18) that also explains why the
+    Automation page's target "connection" dropdown never lists a real credential. Forwarded four
+    genuine product/scope questions to the account owner rather than guessing on his behalf: KAN-18
+    ETA, whether "reports" means more than live dashboards, whether the `viewer` role is meant to
+    include board-view (currently 404s, same as a non-member), and whether the win-feed needs a
+    persisted history (currently live-broadcast-only, matching the War Room TV use case).
+  - Updated the standing "GrowthOS autonomous build" cloud routine (`trig_0167iEpHg2iBmtYXXno9GEr2`)
+    to hourly/24-7 per explicit user request (was every 2h, 05:00–19:00 UTC only; 30-minute cadence
+    isn't possible, the RemoteTrigger API's minimum interval is 1 hour) and triggered an immediate run.
+- **In progress (exact stopping point):** none for this batch — PRs #86/#87/#88/#89 all merged,
+  deployed to dev+prod, and live-verified; session B replied to in full.
+- **Blocked + why:**
+  - The vault key ring (`GROWTHOS_VAULT_KEYS`) needs to be generated and stored in Secret Manager,
+    wired to all 4 Cloud Run services — auto-mode's safety classifier blocked generating the actual
+    key material directly (reasonable: raw cryptographic key generation). Flagged to the account
+    owner for an explicit go-ahead rather than working around it.
+  - The four product/scope questions listed above are the account owner's calls, not something a
+    future run should guess at.
+- **Next step:** once the account owner responds on the vault key ring, provision it (Secret Manager,
+  wired to web-dev/web-prod/api-dev/api-prod) — that unblocks real Google Ads/Meta credential storage
+  and, transitively, the Automation page's connection-binding flow session B was testing. Otherwise,
+  continue the session-B relay loop: react to whatever they report next the same way (root-cause, fix,
+  test, PR, merge, deploy dev+prod, browser-verify against the *actual deployed build* — not just
+  CI/dev mode, given today's lesson — reply).
+- **Waiting on human:**
+  - Vault key ring go-ahead (see above).
+  - The four forwarded product questions (KAN-18 ETA/BigQuery warehouse decision, reports-beyond-
+    dashboards scope, viewer-role board-visibility intent, win-feed persistence intent).
+  - Standing: **KAN-43** (Google Ads/Meta application submission) and **KAN-18** proper (Terraform
+    import/plan against real credentials, then BigQuery/Pub/Sub/Redis/staging shape decision).
+
+---
+
 ## 2026-08-18 — No unblocked TASKS.md work; PR #89 in flight from a concurrent/live session (scheduled routine check, run 5)
 
 - **Last completed:**
