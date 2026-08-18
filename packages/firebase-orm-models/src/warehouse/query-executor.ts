@@ -1,4 +1,5 @@
 import type { CompiledMetricQuery } from '@growthos/shared';
+import { BigQueryWarehouseQueryExecutor, createRealBigQueryClient } from './bigquery-query-executor';
 
 /** One result row from a compiled metric query — column names are whatever the compiled SQL's own `SELECT` aliases (`bucket_date`, requested dimensions, `period` when comparing, and one column per requested metric name). */
 export type WarehouseRow = Record<string, string | number | null>;
@@ -41,4 +42,60 @@ export class NotConfiguredWarehouseQueryExecutor implements WarehouseQueryExecut
   }
 }
 
-export const defaultWarehouseQueryExecutor: WarehouseQueryExecutor = new NotConfiguredWarehouseQueryExecutor();
+/** Which real BigQuery project/dataset/location to run compiled queries against — see {@link readWarehouseEnvConfig}. */
+export interface WarehouseEnvConfig {
+  projectId?: string;
+  dataset?: string;
+  location?: string;
+}
+
+/**
+ * Reads the BigQuery project/dataset/location a real warehouse would run
+ * against from the environment (Cloud Run env vars at deploy time, per
+ * `infra/terraform/bigquery.tf`'s `growthos_core` dataset — KAN-18 phase 2).
+ * `GOOGLE_CLOUD_PROJECT`/`GCLOUD_PROJECT` are the project id env vars the
+ * `@google-cloud/bigquery` client itself already recognizes for
+ * Application Default Credentials, reused here rather than inventing a
+ * third project-id env var; `GROWTHOS_BIGQUERY_CORE_DATASET`/
+ * `GROWTHOS_BIGQUERY_LOCATION` are new, GrowthOS-specific.
+ */
+export function readWarehouseEnvConfig(env: NodeJS.ProcessEnv = process.env): WarehouseEnvConfig {
+  return {
+    projectId: env.GOOGLE_CLOUD_PROJECT ?? env.GCLOUD_PROJECT ?? undefined,
+    dataset: env.GROWTHOS_BIGQUERY_CORE_DATASET ?? undefined,
+    location: env.GROWTHOS_BIGQUERY_LOCATION ?? undefined,
+  };
+}
+
+/**
+ * The env-driven factory behind {@link defaultWarehouseQueryExecutor}:
+ * returns a real {@link BigQueryWarehouseQueryExecutor} once a project id
+ * *and* a dataset are both configured, otherwise the same
+ * {@link NotConfiguredWarehouseQueryExecutor} every environment has used
+ * until now. Exported separately (rather than only inlined into the
+ * default) so a test can exercise the "configured" branch against a fake
+ * env object without mutating real `process.env` or needing real GCP
+ * credentials.
+ */
+export function resolveWarehouseQueryExecutorFromEnv(env: NodeJS.ProcessEnv = process.env): WarehouseQueryExecutor {
+  const config = readWarehouseEnvConfig(env);
+  if (!config.projectId || !config.dataset) {
+    return new NotConfiguredWarehouseQueryExecutor();
+  }
+  return new BigQueryWarehouseQueryExecutor({
+    client: createRealBigQueryClient(config.projectId),
+    dataset: config.dataset,
+    location: config.location,
+  });
+}
+
+/**
+ * Resolved once at module load from real `process.env` — every environment
+ * today (including CI) has no `GROWTHOS_BIGQUERY_CORE_DATASET` set, so this
+ * stays the inert {@link NotConfiguredWarehouseQueryExecutor} until KAN-18's
+ * `infra/terraform/bigquery.tf` is applied and a deploy sets the three env
+ * vars {@link readWarehouseEnvConfig} reads. Frozen at import time rather
+ * than re-read per call, matching how Cloud Run env vars are only ever set
+ * at deploy time, never mutated at runtime.
+ */
+export const defaultWarehouseQueryExecutor: WarehouseQueryExecutor = resolveWarehouseQueryExecutorFromEnv();
