@@ -863,7 +863,10 @@
     "feedConnected": "מחובר",
     "feedConnecting": "מתחבר…",
     "feedEmpty": "אין עדיין ניצחונות. הם יופיעו כאן בזמן אמת.",
-    "feedItem": "{winRuleName} — {schemaName} ({clientId})"
+    "feedItem": "{winRuleName} — {schemaName} ({clientId})",
+    "historyHeading": "היסטוריית ניצחונות",
+    "historyEmpty": "טרם נרשמו ניצחונות.",
+    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים."
   },
   "TrialPipeline": {
     "heading": "צינור ניסיונות",

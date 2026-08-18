@@ -863,7 +863,10 @@
     "feedConnected": "Connected",
     "feedConnecting": "Connecting…",
     "feedEmpty": "No wins yet. They'll appear here in real time.",
-    "feedItem": "{winRuleName} — {schemaName} ({clientId})"
+    "feedItem": "{winRuleName} — {schemaName} ({clientId})",
+    "historyHeading": "Win history",
+    "historyEmpty": "No wins recorded yet.",
+    "historyListCapNote": "Showing the most recent {count} win(s)."
   },
   "TrialPipeline": {
     "heading": "Trial pipeline",
