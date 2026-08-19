@@ -63,6 +63,73 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — CI red on main: stale dbt venv cache root-caused and fixed (PR #99)
+
+- **Last completed:** `TASKS.md` still had zero `todo` rows (same as the prior seven idle entries),
+  but before writing another idle check-in this run first re-verified CI health on `main` per the
+  routine's own checklist — and found it red. The commit at the top of `main` (`3213336`, the prior
+  run's "idle check-in (7)" log-only commit, touching only `PROGRESS.md`) had a failing CI run
+  (`lint · typecheck · test · build` job, run 32242131777): `spawnSync .../dbt-transform/.venv/bin/dbt
+  ENOENT`. Since the commit couldn't have caused a real regression, treated this as an environmental
+  CI bug per the "CI red" playbook (rule out a false failure, else root-cause) rather than a code
+  issue to blame on the diff.
+  - Root cause: `packages/dbt-transform/.venv` is cached in CI (`actions/cache@v4`) keyed only on
+    `requirements.txt`'s hash — so the cache never expires on its own. `dbt-env.mjs`'s
+    `isAlreadyProvisioned()` only checked `existsSync(venvDbt)` + a hash-matching marker file before
+    trusting the cache; neither check catches a venv whose `bin/python` symlink now points at a
+    system interpreter that no longer exists (e.g. a GitHub-hosted-runner Python patch bump between
+    the run that populated the cache and a later run) — invoking `dbt` then fails with `ENOENT`
+    because its shebang interpreter is missing, not because `dbt` itself is absent.
+  - Fix (`packages/dbt-transform/scripts/dbt-env.mjs`): `isAlreadyProvisioned()` now actually probes
+    `dbt --version` before trusting a cached venv; `provisionVenv()` now `rmSync`s the venv directory
+    before recreating it, since an in-place `python -m venv` on an existing directory doesn't
+    reliably repair broken interpreter symlinks (confirmed locally — the naive "just re-run venv
+    creation" fix left the same broken symlinks in place).
+  - Verified by reproducing the exact failure locally (provisioned a venv, then intentionally broke
+    its `bin/python*` symlinks the same way a runner-image bump would, confirmed the identical
+    `ENOENT`/"file not found" CI logs saw), then confirming the fixed script self-heals on the next
+    run while a healthy venv still takes the fast no-reprovision path. `node scripts/run-dbt.mjs
+    test` (118/118), `pnpm lint`, `pnpm typecheck`, `pnpm test` (all 11 package test tasks incl. the
+    full 23-test Playwright e2e suite), `pnpm build` all green locally before opening the PR.
+  - Branch `fix-dbt-venv-stale-cache-ci`, PR #99 opened, both CI jobs (`lint · typecheck · test ·
+    build`, `terraform fmt · validate`) green, no review comments, merged (squash) into `main` as
+    `abb6db8`. Branch delete hit the repo's known git-proxy HTTP 403 on delete-ref pushes (cosmetic
+    only, same as prior entries note). Confirmed the post-merge CI run on `main` for `abb6db8` was
+    healthy in progress before a newer commit superseded it in the same concurrency group (see next).
+  - While this was in flight, a concurrent session's run landed its own commit on `main`
+    (`2571b1e`, "KAN-18 milestone in progress via human PR #100") recording that Yariv's own
+    human-driven PR #100 (`fix/kan-18-dbt-bigquery-prod-build`) *also* independently hardened this
+    same `dbt-env.mjs` venv-repair logic (same root cause, hit while running a real
+    `dbt build --target prod`) as one of several fixes in that PR. Checked PR #100 after my merge
+    landed: its `mergeable_state` is now `dirty` (genuine conflict in `dbt-env.mjs` against the
+    now-different `main`). Did **not** touch PR #100 — it's Yariv's own PR, he's actively pushing to
+    it himself (per the prior entry, two commits ~5 minutes apart), and he'll see the conflict
+    indicator and resolve it; taking it over would step on in-progress human work. Flagging here so a
+    future run checks PR #100's state before assuming this dbt-env.mjs area is untouched.
+- **In progress (exact stopping point):** none — PR #99 is fully merged, `main`'s CI fix is live.
+  PR #100 is Yariv's own in-flight work, not this session's to drive.
+- **Blocked + why:** nothing blocking on this session's own work. `TASKS.md` still has zero `todo`
+  rows — same infra/approval gates as the prior seven idle entries.
+- **Next step:** a future run should (a) check whether PR #100 merged and, if its `dbt-env.mjs` diff
+  conflicts with or duplicates this run's fix, verify the merged result still self-heals a stale venv
+  cache (the behavior this run's fix adds shouldn't be silently dropped), (b) otherwise continue the
+  standing idle-check-in routine: re-check for new/updated PRs, re-check whether `growthos_core`
+  tables now exist in BigQuery (PR #100 suggests `dbt build --target prod` has now actually been run
+  successfully against live BigQuery — 57/57 per its description — so once #100 merges, the
+  `GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_LOCATION` env-var rollout to `web-dev`/`api-dev`
+  described in the KAN-18 entries above is likely unblocked), and (c) re-check KAN-43 approvals.
+- **Waiting on human:**
+  - PR #100 — Yariv is actively driving it; no action needed unless it goes stale or CI blocks it for
+    a reason unrelated to his own in-progress push.
+  - **KAN-43** — Google Ads dev token + Meta Marketing API application submission — still outstanding,
+    LONG LEAD.
+  - `terraform apply`/`import` for `infra/terraform/`, plus Pub/Sub, Redis, and a staging
+    environment — still outstanding.
+  - Delete the merged `fix-dbt-venv-stale-cache-ci` branch on GitHub — this environment's git proxy
+    still returns HTTP 403 on delete-ref pushes; cosmetic only.
+
+---
+
 ## 2026-08-19 — Idle check-in: no unblocked work (7)
 
 - **Last completed:** nothing new to implement this run. Re-verified against the prior idle entry:
