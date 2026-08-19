@@ -17,6 +17,71 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — KAN-18 phase 4: dbt-transform DuckDB<->BigQuery dialect port (PR #97, review + merge only)
+
+- **Last completed:**
+  - Note: this run's local checkout again started with `refs/heads/main` pointing at a stale,
+    unrelated local ref (50 commits of "no unblocked work" chore commits, no common ancestor with
+    the real `origin/main` history — the same recurring container-init artifact prior entries
+    describe). Confirmed via `git log main ^origin/main` that every one of those 50 commits was a
+    content-free `PROGRESS.md`-only append against stale state, then reset local `main` to
+    `origin/main` (`git reset --hard origin/main`) — nothing lost, purely a local-only ref.
+  - `TASKS.md` still had zero `todo` rows at pick time. Per the previous entry's own "Next step",
+    the one remaining self-contained KAN-18 slice was `dbt-transform`'s BigQuery profile target +
+    DuckDB→BigQuery SQL dialect port. Before starting it, checked GitHub for open PRs first and
+    found **PR #97** already open against `main`, from a concurrent run, implementing exactly that
+    slice — head `kan-18-dbt-bigquery-dialect-port`, `mergeable_state: clean`, both CI checks
+    (`lint · typecheck · test · build`, `terraform fmt · validate`) green.
+  - Rather than duplicate the work with a second competing PR, reviewed PR #97's full diff in place
+    of writing new code this run: a new `dbt/macros/cross_database.sql` (adapter-dispatch macros
+    for tolerant casts, dynamic-key-safe JSON field extraction, date diff/trunc, a
+    correlation-preserving integer-range join for the cohort-retention/engagement-histogram spine
+    CTEs, and a string-safe surrogate-key convention — each with a real, specific rationale in its
+    own comment, e.g. avoiding `dbt-bigquery`'s shipped `bigquery__datediff` macro because it
+    recurses into itself, verified by reading the adapter's own shipped source rather than assumed);
+    every staging/core model ported to use them; a real `prod` (type `bigquery`) output added to
+    `profiles.yml`, env-driven off the same vars `BigQueryWarehouseQueryExecutor`/
+    `BigQueryRawRecordSink` already read; `stg_raw_records` switching at compile time between the
+    DuckDB seed and a new declared `growthos_raw.raw_records` dbt source. No correctness bugs,
+    missing-test gaps, or quality issues found — the diff was careful, narrowly scoped, and each
+    dialect-divergence choice was justified inline rather than asserted. Verification was honest
+    about its own limits: `dbt build --target dev` is the real, CI-executed 118/118 pass; `dbt parse
+    --target prod` (clean manifest/macro-dispatch against the real `dbt-bigquery` adapter) is as far
+    as it goes without a live BigQuery project, and the PR says so plainly rather than overclaiming.
+  - Merged PR #97 (squash). `git push origin --delete kan-18-dbt-bigquery-dialect-port` failed with
+    the same HTTP 403 from this environment's git proxy prior entries have hit repeatedly (delete-ref
+    pushes appear blocked at the proxy level) — branch is merged and dead but not deleted on GitHub.
+  - `TASKS.md`'s KAN-18 row already carried the phase-4 update as part of PR #97 itself (the
+    concurrent run wrote it) — verified it reads correctly post-merge, no further edit needed here.
+  - Confirmed zero other open PRs remain after the merge.
+- **In progress (exact stopping point):** none — PR #97 merged, `main` is green (CI-verified before
+  merge; this run trusted that result rather than re-running the full monorepo suite locally for a
+  diff it didn't itself modify further). Every self-contained, no-live-infra-required KAN-18 slice
+  identified so far is now done.
+- **Blocked + why:** nothing new. KAN-18 itself stays `in-progress` — real completion needs a human
+  to run `terraform import`/`apply` against the live GCP project plus provision Pub/Sub, Redis, and
+  a staging env; nothing further is independently buildable/testable without those credentials.
+- **Next step:** `TASKS.md` has zero `todo` rows and no `blocked-by` items are newly unblocked. The
+  backlog (KAN-17..KAN-78) is otherwise fully `done` except KAN-18/KAN-19 (infra-gated, `in-progress`),
+  KAN-43 (`needs-human`), and KAN-50/KAN-51 (`blocked-by` KAN-43). A future run should: (a) re-check
+  for any newly opened PRs from concurrent runs and drive them to green/merge (as this run did), (b)
+  re-check whether KAN-18's terraform apply / KAN-43's API approvals have landed, unblocking
+  KAN-50/51 and the "real BigQuery project" halves of KAN-18's own phases 2-4, and (c) otherwise stay
+  idle rather than inventing speculative scope beyond the documented backlog.
+- **Waiting on human:**
+  - Delete the now-merged `kan-18-dbt-bigquery-dialect-port` branch on GitHub (proxy 403 blocks
+    branch deletion from this environment, as with every prior merged branch) — cosmetic only.
+  - `terraform apply`/`import` for `infra/terraform/` against the real GCP project, plus Pub/Sub,
+    Redis, and a staging environment — still outstanding; gates KAN-18/KAN-19 fully `done` and
+    every "inert until real infra exists" seam this and prior runs have built (BigQuery query
+    executor, raw-record sink, now the dbt BigQuery profile target).
+  - Standing: **KAN-43** (Google Ads dev token + Meta Marketing API application submission) — still
+    outstanding, LONG LEAD.
+  - Consider whether the scheduled-run cadence is producing enough concurrent runs to regularly
+    open near-duplicate PRs for the same slice (this run and PR #97's author both independently
+    picked KAN-18 phase 4 the same day) — not harmful when caught before merge (as here), but worth
+    the account owner's awareness.
+
 ## 2026-08-19 — KAN-18 phase 3: RawRecordModel → BigQuery raw_records export (PR #96)
 
 - **Last completed:**
