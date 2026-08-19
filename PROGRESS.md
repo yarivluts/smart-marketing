@@ -17,6 +17,85 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — KAN-44 audit-log coverage completed: vault secrets + resource attachments (PR #104, hardened in PR #106)
+
+- **Last completed:**
+  - **Broke the 5-run idle streak by finding real buildable work.** Runs 10-14 all concluded "no
+    unblocked task" because every `TASKS.md` row is `done`/`in-progress`/`needs-human`/`blocked-by`.
+    But `done` rows carry explicitly-documented follow-up gaps, and KAN-44's own row named two:
+    *"Vault secret set/rotate and resource-attachment approve/reject/detach are not yet wired — noted
+    as follow-up."* Both were still genuinely open (verified by grepping every `*.service.ts` for
+    `recordAuditLogEntry`), both are pure code with no live-infra dependency, and both are squarely
+    inside KAN-44's stated AC ("every config/key/role/schema change"). A story being marked `done` is
+    not the same as its AC being fully met — worth future runs checking the follow-up notes on `done`
+    rows before concluding the backlog is dry.
+  - **PR #104**: wired `recordAuditLogEntry` into `vault.service.ts` (`setSharedCredentialSecret`,
+    `rotateSharedCredentialSecretKey`) and `resource-library.service.ts`
+    (`requestResourceAttachment`/`decideResourceAttachment`/`detachResource`) — the two KAN-44
+    coverage gaps its own row named. `detachResource` had no actor parameter at all; it and the two
+    vault mutators gained a required `actorId`, plumbed from the three Next.js routes.
+  - **Race with a concurrent run: PR #104 was merged before this session's own independent review
+    agent's findings came back** — a second scheduled run of this same task picked up and merged the
+    open PR while a dedicated review subagent (spawned by this session) was still auditing the diff,
+    the same overlapping-schedule failure mode already documented in this file for KAN-20
+    (2026-07-04). The other run's own inline review was shallower and missed what the dedicated agent
+    found. Not a process failure to "fix" here — it's the known tradeoff of a short scheduling cadence
+    — but worth a human knowing it happens: **PR #104 and the concurrent run's own PROGRESS.md entry
+    both landed for the same story in the same few minutes.**
+  - **PR #106** (opened once main had already moved): fixed the 6 real issues the review agent found
+    in the already-merged PR #104, rather than losing them:
+    - `decideResourceAttachment`/`detachResource` wrote a **hardcoded `before` status literal**
+      (`'pending'`/`'approved'`) instead of the actually-captured prior value — true only because of
+      the guard immediately above each write. Since `entry_hash` commits over `before` in an
+      append-only chain, a future loosening of either guard would silently seal a false value into a
+      chain `verifyAuditLogChainForOrg` still reports valid. Fixed to capture the real value first.
+    - The new snapshot fields used **snake_case** (`has_secret`, `resource_kind`, `resource_id`),
+      the only new entries in this codebase to break the camelCase convention every one of the ~20
+      pre-existing `before`/`after` snapshots uses. Fixed before any entry could ship under the wrong
+      convention — renaming afterward would mean rewriting hash-committed history or living with two
+      conventions forever.
+    - Attachment entries recorded *which* resource but not *what access* — added `scopeSelection`
+      (the field the codebase's own `listActiveAttachmentsForProject` doc comment calls "the actual
+      access-control read") to all three attachment-lifecycle entries.
+    - Added 4 missing tests: a vault rotation guard-failure records nothing; the documented "reveal is
+      not audited" decision is now pinned by a test, not just a comment; all three routes now assert
+      the recorded `actor_id` is the *signed-in caller*, not some other id already in scope.
+  - Vault entries still carry only the *presence* of a secret (`hasSecret`, `rewrapped`) — never the
+    plaintext, ciphertext, or wrapped DEK, in any field including `summary` — since the audit log is
+    readable by every `audit.read` holder. A test asserts this against the real envelope's own fields.
+  - **Trap worth remembering:** `packages/firebase-orm-models/tsconfig.json` excludes `**/*.test.ts`
+    from typecheck. Adding a required param to a service function therefore does **not** fail
+    `pnpm typecheck` at its emulator-test call sites — they keep compiling and passing while silently
+    recording an entry with an undefined actor (the audit write fails and is swallowed by the
+    best-effort try/catch). All 16 call sites across both PRs were found by grep and updated by hand;
+    the review agent independently re-verified by type-checking with tests included. Any future run
+    adding a required param to a service in this package must do the same.
+  - No admin-surface or i18n work needed: the org audit-log page renders `action`/`summary` as data,
+    not per-action labels, so the new entries (and the new `scopeSelection` field) appear there
+    automatically.
+  - Both PRs: `pnpm lint`/`typecheck`/`test`/`build` all green locally and in CI before merge.
+    Branches merged-but-undeleted on GitHub — this sandbox's git remote rejects branch deletes with
+    an HTTP 403, the same recurring, pre-existing limitation this file has documented since 2026-07-04
+    (not new, not a permissions issue, needs a human with direct repo access to bulk-clean up someday).
+- **In progress (exact stopping point):** none — clean stopping point, `main` green at `49446f8`.
+- **Blocked + why:** unchanged. Remaining `TASKS.md` scope still needs a human's long-lead API
+  approval (KAN-43), human-provisioned deploy credentials (KAN-19), or a policy decision on
+  unattended live-BigQuery writes. Note: KAN-18's "scheduled dbt orchestration" gap closed separately
+  this same window via PR #105 (Yariv's own interactive session, Cloud Run Job + Scheduler, hourly) —
+  worth re-reading KAN-18's `TASKS.md` row fresh next run rather than trusting this entry's summary.
+- **Next step:** the same "mine the follow-up notes on `done` rows" approach has more candidates a
+  future run can pick up, all code-only and infra-free: KAN-75's `query_funnel` MCP tool (needs a
+  `fact_funnel_*` dbt model that doesn't exist yet — the largest of these); KAN-26's noted apps/api
+  404-vs-403 gap (only actionable once apps/api gains real org-scoped routes); KAN-56's unported
+  `schema_identity_fields` seed, which currently keeps the identity/attribution dbt chain disabled on
+  BigQuery. Also re-check each run: open PRs, and whether Yariv has answered the KAN-38 "Run now"
+  unattended-prod-write question from run 11 (may now be moot given PR #105's separate scheduled-
+  refresh path — worth checking whether that question is still live before re-raising it).
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-19 deploy credentials).
+
+---
+
+
 ## 2026-08-19 — KAN-44 audit-log follow-up merged (PR #104)
 
 - **Last completed:**
