@@ -35,7 +35,7 @@ cohort_assignment as (
         project_id,
         environment_id,
         customer_id,
-        date_trunc('month', min(occurred_at)) as cohort_month
+        {{ dbt.date_trunc('month', 'min(occurred_at)') }} as cohort_month
     from customer_events
     group by 1, 2, 3, 4
 ),
@@ -55,7 +55,7 @@ cohort_sizes as (
 -- activity — the boundary that determines how many periods are observable
 -- for each cohort (see the model's own doc comment above).
 project_bounds as (
-    select organization_id, project_id, environment_id, max(date_trunc('month', occurred_at)) as max_activity_month
+    select organization_id, project_id, environment_id, max({{ dbt.date_trunc('month', 'occurred_at') }}) as max_activity_month
     from customer_events
     group by 1, 2, 3
 ),
@@ -69,17 +69,17 @@ cohort_period_spine as (
         cm.project_id,
         cm.environment_id,
         cm.cohort_month,
-        gs.period_number
+        period_number
     from cohort_months cm
     inner join project_bounds pb
         on pb.organization_id = cm.organization_id
         and pb.project_id = cm.project_id
         and pb.environment_id = cm.environment_id
-    cross join generate_series(0, date_diff('month', cm.cohort_month, pb.max_activity_month)) as gs(period_number)
+    cross join {{ int_range_join(0, growthos_datediff('cm.cohort_month', 'pb.max_activity_month', 'month'), 'period_number') }}
 ),
 
 customer_activity_months as (
-    select distinct organization_id, project_id, environment_id, customer_id, date_trunc('month', occurred_at) as activity_month
+    select distinct organization_id, project_id, environment_id, customer_id, {{ dbt.date_trunc('month', 'occurred_at') }} as activity_month
     from customer_events
 ),
 
@@ -89,7 +89,7 @@ retained as (
         ca.project_id,
         ca.environment_id,
         ca.cohort_month,
-        date_diff('month', ca.cohort_month, cam.activity_month) as period_number,
+        {{ growthos_datediff('ca.cohort_month', 'cam.activity_month', 'month') }} as period_number,
         count(distinct ca.customer_id) as retained_count
     from cohort_assignment ca
     inner join customer_activity_months cam
@@ -106,10 +106,7 @@ select
     -- uniqueness key, the same "fold every column that makes a row
     -- distinct into an md5" convention `bridge_identity_key`/
     -- `attribution_key` already use.
-    md5(
-        spine.organization_id || '|' || spine.project_id || '|' || spine.environment_id || '|'
-        || spine.cohort_month || '|' || spine.period_number
-    ) as cohort_retention_key,
+    {{ surrogate_key(['spine.organization_id', 'spine.project_id', 'spine.environment_id', 'spine.cohort_month', 'spine.period_number']) }} as cohort_retention_key,
     spine.organization_id,
     spine.project_id,
     spine.environment_id,
@@ -117,7 +114,7 @@ select
     spine.period_number,
     cs.cohort_size,
     coalesce(r.retained_count, 0) as retained_count,
-    coalesce(r.retained_count, 0)::double / cs.cohort_size as retention_rate
+    cast(coalesce(r.retained_count, 0) as {{ dbt.type_float() }}) / cs.cohort_size as retention_rate
 from cohort_period_spine spine
 inner join cohort_sizes cs
     on cs.organization_id = spine.organization_id

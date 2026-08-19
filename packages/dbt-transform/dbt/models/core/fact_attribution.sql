@@ -43,9 +43,9 @@ with touchpoints as (
         environment_id,
         event_id as touchpoint_event_id,
         entity_id as anon_id,
-        coalesce(properties ->> 'channel', 'unknown') as channel_id,
-        properties ->> 'utm_campaign' as campaign_id,
-        properties ->> 'landing_page' as landing_page,
+        coalesce({{ json_text_field('properties', "'channel'") }}, 'unknown') as channel_id,
+        {{ json_text_field('properties', "'utm_campaign'") }} as campaign_id,
+        {{ json_text_field('properties', "'landing_page'") }} as landing_page,
         occurred_at
     from {{ ref('events') }}
     where event_type = 'touchpoint'
@@ -58,7 +58,7 @@ conversions as (
         environment_id,
         event_id as conversion_event_id,
         entity_id as customer_id,
-        coalesce(properties ->> 'event_name', event_type) as conversion_event,
+        coalesce({{ json_text_field('properties', "'event_name'") }}, event_type) as conversion_event,
         occurred_at
     from {{ ref('events') }}
     where event_type != 'touchpoint'
@@ -143,15 +143,26 @@ attributed as (
     from last_touch_winners
 ),
 
--- (conversion x model) pairs with no candidate touchpoint at all.
+-- (conversion x model) pairs with no candidate touchpoint at all. The two
+-- attribution model names as a portable inline row source (a bare
+-- `union all` of literal selects) rather than a `values (...) as m(model)`
+-- table-value constructor with a column-list alias — BigQuery doesn't
+-- support that alias form, but a plain `union all` compiles identically on
+-- both DuckDB and BigQuery.
+model_names as (
+    select 'first_touch' as model
+    union all
+    select 'last_touch' as model
+),
+
 unattributed as (
     select
         c.organization_id, c.project_id, c.environment_id, c.conversion_event_id,
         c.customer_id, c.conversion_event, c.occurred_at as converted_at,
-        m.model, 'unattributed' as channel_id, cast(null as varchar) as campaign_id,
-        cast(null as varchar) as landing_page
+        m.model, 'unattributed' as channel_id, cast(null as {{ dbt.type_string() }}) as campaign_id,
+        cast(null as {{ dbt.type_string() }}) as landing_page
     from conversions c
-    cross join (values ('first_touch'), ('last_touch')) as m(model)
+    cross join model_names m
     left join attributed a
         on a.conversion_event_id = c.conversion_event_id
         and a.model = m.model
@@ -168,10 +179,7 @@ select
     -- One row per (conversion_event_id, model); fold both into the key
     -- (same "everything that makes a row distinct" convention as every
     -- other core model's surrogate key here).
-    md5(
-        organization_id || '|' || project_id || '|' || environment_id || '|'
-        || conversion_event_id || '|' || model
-    ) as attribution_key,
+    {{ surrogate_key(['organization_id', 'project_id', 'environment_id', 'conversion_event_id', 'model']) }} as attribution_key,
     organization_id,
     project_id,
     environment_id,
