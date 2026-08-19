@@ -95,6 +95,21 @@ export interface MetricQueryRequest {
 export interface CompilerTenant {
   organizationId: string;
   projectId: string;
+  /**
+   * The one environment this query counts rows from, compiled as an
+   * additional `environment_id = @tenant_environment_id` predicate — every
+   * dbt-built core/fact table carries the column in its grain. Without it, a
+   * project holding both a test-mode (`gos_test_`, dev/staging) and a
+   * live-mode (`gos_live_`, prod) ingest key would blend test traffic into
+   * its production board numbers (found via session-B dogfooding QA the day
+   * the real warehouse went live, 2026-08-19). Same trusted-context-only
+   * posture as the org/project fields above: an API-key caller gets its
+   * key's own bound environment, a human-session caller gets the project's
+   * `prod` environment resolved server-side — never caller-supplied input.
+   * Optional because unit fixtures and any not-yet-migrated caller may omit
+   * it; production callers should always set it.
+   */
+  environmentId?: string;
 }
 
 /** A bind-parameter value — an array only ever backs an `in` filter's `IN UNNEST(@param)`. */

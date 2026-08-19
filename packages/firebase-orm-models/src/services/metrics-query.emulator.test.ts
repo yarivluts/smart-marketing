@@ -7,6 +7,7 @@ import {
   evolveMetricDefinition,
   getMetricCatalogDetail,
   InMemoryMetricQueryResultCache,
+  listEnvironmentsForProject,
   listMetricsCatalogForProject,
   listQueryCostLogEntriesForProject,
   ProjectQueryQuotaExceededError,
@@ -76,6 +77,47 @@ describe('queryMetrics', () => {
     expect(result.definitionRefs).toEqual({ ad_spend: 'metric:ad_spend@v1' });
     expect(result.cacheHit).toBe(false);
     expect(executor.callCount).toBe(1);
+  });
+
+  it('scopes the compiled query to the project\'s prod environment by default, and to a caller-passed environment when one is given (session-B mixing catch, 2026-08-19)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Env Scope Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const environments = await listEnvironmentsForProject(organization.id, project.id);
+    const prodEnv = environments.find((environment) => environment.name === 'prod');
+    const devEnv = environments.find((environment) => environment.name === 'dev');
+    expect(prodEnv).toBeDefined();
+    expect(devEnv).toBeDefined();
+
+    const captured: Record<string, unknown>[] = [];
+    const capturingExecutor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        captured.push(query.params);
+        return Promise.resolve([]);
+      },
+    };
+    const request = { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' as const } };
+    const cache = new InMemoryMetricQueryResultCache();
+
+    // No environmentId → the prod environment, never a blend of all three.
+    await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor: capturingExecutor, cache });
+    expect(captured[0].tenant_environment_id).toBe(prodEnv?.id);
+
+    // An explicit environmentId (an API key's own binding) wins over the default.
+    await queryMetrics({ organizationId: organization.id, projectId: project.id, environmentId: devEnv?.id, request, executor: capturingExecutor, cache });
+    expect(captured[1].tenant_environment_id).toBe(devEnv?.id);
+
+    // And the two environments' identical requests did NOT share a cache
+    // entry — the second call reached the executor rather than reading the
+    // first's cached rows (the cross-environment cache leak the key guards
+    // against).
+    expect(captured).toHaveLength(2);
   });
 
   it('serves a repeat request for the same definition versions+params from cache without re-executing', async () => {

@@ -1,5 +1,6 @@
 import { defaultWarehouseQueryExecutor, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
+import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
 
 /**
@@ -59,6 +60,8 @@ export interface SearchProjectCustomersParams {
   /** Restricts to one registered entity schema (e.g. `customer`) — omit to search across every entity kind landed for the project. */
   schemaName?: string;
   limit?: number;
+  /** The environment whose rows to search — same semantics as `QueryMetricsParams.environmentId`: an API-key caller passes its key's bound environment; omitted resolves the project's `prod` default server-side. */
+  environmentId?: string;
   /** Defaults to {@link defaultWarehouseQueryExecutor} — overridable so tests can inject a fake executor without a real warehouse, the same convention `queryMetrics` establishes. */
   executor?: WarehouseQueryExecutor;
 }
@@ -87,7 +90,7 @@ function rowToCustomerResult(row: WarehouseRow): CustomerSearchResult {
   };
 }
 
-/** `search_customers` (plan `12 §6.2`, Customer 360): substring search over the `entities` core dbt table's latest-snapshot rows. Not environment-scoped, matching `queryMetrics`'s own convention of folding every environment into one project-level query. */
+/** `search_customers` (plan `12 §6.2`, Customer 360): substring search over the `entities` core dbt table's latest-snapshot rows, environment-scoped like every other warehouse read since session-B's mixing catch (2026-08-19) — see `QueryMetricsParams.environmentId`. */
 export async function searchProjectCustomers(params: SearchProjectCustomersParams): Promise<CustomerSearchResult[]> {
   const trimmedQuery = params.query.trim();
   if (trimmedQuery.length === 0) {
@@ -95,6 +98,7 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
   }
   const limit = clampLimit(params.limit, DEFAULT_CUSTOMER_SEARCH_LIMIT, MAX_CUSTOMER_SEARCH_LIMIT);
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
+  const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
 
   const filters = ['organization_id = @organizationId', 'project_id = @projectId', '(entity_id LIKE @likeQuery OR CAST(properties AS STRING) LIKE @likeQuery)'];
   const queryParams: Record<string, string> = {
@@ -102,6 +106,10 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
     projectId: params.projectId,
     likeQuery: `%${escapeLikePattern(trimmedQuery)}%`,
   };
+  if (environmentId !== undefined) {
+    filters.push('environment_id = @environmentId');
+    queryParams.environmentId = environmentId;
+  }
   if (params.schemaName) {
     filters.push('schema_name = @schemaName');
     queryParams.schemaName = params.schemaName;
@@ -118,6 +126,8 @@ export interface QueryProjectCohortRetentionParams {
   /** Restricts to one cohort's rows (`YYYY-MM-01`, matching `fact_cohort_retention.cohort_month`'s own `date_trunc('month', ...)` grain) — omit to return every cohort's rows, newest cohort first. */
   cohortMonth?: string;
   limit?: number;
+  /** Same semantics as `SearchProjectCustomersParams.environmentId`. */
+  environmentId?: string;
   executor?: WarehouseQueryExecutor;
 }
 
@@ -146,12 +156,17 @@ function rowToCohortRetentionRow(row: WarehouseRow): CohortRetentionRow {
 export async function queryProjectCohortRetention(params: QueryProjectCohortRetentionParams): Promise<CohortRetentionRow[]> {
   const limit = clampLimit(params.limit, DEFAULT_COHORT_ROW_LIMIT, MAX_COHORT_ROW_LIMIT);
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
+  const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
 
   const filters = ['organization_id = @organizationId', 'project_id = @projectId'];
   const queryParams: Record<string, string> = {
     organizationId: params.organizationId,
     projectId: params.projectId,
   };
+  if (environmentId !== undefined) {
+    filters.push('environment_id = @environmentId');
+    queryParams.environmentId = environmentId;
+  }
   if (params.cohortMonth) {
     filters.push('cohort_month = @cohortMonth');
     queryParams.cohortMonth = params.cohortMonth;

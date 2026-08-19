@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { collectIdentifiers, parseFormula, type CompilerParamValue, type MetricQueryRequest } from '@growthos/shared';
 import type { MetricAggregationDef, MetricDefinitionKind } from '../models/metric-def.model';
 import { compileMetricQueryForProject } from './metrics-compiler.service';
+import { resolveDefaultQueryEnvironment } from './organization.service';
 import { getActiveMetricDefinition, listMetricDefinitionsForProject } from './metric-registry.service';
 import { checkProjectQueryQuota, recordQueryCostLogEntry, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { defaultMetricQueryResultCache, type MetricQueryResultCache } from '../warehouse/result-cache';
@@ -32,17 +33,33 @@ export const DEFAULT_METRIC_QUERY_CACHE_TTL_SECONDS = 60;
 function buildResultCacheKey(
   organizationId: string,
   projectId: string,
+  environmentId: string | null,
   definitionRefs: Record<string, string>,
   params: Record<string, CompilerParamValue>,
 ): string {
   const sortEntries = <T>(record: Record<string, T>) => Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
-  const canonical = JSON.stringify({ organizationId, projectId, definitionRefs: sortEntries(definitionRefs), params: sortEntries(params) });
+  // `environmentId` is included explicitly even though a resolved env also
+  // appears in `params` as `tenant_environment_id` — if any code path ever
+  // left the env unset, two different environments' queries would otherwise
+  // share one cache entry and serve each other's rows, the same
+  // cross-slice-leak reasoning as including org/project above.
+  const canonical = JSON.stringify({ organizationId, projectId, environmentId, definitionRefs: sortEntries(definitionRefs), params: sortEntries(params) });
   return createHash('sha256').update(canonical).digest('hex');
 }
 
 export interface QueryMetricsParams {
   organizationId: string;
   projectId: string;
+  /**
+   * The environment whose rows this query counts. An API-key caller passes
+   * its key's own bound environment (`ApiKeyAuthContext.environmentId` — a
+   * test-mode key sees test data, by design); when omitted, the project's
+   * `prod` environment is resolved server-side ({@link
+   * resolveDefaultQueryEnvironment}) so every human-facing surface (board
+   * tiles, goal thermometers, TV boards) counts live traffic only — never a
+   * blend of test and prod events (session-B QA, 2026-08-19).
+   */
+  environmentId?: string;
   request: MetricQueryRequest;
   /** Defaults to {@link defaultWarehouseQueryExecutor} — overridable so tests can inject a fake executor without a real warehouse. */
   executor?: WarehouseQueryExecutor;
@@ -105,13 +122,16 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
   const cache = params.cache ?? defaultMetricQueryResultCache;
   const cacheTtlSeconds = params.cacheTtlSeconds ?? DEFAULT_METRIC_QUERY_CACHE_TTL_SECONDS;
 
+  const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id ?? null;
+
   const compiled = await compileMetricQueryForProject({
     organizationId: params.organizationId,
     projectId: params.projectId,
+    ...(environmentId !== null ? { environmentId } : {}),
     request: params.request,
   });
 
-  const cacheKey = buildResultCacheKey(params.organizationId, params.projectId, compiled.definitionRefs, compiled.params);
+  const cacheKey = buildResultCacheKey(params.organizationId, params.projectId, environmentId, compiled.definitionRefs, compiled.params);
   const cached = cache.get(cacheKey);
   if (cached) {
     return { series: cached, definitionRefs: compiled.definitionRefs, cacheHit: true };

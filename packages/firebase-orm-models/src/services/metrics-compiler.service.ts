@@ -93,6 +93,8 @@ async function resolveCatalog(organizationId: string, projectId: string, names: 
 export interface CompileMetricQueryForProjectParams {
   organizationId: string;
   projectId: string;
+  /** Compiled into the tenant predicate as `environment_id = @tenant_environment_id` when set — see `CompilerTenant.environmentId`'s own doc comment. Callers that resolve an environment (`queryMetrics`) always pass it; a direct caller that omits it compiles an env-unscoped query. */
+  environmentId?: string;
   request: MetricQueryRequest;
 }
 
@@ -112,7 +114,11 @@ export async function compileMetricQueryForProject(params: CompileMetricQueryFor
   await requireProjectInOrg(params.organizationId, params.projectId);
 
   const { catalog, definitionRefs } = await resolveCatalog(params.organizationId, params.projectId, params.request.metrics);
-  const compiled = compileMetricQuery(catalog, params.request, { organizationId: params.organizationId, projectId: params.projectId });
+  const compiled = compileMetricQuery(catalog, params.request, {
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
+  });
 
   return { ...compiled, definitionRefs };
 }

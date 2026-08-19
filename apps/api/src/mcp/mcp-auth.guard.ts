@@ -35,6 +35,8 @@ export interface McpAuthContext {
   scopes?: readonly ApiKeyScope[];
   /** Set only for `principalKind: 'api_key'` — the key's own id (KAN-28), used as the audit-trail actor identifier for act tools an API key scope permits (e.g. `create_goal`/`create_segment` under `dashboards.write`), since a key has no user id of its own to attribute the action to. */
   apiKeyId?: string;
+  /** Set only for `principalKind: 'api_key'` — the key's bound environment (KAN-28), threaded into metric queries so a test-mode key reads its own test slice, never production's; an OAuth (human) caller has no bound environment and gets the server-side prod default instead (`queryMetrics`'s own resolution). */
+  environmentId?: string;
   /** Set only for `principalKind: 'oauth'` — the grant's own id (KAN-77), used as this connection's rate-limit bucket key and audit-trail "client identity" target, distinct from `userId` (the granting human, i.e. the principal). */
   grantId?: string;
   /** Set only for `principalKind: 'oauth'` — the registered `McpOAuthClientModel` id the grant was issued to (KAN-77's "client identity" AC): which third-party application this human authorized, not who authorized it. */
@@ -121,6 +123,7 @@ export class McpAuthGuard implements CanActivate {
         principalKind: 'api_key',
         scopes: apiKeyResult.value.scopes,
         apiKeyId: apiKeyResult.value.apiKey.id,
+        environmentId: apiKeyResult.value.environmentId,
       };
       this.enforceRateLimit(context, `api_key:${apiKeyResult.value.apiKey.id}`);
       return true;

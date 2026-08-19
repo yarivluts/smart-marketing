@@ -127,6 +127,10 @@ function buildLeafCte(
     params.tenant_organization_id = tenant.organizationId;
     params.tenant_project_id = tenant.projectId;
     whereClauses.push(`${quoteIdentifier('organization_id')} = @tenant_organization_id`, `${quoteIdentifier('project_id')} = @tenant_project_id`);
+    if (tenant.environmentId !== undefined) {
+      params.tenant_environment_id = tenant.environmentId;
+      whereClauses.push(`${quoteIdentifier('environment_id')} = @tenant_environment_id`);
+    }
   }
   agg.filters.forEach((filter, index) => whereClauses.push(emitFilterClause(filter, `filter_${leafName}_${index}`, params)));
   queryFilters.forEach((filter, index) => whereClauses.push(emitFilterClause(filter, `qfilter_${index}`, params)));

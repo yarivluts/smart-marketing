@@ -122,6 +122,14 @@ describe('compileMetricQuery — golden-file SQL tests', () => {
       { organizationId: 'org-1', projectId: 'project-1' },
     );
   });
+
+  it('13: a tenant with environmentId also compiles an environment_id predicate — a project holding both test- and live-mode ingest keys must never blend the two in one number', () => {
+    expectGolden(
+      '13-tenant-environment-scoped-aggregation-day',
+      { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      { organizationId: 'org-1', projectId: 'project-1', environmentId: 'env-prod-1' },
+    );
+  });
 });
 
 describe('compileMetricQuery — error handling', () => {
