@@ -1,8 +1,10 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  BigQueryRawRecordSink,
   createOrganizationWithOwner,
   createProject,
+  DualWarehouseSink,
   drainPendingPipelineMessages,
   ensureUserForFirebaseSession,
   enqueueAcceptedRecordsForPipeline,
@@ -11,6 +13,8 @@ import {
   listFailedPipelineMessagesForProject,
   listRawRecordsForBatch,
   replayFailedPipelineMessagesForProject,
+  type BigQueryInsertClient,
+  type BigQueryInsertRow,
   type PipelineRecordEnvelope,
   type WarehouseSink,
 } from '../index';
@@ -330,5 +334,93 @@ describe('KAN-34 pipeline DLQ: listFailedPipelineMessagesForProject + replayFail
     });
 
     expect(await listFailedPipelineMessagesForProject(other.organization.id, other.project.id)).toHaveLength(0);
+  });
+});
+
+describe('KAN-18 phase 3: DualWarehouseSink lands into both Firestore and BigQuery', () => {
+  function fakeBigQueryClient(): { client: BigQueryInsertClient; inserted: BigQueryInsertRow[] } {
+    const inserted: BigQueryInsertRow[] = [];
+    return {
+      inserted,
+      client: {
+        insertRows: async (_datasetId, _tableId, rows) => {
+          inserted.push(...rows);
+        },
+      },
+    };
+  }
+
+  it('lands a message into Firestore RawRecordModel and the BigQuery raw_records export in one drain', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Dual Sink Org');
+    const batchId = unique('batch');
+    const { client, inserted } = fakeBigQueryClient();
+    const dualSink = new DualWarehouseSink(
+      new FirestoreWarehouseSink(),
+      new BigQueryRawRecordSink({ client, dataset: 'growthos_raw' }),
+    );
+
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId,
+      kind: 'event',
+      records: [{ clientId: 'evt-1', schemaName: 'order_completed', payload: { net: 42 } }],
+    });
+    const result = await drainPendingPipelineMessages({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      sink: dualSink,
+    });
+
+    expect(result).toEqual({ delivered: 1, failed: 0 });
+
+    const rawRecords = await listRawRecordsForBatch(organization.id, project.id, batchId);
+    expect(rawRecords.map((r) => r.client_id)).toEqual(['evt-1']);
+
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0].insertId).toBe(rawRecords[0].id);
+    expect(inserted[0].json).toMatchObject({
+      organization_id: organization.id,
+      project_id: project.id,
+      environment_id: prodEnvironment.id,
+      batch_id: batchId,
+      client_id: 'evt-1',
+      payload: JSON.stringify({ net: 42 }),
+    });
+  });
+
+  it('marks the message failed (not delivered) when the BigQuery export leg fails, even though Firestore already landed it', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Dual Sink Failure Org');
+    const batchId = unique('batch');
+    const failingBigQuerySink: WarehouseSink = {
+      insertRawRecord: async () => {
+        throw new Error('simulated BigQuery outage');
+      },
+    };
+    const dualSink = new DualWarehouseSink(new FirestoreWarehouseSink(), failingBigQuerySink);
+
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId,
+      kind: 'event',
+      records: [{ clientId: 'evt-1', schemaName: 'order_completed', payload: {} }],
+    });
+    const result = await drainPendingPipelineMessages({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      sink: dualSink,
+    });
+
+    // Firestore's own write succeeded (it's landed and readable) — only the overall message status
+    // reflects the BigQuery leg's failure, so a later DLQ replay retries both legs (idempotently).
+    expect(result).toEqual({ delivered: 0, failed: 1 });
+    const rawRecords = await listRawRecordsForBatch(organization.id, project.id, batchId);
+    expect(rawRecords.map((r) => r.client_id)).toEqual(['evt-1']);
+    expect(await listFailedPipelineMessagesForProject(organization.id, project.id)).toHaveLength(1);
   });
 });
