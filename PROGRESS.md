@@ -17,6 +17,38 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: no unblocked work (6)
+
+- **Last completed:** nothing new to implement this run. Re-verified against the prior idle entry:
+  `git fetch origin main` — `origin/main` unchanged at `ff644c3` (same commit as idle check-in (5));
+  reset local checkout via `git checkout -B main origin/main` (same recurring detached-HEAD
+  container-init artifact prior entries describe, no work lost — local-only ref). `TASKS.md` still
+  has zero `todo` rows (KAN-18/KAN-19 `in-progress` and infra-gated, KAN-43 `needs-human`, KAN-50/51
+  still `blocked-by` KAN-43). No `GOOGLE_CLOUD_PROJECT`/`GCLOUD_PROJECT`/`*BIGQUERY*`/`*FIREBASE*`
+  env vars and no `infra/terraform/*.tfstate*`, so `GROWTHOS_BIGQUERY_CORE_DATASET`/
+  `dbt build --target prod` are still outstanding. Zero open PRs (`list_pull_requests`, state=open).
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** same as the prior five idle entries — the entire remaining backlog is either
+  `done` or gated on human action: Yariv running `dbt build --target prod` (commands already handed
+  over) plus `terraform apply`/`import`, Pub/Sub, Redis, and a staging environment for KAN-18/19;
+  Google Ads dev token + Meta Marketing API approval for KAN-43, gating KAN-50/51.
+- **Next step:** a future run should: (a) re-check for newly opened/updated PRs, (b) re-check
+  whether `growthos_core` tables now exist in BigQuery (`dbt build --target prod` succeeded) — if
+  so, set `GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_LOCATION` on `web-dev`/`api-dev` and
+  live-verify a real board tile per the KAN-18 entry's "Next step", (c) re-check whether KAN-43's
+  approvals have landed, and (d) otherwise stay idle rather than inventing speculative scope beyond
+  the documented backlog.
+- **Waiting on human:**
+  - Yariv running `dbt build --target prod` against the real BigQuery project — still outstanding.
+  - **KAN-43** — Google Ads dev token + Meta Marketing API application submission — still outstanding,
+    LONG LEAD.
+  - `terraform apply`/`import` for `infra/terraform/`, plus Pub/Sub, Redis, and a staging
+    environment — still outstanding.
+  - Delete already-merged prior branches on GitHub — this environment's git proxy still returns
+    HTTP 403 on delete-ref pushes; cosmetic only.
+
+---
+
 ## 2026-08-19 — Idle check-in: no unblocked work (5)
 
 - **Last completed:** nothing new to implement this run. Re-verified against the prior idle entry:
