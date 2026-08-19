@@ -8,6 +8,7 @@ import {
   ensureUserForFirebaseSession,
   inviteMemberToOrganization,
   acceptInvite,
+  listAuditLogEntriesForOrg,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { PUT as setSecret } from '../route';
@@ -135,5 +136,10 @@ describe('POST /api/orgs/[orgId]/resources/credentials/[credentialId]/secret/rot
     const response = await POST(request, { params });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'rotated' });
+
+    // See the sibling secret/route.test.ts's own note on why this is asserted.
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'credential.secret_rotate');
+    expect(entry?.actor_id).toBe(owner.id);
   });
 });

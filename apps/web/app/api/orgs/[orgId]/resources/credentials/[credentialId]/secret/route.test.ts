@@ -8,6 +8,7 @@ import {
   ensureUserForFirebaseSession,
   inviteMemberToOrganization,
   acceptInvite,
+  listAuditLogEntriesForOrg,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { PUT } from './route';
@@ -142,6 +143,13 @@ describe('PUT /api/orgs/[orgId]/resources/credentials/[credentialId]/secret', ()
     const response = await PUT(request, { params });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'set' });
+
+    // The audit entry must attribute this to the *signed-in caller*, not
+    // e.g. the credential's own `created_by` — that's the one thing this
+    // route actually establishes over calling the service directly.
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'credential.secret_set');
+    expect(entry?.actor_id).toBe(owner.id);
 
     const previousVaultKeys = process.env.GROWTHOS_VAULT_KEYS;
     delete process.env.GROWTHOS_VAULT_KEYS;
