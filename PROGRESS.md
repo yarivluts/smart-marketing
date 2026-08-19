@@ -17,6 +17,52 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: KAN-18 growthos_core landed in BigQuery via merged PR #102 (9)
+
+- **Last completed:** nothing new implemented this run — `TASKS.md` still has zero `todo` rows (every
+  buildable story is `done`; the rest are `in-progress`/`needs-human`/`blocked-by`). But PR #100
+  (flagged as Yariv's own in-flight work in the prior entry) is now merged to `main` as **PR #102**
+  at `7d8cd2d` — same author (`yarivluts`), same fix set, apparently re-opened/retitled along the
+  way. Confirmed via `get_workflow_run`: the merge commit message states a real `dbt build --target
+  prod` ran against the live `growthos-g2w84` project and passed **57/57**, with all 6 core tables +
+  4 staging views confirmed landed in `growthos_core` (`bq ls`), plus the three real bugs it fixed
+  (BigQuery `generate_schema_name` scattering tables across side-datasets, DuckDB-only seeds failing
+  to load on BigQuery, and the identity/attribution chain needing to be BigQuery-disabled pending the
+  unported `schema_identity_fields` seed) and a new typed `WarehouseQueryFailedError` so board
+  tiles/goal thermometers degrade per-tile on a BigQuery-side query rejection instead of crashing.
+  Zero open PRs (`list_pull_requests`, state=open). CI on `main`'s new head (`7d8cd2d`, run
+  `32256910817`) was still `in_progress` at check time (two `in_progress` checks a few minutes apart
+  both showed the same `updated_at`, i.e. genuinely still running, not a stale read) — not blocking
+  this entry since PR #102 already merged and is Yariv's own driven work, not this session's to
+  babysit; a future run should confirm it went green.
+- **In progress (exact stopping point):** none on this session's own branches.
+- **Blocked + why:** same as the prior eight idle entries, now narrower: `growthos_core` tables
+  **do** exist in BigQuery as of this run (the dbt build gate has cleared), but this sandboxed
+  session has no `gcloud`/`bq`/`terraform` CLI and no `GOOGLE_CLOUD_PROJECT`-style env vars — cannot
+  itself set `GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_LOCATION` on the `web-dev`/`api-dev`
+  Cloud Run services or redeploy them (same "this environment's safety controls block live cloud
+  infra" constraint the KAN-18 `TASKS.md` row already documents). Checked `infra/terraform/` and
+  `deploy/cloudbuild.*.yaml` for a way to land this as a code change instead — neither declares these
+  env vars today, so there's no IaC path to drive this from a diff; it's a live Cloud Run config
+  change only a human (or a session with real `gcloud` credentials) can make. Also still open:
+  `terraform apply`/`import`, Pub/Sub, Redis, staging env (KAN-18/19); Google Ads dev token + Meta
+  Marketing API approval (KAN-43, gating KAN-50/51).
+- **Next step:** a future run should (a) confirm CI on `7d8cd2d` finished green, (b) re-check whether
+  a human has set `GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_LOCATION` on `web-dev`/
+  `api-dev` yet and, if so, live-verify a real board tile end-to-end then help roll the same env vars
+  to `web-prod`/`api-prod`, and (c) re-check KAN-43 approvals. Otherwise keep the idle-check-in
+  cadence rather than inventing speculative scope.
+- **Waiting on human:**
+  - Set `GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_LOCATION` on `web-dev`/`api-dev` (Cloud
+    Run env vars) and redeploy, now that `growthos_core` is confirmed populated — this is the one
+    concrete unblocked action a human can take today to light up real board tiles on dev.
+  - **KAN-43** — Google Ads dev token + Meta Marketing API application submission — still outstanding,
+    LONG LEAD.
+  - `terraform apply`/`import` for `infra/terraform/`, plus Pub/Sub, Redis, and a staging
+    environment — still outstanding.
+
+---
+
 ## 2026-08-19 — Idle check-in: KAN-18 milestone in progress, human actively driving PR #100 (8)
 
 - **Last completed:** nothing new implemented this run — `TASKS.md` still has zero `todo` rows and
