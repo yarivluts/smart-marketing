@@ -1,6 +1,7 @@
 import { decryptSecret, encryptSecret, rotateSecretEnvelopeKey } from '../vault/envelope';
 import type { KmsProvider } from '../vault/kms-provider';
 import { SharedCredentialModel } from '../models/shared-credential.model';
+import { recordAuditLogEntry } from './audit-log.service';
 
 export class SharedCredentialNotFoundError extends Error {
   constructor() {
@@ -40,6 +41,8 @@ export interface SetSharedCredentialSecretParams {
   credentialId: string;
   secret: string;
   kms: KmsProvider;
+  /** The acting admin, recorded on the org's audit-log chain (KAN-44). */
+  actorId: string;
 }
 
 /**
@@ -52,12 +55,35 @@ export interface SetSharedCredentialSecretParams {
  */
 export async function setSharedCredentialSecret(params: SetSharedCredentialSecretParams): Promise<SharedCredentialModel> {
   const credential = await requireSharedCredentialInOrg(params.organizationId, params.credentialId);
+  const replacedExistingSecret = Boolean(credential.encrypted_secret);
   credential.encrypted_secret = await encryptSecret(
     params.secret,
     credentialBindingId(params.organizationId, params.credentialId),
     params.kms,
   );
   await credential.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'credential.secret_set',
+      targetType: 'shared_credential',
+      targetId: credential.id,
+      summary: replacedExistingSecret
+        ? `Replaced the stored secret for credential "${credential.name}"`
+        : `Set the stored secret for credential "${credential.name}"`,
+      // Only ever the *presence* of a secret, never the secret or its ciphertext:
+      // an audit trail readable by every `audit.read` holder must not become a
+      // second, weaker copy of the vault it is auditing.
+      before: { has_secret: replacedExistingSecret },
+      after: { has_secret: true },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
   return credential;
 }
 
@@ -67,7 +93,15 @@ export interface RevealSharedCredentialSecretParams {
   kms: KmsProvider;
 }
 
-/** Decrypts a credential's stored secret. Intended for server-side connector use (KAN-49/50/51), never for returning to a browser. */
+/**
+ * Decrypts a credential's stored secret. Intended for server-side connector
+ * use (KAN-49/50/51), never for returning to a browser.
+ *
+ * Deliberately not audit-logged, unlike its set/rotate siblings: KAN-44 scopes
+ * the trail to config *changes*, and this runs on every plugin sync — logging
+ * it would bury real config changes under machine traffic. Auditing secret
+ * *reads* is a separate concern needing its own retention story.
+ */
 export async function revealSharedCredentialSecret(params: RevealSharedCredentialSecretParams): Promise<string> {
   const credential = await requireSharedCredentialInOrg(params.organizationId, params.credentialId);
   if (!credential.encrypted_secret) {
@@ -80,6 +114,8 @@ export interface RotateSharedCredentialSecretKeyParams {
   organizationId: string;
   credentialId: string;
   kms: KmsProvider;
+  /** The acting admin, recorded on the org's audit-log chain (KAN-44). */
+  actorId: string;
 }
 
 /** Re-wraps a credential's stored secret under the KMS provider's current key (KAN-29 "rotation test passes" AC). A no-op — including no Firestore write — if it's already current. */
@@ -95,9 +131,32 @@ export async function rotateSharedCredentialSecretKey(
     credentialBindingId(params.organizationId, params.credentialId),
     params.kms,
   );
-  if (rotated !== credential.encrypted_secret) {
+  const rewrapped = rotated !== credential.encrypted_secret;
+  if (rewrapped) {
     credential.encrypted_secret = rotated;
     await credential.save();
   }
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'credential.secret_rotate',
+      targetType: 'shared_credential',
+      targetId: credential.id,
+      // Recorded even when the envelope was already current: an admin
+      // deliberately invoking key rotation is itself the audited event, and a
+      // silent no-op would leave "I rotated that key" unprovable. `rewrapped`
+      // is what distinguishes the two outcomes.
+      summary: rewrapped
+        ? `Rotated the envelope key for credential "${credential.name}"`
+        : `Ran key rotation for credential "${credential.name}" (already current, no re-wrap needed)`,
+      after: { rewrapped },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
   return credential;
 }

@@ -27,6 +27,7 @@ import {
   ResourceAttachmentModel,
   ResourceNotFoundError,
   setResourceAttachmentWriteTier,
+  verifyAuditLogChainForOrg,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -155,7 +156,7 @@ describe('resource attachment lifecycle: request -> approve -> detach', () => {
     // Project B's slice never includes act_aaa, and vice versa — the actual isolation property.
     expect(activeForB[0].scope_selection).not.toContain('act_aaa');
 
-    await detachResource({ organizationId: organization.id, attachmentId: requestA.id });
+    await detachResource({ organizationId: organization.id, attachmentId: requestA.id, actorId: owner.id });
 
     const activeForAAfterDetach = await listActiveAttachmentsForProject(organization.id, projectA.id);
     expect(activeForAAfterDetach).toHaveLength(0);
@@ -254,7 +255,7 @@ describe('resource attachment lifecycle: request -> approve -> detach', () => {
       requestedByUserId: owner.id,
     });
 
-    await expect(detachResource({ organizationId: organization.id, attachmentId: request.id })).rejects.toThrow(
+    await expect(detachResource({ organizationId: organization.id, attachmentId: request.id, actorId: owner.id })).rejects.toThrow(
       AttachmentNotApprovedError,
     );
   });
@@ -349,7 +350,7 @@ describe('resource attachment lifecycle: request -> approve -> detach', () => {
     ).rejects.toThrow(AttachmentNotFoundError);
 
     await expect(
-      detachResource({ organizationId: organization.id, attachmentId: 'does-not-exist' }),
+      detachResource({ organizationId: organization.id, attachmentId: 'does-not-exist', actorId: owner.id }),
     ).rejects.toThrow(AttachmentNotFoundError);
   });
 });
@@ -494,5 +495,121 @@ describe('connection write tier (KAN-74)', () => {
     await expect(
       setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: 'does-not-exist', tier: 'manage', actorId: owner.id }),
     ).rejects.toThrow(AttachmentNotFoundError);
+  });
+});
+
+/**
+ * KAN-44 AC ("every config change" is audited) for the resource-attachment
+ * lifecycle: which project holds which org credential — and who granted or
+ * revoked it — is exactly the org-level config change the audit trail exists
+ * to answer for, so every state transition must leave an entry.
+ */
+describe('resource attachment audit logging (KAN-44)', () => {
+  async function setupPendingAttachment(orgName: string) {
+    const { owner, organization } = await setupOrgWithOwner(orgName);
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Audited Meta MCC',
+      provider: 'meta_ads',
+      availableScopes: ['act_aaa', 'act_bbb'],
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Audited Project' });
+    const attachment = await requestResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      requestedByUserId: owner.id,
+      scopeSelection: ['act_aaa'],
+    });
+    return { owner, organization, credential, project, attachment };
+  }
+
+  async function entriesFor(organizationId: string, action: string) {
+    const entries = await listAuditLogEntriesForOrg(organizationId);
+    return entries.filter((entry) => entry.action === action);
+  }
+
+  it('records the attach request against the requesting user and target project', async () => {
+    const { owner, organization, credential, project, attachment } = await setupPendingAttachment('Attach Request Audit Org');
+
+    const [entry] = await entriesFor(organization.id, 'resource_attachment.request');
+    expect(entry).toBeDefined();
+    expect(entry.actor_id).toBe(owner.id);
+    expect(entry.project_id).toBe(project.id);
+    expect(entry.target_type).toBe('resource_attachment');
+    expect(entry.target_id).toBe(attachment.id);
+    expect(entry.after).toMatchObject({ status: 'pending', resource_kind: 'credential', resource_id: credential.id });
+  });
+
+  it('records an approval and a rejection as distinct actions, each with its before/after status', async () => {
+    const approved = await setupPendingAttachment('Attach Approve Audit Org');
+    await decideResourceAttachment({
+      organizationId: approved.organization.id,
+      attachmentId: approved.attachment.id,
+      decidedByUserId: approved.owner.id,
+      approve: true,
+    });
+
+    const [approveEntry] = await entriesFor(approved.organization.id, 'resource_attachment.approve');
+    expect(approveEntry).toBeDefined();
+    expect(approveEntry.actor_id).toBe(approved.owner.id);
+    expect(approveEntry.project_id).toBe(approved.project.id);
+    expect(approveEntry.before).toEqual({ status: 'pending' });
+    expect(approveEntry.after).toEqual({ status: 'approved' });
+    expect(await entriesFor(approved.organization.id, 'resource_attachment.reject')).toHaveLength(0);
+
+    const rejected = await setupPendingAttachment('Attach Reject Audit Org');
+    await decideResourceAttachment({
+      organizationId: rejected.organization.id,
+      attachmentId: rejected.attachment.id,
+      decidedByUserId: rejected.owner.id,
+      approve: false,
+    });
+
+    const [rejectEntry] = await entriesFor(rejected.organization.id, 'resource_attachment.reject');
+    expect(rejectEntry).toBeDefined();
+    expect(rejectEntry.after).toEqual({ status: 'rejected' });
+    expect(await entriesFor(rejected.organization.id, 'resource_attachment.approve')).toHaveLength(0);
+  });
+
+  it('records the detach against the revoking admin, and keeps the whole lifecycle chain verifiable', async () => {
+    const { owner, organization, project, attachment } = await setupPendingAttachment('Attach Detach Audit Org');
+    await decideResourceAttachment({
+      organizationId: organization.id,
+      attachmentId: attachment.id,
+      decidedByUserId: owner.id,
+      approve: true,
+    });
+
+    const revoker = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('revoker'),
+    });
+    await detachResource({ organizationId: organization.id, attachmentId: attachment.id, actorId: revoker.id });
+
+    const [detachEntry] = await entriesFor(organization.id, 'resource_attachment.detach');
+    expect(detachEntry).toBeDefined();
+    // The detacher is not the requester — the audit trail must attribute the
+    // revocation to whoever actually performed it.
+    expect(detachEntry.actor_id).toBe(revoker.id);
+    expect(detachEntry.project_id).toBe(project.id);
+    expect(detachEntry.before).toEqual({ status: 'approved' });
+    expect(detachEntry.after).toEqual({ status: 'detached' });
+
+    await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
+  });
+
+  it('records nothing when a transition is rejected by its own guard', async () => {
+    const { organization, attachment } = await setupPendingAttachment('Attach Guard Audit Org');
+
+    // Still `pending`, so detaching must fail — and a failed transition is not
+    // a config change to record.
+    await expect(
+      detachResource({ organizationId: organization.id, attachmentId: attachment.id, actorId: 'someone' }),
+    ).rejects.toThrow(AttachmentNotApprovedError);
+
+    expect(await entriesFor(organization.id, 'resource_attachment.detach')).toHaveLength(0);
   });
 });

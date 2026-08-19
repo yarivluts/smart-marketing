@@ -18,7 +18,7 @@ interface RouteParams {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, credentialId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'resources.manage');
+  const { user, error } = await requireOrgPermission(orgId, 'resources.manage');
   if (error) {
     return error;
   }
@@ -43,7 +43,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams): Promis
   }
 
   try {
-    await setSharedCredentialSecret({ organizationId: orgId, credentialId, secret: secret.trim(), kms });
+    await setSharedCredentialSecret({ organizationId: orgId, credentialId, secret: secret.trim(), kms, actorId: user.id });
     return NextResponse.json({ status: 'set' });
   } catch (err) {
     if (err instanceof SharedCredentialNotFoundError) {

@@ -219,6 +219,23 @@ export async function requestResourceAttachment(
   attachment.requested_at = new Date().toISOString();
   attachment.setPathParams({ organization_id: params.organizationId });
   await attachment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.requestedByUserId,
+      action: 'resource_attachment.request',
+      targetType: 'resource_attachment',
+      targetId: attachment.id,
+      summary: `Requested to attach ${params.resourceKind} "${params.resourceId}" to the project`,
+      after: { status: attachment.status, resource_kind: params.resourceKind, resource_id: params.resourceId },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
   return attachment;
 }
 
@@ -250,12 +267,34 @@ export async function decideResourceAttachment(
   attachment.decided_by = params.decidedByUserId;
   attachment.decided_at = new Date().toISOString();
   await attachment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: attachment.project_id,
+      actorType: 'user',
+      actorId: params.decidedByUserId,
+      action: params.approve ? 'resource_attachment.approve' : 'resource_attachment.reject',
+      targetType: 'resource_attachment',
+      targetId: attachment.id,
+      summary: params.approve
+        ? `Approved attaching ${attachment.resource_kind} "${attachment.resource_id}" to the project`
+        : `Rejected attaching ${attachment.resource_kind} "${attachment.resource_id}" to the project`,
+      before: { status: 'pending' },
+      after: { status: attachment.status },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
   return attachment;
 }
 
 export interface DetachResourceParams {
   organizationId: string;
   attachmentId: string;
+  /** The acting admin, recorded on the org's audit-log chain (KAN-44). */
+  actorId: string;
 }
 
 /** Revokes an approved attachment immediately (plan 08 §1.2). Kept as a `detached` row rather than deleted, for the per-project usage audit trail the plan calls for. */
@@ -268,6 +307,24 @@ export async function detachResource(params: DetachResourceParams): Promise<Reso
   attachment.status = 'detached';
   attachment.detached_at = new Date().toISOString();
   await attachment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: attachment.project_id,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'resource_attachment.detach',
+      targetType: 'resource_attachment',
+      targetId: attachment.id,
+      summary: `Detached ${attachment.resource_kind} "${attachment.resource_id}" from the project`,
+      before: { status: 'approved' },
+      after: { status: attachment.status },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
   return attachment;
 }
 

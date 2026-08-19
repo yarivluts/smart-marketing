@@ -16,7 +16,7 @@ interface RouteParams {
  */
 export async function POST(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, credentialId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'resources.manage');
+  const { user, error } = await requireOrgPermission(orgId, 'resources.manage');
   if (error) {
     return error;
   }
@@ -32,7 +32,7 @@ export async function POST(_request: NextRequest, { params }: RouteParams): Prom
   }
 
   try {
-    await rotateSharedCredentialSecretKey({ organizationId: orgId, credentialId, kms });
+    await rotateSharedCredentialSecretKey({ organizationId: orgId, credentialId, kms, actorId: user.id });
     return NextResponse.json({ status: 'rotated' });
   } catch (err) {
     if (err instanceof SharedCredentialNotFoundError) {
