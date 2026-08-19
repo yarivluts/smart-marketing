@@ -18,7 +18,7 @@ import { getActiveMetricDefinition } from './metric-registry.service';
 import { queryMetrics } from './metrics-query.service';
 import { MetricNotRegisteredError } from './metrics-compiler.service';
 import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
-import { WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import { WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import type { MetricQueryResultCache } from '../warehouse/result-cache';
 
 export class InvalidGoalError extends Error {
@@ -353,7 +353,14 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
     // unrecognized error rethrows instead of degrading into a
     // convincingly-normal-looking "couldn't load" state, see that
     // function's own doc comment for the full rationale.
-    if (error instanceof MetricCompilerError || error instanceof ProjectNotFoundError || error instanceof MetricNotRegisteredError) {
+    // Same `WarehouseQueryFailedError` degrade as `queryBoardTile` — see
+    // that error's own doc comment.
+    if (
+      error instanceof MetricCompilerError ||
+      error instanceof ProjectNotFoundError ||
+      error instanceof MetricNotRegisteredError ||
+      error instanceof WarehouseQueryFailedError
+    ) {
       return { ok: false, reason: 'query_error', message: error.message };
     }
     throw error;
