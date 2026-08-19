@@ -17,6 +17,52 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: KAN-18 milestone in progress, human actively driving PR #100 (8)
+
+- **Last completed:** nothing new implemented this run — `TASKS.md` still has zero `todo` rows and
+  `origin/main` is unchanged at `abb6db8`. But the long-awaited KAN-18 human step landed: PR #100
+  (`fix/kan-18-dbt-bigquery-prod-build`, opened directly by Yariv, `Co-Authored-By: Claude Sonnet 5`)
+  shows a real `dbt build --target prod` was run against the live `growthos-g2w84` project and
+  **passed 57/57** after three real bugs the diff fixes: (1) dbt's default `generate_schema_name`
+  scattered tables across `growthos_core_core`/`_staging`/`_seed` instead of the one `growthos_core`
+  dataset the app's `BigQueryWarehouseQueryExecutor` expects — fixed with a BigQuery-only schema-name
+  override; (2) DuckDB-only seeds (`+column_types: VARCHAR`) tried to load into BigQuery and failed —
+  now `+enabled` only on the duckdb target; (3) the identity/attribution chain
+  (`bridge_identity`/`fact_attribution`/`fact_landing_page_performance` + fixture-value tests) depends
+  on the unported `schema_identity_fields` seed and DuckDB-only SQL syntax — now explicitly
+  BigQuery-disabled with in-file rationale, portable invariant tests left enabled on both targets.
+  Also added a typed `WarehouseQueryFailedError` (BigQuery-side query rejection, e.g. table not built
+  yet, distinct from "no warehouse configured") so `queryBoardTile`/`queryGoalProgress` degrade
+  per-tile instead of crashing, wired the API controller to map it to 502, and hardened
+  `scripts/dbt-env.mjs` against a CI-cache-restored venv with a dangling `bin/python` symlink (root
+  cause of the PR's own first CI failure). Reviewed the diff: reasoning and fixes look correct and
+  well-justified, each with a real-failure doc-comment citing the 2026-08-19 `dbt build --target prod`
+  run that surfaced it. **Did not merge or push to this branch** — CI (`gh actions run 32251528012`,
+  triggered by the venv-fix commit at `fd27e71`) was still `in_progress` at check time, and the
+  push cadence (two commits ~5 minutes apart, both authored by `yarivluts`) shows Yariv is actively
+  driving this PR himself right now; taking it over or force-merging would step on in-progress human
+  work rather than help it.
+- **In progress (exact stopping point):** none on this session's own branches. PR #100 is Yariv's own
+  in-flight work, not this session's.
+- **Blocked + why:** same infra/approval gates as the prior seven idle entries — `terraform apply`/
+  `import`, Pub/Sub, Redis, staging env for KAN-18/19; Google Ads dev token + Meta Marketing API
+  approval for KAN-43, gating KAN-50/51. The `dbt build --target prod` gate itself is now clearing
+  via PR #100.
+- **Next step:** once PR #100's CI goes green and it merges (by Yariv or a future run, whichever
+  happens first), the remaining KAN-18 close-out per the prior entry's plan applies: set
+  `GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_LOCATION` on `web-dev`/`api-dev`, redeploy,
+  live-verify a real board tile against the now-populated `growthos_core` tables, then roll the same
+  env vars to `web-prod`/`api-prod`. A future run should check PR #100's merge state before repeating
+  any of this analysis.
+- **Waiting on human:**
+  - PR #100 — Yariv is actively driving it; no action needed from a future run unless it goes stale.
+  - **KAN-43** — Google Ads dev token + Meta Marketing API application submission — still outstanding,
+    LONG LEAD.
+  - `terraform apply`/`import` for `infra/terraform/`, plus Pub/Sub, Redis, and a staging
+    environment — still outstanding.
+
+---
+
 ## 2026-08-19 — Idle check-in: no unblocked work (7)
 
 - **Last completed:** nothing new to implement this run. Re-verified against the prior idle entry:
