@@ -17,6 +17,32 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: no unblocked work (3)
+
+- **Last completed:** nothing new to implement this run. Re-verified against the prior idle entry:
+  `git fetch origin main` — `origin/main` unchanged at `34d9d30`; `TASKS.md` still has zero `todo`
+  rows (KAN-18/KAN-19 `in-progress` and infra-gated, KAN-43 `needs-human`, KAN-50/51 still
+  `blocked-by` KAN-43); no `GOOGLE_CLOUD_PROJECT`/`GCLOUD_PROJECT`/`*BIGQUERY*`/`*FIREBASE*` env vars
+  and no `infra/terraform/*.tfstate*`, so the KAN-18 `terraform apply` is still outstanding. PR #98
+  (`chore/bigquery-raw-records-schema-json`) is still open, still the human account owner's own
+  manual follow-up (not an agent PR) — left untouched. No other open PRs.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** same as the prior two entries — the entire remaining backlog is either `done`
+  or gated on human action (GCP `terraform apply`/Pub/Sub/Redis/staging for KAN-18/19; Google Ads
+  dev token + Meta Marketing API approval for KAN-43, gating KAN-50/51).
+- **Next step:** a future run should: (a) re-check for newly opened/updated PRs, (b) re-check
+  whether PR #98 merged or terraform state has appeared (either would indicate KAN-18 infra
+  provisioning is progressing — worth re-checking terraform state after), (c) re-check whether
+  KAN-43's approvals have landed, and (d) otherwise stay idle rather than inventing speculative
+  scope beyond the documented backlog.
+- **Waiting on human:**
+  - `terraform apply`/`import` for `infra/terraform/` against the real GCP project, plus Pub/Sub,
+    Redis, and a staging environment — still outstanding (PR #98 suggests this may be in progress).
+  - **KAN-43** — Google Ads dev token + Meta Marketing API application submission — still outstanding,
+    LONG LEAD.
+  - Delete the already-merged `kan-18-dbt-bigquery-dialect-port` (and earlier merged) branches on
+    GitHub — this environment's git proxy still returns HTTP 403 on delete-ref pushes; cosmetic only.
+
 ## 2026-08-19 — Idle check-in: no unblocked work (2)
 
 - **Last completed:** nothing new to implement this run. Re-verified against the prior idle
