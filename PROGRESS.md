@@ -17,6 +17,32 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: no unblocked work (10)
+
+- **Last completed:** nothing new this run. Synced local `main` (a stale ref from an old
+  container snapshot) to `origin/main` at `3f8046e` (PR #103, environment-isolation fix) — no
+  content change, just fixing a divergent local branch pointer. Verified: working tree clean, zero
+  open PRs, CI green on `main`'s current head (run `32266190111`, `success`). Re-read `TASKS.md`
+  top to bottom: every KAN-17..KAN-78 story is `done` except `KAN-18`/`KAN-19` (`in-progress`,
+  remaining scope is all live-infra/human-approval-gated — scheduled dbt orchestration against
+  real BigQuery, per-environment dataset split, `estimated_cost_usd` from job stats, terraform
+  import/apply, Pub/Sub, Redis, staging env, preview/staging deploy), `KAN-43` (`needs-human`,
+  long-lead API approvals), and `KAN-50`/`KAN-51` (`blocked-by` KAN-43). No genuinely unblocked
+  buildable task exists this run.
+- **In progress (exact stopping point):** none — clean stopping point.
+- **Blocked + why:** same as the prior idle entries: the only remaining backlog scope needs either
+  a human's long-lead API approval (KAN-43) or live cloud infra actions this sandboxed session
+  cannot perform itself (this environment's safety controls block creating/mutating real cloud
+  resources directly — confirmed repeatedly in earlier entries).
+- **Next step:** next run re-checks `TASKS.md` for a newly unblocked story, checks for open PRs
+  needing review/merge, and checks whether a human has advanced KAN-18's remaining infra items
+  (scheduled dbt orchestration, dataset split, terraform reconciliation) enough to make a slice of
+  that buildable without live cloud writes.
+- **Waiting on human:** standing items only — **KAN-43** (Google Ads dev token + Meta Marketing
+  API applications, long lead) and the Redis cost decision (KAN-18 remaining scope).
+
+---
+
 ## 2026-08-19 — Environment isolation shipped: warehouse reads scoped per environment (PR #103)
 
 - **Last completed:**
