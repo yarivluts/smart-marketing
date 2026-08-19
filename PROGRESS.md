@@ -19,6 +19,10 @@ Template for each entry:
 
 ## 2026-08-19 — Idle check-in: KAN-18 growthos_core landed in BigQuery via merged PR #102 (9)
 
+> Note from the interactive session, added while resolving a same-minute journal collision: this
+> entry's "Waiting on human" items about setting the Cloud Run env vars were already DONE by the
+> interactive session before this entry landed — see the next entry down for the full state.
+
 - **Last completed:** nothing new implemented this run — `TASKS.md` still has zero `todo` rows (every
   buildable story is `done`; the rest are `in-progress`/`needs-human`/`blocked-by`). But PR #100
   (flagged as Yariv's own in-flight work in the prior entry) is now merged to `main` as **PR #102**
@@ -60,6 +64,53 @@ Template for each entry:
     LONG LEAD.
   - `terraform apply`/`import` for `infra/terraform/`, plus Pub/Sub, Redis, and a staging
     environment — still outstanding.
+---
+
+## 2026-08-19 — KAN-18 warehouse LIVE end to end: first real board tile, dev+prod rolled out
+
+- **Last completed:**
+  - **The full KAN-18 warehouse chain is live and verified on both environments.** With Yariv
+    approving commands one-by-one (auto-mode's classifier blocks an autonomous session from
+    creating/writing live cloud infra — exiting auto mode and approving per-command is the working
+    pattern): ran `dbt build --target prod` against the real `growthos-g2w84` BigQuery (57/57
+    PASS after fixing three real gaps parse-only verification missed — see PR #102), cleaned up the
+    three mislocated side-datasets the first run created, and confirmed all 6 core tables + 4
+    staging views land in `growthos_core` exactly where `BigQueryWarehouseQueryExecutor`'s
+    `defaultDataset` points.
+  - **Dual-write verified with a real event:** session B's `trial_started` test event → ingest API
+    (202) → BOTH Firestore and real `growthos_raw.raw_records` (confirmed via `bq query`, correct
+    org/project/partition) → `dbt build` folds it into `growthos_core.events` and
+    `fact_engagement_daily` (real derived row: dau=1, ratio=1.0, 2026-08-19). Root-caused the
+    initial "not landing" report: the deployed dev images predated PR #96's dual-write code —
+    env-var-only updates redeploy the SAME stale image; rebuilt both images from main first.
+  - **PR #102** (squash of the former #100, rebased): the three dbt prod-build fixes
+    (generate_schema_name override, DuckDB-only seeds/tests gated off BigQuery) + a new typed
+    `WarehouseQueryFailedError` — with the executor live, any metric naming an unbuilt mart table
+    (most of the QA org's) crashed the whole board page via a generic BigQuery error;
+    now board tiles/goal thermometers degrade per-tile and the metrics API returns 502. Full CI
+    green. (A concurrent routine's PR #99 independently fixed the same CI venv-cache issue this
+    branch had also fixed — resolved by taking #99's better version in the rebase. Also hit and
+    routed around a GitHub incident where pull_request-event CI runs were silently dropped for
+    ~an hour: a fresh branch/PR fired fine.)
+  - **First real board tile in GrowthOS history:** session B registered `dau_mau_ratio` against
+    `fact_engagement_daily`, added a big-number tile — it renders the real warehouse-computed
+    datapoint (screenshot-verified). All 3 existing boards degrade per-tile cleanly, zero crashes.
+  - **Rolled to prod:** api-prod rev 00007 + web-prod rev 00017 (fresh images from main), all four
+    BigQuery env vars (`GOOGLE_CLOUD_PROJECT`, `GROWTHOS_BIGQUERY_RAW_DATASET`,
+    `GROWTHOS_BIGQUERY_CORE_DATASET`, `GROWTHOS_BIGQUERY_LOCATION`) on all 4 services,
+    smoke-checked 200. Session B re-verifying prod now.
+- **In progress (exact stopping point):** session B's prod re-verification. dbt refresh is still a
+  manual `dbt build --target prod` run per fold-in — scheduling/orchestration against real BigQuery
+  (the KAN-38 executor still shells out to the DuckDB dev target) is the next natural KAN-18 slice.
+- **Blocked + why:** dev and prod share the single `growthos_raw`/`growthos_core` dataset pair
+  (environment split = remaining KAN-18 scope: staging env, Pub/Sub, Redis — Redis deliberately
+  parked as a human cost decision). `estimated_cost_usd` in the query cost log still null (needs
+  the executor to surface BigQuery job stats — scoped in the original investigation, not built).
+- **Next step:** orchestration against real BigQuery (scheduled dbt runs + freshness readback), or
+  whatever session B's prod verification surfaces. Then per-environment dataset split.
+- **Waiting on human:** nothing for this slice — the per-command-approval pattern covers
+  BigQuery-writing operations when Yariv is present. Standing: KAN-43 (long-lead API approvals),
+  Redis cost decision, staging-environment shape.
 
 ---
 
