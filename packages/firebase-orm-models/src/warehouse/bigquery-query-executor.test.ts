@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CompiledMetricQuery } from '@growthos/shared';
 import { BigQueryWarehouseQueryExecutor, type BigQueryQueryClient, type BigQueryQueryOptions } from './bigquery-query-executor';
+import { WarehouseQueryFailedError } from './query-executor';
 
 function fakeClient(rows: Record<string, unknown>[]): { client: BigQueryQueryClient; calls: BigQueryQueryOptions[] } {
   const calls: BigQueryQueryOptions[] = [];
@@ -77,6 +78,24 @@ describe('BigQueryWarehouseQueryExecutor', () => {
     const rows = await executor.execute(compiled);
 
     expect(rows).toEqual([{ signups: 12, channel: null }]);
+  });
+
+  it('wraps a BigQuery-side rejection (e.g. table not found) in WarehouseQueryFailedError instead of leaking a generic Error', async () => {
+    // A metric registered against a mart table dbt doesn't build is an
+    // expected runtime outcome the moment a real warehouse is configured —
+    // board tiles/goal thermometers degrade per-tile on this typed error;
+    // a generic Error would rethrow through queryBoardTile's deliberate
+    // non-blanket catch and crash the whole board page (hit for real on
+    // dev the day the executor went live, 2026-08-19).
+    const client: BigQueryQueryClient = {
+      query: async () => {
+        throw new Error('Not found: Table growthos-g2w84:growthos_core.fact_ad_spend was not found in location me-west1');
+      },
+    };
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    await expect(executor.execute(compiled)).rejects.toThrow(WarehouseQueryFailedError);
+    await expect(executor.execute(compiled)).rejects.toThrow(/Not found: Table/);
   });
 });
 

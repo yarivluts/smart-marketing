@@ -1,6 +1,6 @@
 import { BigQuery } from '@google-cloud/bigquery';
 import type { CompiledMetricQuery, CompilerParamValue } from '@growthos/shared';
-import type { WarehouseQueryExecutor, WarehouseRow } from './query-executor';
+import { WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from './query-executor';
 
 /**
  * The exact option shape this executor passes to a BigQuery query call —
@@ -69,12 +69,25 @@ export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutor {
   }
 
   async execute(query: CompiledMetricQuery): Promise<WarehouseRow[]> {
-    const [rows] = await this.client.query({
-      query: query.sql,
-      params: toBigQueryParams(query.params),
-      defaultDataset: { datasetId: this.dataset, ...(this.datasetProjectId ? { projectId: this.datasetProjectId } : {}) },
-      ...(this.location ? { location: this.location } : {}),
-    });
+    let rows: Record<string, unknown>[];
+    try {
+      [rows] = await this.client.query({
+        query: query.sql,
+        params: toBigQueryParams(query.params),
+        defaultDataset: { datasetId: this.dataset, ...(this.datasetProjectId ? { projectId: this.datasetProjectId } : {}) },
+        ...(this.location ? { location: this.location } : {}),
+      });
+    } catch (error) {
+      // Every BigQuery-side rejection (table not found, unknown column,
+      // permission, ...) surfaces as a typed error the board/goal degrade
+      // paths already know how to render per-tile — see
+      // WarehouseQueryFailedError's own doc comment. First hit for real the
+      // moment the executor went live on dev (2026-08-19): most registered
+      // metrics name mart tables dbt doesn't build yet, and each of those
+      // would otherwise crash its whole board page.
+      const message = error instanceof Error ? error.message : String(error);
+      throw new WarehouseQueryFailedError(`BigQuery rejected the compiled metric query: ${message}`, error);
+    }
     return rows.map(normalizeRow);
   }
 }

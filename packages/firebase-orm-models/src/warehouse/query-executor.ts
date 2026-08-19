@@ -23,6 +23,26 @@ export class WarehouseNotConfiguredError extends Error {
 }
 
 /**
+ * A configured warehouse REJECTED a query — table not found (a metric
+ * registered against a mart table dbt hasn't built), unknown column, a SQL
+ * error, quota/permission trouble on the BigQuery side, etc. Distinct from
+ * {@link WarehouseNotConfiguredError} ("no warehouse at all"), and typed so
+ * board tiles/goal thermometers can degrade per-tile the same way they
+ * already do for a not-configured warehouse, instead of rethrowing a
+ * generic Error that crashes the whole page. These failures depend on
+ * user-registered metric config (any project member can register a metric
+ * naming a table that doesn't exist), so they are an *expected* runtime
+ * outcome, not a code bug — the deliberate non-blanket-catch posture in
+ * `queryBoardTile` stays intact for everything else.
+ */
+export class WarehouseQueryFailedError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = 'WarehouseQueryFailedError';
+  }
+}
+
+/**
  * The default {@link WarehouseQueryExecutor} in every environment today: this
  * repo has no real BigQuery project, and — unlike the pipeline's raw-record
  * Firestore stand-in (KAN-33) — there is no meaningful Firestore stand-in to

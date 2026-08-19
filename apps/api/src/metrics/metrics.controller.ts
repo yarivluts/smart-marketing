@@ -20,6 +20,7 @@ import {
   ProjectQueryQuotaExceededError,
   queryMetrics,
   WarehouseNotConfiguredError,
+  WarehouseQueryFailedError,
 } from '@growthos/firebase-orm-models';
 import { MetricCompilerError } from '@growthos/shared';
 import { Public } from '../authz/public.decorator';
@@ -66,6 +67,13 @@ export class MetricsController {
       }
       if (error instanceof WarehouseNotConfiguredError) {
         throw new ServiceUnavailableException(error.message);
+      }
+      // 502, not 500: the warehouse itself rejected the compiled query
+      // (table not built yet, unknown column, ...) — an upstream failure the
+      // caller's own metric registration usually explains, not a bug in this
+      // API. See WarehouseQueryFailedError's doc comment.
+      if (error instanceof WarehouseQueryFailedError) {
+        throw new HttpException(error.message, HttpStatus.BAD_GATEWAY);
       }
       if (error instanceof ProjectQueryQuotaExceededError) {
         throw new HttpException(error.message, HttpStatus.TOO_MANY_REQUESTS);
