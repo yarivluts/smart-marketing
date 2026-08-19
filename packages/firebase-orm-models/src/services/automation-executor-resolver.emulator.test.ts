@@ -241,7 +241,7 @@ describe('resolveAutomationActionExecutorForTarget (KAN-72)', () => {
     });
     const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
     const kms = new LocalKmsProvider(keyRing, currentKeyId);
-    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify(VALID_GOOGLE_ADS_SECRET), kms });
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify(VALID_GOOGLE_ADS_SECRET), kms, actorId: owner.id });
 
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
@@ -380,7 +380,7 @@ describe('resolveAutomationActionExecutorForTarget (KAN-73, Meta)', () => {
     });
     const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
     const kms = new LocalKmsProvider(keyRing, currentKeyId);
-    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify(VALID_META_ADS_SECRET), kms });
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify(VALID_META_ADS_SECRET), kms, actorId: owner.id });
 
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
@@ -437,6 +437,7 @@ describe('resolveAutomationActionExecutorForTarget (KAN-73, Meta)', () => {
       credentialId: googleCredential.id,
       secret: JSON.stringify(VALID_GOOGLE_ADS_SECRET),
       kms,
+      actorId: owner.id,
     });
     const googleTarget = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
@@ -481,6 +482,7 @@ describe('resolveAutomationActionExecutorForTarget (KAN-73, Meta)', () => {
       credentialId: metaCredential.id,
       secret: JSON.stringify(VALID_META_ADS_SECRET),
       kms,
+      actorId: owner.id,
     });
     const metaTarget = await ensureAutomationTargetSeeded({
       organizationId: organization.id,

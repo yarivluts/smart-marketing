@@ -58,6 +58,7 @@ async function setupInstalledStripePlugin(orgName: string) {
     credentialId: credential.id,
     secret: JSON.stringify({ apiSecretKey: 'sk_test_route', webhookSigningSecret: WEBHOOK_SECRET }),
     kms,
+    actorId: owner.id,
   });
   const attachment = await requestResourceAttachment({
     organizationId: organization.id,

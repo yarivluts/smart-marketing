@@ -50,13 +50,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
 /** Revokes an approved attachment immediately — requires `resources.manage`. */
 export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, attachmentId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'resources.manage');
+  const { user, error } = await requireOrgPermission(orgId, 'resources.manage');
   if (error) {
     return error;
   }
 
   try {
-    await detachResource({ organizationId: orgId, attachmentId });
+    await detachResource({ organizationId: orgId, attachmentId, actorId: user.id });
     return NextResponse.json({ status: 'detached' });
   } catch (err) {
     if (err instanceof AttachmentNotFoundError) {

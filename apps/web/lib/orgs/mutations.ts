@@ -213,6 +213,7 @@ interface SetSharedCredentialSecretInput {
   credentialId: string;
   secret: string;
   kms: KmsProvider;
+  actorId: string;
 }
 
 export async function setSharedCredentialSecret(input: SetSharedCredentialSecretInput): Promise<SharedCredentialModel> {
@@ -224,6 +225,7 @@ interface RotateSharedCredentialSecretKeyInput {
   organizationId: string;
   credentialId: string;
   kms: KmsProvider;
+  actorId: string;
 }
 
 export async function rotateSharedCredentialSecretKey(
@@ -293,6 +295,7 @@ export async function decideResourceAttachment(
 interface DetachResourceInput {
   organizationId: string;
   attachmentId: string;
+  actorId: string;
 }
 
 export async function detachResource(input: DetachResourceInput): Promise<ResourceAttachmentModel> {

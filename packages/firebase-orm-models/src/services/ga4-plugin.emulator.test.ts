@@ -80,7 +80,7 @@ async function setupInstalledGa4Plugin(orgName: string, secret: { accessToken: s
     availableScopes: ['property'],
     createdByUserId: owner.id,
   });
-  await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify(secret), kms });
+  await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify(secret), kms, actorId: owner.id });
 
   const attachment = await requestResourceAttachment({
     organizationId: organization.id,
