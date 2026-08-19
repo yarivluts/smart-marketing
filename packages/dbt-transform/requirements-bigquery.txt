@@ -1,0 +1,14 @@
+# The BigQuery adapter (KAN-18 phase 4) — deliberately NOT part of
+# requirements.txt: that file provisions the shared venv `pnpm build`/
+# `pnpm test` use for every run (including CI), and dbt-bigquery pulls in a
+# large, GCP-specific dependency tree (google-cloud-bigquery, grpc,
+# pandas-gbq, ...) that only matters once the `prod` target in
+# dbt/profiles.yml is actually used. Install this on top of the existing
+# venv only when you need to run `dbt build --target prod` (or `dbt debug
+# --target prod`) against a real GCP project:
+#
+#   .venv/bin/pip install -r requirements-bigquery.txt
+#
+# Pinned to the same 1.11.x line as `dbt-core` in requirements.txt —
+# dbt adapter packages must match their dbt-core minor version.
+dbt-bigquery==1.11.3

@@ -12,7 +12,7 @@ select
     -- late still buckets by when the event actually happened. Falls back to
     -- `landed_at` for payloads that don't carry a `ts` field.
     coalesce(
-        try_cast(payload ->> 'ts' as timestamp),
+        {{ growthos_try_cast(json_text_field('payload', "'ts'"), dbt.type_timestamp()) }},
         landed_at
     ) as occurred_at
 from {{ ref('stg_raw_records') }}

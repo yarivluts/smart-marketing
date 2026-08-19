@@ -1,0 +1,21 @@
+version: 2
+
+sources:
+  - name: growthos_raw
+    description: >
+      The real, partitioned BigQuery raw ingest landing zone
+      (`infra/terraform/bigquery.tf`'s `growthos_raw` dataset, KAN-18 phase
+      1), streamed into by `BigQueryRawRecordSink` (KAN-18 phase 3). Only
+      resolved against the `bigquery` target (`profiles.yml`) —
+      `stg_raw_records` reads the `raw_records` seed fixture instead on the
+      DuckDB dev target this project's CI actually builds against.
+    database: "{{ target.database }}"
+    schema: "{{ env_var('GROWTHOS_BIGQUERY_RAW_DATASET', 'growthos_raw') }}"
+    tables:
+      - name: raw_records
+        description: >
+          One row per landed raw record, partitioned by `partition_date` and
+          clustered by `organization_id`/`project_id`/`environment_id` — see
+          `infra/terraform/bigquery.tf`'s own field-by-field schema, itself a
+          BigQuery mirror of `RawRecordModel`
+          (packages/firebase-orm-models).

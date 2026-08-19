@@ -52,9 +52,9 @@ with landings as (
         project_id,
         environment_id,
         cast(occurred_at as date) as activity_date,
-        coalesce(properties ->> 'landing_page', '(unknown)') as landing_page,
-        coalesce(properties ->> 'utm_campaign', '(none)') as campaign_id,
-        coalesce(properties ->> 'channel', 'unknown') as channel_id,
+        coalesce({{ json_text_field('properties', "'landing_page'") }}, '(unknown)') as landing_page,
+        coalesce({{ json_text_field('properties', "'utm_campaign'") }}, '(none)') as campaign_id,
+        coalesce({{ json_text_field('properties', "'channel'") }}, 'unknown') as channel_id,
         entity_id as anon_id
     from {{ ref('events') }}
     where event_type = 'touchpoint'
@@ -95,15 +95,15 @@ conversions as (
 )
 
 select
-    md5(
-        coalesce(v.organization_id, c.organization_id) || '|'
-        || coalesce(v.project_id, c.project_id) || '|'
-        || coalesce(v.environment_id, c.environment_id) || '|'
-        || cast(coalesce(v.activity_date, c.activity_date) as varchar) || '|'
-        || coalesce(v.landing_page, c.landing_page) || '|'
-        || coalesce(v.campaign_id, c.campaign_id) || '|'
-        || coalesce(v.channel_id, c.channel_id)
-    ) as landing_page_performance_key,
+    {{ surrogate_key([
+        'coalesce(v.organization_id, c.organization_id)',
+        'coalesce(v.project_id, c.project_id)',
+        'coalesce(v.environment_id, c.environment_id)',
+        'coalesce(v.activity_date, c.activity_date)',
+        'coalesce(v.landing_page, c.landing_page)',
+        'coalesce(v.campaign_id, c.campaign_id)',
+        'coalesce(v.channel_id, c.channel_id)'
+    ]) }} as landing_page_performance_key,
     coalesce(v.organization_id, c.organization_id) as organization_id,
     coalesce(v.project_id, c.project_id) as project_id,
     coalesce(v.environment_id, c.environment_id) as environment_id,

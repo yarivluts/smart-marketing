@@ -27,7 +27,7 @@
 -- without a further axis to cross against.
 
 with customer_events as (
-    select organization_id, project_id, environment_id, entity_id as customer_id, date_trunc('day', occurred_at) as activity_date
+    select organization_id, project_id, environment_id, entity_id as customer_id, {{ dbt.date_trunc('day', 'occurred_at') }} as activity_date
     from {{ ref('events') }}
     where event_type != 'touchpoint'
 ),
@@ -64,7 +64,7 @@ rolling_active as (
         on a.organization_id = d.organization_id
         and a.project_id = d.project_id
         and a.environment_id = d.environment_id
-        and date_diff('day', a.activity_date, d.activity_date) between 0 and {{ var('engagement_window_days', 28) - 1 }}
+        and {{ growthos_datediff('a.activity_date', 'd.activity_date', 'day') }} between 0 and {{ var('engagement_window_days', 28) - 1 }}
     group by 1, 2, 3, 4
 )
 
@@ -72,9 +72,7 @@ select
     -- Composite (project_id, environment_id, activity_date) uniqueness key,
     -- the same "fold every column that makes a row distinct into an md5"
     -- convention `cohort_retention_key`/`attribution_key` already use.
-    md5(
-        daily.organization_id || '|' || daily.project_id || '|' || daily.environment_id || '|' || daily.activity_date
-    ) as engagement_daily_key,
+    {{ surrogate_key(['daily.organization_id', 'daily.project_id', 'daily.environment_id', 'daily.activity_date']) }} as engagement_daily_key,
     daily.organization_id,
     daily.project_id,
     daily.environment_id,
@@ -86,7 +84,7 @@ select
     -- itself in range), so it's always >= dau >= 1 for every row this model
     -- emits — the same "denominator can't be zero by construction" reasoning
     -- `fact_cohort_retention.retention_rate` relies on for its own division.
-    daily.dau::double / rolling.active_customers_l_n as dau_mau_ratio
+    cast(daily.dau as {{ dbt.type_float() }}) / rolling.active_customers_l_n as dau_mau_ratio
 from daily_active daily
 inner join rolling_active rolling
     on rolling.organization_id = daily.organization_id

@@ -21,7 +21,7 @@
 -- projecting speculative future rows.
 
 with customer_events as (
-    select organization_id, project_id, environment_id, entity_id as customer_id, date_trunc('day', occurred_at) as activity_date
+    select organization_id, project_id, environment_id, entity_id as customer_id, {{ dbt.date_trunc('day', 'occurred_at') }} as activity_date
     from {{ ref('events') }}
     where event_type != 'touchpoint'
 ),
@@ -53,14 +53,14 @@ customer_days_active_in_window as (
         on cad.organization_id = pb.organization_id
         and cad.project_id = pb.project_id
         and cad.environment_id = pb.environment_id
-        and date_diff('day', cad.activity_date, pb.as_of_date) between 0 and {{ var('engagement_window_days', 28) - 1 }}
+        and {{ growthos_datediff('cad.activity_date', 'pb.as_of_date', 'day') }} between 0 and {{ var('engagement_window_days', 28) - 1 }}
     group by 1, 2, 3, 4
 ),
 
 bucket_spine as (
-    select pb.organization_id, pb.project_id, pb.environment_id, pb.as_of_date, gs.days_active_bucket
+    select pb.organization_id, pb.project_id, pb.environment_id, pb.as_of_date, days_active_bucket
     from project_bounds pb
-    cross join generate_series(1, {{ var('engagement_window_days', 28) }}) as gs(days_active_bucket)
+    cross join {{ int_range_join(1, var('engagement_window_days', 28), 'days_active_bucket') }}
 ),
 
 histogram as (
@@ -72,10 +72,7 @@ histogram as (
 select
     -- Composite (project_id, environment_id, as_of_date, days_active_bucket)
     -- uniqueness key, the same convention `cohort_retention_key` establishes.
-    md5(
-        spine.organization_id || '|' || spine.project_id || '|' || spine.environment_id || '|'
-        || spine.as_of_date || '|' || spine.days_active_bucket
-    ) as engagement_depth_histogram_key,
+    {{ surrogate_key(['spine.organization_id', 'spine.project_id', 'spine.environment_id', 'spine.as_of_date', 'spine.days_active_bucket']) }} as engagement_depth_histogram_key,
     spine.organization_id,
     spine.project_id,
     spine.environment_id,

@@ -20,15 +20,15 @@ select
     -- applied generically here since an identity key can be registered on
     -- any kind, not just events.
     coalesce(
-        try_cast(r.payload ->> 'ts' as timestamp),
+        {{ growthos_try_cast(json_text_field('r.payload', "'ts'"), dbt.type_timestamp()) }},
         r.landed_at
     ) as observed_at,
     f.field_name,
-    json_extract_string(r.payload, '$.' || f.field_name) as field_value
+    {{ json_text_field('r.payload', 'f.field_name') }} as field_value
 from {{ ref('stg_raw_records') }} r
 inner join {{ ref('schema_identity_fields') }} f
     on r.organization_id = f.organization_id
     and r.project_id = f.project_id
     and r.kind = f.kind
     and r.schema_name = f.schema_name
-where json_extract_string(r.payload, '$.' || f.field_name) is not null
+where {{ json_text_field('r.payload', 'f.field_name') }} is not null

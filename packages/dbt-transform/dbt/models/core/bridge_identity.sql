@@ -173,7 +173,7 @@ select
     -- Deterministic surrogate key, one row per resolved anon_id (same
     -- "fold every column that makes a row distinct into an md5" convention
     -- `stg_raw_records.raw_record_key` already establishes).
-    md5(organization_id || '|' || project_id || '|' || environment_id || '|' || anon_id) as bridge_identity_key,
+    {{ surrogate_key(['organization_id', 'project_id', 'environment_id', 'anon_id']) }} as bridge_identity_key,
     organization_id,
     project_id,
     environment_id,

@@ -2,16 +2,29 @@
 # codebase's provider-agnostic seams — LocalKmsProvider, InMemoryTokenBucketRateLimiter,
 # NotConfiguredWarehouseQueryExecutor): dbt-duckdb runs this project against a local,
 # file-based DuckDB database seeded from a fixture "test dataset" (seeds/raw_records.csv),
-# so `dbt build` is real and green in CI without a live BigQuery project.
-#
-# Once KAN-18 provisions a real GCP project and KAN-33's Firestore raw_records stand-in
-# is replaced by an actual partitioned BigQuery table, add a `prod` output here (type:
-# bigquery) pointed at it — nothing else in this project (models/tests/seeds) needs to
-# change, since dbt compiles the same SQL against either adapter.
+# so `dbt build` is real and green in CI without a live BigQuery project. `dev` (DuckDB)
+# stays the default target CI actually builds against; `prod` (below) is the real
+# BigQuery leg (KAN-18 phase 4) — every model/macro compiles unchanged against either
+# adapter (see macros/cross_database.sql), but `prod` itself is inert until a human
+# provisions the real project (still `needs-human`) and points these env vars at it; it
+# has not been run against a live BigQuery project.
 growthos_transform:
   target: dev
   outputs:
     dev:
       type: duckdb
       path: 'target/growthos_transform.duckdb'
+      threads: 4
+    prod:
+      type: bigquery
+      method: oauth
+      # Same project-id env vars `@google-cloud/bigquery`/this repo's own
+      # BigQueryWarehouseQueryExecutor already read (packages/firebase-orm-models/src/
+      # warehouse/query-executor.ts) — one project id, recognized either way.
+      project: "{{ env_var('GOOGLE_CLOUD_PROJECT', env_var('GCLOUD_PROJECT', '')) }}"
+      # The `growthos_core` dataset (infra/terraform/bigquery.tf) this project's own
+      # `core`-schema models (entities/events/measures/bridge_identity/fact_*) write
+      # into — same env var the query executor reads.
+      dataset: "{{ env_var('GROWTHOS_BIGQUERY_CORE_DATASET', 'growthos_core') }}"
+      location: "{{ env_var('GROWTHOS_BIGQUERY_LOCATION', 'US') }}"
       threads: 4
