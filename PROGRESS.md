@@ -17,6 +17,33 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: no unblocked work
+
+- **Last completed:** nothing new to implement this run. Verified current state against the prior
+  entry's own "next step": `git fetch origin main` — `origin/main` unchanged at `980564a` (the PR #97
+  merge commit); zero open PRs (`list_pull_requests` state=open, repo-wide); `TASKS.md` still has zero
+  `todo` rows, KAN-18/KAN-19 still `in-progress` (infra-gated), KAN-43 still `needs-human`, KAN-50/51
+  still `blocked-by` KAN-43. Checked for signs the human-gated infra had landed since the last run —
+  no `GOOGLE_CLOUD_PROJECT`/`GCLOUD_PROJECT`/`*BIGQUERY*`/`*FIREBASE*` env vars set, and no
+  `infra/terraform/*.tfstate*` present — so the `terraform import`/`apply` step is still outstanding.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** same as the prior entry — the entire remaining backlog is either fully `done`
+  or gated on human action (GCP `terraform apply`/Pub/Sub/Redis/staging provisioning for KAN-18/19;
+  Google Ads dev token + Meta Marketing API approval for KAN-43, which in turn blocks KAN-50/51).
+  Per CLAUDE.md/the prior entry's guidance, staying idle rather than inventing speculative scope
+  beyond the documented backlog.
+- **Next step:** a future run should: (a) re-check for newly opened PRs from concurrent runs, (b)
+  re-check whether KAN-18's terraform apply or KAN-43's API approvals have landed (unblocking
+  KAN-50/51 and the "real BigQuery project" halves of KAN-18's phases 2-4), and (c) otherwise stay
+  idle.
+- **Waiting on human:**
+  - `terraform apply`/`import` for `infra/terraform/` against the real GCP project, plus Pub/Sub,
+    Redis, and a staging environment — still outstanding.
+  - **KAN-43** — Google Ads dev token + Meta Marketing API application submission — still outstanding,
+    LONG LEAD.
+  - Delete the already-merged `kan-18-dbt-bigquery-dialect-port` (and earlier merged) branches on
+    GitHub — this environment's git proxy still returns HTTP 403 on delete-ref pushes; cosmetic only.
+
 ## 2026-08-19 — KAN-18 phase 4: dbt-transform DuckDB<->BigQuery dialect port (PR #97, review + merge only)
 
 - **Last completed:**
