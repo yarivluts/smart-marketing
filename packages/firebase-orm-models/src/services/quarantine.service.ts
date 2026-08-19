@@ -76,7 +76,7 @@ export async function replayQuarantinedRecord(
   if (reasons.length === 0) {
     const schemaDef = await getActiveSchemaDefinition(organizationId, projectId, record.kind, record.schema_name);
     reasons = schemaDef
-      ? validateAgainstSchema(fieldsToValidate, schemaDef.field_defs)
+      ? validateAgainstSchema(fieldsToValidate, schemaDef.field_defs, record.kind)
       : [`schema_not_registered:${record.schema_name}`];
   }
 
