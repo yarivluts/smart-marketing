@@ -17,6 +17,31 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: no unblocked work (14)
+
+- **Last completed:** nothing new this run. Verified: zero open PRs (`list_pull_requests`,
+  state=open), CI green on `main`'s current head (`bd06b2b`, run 13's own idle-check-in commit —
+  `actions_list`/`list_workflow_runs` confirms `completed`/`success`). `TASKS.md` re-read top to
+  bottom: byte-identical to runs 11-13 — every KAN-17..KAN-78 story `done` except `KAN-18`/`KAN-19`
+  (`in-progress`, remaining scope is live-infra/human-approval-gated), `KAN-43` (`needs-human`),
+  `KAN-50`/`KAN-51` (`blocked-by` KAN-43). No newly unblocked `todo` row exists. `git log origin/main`
+  shows no commits from Yariv since `3f8046e` (14:47 UTC) other than this run's own predecessors'
+  idle-check-in commits — the KAN-38 orchestration-executor policy question raised in run 11 (should
+  "Run now" trigger a real unattended `dbt build --target prod`, or stay read-only?) is **still
+  unanswered**. Not re-litigating it or picking a default unilaterally.
+- **In progress (exact stopping point):** none — clean stopping point.
+- **Blocked + why:** unchanged from runs 11-13 — remaining backlog scope needs a human's long-lead
+  API approval (KAN-43), human-provisioned deploy credentials (KAN-19), or a human policy decision
+  on unattended live-BigQuery writes (KAN-18/KAN-38 orchestration-executor question).
+- **Next step:** next run re-checks for open PRs / a newly unblocked `TASKS.md` story, and checks
+  whether Yariv has weighed in on the KAN-38 orchestration-executor question. If not, keep doing
+  idle check-ins rather than guessing at a live-infra-write policy unilaterally.
+- **Waiting on human:** standing items (KAN-43 long-lead approvals; KAN-19 deploy credentials;
+  Redis cost decision) plus the still-open KAN-38 "Run now" unattended-prod-write policy question
+  from run 11.
+
+---
+
 ## 2026-08-19 — Idle check-in: no unblocked work (13)
 
 - **Last completed:** nothing new this run. Verified: zero open PRs (`list_pull_requests`,
