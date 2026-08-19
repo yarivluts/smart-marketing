@@ -17,6 +17,36 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: no unblocked work (12)
+
+- **Last completed:** nothing new this run. Re-synced local `main` to `origin/main` at `ecb6365`
+  (the prior run's own idle-check-in commit) after another stale-local-ref artifact (same shallow-
+  clone-boundary situation run 11 diagnosed — `git reset --hard origin/main` after confirming via
+  `git ls-remote`/CI history that `origin/main` itself hadn't moved unexpectedly). Verified: zero
+  open PRs (`list_pull_requests`, state=open), CI green on `main`'s current head (run `32281433774`,
+  `ecb6365`, `success`). Re-read `TASKS.md` top to bottom: state is byte-identical to run 11 — every
+  KAN-17..KAN-78 story `done` except `KAN-18`/`KAN-19` (`in-progress`, remaining scope is all live-
+  infra/human-approval-gated), `KAN-43` (`needs-human`), `KAN-50`/`KAN-51` (`blocked-by` KAN-43). No
+  newly unblocked `todo` row exists. The dozens of stale un-deleted branches on `origin` (merged PRs
+  whose branch-delete calls hit this sandbox's recurring git-remote 403) are unchanged noise, not new
+  work — left alone per the standing note in earlier entries.
+  - The KAN-38 orchestration-executor question raised in run 11 (should "Run now" trigger a real
+    unattended `dbt build --target prod`, or stay read-only?) has **not** been answered yet — no new
+    commits, PR comments, or PROGRESS entries from a human since run 11 wrote it. Not re-litigating
+    it or picking a default unilaterally; still a live ask.
+- **In progress (exact stopping point):** none — clean stopping point.
+- **Blocked + why:** unchanged from run 11 — remaining backlog scope needs a human's long-lead API
+  approval (KAN-43), human-provisioned deploy credentials (KAN-19), or a human policy decision on
+  unattended live-BigQuery writes (KAN-18/KAN-38 orchestration-executor question).
+- **Next step:** next run re-checks for open PRs / a newly unblocked `TASKS.md` story, and checks
+  whether Yariv has weighed in on the KAN-38 orchestration-executor question. If not, keep doing
+  idle check-ins rather than guessing at a live-infra-write policy unilaterally.
+- **Waiting on human:** standing items (KAN-43 long-lead approvals; KAN-19 deploy credentials;
+  Redis cost decision) plus the still-open KAN-38 "Run now" unattended-prod-write policy question
+  from run 11.
+
+---
+
 ## 2026-08-19 — Idle check-in: no unblocked work (11)
 
 - **Last completed:** nothing new this run. First fixed a local-clone artifact: this container's
