@@ -1,3 +1,10 @@
+-- BigQuery-disabled (KAN-18 follow-up): this model transitively depends on
+-- the `schema_identity_fields` seed, a DuckDB-only fixture whose real
+-- warehouse export (SchemaDefModel.field_defs where is_identity_key) has
+-- not been built yet -- see dbt_project.yml's seeds.+enabled note. Until
+-- that export exists, the whole identity/attribution chain (this model and
+-- everything downstream of it) builds only against the DuckDB dev target.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- One row per (raw_record_key, field_name) where the record's project has
 -- registered `field_name` as an identity key for that (kind, schema_name)
 -- (plan `08 §1`: "any event can carry one or more identity keys ... the

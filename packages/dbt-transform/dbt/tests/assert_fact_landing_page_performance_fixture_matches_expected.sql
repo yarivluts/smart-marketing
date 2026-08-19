@@ -1,3 +1,6 @@
+-- BigQuery-disabled alongside the identity/attribution chain it tests --
+-- see stg_identity_key_observations.sql's own config comment.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. `seeds/raw_records.csv`
 -- carries a hand-built landing-page test under `proj_11`, all on
 -- 2026-05-01 — the exact shape the feature exists to answer ("two pages,

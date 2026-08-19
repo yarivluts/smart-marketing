@@ -13,7 +13,7 @@ import { recordAuditLogEntry } from './audit-log.service';
 import { listMetricsCatalogForProject, queryMetrics, type MetricCatalogEntry } from './metrics-query.service';
 import { MetricNotRegisteredError } from './metrics-compiler.service';
 import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
-import { WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import { WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import type { MetricQueryResultCache } from '../warehouse/result-cache';
 
 export class InvalidBoardError extends Error {
@@ -402,7 +402,16 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
     // signal to notice it. An unrecognized error rethrows instead, so it
     // surfaces as a real failure on the board page rather than a
     // convincingly-normal-looking degraded tile.
-    if (error instanceof MetricCompilerError || error instanceof ProjectNotFoundError || error instanceof MetricNotRegisteredError) {
+    // `WarehouseQueryFailedError` joined this list the day the real BigQuery
+    // executor went live (2026-08-19): a metric registered against a mart
+    // table dbt doesn't build yet is an expected, user-config-dependent
+    // outcome, not a code bug — see that error's own doc comment.
+    if (
+      error instanceof MetricCompilerError ||
+      error instanceof ProjectNotFoundError ||
+      error instanceof MetricNotRegisteredError ||
+      error instanceof WarehouseQueryFailedError
+    ) {
       return { ok: false, reason: 'query_error', message: error.message };
     }
     throw error;

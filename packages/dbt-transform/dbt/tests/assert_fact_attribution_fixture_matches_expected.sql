@@ -1,3 +1,6 @@
+-- BigQuery-disabled alongside the identity/attribution chain it tests --
+-- see stg_identity_key_observations.sql's own config comment.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. KAN-58 AC: "CAC by channel
 -- computable; model labeled in API response." `seeds/raw_records.csv` carries
 -- a hand-built two-channel journey under `proj_10`:
