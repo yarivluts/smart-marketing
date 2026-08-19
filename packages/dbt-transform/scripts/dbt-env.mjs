@@ -9,7 +9,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,7 +44,19 @@ function isAlreadyProvisioned() {
   if (!existsSync(venvDbt) || !existsSync(provisionedMarkerPath)) {
     return false;
   }
-  return readFileSync(provisionedMarkerPath, 'utf8').trim() === requirementsHash();
+  if (readFileSync(provisionedMarkerPath, 'utf8').trim() !== requirementsHash()) {
+    return false;
+  }
+  // A cache restore (this package's `.venv` is cached in CI, keyed only on
+  // requirements.txt's hash) can bring back a venv whose `bin/python`
+  // symlink targets a system interpreter that no longer exists on this
+  // runner (e.g. a hosted-tool-cache Python patch bump between the run that
+  // populated the cache and this one). `existsSync`/the marker hash both
+  // still pass in that case, but the venv is dead: invoking `dbt` fails
+  // with ENOENT because its shebang interpreter is missing, not because
+  // `dbt` itself is absent. Actually probe that it runs before trusting it.
+  const probe = spawnSync(venvDbt, ['--version'], { stdio: 'ignore' });
+  return !probe.error && probe.status === 0;
 }
 
 /**
@@ -73,9 +85,15 @@ function resolvePythonCommand() {
 
 function provisionVenv() {
   console.log('[dbt-transform] provisioning a local Python venv with dbt-core + dbt-duckdb...');
-  if (!existsSync(venvPython)) {
-    runInherit(resolvePythonCommand(), ['-m', 'venv', venvDir]);
+  // Wipe any existing (possibly stale/broken — see the interpreter-probe
+  // comment in `isAlreadyProvisioned`) venv dir first: `python -m venv` on
+  // top of an existing directory doesn't reliably repair broken interpreter
+  // symlinks left behind by a corrupted cache restore, so a clean recreate
+  // is the only way that's guaranteed to fix it.
+  if (existsSync(venvDir)) {
+    rmSync(venvDir, { recursive: true, force: true });
   }
+  runInherit(resolvePythonCommand(), ['-m', 'venv', venvDir]);
   runInherit(venvPython, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'pip']);
   runInherit(venvPython, ['-m', 'pip', 'install', '--quiet', '-r', requirementsPath]);
   writeFileSync(provisionedMarkerPath, requirementsHash());
