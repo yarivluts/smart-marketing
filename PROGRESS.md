@@ -17,6 +17,45 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Environment isolation shipped: warehouse reads scoped per environment (PR #103)
+
+- **Last completed:**
+  - **PR #103** (merged, CI green after one unrelated emulator-flake rerun — the recurring
+    `RESOURCE_EXHAUSTED` onboarding-pack timeout, no connection to the diff): every warehouse read
+    now carries an `environment_id` predicate alongside the org/project tenant scoping, closing
+    session-B's catch that a project holding both a test-mode and live-mode ingest key would blend
+    test traffic into production board numbers. Design: `CompilerTenant.environmentId` compiled
+    into every leaf CTE; `queryMetrics` resolves centrally — an API-key caller passes its key's own
+    bound environment (`POST /v1/metrics/query` now forwards `context.environmentId`, which the
+    guard always resolved and previously dropped; `McpAuthContext` gained the field for api_key
+    principals across all five warehouse-reading MCP tools), while every human-facing surface
+    (board tiles, goals, TV, trial pipeline, MCP OAuth) defaults server-side to the project's
+    `prod` environment via a new `resolveDefaultQueryEnvironment` (lifted from
+    `product-analytics.service`'s identical inline precedent). Result-cache key is env-scoped too.
+    dbt side: every `fact_*` table already carried env in its grain (the original QA guess was
+    inverted); the one real gap was `entities.sql` deduping across environments — env (and org)
+    joined its dedup partition + `entity_key` (now the shared `surrogate_key` macro), with a new
+    `environment_id` not_null test.
+  - `dbt build --target prod` re-run (58/58) rebuilding `entities` under the new grain; fresh
+    images built and deployed to **all 4 Cloud Run services** (api-dev 00012 / api-prod 00008 /
+    web-dev 00024 / web-prod 00018), all smoke-checked 200.
+  - Earlier same day (recorded in the entry two below but worth the pointer here): the prod-side
+    full-pipeline verification completed — session B's prod-org test event landed and its board
+    tile lit up; KAN-18's warehouse is genuinely live end to end on both environments.
+- **In progress (exact stopping point):** session B verifying the isolation live (expected: the
+  Prod-QA board datapoint survives; a dev-key-ingested event no longer counts on any board — and
+  the "no data" rendering there is the fix working, not a regression).
+- **Blocked + why:** nothing for this slice. Remaining KAN-18 scope unchanged: scheduled dbt
+  orchestration against real BigQuery (refresh is still a manual per-command-approved run),
+  physical per-environment dataset split (this fix makes the shared datasets *logically* safe),
+  `estimated_cost_usd` from job stats, terraform reconciliation, Pub/Sub, Redis (human cost
+  decision), staging env.
+- **Next step:** whatever session B's verification surfaces; then the scheduled-dbt-orchestration
+  slice, or new asks from the relay channel.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; Redis cost decision).
+
+---
+
 ## 2026-08-19 — Idle check-in: KAN-18 growthos_core landed in BigQuery via merged PR #102 (9)
 
 > Note from the interactive session, added while resolving a same-minute journal collision: this
