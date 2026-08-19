@@ -15,6 +15,15 @@ clean-targets:
 seeds:
   growthos_transform:
     +schema: seed
+    # Seeds are DuckDB-only fixture stand-ins (see each seed's own .yml
+    # description): on a real BigQuery target, raw records come from the
+    # actual `growthos_raw.raw_records` source table (stg_raw_records
+    # switches at compile time) and the identity-fields export doesn't exist
+    # yet (documented follow-up). Loading them into BigQuery also fails
+    # outright — `+column_types` below are DuckDB type names (VARCHAR),
+    # which BigQuery rejects — as the first real `dbt build --target prod`
+    # (2026-08-19) proved.
+    +enabled: "{{ (target.type == 'duckdb') | as_bool }}"
     raw_records:
       +column_types:
         organization_id: VARCHAR

@@ -1,3 +1,6 @@
+-- BigQuery-disabled alongside the identity/attribution chain it tests --
+-- see stg_identity_key_observations.sql's own config comment.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. `proj_1`'s `cust_1` signup
 -- and activated events (`seeds/raw_records.csv`) have no registered identity
 -- keys and no touchpoint ever landed for that project at all, so

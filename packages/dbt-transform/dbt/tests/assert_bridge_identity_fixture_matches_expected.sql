@@ -1,3 +1,6 @@
+-- BigQuery-disabled alongside the identity/attribution chain it tests --
+-- see stg_identity_key_observations.sql's own config comment.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. KAN-56 AC: "Synthetic
 -- fixtures: anon -> signup -> purchase stitched correctly." `seeds/raw_records.csv`
 -- carries a hand-built identity journey under `proj_2` covering every branch

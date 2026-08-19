@@ -1,3 +1,10 @@
+-- BigQuery-disabled (KAN-18 follow-up): this model transitively depends on
+-- the `schema_identity_fields` seed, a DuckDB-only fixture whose real
+-- warehouse export (SchemaDefModel.field_defs where is_identity_key) has
+-- not been built yet -- see dbt_project.yml's seeds.+enabled note. Until
+-- that export exists, the whole identity/attribution chain (this model and
+-- everything downstream of it) builds only against the DuckDB dev target.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- Rules-based attribution (plan `04 §4`, KAN-58): first-touch and last-touch
 -- credit for every customer-side event, resolved back through touchpoints
 -- via KAN-56's `bridge_identity` and KAN-57's real touchpoint capture.
