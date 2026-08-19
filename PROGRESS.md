@@ -17,6 +17,66 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — KAN-44 audit-log follow-up merged (PR #104)
+
+- **Last completed:**
+  - Session start found the local checkout in the now-familiar stale-pointer state (`HEAD`
+    detached at `fa83975`, local `main` diverged from what a first `git fetch` reported as
+    `origin/main`). Re-fetching resolved it: `origin/main` was in fact already at `fa83975` (this
+    session's own prior work, from earlier in this same conversation before it was summarized) —
+    reattached local `main` to it (`git checkout -B main origin/main`), no data lost, no force-push
+    from this run.
+  - Found **PR #104** (`kan-44-audit-coverage-vault-attachments`) open against `main`, already
+    implemented by an earlier turn of this session: wires `recordAuditLogEntry` into
+    `setSharedCredentialSecret`/`rotateSharedCredentialSecretKey` (vault) and
+    `requestResourceAttachment`/`decideResourceAttachment`/`detachResource` (resource library) —
+    the two KAN-44 coverage gaps its own `TASKS.md` row named as follow-ups. `actorId` plumbed
+    through from the three Next.js routes' `requireOrgPermission`-resolved session user.
+  - Reviewed the diff fresh (this run had no memory of writing it): plumbing is consistent with the
+    existing best-effort-audit-log pattern used elsewhere (`try { recordAuditLogEntry(...) } catch
+    {}` — an audit-log failure must never block the actual mutation), secret material is never
+    written to the log (only `has_secret`/`rewrapped` booleans — verified by a dedicated test per
+    the PR body), and `detachResource`'s new required `actorId` param is threaded through its one
+    caller. No correctness bugs, no missing tests, no reuse/simplification issues found.
+  - Both CI checks (`terraform fmt · validate`, `lint · typecheck · test · build`) were green on
+    the PR's head commit; `mergeable_state` was `clean`. Squash-merged as `989b5a4`.
+  - Updated `TASKS.md`'s KAN-44 row to drop the "not yet wired" callout now that both surfaces are
+    covered.
+  - Could not delete the merged branch (`kan-44-audit-coverage-vault-attachments`) — no
+    delete-branch GitHub MCP tool is available in this session and a direct `git push --delete`
+    gets HTTP 403 (no push credential outside the GitHub MCP server). This matches a large existing
+    pile of merged-but-undeleted branches already in the repo (`kan-18-*`, `kan-19-*`,
+    `kan-20-observability-baseline*`, etc.) — pre-existing, not new; a human with push access (or
+    enabling "automatically delete head branches" in repo settings) should clean these up in bulk.
+  - Re-checked `TASKS.md` after the merge: still zero `| todo |` rows (57 `done`, 2 `in-progress` —
+    KAN-18/KAN-19, 1 `needs-human` — KAN-43, 2 `blocked-by` — KAN-50/KAN-51). No env credentials
+    (`GOOGLE_APPLICATION_CREDENTIALS`/`FIREBASE_*`/`GCP_*`/`SENTRY_DSN`) present in this sandboxed
+    run, so KAN-18's remaining live-infra sub-items (scheduled dbt orchestration against real
+    BigQuery, per-environment dataset split, `estimated_cost_usd`, terraform import/apply
+    reconciliation, Pub/Sub, Redis, staging env) stay out of reach here — they need the
+    per-command-approved interactive pattern noted on KAN-18's own row, not a headless run.
+- **In progress (exact stopping point):** none — PR #104 is merged, `main` is green.
+- **Blocked + why:** same as every recent run — no `todo` work exists; the two `in-progress`
+  stories need real infra access this sandbox doesn't have, `needs-human`/`blocked-by` need
+  external approvals.
+- **Next step:** unchanged — future runs keep finding no unblocked `todo` work until a human moves
+  KAN-18's remaining live-infra sub-items or KAN-43's external applications. If either KAN-18 or
+  KAN-43 progresses, re-scan `TASKS.md` for newly-unblocked stories (KAN-50/KAN-51 unblock on
+  KAN-43; KAN-18's remaining sub-items need per-command human approval for live BigQuery/Terraform
+  writes, same pattern as the 2026-08-19 updates already on its row).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — remaining live-infra sub-items listed on its `TASKS.md` row (scheduled prod dbt
+    orchestration, per-environment dataset split, cost stats, terraform import/apply, Pub/Sub,
+    Redis, staging env) — each needs an interactive, per-command-approved session against real
+    GCP/BigQuery, not a headless run.
+  - Bulk-delete the large pile of already-merged, now-stale branches in the repo (this run's own
+    `kan-44-audit-coverage-vault-attachments` included) — no MCP tool here can do it; either enable
+    GitHub's "automatically delete head branches" repo setting or delete them manually.
+
+---
+
 ## 2026-08-19 — Idle check-in: no unblocked work (14)
 
 - **Last completed:** nothing new this run. Verified: zero open PRs (`list_pull_requests`,
