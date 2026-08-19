@@ -17,6 +17,62 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: no unblocked work (11)
+
+- **Last completed:** nothing new this run. First fixed a local-clone artifact: this container's
+  fresh checkout had a local `main` ref pointing at a stale cached commit (`939077f`, "run 227")
+  while `origin/main` (verified live via `git ls-remote`) was actually at `5299429` ("run 10") —
+  the two shared no common ancestor in this *shallow* clone, which briefly looked like a
+  force-pushed/rewritten remote history. Confirmed via `.git/shallow` that this is a shallow-fetch
+  boundary artifact, not a real history rewrite (both "roots" are parentless shallow-clone
+  boundary commits, not the repo's true root) — `git ls-remote origin main` is the authoritative
+  check and matched the commit `origin/main` had actually been at all along. `git reset --hard
+  origin/main` realigned the local ref; no data was at risk (working tree was already clean).
+  Verified after that: zero open PRs, `TASKS.md` unchanged (every KAN-17..KAN-78 story `done`
+  except `KAN-18`/`KAN-19` `in-progress`, `KAN-43` `needs-human`, `KAN-50`/`KAN-51` `blocked-by`
+  KAN-43), CI still running on `main`'s current head (`5299429`, a docs-only PROGRESS.md commit
+  from the prior run — not this run's to babysit).
+  - **Investigated one candidate buildable slice and deliberately did not build it:**
+    `LocalDbtOrchestrationExecutor` (`packages/firebase-orm-models/src/orchestration/
+    local-dbt-executor.ts`) still hardcodes `dbt build --target dev` (the DuckDB fixture) even
+    though `growthos_core` has held real prod data since PR #102/#103 — so KAN-38's "Run now" /
+    freshness readback in the admin UI shows fixture numbers, never the real warehouse. Making the
+    *read* half env-driven (query real BigQuery `growthos_core.{entities,events,measures}`
+    read-only for freshness, mirroring `BigQueryWarehouseQueryExecutor`'s injectable-client/
+    fake-tested convention) looked safely buildable. But the *write* half — whether an admin's
+    "Run now" click should itself trigger a real `dbt build --target prod` against BigQuery,
+    unattended — is a different, higher-stakes call: every real BigQuery build against
+    `growthos_core` today has deliberately gone through Yariv approving each command
+    interactively (auto-mode's classifier blocks an autonomous session from creating/writing live
+    cloud infra), specifically because it's a real-cost, real-mutation action against prod data.
+    Wiring the deployed app's own "Run now" button to do that automatically, unattended, changes
+    that safety posture for real users going forward — not something to ship on this session's own
+    inference of what "done" means for the TASKS.md note. Splitting it (read-only BigQuery
+    freshness now, build-trigger later) is also live judgment-call territory: it'd ship a "run"
+    that doesn't actually run anything for a prod project, which could read as misleading rather
+    than useful. Flagging this concretely rather than picking a default: **a human should decide
+    whether KAN-38's "Run now" is allowed to trigger real `dbt build --target prod` unattended
+    (and if not, whether a read-only "refresh freshness from BigQuery" mode without a build
+    trigger is still worth building)** before a future run implements either half.
+  - Also checked KAN-19's remaining scope (preview + staging deploy) for a code-only slice:
+    `.github/workflows/ci.yml` has no deploy job and `deploy/cloudbuild.*.yaml` assumes GCP
+    credentials as GitHub secrets that don't exist in this repo yet — same "needs infra
+    (credentials), not code" conclusion `TASKS.md` already records; writing a deploy workflow with
+    no way to verify it against real credentials risks shipping broken CI, so left as-is.
+- **In progress (exact stopping point):** none — clean stopping point.
+- **Blocked + why:** same as the prior idle entries — remaining backlog scope needs either a
+  human's long-lead API approval (KAN-43), human-provisioned deploy credentials (KAN-19), or a
+  human policy decision on unattended live-BigQuery writes (KAN-18's orchestration-executor gap,
+  new finding this run — see above).
+- **Next step:** next run re-checks for open PRs / a newly unblocked `TASKS.md` story, and checks
+  whether Yariv has weighed in on the KAN-38 orchestration-executor question above. If not, keep
+  doing idle check-ins rather than guessing at a live-infra-write policy unilaterally.
+- **Waiting on human:** standing items (KAN-43 long-lead approvals; KAN-19 deploy credentials;
+  Redis cost decision) plus the new one above — should KAN-38's "Run now" trigger real
+  `dbt build --target prod` against BigQuery unattended, or stay read-only/manual?
+
+---
+
 ## 2026-08-19 — Idle check-in: no unblocked work (10)
 
 - **Last completed:** nothing new this run. Synced local `main` (a stale ref from an old
