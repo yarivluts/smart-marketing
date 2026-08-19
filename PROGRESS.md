@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-19 — Merged PRs #92/#93 (concurrent session's work); shipped KAN-18 phase 2 slice (BigQueryWarehouseQueryExecutor); PR #94 open
+## 2026-08-19 — Merged PRs #92/#93/#94; closed duplicate PR #95; KAN-18 phase 2 (BigQueryWarehouseQueryExecutor) done
 
 - **Last completed:**
   - Found this session's local `main` ref stale (pointing at an old commit, 50 commits diverged
@@ -77,14 +77,32 @@ Template for each entry:
     emulator: 21/21 passed clean, confirming the flake, not a real failure.
   - Opened **PR #94** (`kan-18-bigquery-warehouse-executor` → `main`), subscribed to its PR
     activity, and scheduled a ~20-minute self check-in to merge once CI is green.
-- **In progress (exact stopping point):** PR #94 open, CI running at end of this entry (both
-  checks were `in_progress` at last look). A scheduled check-in will merge it once green (or fix
-  and re-push if something fails) — see Next step.
+  - **Check-in fired: both checks green, `mergeable_state: clean` — merged PR #94** (squash).
+  - **Found PR #95**, opened by a *different* concurrent session ~15 minutes after #94, building
+    the exact same feature independently (own `BigQueryWarehouseQueryExecutor` +
+    `resolveDefaultWarehouseQueryExecutor`/`GROWTHOS_BIGQUERY_PROJECT_ID`) against the pre-#94
+    base commit. Compared the two diffs: #95's `BigQuerySdkQueryClient.runQuery` returned
+    `rows as WarehouseRow[]` — a type-only cast with **no runtime conversion** of BigQuery's
+    typed `DATE`/`TIMESTAMP` row values (e.g. the compiler's own `DATE_TRUNC(...) AS bucket_date`
+    comes back as `{ value: '2026-01-01' }`, not a plain string) or `bigint` counts — a real bug
+    that would have shipped non-`WarehouseRow`-shaped values into every view-mapper the first
+    time it ran against a real warehouse. #94's `normalizeRow`/`normalizeValue` handle this
+    explicitly, with test coverage. #95's one genuine improvement (explicit BigQuery param
+    `types` hints alongside `params`) wasn't worth a follow-up: the compiler only ever emits
+    `string`/`readonly string[]` params, which BigQuery infers correctly (`STRING`/
+    `ARRAY<STRING>`) from a non-empty value in every case the compiler produces. **Closed #95 as
+    superseded** with a comment explaining both points, referencing #94.
+  - Updated `TASKS.md`'s KAN-18 row: phase 2 (`BigQueryWarehouseQueryExecutor`) now marked done
+    inline, alongside the still-outstanding phase 1 terraform-apply and phase 3
+    (export job + dbt bigquery dialect port) items.
+- **In progress (exact stopping point):** none — PR #94 merged, PR #95 closed, `TASKS.md` updated.
+  Zero open PRs remain.
 - **Blocked + why:** nothing new. Standing blockers unchanged (see below).
-- **Next step:** once PR #94 is green, merge + delete the branch. Then either continue KAN-18
-  phase 3 (the `RawRecordModel`→BigQuery export job, or the dbt `bigquery` profile target/SQL
-  dialect port — both still scoped in PR #93's description) or re-check `TASKS.md`/open PRs for
-  anything a concurrent session has since posted.
+- **Next step:** re-check `TASKS.md` (still zero `todo` rows as of this entry) and open PRs at the
+  next run. If nothing new has appeared, the next well-scoped KAN-18 slice is either the
+  `RawRecordModel`→BigQuery export job, or `dbt-transform`'s `bigquery` profile target + DuckDB→
+  BigQuery SQL dialect port (both scoped in PR #93's description) — both buildable without live
+  infra, same posture as this run's executor.
 - **Waiting on human:**
   - `terraform apply` (or equivalent) for `infra/terraform/bigquery.tf` (PR #93) — still
     outstanding; everything built in PR #94 stays inert until this exists and a deploy sets
