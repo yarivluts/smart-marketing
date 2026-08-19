@@ -19,6 +19,8 @@ const dbtProjectDir = join(packageDir, 'dbt');
 const venvDir = join(packageDir, '.venv');
 const requirementsPath = join(packageDir, 'requirements.txt');
 const provisionedMarkerPath = join(venvDir, '.provisioned-hash');
+const bigqueryRequirementsPath = join(packageDir, 'requirements-bigquery.txt');
+const bigqueryProvisionedMarkerPath = join(venvDir, '.provisioned-bigquery-hash');
 
 const isWindows = platform() === 'win32';
 const venvBinDir = join(venvDir, isWindows ? 'Scripts' : 'bin');
@@ -109,4 +111,44 @@ export function ensureDbtProvisioned() {
     provisionVenv();
   }
   return { venvPython, venvDbt, dbtProjectDir, packageDir };
+}
+
+function bigqueryRequirementsHash() {
+  return createHash('sha256').update(readFileSync(bigqueryRequirementsPath)).digest('hex');
+}
+
+function isBigQueryAdapterAlreadyProvisioned() {
+  if (!existsSync(bigqueryProvisionedMarkerPath)) {
+    return false;
+  }
+  if (readFileSync(bigqueryProvisionedMarkerPath, 'utf8').trim() !== bigqueryRequirementsHash()) {
+    return false;
+  }
+  // Same "a cache restore can bring back a dead venv" concern
+  // `isAlreadyProvisioned` guards against for the base venv — confirm the
+  // adapter actually imports before trusting the marker.
+  const probe = spawnSync(venvPython, ['-c', 'import dbt.adapters.bigquery'], { stdio: 'ignore' });
+  return !probe.error && probe.status === 0;
+}
+
+/**
+ * Ensures both the base venv (dbt-core + dbt-duckdb) *and* the dbt-bigquery
+ * adapter (`requirements-bigquery.txt`) are provisioned into it, installing
+ * the latter on top only when it isn't already there. Deliberately kept
+ * separate from {@link ensureDbtProvisioned}: `requirements-bigquery.txt` is
+ * NOT part of the shared venv every `pnpm build`/`pnpm test` (including CI)
+ * provisions — it pulls in a large, GCP-specific dependency tree that only
+ * matters once a real BigQuery project is configured (KAN-18) and
+ * `run-orchestration.mjs`'s `resolveOrchestrationTarget` actually selects the
+ * `prod` target. Callers on the `dev` (DuckDB) path never call this, so
+ * CI's provisioning stays exactly as lean as it already was.
+ */
+export function ensureBigQueryAdapterProvisioned() {
+  const paths = ensureDbtProvisioned();
+  if (!isBigQueryAdapterAlreadyProvisioned()) {
+    console.log('[dbt-transform] provisioning the dbt-bigquery adapter (requirements-bigquery.txt) into the existing venv...');
+    runInherit(venvPython, ['-m', 'pip', 'install', '--quiet', '-r', bigqueryRequirementsPath]);
+    writeFileSync(bigqueryProvisionedMarkerPath, bigqueryRequirementsHash());
+  }
+  return paths;
 }

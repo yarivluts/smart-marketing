@@ -32,6 +32,11 @@ describe('LocalDbtOrchestrationExecutor', () => {
       ]),
     );
     expect(result.freshness).toHaveLength(3);
+    // Neither GOOGLE_CLOUD_PROJECT/GCLOUD_PROJECT nor
+    // GROWTHOS_BIGQUERY_CORE_DATASET is set anywhere this test runs (CI
+    // included) — `resolveOrchestrationTarget` stays on `dev`, so this real
+    // run always builds against the DuckDB fixture, never real BigQuery.
+    expect(result.warehouse).toBe('duckdb');
   }, 60_000);
 
   it('comes back with zero rows for a project the fixture has never heard of — an honest, documented limitation until the fixture is replaced by a real per-project export', async () => {
@@ -45,5 +50,6 @@ describe('LocalDbtOrchestrationExecutor', () => {
         { table: 'measures', rowCount: 0, latestRecordAt: null },
       ]),
     );
+    expect(result.warehouse).toBe('duckdb');
   }, 60_000);
 });

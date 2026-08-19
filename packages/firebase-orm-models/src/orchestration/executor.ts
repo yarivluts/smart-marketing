@@ -1,4 +1,4 @@
-import type { OrchestrationFreshnessTable } from '../models/orchestration-run.model';
+import type { OrchestrationFreshnessTable, OrchestrationWarehouse } from '../models/orchestration-run.model';
 
 /** One table's freshness snapshot, as an executor reports it back — camelCase, independent of the persisted model's own snake_case field names (same split as `WarehouseRow`/`MetricCatalogEntry` elsewhere in this package). */
 export interface OrchestrationFreshnessEntry {
@@ -9,6 +9,8 @@ export interface OrchestrationFreshnessEntry {
 
 export interface OrchestrationExecutionResult {
   freshness: OrchestrationFreshnessEntry[];
+  /** Which warehouse this run's `dbt build` actually executed against — see {@link OrchestrationWarehouse}. */
+  warehouse: OrchestrationWarehouse;
 }
 
 export interface OrchestrationExecutorRunParams {

@@ -12,16 +12,26 @@
 //
 // Usage: node scripts/run-orchestration.mjs <organizationId> <projectId> <outputJsonPath>
 //
+// Which dbt target this run builds against (`dev` = the buildable-today
+// DuckDB fixture, `prod` = the real KAN-18 BigQuery warehouse) is decided
+// automatically from the environment by `resolveOrchestrationTarget` — see
+// that module's own doc comment. No caller (this script's own arg list,
+// `LocalDbtOrchestrationExecutor`) ever picks a target explicitly: a deploy
+// either has `GOOGLE_CLOUD_PROJECT`/`GROWTHOS_BIGQUERY_CORE_DATASET` set or
+// it doesn't, the same way `defaultWarehouseQueryExecutor` decides whether
+// board tiles read from real BigQuery.
+//
 // Always writes a JSON result to <outputJsonPath>, regardless of outcome, so
 // the caller has a structured reason to persist even when the dbt build
 // itself fails:
-//   success -> {"ok": true, "freshness": [...], "generatedAt": "<ISO 8601>"}
+//   success -> {"ok": true, "freshness": [...], "warehouse": "duckdb"|"bigquery", "generatedAt": "<ISO 8601>"}
 //   failure -> {"ok": false, "errorMessage": "..."}
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { ensureDbtProvisioned } from './dbt-env.mjs';
+import { ensureBigQueryAdapterProvisioned, ensureDbtProvisioned } from './dbt-env.mjs';
+import { resolveOrchestrationTarget } from './orchestration-target.mjs';
 
 function writeResult(outputPath, result) {
   mkdirSync(dirname(outputPath), { recursive: true });
@@ -44,10 +54,12 @@ function main() {
     process.exit(1);
   }
 
-  const { venvPython, venvDbt, dbtProjectDir, packageDir } = ensureDbtProvisioned();
+  const target = resolveOrchestrationTarget(process.env);
+  const { venvPython, venvDbt, dbtProjectDir, packageDir } =
+    target === 'prod' ? ensureBigQueryAdapterProvisioned() : ensureDbtProvisioned();
   const duckdbPath = join(dbtProjectDir, 'target', 'growthos_transform.duckdb');
 
-  const build = spawnSync(venvDbt, ['build', '--target', 'dev'], {
+  const build = spawnSync(venvDbt, ['build', '--target', target], {
     cwd: dbtProjectDir,
     env: { ...process.env, DBT_PROFILES_DIR: dbtProjectDir },
     encoding: 'utf8',
@@ -66,11 +78,26 @@ function main() {
   }
 
   const freshnessOutputPath = `${outputPath}.freshness.json`;
-  const read = spawnSync(
-    venvPython,
-    [join(packageDir, 'scripts', 'read_freshness.py'), duckdbPath, organizationId, projectId, freshnessOutputPath],
-    { encoding: 'utf8' },
-  );
+  const read =
+    target === 'prod'
+      ? spawnSync(
+          venvPython,
+          [
+            join(packageDir, 'scripts', 'read_freshness_bigquery.py'),
+            process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT,
+            process.env.GROWTHOS_BIGQUERY_CORE_DATASET,
+            process.env.GROWTHOS_BIGQUERY_LOCATION || '',
+            organizationId,
+            projectId,
+            freshnessOutputPath,
+          ],
+          { encoding: 'utf8' },
+        )
+      : spawnSync(
+          venvPython,
+          [join(packageDir, 'scripts', 'read_freshness.py'), duckdbPath, organizationId, projectId, freshnessOutputPath],
+          { encoding: 'utf8' },
+        );
   if (read.stdout) process.stdout.write(read.stdout);
   if (read.stderr) process.stderr.write(read.stderr);
 
@@ -81,7 +108,8 @@ function main() {
   }
 
   const freshness = JSON.parse(readFileSync(freshnessOutputPath, 'utf8'));
-  writeResult(outputPath, { ok: true, freshness, generatedAt: new Date().toISOString() });
+  const warehouse = target === 'prod' ? 'bigquery' : 'duckdb';
+  writeResult(outputPath, { ok: true, freshness, warehouse, generatedAt: new Date().toISOString() });
 }
 
 main();

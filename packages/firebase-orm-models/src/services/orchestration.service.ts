@@ -64,6 +64,7 @@ export async function triggerOrchestrationRun(params: TriggerOrchestrationRunPar
     const result = await executor.run({ organizationId: params.organizationId, projectId: params.projectId });
     run.status = 'succeeded';
     run.finished_at = new Date().toISOString();
+    run.warehouse = result.warehouse;
     run.freshness = result.freshness.map((entry) => ({
       table: entry.table,
       row_count: entry.rowCount,

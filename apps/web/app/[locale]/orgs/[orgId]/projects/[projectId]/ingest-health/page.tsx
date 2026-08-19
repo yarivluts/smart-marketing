@@ -25,6 +25,7 @@ import {
   freshnessTableLabelKey,
   runStatusLabelKey,
   toOrchestrationRunView,
+  warehouseLabelKey,
   type OrchestrationRunView,
 } from '@/lib/orgs/orchestration-view';
 import { ReplayQuarantinedRecordButton } from '@/components/orgs/replay-quarantined-record-button';
@@ -192,17 +193,24 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium text-muted-foreground">{t('orchestrationFreshnessHeading')}</h3>
           {currentFreshness?.freshness ? (
-            <ul className="flex flex-col gap-1">
-              {currentFreshness.freshness.map((entry) => (
-                <li key={entry.table} className="text-sm text-muted-foreground">
-                  {t('orchestrationFreshnessRow', {
-                    table: t(freshnessTableLabelKey(entry.table)),
-                    count: entry.rowCount,
-                    freshness: entry.latestRecordAt ?? t('orchestrationNeverLanded'),
-                  })}
-                </li>
-              ))}
-            </ul>
+            <>
+              {currentFreshness.warehouse ? (
+                <p className="text-xs text-muted-foreground">
+                  {t('orchestrationCurrentWarehouse', { warehouse: t(warehouseLabelKey(currentFreshness.warehouse)) })}
+                </p>
+              ) : null}
+              <ul className="flex flex-col gap-1">
+                {currentFreshness.freshness.map((entry) => (
+                  <li key={entry.table} className="text-sm text-muted-foreground">
+                    {t('orchestrationFreshnessRow', {
+                      table: t(freshnessTableLabelKey(entry.table)),
+                      count: entry.rowCount,
+                      freshness: entry.latestRecordAt ?? t('orchestrationNeverLanded'),
+                    })}
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <p className="text-muted-foreground">{t('orchestrationNoFreshnessYet')}</p>
           )}
@@ -219,6 +227,11 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
                   <span className="font-medium">
                     {t('orchestrationRunSummary', { status: t(runStatusLabelKey(run.status)), startedAt: run.startedAt })}
                   </span>
+                  {run.warehouse ? (
+                    <span className="text-xs text-muted-foreground">
+                      {t('orchestrationCurrentWarehouse', { warehouse: t(warehouseLabelKey(run.warehouse)) })}
+                    </span>
+                  ) : null}
                   {run.errorMessage ? (
                     <span className="text-xs text-destructive">{t('orchestrationRunError', { message: run.errorMessage })}</span>
                   ) : null}

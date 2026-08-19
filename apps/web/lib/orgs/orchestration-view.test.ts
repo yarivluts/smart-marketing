@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { deriveCurrentFreshness, overallFreshnessAsOf, type OrchestrationRunView } from './orchestration-view';
+import { deriveCurrentFreshness, overallFreshnessAsOf, warehouseLabelKey, type OrchestrationRunView } from './orchestration-view';
 
 function run(overrides: Partial<OrchestrationRunView> & Pick<OrchestrationRunView, 'id' | 'status'>): OrchestrationRunView {
   return {
     startedAt: '2026-07-06T11:00:00Z',
     finishedAt: '2026-07-06T11:00:05Z',
     freshness: null,
+    warehouse: null,
     errorMessage: null,
     ...overrides,
   };
@@ -80,5 +81,15 @@ describe('overallFreshnessAsOf', () => {
         { table: 'measures', rowCount: 0, latestRecordAt: null },
       ]),
     ).toBe('2026-07-10T00:00:00.000Z');
+  });
+});
+
+describe('warehouseLabelKey', () => {
+  it('maps duckdb to the fixture translation key', () => {
+    expect(warehouseLabelKey('duckdb')).toBe('orchestrationWarehouseDuckdb');
+  });
+
+  it('maps bigquery to the live-warehouse translation key', () => {
+    expect(warehouseLabelKey('bigquery')).toBe('orchestrationWarehouseBigquery');
   });
 });

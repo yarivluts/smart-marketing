@@ -68,6 +68,44 @@ on the ambient service-account credentials of wherever this actually runs
 (matches how `BigQueryWarehouseQueryExecutor`/`BigQueryRawRecordSink` already
 authenticate — see `packages/firebase-orm-models/src/warehouse/`).
 
+## Scheduled orchestration target selection (KAN-38)
+
+`scripts/run-orchestration.mjs` (invoked by
+`packages/firebase-orm-models`'s `LocalDbtOrchestrationExecutor`, which the
+ingest-health admin page's "Run now" button ultimately triggers) picks its
+dbt target **automatically** from the environment via
+`scripts/orchestration-target.mjs`'s `resolveOrchestrationTarget` — the exact
+same live/not-configured check `readWarehouseEnvConfig`/
+`resolveWarehouseQueryExecutorFromEnv`
+(`packages/firebase-orm-models/src/warehouse/query-executor.ts`) already use
+to decide whether board tiles read from real BigQuery: once both
+`GOOGLE_CLOUD_PROJECT` (or `GCLOUD_PROJECT`) and
+`GROWTHOS_BIGQUERY_CORE_DATASET` are set, a run builds `--target prod` and
+reads freshness back from real BigQuery (`scripts/read_freshness_bigquery.py`,
+provisioning the `dbt-bigquery` adapter into the shared venv on first use via
+`ensureBigQueryAdapterProvisioned` — see `dbt-env.mjs`); otherwise it keeps
+building `--target dev` against the DuckDB fixture and reading freshness back
+via `scripts/read_freshness.py`, exactly as it always has. No caller ever
+picks a target explicitly — there is deliberately no dev/prod selector on the
+"Run now" button, matching `OrchestrationRunModel`'s own "fold every
+environment into one admin view" convention. The result's `warehouse` field
+(`duckdb` | `bigquery`, persisted on `OrchestrationRunModel.warehouse`) tells
+an operator which one actually produced a given run's freshness numbers.
+
+**Verification status:** the `dev`/DuckDB path is exercised end to end by
+`pnpm test` (this package's own `dbt build` plus
+`firebase-orm-models`'s `LocalDbtOrchestrationExecutor` test). The `prod`/
+BigQuery path (`resolveOrchestrationTarget` returning `'prod'`,
+`ensureBigQueryAdapterProvisioned`, and `read_freshness_bigquery.py`) has
+been verified by code review and by running `resolveOrchestrationTarget`'s
+own unit tests, but **not** against a live BigQuery project or a real
+`dbt build --target prod` triggered through this exact script — same posture
+this README's own "Verification status" note above already documents for the
+rest of the `prod` target, since nothing in this repo runs with the two env
+vars above set. Treat it as ready for a human (or an explicitly-authorized
+run) to validate the first time a real "Run now" click happens against a
+deploy that has them configured.
+
 ## Layers
 
 - `models/staging/` — one row per landed raw record (`stg_raw_records`), split

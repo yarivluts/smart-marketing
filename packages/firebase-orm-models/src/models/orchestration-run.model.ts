@@ -24,6 +24,17 @@ export const ORCHESTRATION_FRESHNESS_TABLES = ['entities', 'events', 'measures']
 export type OrchestrationFreshnessTable = (typeof ORCHESTRATION_FRESHNESS_TABLES)[number];
 
 /**
+ * Which warehouse backend a run's `dbt build` actually executed against —
+ * `duckdb` is the buildable-today fixture (KAN-37); `bigquery` is the real
+ * KAN-18 warehouse, selected automatically once `GOOGLE_CLOUD_PROJECT`/
+ * `GROWTHOS_BIGQUERY_CORE_DATASET` are configured (see
+ * `packages/dbt-transform/scripts/orchestration-target.mjs`'s
+ * `resolveOrchestrationTarget`).
+ */
+export const ORCHESTRATION_WAREHOUSES = ['duckdb', 'bigquery'] as const;
+export type OrchestrationWarehouse = (typeof ORCHESTRATION_WAREHOUSES)[number];
+
+/**
  * One table's freshness snapshot as persisted on a run record — row count
  * plus the latest record timestamp for this project, as read back from the
  * dbt-built DuckDB tables at the moment this run's executor finished.
@@ -81,6 +92,10 @@ export class OrchestrationRunModel extends BaseModel {
   /** Present only when `status === 'succeeded'`. */
   @Field({ is_required: false })
   public freshness?: OrchestrationFreshnessRecord[];
+
+  /** Which warehouse this run's `dbt build` actually executed against — present only when `status === 'succeeded'`, same as `freshness`, which it's read back alongside. */
+  @Field({ is_required: false })
+  public warehouse?: OrchestrationWarehouse;
 
   /** Present only when `status === 'failed'`. */
   @Field({ is_required: false })

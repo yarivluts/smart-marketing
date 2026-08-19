@@ -70,6 +70,7 @@ const SAMPLE_FRESHNESS: OrchestrationExecutionResult = {
     { table: 'events', rowCount: 3, latestRecordAt: '2026-01-07T12:00:03Z' },
     { table: 'measures', rowCount: 0, latestRecordAt: null },
   ],
+  warehouse: 'duckdb',
 };
 
 describe('triggerOrchestrationRun', () => {
@@ -89,11 +90,26 @@ describe('triggerOrchestrationRun', () => {
     expect(run.started_at).toBeTruthy();
     expect(run.finished_at).toBeTruthy();
     expect(run.error_message).toBeUndefined();
+    expect(run.warehouse).toBe('duckdb');
     expect(run.freshness).toEqual([
       { table: 'entities', row_count: 2, latest_record_at: '2026-01-20T14:12:00Z' },
       { table: 'events', row_count: 3, latest_record_at: '2026-01-07T12:00:03Z' },
       { table: 'measures', row_count: 0, latest_record_at: null },
     ]);
+  });
+
+  it('records which warehouse a run actually executed against, once BigQuery is configured', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Orchestration Warehouse Org');
+
+    const run = await triggerOrchestrationRun({
+      organizationId: organization.id,
+      projectId: project.id,
+      triggeredByUserId: owner.id,
+      executor: fakeExecutor({ ...SAMPLE_FRESHNESS, warehouse: 'bigquery' }),
+    });
+
+    expect(run.status).toBe('succeeded');
+    expect(run.warehouse).toBe('bigquery');
   });
 
   it('records a failed run with the executor’s error message when the executor rejects', async () => {
@@ -109,6 +125,7 @@ describe('triggerOrchestrationRun', () => {
     expect(run.status).toBe('failed');
     expect(run.error_message).toBe('dbt build exited with code 1');
     expect(run.freshness).toBeUndefined();
+    expect(run.warehouse).toBeUndefined();
     expect(run.finished_at).toBeTruthy();
   });
 

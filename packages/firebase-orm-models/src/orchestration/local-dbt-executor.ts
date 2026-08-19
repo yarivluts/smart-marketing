@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { OrchestrationWarehouse } from '../models/orchestration-run.model';
 import {
   OrchestrationExecutionError,
   type OrchestrationExecutionResult,
@@ -16,6 +17,7 @@ const RUN_TIMEOUT_MS = 5 * 60_000;
 interface RunOrchestrationScriptOutput {
   ok: true;
   freshness: OrchestrationFreshnessEntry[];
+  warehouse: OrchestrationWarehouse;
   generatedAt: string;
 }
 
@@ -94,21 +96,29 @@ function tail(text: string, lines = 20): string {
 /**
  * The only real {@link OrchestrationExecutor} today (KAN-38): actually runs
  * KAN-37's dbt project end to end via `packages/dbt-transform/scripts/run-orchestration.mjs`
- * — `dbt build` (seed + run + test) against the buildable-today DuckDB
- * stand-in, then reads the resulting `core` tables back, filtered to the
- * requesting org/project, for row counts + latest timestamps.
+ * — `dbt build` (seed + run + test), then reads the resulting `core` tables
+ * back, filtered to the requesting org/project, for row counts + latest
+ * timestamps. That script picks its own dbt target automatically from the
+ * environment (`resolveOrchestrationTarget` — the buildable-today DuckDB
+ * stand-in until `GOOGLE_CLOUD_PROJECT`/`GROWTHOS_BIGQUERY_CORE_DATASET` are
+ * configured, then the real KAN-18 BigQuery warehouse); this executor never
+ * picks one itself, and since it never overrides `env` on the `spawnSync`
+ * call below, the child process inherits whatever env vars this process
+ * (i.e. whatever Cloud Run service triggered the run) already has — the
+ * same env-var-inheritance seam `defaultWarehouseQueryExecutor` relies on.
+ * `result.warehouse` reports back which one actually ran.
  *
  * Because dbt-transform's own seed (`seeds/raw_records.csv`) is still a
  * static fixture standing in for a real per-org/project/environment export
- * (see that package's own KAN-37 doc comments), a run triggered for a
- * project this product actually created (not the fixture's own hardcoded
- * `org_1`/`proj_1`/`org_2`/`proj_9`) legitimately comes back with zero rows
- * in every table today — there's no live wiring yet from KAN-33's Firestore
- * `raw_records` into this seed. That's a real, deliberate, documented
- * limitation of *this run*, not a bug in this executor: once a future story
- * replaces the fixture with a real per-project export, freshness numbers
- * become meaningful without this executor (or the model/service around it)
- * needing to change at all.
+ * on the DuckDB (`dev`) target (see that package's own KAN-37 doc comments),
+ * a run triggered for a project this product actually created (not the
+ * fixture's own hardcoded `org_1`/`proj_1`/`org_2`/`proj_9`) legitimately
+ * comes back with zero rows in every table on that target today — there's
+ * no live wiring yet from KAN-33's Firestore `raw_records` into this seed.
+ * That's a real, deliberate, documented limitation of *this run*, not a bug
+ * in this executor: once a future story replaces the fixture with a real
+ * per-project export, freshness numbers become meaningful without this
+ * executor (or the model/service around it) needing to change at all.
  */
 export class LocalDbtOrchestrationExecutor implements OrchestrationExecutor {
   async run(params: OrchestrationExecutorRunParams): Promise<OrchestrationExecutionResult> {
@@ -147,7 +157,7 @@ export class LocalDbtOrchestrationExecutor implements OrchestrationExecutor {
       if (!parsed.ok) {
         throw new OrchestrationExecutionError(parsed.errorMessage);
       }
-      return { freshness: parsed.freshness };
+      return { freshness: parsed.freshness, warehouse: parsed.warehouse };
     } finally {
       rmSync(outputDir, { recursive: true, force: true });
     }

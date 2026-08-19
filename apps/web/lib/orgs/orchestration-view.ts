@@ -1,4 +1,10 @@
-import type { OrchestrationFreshnessTable, OrchestrationRunModel, OrchestrationRunStatus, SchemaDefKind } from '@growthos/firebase-orm-models';
+import type {
+  OrchestrationFreshnessTable,
+  OrchestrationRunModel,
+  OrchestrationRunStatus,
+  OrchestrationWarehouse,
+  SchemaDefKind,
+} from '@growthos/firebase-orm-models';
 
 /**
  * A plain, serializable projection of one table's freshness snapshot on an
@@ -19,6 +25,8 @@ export interface OrchestrationRunView {
   finishedAt: string | null;
   /** Present only for a `succeeded` run. */
   freshness: OrchestrationFreshnessEntryView[] | null;
+  /** Present only for a `succeeded` run — which warehouse this run's `dbt build` actually executed against. */
+  warehouse: OrchestrationWarehouse | null;
   /** Present only for a `failed` run. */
   errorMessage: string | null;
 }
@@ -32,6 +40,7 @@ export function toOrchestrationRunView(run: OrchestrationRunModel): Orchestratio
     freshness: run.freshness
       ? run.freshness.map((entry) => ({ table: entry.table, rowCount: entry.row_count, latestRecordAt: entry.latest_record_at }))
       : null,
+    warehouse: run.warehouse ?? null,
     errorMessage: run.error_message ?? null,
   };
 }
@@ -104,4 +113,14 @@ export function runStatusLabelKey(
   status: OrchestrationRunStatus,
 ): 'orchestrationRunStatusRunning' | 'orchestrationRunStatusSucceeded' | 'orchestrationRunStatusFailed' {
   return RUN_STATUS_LABEL_KEYS[status];
+}
+
+/** The `IngestHealth` translation key for one run's warehouse label — lets an operator tell "this is the buildable-today DuckDB fixture" apart from "this is real BigQuery data" at a glance. */
+const WAREHOUSE_LABEL_KEYS: Record<OrchestrationWarehouse, 'orchestrationWarehouseDuckdb' | 'orchestrationWarehouseBigquery'> = {
+  duckdb: 'orchestrationWarehouseDuckdb',
+  bigquery: 'orchestrationWarehouseBigquery',
+};
+
+export function warehouseLabelKey(warehouse: OrchestrationWarehouse): 'orchestrationWarehouseDuckdb' | 'orchestrationWarehouseBigquery' {
+  return WAREHOUSE_LABEL_KEYS[warehouse];
 }
