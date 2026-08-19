@@ -184,12 +184,29 @@ const FIELD_TYPE_VALIDATORS: Record<SchemaFieldType, (value: unknown) => boolean
 };
 
 /**
+ * The identity-envelope properties the platform's own tracking snippet
+ * (KAN-57's `buildTrackedEvent`) attaches to EVERY event it fires —
+ * `anon_id` always, `customer_id` once `identify()` has run. Implicitly
+ * allowed (as strings) on every event schema: without this, any event
+ * schema that didn't explicitly re-declare them quarantined 100% of real
+ * traffic from the platform's own snippet with `unregistered_field:anon_id`
+ * — found by session-B QA the first time a snippet-shaped event met a
+ * hand-registered schema (2026-08-19). Implicit acceptance only affects
+ * ingest validation; a project that wants either field to participate in
+ * identity stitching (KAN-56) still declares it explicitly with
+ * `is_identity_key`, same as before.
+ */
+export const IMPLICIT_EVENT_ENVELOPE_FIELDS = ['anon_id', 'customer_id'] as const;
+
+/**
  * Reject-list validation against a schema's registered fields: every required field must be present
  * and correctly typed; any field not declared on the schema is quarantined rather than silently
  * dropped (plan `08 §2`). Exported so `quarantine.service.ts`'s replay path can re-run the identical
  * check against the current (possibly since-evolved) active schema, rather than duplicating it.
+ * `kind` gates {@link IMPLICIT_EVENT_ENVELOPE_FIELDS} — only `event` records carry snippet-attached
+ * identity properties; entity/measure validation is unchanged.
  */
-export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: readonly SchemaFieldDef[]): string[] {
+export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: readonly SchemaFieldDef[], kind?: SchemaDefKind): string[] {
   const reasons: string[] = [];
   const declared = new Set(fieldDefs.map((field) => field.name));
 
@@ -203,8 +220,18 @@ export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs
     }
   }
 
+  const implicitEnvelopeFields: readonly string[] = kind === 'event' ? IMPLICIT_EVENT_ENVELOPE_FIELDS : [];
   for (const key of Object.keys(fields)) {
     if (!declared.has(key)) {
+      if (implicitEnvelopeFields.includes(key)) {
+        // Accepted implicitly, but still type-checked: the snippet only ever
+        // sends strings here, so a non-string value is malformed input, not
+        // a schema-registration gap.
+        if (typeof fields[key] !== 'string') {
+          reasons.push(`field_type_mismatch:${key}`);
+        }
+        continue;
+      }
       reasons.push(`unregistered_field:${key}`);
     }
   }
@@ -325,7 +352,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       continue;
     }
 
-    const reasons = validateAgainstSchema(record.fieldsToValidate, schemaDef.field_defs);
+    const reasons = validateAgainstSchema(record.fieldsToValidate, schemaDef.field_defs, params.input.kind);
     if (reasons.length > 0) {
       recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
       quarantinedToPersist.push({ clientId: record.clientId, schemaName: record.schemaName, payload: record.raw, reasons });

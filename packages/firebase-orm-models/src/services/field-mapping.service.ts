@@ -297,7 +297,7 @@ export async function testRunFieldMapping(params: TestRunFieldMappingParams): Pr
     return { ...applied, envelopeErrors: [], schemaRegistered: false, schemaValidationErrors: [] };
   }
 
-  const schemaValidationErrors = validateAgainstSchema(fieldsToValidate, activeSchema.field_defs);
+  const schemaValidationErrors = validateAgainstSchema(fieldsToValidate, activeSchema.field_defs, kind);
   return { ...applied, envelopeErrors: [], schemaRegistered: true, schemaValidationErrors };
 }
 
