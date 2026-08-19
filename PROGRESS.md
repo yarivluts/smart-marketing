@@ -17,6 +17,91 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — KAN-18 phase 3: RawRecordModel → BigQuery raw_records export (PR #96)
+
+- **Last completed:**
+  - `TASKS.md` still had zero `todo` rows at pick time (57 done, KAN-18/19 in-progress/infra-gated,
+    KAN-43 needs-human, KAN-50/51 blocked-by KAN-43); no open PRs and local `main` was fast-forward
+    with `origin/main`. Continued the standing next-step from the previous entry: KAN-18's remaining
+    self-contained, no-live-infra-required slice — the `RawRecordModel`→BigQuery export job (the
+    other option, dbt-transform's BigQuery profile/dialect port, isn't independently testable
+    without real BigQuery credentials, so this one was picked first).
+  - Note: this run's local checkout started with `refs/heads/main` pointing at a stale, unrelated
+    commit (`939077f`, no common ancestor with `origin/main` — the same recurring container-init
+    artifact multiple prior entries describe). Caught it via `git merge-base` returning nothing
+    before branching, and reset with `git checkout -B main origin/main` — nothing lost, this is a
+    local-only ref, never pushed.
+  - **PR #96** — a real `BigQueryRawRecordSink` (`packages/firebase-orm-models/src/warehouse/
+    bigquery-raw-sink.ts`) implementing the existing `WarehouseSink` interface: streams every
+    landed raw record into the `growthos_raw.raw_records` table `infra/terraform/bigquery.tf`
+    (PR #93) already declares, field-for-field, via a narrow injectable `BigQueryInsertClient`
+    (`insertRows(dataset, table, rows)`, BigQuery's streaming-insert "raw" mode with an explicit
+    per-row `insertId`) — same "inject the client interface, not the SDK" convention
+    `BigQueryQueryClient` (PR #94) already established, so tests need no real GCP project/
+    credentials. `payload` is JSON-stringified before sending (BigQuery's `JSON`-typed column
+    expects a pre-serialized value, not a nested object).
+    - New `DualWarehouseSink` (`pipeline/sink.ts`) composes it with the existing
+      `FirestoreWarehouseSink` rather than replacing it: every admin surface reading
+      `RawRecordModel` from Firestore today (ingest health, event-volume sparklines, tracking
+      alerts) keeps working unmodified once BigQuery is configured — this only adds a second
+      landing target. Writes Firestore first, then BigQuery; if either throws, the whole call
+      throws, so `landMessage` marks the pipeline message `failed` (not `delivered`) rather than
+      silently dropping a BigQuery-leg failure — a later KAN-34 DLQ replay retries both legs, safe
+      since both are idempotent by the same message id (a Firestore doc-id overwrite / a BigQuery
+      `insertId` dedup).
+    - `defaultWarehouseSink` is now resolved once at module load via a new
+      `resolveWarehouseSinkFromEnv()`, reading `GOOGLE_CLOUD_PROJECT`/`GCLOUD_PROJECT` (the same
+      vars `query-executor.ts`'s `readWarehouseEnvConfig` already reads) plus a new
+      `GROWTHOS_BIGQUERY_RAW_DATASET`, falling back to the plain `FirestoreWarehouseSink` every
+      environment has used until now (including CI, still true after this PR) when either is
+      unset — mirrors `resolveWarehouseQueryExecutorFromEnv`'s exact posture from PR #94. No call
+      sites changed.
+    - Tests: `warehouse/bigquery-raw-sink.test.ts` (4 cases: dataset/table/insertId pass-through,
+      full field mapping incl. JSON-stringified payload, custom table name, failure propagation),
+      `pipeline/sink.test.ts` (9 cases: `DualWarehouseSink` write-order and both-legs failure
+      propagation, `readWarehouseSinkEnvConfig`, `resolveWarehouseSinkFromEnv`), and two new
+      `pipeline.emulator.test.ts` cases landing a real message through `drainPendingPipelineMessages`
+      into both a real Firestore emulator write and a fake BigQuery client — including the
+      "BigQuery leg fails → message stays `failed`, Firestore already landed, DLQ has it" case.
+    - Deliberately out of scope (per PR #93's own plan, the one remaining KAN-18 slice):
+      `dbt-transform`'s `bigquery` profile target + DuckDB→BigQuery SQL dialect port — not
+      independently testable without real BigQuery credentials, unlike this PR's fake-client
+      approach.
+  - **CI note:** the first CI run failed in `dbt-transform:build` with `.venv/bin/dbt ENOENT` +
+    "Bus error (core dumped)" (exit 135) — a cache/runner-level crash during dependency build, well
+    before any test body ran, in a package this PR never touches. Re-ran the failed job once per
+    the CI-red rules; the re-run's `dbt-transform:build` succeeded cleanly, confirming the flake.
+    Lint, typecheck, terraform fmt/validate, the full test suite (822/822), and build all came back
+    green on the re-run.
+  - Merged PR #96 (squash) once green and `mergeable_state: clean`.
+  - **Housekeeping gap:** `git push origin --delete kan-18-bigquery-raw-record-export` failed with
+    an HTTP 403 from this environment's git proxy (delete-ref pushes appear blocked at the proxy
+    level), and the GitHub MCP server exposes no branch-deletion tool either — the merged branch
+    `kan-18-bigquery-raw-record-export` is still on GitHub, unlike CLAUDE.md's "delete the branch"
+    step. Harmless (already squash-merged, nothing points at it), but a human with direct
+    repo/API access should delete it when convenient; a future run with different tooling access
+    could also retry.
+- **In progress (exact stopping point):** none — PR #96 merged, `TASKS.md`'s KAN-18 row updated
+  inline for phase 3. Zero open PRs remain.
+- **Blocked + why:** nothing new.
+- **Next step:** re-check `TASKS.md` (still zero `todo` rows) and open PRs at the next run. If
+  nothing new has appeared, the one remaining self-contained KAN-18 slice is `dbt-transform`'s
+  `bigquery` profile target + the DuckDB→BigQuery SQL dialect port — harder to verify without real
+  BigQuery credentials than the last two slices, so worth scoping carefully (e.g. structuring it so
+  the DuckDB profile stays the one CI actually runs `dbt build` against, with the BigQuery profile
+  added but untested-by-CI) before committing to it.
+- **Waiting on human:**
+  - Delete the now-merged `kan-18-bigquery-raw-record-export` branch on GitHub (see Housekeeping
+    gap above) — cosmetic only.
+  - `terraform apply` (or equivalent) for `infra/terraform/bigquery.tf` — still outstanding;
+    everything built in PR #94/#96 stays inert until this exists and a deploy sets
+    `GOOGLE_CLOUD_PROJECT`/`GROWTHOS_BIGQUERY_CORE_DATASET`/`GROWTHOS_BIGQUERY_RAW_DATASET`/
+    `GROWTHOS_BIGQUERY_LOCATION`.
+  - Standing: **KAN-43** (Google Ads/Meta application submission), the vault key ring
+    (`GROWTHOS_VAULT_KEYS`) go-ahead, and the Redis/Memorystore cost decision.
+
+---
+
 ## 2026-08-19 — Merged PRs #92/#93/#94; closed duplicate PR #95; KAN-18 phase 2 (BigQueryWarehouseQueryExecutor) done
 
 - **Last completed:**
