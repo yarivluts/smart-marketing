@@ -1,0 +1,13 @@
+[
+  { "name": "raw_record_id", "type": "STRING", "mode": "REQUIRED", "description": "The source PipelineMessage id — the dedup/idempotency key for a re-landed record." },
+  { "name": "organization_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "project_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "environment_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "partition_date", "type": "DATE", "mode": "REQUIRED" },
+  { "name": "batch_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "kind", "type": "STRING", "mode": "REQUIRED", "description": "entity | event | measure" },
+  { "name": "schema_name", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "client_id", "type": "STRING", "mode": "REQUIRED" },
+  { "name": "payload", "type": "JSON", "mode": "REQUIRED" },
+  { "name": "landed_at", "type": "TIMESTAMP", "mode": "REQUIRED" }
+]
