@@ -8,6 +8,7 @@ import {
   createSharedCredential,
   ensureUserForFirebaseSession,
   inviteMemberToOrganization,
+  listAuditLogEntriesForOrg,
   requestResourceAttachment,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -125,7 +126,7 @@ describe('PATCH /api/orgs/[orgId]/resource-attachments/[attachmentId]', () => {
   });
 
   it('lets an org_owner approve a pending attachment, and rejects deciding it again', async () => {
-    const { ownerSession, organization, attachment } = await setupPendingAttachment('Decide Happy Org');
+    const { ownerSession, owner, organization, attachment } = await setupPendingAttachment('Decide Happy Org');
     getServerSessionMock.mockResolvedValue(ownerSession);
 
     const response = await PATCH(patchRequest(organization.id, attachment.id, true), {
@@ -133,6 +134,13 @@ describe('PATCH /api/orgs/[orgId]/resource-attachments/[attachmentId]', () => {
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'approved' });
+
+    // The audit entry must attribute this to the *signed-in caller*, not
+    // e.g. the request's own `requested_by` — that's the one thing this
+    // route actually establishes over calling the service directly.
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const approveEntry = entries.find((candidate) => candidate.action === 'resource_attachment.approve');
+    expect(approveEntry?.actor_id).toBe(owner.id);
 
     const secondDecision = await PATCH(patchRequest(organization.id, attachment.id, false), {
       params: Promise.resolve({ orgId: organization.id, attachmentId: attachment.id }),
@@ -161,7 +169,7 @@ describe('DELETE /api/orgs/[orgId]/resource-attachments/[attachmentId]', () => {
   });
 
   it('lets an org_owner detach an approved attachment', async () => {
-    const { ownerSession, organization, attachment } = await setupPendingAttachment('Detach Happy Org');
+    const { ownerSession, owner, organization, attachment } = await setupPendingAttachment('Detach Happy Org');
     getServerSessionMock.mockResolvedValue(ownerSession);
     await PATCH(patchRequest(organization.id, attachment.id, true), {
       params: Promise.resolve({ orgId: organization.id, attachmentId: attachment.id }),
@@ -172,5 +180,10 @@ describe('DELETE /api/orgs/[orgId]/resource-attachments/[attachmentId]', () => {
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'detached' });
+
+    // See the PATCH describe block's own note on why this is asserted.
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const detachEntry = entries.find((candidate) => candidate.action === 'resource_attachment.detach');
+    expect(detachEntry?.actor_id).toBe(owner.id);
   });
 });

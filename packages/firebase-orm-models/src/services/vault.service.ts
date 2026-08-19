@@ -77,8 +77,8 @@ export async function setSharedCredentialSecret(params: SetSharedCredentialSecre
       // Only ever the *presence* of a secret, never the secret or its ciphertext:
       // an audit trail readable by every `audit.read` holder must not become a
       // second, weaker copy of the vault it is auditing.
-      before: { has_secret: replacedExistingSecret },
-      after: { has_secret: true },
+      before: { hasSecret: replacedExistingSecret },
+      after: { hasSecret: true },
     });
   } catch {
     // Best-effort — see recordAuditLogEntry's own doc comment.

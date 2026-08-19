@@ -540,7 +540,12 @@ describe('resource attachment audit logging (KAN-44)', () => {
     expect(entry.project_id).toBe(project.id);
     expect(entry.target_type).toBe('resource_attachment');
     expect(entry.target_id).toBe(attachment.id);
-    expect(entry.after).toMatchObject({ status: 'pending', resource_kind: 'credential', resource_id: credential.id });
+    expect(entry.after).toEqual({
+      status: 'pending',
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      scopeSelection: ['act_aaa'],
+    });
   });
 
   it('records an approval and a rejection as distinct actions, each with its before/after status', async () => {
@@ -557,7 +562,7 @@ describe('resource attachment audit logging (KAN-44)', () => {
     expect(approveEntry.actor_id).toBe(approved.owner.id);
     expect(approveEntry.project_id).toBe(approved.project.id);
     expect(approveEntry.before).toEqual({ status: 'pending' });
-    expect(approveEntry.after).toEqual({ status: 'approved' });
+    expect(approveEntry.after).toEqual({ status: 'approved', scopeSelection: ['act_aaa'] });
     expect(await entriesFor(approved.organization.id, 'resource_attachment.reject')).toHaveLength(0);
 
     const rejected = await setupPendingAttachment('Attach Reject Audit Org');
@@ -570,7 +575,7 @@ describe('resource attachment audit logging (KAN-44)', () => {
 
     const [rejectEntry] = await entriesFor(rejected.organization.id, 'resource_attachment.reject');
     expect(rejectEntry).toBeDefined();
-    expect(rejectEntry.after).toEqual({ status: 'rejected' });
+    expect(rejectEntry.after).toEqual({ status: 'rejected', scopeSelection: ['act_aaa'] });
     expect(await entriesFor(rejected.organization.id, 'resource_attachment.approve')).toHaveLength(0);
   });
 
@@ -595,7 +600,7 @@ describe('resource attachment audit logging (KAN-44)', () => {
     // revocation to whoever actually performed it.
     expect(detachEntry.actor_id).toBe(revoker.id);
     expect(detachEntry.project_id).toBe(project.id);
-    expect(detachEntry.before).toEqual({ status: 'approved' });
+    expect(detachEntry.before).toEqual({ status: 'approved', scopeSelection: ['act_aaa'] });
     expect(detachEntry.after).toEqual({ status: 'detached' });
 
     await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });

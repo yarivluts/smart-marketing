@@ -107,6 +107,18 @@ describe('revealSharedCredentialSecret', () => {
     expect(revealed).toBe(plaintextSecret);
   });
 
+  it('is deliberately not audit-logged (KAN-44) — it runs on every plugin sync, and logging it would bury real config changes under machine traffic', async () => {
+    const { owner, organization, credential } = await setupOrgWithCredential('Vault Reveal Not Audited Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: 'quiet-read-me', kms, actorId: owner.id });
+
+    const entriesBeforeReveal = (await listAuditLogEntriesForOrg(organization.id)).length;
+    await revealSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, kms });
+
+    expect(await listAuditLogEntriesForOrg(organization.id)).toHaveLength(entriesBeforeReveal);
+  });
+
   it('throws CredentialSecretNotSetError when no secret has ever been set', async () => {
     const { organization, credential } = await setupOrgWithCredential('Vault Unset Org');
     const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
@@ -176,8 +188,8 @@ describe('vault audit logging (KAN-44)', () => {
     expect(entry!.actor_id).toBe(owner.id);
     expect(entry!.target_type).toBe('shared_credential');
     expect(entry!.target_id).toBe(credential.id);
-    expect(entry!.before).toEqual({ has_secret: false });
-    expect(entry!.after).toEqual({ has_secret: true });
+    expect(entry!.before).toEqual({ hasSecret: false });
+    expect(entry!.after).toEqual({ hasSecret: true });
 
     // The whole point: an `audit.read` holder must not be able to recover the
     // secret (or its stored ciphertext) from the audit trail.
@@ -204,8 +216,8 @@ describe('vault audit logging (KAN-44)', () => {
     expect(setEntries).toHaveLength(2);
     // Asserted as a set, not by index: `created_at` is millisecond-precision,
     // so two writes this close together have no guaranteed read-back order.
-    expect(setEntries.map((candidate) => candidate.before?.has_secret).sort()).toEqual([false, true]);
-    expect(setEntries.every((candidate) => candidate.after?.has_secret === true)).toBe(true);
+    expect(setEntries.map((candidate) => candidate.before?.hasSecret).sort()).toEqual([false, true]);
+    expect(setEntries.every((candidate) => candidate.after?.hasSecret === true)).toBe(true);
   });
 
   it('records a rotation, flagging whether the envelope was actually re-wrapped', async () => {
@@ -242,6 +254,19 @@ describe('vault audit logging (KAN-44)', () => {
     // Asserted as a set, not by index — see the replace test's own note.
     expect(rotateEntries.map((candidate) => candidate.after?.rewrapped).sort()).toEqual([false, true]);
     expect(rotateEntries.every((candidate) => candidate.actor_id === owner.id)).toBe(true);
+  });
+
+  it('records nothing when rotation is rejected by its own guard (no secret ever set)', async () => {
+    const { owner, organization, credential } = await setupOrgWithCredential('Vault Rotate Guard Audit Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+
+    await expect(
+      rotateSharedCredentialSecretKey({ organizationId: organization.id, credentialId: credential.id, kms, actorId: owner.id }),
+    ).rejects.toBeInstanceOf(CredentialSecretNotSetError);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.filter((entry) => entry.action === 'credential.secret_rotate')).toHaveLength(0);
   });
 
   it('leaves the org audit chain verifiable after vault writes', async () => {

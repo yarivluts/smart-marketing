@@ -230,7 +230,12 @@ export async function requestResourceAttachment(
       targetType: 'resource_attachment',
       targetId: attachment.id,
       summary: `Requested to attach ${params.resourceKind} "${params.resourceId}" to the project`,
-      after: { status: attachment.status, resource_kind: params.resourceKind, resource_id: params.resourceId },
+      after: {
+        status: attachment.status,
+        resourceKind: params.resourceKind,
+        resourceId: params.resourceId,
+        scopeSelection: attachment.scope_selection ?? null,
+      },
     });
   } catch {
     // Best-effort — see recordAuditLogEntry's own doc comment.
@@ -263,6 +268,12 @@ export async function decideResourceAttachment(
     throw new AttachmentNotPendingError();
   }
 
+  // Captured before the mutation, not hardcoded to the guard's `'pending'`
+  // literal: the audit entry's `before` is hash-committed (see
+  // `recordAuditLogEntry`'s doc comment) into an append-only chain, so it
+  // must reflect what the status actually *was* — never an assumption that
+  // happens to hold only because of the guard above.
+  const statusBeforeDecision = attachment.status;
   attachment.status = params.approve ? 'approved' : 'rejected';
   attachment.decided_by = params.decidedByUserId;
   attachment.decided_at = new Date().toISOString();
@@ -280,8 +291,8 @@ export async function decideResourceAttachment(
       summary: params.approve
         ? `Approved attaching ${attachment.resource_kind} "${attachment.resource_id}" to the project`
         : `Rejected attaching ${attachment.resource_kind} "${attachment.resource_id}" to the project`,
-      before: { status: 'pending' },
-      after: { status: attachment.status },
+      before: { status: statusBeforeDecision },
+      after: { status: attachment.status, scopeSelection: attachment.scope_selection ?? null },
     });
   } catch {
     // Best-effort — see recordAuditLogEntry's own doc comment.
@@ -304,6 +315,9 @@ export async function detachResource(params: DetachResourceParams): Promise<Reso
     throw new AttachmentNotApprovedError();
   }
 
+  // See decideResourceAttachment's own comment on why this is captured, not hardcoded.
+  const statusBeforeDetach = attachment.status;
+  const scopeSelectionBeforeDetach = attachment.scope_selection ?? null;
   attachment.status = 'detached';
   attachment.detached_at = new Date().toISOString();
   await attachment.save();
@@ -318,7 +332,7 @@ export async function detachResource(params: DetachResourceParams): Promise<Reso
       targetType: 'resource_attachment',
       targetId: attachment.id,
       summary: `Detached ${attachment.resource_kind} "${attachment.resource_id}" from the project`,
-      before: { status: 'approved' },
+      before: { status: statusBeforeDetach, scopeSelection: scopeSelectionBeforeDetach },
       after: { status: attachment.status },
     });
   } catch {
