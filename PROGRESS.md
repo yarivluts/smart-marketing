@@ -17,6 +17,34 @@ Template for each entry:
 
 ---
 
+## 2026-08-19 — Idle check-in: no unblocked work (4)
+
+- **Last completed:** nothing new to implement this run. Re-verified against the prior idle entry:
+  `git fetch origin main` — `origin/main` unchanged at `8187032`; `TASKS.md` still has zero `todo`
+  rows (KAN-18/KAN-19 `in-progress` and infra-gated, KAN-43 `needs-human`, KAN-50/51 still
+  `blocked-by` KAN-43); no `GOOGLE_CLOUD_PROJECT`/`GCLOUD_PROJECT`/`*BIGQUERY*`/`*FIREBASE*` env vars
+  and no `infra/terraform/*.tfstate*`, so the KAN-18 `terraform apply` is still outstanding. PR #98
+  (`chore/bigquery-raw-records-schema-json`) is still the only open PR, still the human account
+  owner's own manual follow-up (not an agent PR) — left untouched, unchanged since the last check-in.
+  (Note: this run's local checkout again started detached from a stale local `main` ref with no
+  common ancestor with `origin/main` — same recurring container-init artifact prior entries
+  describe; reset via `git checkout -B main origin/main`, nothing lost, local-only ref.)
+- **In progress (exact stopping point):** none.
+- **Blocked + why:** same as the prior three entries — the entire remaining backlog is either `done`
+  or gated on human action (GCP `terraform apply`/Pub/Sub/Redis/staging for KAN-18/19; Google Ads
+  dev token + Meta Marketing API approval for KAN-43, gating KAN-50/51).
+- **Next step:** a future run should: (a) re-check for newly opened/updated PRs, (b) re-check
+  whether PR #98 merged or terraform state has appeared, (c) re-check whether KAN-43's approvals
+  have landed, and (d) otherwise stay idle rather than inventing speculative scope beyond the
+  documented backlog.
+- **Waiting on human:**
+  - `terraform apply`/`import` for `infra/terraform/` against the real GCP project, plus Pub/Sub,
+    Redis, and a staging environment — still outstanding (PR #98 suggests this may be in progress).
+  - **KAN-43** — Google Ads dev token + Meta Marketing API application submission — still outstanding,
+    LONG LEAD.
+  - Delete already-merged prior branches on GitHub — this environment's git proxy still returns
+    HTTP 403 on delete-ref pushes; cosmetic only.
+
 ## 2026-08-19 — Idle check-in: no unblocked work (3)
 
 - **Last completed:** nothing new to implement this run. Re-verified against the prior idle entry:
