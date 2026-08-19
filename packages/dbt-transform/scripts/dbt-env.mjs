@@ -9,7 +9,7 @@
 
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { platform } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,7 +41,16 @@ function requirementsHash() {
 }
 
 function isAlreadyProvisioned() {
-  if (!existsSync(venvDbt) || !existsSync(provisionedMarkerPath)) {
+  // `venvPython` too, not just `venvDbt`: a venv's `bin/python` is a symlink
+  // to the machine's real interpreter, and a CI-cache-restored venv can come
+  // back with that symlink dangling (the runner image's Python moved between
+  // the run that saved the cache and the run that restored it). The `dbt`
+  // entry-point script still exists then — but its shebang points at the
+  // dead symlink, so spawning it fails with a bare `spawnSync ... dbt ENOENT`
+  // (hit for real on PR #100's CI, 2026-08-19). `existsSync` follows
+  // symlinks, so a dangling one correctly reads as "not provisioned" and
+  // triggers a from-scratch rebuild below.
+  if (!existsSync(venvDbt) || !existsSync(venvPython) || !existsSync(provisionedMarkerPath)) {
     return false;
   }
   return readFileSync(provisionedMarkerPath, 'utf8').trim() === requirementsHash();
@@ -74,6 +83,11 @@ function resolvePythonCommand() {
 function provisionVenv() {
   console.log('[dbt-transform] provisioning a local Python venv with dbt-core + dbt-duckdb...');
   if (!existsSync(venvPython)) {
+    // A venv dir that exists without a live `bin/python` is corrupt (the
+    // dangling-symlink cache case `isAlreadyProvisioned` detects) — `python
+    // -m venv` over it won't reliably repair every broken piece, so start
+    // clean instead of layering onto wreckage.
+    rmSync(venvDir, { recursive: true, force: true });
     runInherit(resolvePythonCommand(), ['-m', 'venv', venvDir]);
   }
   runInherit(venvPython, ['-m', 'pip', 'install', '--quiet', '--upgrade', 'pip']);
