@@ -211,3 +211,25 @@ export async function listEnvironmentsForProject(
     .where('project_id', '==', projectId)
     .get();
 }
+
+/**
+ * The one environment a human-facing surface (a board tile, a goal
+ * thermometer) queries when nothing narrower is specified: the project's
+ * `prod` environment — the same live-traffic slice a `gos_live_` ingest key
+ * writes into (`apiKeyModeForEnvironment`), so "the board's numbers" always
+ * means "real traffic", never dev/staging test events mixed in. Lifted from
+ * `product-analytics.service.ts`'s identical inline resolution (the repo's
+ * one prior "project → single environment" precedent) when metric queries
+ * became environment-scoped (session-B QA, 2026-08-19). `createProject`
+ * provisions exactly one environment per `ENVIRONMENTS` name, so `prod` is
+ * always well-defined; `null` only for a project whose provisioning loop
+ * partially failed (see `createProject`'s own non-atomicity note), which
+ * callers treat as "no environment filter" rather than an error.
+ */
+export async function resolveDefaultQueryEnvironment(
+  organizationId: string,
+  projectId: string,
+): Promise<EnvironmentModel | null> {
+  const environments = await listEnvironmentsForProject(organizationId, projectId);
+  return environments.find((environment) => environment.name === 'prod') ?? environments[0] ?? null;
+}

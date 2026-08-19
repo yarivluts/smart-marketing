@@ -68,6 +68,9 @@ describe('McpAuthGuard', () => {
       principalKind: 'api_key',
       scopes: ['mcp.read'],
       apiKeyId: 'key-1',
+      // The key's own bound environment, threaded into warehouse reads so a
+      // test-mode key only ever sees its test slice.
+      environmentId: 'env-1',
     });
   });
 

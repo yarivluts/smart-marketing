@@ -56,7 +56,16 @@ export class MetricsController {
     const parsedRequest = parseMetricQueryRequestBody(body);
 
     try {
-      const result = await queryMetrics({ organizationId: context.organizationId, projectId: context.projectId, request: parsedRequest });
+      // `environmentId`: the key's own bound environment — a `gos_test_` key
+      // sees its test slice, a `gos_live_` key sees production, matching the
+      // "the credential itself is the scope" posture every other key-scoped
+      // surface here uses.
+      const result = await queryMetrics({
+        organizationId: context.organizationId,
+        projectId: context.projectId,
+        environmentId: context.environmentId,
+        request: parsedRequest,
+      });
       return { series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit };
     } catch (error) {
       if (error instanceof ProjectNotFoundError) {

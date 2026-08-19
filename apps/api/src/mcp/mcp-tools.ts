@@ -185,7 +185,15 @@ async function runMetricQueryTool(
     if (validationError) {
       return errorResult(validationError);
     }
-    const result = await queryMetrics({ organizationId: auth.organizationId, projectId: auth.projectId, request });
+    // API-key caller: the key's bound environment; OAuth (human) caller:
+    // undefined, so queryMetrics resolves the project's prod default — see
+    // McpAuthContext.environmentId's own doc comment.
+    const result = await queryMetrics({
+      organizationId: auth.organizationId,
+      projectId: auth.projectId,
+      ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
+      request,
+    });
     return textResult({ series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
   } catch (error) {
     return errorResult(describeMetricsError(error));
@@ -312,7 +320,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     auditedToolHandler(auth, 'query_cohort', async (args: any) => {
       const { cohort_month: cohortMonth, limit } = args as { cohort_month?: string; limit?: number };
       try {
-        const rows = await queryProjectCohortRetention({ organizationId: auth.organizationId, projectId: auth.projectId, cohortMonth, limit });
+        const rows = await queryProjectCohortRetention({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), cohortMonth, limit });
         return textResult({ rows });
       } catch (error) {
         return errorResult(describeMetricsError(error));
@@ -330,7 +338,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     auditedToolHandler(auth, 'search_customers', async (args: any) => {
       const { query, schema_name: schemaName, limit } = args as { query: string; schema_name?: string; limit?: number };
       try {
-        const results = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, query, schemaName, limit });
+        const results = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), query, schemaName, limit });
         return textResult({ results });
       } catch (error) {
         return errorResult(describeMetricsError(error));
