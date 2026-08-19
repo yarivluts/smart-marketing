@@ -1,3 +1,6 @@
+-- BigQuery-disabled alongside the identity/attribution chain it tests --
+-- see stg_identity_key_observations.sql's own config comment.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. Guards that
 -- `fact_attribution.landing_page` is the *crediting* touchpoint's own entry
 -- URL, not just any touchpoint the conversion could reach — the whole point

@@ -1,3 +1,11 @@
+-- DuckDB-only (KAN-18): asserts exact hand-computed values against the
+-- fixture seed's synthetic projects, which only exist in the DuckDB dev
+-- target -- against a real warehouse with real data the assertion is
+-- meaningless. It also uses DuckDB's `with cte(cols) as (values ...)`
+-- form, which BigQuery rejects outright (proved by the first real
+-- `dbt build --target prod`, 2026-08-19). The portable invariant tests
+-- (ratio/bucket ranges, uniqueness, not-null) stay enabled on both.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. KAN-62 AC: "Cohort matrix
 -- matches hand-computed fixture." `seeds/raw_records.csv` carries a
 -- hand-built two-cohort scenario under `proj_11`, isolated from every other

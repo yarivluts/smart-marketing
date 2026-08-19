@@ -1,3 +1,10 @@
+-- BigQuery-disabled (KAN-18 follow-up): this model transitively depends on
+-- the `schema_identity_fields` seed, a DuckDB-only fixture whose real
+-- warehouse export (SchemaDefModel.field_defs where is_identity_key) has
+-- not been built yet -- see dbt_project.yml's seeds.+enabled note. Until
+-- that export exists, the whole identity/attribution chain (this model and
+-- everything downstream of it) builds only against the DuckDB dev target.
+{{ config(enabled=(target.type == 'duckdb')) }}
 -- Deterministic identity stitching (plan `04 §4`, KAN-56): resolves each
 -- anonymous visitor id to the customer identity it shares registered
 -- identity-key evidence with. No probabilistic fallback — plan `04 §4`'s
