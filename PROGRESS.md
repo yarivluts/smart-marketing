@@ -17,6 +17,75 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-44 follow-up closed: four remaining audit-log gaps (PR #119)
+
+- **Last completed:**
+  - Session start found the now-familiar all-`done`-except-standing-blockers `TASKS.md` state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`) — no `todo` row.
+    The previous run's own "next step" list named three specific, already-identified audit-log gaps
+    (from an earlier Explore-agent sweep); picked those up rather than re-running a fresh sweep, plus
+    found a fourth of the same shape while implementing the first three.
+  - **PR #119 (merged)**: all four follow the codebase's existing best-effort
+    `try { recordAuditLogEntry(...) } catch { /* best-effort */ }` pattern —
+    1. `setHookDeliveryStatus` (`hook.service.ts`) now audit-logs marking a hook delivery
+       reviewed/discarded (`hook_delivery.status_set`) — every sibling mutation in the file already
+       did.
+    2. `ensureAutomationTargetSeeded` (`automation.service.ts`) now audit-logs seeding a new
+       automation target (`automation_target.seed`) — only on the real-creation path; the idempotent
+       re-seed-of-an-existing-target early return stays silent, matching the model's own no-op
+       semantics.
+    3. `createOrganizationWithOwner` (`organization.service.ts`) now audit-logs org creation
+       (`organization.create`) — no such action existed anywhere before this, despite org creation
+       being the single most consequential "config change" the AC names.
+    4. `createProject` (found while implementing #3, same file/shape) now audit-logs project creation
+       (`project.create`) when a creating user is supplied — added an optional `createdByUserId`
+       (audited only when present, the same "no synthetic system actor" posture
+       `triggerOrchestrationRun`'s optional actor param already established, since the vast majority
+       of this function's callers are test fixtures with no real user actor) and wired it through
+       from the real `POST /api/orgs/:orgId/projects` route, which already has the caller's user id
+       via `requireOrgPermission`.
+  - Making org creation audited means every org's audit chain now gets a genesis
+    `organization.create` entry — updated every pre-existing test across three files
+    (`audit-log.emulator.test.ts`, the `apps/web` audit-log route test, and one KAN-44-adjacent
+    assertion each in a couple of other emulator suites) that had asserted an org's audit log/chain
+    was exactly empty or had an exact entry count/list, so they now scope to the entries each test
+    itself wrote (filtering by action prefix) or account for the extra genesis entry explicitly.
+    Caught this by running the *full* test suite before opening the PR, not just the four touched
+    service files — the four touched files' own emulator tests passed on the first try; the breakage
+    was entirely in `audit-log.emulator.test.ts` and one `apps/web` route test that happened to assert
+    exact chain shape.
+  - New/updated tests: emulator coverage for all four gaps (`hook.emulator.test.ts`,
+    `automation.emulator.test.ts`, `org-membership-flows.emulator.test.ts`, the projects route test),
+    plus the exact-count fixes above.
+  - `pnpm lint && pnpm typecheck && pnpm build` green across the full monorepo; `pnpm test` green
+    everywhere: `firebase-orm-models` 883/883, `apps/web` 938 unit + 23/23 Playwright e2e specs,
+    `apps/api` 114/114. CI on the PR itself green (`lint · typecheck · test · build` +
+    `terraform fmt · validate`), `mergeable_state: clean`, no review comments. Branch
+    `kan-44-audit-log-gaps-followup`, PR #119, merged into `main` (squash) at `d304024`. Remote branch
+    deletion: no delete-branch GitHub MCP tool available in this session, same known, pre-existing
+    limitation documented since 2026-07-04.
+  - Also had to reset this session's local `main` to `origin/main` at session start — the container's
+    cached local clone had a completely unrelated history from `origin/main` (`git merge-base`
+    returned nothing) with 5 stray "no unblocked work" commits never reflected upstream; working tree
+    was clean so this was a safe hard-reset, not a real conflict. Noting it here in case a future
+    session hits the same stale-clone symptom.
+- **In progress (exact stopping point):** none — clean stopping point, `main` green at `d304024`.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's long-lead approval or per-command-approved
+  interactive session.
+- **Next step:** the two candidates the 2026-08-20 KAN-39 follow-up entry surfaced but didn't pursue
+  are still open: (1) a Google/Meta Ads budget-resource lookup for automation targets seeded to
+  represent a pre-existing campaign (`GoogleAdsBudgetResourceUnknownError`/its Meta counterpart in
+  `plugin-runtime/{google-ads,meta-ads}/executor.ts` always throw today — a real fix needs a
+  GAQL/Graph API lookup, fully fake-client-testable, no live account needed); (2) a dual-secret grace
+  window for hook endpoint signing-secret rotation (`hook.service.ts`'s `setHookEndpointSigningSecret`
+  doc comment names this as out-of-scope for KAN-53's buildable-today version). A fresh sweep is also
+  fine if neither still looks right by then.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — KAN-76 follow-up closed: segment delete (PR #117)
 
 - **Last completed:**
