@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMartViewSql, martViewName, UnsafeMartIdentifierError } from './schema-mart';
+import { buildMartViewSql, martViewName, MART_INTRINSIC_COLUMNS, MART_KINDS, UnsafeMartIdentifierError } from './schema-mart';
 import type { SchemaFieldDef } from '../models/schema-def.model';
 
 const fields: SchemaFieldDef[] = [
@@ -56,5 +56,25 @@ describe('buildMartViewSql', () => {
     expect(() => buildMartViewSql({ organizationId: 'org-1', projectId: 'proj-1', kind: 'measure', schemaName: 'ok_name', fieldDefs: evil, dataset: 'growthos_core' })).toThrow(
       UnsafeMartIdentifierError,
     );
+  });
+
+  it('emits every MART_INTRINSIC_COLUMNS entry exactly once even with zero declared fields — the reject-list schema-registry.service.ts validates field names against', () => {
+    const empty = buildMartViewSql({ organizationId: 'org-1', projectId: 'proj-1', kind: 'entity', schemaName: 'ok_name', fieldDefs: [], dataset: 'growthos_core' });
+    for (const column of MART_INTRINSIC_COLUMNS) {
+      expect(empty.match(new RegExp(`^  ${column},?$`, 'm'))).toHaveLength(1);
+    }
+  });
+});
+
+describe('MART_KINDS / MART_INTRINSIC_COLUMNS', () => {
+  it('only measure/entity schemas get a mart view — the two kinds validateFields in schema-registry.service.ts gates its reserved-name check on', () => {
+    expect(MART_KINDS).toEqual(['measure', 'entity']);
+  });
+
+  it('lists exactly the columns buildMartViewSql prepends to a declared field list, so a field sharing one of these names would collide', () => {
+    const sql = buildMartViewSql({ organizationId: 'org-1', projectId: 'proj-1', kind: 'measure', schemaName: 'ok_name', fieldDefs: [], dataset: 'growthos_core' });
+    for (const column of MART_INTRINSIC_COLUMNS) {
+      expect(sql).toContain(column);
+    }
   });
 });

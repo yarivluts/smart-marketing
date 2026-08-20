@@ -60,17 +60,91 @@ Template for each entry:
     (`orgs.spec.ts` invite-revoke, `resource-library.spec.ts` — both unrelated to this change) flaked
     once under heavy concurrent machine load and passed on retry #1; reported as "2 flaky", run still
     exit 0.
-- **In progress (exact stopping point):** PR to be opened + driven to green, then merged.
-- **Blocked + why:** unchanged standing items only.
-- **Next step:** open the PR, merge once CI green, delete branch. Remaining unclaimed follow-ups a
-  future run could pick (from the same research pass, all still real as of this run): the schema-mart
-  JSON-level bug (mart views extract declared fields from `$.field` at the payload top level, but the
-  real ingest envelope nests them under `properties`/`attributes`/`dimensions` — the TS twin of the
-  #135 dbt fix; overlaps PR #134's file, so do it after #134 lands) and its measure-`value`/`ts`
-  sibling; the engagement-pack metrics targeting a nonexistent `fact_funnel_event` table; and the
-  unbounded in-memory metric result cache.
+- **In progress (exact stopping point):** PR #136 opened; CI green (`terraform fmt · validate` and
+  `lint · typecheck · test · build` both passed on the conflict-free head); merging now.
+- **Blocked + why:** nothing.
+- **Next step:** Remaining unclaimed follow-ups a future run could pick (from the same research pass,
+  all still real as of this run): the schema-mart JSON-level bug (mart views extract declared fields
+  from `$.field` at the payload top level, but the real ingest envelope nests them under
+  `properties`/`attributes`/`dimensions` — the TS twin of the #135 dbt fix; **#134 has now landed**,
+  so this no longer needs to wait) and its measure-`value`/`ts` sibling; the engagement-pack metrics
+  targeting a nonexistent `fact_funnel_event` table; and the unbounded in-memory metric result cache.
+  Also note the same "PROGRESS.md prepend conflict" pattern #134's own entry documents recurred here
+  too (twice, resolved the same way — keep both entries, newest first).
 - **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
   live-infra sub-items; prune merged feature branches the proxy blocks this run from deleting).
+
+---
+
+## 2026-08-20 — Reject measure/entity fields colliding with mart-view intrinsic columns (PR #134)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked `list_pull_requests(state: open)`
+    first** (collision-avoidance): three concurrent-session PRs open — **#128** (leap-day
+    compare-window clamp), **#131** (reject an aggregation metric whose column can't exist in its
+    custom-schema mart — already covers the previously-flagged `lp_*` follow-up), **#132** (codify
+    live Firestore composite indexes). Picked a genuinely new, non-overlapping correctness fix in a
+    different area (`packages/firebase-orm-models` schema-registry/mart layer).
+  - **Root cause:** `buildMartViewSql` (`warehouse/schema-mart.ts`) always prepends five intrinsic
+    columns to a mart view's SELECT — `organization_id`, `project_id`, `environment_id`,
+    `client_id`, `landed_at` — ahead of a schema's declared fields, but `schema-registry.service.ts`'s
+    `validateFields` never checked field names against that reserved set. A measure/entity schema
+    declaring a field literally named `client_id` or `landed_at` (very plausible real-data names)
+    saved fine, but the generated `CREATE OR REPLACE VIEW` DDL then carried two same-named columns,
+    which BigQuery rejects — `syncSchemaMartView` swallows that into a `{status:'error'}` outcome, so
+    the schema silently ends up with a broken/missing mart view and every metric registered against
+    it fails opaquely at query time, with no validation-time error pointing at the cause.
+  - **Fix:** exported `MART_INTRINSIC_COLUMNS` and `MART_KINDS` from `warehouse/schema-mart.ts` as the
+    single source of truth (also de-duplicating a second local `MART_KINDS` copy that
+    `schema-mart.service.ts` maintained separately, and rebuilt `buildMartViewSql`'s SELECT from the
+    exported list so the reject-list can't drift from the columns actually emitted); `validateFields`
+    now takes `kind` and rejects any measure/entity field name colliding with `MART_INTRINSIC_COLUMNS`
+    at register/evolve time — before anything reaches the warehouse — while leaving `event` schemas
+    untouched (they never get a mart view). Also refreshed a stale `buildMartViewSql` doc comment that
+    still claimed "unqualified names throughout" (left over from before PR #127's dataset-qualification
+    fix).
+  - **Tests:** unit tests in `warehouse/schema-mart.test.ts` (intrinsic-column emission + list shape)
+    and emulator tests in `schema-registry.emulator.test.ts` (rejection on measure/entity, same-name
+    success on `event`).
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` green. `pnpm test`: the full turbo run
+    showed one failure — a 60s **timeout in an unrelated `apps/web` onboarding-pack route test** caused
+    by a transient Firestore-emulator `RESOURCE_EXHAUSTED` overload under full-suite concurrency
+    (`Received message larger than max`), not this change (which is `firebase-orm-models`-only). Confirmed
+    a flake by re-running that exact test file in isolation under its own emulator: **6/6 pass**. The
+    `firebase-orm-models` package's own tests are all green.
+  - **Rebased onto `main` after #131/#132/#133 landed concurrently:** merged `origin/main` into this
+    branch; the only real conflict was this file (two entries both prepended at the top — resolved by
+    keeping both, this one first). `schema-registry.service.ts` auto-merged cleanly (this change's
+    `validateFields`/`MART_INTRINSIC_COLUMNS` work and #131's `validateAggregationAgainstRegisteredSchema`
+    touch disjoint parts of the file).
+  - **Lesson worth keeping — a PR with a merge conflict never gets CI at all.** #134 sat ~30 min with
+    `total_count: 0` check runs and an empty `list_workflow_runs` for its branch, which reads exactly
+    like "CI is slow to queue". It wasn't: `mergeable_state` was `dirty`, and GitHub does not schedule
+    `pull_request` workflow runs for an unmergeable head. The tell is `mergeable_state`, not the check
+    list — **when checks are missing rather than pending, read `pull_request_read: get` first.**
+    Resolving the conflict and pushing queued CI within seconds. Main moved twice mid-run (#131/#132/#133,
+    then #135 + a record commit), so this happened twice; both conflicts were the same shape — two runs
+    prepending a PROGRESS.md entry at the same anchor — and both resolved by keeping both entries, newest
+    first. No code conflict either time (`schema-registry.service.ts` auto-merged cleanly against #131's
+    `validateAggregationAgainstRegisteredSchema`, which touches a disjoint part of the file).
+  - **Merged 2026-08-20:** PR #134 squash-merged into `main` (`df454da`) after CI ran green on the
+    conflict-free head; no review comments. Verified the fix on `main` post-merge
+    (`MART_INTRINSIC_COLUMNS` exported, `rejectMartIntrinsicNames` gating `validateFields`). Local
+    branch deleted; the **remote** branch delete hit the same git-over-HTTPS proxy **HTTP 403** every
+    prior merged branch has hit from a scheduled run — harmless, a human can prune
+    `fix/mart-reserved-field-names` along with the others.
+- **In progress (exact stopping point):** none — #134 fully landed.
+- **Blocked + why:** nothing.
+- **Next step:** a future run should still **check open PRs first** (the concurrent-session collision
+  pattern persists — 5 PRs landed/open around this run: #128, #131, #132, #133, #135). Remaining
+  self-identified headless-buildable follow-ups are thin now; deeper KAN-18/KAN-19 scope needs the
+  interactive per-command-approved GCP pattern, not a headless run. Also worth a look: #131's own entry
+  below flags that #133 ("identity/attribution chain on BigQuery") may have already closed the
+  `fact_landing_page_performance`/`lp_*` BigQuery gap it scoped out — and the later quality-batch entry
+  says it did, with live proof; a run wanting to confirm should check the board renders, not the titles.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
 
 ---
 

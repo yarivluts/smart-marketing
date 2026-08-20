@@ -139,6 +139,51 @@ describe('registerSchemaDefinition', () => {
       }),
     ).rejects.toThrow(InvalidSchemaDefinitionError);
   });
+
+  it('rejects a measure/entity field name colliding with a mart view\'s own intrinsic column, but allows the same name on an event schema (which never gets a mart view)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Mart Reserved Field Org');
+
+    // `client_id` is one of `MART_INTRINSIC_COLUMNS` (warehouse/schema-mart.ts)
+    // — declaring it on a measure schema would make the generated mart
+    // view's own SELECT list carry two `client_id` columns.
+    await expect(
+      registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'measure',
+        name: 'ad_performance_daily',
+        fields: [
+          { name: 'client_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
+          { name: 'spend', type: 'number', isRequired: true, isPii: false, isIdentityKey: false },
+        ],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidSchemaDefinitionError);
+
+    await expect(
+      registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'entity',
+        name: 'customer',
+        fields: [{ name: 'landed_at', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidSchemaDefinitionError);
+
+    // An `event` schema's fields never reach `buildMartViewSql` (events land
+    // in the dbt-built `events` core table, not a mart view) — the same
+    // field name that's rejected above is fine here.
+    const eventSchema = await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'client_activity',
+      fields: [{ name: 'client_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+    expect(eventSchema.field_defs.map((f) => f.name)).toEqual(['client_id']);
+  });
 });
 
 describe('evolveSchemaDefinition', () => {
