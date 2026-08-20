@@ -115,6 +115,13 @@ export async function setAutomationGuardrailPolicy(params: SetAutomationGuardrai
     ) {
       throw new InvalidAutomationActionError('allowedHours start/end must be integers between 0 and 23');
     }
+    if (startHourUtc === endHourUtc) {
+      // A zero-width window isn't a real restriction and `evaluateBudgetChangeGuardrails`'s
+      // `checkAllowedHours` treats equal bounds as "closed all 24 hours" (`hour < startHourUtc`
+      // can never hold), which would silently block every automation action. Use `null` to allow
+      // all hours instead.
+      throw new InvalidAutomationActionError('allowedHours start and end must not be equal — use null to allow all hours');
+    }
   }
 
   const policy = new AutomationGuardrailPolicyModel();

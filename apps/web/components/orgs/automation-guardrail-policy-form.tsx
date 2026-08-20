@@ -64,6 +64,10 @@ export function AutomationGuardrailPolicyForm({ orgId, projectId, policy }: Auto
       setError(t('policyAllowedHoursBothOrNeitherError'));
       return;
     }
+    if (parsedAllowedHoursStartHourUtc !== null && parsedAllowedHoursStartHourUtc === parsedAllowedHoursEndHourUtc) {
+      setError(t('policyAllowedHoursEqualError'));
+      return;
+    }
 
     setSubmitting(true);
     try {

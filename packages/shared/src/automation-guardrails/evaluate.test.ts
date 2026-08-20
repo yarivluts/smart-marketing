@@ -86,6 +86,21 @@ describe('evaluateBudgetChangeGuardrails', () => {
     ]);
   });
 
+  it('treats an allowed-hours window with equal start/end as closed for all 24 hours', () => {
+    const policy: AutomationGuardrailPolicy = { ...PERMISSIVE_POLICY, allowedHours: { startHourUtc: 9, endHourUtc: 9 } };
+    const change: import('./types').ProposedBudgetChange = { targetId: 'campaign-1', beforeDailyBudgetUsd: 100, afterDailyBudgetUsd: 105 };
+
+    // Documents the degenerate-window behavior this pure function actually has (every hour, including
+    // 09:00 itself, reports `outside_allowed_hours`) — `setAutomationGuardrailPolicy` rejects this
+    // config outright at write time so a caller can never reach this case in practice.
+    expect(evaluateBudgetChangeGuardrails(policy, change, { nowUtc: new Date('2026-07-12T09:00:00.000Z'), actionsExecutedToday: 0 })).toEqual([
+      expect.objectContaining({ type: 'outside_allowed_hours' }),
+    ]);
+    expect(evaluateBudgetChangeGuardrails(policy, change, { nowUtc: NOON_UTC, actionsExecutedToday: 0 })).toEqual([
+      expect.objectContaining({ type: 'outside_allowed_hours' }),
+    ]);
+  });
+
   it('blocks a simulated budget change once the daily blast-radius limit is reached', () => {
     const violations = evaluateBudgetChangeGuardrails(
       { ...PERMISSIVE_POLICY, maxActionsPerDay: 5 },

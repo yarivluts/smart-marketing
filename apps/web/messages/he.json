@@ -909,6 +909,7 @@
     "policyProtectedTargetIdsHint": "מזהה יעד אחד בכל שורה — האוטומציה לעולם לא תשנה אותם.",
     "policyInvalidNumberError": "כל שדה בקרה חייב להיות מספר או ריק.",
     "policyAllowedHoursBothOrNeitherError": "יש להגדיר את שני שדות השעות המותרות, או להשאיר את שניהם ריקים.",
+    "policyAllowedHoursEqualError": "שעת ההתחלה ושעת הסיום של החלון המותר לא יכולות להיות זהות (הדבר יחסום את האוטומציה בכל שעה). השאר את שני השדות ריקים כדי לאפשר את כל השעות.",
     "policySetError": "לא ניתן היה לשמור את מדיניות הבקרות. נסה שוב.",
     "policySaveButton": "שמור מדיניות",
     "targetsHeading": "יעדי אוטומציה",

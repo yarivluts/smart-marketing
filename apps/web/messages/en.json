@@ -909,6 +909,7 @@
     "policyProtectedTargetIdsHint": "One target id per line — automation will never modify these.",
     "policyInvalidNumberError": "Every guardrail field must be a number or left blank.",
     "policyAllowedHoursBothOrNeitherError": "Set both allowed-hours fields, or leave both blank.",
+    "policyAllowedHoursEqualError": "Allowed-hours start and end must not be equal (that would block automation every hour). Leave both blank to allow all hours.",
     "policySetError": "Couldn't save the guardrail policy. Please try again.",
     "policySaveButton": "Save policy",
     "targetsHeading": "Automation targets",

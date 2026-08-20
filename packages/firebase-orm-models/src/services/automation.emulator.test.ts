@@ -272,6 +272,45 @@ describe('proposeAutomationBudgetChangeAction', () => {
   });
 });
 
+describe('setAutomationGuardrailPolicy allowedHours validation', () => {
+  it('rejects equal start/end hours, which would otherwise block automation for all 24 hours', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Equal Hours Org');
+
+    await expect(
+      setAutomationGuardrailPolicy({
+        organizationId: organization.id,
+        projectId: project.id,
+        maxDailyBudgetChangePct: null,
+        spendCeilingUsd: null,
+        protectedTargetIds: [],
+        allowedHours: { startHourUtc: 9, endHourUtc: 9 },
+        maxActionsPerDay: null,
+        maxGuardedMetricRegressionPct: null,
+        setByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('accepts a real (non-degenerate) allowed-hours window', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Real Hours Org');
+
+    const policy = await setAutomationGuardrailPolicy({
+      organizationId: organization.id,
+      projectId: project.id,
+      maxDailyBudgetChangePct: null,
+      spendCeilingUsd: null,
+      protectedTargetIds: [],
+      allowedHours: { startHourUtc: 9, endHourUtc: 17 },
+      maxActionsPerDay: null,
+      maxGuardedMetricRegressionPct: null,
+      setByUserId: owner.id,
+    });
+
+    expect(policy.allowed_hours_start_hour_utc).toBe(9);
+    expect(policy.allowed_hours_end_hour_utc).toBe(17);
+  });
+});
+
 describe('approveAutomationAction / rejectAutomationAction', () => {
   it('approves an awaiting_approval action', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Approve Org');
