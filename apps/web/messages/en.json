@@ -449,7 +449,12 @@
     "touchpointSchemaIntro": "Set this up once so events from the website tracking snippet (see the API keys page) aren't quarantined for an unregistered schema.",
     "touchpointSchemaAlreadyRegistered": "The touchpoint schema is registered for this project.",
     "touchpointSchemaSetupButton": "Set up touchpoint capture",
-    "touchpointSchemaSetupError": "Something went wrong. Please try again."
+    "touchpointSchemaSetupError": "Something went wrong. Please try again.",
+    "syncMartsButton": "Sync warehouse views",
+    "syncMartsError": "Could not sync the warehouse views. Please try again.",
+    "syncMartsNotConfigured": "No warehouse is configured for this deployment yet.",
+    "syncMartsDone": "{count, plural, one {# view synced.} other {# views synced.}}",
+    "syncMartsSchemaError": "{schemaName}: {message}"
   },
   "MetricRegistry": {
     "metaTitle": "Metric catalog",
