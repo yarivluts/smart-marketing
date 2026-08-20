@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Ingest API developer reference for the as-implemented contract (PR #130)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked `list_pull_requests(state: open)`
+    first** (per every recent entry's collision-avoidance advice) and found **two open PRs from
+    concurrent sessions already covering the two obvious code candidates**: **#128** (the leap-day
+    `computeCompareWindow` clamp — the exact next-candidate PR #126 flagged) and **#129** (docs-only,
+    recording #126 merged). Both still pending CI. Deliberately did **not** duplicate either — those
+    are their own sessions' to drive.
+  - Picked a genuinely unclaimed, low-collision follow-up flagged by the top PROGRESS entry
+    (custom-schema marts): "the measures ingest shape genuinely differs from events ... and is
+    undocumented - session B had to discover it by trial and error." Wrote **`docs/api/ingest.md`**,
+    a reference for the *as-implemented* Ingest API, verified against the real code
+    (`apps/api/src/ingest/*`, `ingest.service.ts`, `api-key-auth.guard.ts`): bearer-key auth +
+    `ingest.write` scope and the 401/403/429 split; the three request shapes with envelope-vs-schema
+    field placement (events→`properties`, entities→`attributes`, measures→top-level numeric `value`
+    + `dimensions`); the quarantine reason codes; implicit `anon_id`/`customer_id` on events;
+    per-kind idempotency/dedup keys; 202 + `GET /batches/{id}` response shapes and the error table;
+    and an explicit "differences from the plan sketch" section (event `identities`/`context`,
+    measure `currency`, `auto_evolve`, commerce sugar endpoints — all ignored/unbuilt today).
+    Cross-linked it from `docs/plan/12-api-reference.md` §2 so it's discoverable (the discoverability
+    gap was the whole problem).
+  - Docs-only: two `.md` files, no TS/JS/config touched, and there is no Markdown linting in the
+    ESLint config, so `lint`/`typecheck`/`test`/`build` are structurally unaffected — CI confirms.
+    Branch `docs/ingest-api-reference`, **PR #130**, subscribed for drive-to-green.
+- **In progress (exact stopping point):** PR #130 open, awaiting CI; will merge once green and
+  record. (This PROGRESS entry is committed to the same branch, so #130 carries its own record.)
+- **Blocked + why:** unchanged standing items only.
+- **Next step:** land #130 once CI green. Concurrent open PRs to be aware of: **#128** (leap-day
+  fix — good, well-tested; let its own session land it) and **#129** (docs, records #126). A future
+  run should still **check open PRs first** — the collision pattern persists (two fresh duplicates
+  of the flagged candidates within ~40 min of this run). Remaining self-identified follow-ups from
+  the marts entry: the `lp_*` measure-schema redesign (`landing_page_visitor` is a 1-field entity
+  with no numeric fields), and physical dev/prod dataset split.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — Custom-schema marts shipped: the original marketing boards now render REAL data
 
 - **Last completed:** the full arc from "mart generation designed" to "Ad Creative Comparison

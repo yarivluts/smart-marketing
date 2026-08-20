@@ -13,6 +13,11 @@ X-GrowthOS-Signature: sha256=<HMAC of body>             # optional signed mode
 
 ## 2. Ingest API (push)
 
+> **Implementing against this today?** See [`docs/api/ingest.md`](../api/ingest.md) for the
+> exact request/response shapes the API actually accepts right now — the three kinds do not
+> share a payload shape, and some fields sketched below (event `identities`/`context`, measure
+> `currency`, `auto_evolve`, the commerce convenience endpoints) are not implemented yet.
+
 ### 2.1 Events
 ```http
 POST /v1/ingest/events
