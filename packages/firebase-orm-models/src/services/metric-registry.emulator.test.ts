@@ -14,6 +14,7 @@ import {
   MetricDefNotFoundError,
   ProjectNotFoundError,
   registerMetricDefinition,
+  registerSchemaDefinition,
   type MetricDefinitionInput,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -307,6 +308,171 @@ describe('registerMetricDefinition', () => {
         name: 'ad_spend',
         definition: adSpendDefinition,
         dimensions: ['  '],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidMetricDefinitionError);
+  });
+});
+
+describe('aggregation validation against a registered custom-schema mart', () => {
+  const numberField = (name: string) => ({ name, type: 'number', isRequired: true, isPii: false, isIdentityKey: false });
+  const stringField = (name: string) => ({ name, type: 'string', isRequired: true, isPii: false, isIdentityKey: false });
+
+  it('accepts a sum over a numeric field of a registered measure schema', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Mart Ok Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'measure',
+      name: 'ad_performance_daily',
+      fields: [stringField('campaign_id'), numberField('spend'), numberField('clicks')],
+      createdByUserId: owner.id,
+    });
+
+    const metricDef = await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'ad_performance_daily', column: 'spend', timeColumn: 'landed_at', filters: [] } },
+      dimensions: ['campaign_id'],
+      createdByUserId: owner.id,
+    });
+    expect(metricDef.version).toBe(1);
+  });
+
+  it('accepts count_distinct over a non-numeric field of a registered schema (only sum/avg require a number)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Mart Distinct Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'measure',
+      name: 'ad_performance_daily',
+      fields: [stringField('campaign_id'), numberField('spend')],
+      createdByUserId: owner.id,
+    });
+
+    const metricDef = await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'distinct_campaigns',
+      definition: { kind: 'aggregation', aggregation: { function: 'count_distinct', table: 'ad_performance_daily', column: 'campaign_id', timeColumn: 'landed_at', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    expect(metricDef.version).toBe(1);
+  });
+
+  it('rejects a sum over a registered entity schema that has no numeric field (the landing_page_visitor failure)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Mart Entity Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'landing_page_visitor',
+      fields: [stringField('visitor_id')],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'lp_visitors',
+        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'landing_page_visitor', column: 'visitor_id', timeColumn: 'landed_at', filters: [] } },
+        dimensions: [],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidMetricDefinitionError);
+  });
+
+  it('rejects a column that does not exist on the registered schema', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Mart Column Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'measure',
+      name: 'ad_performance_daily',
+      fields: [numberField('spend')],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'ghost',
+        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'ad_performance_daily', column: 'not_a_field', timeColumn: 'landed_at', filters: [] } },
+        dimensions: [],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidMetricDefinitionError);
+  });
+
+  it('rejects a time column that does not exist on the registered schema', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Mart Time Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'measure',
+      name: 'ad_performance_daily',
+      fields: [numberField('spend')],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'bad_time',
+        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'ad_performance_daily', column: 'spend', timeColumn: 'activity_date', filters: [] } },
+        dimensions: [],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidMetricDefinitionError);
+  });
+
+  it('leaves a dbt-built core table (no registered schema of that name) unchecked', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Core Table Org');
+    // No schema named `fact_ad_spend` is registered, so the registry has no
+    // column catalog for it and must not reject a metric over it — the
+    // pack metrics all rely on this pass-through.
+    const metricDef = await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: adSpendDefinition,
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    expect(metricDef.version).toBe(1);
+  });
+
+  it('rejects an evolve that repoints a metric at a bad schema column', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Mart Evolve Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'measure',
+      name: 'ad_performance_daily',
+      fields: [numberField('spend')],
+      createdByUserId: owner.id,
+    });
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'ad_performance_daily', column: 'spend', timeColumn: 'landed_at', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      evolveMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'ad_spend',
+        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'ad_performance_daily', column: 'missing', timeColumn: 'landed_at', filters: [] } },
+        dimensions: [],
         createdByUserId: owner.id,
       }),
     ).rejects.toThrow(InvalidMetricDefinitionError);
