@@ -317,6 +317,7 @@
     "rotateSigningSecret": "Rotate secret",
     "setSigningSecretError": "Couldn't set the signing secret. Please try again.",
     "setSigningSecretSuccess": "Secret saved.",
+    "previousSecretGraceNotice": "The previous secret is still accepted until {expiresAt}, so the sending service keeps working until it's updated.",
     "createEndpointHeading": "Create a hook endpoint",
     "noEnvironments": "This project has no environments yet.",
     "nameLabel": "Name",
