@@ -11,6 +11,7 @@ import {
   ProjectQueryQuotaExceededError,
   queryMetrics,
   queryProjectCohortRetention,
+  queryProjectFunnelSteps,
   recordAuditLogEntry,
   searchProjectCustomers,
   WarehouseNotConfiguredError,
@@ -40,9 +41,6 @@ import type { McpAuthContext } from './mcp-auth.guard';
  * enum, unions, optional/extended variants across three tools) — every
  * `.min(1)`/enum's actual validation still happens, just inside
  * `parseMetricQueryRequestBody` rather than in the zod shape itself.
- *
- * `query_funnel` is not registered — see `mcp-tools.service.ts`'s own doc
- * comment for why (no backing fact table exists yet).
  */
 
 /**
@@ -322,6 +320,24 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       try {
         const rows = await queryProjectCohortRetention({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), cohortMonth, limit });
         return textResult({ rows });
+      } catch (error) {
+        return errorResult(describeMetricsError(error));
+      }
+    }),
+  );
+
+  server.registerTool(
+    'query_funnel',
+    {
+      title: 'Query funnel',
+      description:
+        "Query this project's confirmed funnel (onboarding wizard step order): distinct customer count per stage, ordered by step, each stage's count also expressed as a conversion rate off the first step.",
+      inputSchema: {},
+    },
+    auditedToolHandler(auth, 'query_funnel', async () => {
+      try {
+        const steps = await queryProjectFunnelSteps({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}) });
+        return textResult({ steps });
       } catch (error) {
         return errorResult(describeMetricsError(error));
       }

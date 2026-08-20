@@ -199,6 +199,7 @@ describe('McpController (e2e)', () => {
           'list_metrics',
           'propose_action',
           'query_cohort',
+          'query_funnel',
           'query_metric',
           'search_customers',
         ].sort(),
@@ -255,6 +256,17 @@ describe('McpController (e2e)', () => {
       // No warehouse configured in this environment (KAN-18) — asserts the isolation-relevant
       // shape (an error result, not a leaked cross-project row) rather than real search results.
       const result = await client.callTool({ name: 'search_customers', arguments: { query: 'anyone' } });
+      expect(result.isError).toBe(true);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('query_funnel surfaces a tool error with no real warehouse configured (KAN-18)', async () => {
+    const { rawKey } = await setupProjectWithKey('Query Funnel Org');
+    const client = await connectedClient(rawKey);
+    try {
+      const result = await client.callTool({ name: 'query_funnel', arguments: {} });
       expect(result.isError).toBe(true);
     } finally {
       await client.close();

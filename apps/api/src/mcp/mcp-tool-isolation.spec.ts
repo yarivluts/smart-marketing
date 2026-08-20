@@ -29,6 +29,7 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   compare_periods: { kind: 'connection-scope', permission: 'mcp.read' },
   decompose: { kind: 'connection-scope', permission: 'mcp.read' },
   query_cohort: { kind: 'connection-scope', permission: 'mcp.read' },
+  query_funnel: { kind: 'connection-scope', permission: 'mcp.read' },
   search_customers: { kind: 'connection-scope', permission: 'mcp.read' },
   list_insights: { kind: 'connection-scope', permission: 'mcp.read' },
   propose_action: { kind: 'per-call-permission', permission: 'automation.execute' },

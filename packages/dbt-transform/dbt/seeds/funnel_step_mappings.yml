@@ -1,0 +1,36 @@
+version: 2
+
+seeds:
+  - name: funnel_step_mappings
+    description: >
+      Fixture "test dataset" standing in for a warehouse export of a
+      project's human-confirmed onboarding funnel
+      (`OnboardingStateModel.funnel_steps`, KAN-68) — the same
+      "buildable-today, real export lands here later" posture
+      `schema_identity_fields.csv` already establishes for
+      `bridge_identity`. One row per (project, event_label) the human
+      placed in their funnel, in the order they confirmed. `event_label`
+      matches whatever `fact_funnel_step` derives per event — the
+      registered event schema's own name for a project that registers one
+      schema per funnel step, or that schema's `event_name` payload field
+      for a project that logs several step names under one shared schema
+      (the exact same `coalesce(event_name, event_type)` generalization
+      `fact_attribution.conversion_event` already established, reused here
+      rather than re-derived) — so this works off whatever a project
+      actually confirmed, never a hard-coded event vocabulary.
+    columns:
+      - name: organization_id
+        tests:
+          - not_null
+      - name: project_id
+        tests:
+          - not_null
+      - name: event_label
+        tests:
+          - not_null
+      - name: stage_key
+        tests:
+          - not_null
+      - name: step_order
+        tests:
+          - not_null

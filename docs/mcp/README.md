@@ -154,6 +154,7 @@ Read tools (need only the connection-level `mcp.read`):
 | `compare_periods` | Same as `query_metric` plus a period-over-period comparison |
 | `decompose` | Same as `query_metric` broken down by one or more dimensions |
 | `query_cohort` | Signup-month × period-number retention matrix |
+| `query_funnel` | Per-stage distinct-customer counts for the project's confirmed funnel, with conversion rate off the first step |
 | `search_customers` | Substring search over Customer 360 entity records |
 | `list_insights` | Recent tracking-broke alerts and fired win-rule events |
 
@@ -165,9 +166,6 @@ Act tools (each requires its own extra permission, re-checked on every call):
 | `approve_action` | `automation.approve` (OAuth/human only) | Approve an `awaiting_approval` action so it can execute |
 | `create_goal` | `dashboards.write` | Create a goal pinning a metric to a target/range and deadline |
 | `create_segment` | `dashboards.write` | Save a named customer segment filter definition |
-
-`query_funnel` from the original plan sketch isn't built yet — no `fact_funnel_*` dbt model exists;
-tracked as a follow-up.
 
 ## Safety & limits
 
