@@ -9,6 +9,7 @@ import {
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { syncSchemaMartView } from './schema-mart.service';
+import { MART_INTRINSIC_COLUMNS, MART_KINDS } from '../warehouse/schema-mart';
 
 export class InvalidSchemaDefinitionError extends Error {
   constructor(public readonly reasons: readonly string[]) {
@@ -57,12 +58,19 @@ export interface SchemaFieldInput {
   isIdentityKey: boolean;
 }
 
-function validateFields(fields: readonly SchemaFieldInput[]): SchemaFieldDef[] {
+/**
+ * `kind` gates the {@link MART_INTRINSIC_COLUMNS} reject-list below to the
+ * two kinds that actually get an auto-generated mart view ({@link MART_KINDS}
+ * — measure/entity); an `event` schema's fields never reach `buildMartViewSql`
+ * at all, so e.g. `client_id` is a perfectly fine event field name.
+ */
+function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind): SchemaFieldDef[] {
   const reasons: string[] = [];
   if (fields.length === 0) {
     reasons.push('A schema must declare at least one field.');
   }
 
+  const rejectMartIntrinsicNames = MART_KINDS.includes(kind);
   const seen = new Set<string>();
   for (const field of fields) {
     const name = field.name.trim();
@@ -76,6 +84,17 @@ function validateFields(fields: readonly SchemaFieldInput[]): SchemaFieldDef[] {
     seen.add(name);
     if (!isSchemaFieldType(field.type)) {
       reasons.push(`Field "${name}" has an unknown type "${field.type}".`);
+    }
+    // A measure/entity field sharing a name with one of the mart view's own
+    // intrinsic columns would make the generated `CREATE OR REPLACE VIEW`'s
+    // SELECT list carry two columns with the same name — BigQuery rejects
+    // that outright, so the schema would register fine but its mart view
+    // would silently fail to sync (found by reading `buildMartViewSql`
+    // alongside this function, not by a live failure — see that function's
+    // own doc comment for the sibling bug this mirrors: an unqualified mart
+    // source table, session-B QA, 2026-08-20).
+    if (rejectMartIntrinsicNames && MART_INTRINSIC_COLUMNS.includes(name)) {
+      reasons.push(`Field "${name}" is reserved by the generated warehouse mart view and cannot be declared on a "${kind}" schema.`);
     }
   }
 
@@ -197,7 +216,7 @@ async function validateSchemaDefRequest(
   if (name.length === 0) {
     throw new InvalidSchemaDefinitionError(['A schema must have a non-empty name.']);
   }
-  const fields = validateFields(request.fields);
+  const fields = validateFields(request.fields, request.kind);
 
   return { kind: request.kind, name, fields };
 }

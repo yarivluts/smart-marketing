@@ -1,10 +1,7 @@
 import { defaultWarehouseQueryExecutor, readWarehouseEnvConfig, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor } from '../warehouse/query-executor';
-import { buildMartViewSql, martViewName } from '../warehouse/schema-mart';
-import type { SchemaDefKind, SchemaDefModel } from '../models/schema-def.model';
+import { buildMartViewSql, martViewName, MART_KINDS } from '../warehouse/schema-mart';
+import type { SchemaDefModel } from '../models/schema-def.model';
 import { listSchemaDefinitionsForProject } from './schema-registry.service';
-
-/** Which schema kinds get a mart view: measures and entities are what registered metrics name as their `table`; events already land in the dbt-built `events` core table. */
-const MART_KINDS: readonly SchemaDefKind[] = ['measure', 'entity'];
 
 export interface SyncSchemaMartViewParams {
   organizationId: string;

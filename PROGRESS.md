@@ -17,6 +17,55 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Reject measure/entity fields colliding with mart-view intrinsic columns (PR #133)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked `list_pull_requests(state: open)`
+    first** (collision-avoidance): three concurrent-session PRs open — **#128** (leap-day
+    compare-window clamp), **#131** (reject an aggregation metric whose column can't exist in its
+    custom-schema mart — already covers the previously-flagged `lp_*` follow-up), **#132** (codify
+    live Firestore composite indexes). Picked a genuinely new, non-overlapping correctness fix in a
+    different area (`packages/firebase-orm-models` schema-registry/mart layer).
+  - **Root cause:** `buildMartViewSql` (`warehouse/schema-mart.ts`) always prepends five intrinsic
+    columns to a mart view's SELECT — `organization_id`, `project_id`, `environment_id`,
+    `client_id`, `landed_at` — ahead of a schema's declared fields, but `schema-registry.service.ts`'s
+    `validateFields` never checked field names against that reserved set. A measure/entity schema
+    declaring a field literally named `client_id` or `landed_at` (very plausible real-data names)
+    saved fine, but the generated `CREATE OR REPLACE VIEW` DDL then carried two same-named columns,
+    which BigQuery rejects — `syncSchemaMartView` swallows that into a `{status:'error'}` outcome, so
+    the schema silently ends up with a broken/missing mart view and every metric registered against
+    it fails opaquely at query time, with no validation-time error pointing at the cause.
+  - **Fix:** exported `MART_INTRINSIC_COLUMNS` and `MART_KINDS` from `warehouse/schema-mart.ts` as the
+    single source of truth (also de-duplicating a second local `MART_KINDS` copy that
+    `schema-mart.service.ts` maintained separately, and rebuilt `buildMartViewSql`'s SELECT from the
+    exported list so the reject-list can't drift from the columns actually emitted); `validateFields`
+    now takes `kind` and rejects any measure/entity field name colliding with `MART_INTRINSIC_COLUMNS`
+    at register/evolve time — before anything reaches the warehouse — while leaving `event` schemas
+    untouched (they never get a mart view). Also refreshed a stale `buildMartViewSql` doc comment that
+    still claimed "unqualified names throughout" (left over from before PR #127's dataset-qualification
+    fix).
+  - **Tests:** unit tests in `warehouse/schema-mart.test.ts` (intrinsic-column emission + list shape)
+    and emulator tests in `schema-registry.emulator.test.ts` (rejection on measure/entity, same-name
+    success on `event`).
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` green. `pnpm test`: the full turbo run
+    showed one failure — a 60s **timeout in an unrelated `apps/web` onboarding-pack route test** caused
+    by a transient Firestore-emulator `RESOURCE_EXHAUSTED` overload under full-suite concurrency
+    (`Received message larger than max`), not this change (which is `firebase-orm-models`-only). Confirmed
+    a flake by re-running that exact test file in isolation under its own emulator: **6/6 pass**. The
+    `firebase-orm-models` package's own tests are all green.
+- **In progress (exact stopping point):** PR #133 opened from branch `fix/mart-reserved-field-names`;
+  merge once CI is green, then delete the branch. This PROGRESS entry rides the same PR.
+- **Blocked + why:** unchanged standing items only.
+- **Next step:** land #133 once CI green. A future run should still **check open PRs first** (the
+  concurrent-session collision pattern persists — 3 open at this run's start). Remaining self-identified
+  headless-buildable follow-ups are thin now; deeper KAN-18/KAN-19 scope needs the interactive
+  per-command-approved GCP pattern, not a headless run.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — Ingest API developer reference for the as-implemented contract (PR #130)
 
 - **Last completed:**
