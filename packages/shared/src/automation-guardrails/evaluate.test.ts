@@ -86,6 +86,15 @@ describe('evaluateBudgetChangeGuardrails', () => {
     ]);
   });
 
+  it('treats an allowed-hours window with equal start and end as unrestricted (24h), not a zero-width window that blocks everything', () => {
+    const policy: AutomationGuardrailPolicy = { ...PERMISSIVE_POLICY, allowedHours: { startHourUtc: 9, endHourUtc: 9 } };
+    const change: import('./types').ProposedBudgetChange = { targetId: 'campaign-1', beforeDailyBudgetUsd: 100, afterDailyBudgetUsd: 105 };
+
+    expect(evaluateBudgetChangeGuardrails(policy, change, { nowUtc: new Date('2026-07-12T09:00:00.000Z'), actionsExecutedToday: 0 })).toEqual([]);
+    expect(evaluateBudgetChangeGuardrails(policy, change, { nowUtc: new Date('2026-07-12T00:00:00.000Z'), actionsExecutedToday: 0 })).toEqual([]);
+    expect(evaluateBudgetChangeGuardrails(policy, change, { nowUtc: new Date('2026-07-12T23:00:00.000Z'), actionsExecutedToday: 0 })).toEqual([]);
+  });
+
   it('blocks a simulated budget change once the daily blast-radius limit is reached', () => {
     const violations = evaluateBudgetChangeGuardrails(
       { ...PERMISSIVE_POLICY, maxActionsPerDay: 5 },

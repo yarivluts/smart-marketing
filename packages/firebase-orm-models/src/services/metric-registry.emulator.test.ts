@@ -431,6 +431,51 @@ describe('aggregation validation against a registered custom-schema mart', () =>
     ).rejects.toThrow(InvalidMetricDefinitionError);
   });
 
+  it('accepts a measure metric summing the envelope\'s own value over its event-time ts, which the schema never declares as fields', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Measure Envelope Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'measure',
+      name: 'ad_spend_daily',
+      fields: [{ name: 'channel', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    const metricDef = await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'ad_spend_daily', column: 'value', timeColumn: 'ts', filters: [] } },
+      dimensions: ['channel'],
+      createdByUserId: owner.id,
+    });
+    expect(metricDef.version).toBe(1);
+  });
+
+  it('rejects that same value/ts aggregation against an entity schema, whose mart carries neither column', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Entity Envelope Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'subscription',
+      fields: [numberField('mrr')],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'entity_value',
+        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'subscription', column: 'value', timeColumn: 'ts', filters: [] } },
+        dimensions: [],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidMetricDefinitionError);
+  });
+
   it('leaves a dbt-built core table (no registered schema of that name) unchecked', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Metric Core Table Org');
     // No schema named `fact_ad_spend` is registered, so the registry has no

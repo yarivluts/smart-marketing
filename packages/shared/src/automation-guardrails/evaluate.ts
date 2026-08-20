@@ -23,7 +23,12 @@ function checkAllowedHours(policy: AutomationGuardrailPolicy, context: Guardrail
   }
   const hour = context.nowUtc.getUTCHours();
   const { startHourUtc, endHourUtc } = policy.allowedHours;
-  const withinWindow = startHourUtc <= endHourUtc ? hour >= startHourUtc && hour < endHourUtc : hour >= startHourUtc || hour < endHourUtc;
+  // `startHourUtc === endHourUtc` is not a zero-width window: read literally as
+  // "allowed between 9:00 and 9:00", the only sane meaning is the full day, not
+  // "never" — a `[s, s)` half-open interval collapsing to empty would silently
+  // block every action while the violation message reads as though the window
+  // is open. Wrapping (`startHourUtc > endHourUtc`) is unaffected by this.
+  const withinWindow = startHourUtc === endHourUtc || (startHourUtc < endHourUtc ? hour >= startHourUtc && hour < endHourUtc : hour >= startHourUtc || hour < endHourUtc);
   if (withinWindow) {
     return null;
   }

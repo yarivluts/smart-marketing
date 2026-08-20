@@ -17,6 +17,220 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 (later still) — `allowedHours` guardrail: equal start/end silently blocked all automation (PR #139)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked open PRs first**: **#138**
+    (mart views reading the wrong JSON level) was open and actively being driven by a concurrent
+    session — reviewed it, confirmed it was sound (already covered the top-priority follow-up this
+    run would otherwise have picked), and deliberately left it alone rather than duplicate work.
+    It merged mid-run. **#137** (docs-only, records #128) was also open, untouched, unrelated to
+    anything below.
+  - Picked the next-highest-value **unclaimed** follow-up from #138's own "not taken here" list
+    (item 5): `checkAllowedHours` (`packages/shared/src/automation-guardrails/evaluate.ts`)
+    evaluated a `[start, end)` half-open interval, wrapping past midnight when
+    `startHourUtc > endHourUtc`. When `startHourUtc === endHourUtc` it took the non-wrapping branch
+    and collapsed to `hour >= s && hour < s` — `false` for every hour, silently blocking automation
+    project-wide, every hour of every day — while the violation message
+    (`Automation is only allowed between 9:00 and 9:00 UTC.`) reads as though a window is open. The
+    admin form (`automation-guardrail-policy-form.tsx`) only validates "both or neither are set",
+    not `start !== end`, so a human can trivially land in this state (including by never touching
+    the fields' shared default).
+  - **Fix:** `startHourUtc === endHourUtc` is now treated as **unrestricted (24h)**, not a
+    zero-width window — the only reading consistent with how the violation message describes the
+    window, and the safer default for a guardrail meant to *protect* automation windows rather than
+    silently disable automation with a misleading message. Documented the new semantics on
+    `AutomationGuardrailPolicy.allowedHours`'s doc comment alongside the existing wrap-around note.
+  - **Tests:** new case in `evaluate.test.ts` — `{ startHourUtc: 9, endHourUtc: 9 }` now allows a
+    budget-change action at 09:00, 00:00, and 23:00 UTC (previously all three were rejected). 22/22
+    `automation-guardrails` tests pass.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` all green. `pnpm test`: `packages/shared`
+    passes directly (this package has no Firestore dependency at all). The full monorepo run hit one
+    unrelated flake — `firebase-orm-models`'s `metric-pack-dispatch.emulator.test.ts` (9 tests) timed
+    out under full-suite concurrency with the same `RESOURCE_EXHAUSTED: Received message larger than
+    max` Firestore-emulator-overload class documented in earlier entries; re-ran that file alone and
+    got 10/10 pass in 124s, confirming it wasn't this change.
+  - **Rebase note:** opened the PR branch off `main` before #138 merged; after #138 landed mid-run,
+    confirmed via `git merge-tree` there was no real conflict (disjoint files — #138 touched
+    `warehouse/schema-mart.ts`/`schema-registry.service.ts`/`metric-registry.service.ts`, this touched
+    only `automation-guardrails/`) rather than pre-emptively rebasing; GitHub's `mergeable_state` went
+    `unstable` -> `clean` on its own once CI reran against the moved base.
+  - **Merged 2026-08-20:** PR #139 squash-merged into `main` (`5ce1090`) after both checks
+    (`lint · typecheck · test · build`, `terraform fmt · validate`) passed and `mergeable_state`
+    settled to `clean`; no review comments. The **remote** branch delete hit the same git-over-HTTPS
+    proxy **HTTP 403** every prior merged branch from a scheduled run has hit — harmless, a human can
+    prune `fix/allowed-hours-equal-bounds` along with the others already queued for cleanup.
+- **In progress (exact stopping point):** none — #139 fully landed.
+- **Blocked + why:** nothing.
+- **Next step:** #138's own entry (below) lists four more unclaimed, verified-no-live-infra-needed
+  follow-ups a future run can pick without re-deriving them: (1) tracking alerts/event-volume
+  sparklines not filtering by `environment_id` (needs a new composite index in the same PR); (2) the
+  SaaS pack targeting four nonexistent warehouse tables — scoping to `fact_ad_spend` alone would
+  light up several real metrics; (3) four hand-written warehouse readers bypassing the cost
+  quota/log; (4) a pack whose board seeding half-fails leaves a permanently blank board with no
+  repair action. Also still open and untouched: **PR #137** (docs-only, records #128) — check
+  whether it landed before picking the next task.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting).
+
+---
+
+## 2026-08-20 (later) — Mart views read the wrong JSON level: every custom measure/entity column was NULL
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked open PRs first** — three were open,
+    all from concurrent sessions, all already green or nearly so:
+    - **#128** (leap-day `previous_year` compare-window clamp) — reviewed the diff, CI green,
+      `mergeable_state: clean`, no review comments. **Merged.**
+    - **#134** (reject measure/entity fields colliding with mart-view intrinsic columns) — reviewed,
+      CI green, clean. **Merged.** Its own session recorded its PROGRESS entry.
+    - **#136** (`query_funnel` on the real warehouse) — CI still in progress, owned by a live
+      concurrent session. **Left alone**, and deliberately stayed out of the MCP/funnel area; that
+      session merged it itself while this run was working. Its own entry (below) independently
+      names this run's bug as its top next candidate — it flagged it, this run fixed it, no
+      duplicate work.
+    - Branch deletion for #128/#134 failed with HTTP 403 (this environment's git credentials can't
+      delete remote refs); left for the owning sessions / a human.
+  - **Then found and fixed the real bug of the run** — a direct follow-up to the flag PROGRESS.md
+    itself left open ("mart views read raw payload directly — *but worth confirming*"). It was wrong:
+    `buildMartViewSql` emitted `JSON_VALUE(payload, '$.<field>')`, reading each declared field off
+    the **top level of the ingest envelope**. But ingest stores the whole envelope as
+    `RawRecordModel.payload` and validates declared fields against a sub-object —
+    `dimensions` (measure) / `attributes` (entity) / `properties` (event), per `checkRecordEnvelope`
+    and `docs/api/ingest.md` §4. So for a correctly-formed record every declared mart column was
+    **NULL**, and every metric registered against a custom measure/entity schema silently returned
+    nothing. This is exactly the bug class PR #135 fixed across the dbt models, in the one place #135
+    didn't reach — and `schema-mart.test.ts` pinned the wrong path (`'$.platform'`), the same
+    "fixture encodes the wrong assumption, so CI stays green forever" pattern #135 called out.
+  - **Second gap, same surface:** a measure's envelope carries the number the measure is *about*
+    (`value`) and its event time (`ts`) outside `dimensions`, and the docs explicitly tell users not
+    to declare `value` as a schema field. So a measure mart built exactly as documented had **no
+    numeric column to `sum`/`avg` at all** (which PR #131's new validation would now reject outright)
+    and its only time column was ingest-time `landed_at` — bucketing a backfilled measure on the day
+    it was uploaded rather than the day it describes. Both are now intrinsic columns on measure marts
+    (`column: "value"`, `timeColumn: "ts"`), reserved on measure schemas via #134's own reject-list.
+  - **Made the intrinsic-column list the single source of truth** it already claimed to be:
+    `MART_INTRINSIC_COLUMNS` became kind-aware `martIntrinsicColumnNames(kind)` /
+    `martIntrinsicColumnTypes(kind)`, both derived from the specs the builder actually emits.
+    `metric-registry.service.ts` had drifted already — it hard-coded only `client_id`/`landed_at`
+    while the builder emitted five columns, so a metric legitimately naming `environment_id` was
+    wrongly rejected; it now reads the same source.
+  - **Caught in this run's own pre-merge self-review:** a measure schema registered *before* #134's
+    reject-list existed can still declare a field named `value`/`ts`, and the new intrinsic columns
+    would have made that view emit the name twice — the precise `CREATE OR REPLACE VIEW` failure #134
+    exists to prevent, reintroduced from the other side. `buildMartViewSql` now drops an intrinsic
+    whose name a declared field already takes (the declared field wins, matching what
+    already-registered metrics resolve against), with a regression test.
+  - Tests: rewrote the mart-builder unit tests onto the real envelope shapes (measure `dimensions`
+    vs. entity `attributes`, the value/ts intrinsics, the legacy-collision case, and a
+    per-kind check that the emitted SELECT list matches `martIntrinsicColumnNames` exactly so the two
+    can't drift again); new emulator cases for the measure-only `value`/`ts` reservation and for a
+    measure metric aggregating `value` over `ts`. `docs/api/ingest.md` §3 updated to describe the
+    columns the mart now actually exposes.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test` all green (924
+    firebase-orm-models, 943 web, 396 shared + the rest). One `apps/web` Playwright case
+    (`resource-library.spec.ts`) flaked once and passed on retry #1 — the same known flake earlier
+    runs recorded.
+- **In progress (exact stopping point):** none — the change is merged and self-contained.
+- **Blocked + why:** nothing.
+- **Next step:** a research pass this run mined `PROGRESS.md`/`TASKS.md`/the codebase for remaining
+  headless-buildable follow-ups and ranked them; the ones **not** taken here, still open and worth a
+  future run (all verified as not needing live infra):
+  1. **Tracking alerts + event-volume sparklines blend every environment together** —
+     `getMostRecentRawRecordForSchema`/`listRawRecordsForSchemaSince` (`pipeline.service.ts`) don't
+     filter `environment_id`, so a dev key still firing an event keeps `lastSeenAt` fresh and the
+     production silence alert never fires — the exact failure KAN-36 exists to catch. Needs a new
+     composite index in `firestore.indexes.json` in the same PR (PR #132's standing rule).
+  2. **The SaaS pack targets four warehouse tables that don't exist** (`fact_revenue_event`,
+     `fact_subscription_event`, `dim_subscription`, `fact_funnel_event`), so KAN-59/61's headline AC
+     can't be met. Scoping one run to `fact_ad_spend` alone would light up `ad_spend`/
+     `cost_per_signup`/`cac`/`troi` and the Marketing board's spend tiles.
+  3. **Four hand-written warehouse readers bypass the cost quota and cost log** (`searchProjectCustomers`,
+     `queryProjectCohortRetention`, `countSegmentMembers` — leave `queryProjectFunnelSteps` to #136),
+     so an MCP client can run unbounded BigQuery scans invisible to the cost-guardrails page.
+  4. **A pack whose board seeding half-fails leaves a permanently blank board** — name-only
+     idempotency in `ensureSaasMetricPackDefaultBoardsSeeded` skips a tiles-empty board on reinstall,
+     with no admin repair action.
+  5. **`allowedHours` with equal start and end blocks all automation** (`checkAllowedHours` evaluates
+     `hour >= s && hour < s`), while the message reads as though the window is open.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision).
+
+---
+
+## 2026-08-20 — MCP `query_funnel` now runs on the real BigQuery warehouse (PR #136)
+
+- **Last completed:**
+  - Session start: unshallowed the local clone (it started as a 50-commit shallow snapshot whose local
+    `main` looked "diverged" from `origin/main` — the same recurring stale-pointer artifact prior runs
+    hit, resolved here by `git fetch --unshallow` then `git checkout -B main origin/main`; `origin/main`
+    is `dfb97d0`, 131 commits ahead of the shallow tip, nothing lost). `TASKS.md` still all-`done`
+    except the standing blockers (KAN-18/19 `in-progress`, KAN-43 `needs-human`, KAN-50/51 `blocked-by`).
+  - Checked `list_pull_requests(state: open)`: **#134** (`fix/mart-reserved-field-names`) and **#128**
+    (`fix/compare-window-leap-year-overflow`) are open, owned by concurrent sessions — did not touch
+    either. Ran a research pass over the top PROGRESS entries' own flagged follow-ups; the highest-value
+    UNCLAIMED one that doesn't collide with #134/#128 was `query_funnel`.
+  - **Fix (branch `fix/query-funnel-real-warehouse`):** `queryProjectFunnelSteps`
+    (`packages/firebase-orm-models/src/services/mcp-tools.service.ts`) queried `fact_funnel_step`, the
+    one core dbt model still `enabled=(target.type == 'duckdb')` (its `funnel_step_mappings` seed has no
+    real warehouse export — #133 lifted every other model's DuckDB gate but not this one). So on the
+    real BigQuery warehouse the table doesn't exist and `query_funnel` threw `WarehouseQueryFailedError`
+    for every call — the MCP tool was dead in production. It now reads the project's human-confirmed
+    funnel from Firestore (`OnboardingStateModel.funnel_steps`, KAN-68 — the very export the seed stands
+    in for) via `getOnboardingState`, then counts `COUNT(DISTINCT entity_id)` per step straight off the
+    BigQuery-enabled `events` core table, matching each step's `eventSchemaName` against
+    `events.event_type` (the same fixed-JSON-path narrowing #133 took for identity; keeps every dynamic
+    value a bound `@param`, never spliced). Same hand-written-SQL-over-`WarehouseQueryExecutor` pattern
+    `searchProjectCustomers`/`queryProjectCohortRetention` already use. One row per confirmed step in
+    confirmed order (a step with no events yet reports a real `0`, not a dropped row); a project with no
+    confirmed funnel returns `[]` without touching the warehouse. The dbt `fact_funnel_step` model is
+    left as-is (still serves its DuckDB fixture-parity tests); only the TS adapter changed.
+  - **Tests:** rewrote the `queryProjectFunnelSteps` block in `mcp-tools.emulator.test.ts` (seeds a real
+    confirmed funnel via `confirmOnboardingFunnelSteps`, asserts the `events` query shape + bound
+    params + per-step mapping, a zero-count-step case, the env filter, and the no-funnel→no-warehouse-hit
+    case). Updated `apps/api/src/mcp/mcp.controller.e2e.spec.ts`'s "query_funnel errors with no
+    warehouse" case to first confirm a funnel (otherwise it now legitimately returns `[]` before
+    reaching the executor). Doc comments updated (module header + cohort cross-ref).
+  - **Self-reviewed the diff:** the `event_type != 'touchpoint'` filter was dropped as redundant (the
+    `IN (confirmed schemas)` list already scopes it, and the wizard never proposes touchpoint schemas
+    as funnel steps); duplicate-eventSchemaName across steps is handled (deduped `IN` list, count fanned
+    back out); `getOnboardingState`'s `requireProjectInOrg` validates the project. No unused imports
+    (`rowToFunnelStepAggregate` removed, `WarehouseRow` still used elsewhere).
+  - **All checks green locally:** `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` (exit 0;
+    firebase-orm-models 913, api 114, web vitest 943, all packages pass). Two web Playwright E2E cases
+    (`orgs.spec.ts` invite-revoke, `resource-library.spec.ts` — both unrelated to this change) flaked
+    once under heavy concurrent machine load and passed on retry #1; reported as "2 flaky", run still
+    exit 0.
+- **Merged 2026-08-20:** PR #136 squash-merged into `main` (`3940398`) after both checks
+  (`lint · typecheck · test · build`, `terraform fmt · validate`) passed on a conflict-free head and
+  `mergeable_state` settled to `clean`; no review comments. Local branch cleaned up. The **remote**
+  branch delete hit the same git-over-HTTPS proxy **HTTP 403** every prior merged branch from a
+  scheduled run has hit — harmless, a human can prune `fix/query-funnel-real-warehouse` along with the
+  others.
+  - Rebased onto `origin/main` **twice** mid-run as concurrent sessions landed #134 then (separately)
+    its own PROGRESS.md-record commit: both times the only conflict was this file (two entries
+    prepended at the same anchor), resolved by keeping both, newest first. No code conflict either
+    time — `mcp-tools.service.ts`/`.emulator.test.ts`/`mcp.controller.e2e.spec.ts` weren't touched by
+    #134/#128's changes (`schema-mart.ts`, `schema-registry.service.ts`, `metrics-compiler/time.ts`).
+    Same "PROGRESS.md prepend conflict, same shape, twice" pattern #134's own entry (below) documents.
+- **In progress (exact stopping point):** none — #136 fully landed.
+- **Blocked + why:** nothing.
+- **Next step:** next run picks the next unblocked task. Remaining unclaimed follow-ups from this
+  run's own research pass, all still real: the schema-mart JSON-level bug (mart views extract declared
+  fields from `$.field` at the payload top level, but the real ingest envelope nests them under
+  `properties`/`attributes`/`dimensions` — the TS twin of the #135 dbt fix; #134 has landed, so this no
+  longer needs to wait) and its measure-`value`/`ts` sibling; the engagement-pack metrics targeting a
+  nonexistent `fact_funnel_event` table; and the unbounded in-memory metric result cache. Also: **PR
+  #137** (docs-only, records #128) was still open as of this run's end — check whether it landed before
+  picking the next task, to avoid re-treading the same PROGRESS.md-conflict dance.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; prune merged feature branches the proxy blocks this run from deleting).
+
+---
+
 ## 2026-08-20 — metrics-compiler: previous_year compare window leap-day overflow (PR #128, merged)
 
 - **Last completed:**

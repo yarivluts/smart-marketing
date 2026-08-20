@@ -2,6 +2,7 @@ import { defaultWarehouseQueryExecutor, type WarehouseQueryExecutor, type Wareho
 import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
+import { getOnboardingState } from './onboarding.service';
 
 /**
  * Read-only data adapters backing three of the MCP server's tools (KAN-75,
@@ -11,13 +12,14 @@ import { listRecentWinEventsForProject } from './win-rule.service';
  * `queryMetrics`, KAN-42) or `list_metrics`/`describe_metric` (the already-
  * built metrics catalog). All three hand-write parameterized SQL against a
  * dbt core table (`entities`, KAN-37; `fact_cohort_retention`, KAN-62;
- * `fact_funnel_step`, this follow-up) and run it through the same
- * {@link WarehouseQueryExecutor} the compiler-produced SQL in
+ * `events`, KAN-37 — see `queryProjectFunnelSteps` for why the funnel reads
+ * `events` directly rather than the `fact_funnel_step` model) and run it
+ * through the same {@link WarehouseQueryExecutor} the compiler-produced SQL in
  * `metrics-query.service.ts` uses — `CompiledMetricQuery` is just
  * `{ sql, params }`, so this is legitimate reuse of that interface's own
- * contract, not a new escape hatch bypassing it. Like every other warehouse
- * read in this codebase today, all three throw `WarehouseNotConfiguredError`
- * until KAN-18 provisions a real BigQuery project.
+ * contract, not a new escape hatch bypassing it. Each throws
+ * `WarehouseNotConfiguredError` in an environment with no warehouse wired up
+ * (the default until KAN-18 provisions a real BigQuery project).
  */
 
 export class InvalidMcpToolRequestError extends Error {
@@ -149,7 +151,7 @@ function rowToCohortRetentionRow(row: WarehouseRow): CohortRetentionRow {
   };
 }
 
-/** The `query_cohort` half of plan `12 §6.2`'s "funnels/cohorts" tool: the `cohort_month x period_number` retention matrix `fact_cohort_retention` (KAN-62) already computes. See this module's own doc comment for why `query_funnel` is not built. */
+/** The `query_cohort` half of plan `12 §6.2`'s "funnels/cohorts" tool: the `cohort_month x period_number` retention matrix `fact_cohort_retention` (KAN-62) already computes. Its `query_funnel` sibling is {@link queryProjectFunnelSteps}. */
 export async function queryProjectCohortRetention(params: QueryProjectCohortRetentionParams): Promise<CohortRetentionRow[]> {
   const limit = clampLimit(params.limit, DEFAULT_COHORT_ROW_LIMIT, MAX_COHORT_ROW_LIMIT);
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
@@ -191,16 +193,42 @@ export interface FunnelStepResult {
   conversionRateFromFirst: number;
 }
 
-function rowToFunnelStepAggregate(row: WarehouseRow): { stageKey: string; stepOrder: number; customerCount: number } {
-  return {
-    stageKey: String(row.stage_key ?? ''),
-    stepOrder: Number(row.step_order ?? 0),
-    customerCount: Number(row.customer_count ?? 0),
-  };
-}
-
-/** The `query_funnel` half of plan `12 §6.2`'s "funnels/cohorts" tool: per-stage distinct-customer counts from `fact_funnel_step` (KAN-75 follow-up), ordered by the project's own confirmed step order, each stage's count also expressed as a conversion rate off the first step. */
+/**
+ * The `query_funnel` half of plan `12 §6.2`'s "funnels/cohorts" tool:
+ * per-stage distinct-customer counts for the project's own human-confirmed
+ * funnel, in the confirmed step order, each stage's count also expressed as a
+ * conversion rate off the first step.
+ *
+ * The confirmed funnel lives in Firestore (`OnboardingStateModel.funnel_steps`,
+ * KAN-68), NOT in the warehouse: the dbt `fact_funnel_step` model that would
+ * otherwise hold it stays DuckDB-only because its `funnel_step_mappings` seed
+ * has no real warehouse export yet (same posture #133 lifted for the identity
+ * chain). So this reads the confirmed steps from Firestore and counts distinct
+ * customers per step straight off the BigQuery-enabled `events` core table —
+ * the same hand-written-SQL-over-`WarehouseQueryExecutor` pattern
+ * `searchProjectCustomers`/`queryProjectCohortRetention` use. A step is keyed
+ * by its `eventSchemaName` matched against `events.event_type` (the same
+ * fixed-path narrowing #133 took for identity): the onboarding wizard proposes
+ * funnel steps *from* event schemas, so this is the faithful key, and it keeps
+ * every dynamic value a bound parameter rather than the DuckDB fixture model's
+ * data-driven `coalesce(event_name, event_type)` label.
+ *
+ * `COUNT(DISTINCT entity_id)` is the distinct-customer count reaching each
+ * step, so a customer re-firing the same step event can't inflate it — the
+ * same "first reached" grain `fact_funnel_step` computes, without needing the
+ * per-customer min-timestamp. One row per confirmed step (a step with no
+ * events yet reports a real `0`, not a dropped row, so the funnel's drop-off
+ * is visible end to end). A project whose funnel isn't confirmed yet (no
+ * onboarding state, or an empty funnel) returns an empty list without touching
+ * the warehouse.
+ */
 export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsParams): Promise<FunnelStepResult[]> {
+  const state = await getOnboardingState(params.organizationId, params.projectId);
+  const steps = [...(state?.funnel_steps ?? [])].sort((a, b) => a.order - b.order);
+  if (steps.length === 0) {
+    return [];
+  }
+
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
   const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
 
@@ -214,15 +242,36 @@ export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsPar
     queryParams.environmentId = environmentId;
   }
 
-  const sql = `SELECT stage_key, step_order, COUNT(DISTINCT customer_id) AS customer_count FROM fact_funnel_step WHERE ${filters.join(' AND ')} GROUP BY stage_key, step_order ORDER BY step_order ASC`;
-  const rows = await executor.execute({ sql, params: queryParams });
-  const aggregates = rows.map(rowToFunnelStepAggregate).sort((a, b) => a.stepOrder - b.stepOrder);
-  const firstStepCount = aggregates[0]?.customerCount ?? 0;
+  // The distinct event schema names across the confirmed steps, bound as
+  // parameters (never spliced into the SQL) — a funnel could in principle map
+  // two stages to the same event schema, so dedupe for the `IN` list and fan
+  // the count back out to every step below.
+  const schemaNames = [...new Set(steps.map((step) => step.eventSchemaName))];
+  const boundSchemaParams = schemaNames.map((name, index) => {
+    const paramName = `funnelEvent${index}`;
+    queryParams[paramName] = name;
+    return `@${paramName}`;
+  });
+  filters.push(`event_type IN (${boundSchemaParams.join(', ')})`);
 
-  return aggregates.map((aggregate) => ({
-    ...aggregate,
-    conversionRateFromFirst: firstStepCount > 0 ? aggregate.customerCount / firstStepCount : 0,
-  }));
+  const sql = `SELECT event_type, COUNT(DISTINCT entity_id) AS customer_count FROM events WHERE ${filters.join(' AND ')} GROUP BY event_type`;
+  const rows = await executor.execute({ sql, params: queryParams });
+
+  const countByEventType = new Map<string, number>();
+  for (const row of rows) {
+    countByEventType.set(String(row.event_type ?? ''), Number(row.customer_count ?? 0));
+  }
+
+  const firstStepCount = countByEventType.get(steps[0].eventSchemaName) ?? 0;
+  return steps.map((step) => {
+    const customerCount = countByEventType.get(step.eventSchemaName) ?? 0;
+    return {
+      stageKey: step.stageKey,
+      stepOrder: step.order,
+      customerCount,
+      conversionRateFromFirst: firstStepCount > 0 ? customerCount / firstStepCount : 0,
+    };
+  });
 }
 
 export type ProjectInsightKind = 'tracking_alert' | 'win_event';
