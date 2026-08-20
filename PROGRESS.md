@@ -17,6 +17,60 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-76 follow-up closed: segment delete (PR #117)
+
+- **Last completed:**
+  - Session start found the now-familiar all-`done`-except-standing-blockers `TASKS.md` state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`) — no `todo` row.
+    Delegated a codebase-wide sweep (Explore agent) for a genuine, infra-free, single-PR-sized
+    follow-up; its top three candidates were all missing-audit-log gaps (`setHookDeliveryStatus`,
+    `ensureAutomationTargetSeeded`, org/project creation). In parallel, found something more
+    substantial myself while investigating: **saved segments (KAN-76) had no delete capability at
+    all** — every sibling saved-config type (`goals`, `boards`, `win rules`) has a `delete*` service
+    function, a DELETE route, and a UI delete action; `segment.service.ts` had none. A segment, once
+    created, could never be removed — a clear CLAUDE.md "everything user-manageable gets an admin
+    surface" gap, not just a missing audit line, so picked this over the sweep's own candidates.
+  - **PR #117 (merged)**: `deleteSegment` (`segment.service.ts`) mirrors `deleteGoal`/`deleteBoard`
+    exactly — existence-checked via the existing private `loadSegment` helper (`SegmentNotFoundError`
+    for a segment outside the org/project), hard delete, best-effort `segment.delete` audit log entry
+    (KAN-44 AC). New `DELETE /api/orgs/:orgId/projects/:projectId/segments/:segmentId` route, gated
+    on the existing `dashboards.write` permission. New inline per-row `DeleteSegmentButton` on the
+    segments page — unlike goals/boards, segments have no detail page to redirect away from, so it
+    calls `router.refresh()` to re-fetch the list in place instead of navigating. New `en`/`he`
+    `deleteConfirm`/`deleteButton`/`deleteError` keys under the `Segments` namespace.
+  - New tests: 3 emulator tests (`deleteSegment` — deletes so it's no longer listed, records a
+    `segment.delete` audit entry, throws `SegmentNotFoundError` for a cross-org/project segment), 3
+    route tests (unauthenticated → 401, missing segment → 404, deletes then 404s on re-delete), 3
+    component tests (cancelled confirm no-ops, confirmed delete calls the route + refreshes,
+    request failure shows an inline error without refreshing).
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green across the full monorepo
+    before opening the PR (firebase-orm-models 868/868 incl. the 3 new tests; apps/web 934 unit
+    tests + 23/23 e2e specs — one flaky retry each on two separate full runs, on `tv-pairing.spec.ts`
+    and `resource-library.spec.ts` respectively, both unrelated to this change and green on retry).
+    CI on the PR itself green (`lint · typecheck · test · build` + `terraform fmt · validate`), no
+    review comments. Branch `kan-76-segment-delete`, PR #117, merged into `main` (squash). Remote
+    branch deletion: no delete-branch GitHub MCP tool available in this session, same known,
+    pre-existing limitation documented since 2026-07-04.
+- **In progress (exact stopping point):** none — clean stopping point, `main` green post-merge.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's long-lead approval or per-command-approved
+  interactive session.
+- **Next step:** the sweep agent's own three candidates (all missing-audit-log gaps, ranked
+  small-to-small-medium) are still open for a future run: `setHookDeliveryStatus` never audit-logs
+  despite every sibling mutation in `hook.service.ts` doing so; `ensureAutomationTargetSeeded` never
+  audit-logs despite every other mutator in `automation.service.ts` doing so; `createProject`/
+  `createOrganizationWithOwner` never audit-log org/project creation at all (no `organization.create`/
+  `project.create` action exists anywhere). None of these needed doing this run since the segment-
+  delete gap was a clearer, higher-value miss, but they're legitimate next candidates. Also
+  confirmed during the sweep and worth recording so a future run doesn't re-investigate them:
+  `listSchemaDefinitionVersions` is NOT actually a dead-capability gap (the existing Schema Registry
+  page's `SchemaFamilyCard` already renders every version of a family) — retract that standing item
+  from prior entries' "still open" lists.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — Isolation proven at every layer; search_customers dialect bug fixed (PR #115)
 
 - **Last completed:**
