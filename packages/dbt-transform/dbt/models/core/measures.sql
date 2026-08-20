@@ -7,7 +7,7 @@ select
     environment_id,
     schema_name as measure_type,
     client_id,
-    payload as properties,
+    dimensions as properties,
     measure_value,
     measure_date,
     landed_at

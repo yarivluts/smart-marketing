@@ -6,6 +6,10 @@ select
     schema_name,
     client_id,
     payload,
+    -- The event's own `properties` object from the ingest envelope
+    -- (`{event, event_id, ts, properties}`) — every downstream reader wants
+    -- the user-declared fields, not the envelope wrapper.
+    {{ json_object_field('payload', "'properties'") }} as properties,
     landed_at,
     -- Prefer the event's own client-reported `ts` (when the payload declares
     -- one) over ingest-time `landed_at`, so a batch replayed or delivered

@@ -63,6 +63,26 @@
     lax_string({{ json_column }}[{{ field_name }}])
 {% endmacro %}
 
+-- The nested JSON OBJECT at `field_name` (not its text value) — used to
+-- reach inside a raw record's ingest envelope, whose real shape is
+-- `{event, event_id, ts, properties:{...}}` for events,
+-- `{id, attributes:{...}}` for entities and
+-- `{measure, ts, value, dimensions:{...}}` for measures (see
+-- `checkRecordEnvelope` in @growthos/firebase-orm-models). Returns a JSON
+-- value on both adapters, so downstream `json_text_field` calls compose on
+-- top of it unchanged.
+{% macro json_object_field(json_column, field_name) %}
+  {{ return(adapter.dispatch('json_object_field', 'growthos_transform')(json_column, field_name)) }}
+{% endmacro %}
+
+{% macro default__json_object_field(json_column, field_name) %}
+    json_extract({{ json_column }}, '$.' || {{ field_name }})
+{% endmacro %}
+
+{% macro bigquery__json_object_field(json_column, field_name) %}
+    {{ json_column }}[{{ field_name }}]
+{% endmacro %}
+
 -- `first_date`/`second_date` difference in `datepart` units (result =
 -- second - first, matching this project's original DuckDB
 -- `date_diff(part, first, second)` call convention). NOT built on
@@ -133,3 +153,5 @@
 {%- endfor -%}
 {{ dbt.hash(parts | join(" || '|' || ")) }}
 {%- endmacro %}
+
+-- Extracts a nested JSON OBJECT (not
