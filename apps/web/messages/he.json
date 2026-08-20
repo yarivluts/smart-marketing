@@ -833,7 +833,10 @@
     "createError": "לא ניתן היה ליצור את הפלח. נסה שוב.",
     "memberCount": "{count, plural, one {חבר #} other {# חברים}}",
     "memberCountNotConfigured": "ספירת חברים אינה זמינה (מחסן הנתונים טרם הוגדר)",
-    "memberCountError": "ספירת חברים אינה זמינה"
+    "memberCountError": "ספירת חברים אינה זמינה",
+    "deleteConfirm": "למחוק את הפלח הזה? לא ניתן לבטל פעולה זו.",
+    "deleteButton": "מחק",
+    "deleteError": "לא ניתן היה למחוק את הפלח. נסה שוב."
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

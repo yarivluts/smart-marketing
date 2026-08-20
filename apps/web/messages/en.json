@@ -833,7 +833,10 @@
     "createError": "Could not create the segment. Please try again.",
     "memberCount": "{count, plural, one {# member} other {# members}}",
     "memberCountNotConfigured": "Member count unavailable (warehouse not configured yet)",
-    "memberCountError": "Member count unavailable"
+    "memberCountError": "Member count unavailable",
+    "deleteConfirm": "Delete this segment? This cannot be undone.",
+    "deleteButton": "Delete",
+    "deleteError": "Could not delete the segment. Please try again."
   },
   "WinRules": {
     "metaTitle": "Win rules",

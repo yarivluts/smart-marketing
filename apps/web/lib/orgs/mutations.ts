@@ -64,6 +64,7 @@ import {
   deleteGoal as deleteGoalInOrganization,
   type GoalModel,
   createSegment as createSegmentInOrganization,
+  deleteSegment as deleteSegmentInOrganization,
   type SegmentModel,
   createWinRule as createWinRuleInOrganization,
   updateWinRule as updateWinRuleInOrganization,
@@ -858,6 +859,11 @@ interface CreateSegmentInput {
 export async function createSegment(input: CreateSegmentInput): Promise<SegmentModel> {
   await ensureFirestoreOrm();
   return createSegmentInOrganization(input);
+}
+
+export async function deleteSegment(organizationId: string, projectId: string, segmentId: string, deletedByUserId: string): Promise<void> {
+  await ensureFirestoreOrm();
+  return deleteSegmentInOrganization(organizationId, projectId, segmentId, deletedByUserId);
 }
 
 interface CreateWinRuleInput {

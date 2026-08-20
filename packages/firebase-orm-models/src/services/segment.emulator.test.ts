@@ -5,6 +5,7 @@ import {
   createOrganizationWithOwner,
   createProject,
   createSegment,
+  deleteSegment,
   ensureUserForFirebaseSession,
   InvalidSegmentError,
   listAuditLogEntriesForOrg,
@@ -212,6 +213,61 @@ describe('listSegmentsForProject', () => {
     const segments = await listSegmentsForProject(organization.id, project.id);
     expect(segments.map((segment) => segment.id).sort()).toEqual([first.id, second.id].sort());
     expect(segments.every((segment) => segment.project_id === project.id)).toBe(true);
+  });
+});
+
+describe('deleteSegment', () => {
+  it('deletes a segment so it is no longer listed', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Delete Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    await deleteSegment(organization.id, project.id, segment.id, owner.id);
+
+    expect(await listSegmentsForProject(organization.id, project.id)).toEqual([]);
+  });
+
+  it('records a segment.delete audit log entry', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Delete Audit Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    await deleteSegment(organization.id, project.id, segment.id, owner.id);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'segment.delete' && candidate.target_id === segment.id);
+    expect(entry?.actor_id).toBe(owner.id);
+    expect(entry?.summary).toContain('Pro customers');
+  });
+
+  it('throws SegmentNotFoundError for a segment that does not belong to this org+project', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Delete Missing Org');
+    const { organization: otherOrg, project: otherProject } = await setupOrgWithProject('Segment Delete Other Org');
+    await registerCustomerSchema(otherOrg.id, otherProject.id, owner.id);
+    const segment = await createSegment({
+      organizationId: otherOrg.id,
+      projectId: otherProject.id,
+      name: 'Elsewhere',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    await expect(deleteSegment(organization.id, project.id, segment.id, owner.id)).rejects.toBeInstanceOf(SegmentNotFoundError);
   });
 });
 
