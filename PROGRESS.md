@@ -17,6 +17,42 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Autonomous refresh + snippet compatibility + live freshness panel (PRs #105/#107/#113)
+
+- **Last completed:**
+  - **PR #105 (merged):** hourly scheduled warehouse refresh — a minimal python+dbt-bigquery image
+    (`packages/dbt-transform/Dockerfile`) run as Cloud Run Job `dbt-refresh` on Cloud Scheduler
+    `dbt-refresh-hourly` (`0 * * * *` UTC, OAuth as the compute SA; `cloudscheduler.googleapis.com`
+    newly enabled). Verified beyond the initial manual + scheduler-forced runs: ticks fired green
+    all night (01:00/02:00/03:00 UTC checked explicitly), and session B independently confirmed a
+    test event flowed ingest → BigQuery → `growthos_core.events` with **no human triggering
+    anything** — the first fully-autonomous end-to-end datapoint.
+  - **PR #107 (merged + deployed everywhere):** the platform was incompatible with its own tracking
+    snippet — `buildTrackedEvent` attaches `anon_id` (and `customer_id` post-identify) to every
+    event, so any schema not re-declaring them quarantined 100% of real snippet traffic
+    (session-B catch). `validateAgainstSchema` now takes the record kind and implicitly accepts
+    those two fields on events only (still string-type-checked; explicit declarations win;
+    entity/measure and identity-stitching semantics unchanged; quarantine replay passes the kind
+    too). Verified live by session B: Retry on the previously-quarantined record re-validated
+    clean and landed with `anon_id` intact.
+  - **PR #113 (merged + deployed):** the ingest-health orchestration panel showed "no runs yet"
+    while the scheduled refresh ran like clockwork — it only lists `OrchestrationRunModel` records,
+    which only the in-app "Run now" writes. New "Warehouse freshness (live)" block reads latest
+    `landed_at` + landed-record count for the project's prod environment straight from
+    `stg_raw_records` via the existing executor/env-resolution seams — truth regardless of which
+    mechanism refreshed. Deployed to web-dev (rev 00026) / web-prod (rev 00020); session B
+    verifying the timestamps now.
+  - Operational lesson recorded: with per-command approval mode active, approval-requiring gcloud
+    commands must run in the FOREGROUND — a backgrounded one can't surface its prompt and hangs
+    silently forever (cost ~4 hours of phantom "builds" this run before being caught).
+- **In progress (exact stopping point):** session B's freshness-panel verification.
+- **Blocked + why:** nothing new. Remaining KAN-18 scope unchanged (physical env dataset split,
+  cost logging from job stats, terraform reconciliation, Pub/Sub, Redis-cost decision, staging).
+- **Next step:** whatever session B's verification or the relay surfaces next.
+- **Waiting on human:** standing only (KAN-43 long-lead; Redis cost decision).
+
+---
+
 ## 2026-08-20 — KAN-76 follow-up closed: live segment member counts (PR #111)
 
 - **Last completed:**
