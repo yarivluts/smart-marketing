@@ -174,22 +174,28 @@ export async function listRawRecordsForBatch(
 }
 
 /**
- * The single most recently landed raw record for one schema (KAN-36's
- * "has this event ever flowed, and if so when did we last see it" building
- * block). No lower bound on `landed_at` — this deliberately looks arbitrarily
- * far back so a genuinely silent event is still found, not just missed
- * because it fell outside some recent window. Two equality filters
- * (`kind`, `schema_name`) plus an `orderBy` on a third (`landed_at`) needs a
+ * The single most recently landed raw record for one schema, scoped to one
+ * environment (KAN-36's "has this event ever flowed, and if so when did we
+ * last see it" building block). Scoping matters: a project's environments
+ * carry independent traffic (a `dev` key firing test events must never mask
+ * `prod` going silent, or vice versa), so this deliberately does not fold
+ * every environment into one project-wide answer. No lower bound on
+ * `landed_at` — this deliberately looks arbitrarily far back so a genuinely
+ * silent event is still found, not just missed because it fell outside some
+ * recent window. Three equality filters (`environment_id`, `kind`,
+ * `schema_name`) plus an `orderBy` on a fourth (`landed_at`) needs a
  * composite index in real (non-emulator) Firestore, the same documented
  * requirement `drainPendingPipelineMessages`'s own query already carries.
  */
 export async function getMostRecentRawRecordForSchema(
   organizationId: string,
   projectId: string,
+  environmentId: string,
   kind: SchemaDefKind,
   schemaName: string,
 ): Promise<RawRecordModel | null> {
   const matches = await RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('environment_id', '==', environmentId)
     .where('kind', '==', kind)
     .where('schema_name', '==', schemaName)
     .orderBy('landed_at', 'desc')
@@ -199,26 +205,30 @@ export async function getMostRecentRawRecordForSchema(
 }
 
 /**
- * Every raw record landed for one schema since a given timestamp, newest
- * first, bounded to `limit` — the per-event volume/sparkline building block
- * (KAN-36). Newest-first (not oldest-first) so that a schema landing more
- * than `limit` records within the window still gets truncated to its most
- * recent ones — the ones a sparkline and a "last seen" reading actually care
- * about — rather than silently keeping the stalest end of the window and
- * making a busy, healthy event look quiet. Same composite-index caveat as
+ * Every raw record landed for one schema in one environment since a given
+ * timestamp, newest first, bounded to `limit` — the per-event volume/
+ * sparkline building block (KAN-36). Scoped to one environment for the same
+ * reason {@link getMostRecentRawRecordForSchema} is. Newest-first (not
+ * oldest-first) so that a schema landing more than `limit` records within
+ * the window still gets truncated to its most recent ones — the ones a
+ * sparkline and a "last seen" reading actually care about — rather than
+ * silently keeping the stalest end of the window and making a busy, healthy
+ * event look quiet. Same composite-index caveat as
  * {@link getMostRecentRawRecordForSchema}; the range filter shares
- * `orderBy`'s own field (`landed_at`), so only the two equality prefixes
- * (`kind`, `schema_name`) need it.
+ * `orderBy`'s own field (`landed_at`), so only the three equality prefixes
+ * (`environment_id`, `kind`, `schema_name`) need it.
  */
 export async function listRawRecordsForSchemaSince(
   organizationId: string,
   projectId: string,
+  environmentId: string,
   kind: SchemaDefKind,
   schemaName: string,
   sinceIso: string,
   limit: number,
 ): Promise<RawRecordModel[]> {
   return RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('environment_id', '==', environmentId)
     .where('kind', '==', kind)
     .where('schema_name', '==', schemaName)
     .where('landed_at', '>=', sinceIso)

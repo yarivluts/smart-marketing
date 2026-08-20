@@ -212,7 +212,7 @@ describe('a full Stripe backfill sync', () => {
     expect(eventsRun.records_accepted).toBe(2);
     expect(eventsRun.records_quarantined).toBe(0);
 
-    const landedCharge = await getMostRecentRawRecordForSchema(organization.id, project.id, 'event', 'stripe_charge');
+    const landedCharge = await getMostRecentRawRecordForSchema(organization.id, project.id, environment.id, 'event', 'stripe_charge');
     expect(landedCharge).not.toBeNull();
     expect((landedCharge!.payload.properties as Record<string, unknown>).charge_id).toBe('ch_1');
 
@@ -228,7 +228,7 @@ describe('a full Stripe backfill sync', () => {
     expect(entitiesRun.status).toBe('succeeded');
     expect(entitiesRun.records_accepted).toBe(1);
 
-    const landedSubscription = await getMostRecentRawRecordForSchema(organization.id, project.id, 'entity', 'stripe_subscription');
+    const landedSubscription = await getMostRecentRawRecordForSchema(organization.id, project.id, environment.id, 'entity', 'stripe_subscription');
     expect(landedSubscription).not.toBeNull();
     expect((landedSubscription!.payload.attributes as Record<string, unknown>).mrr_normalized).toBe(2000);
 
@@ -379,7 +379,7 @@ describe('processStripeWebhookEvent', () => {
     expect(result.handled).toBe(true);
     expect(result.summary?.accepted).toBe(1);
 
-    const landed = await getMostRecentRawRecordForSchema(organization.id, project.id, 'event', 'stripe_charge');
+    const landed = await getMostRecentRawRecordForSchema(organization.id, project.id, environment.id, 'event', 'stripe_charge');
     expect((landed!.payload.properties as Record<string, unknown>).charge_id).toBe('ch_1');
   });
 

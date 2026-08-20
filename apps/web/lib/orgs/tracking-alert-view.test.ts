@@ -14,11 +14,12 @@ function alert(overrides: Partial<TrackingAlertModel> & Pick<TrackingAlertModel,
 }
 
 describe('toTrackingAlertView', () => {
-  it('maps every field, including a defined resolvedAt', () => {
-    const view = toTrackingAlertView(alert({ id: 'a1', status: 'resolved', resolved_at: '2026-07-08T11:00:00.000Z' }));
+  it('maps every field, including a defined resolvedAt and the caller-supplied environmentName', () => {
+    const view = toTrackingAlertView(alert({ id: 'a1', status: 'resolved', resolved_at: '2026-07-08T11:00:00.000Z' }), 'prod');
     expect(view).toEqual({
       id: 'a1',
       schemaName: 'order_completed',
+      environmentName: 'prod',
       status: 'resolved',
       detectedAt: '2026-07-08T10:00:00.000Z',
       lastSeenAt: '2026-07-08T09:00:00.000Z',
@@ -28,7 +29,7 @@ describe('toTrackingAlertView', () => {
   });
 
   it('maps a missing resolvedAt to null, not undefined', () => {
-    const view = toTrackingAlertView(alert({ id: 'a2', status: 'active' }));
+    const view = toTrackingAlertView(alert({ id: 'a2', status: 'active' }), 'dev');
     expect(view.resolvedAt).toBeNull();
   });
 });

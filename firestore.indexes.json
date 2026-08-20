@@ -45,6 +45,7 @@
       "collectionGroup": "raw_records",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "environment_id", "order": "ASCENDING" },
         { "fieldPath": "kind", "order": "ASCENDING" },
         { "fieldPath": "schema_name", "order": "ASCENDING" },
         { "fieldPath": "landed_at", "order": "DESCENDING" }

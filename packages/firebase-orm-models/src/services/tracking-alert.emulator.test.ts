@@ -25,6 +25,14 @@ import { connectToFirestoreEmulator } from '../test-utils/emulator';
  * which is already covered by `pipeline.service`'s own tests) so each test
  * can control exactly when an event was "last seen" relative to
  * {@link TRACKING_ALERT_SILENCE_THRESHOLD_MS}.
+ *
+ * Both functions fan out per environment (`createProject` seeds
+ * dev/staging/prod for every project), so most single-environment tests
+ * below pick one arbitrary environment (`environmentId`, the project's
+ * `dev` environment) and assert against it explicitly by filtering on
+ * `environmentId`/`environmentName` rather than assuming a single outcome —
+ * `checkTrackingAlertsForProject`/`getEventVolumeOverviewForProject` legitimately
+ * return one entry per (schema, environment) pair now.
  */
 
 beforeAll(async () => {
@@ -43,7 +51,9 @@ async function setupOrgWithProject(orgName: string) {
   const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
-  return { owner, organization, project, environmentId: environments[0].id };
+  const devEnvironment = environments.find((environment) => environment.name === 'dev')!;
+  const prodEnvironment = environments.find((environment) => environment.name === 'prod')!;
+  return { owner, organization, project, environments, environmentId: devEnvironment.id, prodEnvironmentId: prodEnvironment.id };
 }
 
 async function registerEventSchema(organizationId: string, projectId: string, name: string, createdByUserId: string) {
@@ -93,7 +103,7 @@ describe('checkTrackingAlertsForProject', () => {
 
     const result = await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, triggeredByUserId: owner.id, now: NOW });
 
-    const outcome = result.outcomes.find((entry) => entry.schemaName === 'order_completed');
+    const outcome = result.outcomes.find((entry) => entry.schemaName === 'order_completed' && entry.environmentId === environmentId);
     expect(outcome?.action).toBe('fired');
     expect(outcome?.alert?.status).toBe('active');
     expect(outcome?.alert?.last_seen_at).toBe(TWO_HOURS_AGO);
@@ -101,15 +111,16 @@ describe('checkTrackingAlertsForProject', () => {
 
     const active = await listActiveTrackingAlertsForProject(organization.id, project.id);
     expect(active.map((alert) => alert.schema_name)).toEqual(['order_completed']);
+    expect(active[0]?.environment_id).toBe(environmentId);
   });
 
   it('does not fire for an event that has never landed a single record', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Tracking Alert Never Seen Org');
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Tracking Alert Never Seen Org');
     await registerEventSchema(organization.id, project.id, 'never_fired', owner.id);
 
     const result = await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, now: NOW });
 
-    const outcome = result.outcomes.find((entry) => entry.schemaName === 'never_fired');
+    const outcome = result.outcomes.find((entry) => entry.schemaName === 'never_fired' && entry.environmentId === environmentId);
     expect(outcome?.action).toBe('healthy');
     expect(outcome?.alert).toBeNull();
     expect(outcome?.lastSeenAt).toBeNull();
@@ -122,7 +133,7 @@ describe('checkTrackingAlertsForProject', () => {
 
     const result = await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, now: NOW });
 
-    const outcome = result.outcomes.find((entry) => entry.schemaName === 'signup');
+    const outcome = result.outcomes.find((entry) => entry.schemaName === 'signup' && entry.environmentId === environmentId);
     expect(outcome?.action).toBe('healthy');
     expect(outcome?.alert).toBeNull();
   });
@@ -133,12 +144,12 @@ describe('checkTrackingAlertsForProject', () => {
     await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId, schemaName: 'order_completed', landedAt: TWO_HOURS_AGO });
 
     const first = await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, now: NOW });
-    const firstAlert = first.outcomes.find((entry) => entry.schemaName === 'order_completed')?.alert;
+    const firstAlert = first.outcomes.find((entry) => entry.schemaName === 'order_completed' && entry.environmentId === environmentId)?.alert;
     expect(firstAlert).toBeTruthy();
 
     const laterNow = NOW + 15 * 60 * 1000;
     const second = await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, now: laterNow });
-    const secondOutcome = second.outcomes.find((entry) => entry.schemaName === 'order_completed');
+    const secondOutcome = second.outcomes.find((entry) => entry.schemaName === 'order_completed' && entry.environmentId === environmentId);
 
     expect(secondOutcome?.action).toBe('still_active');
     expect(secondOutcome?.alert?.id).toBe(firstAlert?.id);
@@ -165,7 +176,7 @@ describe('checkTrackingAlertsForProject', () => {
     });
 
     const result = await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, now: laterNow });
-    const outcome = result.outcomes.find((entry) => entry.schemaName === 'order_completed');
+    const outcome = result.outcomes.find((entry) => entry.schemaName === 'order_completed' && entry.environmentId === environmentId);
 
     expect(outcome?.action).toBe('resolved');
     expect(outcome?.alert?.status).toBe('resolved');
@@ -232,10 +243,38 @@ describe('checkTrackingAlertsForProject', () => {
   it('defaults to the documented cap when no limit is given', () => {
     expect(DEFAULT_TRACKING_ALERT_LIST_LIMIT).toBeGreaterThan(0);
   });
+
+  it('fires a prod alert while a still-flowing dev environment stays healthy for the same event (KAN-36 environment-isolation regression)', async () => {
+    const { owner, organization, project, environmentId, prodEnvironmentId } = await setupOrgWithProject('Tracking Alert Env Isolation Org');
+    await registerEventSchema(organization.id, project.id, 'order_completed', owner.id);
+    // dev keeps firing right up to `now` — prod went silent two hours ago. Before this fix, both
+    // environments were folded into one project-wide "most recent record" lookup, so dev's fresh
+    // traffic would have kept the whole schema looking healthy and the prod outage would never alert.
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId, schemaName: 'order_completed', landedAt: TEN_MINUTES_AGO });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironmentId,
+      schemaName: 'order_completed',
+      landedAt: TWO_HOURS_AGO,
+    });
+
+    const result = await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, now: NOW });
+
+    const devOutcome = result.outcomes.find((entry) => entry.schemaName === 'order_completed' && entry.environmentId === environmentId);
+    const prodOutcome = result.outcomes.find((entry) => entry.schemaName === 'order_completed' && entry.environmentId === prodEnvironmentId);
+    expect(devOutcome?.action).toBe('healthy');
+    expect(prodOutcome?.action).toBe('fired');
+    expect(prodOutcome?.alert?.environment_id).toBe(prodEnvironmentId);
+
+    const active = await listActiveTrackingAlertsForProject(organization.id, project.id);
+    expect(active).toHaveLength(1);
+    expect(active[0]?.environment_id).toBe(prodEnvironmentId);
+  });
 });
 
 describe('getEventVolumeOverviewForProject', () => {
-  it('returns a daily-bucketed sparkline plus last-seen for every active event schema', async () => {
+  it('returns a daily-bucketed sparkline plus last-seen for every active event schema in every environment', async () => {
     const { owner, organization, project, environmentId } = await setupOrgWithProject('Event Volume Org');
     await registerEventSchema(organization.id, project.id, 'order_completed', owner.id);
     await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId, schemaName: 'order_completed', landedAt: TEN_MINUTES_AGO });
@@ -243,12 +282,16 @@ describe('getEventVolumeOverviewForProject', () => {
 
     const overview = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7 });
 
-    const entry = overview.find((candidate) => candidate.schemaName === 'order_completed');
+    const entry = overview.find((candidate) => candidate.schemaName === 'order_completed' && candidate.environmentId === environmentId);
     expect(entry).toBeDefined();
+    expect(entry?.environmentName).toBe('dev');
     expect(entry?.lastSeenAt).toBe(TEN_MINUTES_AGO);
     expect(entry?.dailyCounts).toHaveLength(7);
     const todayKey = new Date(NOW).toISOString().slice(0, 10);
     expect(entry?.dailyCounts.find((bucket) => bucket.date === todayKey)?.count).toBe(2);
+
+    // One entry per environment for the same schema — dev/staging/prod each get their own row.
+    expect(overview.filter((candidate) => candidate.schemaName === 'order_completed')).toHaveLength(3);
   });
 
   it('reports the most recent lastSeenAt and does not lose recent days when a schema lands more records than the per-event cap', async () => {
@@ -262,7 +305,7 @@ describe('getEventVolumeOverviewForProject', () => {
 
     const overview = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7 });
 
-    const entry = overview.find((candidate) => candidate.schemaName === 'page_view');
+    const entry = overview.find((candidate) => candidate.schemaName === 'page_view' && candidate.environmentId === environmentId);
     expect(entry?.lastSeenAt).toBe(TEN_MINUTES_AGO);
     const todayKey = new Date(NOW).toISOString().slice(0, 10);
     expect(entry?.dailyCounts.find((bucket) => bucket.date === todayKey)?.count).toBe(1);
@@ -276,7 +319,7 @@ describe('getEventVolumeOverviewForProject', () => {
 
     const overview = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7 });
 
-    const entry = overview.find((candidate) => candidate.schemaName === 'order_completed');
+    const entry = overview.find((candidate) => candidate.schemaName === 'order_completed' && candidate.environmentId === environmentId);
     expect(entry?.lastSeenAt).toBe(longAgo);
     expect(entry?.dailyCounts.every((bucket) => bucket.count === 0)).toBe(true);
   });
@@ -297,7 +340,21 @@ describe('getEventVolumeOverviewForProject', () => {
     const overview = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW });
     const otherOverview = await getEventVolumeOverviewForProject(other.organization.id, other.project.id, { now: NOW });
 
-    expect(overview.find((entry) => entry.schemaName === 'order_completed')?.lastSeenAt).toBe(TEN_MINUTES_AGO);
-    expect(otherOverview.find((entry) => entry.schemaName === 'order_completed')?.lastSeenAt).toBeNull();
+    expect(overview.find((entry) => entry.schemaName === 'order_completed' && entry.environmentId === environmentId)?.lastSeenAt).toBe(TEN_MINUTES_AGO);
+    expect(otherOverview.find((entry) => entry.schemaName === 'order_completed' && entry.environmentId === other.environmentId)?.lastSeenAt).toBeNull();
+  });
+
+  it('does not let a busy dev environment mask a quiet prod environment for the same event', async () => {
+    const { owner, organization, project, environmentId, prodEnvironmentId } = await setupOrgWithProject('Event Volume Env Isolation Org');
+    await registerEventSchema(organization.id, project.id, 'order_completed', owner.id);
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId, schemaName: 'order_completed', landedAt: TEN_MINUTES_AGO });
+
+    const overview = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7 });
+
+    const devEntry = overview.find((candidate) => candidate.schemaName === 'order_completed' && candidate.environmentId === environmentId);
+    const prodEntry = overview.find((candidate) => candidate.schemaName === 'order_completed' && candidate.environmentId === prodEnvironmentId);
+    expect(devEntry?.lastSeenAt).toBe(TEN_MINUTES_AGO);
+    expect(prodEntry?.lastSeenAt).toBeNull();
+    expect(prodEntry?.dailyCounts.every((bucket) => bucket.count === 0)).toBe(true);
   });
 });
