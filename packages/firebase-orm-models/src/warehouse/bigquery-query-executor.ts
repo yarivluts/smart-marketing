@@ -1,6 +1,6 @@
 import { BigQuery } from '@google-cloud/bigquery';
 import type { CompiledMetricQuery, CompilerParamValue } from '@growthos/shared';
-import { WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseQueryExecutorWithStats, type WarehouseQueryStats, type WarehouseRow } from './query-executor';
+import { WarehouseQueryFailedError, type WarehouseQueryExecutorWithStats, type WarehouseQueryStats, type WarehouseRow } from './query-executor';
 
 /**
  * BigQuery's public on-demand analysis price as of this writing — $6.25 per
