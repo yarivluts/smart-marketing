@@ -14,7 +14,7 @@ import { FieldMappingModel } from '../models/field-mapping.model';
 import { HookEndpointModel } from '../models/hook-endpoint.model';
 import { ProjectModel } from '../models/project.model';
 import { isSchemaDefKind, type SchemaDefKind } from '../models/schema-def.model';
-import { checkRecordEnvelope, validateAgainstSchema } from './ingest.service';
+import { checkRecordEnvelope, ingestBatch, validateAgainstSchema, type IngestBatchInput, type IngestBatchSummary } from './ingest.service';
 import { getActiveSchemaDefinition } from './schema-registry.service';
 import { getHookDeliveryForProject } from './hook.service';
 import { EnvironmentNotFoundError } from './key.service';
@@ -46,6 +46,27 @@ export class InvalidSamplePayloadError extends Error {
   constructor() {
     super('Sample payload is not valid JSON.');
     this.name = 'InvalidSamplePayloadError';
+  }
+}
+
+export class FieldMappingDisabledError extends Error {
+  constructor() {
+    super('This field mapping is disabled. Enable a mapping (or create a new one) before applying it.');
+    this.name = 'FieldMappingDisabledError';
+  }
+}
+
+export class HookDeliveryDiscardedError extends Error {
+  constructor() {
+    super('This hook delivery was discarded and cannot have a mapping applied to it.');
+    this.name = 'HookDeliveryDiscardedError';
+  }
+}
+
+export class HookDeliveryAlreadyAppliedError extends Error {
+  constructor() {
+    super('This hook delivery already had a field mapping applied to it.');
+    this.name = 'HookDeliveryAlreadyAppliedError';
   }
 }
 
@@ -236,11 +257,52 @@ export interface TestRunFieldMappingResult extends MappingApplyResult {
 }
 
 /**
+ * The shared core of both `testRunFieldMapping` and `applyFieldMappingToDelivery`: parse a sample
+ * payload, run it through the mapping engine, then the same envelope/schema validators
+ * `ingest.service.ts` itself uses — so a preview and a real apply can never silently disagree about
+ * whether a record is valid. Never persists anything on its own; `applyFieldMappingToDelivery` is
+ * the only caller that goes on to actually ingest a clean result.
+ */
+async function runFieldMapping(
+  organizationId: string,
+  projectId: string,
+  kind: SchemaDefKind & MappingRecordKind,
+  rules: readonly MappingRule[],
+  schemaName: string,
+  samplePayloadText: string,
+): Promise<TestRunFieldMappingResult> {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(samplePayloadText);
+  } catch {
+    throw new InvalidSamplePayloadError();
+  }
+
+  const applied = applyFieldMapping(rules, payload);
+  if (applied.errors.length > 0) {
+    return { ...applied, envelopeErrors: [], schemaRegistered: false, schemaValidationErrors: [] };
+  }
+
+  const { fieldsToValidate, envelopeReasons } = checkRecordEnvelope(kind, applied.record);
+  if (envelopeReasons.length > 0) {
+    return { ...applied, envelopeErrors: envelopeReasons, schemaRegistered: false, schemaValidationErrors: [] };
+  }
+
+  const activeSchema = await getActiveSchemaDefinition(organizationId, projectId, kind, schemaName);
+  if (!activeSchema) {
+    return { ...applied, envelopeErrors: [], schemaRegistered: false, schemaValidationErrors: [] };
+  }
+
+  const schemaValidationErrors = validateAgainstSchema(fieldsToValidate, activeSchema.field_defs, kind);
+  return { ...applied, envelopeErrors: [], schemaRegistered: true, schemaValidationErrors };
+}
+
+/**
  * Runs a mapping (saved or draft) against one sample payload without
  * persisting anything (KAN-54 AC: "test-run on sample"). Reuses
- * `ingest.service.ts`'s own envelope/schema validators so a test-run shows
- * exactly what would happen if the mapped record were actually ingested,
- * without requiring a real ingest call.
+ * `ingest.service.ts`'s own envelope/schema validators (via {@link runFieldMapping}) so a test-run
+ * shows exactly what would happen if the mapped record were actually ingested, without requiring a
+ * real ingest call.
  */
 export async function testRunFieldMapping(params: TestRunFieldMappingParams): Promise<TestRunFieldMappingResult> {
   await requireProjectInOrg(params.organizationId, params.projectId);
@@ -275,30 +337,114 @@ export async function testRunFieldMapping(params: TestRunFieldMappingParams): Pr
     samplePayloadText = params.samplePayload ?? '';
   }
 
-  let payload: unknown;
+  return runFieldMapping(params.organizationId, params.projectId, kind, rules, schemaName, samplePayloadText);
+}
+
+export interface ApplyFieldMappingToDeliveryParams {
+  organizationId: string;
+  projectId: string;
+  fieldMappingId: string;
+  hookDeliveryId: string;
+  actorId: string;
+}
+
+export interface ApplyFieldMappingToDeliveryResult extends TestRunFieldMappingResult {
+  /**
+   * Whether the mapped record actually landed via the ingest pipeline. `false` means the same kind
+   * of problem a test-run would have shown (see the inherited `errors`/`envelopeErrors`/
+   * `schemaValidationErrors`) blocked it — nothing was persisted and the delivery is untouched.
+   */
+  applied: boolean;
+  /** Only set when `applied` is `true` — the batch this delivery's mapped record landed in (KAN-32/33), with its accept/quarantine/duplicate outcome. */
+  ingestSummary?: IngestBatchSummary;
+}
+
+/**
+ * Closes KAN-54's own follow-up gap: `testRunFieldMapping` only ever previews a mapping — nothing
+ * in this codebase actually consumed a saved mapping against a real queued delivery (KAN-53) and
+ * landed it through the ingest pipeline (KAN-32/33). Runs the exact same mapping/validation path
+ * `testRunFieldMapping` exercises (shared via {@link runFieldMapping}, not re-derived) and, only
+ * once that comes back clean, feeds the mapped record through `ingestBatch` as a real one-record
+ * batch — the same accept/quarantine/dedup path a direct `POST /v1/ingest/...` call goes through,
+ * so a mapped delivery is indistinguishable from a record a client sent straight to the ingest API.
+ *
+ * A disabled mapping or a discarded delivery both refuse outright (a human turned one of them off
+ * on purpose). A delivery that was already applied refuses too — `applied_at` is set once,
+ * permanently, the same "immediate and final" posture `ApiKeyModel.revoked_at`/
+ * `HookEndpointModel.disabled_at` take for their own presence-means-done fields — since re-running
+ * an already-landed delivery through `ingestBatch` a second time would only ever produce a
+ * confusing `duplicate` outcome (dedup keys make it harmless, not meaningful).
+ */
+export async function applyFieldMappingToDelivery(params: ApplyFieldMappingToDeliveryParams): Promise<ApplyFieldMappingToDeliveryResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const mapping = await loadFieldMapping(params.organizationId, params.projectId, params.fieldMappingId);
+  if (mapping.disabled_at) {
+    throw new FieldMappingDisabledError();
+  }
+  const delivery = await getHookDeliveryForProject(params.organizationId, params.projectId, params.hookDeliveryId);
+  if (delivery.status === 'discarded') {
+    throw new HookDeliveryDiscardedError();
+  }
+  if (delivery.applied_at) {
+    throw new HookDeliveryAlreadyAppliedError();
+  }
+
+  const kind = requireMappingKind(mapping.kind);
+  const result = await runFieldMapping(params.organizationId, params.projectId, kind, mapping.rules, mapping.schema_name, delivery.raw_payload);
+
+  const isValid = result.errors.length === 0 && result.envelopeErrors.length === 0 && result.schemaRegistered && result.schemaValidationErrors.length === 0;
+  if (!isValid) {
+    return { ...result, applied: false };
+  }
+
+  const input: IngestBatchInput =
+    kind === 'event'
+      ? { kind: 'event', records: [result.record] }
+      : kind === 'entity'
+        ? { kind: 'entity', type: mapping.schema_name, records: [result.record] }
+        : { kind: 'measure', records: [result.record] };
+
+  const summary = await ingestBatch({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: mapping.environment_id,
+    input,
+  });
+
+  const now = new Date().toISOString();
+  delivery.status = 'reviewed';
+  delivery.reviewed_at = now;
+  delivery.reviewed_by = params.actorId;
+  delivery.applied_at = now;
+  delivery.applied_by = params.actorId;
+  delivery.applied_field_mapping_id = mapping.id;
+  delivery.applied_batch_id = summary.batchId;
+  await delivery.save();
+
   try {
-    payload = JSON.parse(samplePayloadText);
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: mapping.environment_id,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'field_mapping.apply_to_delivery',
+      targetType: 'hook_delivery',
+      targetId: delivery.id,
+      summary: `Applied field mapping "${mapping.name}" to a hook delivery: batch ${summary.batchId} (${summary.accepted} accepted, ${summary.quarantined} quarantined, ${summary.duplicates} duplicate)`,
+      after: {
+        fieldMappingId: mapping.id,
+        batchId: summary.batchId,
+        accepted: summary.accepted,
+        quarantined: summary.quarantined,
+        duplicates: summary.duplicates,
+      },
+    });
   } catch {
-    throw new InvalidSamplePayloadError();
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
   }
 
-  const applied = applyFieldMapping(rules, payload);
-  if (applied.errors.length > 0) {
-    return { ...applied, envelopeErrors: [], schemaRegistered: false, schemaValidationErrors: [] };
-  }
-
-  const { fieldsToValidate, envelopeReasons } = checkRecordEnvelope(kind, applied.record);
-  if (envelopeReasons.length > 0) {
-    return { ...applied, envelopeErrors: envelopeReasons, schemaRegistered: false, schemaValidationErrors: [] };
-  }
-
-  const activeSchema = await getActiveSchemaDefinition(params.organizationId, params.projectId, kind, schemaName);
-  if (!activeSchema) {
-    return { ...applied, envelopeErrors: [], schemaRegistered: false, schemaValidationErrors: [] };
-  }
-
-  const schemaValidationErrors = validateAgainstSchema(fieldsToValidate, activeSchema.field_defs, kind);
-  return { ...applied, envelopeErrors: [], schemaRegistered: true, schemaValidationErrors };
+  return { ...result, applied: true, ingestSummary: summary };
 }
 
 export interface SuggestFieldMappingRulesParams {

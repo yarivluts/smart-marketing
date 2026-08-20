@@ -333,7 +333,8 @@
     "deliveryStatusDiscarded": "נמחק",
     "markReviewed": "סימון כנבדק",
     "discardDelivery": "מחיקה",
-    "deliveryStatusError": "לא ניתן היה לעדכן את המשלוח. נסה שוב."
+    "deliveryStatusError": "לא ניתן היה לעדכן את המשלוח. נסה שוב.",
+    "appliedViaMapping": "מופה ונקלט (אצווה {batchId})"
   },
   "FieldMappings": {
     "metaTitle": "מיפויי שדות",
@@ -379,6 +380,10 @@
     "schemaNotRegisteredWarning": "לסכימת היעד אין גרסה פעילה רשומה, כך שהרשומה לא נבדקה מולה.",
     "schemaValidationErrors": "שגיאות אימות סכימה: {errors}",
     "testRunSuccess": "הרשומה הממופה תקינה עבור סכימת היעד.",
+    "applyToDelivery": "החלה על המשלוח",
+    "applyToDeliveryError": "לא ניתן היה להחיל את המיפוי. נסה שוב.",
+    "applyToDeliverySuccess": "הוחל בצינור הקליטה: {accepted} התקבלו, {quarantined} הוסגרו, {duplicates} כפולים.",
+    "applyToDeliveryValidationChanged": "המשלוח כבר לא ממופה כראוי (ראה שגיאות למעלה) — לא הוחל דבר.",
     "suggestMappings": "הצעת מיפויים",
     "suggestSamplePayloadLabel": "מטען דוגמה להצעת מיפויים ממנו (JSON)",
     "runSuggest": "הצע",

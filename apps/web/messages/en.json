@@ -333,7 +333,8 @@
     "deliveryStatusDiscarded": "Discarded",
     "markReviewed": "Mark reviewed",
     "discardDelivery": "Discard",
-    "deliveryStatusError": "Couldn't update this delivery. Please try again."
+    "deliveryStatusError": "Couldn't update this delivery. Please try again.",
+    "appliedViaMapping": "Mapped and ingested (batch {batchId})"
   },
   "FieldMappings": {
     "metaTitle": "Field mappings",
@@ -379,6 +380,10 @@
     "schemaNotRegisteredWarning": "The target schema has no active registered version, so this record wasn't checked against it.",
     "schemaValidationErrors": "Schema validation errors: {errors}",
     "testRunSuccess": "Mapped record is valid for the target schema.",
+    "applyToDelivery": "Apply to delivery",
+    "applyToDeliveryError": "Couldn't apply this mapping. Please try again.",
+    "applyToDeliverySuccess": "Applied to the ingest pipeline: {accepted} accepted, {quarantined} quarantined, {duplicates} duplicate.",
+    "applyToDeliveryValidationChanged": "This delivery no longer maps cleanly (see errors above) — nothing was applied.",
     "suggestMappings": "Suggest mappings",
     "suggestSamplePayloadLabel": "Sample payload to propose mappings from (JSON)",
     "runSuggest": "Suggest",

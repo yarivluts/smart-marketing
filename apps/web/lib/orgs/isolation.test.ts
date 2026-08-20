@@ -18,6 +18,7 @@ import { POST as evolveSchemaDef } from '@/app/api/orgs/[orgId]/projects/[projec
 import { GET as listFieldMappings, POST as createFieldMappingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/field-mappings/route';
 import { DELETE as disableFieldMappingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/field-mappings/[fieldMappingId]/route';
 import { POST as testRunFieldMappingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/field-mappings/test-run/route';
+import { POST as applyFieldMappingRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/field-mappings/[fieldMappingId]/apply/route';
 import { GET as listMetricDefs, POST as registerMetricDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/metric-defs/route';
 import { POST as evolveMetricDef } from '@/app/api/orgs/[orgId]/projects/[projectId]/metric-defs/evolve/route';
 import { GET as listAuditLog } from '@/app/api/orgs/[orgId]/audit-log/route';
@@ -487,6 +488,18 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         testRunFieldMappingRoute(testRunRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
         }),
+    );
+
+    const applyRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/field-mappings/${FAKE_MEMBERSHIP_ID}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hookDeliveryId: FAKE_MEMBERSHIP_ID }),
+      });
+    const applyParams = (orgId: string) => Promise.resolve({ orgId, projectId: FAKE_ORG_ID, fieldMappingId: FAKE_MEMBERSHIP_ID });
+    await expectIndistinguishable(
+      () => applyFieldMappingRoute(applyRequestFor(orgB.id, FAKE_ORG_ID), { params: applyParams(orgB.id) }),
+      () => applyFieldMappingRoute(applyRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), { params: applyParams(FAKE_ORG_ID) }),
     );
   });
 
