@@ -2,10 +2,11 @@ import { BaseModel, Field, Model } from '@arbel/firebase-orm';
 
 /**
  * `pending`: sitting in the review queue, untouched.
- * `reviewed`: a human has looked at it. KAN-53 has no mapping engine yet
- * (that's KAN-54's E9.2) so this is bookkeeping, not a transform into a
- * registered event/entity/measure — the queue exists so "nothing lost" (the
- * E9.1 AC) is verifiable today even before there's anywhere to map into.
+ * `reviewed`: a human has looked at it, either by hand (`setHookDeliveryStatus`)
+ * or because `field-mapping.service.ts`'s `applyFieldMappingToDelivery` (KAN-54
+ * follow-up) actually mapped and landed it — see `applied_at`/`applied_by`/
+ * `applied_field_mapping_id`/`applied_batch_id` below for which of the two
+ * happened, and whether the record made it into the ingest pipeline.
  * `discarded`: a human decided this payload doesn't need mapping (test pings,
  * noise) and cleared it from the active queue view.
  */
@@ -60,4 +61,19 @@ export class HookDeliveryModel extends BaseModel {
 
   @Field()
   public reviewed_by?: string;
+
+  /** Set together, all-or-nothing, only once `applyFieldMappingToDelivery` actually lands this delivery's mapped record via `ingestBatch` — presence alone means "this delivery was mapped and ingested for real", not just previewed via a test-run. */
+  @Field()
+  public applied_at?: string;
+
+  @Field()
+  public applied_by?: string;
+
+  /** Which saved `FieldMappingModel` produced the record that landed — kept even if that mapping is later disabled or its rules change. */
+  @Field()
+  public applied_field_mapping_id?: string;
+
+  /** The `IngestBatchModel` this delivery's mapped record landed in (KAN-32/33) — lets an admin trace a delivery all the way to its accept/quarantine/duplicate outcome. */
+  @Field()
+  public applied_batch_id?: string;
 }

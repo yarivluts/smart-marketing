@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 
 export interface TestRunHookDeliveryOption {
@@ -24,24 +25,40 @@ interface TestRunResponseBody {
   schemaValidationErrors: string[];
 }
 
+interface ApplyResponseBody extends TestRunResponseBody {
+  applied: boolean;
+  ingestSummary?: { accepted: number; quarantined: number; duplicates: number };
+}
+
 /**
  * Runs a saved mapping against a sample payload without persisting anything
  * (KAN-54 AC: "test-run on sample") — the sample is either pasted JSON or an
  * already-queued hook delivery's raw payload (KAN-53). Collapsed by default
- * on the field-mappings list so browsing the list stays uncluttered.
+ * on the field-mappings list so browsing the list stays uncluttered. Once a
+ * test-run against a real queued delivery comes back clean, an "apply to
+ * delivery" action (KAN-54 follow-up) lands the mapped record for real via
+ * the ingest pipeline and marks the delivery handled — see
+ * `applyFieldMappingToDelivery`'s own doc comment for why this reuses the
+ * exact same validation path rather than trusting the earlier preview.
  */
 export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hookDeliveries }: TestRunFieldMappingPanelProps): React.ReactElement {
   const t = useTranslations('FieldMappings');
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [samplePayload, setSamplePayload] = useState('');
   const [hookDeliveryId, setHookDeliveryId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<TestRunResponseBody | null>(null);
+  const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [applySummary, setApplySummary] = useState<ApplyResponseBody['ingestSummary'] | null>(null);
 
   async function handleRun(): Promise<void> {
     setError(null);
     setResult(null);
+    setApplyError(null);
+    setApplySummary(null);
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/field-mappings/test-run`, {
@@ -59,6 +76,37 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
       setResult((await response.json()) as TestRunResponseBody);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleApply(): Promise<void> {
+    if (!hookDeliveryId) return;
+    setApplyError(null);
+    setApplySummary(null);
+    setApplying(true);
+    try {
+      const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/field-mappings/${fieldMappingId}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hookDeliveryId }),
+      });
+      if (!response.ok) {
+        setApplyError(t('applyToDeliveryError'));
+        return;
+      }
+      const body = (await response.json()) as ApplyResponseBody;
+      if (!body.applied) {
+        // Re-validation at apply time disagreed with the earlier preview (e.g. the schema evolved,
+        // or the delivery changed, in between) — show the same error rendering a test-run would.
+        setResult(body);
+        setApplyError(t('applyToDeliveryValidationChanged'));
+        return;
+      }
+      setApplySummary(body.ingestSummary ?? null);
+      setHookDeliveryId('');
+      router.refresh();
+    } finally {
+      setApplying(false);
     }
   }
 
@@ -107,6 +155,11 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
         <Button type="button" size="sm" onClick={handleRun} disabled={submitting || (!hookDeliveryId && samplePayload.trim().length === 0)}>
           {t('runTestRun')}
         </Button>
+        {isSuccess && hookDeliveryId ? (
+          <Button type="button" variant="outline" size="sm" onClick={handleApply} disabled={applying}>
+            {t('applyToDelivery')}
+          </Button>
+        ) : null}
         <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
           {t('close')}
         </Button>
@@ -114,6 +167,11 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
       {error ? (
         <p role="alert" className="text-xs text-destructive">
           {error}
+        </p>
+      ) : null}
+      {applyError ? (
+        <p role="alert" className="text-xs text-destructive">
+          {applyError}
         </p>
       ) : null}
       {result ? (
@@ -127,6 +185,15 @@ export function TestRunFieldMappingPanel({ orgId, projectId, fieldMappingId, hoo
           ) : null}
           {isSuccess ? <p className="text-green-600 dark:text-green-400">{t('testRunSuccess')}</p> : null}
         </div>
+      ) : null}
+      {applySummary ? (
+        <p className="text-xs text-green-600 dark:text-green-400">
+          {t('applyToDeliverySuccess', {
+            accepted: applySummary.accepted,
+            quarantined: applySummary.quarantined,
+            duplicates: applySummary.duplicates,
+          })}
+        </p>
       ) : null}
     </div>
   );

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  applyFieldMappingToDelivery,
   createFieldMapping,
   createHookEndpoint,
   createOrganizationWithOwner,
@@ -8,7 +9,11 @@ import {
   disableFieldMapping,
   ensureUserForFirebaseSession,
   EnvironmentNotFoundError,
+  FieldMappingDisabledError,
   FieldMappingNotFoundError,
+  getIngestBatch,
+  HookDeliveryAlreadyAppliedError,
+  HookDeliveryDiscardedError,
   InvalidFieldMappingError,
   InvalidSamplePayloadError,
   listFieldMappingsForProject,
@@ -16,6 +21,7 @@ import {
   ProjectNotFoundError,
   receiveHookPayload,
   registerSchemaDefinition,
+  setHookDeliveryStatus,
   suggestFieldMappingRules,
   TargetSchemaNotRegisteredError,
   testRunFieldMapping,
@@ -396,6 +402,142 @@ describe('testRunFieldMapping', () => {
         samplePayload: SAMPLE_SHOPIFY_PAYLOAD,
       }),
     ).rejects.toBeInstanceOf(InvalidFieldMappingError);
+  });
+});
+
+describe('applyFieldMappingToDelivery', () => {
+  async function setupMappingAndDelivery(orgName: string) {
+    const { owner, organization, project, prodEnvironment } = await setupProject(orgName);
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Shopify',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+    const mapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Shopify orders -> order_completed',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+    return { owner, organization, project, prodEnvironment, endpoint, mapping };
+  }
+
+  async function receiveDelivery(hookId: string, payload: string) {
+    const received = await receiveHookPayload({ hookId, rawBody: payload, headers: {} });
+    if (!received.ok) throw new Error('expected the delivery to be accepted');
+    return received.value.delivery;
+  }
+
+  it('maps a clean delivery, lands it via the ingest pipeline, and marks the delivery reviewed+applied', async () => {
+    const { owner, organization, project, endpoint, mapping } = await setupMappingAndDelivery('Mapping Apply Org');
+    const delivery = await receiveDelivery(endpoint.hook_id, SAMPLE_SHOPIFY_PAYLOAD);
+
+    const result = await applyFieldMappingToDelivery({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      hookDeliveryId: delivery.id,
+      actorId: owner.id,
+    });
+
+    expect(result.applied).toBe(true);
+    expect(result.errors).toEqual([]);
+    expect(result.schemaValidationErrors).toEqual([]);
+    expect(result.ingestSummary).toMatchObject({ total: 1, accepted: 1, quarantined: 0, duplicates: 0 });
+
+    const batch = await getIngestBatch(organization.id, project.id, mapping.environment_id, result.ingestSummary!.batchId);
+    expect(batch?.record_results).toEqual([{ client_id: 'shopify-order-820982911946154500', status: 'accepted' }]);
+
+    const [reloaded] = (await listHookDeliveriesForProject(organization.id, project.id)).filter((d) => d.id === delivery.id);
+    expect(reloaded.status).toBe('reviewed');
+    expect(reloaded.applied_at).toBeTruthy();
+    expect(reloaded.applied_by).toBe(owner.id);
+    expect(reloaded.applied_field_mapping_id).toBe(mapping.id);
+    expect(reloaded.applied_batch_id).toBe(result.ingestSummary!.batchId);
+  });
+
+  it('does not ingest or mutate the delivery when the mapped record fails validation', async () => {
+    const { owner, organization, project, endpoint, mapping } = await setupMappingAndDelivery('Mapping Apply Invalid Org');
+    const delivery = await receiveDelivery(endpoint.hook_id, JSON.stringify({ id: 1, created_at: '2024-01-01T00:00:00Z' }));
+
+    const result = await applyFieldMappingToDelivery({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      hookDeliveryId: delivery.id,
+      actorId: owner.id,
+    });
+
+    expect(result.applied).toBe(false);
+    expect(result.ingestSummary).toBeUndefined();
+    expect(result.errors.length).toBeGreaterThan(0);
+
+    const [reloaded] = (await listHookDeliveriesForProject(organization.id, project.id)).filter((d) => d.id === delivery.id);
+    expect(reloaded.status).toBe('pending');
+    expect(reloaded.applied_at).toBeUndefined();
+  });
+
+  it('rejects applying a disabled mapping', async () => {
+    const { owner, organization, project, endpoint, mapping } = await setupMappingAndDelivery('Mapping Apply Disabled Org');
+    const delivery = await receiveDelivery(endpoint.hook_id, SAMPLE_SHOPIFY_PAYLOAD);
+    await disableFieldMapping({ organizationId: organization.id, projectId: project.id, fieldMappingId: mapping.id, disabledByUserId: owner.id });
+
+    await expect(
+      applyFieldMappingToDelivery({
+        organizationId: organization.id,
+        projectId: project.id,
+        fieldMappingId: mapping.id,
+        hookDeliveryId: delivery.id,
+        actorId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(FieldMappingDisabledError);
+  });
+
+  it('rejects applying to a discarded delivery', async () => {
+    const { owner, organization, project, endpoint, mapping } = await setupMappingAndDelivery('Mapping Apply Discarded Org');
+    const delivery = await receiveDelivery(endpoint.hook_id, SAMPLE_SHOPIFY_PAYLOAD);
+    await setHookDeliveryStatus({ organizationId: organization.id, projectId: project.id, hookDeliveryId: delivery.id, status: 'discarded', actedByUserId: owner.id });
+
+    await expect(
+      applyFieldMappingToDelivery({
+        organizationId: organization.id,
+        projectId: project.id,
+        fieldMappingId: mapping.id,
+        hookDeliveryId: delivery.id,
+        actorId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(HookDeliveryDiscardedError);
+  });
+
+  it('rejects re-applying a delivery that was already applied', async () => {
+    const { owner, organization, project, endpoint, mapping } = await setupMappingAndDelivery('Mapping Apply Twice Org');
+    const delivery = await receiveDelivery(endpoint.hook_id, SAMPLE_SHOPIFY_PAYLOAD);
+
+    await applyFieldMappingToDelivery({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      hookDeliveryId: delivery.id,
+      actorId: owner.id,
+    });
+
+    await expect(
+      applyFieldMappingToDelivery({
+        organizationId: organization.id,
+        projectId: project.id,
+        fieldMappingId: mapping.id,
+        hookDeliveryId: delivery.id,
+        actorId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(HookDeliveryAlreadyAppliedError);
   });
 });
 

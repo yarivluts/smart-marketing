@@ -32,6 +32,8 @@ import {
   createOrgPerson as createOrgPersonInOrganization,
   createProject as createProjectInOrganization,
   createResourceTemplate as createResourceTemplateInOrganization,
+  applyFieldMappingToDelivery as applyFieldMappingToDeliveryInOrganization,
+  type ApplyFieldMappingToDeliveryResult,
   createFieldMapping as createFieldMappingInOrganization,
   createHookEndpoint as createHookEndpointInOrganization,
   createSharedCredential as createSharedCredentialInOrganization,
@@ -471,6 +473,19 @@ interface TestRunFieldMappingInput {
 export async function testRunFieldMapping(input: TestRunFieldMappingInput): Promise<TestRunFieldMappingResult> {
   await ensureFirestoreOrm();
   return testRunFieldMappingInOrganization(input);
+}
+
+interface ApplyFieldMappingToDeliveryInput {
+  organizationId: string;
+  projectId: string;
+  fieldMappingId: string;
+  hookDeliveryId: string;
+  actorId: string;
+}
+
+export async function applyFieldMappingToDelivery(input: ApplyFieldMappingToDeliveryInput): Promise<ApplyFieldMappingToDeliveryResult> {
+  await ensureFirestoreOrm();
+  return applyFieldMappingToDeliveryInOrganization(input);
 }
 
 interface SuggestFieldMappingRulesInput {

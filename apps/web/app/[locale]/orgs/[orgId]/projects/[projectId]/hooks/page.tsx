@@ -136,6 +136,9 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
                     <HookDeliveryStatusButtons orgId={orgId} projectId={projectId} hookDeliveryId={delivery.id} />
                   ) : null}
                 </div>
+                {delivery.applied_at ? (
+                  <p className="text-xs text-muted-foreground">{t('appliedViaMapping', { batchId: delivery.applied_batch_id ?? '' })}</p>
+                ) : null}
                 <pre className="max-h-40 overflow-auto rounded-md bg-muted/50 p-2 text-xs">{delivery.raw_payload}</pre>
               </li>
             ))}
