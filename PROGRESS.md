@@ -17,6 +17,39 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Isolation proven at every layer; search_customers dialect bug fixed (PR #115)
+
+- **Last completed:**
+  - **Environment isolation now proven live at EVERY warehouse-read surface**, all with the same
+    discriminating dataset (prod env dau-sum=3, dev env=1 on one project; a leak would show 4):
+    board tiles (previously), the public REST `POST /v1/metrics/query` (a `gos_live_` key returns
+    3, a `gos_test_` key on the same project returns 1 — the key's own binding wins), and the MCP
+    layer (`query_metric` via plain curl JSON-RPC against the stateless StreamableHTTP transport —
+    no client needed; same numbers per key). Session-B ran all of it, including catching that an
+    `avg`-shaped metric can't discriminate when both rows share a value, and registering a
+    `sum`-shaped one instead.
+  - **PR #115 (merged + deployed):** session-B's MCP round also surfaced a real dialect bug —
+    `search_customers` used `CAST(properties AS STRING)`, which BigQuery rejects outright for JSON
+    columns, so every non-empty search errored identically everywhere. Fixed with
+    `TO_JSON_STRING(properties)`; verified live post-deploy (same curl, both keys, clean
+    `{"results": []}`). Class note recorded in-code: fake-executor tests validate query *shape*,
+    not dialect *validity* — only a live warehouse run can catch this kind.
+  - Also from that round: my curl recipe's `query_metric` args were wrong (`metric` singular, not
+    `metrics` array) — the tool's validation error was clean enough for session B to self-correct,
+    which is its own small UX win worth noting.
+- **In progress (exact stopping point):** none — every item opened today is shipped AND
+  independently verified: warehouse live on both envs, env isolation at every layer, hourly
+  autonomous refresh, snippet-compatibility fix, live freshness panel, search_customers.
+- **Blocked + why:** nothing. Remaining KAN-18 scope unchanged and lower-priority (physical env
+  dataset split, query-cost logging from BigQuery job stats, terraform reconciliation, Pub/Sub,
+  Redis-cost decision, staging env).
+- **Next step:** whatever the relay/backlog surfaces; the two human-gated standing items below are
+  the only known blockers to further KAN scope.
+- **Waiting on human:** standing only — **KAN-43** (Google Ads dev token + Meta Marketing API
+  applications, long-lead) and the Redis/Memorystore cost decision.
+
+---
+
 ## 2026-08-20 — Autonomous refresh + snippet compatibility + live freshness panel (PRs #105/#107/#113)
 
 - **Last completed:**
