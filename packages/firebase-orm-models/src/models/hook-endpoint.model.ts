@@ -59,6 +59,27 @@ export class HookEndpointModel extends BaseModel {
   @Field()
   public signing_secret_encrypted?: SecretEnvelope;
 
+  /**
+   * The secret `signing_secret_encrypted` displaced on its most recent rotation
+   * (never populated on the *first* set — only a true rotation has a prior
+   * secret to keep). `receiveHookPayload` accepts a signature verified against
+   * either this or the live secret until {@link previous_signing_secret_expires_at}
+   * passes, so an already-configured sending SaaS keeps working for the grace
+   * window instead of failing the instant a human rotates the secret.
+   *
+   * `null` (never `undefined`) is how `receiveHookPayload` clears this once the
+   * grace window has served its purpose — same reasoning `BoardModel.compare`
+   * documents: `@arbel/firebase-orm`'s `getDocumentData()` omits an `undefined`
+   * field from `updateDoc()` entirely, leaving the previously stored value
+   * untouched, where an explicit `null` is a real value that overwrites it.
+   */
+  @Field()
+  public previous_signing_secret_encrypted?: SecretEnvelope | null;
+
+  /** ISO timestamp after which {@link previous_signing_secret_encrypted} is no longer accepted. `null` (not `undefined`) once cleared — see that field's own doc comment. */
+  @Field()
+  public previous_signing_secret_expires_at?: string | null;
+
   @Field({ is_required: true })
   public created_by!: string;
 

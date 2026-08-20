@@ -317,6 +317,7 @@
     "rotateSigningSecret": "החלפת סוד",
     "setSigningSecretError": "לא ניתן היה לשמור את סוד החתימה. נסה שוב.",
     "setSigningSecretSuccess": "הסוד נשמר.",
+    "previousSecretGraceNotice": "הסוד הקודם עדיין מתקבל עד {expiresAt}, כך שהשירות השולח ימשיך לעבוד עד לעדכונו.",
     "createEndpointHeading": "יצירת נקודת קצה לוֶבְּהוּק",
     "noEnvironments": "לפרויקט זה אין עדיין סביבות.",
     "nameLabel": "שם",

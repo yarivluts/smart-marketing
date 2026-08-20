@@ -94,12 +94,19 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
                   </div>
                   {!endpoint.disabled_at ? <HookReceiveUrl hookApiBaseUrl={hookApiBaseUrl} hookId={endpoint.hook_id} /> : null}
                   {!endpoint.disabled_at && endpoint.signature_mode === 'hmac_sha256' ? (
-                    <SetHookSigningSecretForm
-                      orgId={orgId}
-                      projectId={projectId}
-                      hookEndpointId={endpoint.id}
-                      hasSigningSecret={Boolean(endpoint.signing_secret_encrypted)}
-                    />
+                    <>
+                      <SetHookSigningSecretForm
+                        orgId={orgId}
+                        projectId={projectId}
+                        hookEndpointId={endpoint.id}
+                        hasSigningSecret={Boolean(endpoint.signing_secret_encrypted)}
+                      />
+                      {endpoint.previous_signing_secret_expires_at && endpoint.previous_signing_secret_expires_at > new Date().toISOString() ? (
+                        <p className="text-xs text-muted-foreground">
+                          {t('previousSecretGraceNotice', { expiresAt: endpoint.previous_signing_secret_expires_at })}
+                        </p>
+                      ) : null}
+                    </>
                   ) : null}
                 </li>
               );
