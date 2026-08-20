@@ -5,6 +5,7 @@ import { Test } from '@nestjs/testing';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {
+  confirmOnboardingFunnelSteps,
   connectFirestoreOrm,
   createOrganizationWithOwner,
   createOrgPerson,
@@ -263,7 +264,16 @@ describe('McpController (e2e)', () => {
   });
 
   it('query_funnel surfaces a tool error with no real warehouse configured (KAN-18)', async () => {
-    const { rawKey } = await setupProjectWithKey('Query Funnel Org');
+    const { owner, organization, project, rawKey } = await setupProjectWithKey('Query Funnel Org');
+    // A confirmed funnel is what makes the tool actually query the warehouse — without one it
+    // legitimately returns an empty list (nothing to show) and never touches the executor. Confirm
+    // one so this test still exercises the "no warehouse → tool error" path it is asserting.
+    await confirmOnboardingFunnelSteps({
+      organizationId: organization.id,
+      projectId: project.id,
+      userId: owner.id,
+      steps: [{ eventSchemaName: 'signup', stageKey: 'signup', order: 0 }],
+    });
     const client = await connectedClient(rawKey);
     try {
       const result = await client.callTool({ name: 'query_funnel', arguments: {} });

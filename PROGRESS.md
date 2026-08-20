@@ -17,6 +17,65 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — MCP `query_funnel` now runs on the real BigQuery warehouse (PR #136)
+
+- **Last completed:**
+  - Session start: unshallowed the local clone (it started as a 50-commit shallow snapshot whose local
+    `main` looked "diverged" from `origin/main` — the same recurring stale-pointer artifact prior runs
+    hit, resolved here by `git fetch --unshallow` then `git checkout -B main origin/main`; `origin/main`
+    is `dfb97d0`, 131 commits ahead of the shallow tip, nothing lost). `TASKS.md` still all-`done`
+    except the standing blockers (KAN-18/19 `in-progress`, KAN-43 `needs-human`, KAN-50/51 `blocked-by`).
+  - Checked `list_pull_requests(state: open)`: **#134** (`fix/mart-reserved-field-names`) and **#128**
+    (`fix/compare-window-leap-year-overflow`) are open, owned by concurrent sessions — did not touch
+    either. Ran a research pass over the top PROGRESS entries' own flagged follow-ups; the highest-value
+    UNCLAIMED one that doesn't collide with #134/#128 was `query_funnel`.
+  - **Fix (branch `fix/query-funnel-real-warehouse`):** `queryProjectFunnelSteps`
+    (`packages/firebase-orm-models/src/services/mcp-tools.service.ts`) queried `fact_funnel_step`, the
+    one core dbt model still `enabled=(target.type == 'duckdb')` (its `funnel_step_mappings` seed has no
+    real warehouse export — #133 lifted every other model's DuckDB gate but not this one). So on the
+    real BigQuery warehouse the table doesn't exist and `query_funnel` threw `WarehouseQueryFailedError`
+    for every call — the MCP tool was dead in production. It now reads the project's human-confirmed
+    funnel from Firestore (`OnboardingStateModel.funnel_steps`, KAN-68 — the very export the seed stands
+    in for) via `getOnboardingState`, then counts `COUNT(DISTINCT entity_id)` per step straight off the
+    BigQuery-enabled `events` core table, matching each step's `eventSchemaName` against
+    `events.event_type` (the same fixed-JSON-path narrowing #133 took for identity; keeps every dynamic
+    value a bound `@param`, never spliced). Same hand-written-SQL-over-`WarehouseQueryExecutor` pattern
+    `searchProjectCustomers`/`queryProjectCohortRetention` already use. One row per confirmed step in
+    confirmed order (a step with no events yet reports a real `0`, not a dropped row); a project with no
+    confirmed funnel returns `[]` without touching the warehouse. The dbt `fact_funnel_step` model is
+    left as-is (still serves its DuckDB fixture-parity tests); only the TS adapter changed.
+  - **Tests:** rewrote the `queryProjectFunnelSteps` block in `mcp-tools.emulator.test.ts` (seeds a real
+    confirmed funnel via `confirmOnboardingFunnelSteps`, asserts the `events` query shape + bound
+    params + per-step mapping, a zero-count-step case, the env filter, and the no-funnel→no-warehouse-hit
+    case). Updated `apps/api/src/mcp/mcp.controller.e2e.spec.ts`'s "query_funnel errors with no
+    warehouse" case to first confirm a funnel (otherwise it now legitimately returns `[]` before
+    reaching the executor). Doc comments updated (module header + cohort cross-ref).
+  - **Self-reviewed the diff:** the `event_type != 'touchpoint'` filter was dropped as redundant (the
+    `IN (confirmed schemas)` list already scopes it, and the wizard never proposes touchpoint schemas
+    as funnel steps); duplicate-eventSchemaName across steps is handled (deduped `IN` list, count fanned
+    back out); `getOnboardingState`'s `requireProjectInOrg` validates the project. No unused imports
+    (`rowToFunnelStepAggregate` removed, `WarehouseRow` still used elsewhere).
+  - **All checks green locally:** `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` (exit 0;
+    firebase-orm-models 913, api 114, web vitest 943, all packages pass). Two web Playwright E2E cases
+    (`orgs.spec.ts` invite-revoke, `resource-library.spec.ts` — both unrelated to this change) flaked
+    once under heavy concurrent machine load and passed on retry #1; reported as "2 flaky", run still
+    exit 0.
+- **In progress (exact stopping point):** PR #136 opened; CI green (`terraform fmt · validate` and
+  `lint · typecheck · test · build` both passed on the conflict-free head); merging now.
+- **Blocked + why:** nothing.
+- **Next step:** Remaining unclaimed follow-ups a future run could pick (from the same research pass,
+  all still real as of this run): the schema-mart JSON-level bug (mart views extract declared fields
+  from `$.field` at the payload top level, but the real ingest envelope nests them under
+  `properties`/`attributes`/`dimensions` — the TS twin of the #135 dbt fix; **#134 has now landed**,
+  so this no longer needs to wait) and its measure-`value`/`ts` sibling; the engagement-pack metrics
+  targeting a nonexistent `fact_funnel_event` table; and the unbounded in-memory metric result cache.
+  Also note the same "PROGRESS.md prepend conflict" pattern #134's own entry documents recurred here
+  too (twice, resolved the same way — keep both entries, newest first).
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; prune merged feature branches the proxy blocks this run from deleting).
+
+---
+
 ## 2026-08-20 — Reject measure/entity fields colliding with mart-view intrinsic columns (PR #134)
 
 - **Last completed:**
