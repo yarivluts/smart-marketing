@@ -17,6 +17,51 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Metrics compiler: inclusive `end` date silently dropped the last day for timestamp time columns (PR #126)
+
+- **Last completed:**
+  - Session start found the by-now-standard all-`done`-except-standing-blockers `TASKS.md` state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`) and **zero open
+    PRs** (checked `list_pull_requests(state: open)` first, per every recent entry's advice — clean
+    baseline, no duplicate debt to reconcile this run). `main` green at `3660a0a` (fresh install +
+    full `pnpm typecheck` verified locally).
+  - Rather than record another no-op, ran a bounded adversarial correctness review of the metrics
+    query compiler (the area recent PRs #123/#124 show active QA is probing) via a subagent, requiring
+    a concrete failing-input repro. It surfaced a real off-by-a-day bug, which I verified independently
+    against the code + golden fixtures before acting.
+  - **The bug:** `compiler.ts` `buildLeafCte` compared the **raw** time column to a **date-only**
+    bound (`` `ts` <= @end ``, `@end` = `'YYYY-MM-DD'`), while `bucketExpression` on the same column
+    already wraps it in `DATE(...)`. The compiler never knows a `timeColumn`'s SQL type, so for a
+    TIMESTAMP column BigQuery coerces `` `ts` <= '2026-01-31' `` to `ts <= 2026-01-31 00:00:00` and
+    silently drops every row on the final (inclusive-per-`types.ts`) day after midnight. Affected
+    every metric bucketing a timestamp column (`signups`, `new_paying`, `arpa`, `gross_margin`,
+    `orders` on `placed_at`, `revenue_churn_rate` on `started_at`, ...); DATE-column metrics
+    (`ad_spend` on `date`) were unaffected, which is why it hid. The golden-file tests only asserted a
+    fixed SQL string, so they locked the buggy predicate in rather than verifying its semantics.
+  - **The fix (PR #126, branch `fix/metrics-compiler-inclusive-end-timestamp`):** normalize the range
+    predicate with `DATE(...)` exactly as the bucket expression does, via a shared
+    `dateColumnExpression` helper both now go through (`DATE(date_expr)` is an identity on a DATE
+    column, so it's correct for both types). Regenerated the 13 golden `.sql` fixtures (WHERE
+    predicate text only; **bind params unchanged**) and added two semantic regression tests pinning
+    the inclusive-end behavior on the current + compare windows, so the naive predicate can't silently
+    return. Honestly noted the partition-pruning tradeoff + a half-open-range alternative in the PR
+    body.
+  - Verified locally before opening the PR: `packages/shared` unit (389, compiler 18→20),
+    `metrics-compiler.emulator` (real registry→compiler, 5), `board.emulator`+`goal.emulator`
+    (metric-query consumers, 44), and full-monorepo `pnpm lint`/`typecheck`/`build` all green.
+- **In progress (exact stopping point):** PR #126 opened, awaiting CI; subscribed for drive-to-green.
+- **Blocked + why:** unchanged standing items only.
+- **Next step:** land #126 once CI is green (merge + record). The compiler review also surfaced a
+  **separate, unfixed** bug kept out of #126 to stay one-task-scoped: `time.ts`
+  `computeCompareWindow`'s `previous_year` uses `setUTCFullYear(y-1)`, so a window ending
+  `2024-02-29` rolls forward to `2023-03-01` (JS leap-day overflow) instead of `2023-02-28`, spilling
+  the previous-year compare window into March and over-counting by a day. Not covered by the
+  non-leap fixture 08. Good next-run candidate — confirm still unfixed against `main` first.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — Independently implemented the same ad-platform budget-resource-lookup fix; superseded by a concurrent session's PR #122
 
 - **Last completed:**
