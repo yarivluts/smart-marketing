@@ -176,6 +176,22 @@ export async function updateBoardSettings(params: UpdateBoardSettingsParams): Pr
   board.updated_by = params.updatedByUserId;
   board.updated_at = new Date().toISOString();
   await board.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.updatedByUserId,
+      action: 'board.settings_update',
+      targetType: 'board',
+      targetId: board.id,
+      summary: `Updated board "${board.name}" settings`,
+    });
+  } catch {
+    // Best-effort — see the comment in `createBoard`.
+  }
+
   return board;
 }
 
@@ -281,13 +297,44 @@ export async function saveBoardTiles(params: SaveBoardTilesParams): Promise<Boar
   board.updated_by = params.updatedByUserId;
   board.updated_at = new Date().toISOString();
   await board.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.updatedByUserId,
+      action: 'board.tiles_save',
+      targetType: 'board',
+      targetId: board.id,
+      summary: `Saved ${board.tiles.length} tile(s) for board "${board.name}"`,
+    });
+  } catch {
+    // Best-effort — see the comment in `createBoard`.
+  }
+
   return board;
 }
 
-/** Deletes a board outright — unlike most lifecycle models in this codebase (plugin installs, resource attachments), a board is disposable user content with no audit-trail requirement of its own; it isn't a security- or billing-relevant resource, so nothing depends on its history surviving deletion. */
-export async function deleteBoard(organizationId: string, projectId: string, boardId: string): Promise<void> {
+/** Deletes a board outright — disposable user content, the same posture `deleteGoal`/`deleteWinRule` document for their own boards-sibling config. Still audit-logged like every other lifecycle change in this file: a deleted board's own history doesn't need to survive, but the fact that someone deleted it does (KAN-44 AC: "every config ... change"). */
+export async function deleteBoard(organizationId: string, projectId: string, boardId: string, deletedByUserId: string): Promise<void> {
   const board = await loadBoard(organizationId, projectId, boardId);
   await board.delete();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      projectId,
+      actorType: 'user',
+      actorId: deletedByUserId,
+      action: 'board.delete',
+      targetType: 'board',
+      targetId: boardId,
+      summary: `Deleted board "${board.name}"`,
+    });
+  } catch {
+    // Best-effort — see the comment in `createBoard`.
+  }
 }
 
 export type BoardTileQueryOutcome =
