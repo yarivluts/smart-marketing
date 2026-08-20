@@ -1,6 +1,6 @@
 import { assertSafeIdentifier, quoteIdentifier } from './identifiers';
 import { collectIdentifiers, parseFormula, type FormulaAstNode } from './formula-parser';
-import { bucketExpression, computeCompareWindow, type TimeWindow } from './time';
+import { bucketExpression, computeCompareWindow, dateColumnExpression, type TimeWindow } from './time';
 import {
   METRIC_FILTER_OPERATORS,
   MetricCompilerError,
@@ -122,7 +122,8 @@ function buildLeafCte(
   params[startParam] = period.window.start;
   params[endParam] = period.window.end;
 
-  const whereClauses = [`${timeColumnSql} >= @${startParam}`, `${timeColumnSql} <= @${endParam}`];
+  const timeFilterSql = dateColumnExpression(timeColumnSql);
+  const whereClauses = [`${timeFilterSql} >= @${startParam}`, `${timeFilterSql} <= @${endParam}`];
   if (tenant) {
     params.tenant_organization_id = tenant.organizationId;
     params.tenant_project_id = tenant.projectId;

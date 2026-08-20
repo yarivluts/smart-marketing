@@ -4,7 +4,7 @@ leaf_ad_spend_current AS (
     DATE_TRUNC(DATE(`date`), DAY) AS bucket_date,
     SUM(`reporting_spend`) AS value_ad_spend
   FROM `fact_ad_spend`
-  WHERE `date` >= @time_start_current AND `date` <= @time_end_current
+  WHERE DATE(`date`) >= @time_start_current AND DATE(`date`) <= @time_end_current
   GROUP BY bucket_date
 )
 SELECT

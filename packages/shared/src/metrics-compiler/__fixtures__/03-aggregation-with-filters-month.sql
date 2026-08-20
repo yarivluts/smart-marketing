@@ -5,7 +5,7 @@ leaf_signups_current AS (
     `geo` AS `geo`,
     COUNT(DISTINCT `customer_id`) AS value_signups
   FROM `fact_funnel_event`
-  WHERE `ts` >= @time_start_current AND `ts` <= @time_end_current AND `step` = @filter_signups_0 AND `geo` = @qfilter_0
+  WHERE DATE(`ts`) >= @time_start_current AND DATE(`ts`) <= @time_end_current AND `step` = @filter_signups_0 AND `geo` = @qfilter_0
   GROUP BY bucket_date, `geo`
 )
 SELECT
