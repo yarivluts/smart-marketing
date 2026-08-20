@@ -21,12 +21,15 @@ function estimateOnDemandCostUsd(bytesProcessed: number | undefined): number | n
 }
 
 /**
- * BigQuery's `jobs.query` REST response (what `@google-cloud/bigquery`'s
- * `query()` convenience method calls under the hood for a simple query like
- * the ones this executor runs) includes `totalBytesProcessed` as a
- * stringified int64 alongside the rows — this reads it off the client's own
- * second tuple element ({@link BigQueryQueryClient}'s narrowed `apiResponse`
- * slot) without assuming any other shape from it.
+ * BigQuery's `GetQueryResultsResponse` (the REST response `query()` resolves
+ * through — verified against the real `@google-cloud/bigquery@9.0.2` source:
+ * `Job#getQueryResults` calls back `(err, rows, nextQuery, apiResponse)`, and
+ * `@google-cloud/promisify` turns every non-error callback arg into an array
+ * when there's more than one, i.e. `[rows, nextQuery, apiResponse]` — the
+ * response `createRealBigQueryClient` normalizes into {@link BigQueryQueryClient}'s
+ * own second tuple slot) includes `totalBytesProcessed` as a stringified
+ * int64 alongside the rows — this reads it off that slot without assuming
+ * any other shape from it.
  */
 function extractBytesProcessed(response: unknown): number | undefined {
   if (!response || typeof response !== 'object') {
@@ -63,11 +66,24 @@ export interface BigQueryQueryClient {
   query(options: BigQueryQueryOptions): Promise<[Record<string, unknown>[], unknown?]>;
 }
 
-/** Wraps a real `@google-cloud/bigquery` `BigQuery` instance behind {@link BigQueryQueryClient}. */
+/**
+ * Wraps a real `@google-cloud/bigquery` `BigQuery` instance behind
+ * {@link BigQueryQueryClient}. `bigquery.query()` itself promise-resolves to
+ * a 3-element array — `[rows, nextQuery, apiResponse]`, per
+ * `@google-cloud/promisify`'s array-of-remaining-callback-args behavior for
+ * `Job#getQueryResults`'s `(err, rows, nextQuery, apiResponse)` callback —
+ * not the 2-element `[rows, apiResponse]` `BigQueryQueryClient` narrows down
+ * to; this normalizes that discrepancy right here at the SDK boundary
+ * (dropping the middling `nextQuery`, which this executor never paginates
+ * through) rather than leaking the SDK's own tuple shape into every caller.
+ */
 export function createRealBigQueryClient(projectId?: string): BigQueryQueryClient {
   const bigquery = new BigQuery(projectId ? { projectId } : undefined);
   return {
-    query: (options) => bigquery.query(options) as unknown as Promise<[Record<string, unknown>[], unknown?]>,
+    query: async (options) => {
+      const [rows, , apiResponse] = (await bigquery.query(options)) as unknown as [Record<string, unknown>[], unknown, unknown];
+      return [rows, apiResponse];
+    },
   };
 }
 

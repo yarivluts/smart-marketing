@@ -185,4 +185,46 @@ describe('createRealBigQueryClient', () => {
     vi.doUnmock('@google-cloud/bigquery');
     vi.resetModules();
   });
+
+  it('normalizes the real SDK\'s 3-element [rows, nextQuery, apiResponse] resolution into [rows, apiResponse] — the exact shape a real bigquery.query() call resolves to (verified against @google-cloud/bigquery@9.0.2\'s own Job#getQueryResults callback + @google-cloud/promisify)', async () => {
+    vi.resetModules();
+    const apiResponse = { totalBytesProcessed: String(2 ** 40), schema: {}, jobComplete: true };
+    // The real SDK's query() promise-resolves [rows, nextQuery, apiResponse] — nextQuery
+    // (here `null`, no further pages) sits at index 1, NOT the response object.
+    const queryMock = vi.fn().mockResolvedValue([[{ ad_spend: 100 }], null, apiResponse]);
+    const bigQueryCtor = vi.fn().mockImplementation(() => ({ query: queryMock }));
+    vi.doMock('@google-cloud/bigquery', () => ({ BigQuery: bigQueryCtor }));
+
+    const { createRealBigQueryClient: createRealBigQueryClientFresh } = await import('./bigquery-query-executor');
+    const client = createRealBigQueryClientFresh('growthos-g2w84');
+    const [rows, response] = await client.query({ query: 'SELECT 1' });
+
+    expect(rows).toEqual([{ ad_spend: 100 }]);
+    // The regression this guards: reading index 1 (nextQuery, `null`) instead
+    // of index 2 (the real apiResponse) would silently make every real cost
+    // estimate come back null forever.
+    expect(response).toBe(apiResponse);
+
+    vi.doUnmock('@google-cloud/bigquery');
+    vi.resetModules();
+  });
+
+  it('feeds a real end-to-end estimated cost through BigQueryWarehouseQueryExecutor.executeWithStats via the normalized client', async () => {
+    vi.resetModules();
+    const apiResponse = { totalBytesProcessed: String(2 ** 40) };
+    const queryMock = vi.fn().mockResolvedValue([[{ ad_spend: 100 }], null, apiResponse]);
+    const bigQueryCtor = vi.fn().mockImplementation(() => ({ query: queryMock }));
+    vi.doMock('@google-cloud/bigquery', () => ({ BigQuery: bigQueryCtor }));
+
+    const { createRealBigQueryClient: createRealBigQueryClientFresh, BigQueryWarehouseQueryExecutor: ExecutorFresh } = await import('./bigquery-query-executor');
+    const client = createRealBigQueryClientFresh('growthos-g2w84');
+    const executor = new ExecutorFresh({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeCloseTo(6.25, 10);
+
+    vi.doUnmock('@google-cloud/bigquery');
+    vi.resetModules();
+  });
 });
