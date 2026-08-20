@@ -129,6 +129,8 @@ export interface DrainPipelineParams {
   environmentId: string;
   limit?: number;
   sink?: WarehouseSink;
+  /** Records a `pipeline_message.drain` audit entry (KAN-44) when set — omitted by this function's own unit tests and by every other internal caller that isn't a human-initiated "drain now" action. */
+  performedByUserId?: string;
 }
 
 /**
@@ -159,7 +161,28 @@ export async function drainPendingPipelineMessages(params: DrainPipelineParams):
     .limit(limit)
     .get();
 
-  return landMessages(pending as PipelineMessageModel[], params.sink ?? defaultWarehouseSink);
+  const result = await landMessages(pending as PipelineMessageModel[], params.sink ?? defaultWarehouseSink);
+
+  if (params.performedByUserId) {
+    try {
+      await recordAuditLogEntry({
+        organizationId: params.organizationId,
+        projectId: params.projectId,
+        environmentId: params.environmentId,
+        actorType: 'user',
+        actorId: params.performedByUserId,
+        action: 'pipeline_message.drain',
+        targetType: 'project',
+        targetId: params.projectId,
+        summary: `Drained ${pending.length} queued pipeline message(s) for environment ${params.environmentId}: ${result.delivered} delivered, ${result.failed} failed`,
+        after: { environmentId: params.environmentId, attempted: pending.length, delivered: result.delivered, failed: result.failed },
+      });
+    } catch {
+      // Best-effort — see the comment on `recordAuditLogEntry`.
+    }
+  }
+
+  return result;
 }
 
 /** Every raw record landed for one batch — used by tests to verify the "visible in BQ" AC, and a building block a future KAN-35 ingest-health admin surface could reuse. */

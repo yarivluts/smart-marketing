@@ -27,6 +27,7 @@ import {
   toOrchestrationRunView,
   type OrchestrationRunView,
 } from '@/lib/orgs/orchestration-view';
+import { DrainPipelineMessagesButton } from '@/components/orgs/drain-pipeline-messages-button';
 import { ReplayQuarantinedRecordButton } from '@/components/orgs/replay-quarantined-record-button';
 import { RetryFailedPipelineMessagesButton } from '@/components/orgs/retry-failed-pipeline-messages-button';
 import { TriggerOrchestrationRunButton } from '@/components/orgs/trigger-orchestration-run-button';
@@ -86,6 +87,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   const t = await getTranslations('IngestHealth');
   const tEnv = await getTranslations('EnvBadge');
   const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
+  const environmentOptions = environments.map((environment) => ({ id: environment.id, name: environment.name }));
 
   function renderRollup(rollup: IngestHealthRollup, key: string) {
     return (
@@ -181,6 +183,12 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
             ))}
           </ul>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('pipelineDrainHeading')}</h2>
+        <p className="text-xs text-muted-foreground">{t('pipelineDrainDescription')}</p>
+        <DrainPipelineMessagesButton orgId={orgId} projectId={projectId} environments={environmentOptions} />
       </section>
 
       <section className="flex flex-col gap-3">

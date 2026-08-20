@@ -425,4 +425,49 @@ describe('audit-log wiring into mutation call sites (KAN-44)', () => {
     const entries = await listAuditLogEntriesForOrg(organization.id);
     expect(entries.some((e) => e.action === 'pipeline_message.replay')).toBe(false);
   });
+
+  it('records pipeline_message.drain with delivered/failed counts when an actor performs the drain', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Pipeline Drain Audit Org');
+    const batchId = unique('batch');
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId,
+      kind: 'event',
+      records: [{ clientId: 'evt-1', schemaName: 'order_completed', payload: {} }],
+    });
+
+    const result = await drainPendingPipelineMessages({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      performedByUserId: owner.id,
+    });
+    expect(result).toEqual({ delivered: 1, failed: 0 });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const drainEntry = entries.find((e) => e.action === 'pipeline_message.drain');
+    expect(drainEntry?.actor_id).toBe(owner.id);
+    expect(drainEntry?.environment_id).toBe(prodEnvironment.id);
+    expect(drainEntry?.after).toEqual({ environmentId: prodEnvironment.id, attempted: 1, delivered: 1, failed: 0 });
+  });
+
+  it('records nothing when drainPendingPipelineMessages is called with no actor (e.g. ingestBatch’s own scoped landing path)', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Pipeline Drain No-Actor Org');
+    const batchId = unique('batch');
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId,
+      kind: 'event',
+      records: [{ clientId: 'evt-1', schemaName: 'order_completed', payload: {} }],
+    });
+
+    await drainPendingPipelineMessages({ organizationId: organization.id, projectId: project.id, environmentId: prodEnvironment.id });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.some((e) => e.action === 'pipeline_message.drain')).toBe(false);
+  });
 });

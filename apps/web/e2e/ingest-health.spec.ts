@@ -102,6 +102,13 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
     await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
     await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();
+
+    // KAN-33's queued-pipeline-messages catch-up drain: nothing is ever left `queued` under normal
+    // ingest (records are landed synchronously by `ingestBatch` itself), so draining a freshly created
+    // project's own default environment is expected to report 0 delivered, 0 failed.
+    await page.getByRole('button', { name: 'Drain queued messages' }).click();
+    await expect(page.getByText('0 delivered, 0 failed')).toBeVisible();
+
     await expect(page.getByText('No orchestration runs for this project yet.')).toBeVisible();
     await expect(page.getByText('No successful orchestration run yet.')).toBeVisible();
   });

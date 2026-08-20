@@ -42,6 +42,7 @@ import {
   disableHookEndpoint as disableHookEndpointInOrganization,
   disablePlugin as disablePluginInOrganization,
   type DrainPipelineResult,
+  drainPendingPipelineMessages as drainPendingPipelineMessagesInOrganization,
   detachResource as detachResourceInOrganization,
   disableFieldMapping as disableFieldMappingInOrganization,
   enablePlugin as enablePluginInOrganization,
@@ -591,6 +592,26 @@ export async function replayFailedPipelineMessagesForProject(
     undefined,
     input.performedByUserId,
   );
+}
+
+interface DrainPipelineMessagesInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  performedByUserId: string;
+}
+
+/** Catch-up sweep for one environment's still-`queued` pipeline messages (KAN-33's general-purpose drain, never called from the ingest path itself — see `drainPendingPipelineMessages`'s own doc comment). */
+export async function drainPendingPipelineMessagesForEnvironment(
+  input: DrainPipelineMessagesInput,
+): Promise<DrainPipelineResult> {
+  await ensureFirestoreOrm();
+  return drainPendingPipelineMessagesInOrganization({
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    environmentId: input.environmentId,
+    performedByUserId: input.performedByUserId,
+  });
 }
 
 interface TriggerOrchestrationRunInput {
