@@ -17,6 +17,69 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Fresh sweep found a new follow-up: stuck queued pipeline messages (PR #120)
+
+- **Last completed:**
+  - Session start found the by-now-familiar all-`done`-except-standing-blockers `TASKS.md` state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`) — no `todo` row.
+    Also hit a git quirk worth documenting: this container's local `main` branch ref was a stale
+    shallow-clone window (50 commits ending 2026-08-13, "run 227") while `origin/main` had already
+    advanced past it (50 commits ending 2026-08-20) — `git merge-base` found no common ancestor
+    purely because neither shallow window reached far enough back, not because the histories are
+    actually unrelated. Worked directly off `origin/main` instead of trying to reconcile local
+    `main`; no destructive git operations were needed.
+  - Per the prior run's own note that the "mine `done` rows' follow-up notes" list was running dry,
+    delegated a fresh codebase-wide sweep (general-purpose agent) instead, explicitly excluding every
+    previously-ruled-out candidate. It surfaced `pipeline.service.ts`'s `drainPendingPipelineMessages`
+    — its own doc comment names a gap directly: built "for a future scheduled worker (KAN-38) or ops
+    use," but the ops-use half was never actually wired up. A pipeline message stuck `queued` (e.g. a
+    crash between publish and land) had zero admin visibility and no manual sweep, unlike its
+    already-shipped sibling on the same ingest-health page (the failed-message DLQ browser + replay
+    button from KAN-34).
+  - **PR #120**: added `listQueuedPipelineMessagesForProject` (project-wide, folds every environment)
+    and `sweepQueuedPipelineMessagesForProject` (lands every stuck message, audit-logged as
+    `pipeline_message.sweep`) to `packages/firebase-orm-models`, mirroring
+    `listFailedPipelineMessagesForProject`/`replayFailedPipelineMessagesForProject`'s existing DLQ
+    pattern field-for-field rather than inventing a new shape. Wired into the ingest-health admin
+    page: a new "Stuck queued messages" section (client id, kind, environment, minutes stuck) with a
+    sweep button, gated on the page's existing `ingest.write` permission — same "whole feature is
+    admin-only" posture as every other section on that page. New `en`/`he` translation keys only, no
+    hard-coded strings.
+  - New emulator tests (`pipeline.emulator.test.ts`): cross-environment project-wide listing, a sweep
+    that clears the queue and writes the audit entry, sweep idempotency against an already-delivered
+    message, and cross-project isolation. New unit tests for `toQueuedPipelineMessageView` (the
+    minutes-elapsed computation) and the `SweepQueuedPipelineMessagesButton` component. Extended the
+    existing `ingest-health.spec.ts` e2e empty-state assertion to cover the new section.
+  - Self-review before opening the PR found no correctness bugs or gaps — the new code is a close
+    structural mirror of the already-reviewed failed-message DLQ pattern, and reused its existing
+    audit-log/permission/isolation conventions rather than introducing new ones.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green across the full monorepo before
+    opening the PR (firebase-orm-models 868/868 tests incl. 3 new; apps/web 932/932 unit tests + all
+    22 Playwright e2e specs green; 3 turbo lint/typecheck/build passes clean). CI on the PR itself
+    green (`lint · typecheck · test · build` + `terraform fmt · validate`), `mergeable_state: clean`,
+    no review comments. Branch `kan-33-queued-pipeline-message-sweep`, PR #120, merged into `main`
+    (squash) after two concurrent runs' PRs (#117, #119) had already landed ahead of it — merged clean
+    with no rebase needed. Remote branch deletion: no delete-branch GitHub MCP tool available in this
+    session, same known, pre-existing limitation documented since 2026-07-04.
+- **In progress (exact stopping point):** none — clean stopping point, `main` green at `3c0cc13`.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's long-lead approval or per-command-approved
+  interactive session.
+- **Next step:** the "mine follow-up notes on `done` rows" approach is now confirmed dry (this run's
+  fresh sweep needed a dedicated agent pass rather than a quick PROGRESS.md grep to find anything).
+  A future run should keep doing that same kind of broad, generic sweep (TODO/deferred comments,
+  built-but-never-called service exports, CLAUDE.md compliance) rather than assuming there's a known
+  list of candidates left to work through — this run's sweep also turned up two lower-priority,
+  already-deprioritized-shape candidates worth a look if a fresh sweep ever comes up empty again:
+  `metric-registry.service.ts`'s `listMetricDefinitionVersions` (same unwired-version-history shape
+  as schema-def's own already-flagged, still-lower-priority gap) and `pipeline.service.ts`'s
+  `listRawRecordsForBatch` (explicitly framed by its own doc comment as a future building block, not
+  a completed-but-orphaned feature — weakest of the three).
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — KAN-44 follow-up closed: four remaining audit-log gaps (PR #119)
 
 - **Last completed:**
