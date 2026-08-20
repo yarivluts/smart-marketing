@@ -132,6 +132,35 @@ describe('compileMetricQuery — golden-file SQL tests', () => {
   });
 });
 
+describe('compileMetricQuery — inclusive time-range semantics', () => {
+  // Regression: `end` is documented inclusive (YYYY-MM-DD). The compiler never knows a
+  // time column's SQL type, so a bare `ts <= '2026-01-31'` on a TIMESTAMP column coerces
+  // the bound to midnight and silently drops that final day's later rows. The predicate
+  // must normalize the column with DATE(), exactly as the bucketing expression does.
+  it('normalizes the time column with DATE() in the range predicate so the inclusive end day is kept for a timestamp column', () => {
+    const catalog = buildTestCatalog();
+    // `signups` aggregates `fact_funnel_event` on the `ts` timestamp column.
+    const compiled = compileMetricQuery(catalog, {
+      metrics: ['signups'],
+      time: { start: '2026-01-01', end: '2026-01-31', grain: 'month' },
+    });
+    expect(compiled.sql).toContain('WHERE DATE(`ts`) >= @time_start_current AND DATE(`ts`) <= @time_end_current');
+    // The naive, buggy predicate must not survive.
+    expect(compiled.sql).not.toContain('`ts` >= @time_start_current');
+    expect(compiled.sql).not.toContain('`ts` <= @time_end_current');
+    expect(compiled.params.time_end_current).toBe('2026-01-31');
+  });
+
+  it('applies the same DATE() normalization to a compare window predicate', () => {
+    const catalog = buildTestCatalog();
+    const compiled = compileMetricQuery(catalog, {
+      metrics: ['signups'],
+      time: { start: '2026-01-01', end: '2026-01-31', grain: 'month', compare: 'previous_year' },
+    });
+    expect(compiled.sql).toContain('DATE(`ts`) >= @time_start_previous AND DATE(`ts`) <= @time_end_previous');
+  });
+});
+
 describe('compileMetricQuery — error handling', () => {
   it('rejects an unknown metric name', () => {
     const catalog = buildTestCatalog();

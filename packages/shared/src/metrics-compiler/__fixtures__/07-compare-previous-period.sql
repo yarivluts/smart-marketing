@@ -5,7 +5,7 @@ leaf_ad_spend_current AS (
     `channel` AS `channel`,
     SUM(`reporting_spend`) AS value_ad_spend
   FROM `fact_ad_spend`
-  WHERE `date` >= @time_start_current AND `date` <= @time_end_current
+  WHERE DATE(`date`) >= @time_start_current AND DATE(`date`) <= @time_end_current
   GROUP BY bucket_date, `channel`
 ),
 leaf_ad_spend_previous AS (
@@ -14,7 +14,7 @@ leaf_ad_spend_previous AS (
     `channel` AS `channel`,
     SUM(`reporting_spend`) AS value_ad_spend
   FROM `fact_ad_spend`
-  WHERE `date` >= @time_start_previous AND `date` <= @time_end_previous
+  WHERE DATE(`date`) >= @time_start_previous AND DATE(`date`) <= @time_end_previous
   GROUP BY bucket_date, `channel`
 )
 SELECT

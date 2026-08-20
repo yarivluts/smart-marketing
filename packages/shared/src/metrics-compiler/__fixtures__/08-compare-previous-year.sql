@@ -4,7 +4,7 @@ leaf_signups_current AS (
     DATE_TRUNC(DATE(`ts`), MONTH) AS bucket_date,
     COUNT(DISTINCT `customer_id`) AS value_signups
   FROM `fact_funnel_event`
-  WHERE `ts` >= @time_start_current AND `ts` <= @time_end_current AND `step` = @filter_signups_0
+  WHERE DATE(`ts`) >= @time_start_current AND DATE(`ts`) <= @time_end_current AND `step` = @filter_signups_0
   GROUP BY bucket_date
 ),
 leaf_signups_previous AS (
@@ -12,7 +12,7 @@ leaf_signups_previous AS (
     DATE_TRUNC(DATE(`ts`), MONTH) AS bucket_date,
     COUNT(DISTINCT `customer_id`) AS value_signups
   FROM `fact_funnel_event`
-  WHERE `ts` >= @time_start_previous AND `ts` <= @time_end_previous AND `step` = @filter_signups_0
+  WHERE DATE(`ts`) >= @time_start_previous AND DATE(`ts`) <= @time_end_previous AND `step` = @filter_signups_0
   GROUP BY bucket_date
 )
 SELECT

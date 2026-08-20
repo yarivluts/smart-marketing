@@ -13,12 +13,26 @@ const GRAIN_TO_BQ_DATE_PART: Record<TimeGrain, string> = {
   year: 'YEAR',
 };
 
+/**
+ * Normalizes a (already-quoted) time column expression to a DATE. The compiler
+ * never knows a column's SQL type, so a `timeColumn` may be a DATE or a
+ * TIMESTAMP/DATETIME; wrapping in `DATE(...)` collapses both to a date. Both the
+ * bucketing expression and the inclusive time-range predicate go through this,
+ * so a `YYYY-MM-DD` `end` bound stays inclusive of the whole final day even for
+ * a timestamp column (a bare `ts <= '2026-01-31'` coerces to midnight and would
+ * silently drop that day's later rows). `DATE(date_expr)` is an identity on a
+ * DATE column, so this is safe for both.
+ */
+export function dateColumnExpression(timeColumnSql: string): string {
+  return `DATE(${timeColumnSql})`;
+}
+
 /** Buckets a (already-quoted) timestamp/date column expression to the requested grain, e.g. `DATE_TRUNC(DATE(\`ts\`), WEEK)`. */
 export function bucketExpression(timeColumnSql: string, grain: TimeGrain): string {
   if (!TIME_GRAINS.includes(grain)) {
     throw new MetricCompilerError(`Unknown time grain "${grain}".`);
   }
-  return `DATE_TRUNC(DATE(${timeColumnSql}), ${GRAIN_TO_BQ_DATE_PART[grain]})`;
+  return `DATE_TRUNC(${dateColumnExpression(timeColumnSql)}, ${GRAIN_TO_BQ_DATE_PART[grain]})`;
 }
 
 function parseDateOnly(value: string): Date {
