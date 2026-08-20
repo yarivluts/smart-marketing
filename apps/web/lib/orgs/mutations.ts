@@ -155,6 +155,7 @@ interface CreateProjectInput {
   organizationId: string;
   name: string;
   vertical?: string;
+  createdByUserId?: string;
 }
 
 export async function createProject(input: CreateProjectInput): Promise<CreateProjectResult> {

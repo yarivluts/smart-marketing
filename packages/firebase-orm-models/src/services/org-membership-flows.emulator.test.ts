@@ -13,6 +13,7 @@ import {
   inviteMemberToOrganization,
   InviteNotFoundError,
   LastOwnerError,
+  listAuditLogEntriesForOrg,
   listEnvironmentsForProject,
   listMembershipsForUser,
   listMembershipsWithOrganizations,
@@ -70,6 +71,12 @@ describe('createOrganizationWithOwner', () => {
     const bindings = await listRoleBindingsForUser(owner.id, [organization.id]);
     expect(bindings).toHaveLength(1);
     expect(bindings[0].role).toBe('org_owner');
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const createEntries = entries.filter((entry) => entry.action === 'organization.create');
+    expect(createEntries).toHaveLength(1);
+    expect(createEntries[0].target_id).toBe(organization.id);
+    expect(createEntries[0].actor_id).toBe(owner.id);
   });
 });
 
@@ -107,6 +114,30 @@ describe('createProject', () => {
 
     const projects = await listOrgProjects(organization.id);
     expect(projects.map((p) => p.id)).toContain(project.id);
+
+    // No `createdByUserId` passed above — no synthetic system actor, same posture `triggerOrchestrationRun` establishes.
+    const entriesWithoutActor = await listAuditLogEntriesForOrg(organization.id);
+    expect(entriesWithoutActor.filter((entry) => entry.action === 'project.create')).toHaveLength(0);
+  });
+
+  it('audit-logs the creation when a creating user is supplied', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('project-owner-audited'),
+    });
+    const { organization } = await createOrganizationWithOwner({ name: 'Audited Project Org', ownerUserId: owner.id });
+
+    const { project } = await createProject({
+      organizationId: organization.id,
+      name: 'Website',
+      createdByUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const createEntries = entries.filter((entry) => entry.action === 'project.create');
+    expect(createEntries).toHaveLength(1);
+    expect(createEntries[0].target_id).toBe(project.id);
+    expect(createEntries[0].actor_id).toBe(owner.id);
   });
 });
 

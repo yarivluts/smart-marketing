@@ -194,6 +194,24 @@ export async function ensureAutomationTargetSeeded(params: SeedAutomationTargetP
   target.resource_attachment_id = params.resourceAttachmentId;
   target.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await target.save(params.targetId);
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: params.environmentId,
+      actorType: 'user',
+      actorId: params.seededByUserId,
+      action: 'automation_target.seed',
+      targetType: 'automation_target',
+      targetId: target.id,
+      summary: `Seeded automation target "${target.label}" (${target.target_type})`,
+      after: { targetType: target.target_type, label: target.label, dailyBudgetUsd: target.daily_budget_usd },
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+  }
+
   return target;
 }
 

@@ -12,6 +12,7 @@ import {
   HookEndpointNotFoundError,
   HookEndpointNotHmacModeError,
   LocalKmsProvider,
+  listAuditLogEntriesForOrg,
   listHookDeliveriesForProject,
   listHookEndpointsForProject,
   MissingSignatureHeaderNameError,
@@ -366,6 +367,14 @@ describe('listHookDeliveriesForProject / setHookDeliveryStatus', () => {
       actedByUserId: owner.id,
     });
     expect(discarded.status).toBe('discarded');
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const statusEntries = entries.filter((entry) => entry.action === 'hook_delivery.status_set');
+    expect(statusEntries).toHaveLength(2);
+    expect(statusEntries.map((entry) => entry.target_id).sort()).toEqual(
+      [first.value.delivery.id, second.value.delivery.id].sort(),
+    );
+    expect(statusEntries.every((entry) => entry.actor_id === owner.id)).toBe(true);
   });
 });
 

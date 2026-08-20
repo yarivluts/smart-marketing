@@ -334,5 +334,23 @@ export async function setHookDeliveryStatus(params: SetHookDeliveryStatusParams)
   delivery.reviewed_at = new Date().toISOString();
   delivery.reviewed_by = params.actedByUserId;
   await delivery.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: delivery.environment_id,
+      actorType: 'user',
+      actorId: params.actedByUserId,
+      action: 'hook_delivery.status_set',
+      targetType: 'hook_delivery',
+      targetId: delivery.id,
+      summary: `Marked hook delivery "${delivery.id}" as ${params.status}`,
+      after: { status: params.status },
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+  }
+
   return delivery;
 }

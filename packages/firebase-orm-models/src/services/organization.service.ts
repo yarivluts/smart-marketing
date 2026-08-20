@@ -5,6 +5,7 @@ import { OrganizationModel } from '../models/organization.model';
 import { ProjectModel } from '../models/project.model';
 import { RoleBindingModel } from '../models/role-binding.model';
 import { UserModel } from '../models/user.model';
+import { recordAuditLogEntry } from './audit-log.service';
 
 export interface CreateOrganizationParams {
   name: string;
@@ -58,6 +59,20 @@ export async function createOrganizationWithOwner(
   roleBinding.setPathParams({ organization_id: organization.id });
   await roleBinding.save();
 
+  try {
+    await recordAuditLogEntry({
+      organizationId: organization.id,
+      actorType: 'user',
+      actorId: params.ownerUserId,
+      action: 'organization.create',
+      targetType: 'organization',
+      targetId: organization.id,
+      summary: `Created organization "${organization.name}"`,
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+  }
+
   return { organization, membership, roleBinding };
 }
 
@@ -65,6 +80,8 @@ export interface CreateProjectParams {
   organizationId: string;
   name: string;
   vertical?: string;
+  /** The human who created this project, if any — audited when present. Omit for a caller with no real user actor (test fixtures, a future non-human caller), the same "no synthetic system actor" posture `triggerOrchestrationRun`'s optional actor param establishes. */
+  createdByUserId?: string;
 }
 
 export interface CreateProjectResult {
@@ -96,6 +113,23 @@ export async function createProject(params: CreateProjectParams): Promise<Create
       return environment;
     }),
   );
+
+  if (params.createdByUserId) {
+    try {
+      await recordAuditLogEntry({
+        organizationId: params.organizationId,
+        projectId: project.id,
+        actorType: 'user',
+        actorId: params.createdByUserId,
+        action: 'project.create',
+        targetType: 'project',
+        targetId: project.id,
+        summary: `Created project "${project.name}"`,
+      });
+    } catch {
+      // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+    }
+  }
 
   return { project, environments };
 }
