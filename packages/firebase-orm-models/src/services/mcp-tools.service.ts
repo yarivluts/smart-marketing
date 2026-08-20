@@ -92,7 +92,12 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
   const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
 
-  const filters = ['organization_id = @organizationId', 'project_id = @projectId', '(entity_id LIKE @likeQuery OR CAST(properties AS STRING) LIKE @likeQuery)'];
+  // TO_JSON_STRING, not CAST(... AS STRING): BigQuery rejects a direct
+  // JSON→STRING cast outright ("Invalid cast from JSON to STRING") — found
+  // live the first time this tool ran against the real warehouse
+  // (session-B QA, 2026-08-20); the fake-executor tests can't catch dialect
+  // validity, only query shape.
+  const filters = ['organization_id = @organizationId', 'project_id = @projectId', '(entity_id LIKE @likeQuery OR TO_JSON_STRING(properties) LIKE @likeQuery)'];
   const queryParams: Record<string, string> = {
     organizationId: params.organizationId,
     projectId: params.projectId,
