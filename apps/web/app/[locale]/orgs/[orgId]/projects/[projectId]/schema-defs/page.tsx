@@ -15,6 +15,7 @@ import { toTrackingAlertView, trackingAlertStatusLabelKey } from '@/lib/orgs/tra
 import { RegisterSchemaDefForm } from '@/components/orgs/register-schema-def-form';
 import { SchemaFamilyCard, type SchemaVersionView } from '@/components/orgs/schema-family-card';
 import { CheckTrackingAlertsButton } from '@/components/orgs/check-tracking-alerts-button';
+import { SyncSchemaMartsButton } from '@/components/orgs/sync-schema-marts-button';
 import { EventVolumeSparkline } from '@/components/orgs/event-volume-sparkline';
 import { RegisterTouchpointSchemaButton } from '@/components/orgs/register-touchpoint-schema-button';
 
@@ -109,7 +110,10 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('registeredHeading')}</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">{t('registeredHeading')}</h2>
+          <SyncSchemaMartsButton orgId={orgId} projectId={projectId} />
+        </div>
         {families.length === 0 ? (
           <p className="text-muted-foreground">{t('noSchemas')}</p>
         ) : (

@@ -8,6 +8,7 @@ import {
 } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
+import { syncSchemaMartView } from './schema-mart.service';
 
 export class InvalidSchemaDefinitionError extends Error {
   constructor(public readonly reasons: readonly string[]) {
@@ -282,6 +283,13 @@ export async function registerSchemaDefinition(params: RegisterSchemaDefinitionP
     // Best-effort — audit logging must never turn a successful registration into a failure for the caller.
   }
 
+  // Best-effort mart-view sync (KAN-18 custom-schema marts): a metric
+  // registered against this schema's name needs a real BigQuery relation to
+  // query -- see `schema-mart.service.ts`. Never fails the registration:
+  // an unconfigured warehouse skips, a warehouse-side rejection is already
+  // a non-throwing outcome, and the admin "sync" sweep can always repair.
+  await syncSchemaMartView({ organizationId: params.organizationId, projectId: params.projectId, schemaDef });
+
   return schemaDef;
 }
 
@@ -351,6 +359,10 @@ export async function evolveSchemaDefinition(params: EvolveSchemaDefinitionParam
   } catch {
     // Best-effort — see the comment in registerSchemaDefinition above.
   }
+
+  // Same best-effort mart-view sync as `registerSchemaDefinition` — an
+  // evolved field set must be reflected in the view's columns.
+  await syncSchemaMartView({ organizationId: params.organizationId, projectId: params.projectId, schemaDef: next });
 
   return next;
 }

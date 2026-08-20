@@ -159,4 +159,6 @@ export * from './services/automation-executor-resolver.service';
 export * from './services/mcp-oauth.service';
 export * from './services/mcp-tools.service';
 export * from './services/warehouse-freshness.service';
+export * from './services/schema-mart.service';
+export * from './warehouse/schema-mart';
 export * from './services/segment.service';

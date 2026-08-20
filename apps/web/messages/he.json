@@ -449,7 +449,12 @@
     "touchpointSchemaIntro": "הגדירו זאת פעם אחת כדי שאירועים מקטע המעקב לאתר (ראו בעמוד מפתחות ה-API) לא יוסגרו בהסגר עקב סכימה לא רשומה.",
     "touchpointSchemaAlreadyRegistered": "סכימת נקודות המגע רשומה עבור פרויקט זה.",
     "touchpointSchemaSetupButton": "הגדרת לכידת נקודות מגע",
-    "touchpointSchemaSetupError": "משהו השתבש. נסה שוב."
+    "touchpointSchemaSetupError": "משהו השתבש. נסה שוב.",
+    "syncMartsButton": "סנכרן תצוגות מחסן",
+    "syncMartsError": "לא ניתן היה לסנכרן את תצוגות המחסן. נסה שוב.",
+    "syncMartsNotConfigured": "טרם הוגדר מחסן נתונים לפריסה הזו.",
+    "syncMartsDone": "{count, plural, one {תצוגה אחת סונכרנה.} other {# תצוגות סונכרנו.}}",
+    "syncMartsSchemaError": "{schemaName}: {message}"
   },
   "MetricRegistry": {
     "metaTitle": "קטלוג מדדים",

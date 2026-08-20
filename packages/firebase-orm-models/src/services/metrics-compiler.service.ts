@@ -10,6 +10,8 @@ import {
 import { ProjectModel } from '../models/project.model';
 import { MetricDefModel } from '../models/metric-def.model';
 import { getActiveMetricDefinition } from './metric-registry.service';
+import { listSchemaDefinitionsForProject } from './schema-registry.service';
+import { martViewName } from '../warehouse/schema-mart';
 import { ProjectNotFoundError } from './resource-library.service';
 
 export class MetricNotRegisteredError extends Error {
@@ -114,11 +116,47 @@ export async function compileMetricQueryForProject(params: CompileMetricQueryFor
   await requireProjectInOrg(params.organizationId, params.projectId);
 
   const { catalog, definitionRefs } = await resolveCatalog(params.organizationId, params.projectId, params.request.metrics);
-  const compiled = compileMetricQuery(catalog, params.request, {
+  const mappedCatalog = await mapCustomSchemaTables(params.organizationId, params.projectId, catalog);
+  const compiled = compileMetricQuery(mappedCatalog, params.request, {
     organizationId: params.organizationId,
     projectId: params.projectId,
     ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
   });
 
   return { ...compiled, definitionRefs };
+}
+
+/**
+ * Rewrites each aggregation's `table` to its mart-view name when it matches
+ * one of the project's own ACTIVE measure/entity schemas (KAN-18
+ * custom-schema marts — see `warehouse/schema-mart.ts` for the whole
+ * design). Users register metrics against the plain schema name
+ * (`ad_performance_daily`); the actual BigQuery relation is the
+ * name-mangled per-project view. A table matching no registered schema
+ * passes through untouched — dbt-built core tables (`fact_engagement_daily`
+ * etc.) keep resolving by their own names.
+ */
+async function mapCustomSchemaTables(organizationId: string, projectId: string, catalog: MetricCatalog): Promise<MetricCatalog> {
+  const needsLookup = [...catalog.values()].some((definition) => definition.aggregation !== undefined);
+  if (!needsLookup) {
+    return catalog;
+  }
+  const schemaDefs = await listSchemaDefinitionsForProject(organizationId, projectId);
+  const martNameBySchemaName = new Map(
+    schemaDefs
+      .filter((def) => def.status === 'active' && (def.kind === 'measure' || def.kind === 'entity'))
+      .map((def) => [def.name, martViewName(organizationId, projectId, def.name)] as const),
+  );
+  if (martNameBySchemaName.size === 0) {
+    return catalog;
+  }
+  return new Map(
+    [...catalog.entries()].map(([name, definition]) => {
+      const mapped = definition.aggregation ? martNameBySchemaName.get(definition.aggregation.table) : undefined;
+      if (!mapped || !definition.aggregation) {
+        return [name, definition] as const;
+      }
+      return [name, { ...definition, aggregation: { ...definition.aggregation, table: mapped } }] as const;
+    }),
+  );
 }
