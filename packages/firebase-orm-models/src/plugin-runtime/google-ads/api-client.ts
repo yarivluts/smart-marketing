@@ -28,6 +28,10 @@ export interface GoogleAdsCreateCampaignDraftResult {
   adResourceNames: string[];
 }
 
+interface GoogleAdsSearchResult {
+  results?: Array<{ campaign?: { campaignBudget?: string } }>;
+}
+
 /**
  * The Google Ads REST API (v17) mutate/OAuth calls this connector needs,
  * kept as a small interface (not the `google-ads-api` npm SDK) so a run's
@@ -41,6 +45,17 @@ export interface GoogleAdsApiClient {
   createCampaignDraft(customerId: string, draft: GoogleAdsCampaignDraft): Promise<GoogleAdsCreateCampaignDraftResult>;
   setCampaignBudgetAmount(customerId: string, campaignBudgetResourceName: string, dailyBudgetUsd: number): Promise<void>;
   setCampaignStatus(customerId: string, campaignResourceName: string, status: GoogleAdsCampaignStatus): Promise<void>;
+  /**
+   * Looks up a campaign's budget resource name via GAQL — used when a
+   * target's `campaign_budget_resource_name` isn't already known locally
+   * (a target seeded to represent a pre-existing campaign this plugin
+   * didn't itself create via `createCampaignDraft`; see
+   * `AutomationTargetStateModel.campaign_budget_resource_name`'s own doc
+   * comment). Returns `null` when no campaign with that resource name
+   * exists for this customer, letting the caller map that to a
+   * domain-specific not-found error instead of a raw API failure.
+   */
+  lookupCampaignBudgetResourceName(customerId: string, campaignResourceName: string): Promise<string | null>;
 }
 
 const GOOGLE_ADS_API_BASE_URL = 'https://googleads.googleapis.com/v17';
@@ -59,6 +74,11 @@ interface MutateResult {
 
 function usdToMicros(usd: number): string {
   return String(Math.round(usd * 1_000_000));
+}
+
+/** GAQL string literals use the same backslash/quote escaping as standard SQL string literals. */
+function escapeGaqlStringLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 /**
@@ -197,5 +217,26 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
 
   async setCampaignStatus(customerId: string, campaignResourceName: string, status: GoogleAdsCampaignStatus): Promise<void> {
     await this.mutate(customerId, 'campaigns', [{ update: { resourceName: campaignResourceName, status }, updateMask: 'status' }]);
+  }
+
+  async lookupCampaignBudgetResourceName(customerId: string, campaignResourceName: string): Promise<string | null> {
+    const accessToken = await this.getAccessToken();
+    const query = `SELECT campaign.campaign_budget FROM campaign WHERE campaign.resource_name = '${escapeGaqlStringLiteral(campaignResourceName)}'`;
+    const response = await fetch(`${GOOGLE_ADS_API_BASE_URL}/customers/${customerId}/googleAds:search`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'developer-token': this.options.developerToken,
+        ...(this.options.loginCustomerId ? { 'login-customer-id': this.options.loginCustomerId } : {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new GoogleAdsApiError(`Google Ads API request to googleAds:search failed with status ${response.status}: ${detail}`, response.status);
+    }
+    const body = (await response.json()) as GoogleAdsSearchResult;
+    return body.results?.[0]?.campaign?.campaignBudget ?? null;
   }
 }

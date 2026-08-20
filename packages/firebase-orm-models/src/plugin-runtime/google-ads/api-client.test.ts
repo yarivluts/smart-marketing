@@ -160,6 +160,40 @@ describe('GoogleAdsHttpApiClient', () => {
     ]);
   });
 
+  it('looks up a campaign budget resource name via GAQL search, escaping quotes in the resource name', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ campaign: { campaignBudget: 'customers/123/campaignBudgets/1' } }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).lookupCampaignBudgetResourceName('123', "customers/123/campaigns/o'brien");
+
+    expect(result).toBe('customers/123/campaignBudgets/1');
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/googleAds:search');
+    const body = JSON.parse(String(init.body));
+    expect(body.query).toBe("SELECT campaign.campaign_budget FROM campaign WHERE campaign.resource_name = 'customers/123/campaigns/o\\'brien'");
+  });
+
+  it('returns null from lookupCampaignBudgetResourceName when no campaign matches', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ results: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).lookupCampaignBudgetResourceName('123', 'customers/123/campaigns/999');
+
+    expect(result).toBeNull();
+  });
+
+  it('throws GoogleAdsApiError with the response status on a failed search call', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 403));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      new GoogleAdsHttpApiClient(OPTIONS).lookupCampaignBudgetResourceName('123', 'customers/123/campaigns/1'),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
   it('throws GoogleAdsApiError when the OAuth token refresh fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, false, 401)));
 

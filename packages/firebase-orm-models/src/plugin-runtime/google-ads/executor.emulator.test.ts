@@ -43,6 +43,7 @@ function fakeApiClient(overrides: Partial<GoogleAdsApiClient> = {}): GoogleAdsAp
     createCampaignDraft: vi.fn().mockResolvedValue(CREATE_RESULT),
     setCampaignBudgetAmount: vi.fn().mockResolvedValue(undefined),
     setCampaignStatus: vi.fn().mockResolvedValue(undefined),
+    lookupCampaignBudgetResourceName: vi.fn().mockResolvedValue(null),
     ...overrides,
   };
 }
@@ -206,19 +207,21 @@ describe('GoogleAdsAutomationActionExecutor', () => {
     expect(apiClient.setCampaignBudgetAmount).toHaveBeenCalledWith('999', CREATE_RESULT.campaignBudgetResourceName, 25);
   });
 
-  it('throws GoogleAdsBudgetResourceUnknownError for a budget change against a target this plugin never created', async () => {
+  it('throws GoogleAdsBudgetResourceUnknownError when the GAQL lookup finds no matching campaign', async () => {
     const { owner, organization, project } = await setupOrgWithProject('GAds Executor No Budget Resource Org');
+    const targetId = unique('campaign');
     const target = await ensureAutomationTargetSeeded({
       organizationId: organization.id,
       projectId: project.id,
       environmentId: 'live',
-      targetId: unique('campaign'),
+      targetId,
       targetType: 'campaign',
       label: 'Manually Seeded Target',
       initialDailyBudgetUsd: 100,
       seededByUserId: owner.id,
     });
-    const executor = new GoogleAdsAutomationActionExecutor(fakeApiClient(), '999');
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
 
     await expect(
       executor.executeBudgetChange({
@@ -230,6 +233,52 @@ describe('GoogleAdsAutomationActionExecutor', () => {
         afterDailyBudgetUsd: 120,
       }),
     ).rejects.toBeInstanceOf(GoogleAdsBudgetResourceUnknownError);
+    expect(apiClient.lookupCampaignBudgetResourceName).toHaveBeenCalledWith('999', targetId);
+  });
+
+  it('resolves a pre-existing campaign\'s budget resource via GAQL lookup, then reuses the cached value on rollback with no second lookup', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Lookup Budget Resource Org');
+    const targetId = unique('campaign');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId,
+      targetType: 'campaign',
+      label: 'Pre-Existing Campaign Target',
+      initialDailyBudgetUsd: 25,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient({
+      lookupCampaignBudgetResourceName: vi.fn().mockResolvedValue('customers/999/campaignBudgets/42'),
+    });
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    const result = await executor.executeBudgetChange({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      beforeDailyBudgetUsd: 25,
+      afterDailyBudgetUsd: 50,
+    });
+    expect(result).toEqual({ actualDailyBudgetUsd: 50 });
+    expect(apiClient.setCampaignBudgetAmount).toHaveBeenCalledWith('999', 'customers/999/campaignBudgets/42', 50);
+    expect(apiClient.lookupCampaignBudgetResourceName).toHaveBeenCalledTimes(1);
+
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloaded.campaign_budget_resource_name).toBe('customers/999/campaignBudgets/42');
+
+    await executor.rollbackBudgetChange({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      beforeDailyBudgetUsd: 25,
+      afterDailyBudgetUsd: 50,
+    });
+    expect(apiClient.setCampaignBudgetAmount).toHaveBeenCalledWith('999', 'customers/999/campaignBudgets/42', 25);
+    expect(apiClient.lookupCampaignBudgetResourceName).toHaveBeenCalledTimes(1);
   });
 
   it('throws GoogleAdsWrongPlatformCampaignDraftError for a platform: "meta" draft (KAN-73 cross-provider isolation)', async () => {

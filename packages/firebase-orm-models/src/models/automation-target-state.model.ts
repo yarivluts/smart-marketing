@@ -84,11 +84,14 @@ export class AutomationTargetStateModel extends BaseModel {
    * The ad platform's own budget-resource name backing
    * {@link campaign_resource_name} (Google Ads models a campaign's budget as
    * a separate `CampaignBudget` resource, not a plain field on the campaign
-   * itself) — only ever set alongside `campaign_resource_name` by a
-   * `campaign_draft_create` execution. A `budget_change` action against a
-   * target with no known budget resource name (e.g. one seeded to represent
-   * a pre-existing campaign this plugin didn't create) isn't supported yet —
-   * see `GoogleAdsAutomationActionExecutor`'s own doc comment.
+   * itself; Meta has no separate budget resource, so this always just
+   * equals `campaign_resource_name` there) — set alongside
+   * `campaign_resource_name` by a `campaign_draft_create` execution, or
+   * resolved lazily (and cached here) by a `budget_change` action's own
+   * executor the first time one runs against a target seeded to represent a
+   * pre-existing campaign this plugin didn't create — see
+   * `GoogleAdsAutomationActionExecutor`/`MetaAutomationActionExecutor`'s own
+   * `resolveBudgetResourceName` helpers.
    */
   @Field()
   public campaign_budget_resource_name?: string;
