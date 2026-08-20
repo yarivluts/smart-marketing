@@ -53,6 +53,60 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-77 follow-up closed: MCP OAuth refresh-token reuse detection (PR #114)
+
+- **Last completed:**
+  - Session start found `TASKS.md` in the now-familiar all-`done`-except-standing-blockers state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`) — no `todo` row.
+    Continued the established "mine a `done` row's own named follow-up gap" approach: the KAN-76
+    run's own PROGRESS entry had ranked two candidates it didn't pursue; picked the higher-ranked
+    one, MCP refresh-token reuse detection — `mcp-oauth.service.ts`'s own doc comment named the gap
+    directly: rotation invalidates a stolen-and-replayed refresh token on the legitimate client's
+    *next* refresh, but nothing detects the replay itself as it happens (OAuth 2.1 §4.3.1's standard
+    "refresh token reuse" guidance), and there's no automatic grant revocation on detection.
+  - **PR #114**: `McpOAuthGrantModel` gained `used_refresh_token_hashes` (every hash a grant has
+    rotated *out of*, appended in `mintTokenPair` right before the live `refresh_token_hash` is
+    overwritten). `refreshMcpAccessToken` now falls back to checking a presented token against that
+    history whenever it isn't the current live one — a match immediately revokes the *entire* grant
+    (not just that request), locking out the legitimate client's side of the family too, and returns
+    a new `refresh_token_reuse_detected` failure reason. The auto-revocation is audit-logged
+    (`mcp_oauth_grant.refresh_token_reuse_detected`, `actorType: 'system'`) and distinguished from a
+    human's manual revoke via a `revoked_by` sentinel; `McpOAuthGrantSummary` gained
+    `revokedDueToTokenReuse` so the project Keys page's MCP connections list shows a specific
+    security-warning label instead of the generic "Revoked" text (new `en`/`he` keys — no hard-coded
+    strings, per CLAUDE.md).
+  - Two new emulator tests in `mcp-oauth.emulator.test.ts`: replaying a rotated-out refresh token is
+    detected, revokes the whole grant (proven by then also rejecting the legitimate client's
+    just-rotated-in token), and is reported via `revokedDueToTokenReuse`; a replay against a grant
+    that was already manually revoked is *not* misattributed as reuse-detected (the sentinel-based
+    distinction actually discriminates, not just always-true).
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green across the full monorepo
+    before opening the PR (firebase-orm-models 860/860 incl. the 2 new tests; apps/web unit + all 23
+    Playwright e2e specs green; apps/api e2e green; 11/11 turbo tasks). CI on the PR itself green
+    (`lint · typecheck · test · build` + `terraform fmt · validate`), no review comments. Branch
+    `kan-77-refresh-token-reuse-detection`, PR #114, merged into `main` (squash). `main` had moved
+    ahead during this run (PRs #105/#107/#113 landed from concurrent runs) but merged clean
+    (`mergeable_state: clean`) with no rebase needed. Remote branch deletion: no delete-branch
+    GitHub MCP tool available in this session, same known, pre-existing limitation documented since
+    2026-07-04.
+- **In progress (exact stopping point):** none — clean stopping point, `main` green at `f055402`.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's long-lead approval or per-command-approved
+  interactive session.
+- **Next step:** the "mine follow-up notes on `done` rows" list is thinner again — the KAN-76 run's
+  other ranked candidate, a per-family schema version-history UI (`schema-registry.service.ts`'s
+  `listSchemaDefinitionVersions` is built/tested but never called by any route or page), is what's
+  left from that pass, though it was already flagged as the weaker-justified one (closer to
+  "speculative, no confirmed UI need"). Also still open from earlier runs: KAN-26's apps/api
+  404-vs-403 gap (not actionable — apps/api has no org-scoped routes yet) and KAN-56's unported
+  `schema_identity_fields` seed (needs a real warehouse-export design, not a quick follow-up). A
+  fresh sweep for new candidates (rather than this list, which is running dry) is probably the
+  better use of a future run's time.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — KAN-76 follow-up closed: live segment member counts (PR #111)
 
 - **Last completed:**
