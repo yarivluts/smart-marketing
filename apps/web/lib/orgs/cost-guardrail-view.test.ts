@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatLabels, labelsToLines, outcomeLabelKey, parseLabelsInput, toProjectCostQuotaView, toQueryCostLogEntryView } from './cost-guardrail-view';
+import { formatEstimatedCostUsd, formatLabels, labelsToLines, outcomeLabelKey, parseLabelsInput, toProjectCostQuotaView, toQueryCostLogEntryView } from './cost-guardrail-view';
 
 describe('formatLabels / parseLabelsInput', () => {
   it('formats an empty label set as an empty string', () => {
@@ -73,5 +73,30 @@ describe('toQueryCostLogEntryView', () => {
       executedAt: '2026-01-01T00:00:00Z',
       estimatedCostUsd: null,
     });
+  });
+
+  it('passes through a real estimated cost unchanged', () => {
+    const entry = {
+      id: 'entry-2',
+      outcome: 'executed' as const,
+      definition_refs: {},
+      executed_at: '2026-01-01T00:00:00Z',
+      estimated_cost_usd: 1.23,
+    };
+    expect(toQueryCostLogEntryView(entry as never).estimatedCostUsd).toBe(1.23);
+  });
+});
+
+describe('formatEstimatedCostUsd', () => {
+  it('formats to 4 decimal places with a leading dollar sign', () => {
+    expect(formatEstimatedCostUsd(6.25)).toBe('$6.2500');
+  });
+
+  it('keeps small fractional-cent costs visible instead of rounding to $0.00', () => {
+    expect(formatEstimatedCostUsd(0.0003)).toBe('$0.0003');
+  });
+
+  it('formats zero cost explicitly', () => {
+    expect(formatEstimatedCostUsd(0)).toBe('$0.0000');
   });
 });

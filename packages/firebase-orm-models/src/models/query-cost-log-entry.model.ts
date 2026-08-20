@@ -45,11 +45,16 @@ export class QueryCostLogEntryModel extends BaseModel {
   public executed_at!: string;
 
   /**
-   * Real per-query dollar cost is unavailable until KAN-18 provisions a real
-   * BigQuery project to read actual job bytes-billed from — this stays
-   * `null` today rather than a fabricated estimate, the same
-   * honesty-over-fabrication posture `WarehouseNotConfiguredError` already
-   * established for "no real warehouse to bill against yet".
+   * A best-effort dollar-cost estimate for this execution, from the real
+   * `BigQueryWarehouseQueryExecutor`'s own reported bytes-processed x
+   * BigQuery's on-demand list price (KAN-18's warehouse is now live — see
+   * `bigquery-query-executor.ts`'s `executeWithStats`). Stays `null` for any
+   * entry logged before an executor could report stats, for every non-`executed`
+   * outcome (nothing ran against a real warehouse to have a cost), and in any
+   * test/dev environment still running a stats-less fake executor — never a
+   * fabricated number, the same honesty-over-fabrication posture
+   * `WarehouseNotConfiguredError` already established for "no real warehouse
+   * to bill against yet".
    */
   @Field({ is_required: false })
   public estimated_cost_usd?: number | null;

@@ -118,9 +118,11 @@ export interface RecordQueryCostLogEntryParams {
   projectId: string;
   outcome: QueryCostLogOutcome;
   definitionRefs: Record<string, string>;
+  /** The executor's own {@link WarehouseQueryStats.estimatedCostUsd} when it could compute one (KAN-18's real `BigQueryWarehouseQueryExecutor`) — omitted or `null` from every other caller (a fake test executor, `warehouse_not_configured`/`blocked_quota_exceeded` outcomes, which never reached an executor at all), same as `estimated_cost_usd` already defaulting to `null`. */
+  estimatedCostUsd?: number | null;
 }
 
-/** Appends one cost-log entry (KAN-39's "query cost logging" half of the AC) — see `QueryCostLogEntryModel`'s own doc comment for why `estimated_cost_usd` stays `null` today. */
+/** Appends one cost-log entry (KAN-39's "query cost logging" half of the AC) — `estimated_cost_usd` carries the caller's own real cost estimate when it has one (see `RecordQueryCostLogEntryParams.estimatedCostUsd`), otherwise `null`. */
 export async function recordQueryCostLogEntry(params: RecordQueryCostLogEntryParams): Promise<QueryCostLogEntryModel> {
   const entry = new QueryCostLogEntryModel();
   entry.organization_id = params.organizationId;
@@ -128,7 +130,7 @@ export async function recordQueryCostLogEntry(params: RecordQueryCostLogEntryPar
   entry.outcome = params.outcome;
   entry.definition_refs = params.definitionRefs;
   entry.executed_at = new Date().toISOString();
-  entry.estimated_cost_usd = null;
+  entry.estimated_cost_usd = params.estimatedCostUsd ?? null;
   entry.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await entry.save();
   return entry;

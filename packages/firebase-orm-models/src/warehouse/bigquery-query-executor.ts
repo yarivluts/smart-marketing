@@ -1,6 +1,44 @@
 import { BigQuery } from '@google-cloud/bigquery';
 import type { CompiledMetricQuery, CompilerParamValue } from '@growthos/shared';
-import { WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from './query-executor';
+import { WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseQueryExecutorWithStats, type WarehouseQueryStats, type WarehouseRow } from './query-executor';
+
+/**
+ * BigQuery's public on-demand analysis price as of this writing — $6.25 per
+ * TiB scanned (see https://cloud.google.com/bigquery/pricing#analysis_pricing_models).
+ * A best-effort estimate only: ignores the free monthly tier, flat-rate/
+ * reservation pricing, and any org-specific discount, matching the "honest
+ * estimate, not fabricated precision" posture `QueryCostLogEntryModel`'s own
+ * doc comment already established for this field.
+ */
+const ON_DEMAND_USD_PER_TEBIBYTE = 6.25;
+const BYTES_PER_TEBIBYTE = 2 ** 40;
+
+function estimateOnDemandCostUsd(bytesProcessed: number | undefined): number | null {
+  if (bytesProcessed === undefined || !Number.isFinite(bytesProcessed) || bytesProcessed < 0) {
+    return null;
+  }
+  return (bytesProcessed / BYTES_PER_TEBIBYTE) * ON_DEMAND_USD_PER_TEBIBYTE;
+}
+
+/**
+ * BigQuery's `jobs.query` REST response (what `@google-cloud/bigquery`'s
+ * `query()` convenience method calls under the hood for a simple query like
+ * the ones this executor runs) includes `totalBytesProcessed` as a
+ * stringified int64 alongside the rows — this reads it off the client's own
+ * second tuple element ({@link BigQueryQueryClient}'s narrowed `apiResponse`
+ * slot) without assuming any other shape from it.
+ */
+function extractBytesProcessed(response: unknown): number | undefined {
+  if (!response || typeof response !== 'object') {
+    return undefined;
+  }
+  const raw = (response as Record<string, unknown>).totalBytesProcessed;
+  if (typeof raw !== 'string' && typeof raw !== 'number') {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 /**
  * The exact option shape this executor passes to a BigQuery query call —
@@ -52,7 +90,7 @@ export interface BigQueryWarehouseQueryExecutorConfig {
  * param infers `STRING`, a `readonly string[]` infers `ARRAY<STRING>`,
  * matching every `IN UNNEST(@param)` the compiler emits for an `in` filter).
  */
-export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutor {
+export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutorWithStats {
   private readonly client: BigQueryQueryClient;
 
   private readonly dataset: string;
@@ -69,9 +107,20 @@ export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutor {
   }
 
   async execute(query: CompiledMetricQuery): Promise<WarehouseRow[]> {
-    let rows: Record<string, unknown>[];
+    const { rows } = await this.runQuery(query);
+    return rows;
+  }
+
+  async executeWithStats(query: CompiledMetricQuery): Promise<{ rows: WarehouseRow[]; stats: WarehouseQueryStats }> {
+    const { rows, response } = await this.runQuery(query);
+    return { rows, stats: { estimatedCostUsd: estimateOnDemandCostUsd(extractBytesProcessed(response)) } };
+  }
+
+  private async runQuery(query: CompiledMetricQuery): Promise<{ rows: WarehouseRow[]; response: unknown }> {
+    let rawRows: Record<string, unknown>[];
+    let response: unknown;
     try {
-      [rows] = await this.client.query({
+      [rawRows, response] = await this.client.query({
         query: query.sql,
         params: toBigQueryParams(query.params),
         defaultDataset: { datasetId: this.dataset, ...(this.datasetProjectId ? { projectId: this.datasetProjectId } : {}) },
@@ -88,7 +137,7 @@ export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutor {
       const message = error instanceof Error ? error.message : String(error);
       throw new WarehouseQueryFailedError(`BigQuery rejected the compiled metric query: ${message}`, error);
     }
-    return rows.map(normalizeRow);
+    return { rows: rawRows.map(normalizeRow), response };
   }
 }
 

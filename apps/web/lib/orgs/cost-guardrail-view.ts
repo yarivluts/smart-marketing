@@ -34,6 +34,17 @@ export function toQueryCostLogEntryView(entry: QueryCostLogEntryModel): QueryCos
   };
 }
 
+/**
+ * A single query's estimated dollar cost is typically a small fraction of a
+ * cent (BigQuery's on-demand price is $6.25 per TiB scanned, and most
+ * GrowthOS metric queries scan far less than a TiB), so this keeps four
+ * decimal places rather than the usual two — two would round almost every
+ * real entry down to "$0.00", which reads as "free" rather than "small".
+ */
+export function formatEstimatedCostUsd(estimatedCostUsd: number): string {
+  return `$${estimatedCostUsd.toFixed(4)}`;
+}
+
 /** The `CostGuardrails` translation key for one cost-log entry's outcome label. */
 const OUTCOME_LABEL_KEYS: Record<QueryCostLogOutcome, 'outcomeExecuted' | 'outcomeBlockedQuotaExceeded' | 'outcomeWarehouseNotConfigured'> = {
   executed: 'outcomeExecuted',

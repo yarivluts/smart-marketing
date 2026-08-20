@@ -3,14 +3,14 @@ import type { CompiledMetricQuery } from '@growthos/shared';
 import { BigQueryWarehouseQueryExecutor, type BigQueryQueryClient, type BigQueryQueryOptions } from './bigquery-query-executor';
 import { WarehouseQueryFailedError } from './query-executor';
 
-function fakeClient(rows: Record<string, unknown>[]): { client: BigQueryQueryClient; calls: BigQueryQueryOptions[] } {
+function fakeClient(rows: Record<string, unknown>[], response?: unknown): { client: BigQueryQueryClient; calls: BigQueryQueryOptions[] } {
   const calls: BigQueryQueryOptions[] = [];
   return {
     calls,
     client: {
       query: async (options) => {
         calls.push(options);
-        return [rows];
+        return [rows, response];
       },
     },
   };
@@ -96,6 +96,75 @@ describe('BigQueryWarehouseQueryExecutor', () => {
 
     await expect(executor.execute(compiled)).rejects.toThrow(WarehouseQueryFailedError);
     await expect(executor.execute(compiled)).rejects.toThrow(/Not found: Table/);
+  });
+});
+
+describe('BigQueryWarehouseQueryExecutor.executeWithStats', () => {
+  it('estimates cost from the response totalBytesProcessed at $6.25/TiB', async () => {
+    // 1 TiB exactly, so the estimate should land exactly on the documented per-TiB price.
+    const { client } = fakeClient([{ ad_spend: 100 }], { totalBytesProcessed: String(2 ** 40) });
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { rows, stats } = await executor.executeWithStats(compiled);
+
+    expect(rows).toEqual([{ ad_spend: 100 }]);
+    expect(stats.estimatedCostUsd).toBeCloseTo(6.25, 10);
+  });
+
+  it('scales linearly with a fractional-TiB byte count', async () => {
+    const { client } = fakeClient([], { totalBytesProcessed: String(2 ** 39) }); // 0.5 TiB
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeCloseTo(3.125, 10);
+  });
+
+  it('accepts a numeric totalBytesProcessed, not just a stringified one', async () => {
+    const { client } = fakeClient([], { totalBytesProcessed: 2 ** 40 });
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeCloseTo(6.25, 10);
+  });
+
+  it('reports a null estimate when the response has no totalBytesProcessed', async () => {
+    const { client } = fakeClient([], {});
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeNull();
+  });
+
+  it('reports a null estimate when the client returns no second response element at all', async () => {
+    const { client } = fakeClient([]);
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeNull();
+  });
+
+  it('reports a null estimate for a non-numeric totalBytesProcessed instead of throwing or returning NaN', async () => {
+    const { client } = fakeClient([], { totalBytesProcessed: 'not-a-number' });
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeNull();
+  });
+
+  it('still wraps a BigQuery-side rejection in WarehouseQueryFailedError', async () => {
+    const client: BigQueryQueryClient = {
+      query: async () => {
+        throw new Error('Not found: Table growthos-g2w84:growthos_core.fact_ad_spend was not found');
+      },
+    };
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    await expect(executor.executeWithStats(compiled)).rejects.toThrow(WarehouseQueryFailedError);
   });
 });
 
