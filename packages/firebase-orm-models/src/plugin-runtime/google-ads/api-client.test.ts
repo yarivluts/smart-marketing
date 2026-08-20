@@ -172,4 +172,45 @@ describe('GoogleAdsHttpApiClient', () => {
 
     await expect(new GoogleAdsHttpApiClient(OPTIONS).setCampaignStatus('123', 'x', 'PAUSED')).rejects.toMatchObject({ status: 400 });
   });
+
+  it('looks up a campaign budget resource name via a GAQL search', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          results: [{ campaign: { resourceName: 'customers/123/campaigns/1', campaignBudget: 'customers/123/campaignBudgets/1' } }],
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).lookupCampaignBudgetResourceName('123', 'customers/123/campaigns/1');
+
+    expect(result).toBe('customers/123/campaignBudgets/1');
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/googleAds:search');
+    const headers = init.headers as Record<string, string>;
+    expect(headers.Authorization).toBe('Bearer access-token-1');
+    expect(headers['developer-token']).toBe('dev-token');
+    const body = JSON.parse(String(init.body));
+    expect(body.query).toContain("campaign.resource_name = 'customers/123/campaigns/1'");
+  });
+
+  it('throws GoogleAdsApiError when the GAQL search returns no matching campaign', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ results: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      new GoogleAdsHttpApiClient(OPTIONS).lookupCampaignBudgetResourceName('123', 'customers/123/campaigns/999'),
+    ).rejects.toBeInstanceOf(GoogleAdsApiError);
+  });
+
+  it('throws GoogleAdsApiError with the response status when the GAQL search request itself fails', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 403));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      new GoogleAdsHttpApiClient(OPTIONS).lookupCampaignBudgetResourceName('123', 'customers/123/campaigns/1'),
+    ).rejects.toMatchObject({ status: 403 });
+  });
 });

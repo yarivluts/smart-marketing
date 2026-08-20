@@ -9,7 +9,7 @@ import {
   listAutomationTargetStatesForProject,
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
-import type { MetaAdsApiClient } from './api-client';
+import { MetaAdsApiError, type MetaAdsApiClient } from './api-client';
 import { MetaAdsBudgetResourceUnknownError, MetaAdsWrongPlatformCampaignDraftError, MetaAutomationActionExecutor } from './executor';
 
 beforeAll(async () => {
@@ -39,6 +39,7 @@ function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiCli
     createAd: vi.fn().mockResolvedValue({ adId: 'ad-1' }),
     setDailyBudgetCents: vi.fn().mockResolvedValue(undefined),
     setObjectStatus: vi.fn().mockResolvedValue(undefined),
+    getCampaign: vi.fn().mockRejectedValue(new MetaAdsApiError('No campaign found.', 404)),
     ...overrides,
   };
 }
@@ -244,6 +245,49 @@ describe('MetaAutomationActionExecutor', () => {
         afterDailyBudgetUsd: 120,
       }),
     ).rejects.toBeInstanceOf(MetaAdsBudgetResourceUnknownError);
+  });
+
+  it('resolves and caches the budget resource name via a live lookup for a pre-existing campaign target, then reuses it without a second lookup', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor Lookup Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Pre-existing Campaign Target',
+      initialDailyBudgetUsd: 100,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient({ getCampaign: vi.fn().mockResolvedValue({ campaignId: target.id }) });
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+
+    const result = await executor.executeBudgetChange({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      beforeDailyBudgetUsd: 100,
+      afterDailyBudgetUsd: 120,
+    });
+    expect(result).toEqual({ actualDailyBudgetUsd: 120 });
+    expect(apiClient.getCampaign).toHaveBeenCalledWith(target.id);
+    expect(apiClient.setDailyBudgetCents).toHaveBeenCalledWith(target.id, 12000);
+
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloaded.campaign_resource_name).toBe(target.id);
+    expect(reloaded.campaign_budget_resource_name).toBe(target.id);
+
+    await executor.rollbackBudgetChange({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      beforeDailyBudgetUsd: 100,
+      afterDailyBudgetUsd: 120,
+    });
+    expect(apiClient.getCampaign).toHaveBeenCalledTimes(1);
+    expect(apiClient.setDailyBudgetCents).toHaveBeenCalledWith(target.id, 10000);
   });
 
   it('throws MetaAdsWrongPlatformCampaignDraftError for a platform: "google_ads" draft (KAN-73 cross-provider isolation)', async () => {

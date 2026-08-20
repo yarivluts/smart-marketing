@@ -94,6 +94,16 @@ export interface MetaAdsApiClient {
   setDailyBudgetCents(campaignId: string, dailyBudgetCents: number): Promise<void>;
   /** Sets any object's (campaign/ad set/ad) status — covers both `campaign_activation` (`ACTIVE`/`PAUSED`) and a creation rollback (`DELETED`). */
   setObjectStatus(objectId: string, status: MetaObjectStatus): Promise<void>;
+  /**
+   * Confirms a campaign id refers to a real campaign — used by
+   * `MetaAutomationActionExecutor` for a `budget_change` action against a
+   * target seeded to represent a pre-existing campaign this plugin didn't
+   * create (so `campaign_budget_resource_name` was never recorded; Meta has
+   * no separate budget resource — see `MetaAutomationActionExecutor`'s own
+   * doc comment). Throws `MetaAdsApiError` if `campaignId` doesn't resolve
+   * to a real campaign.
+   */
+  getCampaign(campaignId: string): Promise<{ campaignId: string }>;
 }
 
 const META_API_VERSION = 'v21.0';
@@ -138,6 +148,16 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
     });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new MetaAdsApiError(`Meta Graph API request to ${path} failed with status ${response.status}: ${detail}`, response.status);
+    }
+    return (await response.json()) as T;
+  }
+
+  private async getRequest<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+    const query = new URLSearchParams({ ...params, access_token: this.options.accessToken });
+    const response = await fetch(`${META_GRAPH_API_BASE_URL}/${path}?${query.toString()}`, { method: 'GET' });
     if (!response.ok) {
       const detail = await response.text();
       throw new MetaAdsApiError(`Meta Graph API request to ${path} failed with status ${response.status}: ${detail}`, response.status);
@@ -213,6 +233,11 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
 
   async setObjectStatus(objectId: string, status: MetaObjectStatus): Promise<void> {
     await this.request<{ success?: boolean }>(objectId, { status });
+  }
+
+  async getCampaign(campaignId: string): Promise<{ campaignId: string }> {
+    const result = await this.getRequest<{ id: string }>(campaignId, { fields: 'id' });
+    return { campaignId: result.id };
   }
 }
 

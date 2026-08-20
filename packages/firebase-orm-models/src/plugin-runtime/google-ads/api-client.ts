@@ -41,6 +41,15 @@ export interface GoogleAdsApiClient {
   createCampaignDraft(customerId: string, draft: GoogleAdsCampaignDraft): Promise<GoogleAdsCreateCampaignDraftResult>;
   setCampaignBudgetAmount(customerId: string, campaignBudgetResourceName: string, dailyBudgetUsd: number): Promise<void>;
   setCampaignStatus(customerId: string, campaignResourceName: string, status: GoogleAdsCampaignStatus): Promise<void>;
+  /**
+   * Looks up a campaign's own budget-resource name via GAQL — used by
+   * `GoogleAdsAutomationActionExecutor` for a `budget_change` action against
+   * a target seeded to represent a pre-existing campaign this plugin didn't
+   * create (so `campaign_budget_resource_name` was never recorded). Throws
+   * `GoogleAdsApiError` if `campaignResourceName` doesn't resolve to a real
+   * campaign.
+   */
+  lookupCampaignBudgetResourceName(customerId: string, campaignResourceName: string): Promise<string>;
 }
 
 const GOOGLE_ADS_API_BASE_URL = 'https://googleads.googleapis.com/v17';
@@ -197,5 +206,30 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
 
   async setCampaignStatus(customerId: string, campaignResourceName: string, status: GoogleAdsCampaignStatus): Promise<void> {
     await this.mutate(customerId, 'campaigns', [{ update: { resourceName: campaignResourceName, status }, updateMask: 'status' }]);
+  }
+
+  async lookupCampaignBudgetResourceName(customerId: string, campaignResourceName: string): Promise<string> {
+    const accessToken = await this.getAccessToken();
+    const query = `SELECT campaign.campaign_budget FROM campaign WHERE campaign.resource_name = '${campaignResourceName}'`;
+    const response = await fetch(`${GOOGLE_ADS_API_BASE_URL}/customers/${customerId}/googleAds:search`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'developer-token': this.options.developerToken,
+        ...(this.options.loginCustomerId ? { 'login-customer-id': this.options.loginCustomerId } : {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new GoogleAdsApiError(`Google Ads API search for campaign "${campaignResourceName}" failed with status ${response.status}: ${detail}`, response.status);
+    }
+    const body = (await response.json()) as { results?: Array<{ campaign?: { campaignBudget?: string } }> };
+    const budgetResourceName = body.results?.[0]?.campaign?.campaignBudget;
+    if (!budgetResourceName) {
+      throw new GoogleAdsApiError(`No Google Ads campaign found for resource name "${campaignResourceName}".`, 404);
+    }
+    return budgetResourceName;
   }
 }

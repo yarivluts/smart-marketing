@@ -156,4 +156,25 @@ describe('MetaAdsHttpApiClient', () => {
     await expect(new MetaAdsHttpApiClient(OPTIONS).setObjectStatus('campaign-1', 'PAUSED')).rejects.toMatchObject({ status: 400 });
     await expect(new MetaAdsHttpApiClient(OPTIONS).setObjectStatus('campaign-1', 'PAUSED')).rejects.toBeInstanceOf(MetaAdsApiError);
   });
+
+  it('fetches a campaign by id via a GET request', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'campaign-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).getCampaign('campaign-1');
+
+    expect(result).toEqual({ campaignId: 'campaign-1' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe('GET');
+    const parsedUrl = new URL(url);
+    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v21.0/campaign-1');
+    expect(parsedUrl.searchParams.get('fields')).toBe('id');
+    expect(parsedUrl.searchParams.get('access_token')).toBe('access-token-1');
+  });
+
+  it('throws MetaAdsApiError with the response status when the campaign lookup fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'not found' }, false, 404)));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).getCampaign('missing-campaign')).rejects.toMatchObject({ status: 404 });
+  });
 });

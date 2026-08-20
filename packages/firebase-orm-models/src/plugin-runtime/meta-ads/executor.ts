@@ -12,7 +12,7 @@ import {
 } from '../../automation-runtime';
 import { usdToCents, type MetaAdsApiClient } from './api-client';
 
-/** A `budget_change` action was proposed against a target with no known Meta campaign resource — see `AutomationTargetStateModel.campaign_budget_resource_name`'s own doc comment for why this isn't looked up on demand yet. */
+/** A `budget_change` action was proposed against a target whose Meta campaign resource is unknown and couldn't be confirmed via a live lookup either (e.g. the target's id/`campaign_resource_name` doesn't correspond to a real campaign on this ad account). */
 export class MetaAdsBudgetResourceUnknownError extends Error {
   constructor(targetId: string) {
     super(
@@ -90,10 +90,8 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
 
   async executeBudgetChange(input: AutomationBudgetChangeExecutionInput): Promise<AutomationBudgetChangeExecutionResult> {
     const target = await loadTarget(input);
-    if (!target.campaign_budget_resource_name) {
-      throw new MetaAdsBudgetResourceUnknownError(input.targetId);
-    }
-    await this.apiClient.setDailyBudgetCents(target.campaign_budget_resource_name, usdToCents(input.afterDailyBudgetUsd));
+    const budgetResourceName = await this.resolveCampaignBudgetResourceName(target);
+    await this.apiClient.setDailyBudgetCents(budgetResourceName, usdToCents(input.afterDailyBudgetUsd));
     target.daily_budget_usd = input.afterDailyBudgetUsd;
     target.updated_at = new Date().toISOString();
     await target.save();
@@ -102,14 +100,38 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
 
   async rollbackBudgetChange(input: AutomationBudgetChangeExecutionInput): Promise<AutomationBudgetChangeExecutionResult> {
     const target = await loadTarget(input);
-    if (!target.campaign_budget_resource_name) {
-      throw new MetaAdsBudgetResourceUnknownError(input.targetId);
-    }
-    await this.apiClient.setDailyBudgetCents(target.campaign_budget_resource_name, usdToCents(input.beforeDailyBudgetUsd));
+    const budgetResourceName = await this.resolveCampaignBudgetResourceName(target);
+    await this.apiClient.setDailyBudgetCents(budgetResourceName, usdToCents(input.beforeDailyBudgetUsd));
     target.daily_budget_usd = input.beforeDailyBudgetUsd;
     target.updated_at = new Date().toISOString();
     await target.save();
     return { actualDailyBudgetUsd: input.beforeDailyBudgetUsd };
+  }
+
+  /**
+   * Returns the target's known budget-resource name (== its
+   * `campaign_resource_name`, see this class's own doc comment), or — for a
+   * target seeded to represent a pre-existing campaign this plugin never
+   * created via `campaign_draft_create` (its id *is* the campaign's own
+   * resource name in that case, see `AutomationTargetStateModel`'s own doc
+   * comment) — confirms it via a live lookup and caches both resource-name
+   * fields on the target (not yet saved; the caller's own subsequent
+   * `target.save()` persists it alongside the budget change itself). Throws
+   * `MetaAdsBudgetResourceUnknownError` if the lookup itself fails.
+   */
+  private async resolveCampaignBudgetResourceName(target: AutomationTargetStateModel): Promise<string> {
+    if (target.campaign_budget_resource_name) {
+      return target.campaign_budget_resource_name;
+    }
+    const campaignResourceName = target.campaign_resource_name ?? target.id;
+    try {
+      await this.apiClient.getCampaign(campaignResourceName);
+    } catch {
+      throw new MetaAdsBudgetResourceUnknownError(target.id);
+    }
+    target.campaign_resource_name = campaignResourceName;
+    target.campaign_budget_resource_name = campaignResourceName;
+    return campaignResourceName;
   }
 
   async executeCampaignDraftCreate(
