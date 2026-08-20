@@ -4,11 +4,14 @@ import {
   isMetricDefinitionKind,
   isMetricFilterOperator,
   MetricDefModel,
+  type MetricAggFunction,
   type MetricAggregationDef,
   type MetricDefinitionKind,
   type MetricFilterDef,
 } from '../models/metric-def.model';
+import type { SchemaFieldType } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
+import { getActiveMartSchemaByName } from './schema-registry.service';
 import { recordAuditLogEntry } from './audit-log.service';
 
 export class InvalidMetricDefinitionError extends Error {
@@ -132,6 +135,72 @@ function validateAggregation(input: MetricAggregationInput, reasons: string[]): 
   return { function: input.function, table, ...(column ? { column } : {}), timeColumn, filters };
 }
 
+/**
+ * Aggregation functions whose column must be numeric. `count` needs no
+ * column at all; `count_distinct`/`min`/`max` are legitimate over a string
+ * or timestamp column (distinct ids, earliest/latest value), so only
+ * `sum`/`avg` genuinely require a number.
+ */
+const NUMERIC_COLUMN_AGG_FUNCTIONS = new Set<MetricAggFunction>(['sum', 'avg']);
+
+/**
+ * When an aggregation's `table` names one of the project's own registered
+ * measure/entity schemas, the real warehouse relation is that schema's
+ * auto-generated mart view (`warehouse/schema-mart.ts`) — whose columns are
+ * exactly the schema's declared fields plus the always-present `client_id`
+ * and `landed_at`. So we can (and should) catch here, at registration time,
+ * an aggregation that names a column the mart won't have or sums a
+ * non-numeric one: without this the metric registers fine and only fails
+ * silently at query time, rendering an empty tile. This is precisely the
+ * failure mode a one-field `entity` schema (no numeric field) hit when a
+ * `sum` metric was registered against it.
+ *
+ * A `table` matching no active measure/entity schema — a dbt-built core
+ * table like `fact_ad_spend`, whose column catalog the registry doesn't
+ * know — is left entirely alone, mirroring `mapCustomSchemaTables`'s own
+ * scope in `metrics-compiler.service.ts`.
+ */
+async function validateAggregationAgainstRegisteredSchema(
+  organizationId: string,
+  projectId: string,
+  aggregation: MetricAggregationDef,
+  reasons: string[],
+): Promise<void> {
+  // One indexed lookup for the active measure/entity schema this table would
+  // resolve to (mapCustomSchemaTables' own scope) — never a full scan of the
+  // project's schema defs, which would add an unbounded read to every metric
+  // registration.
+  const schema = await getActiveMartSchemaByName(organizationId, projectId, aggregation.table);
+  if (!schema) {
+    return;
+  }
+
+  // Mirrors the SELECT list `buildMartViewSql` emits: every declared field, plus the two intrinsic columns every mart carries.
+  const columnTypes = new Map<string, SchemaFieldType>(schema.field_defs.map((field) => [field.name, field.type]));
+  columnTypes.set('client_id', 'string');
+  columnTypes.set('landed_at', 'timestamp');
+  const availableColumns = [...columnTypes.keys()].sort().join(', ');
+
+  if (!columnTypes.has(aggregation.timeColumn)) {
+    reasons.push(
+      `Aggregation time column "${aggregation.timeColumn}" does not exist on schema "${schema.name}" (${schema.kind}). Available columns: ${availableColumns}.`,
+    );
+  }
+
+  if (aggregation.column !== undefined) {
+    const columnType = columnTypes.get(aggregation.column);
+    if (columnType === undefined) {
+      reasons.push(
+        `Aggregation column "${aggregation.column}" does not exist on schema "${schema.name}" (${schema.kind}). Available columns: ${availableColumns}.`,
+      );
+    } else if (NUMERIC_COLUMN_AGG_FUNCTIONS.has(aggregation.function) && columnType !== 'number') {
+      reasons.push(
+        `Aggregation function "${aggregation.function}" over schema "${schema.name}" needs a numeric column, but "${aggregation.column}" is of type ${columnType}.`,
+      );
+    }
+  }
+}
+
 interface ValidatedDefinition {
   definitionKind: MetricDefinitionKind;
   aggregation?: MetricAggregationDef;
@@ -221,6 +290,12 @@ async function validateMetricDefRequest(request: MetricDefRequest): Promise<Vali
 
   const definition = validateDefinitionBody(request.definition, reasons);
   const dimensions = validateDimensions(request.dimensions, reasons);
+
+  // Only once the aggregation itself is structurally valid — otherwise
+  // there's no well-formed table/column/function to check against a schema.
+  if (definition?.definitionKind === 'aggregation' && definition.aggregation) {
+    await validateAggregationAgainstRegisteredSchema(request.organizationId, request.projectId, definition.aggregation, reasons);
+  }
 
   if (reasons.length > 0 || !definition) {
     throw new InvalidMetricDefinitionError(reasons);
