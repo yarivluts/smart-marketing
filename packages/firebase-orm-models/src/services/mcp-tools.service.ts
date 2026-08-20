@@ -4,28 +4,20 @@ import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
 
 /**
- * Read-only data adapters backing two of the MCP server's tools (KAN-75,
+ * Read-only data adapters backing three of the MCP server's tools (KAN-75,
  * plan `12 §6.2`'s "funnels/cohorts" and "search_customers") that have no
  * existing service function to wrap directly, unlike `query_metric`/
  * `compare_periods`/`decompose` (all thin wrappers over the already-built
  * `queryMetrics`, KAN-42) or `list_metrics`/`describe_metric` (the already-
- * built metrics catalog). Both hand-write parameterized SQL against a dbt
- * core table (`entities`, KAN-37; `fact_cohort_retention`, KAN-62) and run it
- * through the same {@link WarehouseQueryExecutor} the compiler-produced SQL
- * in `metrics-query.service.ts` uses — `CompiledMetricQuery` is just
+ * built metrics catalog). All three hand-write parameterized SQL against a
+ * dbt core table (`entities`, KAN-37; `fact_cohort_retention`, KAN-62;
+ * `fact_funnel_step`, this follow-up) and run it through the same
+ * {@link WarehouseQueryExecutor} the compiler-produced SQL in
+ * `metrics-query.service.ts` uses — `CompiledMetricQuery` is just
  * `{ sql, params }`, so this is legitimate reuse of that interface's own
  * contract, not a new escape hatch bypassing it. Like every other warehouse
- * read in this codebase today, both throw `WarehouseNotConfiguredError`
+ * read in this codebase today, all three throw `WarehouseNotConfiguredError`
  * until KAN-18 provisions a real BigQuery project.
- *
- * `query_funnel` has no equivalent here: no fact table or query path for
- * step-conversion sequencing exists anywhere in this codebase yet (no
- * `fact_funnel_*` dbt model — only a client-side event-name-classification
- * heuristic, `funnel-suggestion/suggest.ts`, and an onboarding funnel-step
- * *confirmation* endpoint, neither of which computes a conversion query).
- * Building that is a materially separate change (a new dbt fact table plus
- * its own query shape) and is deliberately not attempted here — see
- * PROGRESS.md.
  */
 
 export class InvalidMcpToolRequestError extends Error {
@@ -175,6 +167,57 @@ export async function queryProjectCohortRetention(params: QueryProjectCohortRete
   const sql = `SELECT cohort_month, period_number, cohort_size, retained_count, retention_rate FROM fact_cohort_retention WHERE ${filters.join(' AND ')} ORDER BY cohort_month DESC, period_number ASC LIMIT ${limit}`;
   const rows = await executor.execute({ sql, params: queryParams });
   return rows.map(rowToCohortRetentionRow);
+}
+
+export interface QueryProjectFunnelStepsParams {
+  organizationId: string;
+  projectId: string;
+  /** Same semantics as `SearchProjectCustomersParams.environmentId`. */
+  environmentId?: string;
+  executor?: WarehouseQueryExecutor;
+}
+
+export interface FunnelStepResult {
+  stageKey: string;
+  stepOrder: number;
+  /** Distinct customers who ever reached this stage (`fact_funnel_step`'s own "first reached" grain — a customer can't inflate this by re-firing the same step event). */
+  customerCount: number;
+  /** `customerCount` as a fraction of the funnel's first step's own `customerCount` (1.0 for the first step itself; 0 when the first step had nobody). Computed here, not in SQL — a single small division over an already-small result set. */
+  conversionRateFromFirst: number;
+}
+
+function rowToFunnelStepAggregate(row: WarehouseRow): { stageKey: string; stepOrder: number; customerCount: number } {
+  return {
+    stageKey: String(row.stage_key ?? ''),
+    stepOrder: Number(row.step_order ?? 0),
+    customerCount: Number(row.customer_count ?? 0),
+  };
+}
+
+/** The `query_funnel` half of plan `12 §6.2`'s "funnels/cohorts" tool: per-stage distinct-customer counts from `fact_funnel_step` (KAN-75 follow-up), ordered by the project's own confirmed step order, each stage's count also expressed as a conversion rate off the first step. */
+export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsParams): Promise<FunnelStepResult[]> {
+  const executor = params.executor ?? defaultWarehouseQueryExecutor;
+  const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
+
+  const filters = ['organization_id = @organizationId', 'project_id = @projectId'];
+  const queryParams: Record<string, string> = {
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+  };
+  if (environmentId !== undefined) {
+    filters.push('environment_id = @environmentId');
+    queryParams.environmentId = environmentId;
+  }
+
+  const sql = `SELECT stage_key, step_order, COUNT(DISTINCT customer_id) AS customer_count FROM fact_funnel_step WHERE ${filters.join(' AND ')} GROUP BY stage_key, step_order ORDER BY step_order ASC`;
+  const rows = await executor.execute({ sql, params: queryParams });
+  const aggregates = rows.map(rowToFunnelStepAggregate).sort((a, b) => a.stepOrder - b.stepOrder);
+  const firstStepCount = aggregates[0]?.customerCount ?? 0;
+
+  return aggregates.map((aggregate) => ({
+    ...aggregate,
+    conversionRateFromFirst: firstStepCount > 0 ? aggregate.customerCount / firstStepCount : 0,
+  }));
 }
 
 export type ProjectInsightKind = 'tracking_alert' | 'win_event';

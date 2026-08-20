@@ -43,6 +43,13 @@ seeds:
         kind: VARCHAR
         schema_name: VARCHAR
         field_name: VARCHAR
+    funnel_step_mappings:
+      +column_types:
+        organization_id: VARCHAR
+        project_id: VARCHAR
+        event_label: VARCHAR
+        stage_key: VARCHAR
+        step_order: INTEGER
 
 models:
   growthos_transform:

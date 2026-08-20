@@ -87,12 +87,19 @@ authenticate — see `packages/firebase-orm-models/src/warehouse/`).
     `stg_identity_key_observations` staging model, so the fields it stitches
     on are whatever a project has actually registered, never hard-coded. See
     the model's own doc comment for the full conflict-resolution rule.
+  - `fact_funnel_step` (KAN-75 follow-up): one row per (customer, funnel
+    stage) ever reached, against a project's human-confirmed funnel. Reads
+    `seeds/funnel_step_mappings.csv` (a stand-in for a warehouse export of
+    KAN-68's `OnboardingStateModel.funnel_steps`, same posture as
+    `schema_identity_fields.csv`). Feeds the MCP server's `query_funnel`
+    tool. See the model's own doc comment for the label-derivation and
+    grain rules.
 
 This is a deliberately generic, denormalized shape — no join-graph/mart layer
 yet (the same simplification KAN-41's metrics compiler already documents for
 its own dimension/filter handling). Vertical-specific canonical tables (plan
-`04 §1`'s `fact_ad_spend`, `fact_funnel_event`, etc.) are a later step once a
-real source plugin (KAN-49+) lands typed data to build them from.
+`04 §1`'s `fact_ad_spend`, etc.) are a later step once a real source plugin
+(KAN-49+) lands typed data to build them from.
 
 ## Running locally
 

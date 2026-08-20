@@ -1,0 +1,12 @@
+organization_id,project_id,event_label,stage_key,step_order
+org_1,proj_1,signup,signup,0
+org_1,proj_1,activated,activation,1
+org_2,proj_9,signup,signup,0
+org_1,proj_2,signup,signup,0
+org_1,proj_2,activated,activation,1
+org_1,proj_2,purchase,conversion,2
+org_1,proj_10,signup,signup,0
+org_1,proj_10,purchase,conversion,2
+org_1,proj_11,signup,signup,0
+org_1,proj_11,activated,activation,1
+org_1,proj_11,purchase,conversion,2

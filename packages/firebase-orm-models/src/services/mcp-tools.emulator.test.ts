@@ -7,6 +7,7 @@ import {
   InvalidMcpToolRequestError,
   listProjectInsights,
   queryProjectCohortRetention,
+  queryProjectFunnelSteps,
   searchProjectCustomers,
   TrackingAlertModel,
   WinEventModel,
@@ -15,7 +16,7 @@ import {
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
-/** Tests for KAN-75's MCP-tool data adapters: `search_customers`/`query_cohort` (hand-written SQL through a fake `WarehouseQueryExecutor`) and `list_insights` (a real Firestore fan-out over tracking alerts + win events). */
+/** Tests for KAN-75's MCP-tool data adapters: `search_customers`/`query_cohort`/`query_funnel` (hand-written SQL through a fake `WarehouseQueryExecutor`) and `list_insights` (a real Firestore fan-out over tracking alerts + win events). */
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('mcp-tools-service-tests');
@@ -135,6 +136,46 @@ describe('queryProjectCohortRetention', () => {
 
     expect(executor.calls[0].sql).toContain('cohort_month = @cohortMonth');
     expect(executor.calls[0].params.cohortMonth).toBe('2026-02-01');
+  });
+});
+
+describe('queryProjectFunnelSteps', () => {
+  it('builds a parameterized funnel query, orders by step_order, and derives conversion rates off the first step', async () => {
+    const { organization, project } = await setupOrgWithProject('Funnel Org');
+    const executor = new FakeWarehouseQueryExecutor([
+      { stage_key: 'activation', step_order: 1, customer_count: 2 },
+      { stage_key: 'signup', step_order: 0, customer_count: 5 },
+      { stage_key: 'conversion', step_order: 2, customer_count: 2 },
+    ]);
+
+    const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(rows).toEqual([
+      { stageKey: 'signup', stepOrder: 0, customerCount: 5, conversionRateFromFirst: 1 },
+      { stageKey: 'activation', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.4 },
+      { stageKey: 'conversion', stepOrder: 2, customerCount: 2, conversionRateFromFirst: 0.4 },
+    ]);
+    expect(executor.calls[0].sql).toContain('FROM fact_funnel_step');
+    expect(executor.calls[0].sql).toContain('GROUP BY stage_key, step_order');
+    expect(executor.calls[0].sql).toContain('ORDER BY step_order ASC');
+  });
+
+  it('adds an environment_id filter when provided', async () => {
+    const { organization, project } = await setupOrgWithProject('Funnel Env Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, environmentId: 'env-test', executor });
+
+    expect(executor.calls[0].sql).toContain('environment_id = @environmentId');
+    expect(executor.calls[0].params.environmentId).toBe('env-test');
+  });
+
+  it('returns an empty list, with no division-by-zero, when the funnel has no data yet', async () => {
+    const { organization, project } = await setupOrgWithProject('Funnel Empty Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+    expect(rows).toEqual([]);
   });
 });
 

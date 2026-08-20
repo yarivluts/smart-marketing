@@ -197,6 +197,37 @@ models:
         tests:
           - not_null
 
+  - name: fact_funnel_step
+    description: >
+      Step-conversion funnel (plan `04 §1`'s `fact_funnel_event`,
+      generalized; KAN-75's `query_funnel` follow-up): one row per
+      (customer, funnel stage) the customer ever reached, against a
+      human-confirmed funnel (`funnel_step_mappings`, standing in for
+      KAN-68's onboarding-wizard `OnboardingStateModel.funnel_steps`
+      export). Feeds the `query_funnel` MCP tool. See the model's own doc
+      comment for the full label-derivation and grain rules.
+    columns:
+      - name: funnel_step_key
+        description: Composite (project_id, environment_id, customer_id, stage_key) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: stage_key
+        tests:
+          - not_null
+      - name: step_order
+        tests:
+          - not_null
+      - name: reached_at
+        tests:
+          - not_null
+      - name: event_count
+        tests:
+          - not_null
+
   - name: fact_landing_page_performance
     description: >
       Visitors and last-touch attributed conversions per
