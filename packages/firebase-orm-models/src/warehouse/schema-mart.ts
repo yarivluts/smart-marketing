@@ -80,6 +80,22 @@ function fieldExpression(field: SchemaFieldDef): string {
   return `${byType[field.type]} AS \`${name}\``;
 }
 
+/** Which schema kinds get an auto-generated mart view — measures and entities are what registered metrics name as their `table`; events already land in the dbt-built `events` core table. Exported (not just kept local to `schema-mart.service.ts`) so `schema-registry.service.ts` can gate its own reserved-field-name check (see {@link MART_INTRINSIC_COLUMNS}) on the same kinds, rather than maintaining a second copy of this list that could drift. */
+export const MART_KINDS: readonly SchemaDefKind[] = ['measure', 'entity'];
+
+/**
+ * The columns every mart view carries alongside a schema's own declared
+ * fields (see `buildMartViewSql` below) — a measure/entity schema declaring
+ * a field with one of these names would make the generated view's SELECT
+ * list carry two columns sharing a name, which BigQuery rejects outright
+ * (`CREATE OR REPLACE VIEW` fails, so the schema registers but its mart
+ * never syncs). `schema-registry.service.ts`'s `validateFields` rejects the
+ * collision at registration time instead, using this exact list, so it's
+ * exported here rather than duplicated as a second hard-coded array that
+ * could silently drift out of sync with the columns actually emitted below.
+ */
+export const MART_INTRINSIC_COLUMNS: readonly string[] = ['organization_id', 'project_id', 'environment_id', 'client_id', 'landed_at'];
+
 export interface BuildMartViewSqlParams {
   organizationId: string;
   projectId: string;
@@ -100,15 +116,19 @@ export interface BuildMartViewSqlParams {
 }
 
 /**
- * `CREATE OR REPLACE VIEW` DDL for one schema's mart. Unqualified names
- * throughout — the executor's `defaultDataset` resolves both the view and
- * `stg_raw_records`, exactly like every compiled metric query. Tenant
- * columns stay in the SELECT so the compiler's org/project/environment
- * predicates keep working unchanged; the WHERE also bakes org+project in as
- * defense in depth (a query that somehow skipped the tenant predicate still
- * can't see another project's rows through this view). `client_id` and
- * `landed_at` ride along so entities keep an id and every mart has a usable
- * time column even when the schema declares none.
+ * `CREATE OR REPLACE VIEW` DDL for one schema's mart. Both the view name and
+ * its `stg_raw_records` source are fully qualified with `dataset` — a stored
+ * view's body resolves no `defaultDataset` at query time (unlike an ad-hoc
+ * compiled metric query, where the executor's own `defaultDataset` covers an
+ * unqualified name), so an unqualified `FROM \`stg_raw_records\`` would
+ * create fine but fail every later SELECT against the view (found live by
+ * session-B QA, 2026-08-20 — see the fix that added `dataset` to this
+ * function's params). Tenant columns stay in the SELECT so the compiler's
+ * org/project/environment predicates keep working unchanged; the WHERE also
+ * bakes org+project in as defense in depth (a query that somehow skipped the
+ * tenant predicate still can't see another project's rows through this
+ * view). {@link MART_INTRINSIC_COLUMNS} ride along so entities keep an id and
+ * every mart has a usable time column even when the schema declares none.
  */
 export function buildMartViewSql(params: BuildMartViewSqlParams): string {
   const dataset = assertMartSafe(params.dataset, 'dataset');
@@ -117,14 +137,7 @@ export function buildMartViewSql(params: BuildMartViewSqlParams): string {
   return [
     `CREATE OR REPLACE VIEW \`${dataset}.${viewName}\` AS`,
     'SELECT',
-    [
-      '  organization_id',
-      '  project_id',
-      '  environment_id',
-      '  client_id',
-      '  landed_at',
-      ...fieldSelects,
-    ].join(',\n'),
+    [...MART_INTRINSIC_COLUMNS.map((column) => `  ${column}`), ...fieldSelects].join(',\n'),
     `FROM \`${dataset}.stg_raw_records\``,
     `WHERE kind = '${params.kind}' AND schema_name = '${assertMartSafe(params.schemaName, 'schema name')}'`,
     `  AND organization_id = '${assertLiteralSafe(params.organizationId, 'organization id')}' AND project_id = '${assertLiteralSafe(params.projectId, 'project id')}'`,
