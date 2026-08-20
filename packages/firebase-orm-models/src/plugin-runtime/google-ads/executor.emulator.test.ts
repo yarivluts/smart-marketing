@@ -9,7 +9,7 @@ import {
   listAutomationTargetStatesForProject,
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
-import type { GoogleAdsApiClient, GoogleAdsCreateCampaignDraftResult } from './api-client';
+import { GoogleAdsApiError, type GoogleAdsApiClient, type GoogleAdsCreateCampaignDraftResult } from './api-client';
 import { GoogleAdsAutomationActionExecutor, GoogleAdsBudgetResourceUnknownError, GoogleAdsWrongPlatformCampaignDraftError } from './executor';
 
 beforeAll(async () => {
@@ -43,6 +43,7 @@ function fakeApiClient(overrides: Partial<GoogleAdsApiClient> = {}): GoogleAdsAp
     createCampaignDraft: vi.fn().mockResolvedValue(CREATE_RESULT),
     setCampaignBudgetAmount: vi.fn().mockResolvedValue(undefined),
     setCampaignStatus: vi.fn().mockResolvedValue(undefined),
+    lookupCampaignBudgetResourceName: vi.fn().mockRejectedValue(new GoogleAdsApiError('No campaign found.', 404)),
     ...overrides,
   };
 }
@@ -230,6 +231,51 @@ describe('GoogleAdsAutomationActionExecutor', () => {
         afterDailyBudgetUsd: 120,
       }),
     ).rejects.toBeInstanceOf(GoogleAdsBudgetResourceUnknownError);
+  });
+
+  it('resolves and caches the budget resource name via GAQL lookup for a pre-existing campaign target, then reuses it without a second lookup', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Lookup Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Pre-existing Campaign Target',
+      initialDailyBudgetUsd: 100,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient({
+      lookupCampaignBudgetResourceName: vi.fn().mockResolvedValue('customers/999/campaignBudgets/42'),
+    });
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    const result = await executor.executeBudgetChange({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      beforeDailyBudgetUsd: 100,
+      afterDailyBudgetUsd: 120,
+    });
+    expect(result).toEqual({ actualDailyBudgetUsd: 120 });
+    expect(apiClient.lookupCampaignBudgetResourceName).toHaveBeenCalledWith('999', target.id);
+    expect(apiClient.setCampaignBudgetAmount).toHaveBeenCalledWith('999', 'customers/999/campaignBudgets/42', 120);
+
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloaded.campaign_resource_name).toBe(target.id);
+    expect(reloaded.campaign_budget_resource_name).toBe('customers/999/campaignBudgets/42');
+
+    await executor.rollbackBudgetChange({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      beforeDailyBudgetUsd: 100,
+      afterDailyBudgetUsd: 120,
+    });
+    expect(apiClient.lookupCampaignBudgetResourceName).toHaveBeenCalledTimes(1);
+    expect(apiClient.setCampaignBudgetAmount).toHaveBeenCalledWith('999', 'customers/999/campaignBudgets/42', 100);
   });
 
   it('throws GoogleAdsWrongPlatformCampaignDraftError for a platform: "meta" draft (KAN-73 cross-provider isolation)', async () => {

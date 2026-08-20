@@ -12,7 +12,7 @@ import {
 } from '../../automation-runtime';
 import type { GoogleAdsApiClient } from './api-client';
 
-/** A `budget_change` action was proposed against a target with no known Google Ads budget-resource name — see `AutomationTargetStateModel.campaign_budget_resource_name`'s own doc comment for why this isn't looked up on demand yet. */
+/** A `budget_change` action was proposed against a target whose Google Ads budget-resource name is unknown and couldn't be resolved via a live GAQL lookup either (e.g. the target's id/`campaign_resource_name` doesn't correspond to a real campaign on this Google Ads account). */
 export class GoogleAdsBudgetResourceUnknownError extends Error {
   constructor(targetId: string) {
     super(
@@ -76,10 +76,8 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
 
   async executeBudgetChange(input: AutomationBudgetChangeExecutionInput): Promise<AutomationBudgetChangeExecutionResult> {
     const target = await loadTarget(input);
-    if (!target.campaign_budget_resource_name) {
-      throw new GoogleAdsBudgetResourceUnknownError(input.targetId);
-    }
-    await this.apiClient.setCampaignBudgetAmount(this.customerId, target.campaign_budget_resource_name, input.afterDailyBudgetUsd);
+    const budgetResourceName = await this.resolveCampaignBudgetResourceName(target);
+    await this.apiClient.setCampaignBudgetAmount(this.customerId, budgetResourceName, input.afterDailyBudgetUsd);
     target.daily_budget_usd = input.afterDailyBudgetUsd;
     target.updated_at = new Date().toISOString();
     await target.save();
@@ -88,14 +86,38 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
 
   async rollbackBudgetChange(input: AutomationBudgetChangeExecutionInput): Promise<AutomationBudgetChangeExecutionResult> {
     const target = await loadTarget(input);
-    if (!target.campaign_budget_resource_name) {
-      throw new GoogleAdsBudgetResourceUnknownError(input.targetId);
-    }
-    await this.apiClient.setCampaignBudgetAmount(this.customerId, target.campaign_budget_resource_name, input.beforeDailyBudgetUsd);
+    const budgetResourceName = await this.resolveCampaignBudgetResourceName(target);
+    await this.apiClient.setCampaignBudgetAmount(this.customerId, budgetResourceName, input.beforeDailyBudgetUsd);
     target.daily_budget_usd = input.beforeDailyBudgetUsd;
     target.updated_at = new Date().toISOString();
     await target.save();
     return { actualDailyBudgetUsd: input.beforeDailyBudgetUsd };
+  }
+
+  /**
+   * Returns the target's known budget-resource name, or — for a target
+   * seeded to represent a pre-existing campaign this plugin never created
+   * via `campaign_draft_create` (its id *is* the campaign's own resource
+   * name in that case, see `AutomationTargetStateModel`'s own doc comment) —
+   * resolves it via a live GAQL lookup and caches both resource names on the
+   * target (not yet saved; the caller's own subsequent `target.save()`
+   * persists it alongside the budget change itself). Throws
+   * `GoogleAdsBudgetResourceUnknownError` if the lookup itself fails.
+   */
+  private async resolveCampaignBudgetResourceName(target: AutomationTargetStateModel): Promise<string> {
+    if (target.campaign_budget_resource_name) {
+      return target.campaign_budget_resource_name;
+    }
+    const campaignResourceName = target.campaign_resource_name ?? target.id;
+    let budgetResourceName: string;
+    try {
+      budgetResourceName = await this.apiClient.lookupCampaignBudgetResourceName(this.customerId, campaignResourceName);
+    } catch {
+      throw new GoogleAdsBudgetResourceUnknownError(target.id);
+    }
+    target.campaign_resource_name = campaignResourceName;
+    target.campaign_budget_resource_name = budgetResourceName;
+    return budgetResourceName;
   }
 
   async executeCampaignDraftCreate(
