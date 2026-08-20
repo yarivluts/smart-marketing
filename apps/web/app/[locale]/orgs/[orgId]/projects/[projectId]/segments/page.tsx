@@ -8,6 +8,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { countSegmentMembers, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
 import { buildSegmentMemberCountView, toSegmentSummaryView, type SegmentMemberCountView } from '@/lib/orgs/segment-view';
 import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
+import { DeleteSegmentButton } from '@/components/orgs/delete-segment-button';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -87,7 +88,10 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
                 <li key={segment.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{segment.name}</span>
-                    <span className="text-xs text-muted-foreground">{t('filterCount', { count: segment.filterCount })}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{t('filterCount', { count: segment.filterCount })}</span>
+                      <DeleteSegmentButton orgId={orgId} projectId={projectId} segmentId={segment.id} />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>{t('schemaLabel', { schemaName: segment.schemaName })}</span>

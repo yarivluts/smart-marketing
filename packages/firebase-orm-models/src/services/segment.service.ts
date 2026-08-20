@@ -129,6 +129,27 @@ async function loadSegment(organizationId: string, projectId: string, segmentId:
   return segment;
 }
 
+/** Deletes a segment outright — disposable saved config, the same posture `deleteGoal`/`deleteBoard`/`deleteWinRule` document for their own siblings. Still audit-logged like every other lifecycle change in this file (KAN-44 AC: "every config ... change"). */
+export async function deleteSegment(organizationId: string, projectId: string, segmentId: string, deletedByUserId: string): Promise<void> {
+  const segment = await loadSegment(organizationId, projectId, segmentId);
+  await segment.delete();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      projectId,
+      actorType: 'user',
+      actorId: deletedByUserId,
+      action: 'segment.delete',
+      targetType: 'segment',
+      targetId: segmentId,
+      summary: `Deleted segment "${segment.name}"`,
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful delete into a failure for the caller.
+  }
+}
+
 /** Same identifier-safety posture `packages/shared`'s metrics compiler applies to every compiled column reference (`assertSafeIdentifier`) — a segment's filter `field` is user-supplied and gets spliced directly into the JSON-subscript expression below, so only letters/digits/underscores are allowed through. */
 const SAFE_SEGMENT_FIELD_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
