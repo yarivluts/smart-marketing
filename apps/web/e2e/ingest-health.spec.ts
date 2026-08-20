@@ -102,6 +102,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
     await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
     await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();
+    await expect(page.getByText('No pipeline messages stuck in the queue.')).toBeVisible();
     await expect(page.getByText('No orchestration runs for this project yet.')).toBeVisible();
     await expect(page.getByText('No successful orchestration run yet.')).toBeVisible();
   });

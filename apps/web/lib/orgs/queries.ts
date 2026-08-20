@@ -32,6 +32,7 @@ import {
   listBoardsForProject as listBoardsForProjectInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
   listFailedPipelineMessagesForProject as listFailedPipelineMessagesForProjectInOrganization,
+  listQueuedPipelineMessagesForProject as listQueuedPipelineMessagesForProjectInOrganization,
   listFieldMappingsForProject as listFieldMappingsForProjectInOrganization,
   listGoalsForProject as listGoalsForProjectInOrganization,
   listHookDeliveriesForProject as listHookDeliveriesForProjectInOrganization,
@@ -249,6 +250,15 @@ export async function listFailedPipelineMessagesForProject(
 ): Promise<PipelineMessageModel[]> {
   await ensureFirestoreOrm();
   return listFailedPipelineMessagesForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listQueuedPipelineMessagesForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<PipelineMessageModel[]> {
+  await ensureFirestoreOrm();
+  return listQueuedPipelineMessagesForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export async function listAuditLogEntriesForOrg(organizationId: string, limit?: number): Promise<AuditLogEntryModel[]> {

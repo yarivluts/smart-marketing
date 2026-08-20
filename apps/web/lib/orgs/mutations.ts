@@ -92,6 +92,7 @@ import {
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
   replayFailedPipelineMessagesForProject as replayFailedPipelineMessagesForProjectInOrganization,
+  sweepQueuedPipelineMessagesForProject as sweepQueuedPipelineMessagesForProjectInOrganization,
   replayQuarantinedRecord as replayQuarantinedRecordInOrganization,
   type ReplayQuarantinedRecordResult,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
@@ -587,6 +588,25 @@ export async function replayFailedPipelineMessagesForProject(
 ): Promise<DrainPipelineResult> {
   await ensureFirestoreOrm();
   return replayFailedPipelineMessagesForProjectInOrganization(
+    input.organizationId,
+    input.projectId,
+    undefined,
+    undefined,
+    input.performedByUserId,
+  );
+}
+
+interface SweepQueuedPipelineMessagesInput {
+  organizationId: string;
+  projectId: string;
+  performedByUserId: string;
+}
+
+export async function sweepQueuedPipelineMessagesForProject(
+  input: SweepQueuedPipelineMessagesInput,
+): Promise<DrainPipelineResult> {
+  await ensureFirestoreOrm();
+  return sweepQueuedPipelineMessagesForProjectInOrganization(
     input.organizationId,
     input.projectId,
     undefined,
