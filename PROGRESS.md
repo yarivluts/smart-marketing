@@ -17,6 +17,49 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Independently implemented the same ad-platform budget-resource-lookup fix; superseded by a concurrent session's PR #122
+
+- **Last completed:**
+  - Session start found the same all-`done`-except-standing-blockers `TASKS.md` state the entries
+    below also describe, and picked the same highest-ranked follow-up a prior entry had named as an
+    open candidate: KAN-71/72/73's `budget_change` action throwing
+    `GoogleAdsBudgetResourceUnknownError`/`MetaAdsBudgetResourceUnknownError` for any automation
+    target seeded to represent a pre-existing campaign (rather than one created via
+    `campaign_draft_create`), since `campaign_budget_resource_name` was only ever populated by the
+    create path.
+  - Implemented it independently (Google Ads: a real GAQL `googleAds:search` lookup via a new
+    `GoogleAdsApiClient.lookupCampaignBudgetResourceName`, cached onto the target after first
+    resolution; Meta: `campaign_budget_resource_name` always equals `campaign_resource_name` by
+    construction, so it resolves for free from the target's own id with no API call), with full unit
+    + Firestore-emulator test coverage. `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all
+    green across the monorepo (one unrelated `apps/web` test file timed out under full-suite emulator
+    contention — reran in isolation and it passed cleanly in 2.37s, a pre-existing flake). Opened as
+    **PR #118**.
+  - **Did not check for a concurrent open PR before starting implementation** — a different session
+    was independently solving the exact same gap at the same time and opened **PR #122** with a
+    functionally equivalent (and, per the reconciling run's review below, slightly more thorough —
+    it added a real `getCampaign` existence check to the Meta client rather than trusting a
+    caller-supplied id blindly) implementation, rebased onto a more current `main`. A third session
+    reviewed both, merged #122 (`14b1807`), and closed #118 as superseded with a pointer comment —
+    all recorded in the entry directly below this one. This run picked up that closure via its PR
+    subscription, synced to `origin/main`, deleted its now-dead local branch, and confirmed zero open
+    PRs and a green `main` — no further action needed; the gap is fully closed.
+  - Net effect on `main`: zero — PR #122 already shipped the equivalent fix. This entry exists only
+    so the collision is visible from this session's own vantage point too, alongside the reconciling
+    run's account.
+- **In progress (exact stopping point):** none — clean stopping point, `main` unchanged by this
+  session, at whatever commit the reconciling run below left it at.
+- **Blocked + why:** unchanged standing items only.
+- **Next step:** same as the entry below — check `list_pull_requests(state: open)` (now confirmed
+  empty) before starting a fresh sweep for the next candidate. Given this is now a repeat of the
+  same collision the immediately-following entry already escalated to the human (push notification
+  sent by that run), not repeating that notification here — see its own "Waiting on human" note on
+  cadence/locking instead.
+- **Waiting on human:** none new from this entry — see the entry below for the standing cadence/lock
+  question already raised.
+
+---
+
 ## 2026-08-20 — Reconciled three duplicate open PRs from concurrent sessions; no new feature work
 
 - **Last completed:**
