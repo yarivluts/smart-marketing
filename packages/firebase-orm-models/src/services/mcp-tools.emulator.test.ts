@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  confirmOnboardingFunnelSteps,
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
@@ -140,12 +141,27 @@ describe('queryProjectCohortRetention', () => {
 });
 
 describe('queryProjectFunnelSteps', () => {
-  it('builds a parameterized funnel query, orders by step_order, and derives conversion rates off the first step', async () => {
-    const { organization, project } = await setupOrgWithProject('Funnel Org');
+  async function confirmFunnel(organizationId: string, projectId: string, userId: string) {
+    await confirmOnboardingFunnelSteps({
+      organizationId,
+      projectId,
+      userId,
+      steps: [
+        { eventSchemaName: 'signup', stageKey: 'signup', order: 0 },
+        { eventSchemaName: 'activated', stageKey: 'activation', order: 1 },
+        { eventSchemaName: 'purchase', stageKey: 'conversion', order: 2 },
+      ],
+    });
+  }
+
+  it('reads the confirmed funnel from Firestore and counts distinct customers per step over the events table', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Org');
+    await confirmFunnel(organization.id, project.id, owner.id);
     const executor = new FakeWarehouseQueryExecutor([
-      { stage_key: 'activation', step_order: 1, customer_count: 2 },
-      { stage_key: 'signup', step_order: 0, customer_count: 5 },
-      { stage_key: 'conversion', step_order: 2, customer_count: 2 },
+      // Deliberately out of confirmed order — the step order comes from the funnel, not the rows.
+      { event_type: 'activated', customer_count: 2 },
+      { event_type: 'signup', customer_count: 5 },
+      { event_type: 'purchase', customer_count: 2 },
     ]);
 
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
@@ -155,13 +171,38 @@ describe('queryProjectFunnelSteps', () => {
       { stageKey: 'activation', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.4 },
       { stageKey: 'conversion', stepOrder: 2, customerCount: 2, conversionRateFromFirst: 0.4 },
     ]);
-    expect(executor.calls[0].sql).toContain('FROM fact_funnel_step');
-    expect(executor.calls[0].sql).toContain('GROUP BY stage_key, step_order');
-    expect(executor.calls[0].sql).toContain('ORDER BY step_order ASC');
+    expect(executor.calls[0].sql).toContain('FROM events');
+    expect(executor.calls[0].sql).toContain('COUNT(DISTINCT entity_id) AS customer_count');
+    expect(executor.calls[0].sql).toContain('event_type IN (@funnelEvent0, @funnelEvent1, @funnelEvent2)');
+    expect(executor.calls[0].params).toMatchObject({
+      organizationId: organization.id,
+      projectId: project.id,
+      funnelEvent0: 'signup',
+      funnelEvent1: 'activated',
+      funnelEvent2: 'purchase',
+    });
+  });
+
+  it('reports a real 0 (no division-by-zero) for a confirmed step with no events yet', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Partial Org');
+    await confirmFunnel(organization.id, project.id, owner.id);
+    const executor = new FakeWarehouseQueryExecutor([
+      { event_type: 'signup', customer_count: 4 },
+      // 'activated' / 'purchase' have landed no events yet — absent from the grouped rows.
+    ]);
+
+    const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(rows).toEqual([
+      { stageKey: 'signup', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
+      { stageKey: 'activation', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0 },
+      { stageKey: 'conversion', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0 },
+    ]);
   });
 
   it('adds an environment_id filter when provided', async () => {
-    const { organization, project } = await setupOrgWithProject('Funnel Env Org');
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Env Org');
+    await confirmFunnel(organization.id, project.id, owner.id);
     const executor = new FakeWarehouseQueryExecutor([]);
 
     await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, environmentId: 'env-test', executor });
@@ -170,12 +211,14 @@ describe('queryProjectFunnelSteps', () => {
     expect(executor.calls[0].params.environmentId).toBe('env-test');
   });
 
-  it('returns an empty list, with no division-by-zero, when the funnel has no data yet', async () => {
+  it('returns an empty list, without touching the warehouse, when no funnel is confirmed', async () => {
     const { organization, project } = await setupOrgWithProject('Funnel Empty Org');
-    const executor = new FakeWarehouseQueryExecutor([]);
+    const executor = new FakeWarehouseQueryExecutor([{ event_type: 'signup', customer_count: 9 }]);
 
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+
     expect(rows).toEqual([]);
+    expect(executor.calls).toHaveLength(0);
   });
 });
 
