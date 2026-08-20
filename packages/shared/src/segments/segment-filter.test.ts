@@ -36,6 +36,12 @@ describe('isValidSegmentFilterCondition', () => {
     expect(isValidSegmentFilterCondition({ field: '  ', op: '=', value: 'pro' })).toBe(false);
   });
 
+  it('rejects a field name that is not a safe identifier (segment.service.ts compiles it straight into a SQL/JSON-key expression)', () => {
+    expect(isValidSegmentFilterCondition({ field: "plan'; DROP TABLE entities; --", op: '=', value: 'pro' })).toBe(false);
+    expect(isValidSegmentFilterCondition({ field: 'properties.nested', op: '=', value: 'pro' })).toBe(false);
+    expect(isValidSegmentFilterCondition({ field: '1plan', op: '=', value: 'pro' })).toBe(false);
+  });
+
   it('rejects an unknown operator', () => {
     expect(isValidSegmentFilterCondition({ field: 'plan', op: 'like', value: 'pro' })).toBe(false);
   });

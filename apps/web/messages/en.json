@@ -822,7 +822,10 @@
     "addFilterButton": "Add filter",
     "removeFilterButton": "Remove",
     "createButton": "Create segment",
-    "createError": "Could not create the segment. Please try again."
+    "createError": "Could not create the segment. Please try again.",
+    "memberCount": "{count, plural, one {# member} other {# members}}",
+    "memberCountNotConfigured": "Member count unavailable (warehouse not configured yet)",
+    "memberCountError": "Member count unavailable"
   },
   "WinRules": {
     "metaTitle": "Win rules",

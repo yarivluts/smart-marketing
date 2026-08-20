@@ -23,13 +23,27 @@ export interface SegmentFilterCondition {
   value: string | number | boolean;
 }
 
+/**
+ * A saved filter's `field` gets compiled straight into a SQL identifier /
+ * JSON-subscript key by `segment.service.ts`'s `countSegmentMembers` — the
+ * same "letters/digits/underscore only" identifier-safety posture
+ * `packages/shared`'s own metrics compiler applies to every compiled column
+ * reference. Enforcing it here (not only at read/compile time) means a
+ * segment with an unsafe field name can never be *saved* in the first
+ * place, so a later count/query never has to fail on already-persisted
+ * data — `createSegment`'s "collect every validation failure" pass folds
+ * an unsafe field name into the exact same `InvalidSegmentError` a missing
+ * name or unknown operator already produces.
+ */
+const SAFE_SEGMENT_FIELD_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 /** Structural validation only — whether `field` is actually a real, declared field on the target entity schema is checked against the schema registry by the caller (`segment.service.ts`), not here. */
 export function isValidSegmentFilterCondition(value: unknown): value is SegmentFilterCondition {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
   const candidate = value as Record<string, unknown>;
-  if (typeof candidate.field !== 'string' || candidate.field.trim().length === 0) {
+  if (typeof candidate.field !== 'string' || !SAFE_SEGMENT_FIELD_PATTERN.test(candidate.field)) {
     return false;
   }
   if (!isSegmentFilterOperator(candidate.op)) {

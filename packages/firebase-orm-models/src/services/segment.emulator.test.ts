@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  countSegmentMembers,
   createOrganizationWithOwner,
   createProject,
   createSegment,
@@ -10,11 +11,25 @@ import {
   listSegmentsForProject,
   ProjectNotFoundError,
   registerSchemaDefinition,
+  SegmentNotFoundError,
+  WarehouseNotConfiguredError,
+  WarehouseQueryFailedError,
   type SchemaFieldInput,
+  type WarehouseQueryExecutor,
+  type WarehouseRow,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
-/** Emulator-backed tests for KAN-76's minimal saved-segment definition (`create_segment`). */
+/** Emulator-backed tests for KAN-76's minimal saved-segment definition (`create_segment`) and its `countSegmentMembers` live-member-count follow-up (hand-written SQL through a fake `WarehouseQueryExecutor`, the same posture `mcp-tools.emulator.test.ts` uses for its own adapters). */
+
+class FakeWarehouseQueryExecutor implements WarehouseQueryExecutor {
+  public calls: Array<{ sql: string; params: Record<string, unknown> }> = [];
+  constructor(private readonly rows: WarehouseRow[]) {}
+  execute(query: { sql: string; params: Record<string, unknown> }): Promise<WarehouseRow[]> {
+    this.calls.push(query);
+    return Promise.resolve(this.rows);
+  }
+}
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('segment-tests');
@@ -39,6 +54,7 @@ const customerFieldsV1: SchemaFieldInput[] = [
   { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
   { name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
   { name: 'mrr_usd', type: 'number', isRequired: true, isPii: false, isIdentityKey: false },
+  { name: 'is_paying', type: 'boolean', isRequired: true, isPii: false, isIdentityKey: false },
 ];
 
 async function registerCustomerSchema(organizationId: string, projectId: string, createdByUserId: string) {
@@ -196,5 +212,187 @@ describe('listSegmentsForProject', () => {
     const segments = await listSegmentsForProject(organization.id, project.id);
     expect(segments.map((segment) => segment.id).sort()).toEqual([first.id, second.id].sort());
     expect(segments.every((segment) => segment.project_id === project.id)).toBe(true);
+  });
+});
+
+describe('countSegmentMembers', () => {
+  it('builds a parameterized COUNT query scoped to the segment’s schema and org/project, with a typed clause per filter', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Paying pro customers',
+      schemaName: 'customer',
+      filters: [
+        { field: 'plan', op: '=', value: 'pro' },
+        { field: 'mrr_usd', op: '>', value: 200 },
+      ],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ member_count: 42 }]);
+
+    const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(outcome).toEqual({ ok: true, count: 42 });
+    expect(executor.calls).toHaveLength(1);
+    const { sql, params } = executor.calls[0];
+    expect(sql).toContain('SELECT COUNT(*) AS member_count FROM entities');
+    expect(sql).toContain('schema_name = @schemaName');
+    expect(params.schemaName).toBe('customer');
+    expect(sql).toContain("LAX_STRING(properties['plan']) = @filter_0");
+    expect(params.filter_0).toBe('pro');
+    expect(sql).toContain("LAX_FLOAT64(properties['mrr_usd']) > SAFE_CAST(@filter_1 AS FLOAT64)");
+    expect(params.filter_1).toBe('200');
+  });
+
+  it('casts a boolean field’s bound parameter through SAFE_CAST(... AS BOOL)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Bool Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Paying customers',
+      schemaName: 'customer',
+      filters: [{ field: 'is_paying', op: '=', value: true }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ member_count: 7 }]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(executor.calls[0].sql).toContain("LAX_BOOL(properties['is_paying']) = SAFE_CAST(@filter_0 AS BOOL)");
+    expect(executor.calls[0].params.filter_0).toBe('true');
+  });
+
+  it('compiles the "contains" operator as a wildcard-escaped LIKE over the string extraction, regardless of declared field type', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Contains Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Plans mentioning "pro"',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: 'contains', value: '50%_pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(executor.calls[0].sql).toContain("LAX_STRING(properties['plan']) LIKE @filter_0");
+    expect(executor.calls[0].params.filter_0).toBe('%50\\%\\_pro%');
+  });
+
+  it('falls back to a plain string extraction for a field the current active schema no longer declares', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Unknown Field Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Legacy filter',
+      schemaName: 'customer',
+      filters: [{ field: 'retired_field', op: '=', value: 'x' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(executor.calls[0].sql).toContain("LAX_STRING(properties['retired_field']) = @filter_0");
+  });
+
+  it('adds an environment_id filter when provided', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Env Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, environmentId: 'env-test', executor });
+
+    expect(executor.calls[0].sql).toContain('environment_id = @environmentId');
+    expect(executor.calls[0].params.environmentId).toBe('env-test');
+  });
+
+  it('returns 0 when the executor reports no matching rows', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Zero Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Nobody yet',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'enterprise' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+    expect(outcome).toEqual({ ok: true, count: 0 });
+  });
+
+  it('degrades to a "warehouse_not_configured" outcome instead of throwing, mirroring queryBoardTile/queryGoalProgress', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Not Configured Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor: WarehouseQueryExecutor = {
+      execute: () => Promise.reject(new WarehouseNotConfiguredError()),
+    };
+
+    const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+    expect(outcome).toEqual({ ok: false, reason: 'warehouse_not_configured', message: expect.any(String) });
+  });
+
+  it('degrades to a "query_error" outcome when the warehouse rejects the query', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Query Error Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor: WarehouseQueryExecutor = {
+      execute: () => Promise.reject(new WarehouseQueryFailedError('table not found')),
+    };
+
+    const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+    expect(outcome).toEqual({ ok: false, reason: 'query_error', message: 'table not found' });
+  });
+
+  it('throws SegmentNotFoundError for a segment that does not belong to this org+project', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Missing Org');
+    const { organization: otherOrg, project: otherProject } = await setupOrgWithProject('Segment Count Missing Other Org');
+    await registerCustomerSchema(otherOrg.id, otherProject.id, owner.id);
+    const segment = await createSegment({
+      organizationId: otherOrg.id,
+      projectId: otherProject.id,
+      name: 'Elsewhere',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await expect(
+      countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor }),
+    ).rejects.toBeInstanceOf(SegmentNotFoundError);
+    expect(executor.calls).toHaveLength(0);
   });
 });
