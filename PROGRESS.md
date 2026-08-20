@@ -50,6 +50,74 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-39 follow-up closed: real BigQuery cost estimates in the query cost log (PR #116)
+
+- **Last completed:**
+  - Session start found the now-familiar all-`done`-except-standing-blockers `TASKS.md` state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`) — no `todo` row.
+    A research sweep (per the previous run's own "fresh sweep" recommendation) surfaced three
+    candidate follow-up gaps on `done` stories; picked the highest-ranked one: KAN-39's
+    `estimated_cost_usd` was explicitly conditioned on "until KAN-18 provisions a real BigQuery
+    project" — and KAN-18's warehouse has been live end-to-end (dev + prod) since 2026-08-19, so
+    the blocking condition this deferral named was already resolved.
+  - **PR #116**: `BigQueryWarehouseQueryExecutor` gained `executeWithStats()`, extracting
+    `totalBytesProcessed` from the real BigQuery response and estimating cost at BigQuery's
+    on-demand $6.25/TiB list price. A new optional `WarehouseQueryExecutorWithStats`
+    interface + `supportsQueryStats()` type guard (`warehouse/query-executor.ts`) lets
+    `queryMetrics` opt into a real cost estimate only when the configured executor supports one —
+    every other executor (`NotConfiguredWarehouseQueryExecutor`, every test fake) is byte-for-byte
+    unchanged and keeps logging `null`. `recordQueryCostLogEntry` now accepts and stores the
+    caller's estimate instead of hardcoding `null`. The cost-guardrails admin page now actually
+    renders the per-entry estimate (`formatEstimatedCostUsd`) — the field existed in the view type
+    since KAN-39 shipped but nothing had ever displayed it; new `logEntryCost`/`logEntryCostUnknown`
+    en/he keys.
+  - **Bug caught and fixed during this run's own pre-merge self-review** (an independent subagent
+    review pass, per CLAUDE.md): `createRealBigQueryClient` was reading the API response off the
+    wrong tuple index. Verified directly against the installed `@google-cloud/bigquery@9.0.2`
+    source: `query()`'s underlying `Job#getQueryResults` calls back
+    `(err, rows, nextQuery, apiResponse)`, and `@google-cloud/promisify` resolves every non-error
+    callback arg as an array when there's more than one — i.e. `bigquery.query()` promise-resolves
+    `[rows, nextQuery, apiResponse]` (3 elements), not the 2-element `[rows, apiResponse]` shape the
+    code assumed. Reading index 1 (`nextQuery`, usually `null`) instead of index 2 (the real
+    response) meant `estimated_cost_usd` would have silently stayed `null` forever against the real
+    warehouse — exactly the bug this PR set out to fix, and it would have shipped invisibly since
+    every test fake matched the code's own (wrong) assumption. Fixed by normalizing the SDK's real
+    3-tuple down to `BigQueryQueryClient`'s narrowed 2-tuple contract right at the
+    `createRealBigQueryClient` adapter boundary; added regression tests asserting the correct index
+    end-to-end, including through `executeWithStats`, using a resolved-array shape that matches the
+    real SDK rather than the hand-authored fake's own assumption.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green across the full monorepo
+    before opening the PR (firebase-orm-models 879/879 incl. the new tests; apps/web unit +
+    Playwright e2e green — one pre-existing flaky e2e test in `resource-library.spec.ts`, unrelated,
+    passed on its automatic retry). CI on the PR itself green (`lint · typecheck · test · build` +
+    `terraform fmt · validate`), `mergeable_state: clean`, no review comments. Branch
+    `kan-39-real-bigquery-cost-stats`, PR #116, merged into `main` (squash) at `54d09a8`. Remote
+    branch deletion failed with the same HTTP 403 this sandbox's git remote has rejected every prior
+    run's delete attempt with since 2026-07-04 — branch is merged and dead but not deleted.
+  - Also had to build `@growthos/shared`, `@growthos/firebase-orm-models`, and
+    `@growthos/tracking-sdk` explicitly before their dependents' tests would resolve in this fresh
+    container (`Failed to resolve entry for package "@growthos/..."` from Vite) — a known
+    fresh-clone build-ordering quirk, not a real break; noting it here in case a future run hits the
+    same thing and wonders whether something regressed.
+- **In progress (exact stopping point):** none — clean stopping point, `main` green at `54d09a8`.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's long-lead approval or per-command-approved
+  interactive session.
+- **Next step:** the other two candidates this run's research sweep surfaced but didn't pursue
+  (ranked below the one picked): (1) a Google/Meta Ads budget-resource lookup for automation targets
+  seeded to represent a pre-existing campaign (`GoogleAdsBudgetResourceUnknownError`/its Meta
+  counterpart in `plugin-runtime/{google-ads,meta-ads}/executor.ts` always throw today — a real fix
+  needs a GAQL/Graph API lookup, fully fake-client-testable, no live account needed); (2) a
+  dual-secret grace window for hook endpoint signing-secret rotation (`hook.service.ts`'s
+  `setHookEndpointSigningSecret` doc comment names this as out-of-scope for KAN-53's buildable-today
+  version — rotating today instantly breaks in-flight senders with no overlap period; an admin UI
+  already exists to extend). Either is a reasonable next pick. A fresh sweep is also fine if neither
+  still looks right by then.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — Autonomous refresh + snippet compatibility + live freshness panel (PRs #105/#107/#113)
 
 - **Last completed:**
