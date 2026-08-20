@@ -11,6 +11,7 @@ import {
   listOrchestrationRunsForProject,
   listOrgProjects,
   listQuarantinedRecordsForProject,
+  listQueuedPipelineMessagesForProject,
   listRecentIngestBatchesForProject,
 } from '@/lib/orgs/queries';
 import {
@@ -19,6 +20,7 @@ import {
   formatThroughput,
   toIngestBatchView,
   toQuarantinedRecordView,
+  toQueuedPipelineMessageView,
   type IngestHealthRollup,
 } from '@/lib/orgs/ingest-health-view';
 import {
@@ -30,6 +32,7 @@ import {
 } from '@/lib/orgs/orchestration-view';
 import { ReplayQuarantinedRecordButton } from '@/components/orgs/replay-quarantined-record-button';
 import { RetryFailedPipelineMessagesButton } from '@/components/orgs/retry-failed-pipeline-messages-button';
+import { SweepQueuedPipelineMessagesButton } from '@/components/orgs/sweep-queued-pipeline-messages-button';
 import { TriggerOrchestrationRunButton } from '@/components/orgs/trigger-orchestration-run-button';
 
 type PageProps = Readonly<{
@@ -66,12 +69,22 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
     notFound();
   }
 
-  const [projects, batches, environments, quarantinedRecords, failedPipelineMessages, orchestrationRuns, warehouseFreshness] = await Promise.all([
+  const [
+    projects,
+    batches,
+    environments,
+    quarantinedRecords,
+    failedPipelineMessages,
+    queuedPipelineMessages,
+    orchestrationRuns,
+    warehouseFreshness,
+  ] = await Promise.all([
     listOrgProjects(orgId),
     listRecentIngestBatchesForProject(orgId, projectId),
     listEnvironmentsForProject(orgId, projectId),
     listQuarantinedRecordsForProject(orgId, projectId),
     listFailedPipelineMessagesForProject(orgId, projectId),
+    listQueuedPipelineMessagesForProject(orgId, projectId),
     listOrchestrationRunsForProject(orgId, projectId),
     getWarehouseFreshnessForProject({ organizationId: orgId, projectId }),
   ]);
@@ -80,8 +93,10 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
     notFound();
   }
 
-  const summary = computeIngestHealthSummary(batches.map(toIngestBatchView), Date.now());
+  const now = Date.now();
+  const summary = computeIngestHealthSummary(batches.map(toIngestBatchView), now);
   const quarantinedViews = quarantinedRecords.map(toQuarantinedRecordView);
+  const queuedPipelineMessageViews = queuedPipelineMessages.map((message) => toQueuedPipelineMessageView(message, now));
   const orchestrationRunViews = orchestrationRuns.map(toOrchestrationRunView);
   const currentFreshness = deriveCurrentFreshness(orchestrationRunViews);
 
@@ -177,6 +192,33 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
                     kind: t(message.kind),
                     environment: environmentDisplayNameById.get(message.environment_id) ?? message.environment_id,
                     reason: message.failure_reason ?? '',
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold">{t('queuedMessagesHeading')}</h2>
+          {queuedPipelineMessageViews.length > 0 ? (
+            <SweepQueuedPipelineMessagesButton orgId={orgId} projectId={projectId} />
+          ) : null}
+        </div>
+        {queuedPipelineMessageViews.length === 0 ? (
+          <p className="text-muted-foreground">{t('noQueuedMessages')}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {queuedPipelineMessageViews.map((message) => (
+              <li key={message.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
+                <span className="font-medium">
+                  {t('queuedMessageSummary', {
+                    clientId: message.clientId,
+                    kind: t(message.kind),
+                    environment: environmentDisplayNameById.get(message.environmentId) ?? message.environmentId,
+                    minutes: formatMinutesAgo(message.minutesAgo),
                   })}
                 </span>
               </li>

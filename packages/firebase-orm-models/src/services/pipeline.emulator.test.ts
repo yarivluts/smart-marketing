@@ -10,9 +10,12 @@ import {
   enqueueAcceptedRecordsForPipeline,
   FirestoreWarehouseSink,
   landPipelineMessages,
+  listAuditLogEntriesForOrg,
   listFailedPipelineMessagesForProject,
+  listQueuedPipelineMessagesForProject,
   listRawRecordsForBatch,
   replayFailedPipelineMessagesForProject,
+  sweepQueuedPipelineMessagesForProject,
   type BigQueryInsertClient,
   type BigQueryInsertRow,
   type PipelineRecordEnvelope,
@@ -334,6 +337,82 @@ describe('KAN-34 pipeline DLQ: listFailedPipelineMessagesForProject + replayFail
     });
 
     expect(await listFailedPipelineMessagesForProject(other.organization.id, other.project.id)).toHaveLength(0);
+  });
+});
+
+describe('listQueuedPipelineMessagesForProject + sweepQueuedPipelineMessagesForProject', () => {
+  it('lists a stuck queued message across environments for one project and clears it once swept', async () => {
+    const { organization, project, owner, devEnvironment, prodEnvironment } = await setupProject('Stuck Queue Org');
+
+    // Two messages enqueued but never landed (e.g. a crash between publish and land) — one per
+    // environment, to prove the project-wide listing folds every environment together.
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      batchId: unique('batch'),
+      kind: 'event',
+      records: [{ clientId: 'evt-stuck-dev', schemaName: 'order_completed', payload: { net: 1 } }],
+    });
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId: unique('batch'),
+      kind: 'event',
+      records: [{ clientId: 'evt-stuck-prod', schemaName: 'order_completed', payload: { net: 2 } }],
+    });
+
+    const queued = await listQueuedPipelineMessagesForProject(organization.id, project.id);
+    expect(queued.map((m) => m.client_id).sort()).toEqual(['evt-stuck-dev', 'evt-stuck-prod']);
+
+    const result = await sweepQueuedPipelineMessagesForProject(organization.id, project.id, undefined, undefined, owner.id);
+    expect(result).toEqual({ delivered: 2, failed: 0 });
+    expect(await listQueuedPipelineMessagesForProject(organization.id, project.id)).toHaveLength(0);
+
+    const auditEntries = await listAuditLogEntriesForOrg(organization.id);
+    const sweepEntry = auditEntries.find((entry) => entry.action === 'pipeline_message.sweep');
+    expect(sweepEntry).toBeDefined();
+    expect(sweepEntry?.after).toEqual({ attempted: 2, delivered: 2, failed: 0 });
+  });
+
+  it('does not re-sweep an already-delivered message', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Sweep Idempotent Org');
+
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId: unique('batch'),
+      kind: 'event',
+      records: [{ clientId: 'evt-1', schemaName: 'order_completed', payload: {} }],
+    });
+
+    const first = await sweepQueuedPipelineMessagesForProject(organization.id, project.id);
+    const second = await sweepQueuedPipelineMessagesForProject(organization.id, project.id);
+
+    expect(first).toEqual({ delivered: 1, failed: 0 });
+    expect(second).toEqual({ delivered: 0, failed: 0 });
+  });
+
+  it('does not surface or sweep a stuck message from a sibling project', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Sweep Isolation Org A');
+    const other = await setupProject('Sweep Isolation Org B');
+
+    await enqueueAcceptedRecordsForPipeline({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      batchId: unique('batch'),
+      kind: 'event',
+      records: [{ clientId: 'evt-1', schemaName: 'order_completed', payload: {} }],
+    });
+
+    expect(await listQueuedPipelineMessagesForProject(other.organization.id, other.project.id)).toHaveLength(0);
+    expect(await sweepQueuedPipelineMessagesForProject(other.organization.id, other.project.id)).toEqual({ delivered: 0, failed: 0 });
+
+    // The sibling project's own stuck message is untouched by the other project's sweep.
+    expect(await listQueuedPipelineMessagesForProject(organization.id, project.id)).toHaveLength(1);
   });
 });
 

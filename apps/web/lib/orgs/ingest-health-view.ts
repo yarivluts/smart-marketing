@@ -1,6 +1,7 @@
 import {
   SCHEMA_DEF_KINDS,
   type IngestBatchModel,
+  type PipelineMessageModel,
   type QuarantinedRecordModel,
   type SchemaDefKind,
 } from '@growthos/firebase-orm-models';
@@ -181,6 +182,30 @@ export function toQuarantinedRecordView(record: QuarantinedRecordModel): Quarant
     clientId: record.client_id,
     reasons: record.reasons,
     createdAt: record.created_at,
+  };
+}
+
+/**
+ * A pipeline message still stuck `queued` (never reached a `delivered`/`failed` terminal status —
+ * e.g. the process crashed between publish and land). `minutesAgo` is computed against `nowMs` at
+ * render time rather than shipped as a raw timestamp, same "server computes, client just displays"
+ * posture as `IngestHealthRollup.freshnessMinutes`.
+ */
+export interface QueuedPipelineMessageView {
+  id: string;
+  kind: SchemaDefKind;
+  environmentId: string;
+  clientId: string;
+  minutesAgo: number;
+}
+
+export function toQueuedPipelineMessageView(message: PipelineMessageModel, nowMs: number): QueuedPipelineMessageView {
+  return {
+    id: message.id,
+    kind: message.kind,
+    environmentId: message.environment_id,
+    clientId: message.client_id,
+    minutesAgo: (nowMs - new Date(message.enqueued_at).getTime()) / 60_000,
   };
 }
 

@@ -228,6 +228,68 @@ export async function listRawRecordsForSchemaSince(
 }
 
 /**
+ * Every message still `queued` across a whole project (every environment folded together) — the
+ * project-wide admin-visibility counterpart to `drainPendingPipelineMessages`'s single-environment
+ * sweep, same "fold every environment into one admin view" posture as
+ * `listFailedPipelineMessagesForProject`/`listRecentIngestBatchesForProject`. A message normally only
+ * sits `queued` for the instant between publish and land (`ingestBatch` lands its own batch
+ * synchronously), so anything showing up here has been stuck — e.g. the process crashed between
+ * publish and land — and never got a `delivered`/`failed` terminal status. Oldest first, so the
+ * longest-stuck messages are the ones an operator sees first.
+ */
+export async function listQueuedPipelineMessagesForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
+): Promise<PipelineMessageModel[]> {
+  return PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .query()
+    .where('status', '==', 'queued')
+    .orderBy('enqueued_at')
+    .limit(Math.min(limit, MAX_PIPELINE_DRAIN_BATCH_SIZE))
+    .get();
+}
+
+/**
+ * Manually sweeps every message still stuck `queued` across a whole project (every environment),
+ * landing each one — the project-wide, admin-triggerable counterpart to
+ * `drainPendingPipelineMessages`'s single-environment sweep, same "ops use, not on the hot ingest
+ * path" posture that function's own doc comment already establishes. Reuses `landMessages` directly
+ * (not `drainPendingPipelineMessages` per environment) so one call sweeps the whole project in a
+ * single pass rather than requiring a caller to already know every environment id.
+ */
+export async function sweepQueuedPipelineMessagesForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
+  sink?: WarehouseSink,
+  performedByUserId?: string,
+): Promise<DrainPipelineResult> {
+  const queued = await listQueuedPipelineMessagesForProject(organizationId, projectId, limit);
+  const result = await landMessages(queued, sink ?? defaultWarehouseSink);
+
+  if (performedByUserId) {
+    try {
+      await recordAuditLogEntry({
+        organizationId,
+        projectId,
+        actorType: 'user',
+        actorId: performedByUserId,
+        action: 'pipeline_message.sweep',
+        targetType: 'project',
+        targetId: projectId,
+        summary: `Swept ${queued.length} stuck queued pipeline message(s): ${result.delivered} delivered, ${result.failed} failed`,
+        after: { attempted: queued.length, delivered: result.delivered, failed: result.failed },
+      });
+    } catch {
+      // Best-effort — see the comment on `recordAuditLogEntry`.
+    }
+  }
+
+  return result;
+}
+
+/**
  * The pipeline's dead-letter queue (KAN-34): every message a `landMessage` attempt has given up on,
  * across every environment in a project — same "fold every environment into one admin view" posture as
  * `listRecentIngestBatchesForProject`/`listApiKeysForProject`. Newest first.

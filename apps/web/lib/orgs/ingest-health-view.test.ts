@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { computeIngestHealthSummary, formatMinutesAgo, formatThroughput, type IngestBatchView } from './ingest-health-view';
+import type { PipelineMessageModel } from '@growthos/firebase-orm-models';
+import {
+  computeIngestHealthSummary,
+  formatMinutesAgo,
+  formatThroughput,
+  toQueuedPipelineMessageView,
+  type IngestBatchView,
+} from './ingest-health-view';
 
 const NOW = Date.parse('2026-07-06T12:00:00Z');
 
@@ -124,5 +131,23 @@ describe('formatThroughput', () => {
 
   it('takes the whole-number branch for a value that rounds up to exactly 10, not "10.0"', () => {
     expect(formatThroughput(9.96)).toBe('10');
+  });
+});
+
+describe('toQueuedPipelineMessageView', () => {
+  function message(overrides: Partial<PipelineMessageModel>): PipelineMessageModel {
+    return {
+      id: 'msg-1',
+      kind: 'event',
+      environment_id: 'env-prod',
+      client_id: 'evt-1',
+      enqueued_at: '2026-07-06T11:55:00Z',
+      ...overrides,
+    } as PipelineMessageModel;
+  }
+
+  it('computes minutes elapsed since the message was enqueued', () => {
+    const view = toQueuedPipelineMessageView(message({}), NOW);
+    expect(view).toEqual({ id: 'msg-1', kind: 'event', environmentId: 'env-prod', clientId: 'evt-1', minutesAgo: 5 });
   });
 });
