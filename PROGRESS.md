@@ -17,6 +17,58 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Reconciled three duplicate open PRs from concurrent sessions; no new feature work
+
+- **Last completed:**
+  - Session start found the by-now-standard all-`done`-except-standing-blockers `TASKS.md` state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`) — no `todo` row.
+    Per the immediately preceding run's own explicit advice ("check recent CI/PR history *before*
+    spending a full implementation cycle, not just at merge time, to catch a collision earlier and
+    cheaper"), checked open PRs before picking a fresh sweep target — and found the collision problem
+    that prior run flagged had gotten worse, not better: **three open PRs, all duplicates of work
+    already merged or duplicated by another open PR**, all opened by independent concurrent sessions
+    within the same ~8-hour window:
+    - **#122** vs **#118** — both "resolve ad-platform budget resource for pre-existing campaigns"
+      (the exact KAN-71/72/73 follow-up prior PROGRESS.md entries had named as an open candidate),
+      functionally identical GAQL-lookup-and-cache implementations. #122 was rebased onto the more
+      current `main` (past #119/#120/#121) with `mergeable_state: clean`; #118 was based on an older
+      commit. Reviewed #122's diff directly (proper GAQL string-literal escaping against
+      injection via a caller-influenced campaign resource name, cache-on-target behavior, full test
+      coverage on both the Google Ads and Meta clients/executors) and merged it (`14b1807`). Closed
+      #118 as superseded with a comment pointing to #122.
+    - **#112** ("ops-triggered drain for queued pipeline messages") — duplicated the gap already
+      closed by merged **#120** ("admin visibility + manual sweep for stuck queued pipeline
+      messages"), which shipped a strictly more complete fix (project-wide browsable list + sweep-all,
+      vs. #112's blind per-environment drain button with no message-level visibility). Closed #112 as
+      superseded with a comment pointing to #120.
+  - No new feature work this run — the highest-value action available was unwinding duplicate
+    open-PR debt before it accumulated further, not adding a fourth implementation of an
+    already-solved gap. All three duplicate pairs trace back to the same root cause the prior run's
+    entry named: multiple sessions independently sweeping the codebase for "next work" from the same
+    PROGRESS.md follow-up notes within minutes-to-hours of each other, with no shared lock on which
+    candidate a given run has claimed.
+  - `main` is green post-merge (PR #122's own CI — `lint · typecheck · test · build` +
+    `terraform fmt · validate` — was green against a `main` matching this run's own tip before merge).
+    Zero open PRs remain on the repo as of this run's end.
+- **In progress (exact stopping point):** none — clean stopping point, `main` at `14b1807`.
+- **Blocked + why:** unchanged standing items only.
+- **Next step:** a fresh codebase-wide sweep (TODO/deferred comments, built-but-never-called service
+  exports, CLAUDE.md compliance) is still the right approach for finding the next candidate, per the
+  2026-08-20 "fresh sweep" entry below — but **check `list_pull_requests(state: open)` first, every
+  run, before starting implementation, not just before merging.** This run's finding shows that
+  advice from a prior entry wasn't yet being followed by every concurrent session; restating it here
+  doesn't fix the root cause (no cross-session coordination exists), but at minimum the next run that
+  does check will find a clean zero-open-PR baseline instead of more duplicate debt to reconcile.
+  Flagged to the human via push notification given this is the second run in a row whose primary
+  output was collision cleanup rather than new work — worth revisiting the scheduled cadence.
+- **Waiting on human:**
+  - standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra sub-items).
+  - Worth a decision: reduce the scheduled cadence, or add some form of claim/lock so concurrent runs
+    don't keep picking the same follow-up candidates. Three independent collisions in one day (KAN-44
+    audit gaps, ad-platform budget lookup, queued-pipeline-message drain) is a real, recurring cost.
+
+---
+
 ## 2026-08-20 — Collided with a concurrent run on the same KAN-44 gap; no net change (PR #121, closed)
 
 - **Last completed:**
