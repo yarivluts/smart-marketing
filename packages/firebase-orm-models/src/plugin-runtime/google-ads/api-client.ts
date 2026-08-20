@@ -210,7 +210,12 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
 
   async lookupCampaignBudgetResourceName(customerId: string, campaignResourceName: string): Promise<string> {
     const accessToken = await this.getAccessToken();
-    const query = `SELECT campaign.campaign_budget FROM campaign WHERE campaign.resource_name = '${campaignResourceName}'`;
+    // `campaignResourceName` can originate from a caller-supplied automation
+    // target id (see `GoogleAdsAutomationActionExecutor.resolveCampaignBudgetResourceName`) —
+    // escape it before splicing into the GAQL string literal so it can't break out of the
+    // WHERE clause (GAQL, like SQL, escapes an embedded `'` as `\'`).
+    const escapedCampaignResourceName = campaignResourceName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const query = `SELECT campaign.campaign_budget FROM campaign WHERE campaign.resource_name = '${escapedCampaignResourceName}'`;
     const response = await fetch(`${GOOGLE_ADS_API_BASE_URL}/customers/${customerId}/googleAds:search`, {
       method: 'POST',
       headers: {

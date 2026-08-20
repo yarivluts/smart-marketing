@@ -205,6 +205,19 @@ describe('GoogleAdsHttpApiClient', () => {
     ).rejects.toBeInstanceOf(GoogleAdsApiError);
   });
 
+  it('escapes a single quote in the campaign resource name before splicing it into the GAQL query', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ results: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      new GoogleAdsHttpApiClient(OPTIONS).lookupCampaignBudgetResourceName('123', "malicious' OR '1'='1"),
+    ).rejects.toBeInstanceOf(GoogleAdsApiError);
+
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    const body = JSON.parse(String(init.body));
+    expect(body.query).toContain("campaign.resource_name = 'malicious\\' OR \\'1\\'=\\'1'");
+  });
+
   it('throws GoogleAdsApiError with the response status when the GAQL search request itself fails', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 403));
     vi.stubGlobal('fetch', fetchMock);
