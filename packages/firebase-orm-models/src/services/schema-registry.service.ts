@@ -9,7 +9,7 @@ import {
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { syncSchemaMartView } from './schema-mart.service';
-import { MART_INTRINSIC_COLUMNS, MART_KINDS } from '../warehouse/schema-mart';
+import { martIntrinsicColumnNames, MART_KINDS } from '../warehouse/schema-mart';
 
 export class InvalidSchemaDefinitionError extends Error {
   constructor(public readonly reasons: readonly string[]) {
@@ -59,10 +59,12 @@ export interface SchemaFieldInput {
 }
 
 /**
- * `kind` gates the {@link MART_INTRINSIC_COLUMNS} reject-list below to the
- * two kinds that actually get an auto-generated mart view ({@link MART_KINDS}
- * — measure/entity); an `event` schema's fields never reach `buildMartViewSql`
- * at all, so e.g. `client_id` is a perfectly fine event field name.
+ * `kind` gates the intrinsic-column reject-list below to the two kinds that
+ * actually get an auto-generated mart view ({@link MART_KINDS} —
+ * measure/entity), and picks which columns that kind's mart carries: an
+ * `event` schema's fields never reach `buildMartViewSql` at all, so e.g.
+ * `client_id` is a perfectly fine event field name, while a measure's mart
+ * additionally carries the envelope's own `value`/`ts`.
  */
 function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind): SchemaFieldDef[] {
   const reasons: string[] = [];
@@ -70,7 +72,7 @@ function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind
     reasons.push('A schema must declare at least one field.');
   }
 
-  const rejectMartIntrinsicNames = MART_KINDS.includes(kind);
+  const reservedNames: readonly string[] = MART_KINDS.includes(kind) ? martIntrinsicColumnNames(kind) : [];
   const seen = new Set<string>();
   for (const field of fields) {
     const name = field.name.trim();
@@ -93,7 +95,7 @@ function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind
     // alongside this function, not by a live failure — see that function's
     // own doc comment for the sibling bug this mirrors: an unqualified mart
     // source table, session-B QA, 2026-08-20).
-    if (rejectMartIntrinsicNames && MART_INTRINSIC_COLUMNS.includes(name)) {
+    if (reservedNames.includes(name)) {
       reasons.push(`Field "${name}" is reserved by the generated warehouse mart view and cannot be declared on a "${kind}" schema.`);
     }
   }

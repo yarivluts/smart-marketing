@@ -12,6 +12,7 @@ import {
 import type { SchemaFieldType } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { getActiveMartSchemaByName } from './schema-registry.service';
+import { martIntrinsicColumnTypes } from '../warehouse/schema-mart';
 import { recordAuditLogEntry } from './audit-log.service';
 
 export class InvalidMetricDefinitionError extends Error {
@@ -147,8 +148,8 @@ const NUMERIC_COLUMN_AGG_FUNCTIONS = new Set<MetricAggFunction>(['sum', 'avg']);
  * When an aggregation's `table` names one of the project's own registered
  * measure/entity schemas, the real warehouse relation is that schema's
  * auto-generated mart view (`warehouse/schema-mart.ts`) — whose columns are
- * exactly the schema's declared fields plus the always-present `client_id`
- * and `landed_at`. So we can (and should) catch here, at registration time,
+ * exactly the schema's declared fields plus that kind's intrinsic columns.
+ * So we can (and should) catch here, at registration time,
  * an aggregation that names a column the mart won't have or sums a
  * non-numeric one: without this the metric registers fine and only fails
  * silently at query time, rendering an empty tile. This is precisely the
@@ -175,10 +176,8 @@ async function validateAggregationAgainstRegisteredSchema(
     return;
   }
 
-  // Mirrors the SELECT list `buildMartViewSql` emits: every declared field, plus the two intrinsic columns every mart carries.
-  const columnTypes = new Map<string, SchemaFieldType>(schema.field_defs.map((field) => [field.name, field.type]));
-  columnTypes.set('client_id', 'string');
-  columnTypes.set('landed_at', 'timestamp');
+  // Mirrors the SELECT list `buildMartViewSql` emits: every declared field, plus the intrinsic columns that kind's mart carries (read from the builder itself so the two can't drift).
+  const columnTypes = new Map<string, SchemaFieldType>([...martIntrinsicColumnTypes(schema.kind), ...schema.field_defs.map((field): [string, SchemaFieldType] => [field.name, field.type])]);
   const availableColumns = [...columnTypes.keys()].sort().join(', ');
 
   if (!columnTypes.has(aggregation.timeColumn)) {

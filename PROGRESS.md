@@ -17,6 +17,87 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 (later) — Mart views read the wrong JSON level: every custom measure/entity column was NULL
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked open PRs first** — three were open,
+    all from concurrent sessions, all already green or nearly so:
+    - **#128** (leap-day `previous_year` compare-window clamp) — reviewed the diff, CI green,
+      `mergeable_state: clean`, no review comments. **Merged.**
+    - **#134** (reject measure/entity fields colliding with mart-view intrinsic columns) — reviewed,
+      CI green, clean. **Merged.** Its own session recorded its PROGRESS entry.
+    - **#136** (`query_funnel` on the real warehouse) — CI still in progress, owned by a live
+      concurrent session. **Left alone**, and deliberately stayed out of the MCP/funnel area.
+    - Branch deletion for #128/#134 failed with HTTP 403 (this environment's git credentials can't
+      delete remote refs); left for the owning sessions / a human.
+  - **Then found and fixed the real bug of the run** — a direct follow-up to the flag PROGRESS.md
+    itself left open ("mart views read raw payload directly — *but worth confirming*"). It was wrong:
+    `buildMartViewSql` emitted `JSON_VALUE(payload, '$.<field>')`, reading each declared field off
+    the **top level of the ingest envelope**. But ingest stores the whole envelope as
+    `RawRecordModel.payload` and validates declared fields against a sub-object —
+    `dimensions` (measure) / `attributes` (entity) / `properties` (event), per `checkRecordEnvelope`
+    and `docs/api/ingest.md` §4. So for a correctly-formed record every declared mart column was
+    **NULL**, and every metric registered against a custom measure/entity schema silently returned
+    nothing. This is exactly the bug class PR #135 fixed across the dbt models, in the one place #135
+    didn't reach — and `schema-mart.test.ts` pinned the wrong path (`'$.platform'`), the same
+    "fixture encodes the wrong assumption, so CI stays green forever" pattern #135 called out.
+  - **Second gap, same surface:** a measure's envelope carries the number the measure is *about*
+    (`value`) and its event time (`ts`) outside `dimensions`, and the docs explicitly tell users not
+    to declare `value` as a schema field. So a measure mart built exactly as documented had **no
+    numeric column to `sum`/`avg` at all** (which PR #131's new validation would now reject outright)
+    and its only time column was ingest-time `landed_at` — bucketing a backfilled measure on the day
+    it was uploaded rather than the day it describes. Both are now intrinsic columns on measure marts
+    (`column: "value"`, `timeColumn: "ts"`), reserved on measure schemas via #134's own reject-list.
+  - **Made the intrinsic-column list the single source of truth** it already claimed to be:
+    `MART_INTRINSIC_COLUMNS` became kind-aware `martIntrinsicColumnNames(kind)` /
+    `martIntrinsicColumnTypes(kind)`, both derived from the specs the builder actually emits.
+    `metric-registry.service.ts` had drifted already — it hard-coded only `client_id`/`landed_at`
+    while the builder emitted five columns, so a metric legitimately naming `environment_id` was
+    wrongly rejected; it now reads the same source.
+  - **Caught in this run's own pre-merge self-review:** a measure schema registered *before* #134's
+    reject-list existed can still declare a field named `value`/`ts`, and the new intrinsic columns
+    would have made that view emit the name twice — the precise `CREATE OR REPLACE VIEW` failure #134
+    exists to prevent, reintroduced from the other side. `buildMartViewSql` now drops an intrinsic
+    whose name a declared field already takes (the declared field wins, matching what
+    already-registered metrics resolve against), with a regression test.
+  - Tests: rewrote the mart-builder unit tests onto the real envelope shapes (measure `dimensions`
+    vs. entity `attributes`, the value/ts intrinsics, the legacy-collision case, and a
+    per-kind check that the emitted SELECT list matches `martIntrinsicColumnNames` exactly so the two
+    can't drift again); new emulator cases for the measure-only `value`/`ts` reservation and for a
+    measure metric aggregating `value` over `ts`. `docs/api/ingest.md` §3 updated to describe the
+    columns the mart now actually exposes.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build`, `pnpm test` all green (924
+    firebase-orm-models, 943 web, 396 shared + the rest). One `apps/web` Playwright case
+    (`resource-library.spec.ts`) flaked once and passed on retry #1 — the same known flake earlier
+    runs recorded.
+- **In progress (exact stopping point):** none — the change is merged and self-contained.
+- **Blocked + why:** nothing.
+- **Next step:** a research pass this run mined `PROGRESS.md`/`TASKS.md`/the codebase for remaining
+  headless-buildable follow-ups and ranked them; the ones **not** taken here, still open and worth a
+  future run (all verified as not needing live infra):
+  1. **Tracking alerts + event-volume sparklines blend every environment together** —
+     `getMostRecentRawRecordForSchema`/`listRawRecordsForSchemaSince` (`pipeline.service.ts`) don't
+     filter `environment_id`, so a dev key still firing an event keeps `lastSeenAt` fresh and the
+     production silence alert never fires — the exact failure KAN-36 exists to catch. Needs a new
+     composite index in `firestore.indexes.json` in the same PR (PR #132's standing rule).
+  2. **The SaaS pack targets four warehouse tables that don't exist** (`fact_revenue_event`,
+     `fact_subscription_event`, `dim_subscription`, `fact_funnel_event`), so KAN-59/61's headline AC
+     can't be met. Scoping one run to `fact_ad_spend` alone would light up `ad_spend`/
+     `cost_per_signup`/`cac`/`troi` and the Marketing board's spend tiles.
+  3. **Four hand-written warehouse readers bypass the cost quota and cost log** (`searchProjectCustomers`,
+     `queryProjectCohortRetention`, `countSegmentMembers` — leave `queryProjectFunnelSteps` to #136),
+     so an MCP client can run unbounded BigQuery scans invisible to the cost-guardrails page.
+  4. **A pack whose board seeding half-fails leaves a permanently blank board** — name-only
+     idempotency in `ensureSaasMetricPackDefaultBoardsSeeded` skips a tiles-empty board on reinstall,
+     with no admin repair action.
+  5. **`allowedHours` with equal start and end blocks all automation** (`checkAllowedHours` evaluates
+     `hour >= s && hour < s`), while the message reads as though the window is open.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision).
+
+---
+
 ## 2026-08-20 — Reject measure/entity fields colliding with mart-view intrinsic columns (PR #134)
 
 - **Last completed:**

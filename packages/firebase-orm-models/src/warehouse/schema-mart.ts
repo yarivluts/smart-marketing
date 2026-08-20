@@ -65,10 +65,24 @@ export function martViewName(organizationId: string, projectId: string, schemaNa
   return `m_${tenantHash}_${schemaName}`;
 }
 
-/** BigQuery expression extracting one declared field from the `payload` JSON column, typed per the schema's own field type. */
-function fieldExpression(field: SchemaFieldDef): string {
-  const name = assertMartSafe(field.name, 'column');
-  const jsonPath = `'$.${name}'`;
+/**
+ * Where a kind's schema-declared fields live inside the stored `payload`.
+ * Ingest stores the whole ENVELOPE as `RawRecordModel.payload` and validates
+ * declared fields against a sub-object — `checkRecordEnvelope`
+ * (`ingest.service.ts`) and `docs/api/ingest.md` §4 are the contract:
+ * measures put them in `dimensions`, entities in `attributes`, events in
+ * `properties`. Reading `$.<field>` off the envelope's top level (as this
+ * builder originally did) yields NULL for every declared column of a
+ * correctly-formed record — the same wrong-JSON-level assumption the dbt
+ * models carried until they were fixed.
+ */
+const FIELD_ENVELOPE_OBJECT: Record<SchemaDefKind, string> = {
+  measure: 'dimensions',
+  entity: 'attributes',
+  event: 'properties',
+};
+
+function typedJsonExpression(type: SchemaFieldType, jsonPath: string): string {
   const byType: Record<SchemaFieldType, string> = {
     string: `JSON_VALUE(payload, ${jsonPath})`,
     number: `SAFE_CAST(JSON_VALUE(payload, ${jsonPath}) AS FLOAT64)`,
@@ -77,24 +91,73 @@ function fieldExpression(field: SchemaFieldDef): string {
     object: `JSON_QUERY(payload, ${jsonPath})`,
     array: `JSON_QUERY(payload, ${jsonPath})`,
   };
-  return `${byType[field.type]} AS \`${name}\``;
+  return byType[type];
 }
 
-/** Which schema kinds get an auto-generated mart view — measures and entities are what registered metrics name as their `table`; events already land in the dbt-built `events` core table. Exported (not just kept local to `schema-mart.service.ts`) so `schema-registry.service.ts` can gate its own reserved-field-name check (see {@link MART_INTRINSIC_COLUMNS}) on the same kinds, rather than maintaining a second copy of this list that could drift. */
+/** BigQuery expression extracting one declared field from the `payload` envelope's own field sub-object (see {@link FIELD_ENVELOPE_OBJECT}), typed per the schema's own field type. */
+function fieldExpression(field: SchemaFieldDef, kind: SchemaDefKind): string {
+  const name = assertMartSafe(field.name, 'column');
+  return `${typedJsonExpression(field.type, `'$.${FIELD_ENVELOPE_OBJECT[kind]}.${name}'`)} AS \`${name}\``;
+}
+
+/** Which schema kinds get an auto-generated mart view — measures and entities are what registered metrics name as their `table`; events already land in the dbt-built `events` core table. Exported (not just kept local to `schema-mart.service.ts`) so `schema-registry.service.ts` can gate its own reserved-field-name check (see {@link martIntrinsicColumnNames}) on the same kinds, rather than maintaining a second copy of this list that could drift. */
 export const MART_KINDS: readonly SchemaDefKind[] = ['measure', 'entity'];
 
+interface MartIntrinsicColumn {
+  name: string;
+  /** The type a registered metric can rely on for this column — `metric-registry.service.ts` validates an aggregation's `column`/`timeColumn` against these alongside the schema's declared fields. */
+  type: SchemaFieldType;
+  /** SQL for the column: a bare `stg_raw_records` column, or an extraction out of the envelope. */
+  sql: string;
+}
+
+/** Carried by every mart regardless of kind: real `stg_raw_records` columns, selected through as-is. */
+const COMMON_MART_INTRINSIC_COLUMNS: readonly MartIntrinsicColumn[] = [
+  { name: 'organization_id', type: 'string', sql: 'organization_id' },
+  { name: 'project_id', type: 'string', sql: 'project_id' },
+  { name: 'environment_id', type: 'string', sql: 'environment_id' },
+  { name: 'client_id', type: 'string', sql: 'client_id' },
+  { name: 'landed_at', type: 'timestamp', sql: 'landed_at' },
+];
+
 /**
- * The columns every mart view carries alongside a schema's own declared
- * fields (see `buildMartViewSql` below) — a measure/entity schema declaring
- * a field with one of these names would make the generated view's SELECT
- * list carry two columns sharing a name, which BigQuery rejects outright
- * (`CREATE OR REPLACE VIEW` fails, so the schema registers but its mart
- * never syncs). `schema-registry.service.ts`'s `validateFields` rejects the
- * collision at registration time instead, using this exact list, so it's
- * exported here rather than duplicated as a second hard-coded array that
- * could silently drift out of sync with the columns actually emitted below.
+ * A measure's envelope (`{measure, ts, value, dimensions}`) carries the
+ * number the measure is *about* and its event time outside `dimensions` —
+ * and `docs/api/ingest.md` §3 tells users not to declare `value` as a schema
+ * field or put it in `dimensions`. So without these two, a measure mart
+ * built exactly as the docs prescribe has no numeric column to `sum`/`avg`
+ * at all, and its only time column is ingest-time `landed_at` (bucketing a
+ * backfilled measure on the day it was uploaded rather than the day it
+ * describes).
  */
-export const MART_INTRINSIC_COLUMNS: readonly string[] = ['organization_id', 'project_id', 'environment_id', 'client_id', 'landed_at'];
+const MEASURE_MART_INTRINSIC_COLUMNS: readonly MartIntrinsicColumn[] = [
+  { name: 'value', type: 'number', sql: `${typedJsonExpression('number', "'$.value'")} AS \`value\`` },
+  { name: 'ts', type: 'timestamp', sql: `${typedJsonExpression('timestamp', "'$.ts'")} AS \`ts\`` },
+];
+
+function martIntrinsicColumnsForKind(kind: SchemaDefKind): readonly MartIntrinsicColumn[] {
+  return kind === 'measure' ? [...COMMON_MART_INTRINSIC_COLUMNS, ...MEASURE_MART_INTRINSIC_COLUMNS] : COMMON_MART_INTRINSIC_COLUMNS;
+}
+
+/**
+ * The columns a mart view of this kind carries alongside the schema's own
+ * declared fields (see `buildMartViewSql` below) — a schema declaring a field
+ * with one of these names would make the generated view's SELECT list carry
+ * two columns sharing a name, which BigQuery rejects outright (`CREATE OR
+ * REPLACE VIEW` fails, so the schema registers but its mart never syncs).
+ * `schema-registry.service.ts`'s `validateFields` rejects the collision at
+ * registration time instead, using this exact list, so it's derived from the
+ * emitted columns rather than duplicated as a second hard-coded array that
+ * could silently drift.
+ */
+export function martIntrinsicColumnNames(kind: SchemaDefKind): readonly string[] {
+  return martIntrinsicColumnsForKind(kind).map((column) => column.name);
+}
+
+/** The intrinsic columns' names and types, for validating a registered metric's `column`/`timeColumn` against the relation the mart actually exposes. */
+export function martIntrinsicColumnTypes(kind: SchemaDefKind): ReadonlyMap<string, SchemaFieldType> {
+  return new Map(martIntrinsicColumnsForKind(kind).map((column) => [column.name, column.type]));
+}
 
 export interface BuildMartViewSqlParams {
   organizationId: string;
@@ -127,17 +190,28 @@ export interface BuildMartViewSqlParams {
  * org/project/environment predicates keep working unchanged; the WHERE also
  * bakes org+project in as defense in depth (a query that somehow skipped the
  * tenant predicate still can't see another project's rows through this
- * view). {@link MART_INTRINSIC_COLUMNS} ride along so entities keep an id and
- * every mart has a usable time column even when the schema declares none.
+ * view). The intrinsic columns ({@link martIntrinsicColumnNames}) ride along
+ * so entities keep an id and every mart has a usable time column even when
+ * the schema declares none.
  */
 export function buildMartViewSql(params: BuildMartViewSqlParams): string {
   const dataset = assertMartSafe(params.dataset, 'dataset');
   const viewName = martViewName(params.organizationId, params.projectId, params.schemaName);
-  const fieldSelects = params.fieldDefs.map((field) => `  ${fieldExpression(field)}`);
+  const fieldSelects = params.fieldDefs.map((field) => `  ${fieldExpression(field, params.kind)}`);
+  // A schema registered before its kind's reserved-name check existed can
+  // still declare a field named like an intrinsic column. Emitting both would
+  // put two same-named columns in the SELECT and BigQuery would reject the
+  // whole view, so the declared field wins — it's the one already-registered
+  // metrics resolve against, and `martIntrinsicColumnTypes`' callers resolve
+  // the same way.
+  const declaredNames = new Set(params.fieldDefs.map((field) => field.name));
+  const intrinsicSelects = martIntrinsicColumnsForKind(params.kind)
+    .filter((column) => !declaredNames.has(column.name))
+    .map((column) => `  ${column.sql}`);
   return [
     `CREATE OR REPLACE VIEW \`${dataset}.${viewName}\` AS`,
     'SELECT',
-    [...MART_INTRINSIC_COLUMNS.map((column) => `  ${column}`), ...fieldSelects].join(',\n'),
+    [...intrinsicSelects, ...fieldSelects].join(',\n'),
     `FROM \`${dataset}.stg_raw_records\``,
     `WHERE kind = '${params.kind}' AND schema_name = '${assertMartSafe(params.schemaName, 'schema name')}'`,
     `  AND organization_id = '${assertLiteralSafe(params.organizationId, 'organization id')}' AND project_id = '${assertLiteralSafe(params.projectId, 'project id')}'`,
