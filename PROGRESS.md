@@ -48,6 +48,15 @@ Template for each entry:
     conversions=1` — the full touchpoint → identity → attribution → landing-page chain resolving
     correctly, conversion attributed.
   - Scheduled `dbt-refresh` job image rebuilt twice so hourly ticks carry both changes.
+  - **Operational lesson (cost a false "verified" report):** the scheduled job runs a BAKED image,
+    and its dbt models are FULL TABLE REBUILDS — so an hourly tick on a stale image silently
+    CLOBBERS correct data. Exactly that happened: a local build produced the correct landing-page
+    row at ~19:00Z, the 19:00:03Z scheduled tick (still on the pre-fix image) overwrote it back to
+    `(unknown)`, and session B read the regressed state minutes after the "verified" message.
+    **Rule going forward: rebuild + repoint the `dbt-refresh` job image in the same breath as any
+    merged dbt change, and verify from a JOB execution, not a local run.** Final state confirmed
+    this way: `/pricing | brand | paid_search | visitors=1 | conversions=1`, produced by the
+    scheduled service itself.
 - **In progress (exact stopping point):** session B verifying the pack's Landing page performance
   board renders 1/1/100%, and re-checking the ad-side tiles (unaffected by the envelope bug — mart
   views read raw payload directly — but worth confirming).
