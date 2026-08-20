@@ -6,7 +6,7 @@ import { resolveDefaultQueryEnvironment } from './organization.service';
 import { getActiveMetricDefinition, listMetricDefinitionsForProject } from './metric-registry.service';
 import { checkProjectQueryQuota, recordQueryCostLogEntry, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { defaultMetricQueryResultCache, type MetricQueryResultCache } from '../warehouse/result-cache';
-import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import { defaultWarehouseQueryExecutor, supportsQueryStats, WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 
 /** Default TTL for a cached query result — the plan gives no specific number, so this picks a value short enough that a metric evolving mid-day doesn't stay stale for long, while still absorbing the AC's own "p95 < 1.5s on cached" repeat-request burst (e.g. a dashboard's several tiles re-querying the same window seconds apart). */
 export const DEFAULT_METRIC_QUERY_CACHE_TTL_SECONDS = 60;
@@ -87,9 +87,10 @@ async function logCostAttempt(
   projectId: string,
   outcome: Parameters<typeof recordQueryCostLogEntry>[0]['outcome'],
   definitionRefs: Record<string, string>,
+  estimatedCostUsd?: number | null,
 ): Promise<void> {
   try {
-    await recordQueryCostLogEntry({ organizationId, projectId, outcome, definitionRefs });
+    await recordQueryCostLogEntry({ organizationId, projectId, outcome, definitionRefs, estimatedCostUsd });
   } catch {
     // Best-effort — see this function's own doc comment.
   }
@@ -116,6 +117,14 @@ async function logCostAttempt(
  * throws — is logged as `'executed'`: it cleared the guardrail and reached
  * the executor, which is what the quota counts against, regardless of
  * whether the executor itself then succeeded or failed.
+ *
+ * On a successful execution, an executor that also implements
+ * `WarehouseQueryExecutorWithStats` (the real `BigQueryWarehouseQueryExecutor`,
+ * KAN-18) is called via `executeWithStats` instead of `execute`, so its
+ * reported cost estimate can ride along into the logged entry's
+ * `estimated_cost_usd` — every other executor (every test fake, and the
+ * default `NotConfiguredWarehouseQueryExecutor`, which never reaches this
+ * branch anyway) keeps logging `null`, unchanged.
  */
 export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQueryResult> {
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
@@ -144,9 +153,17 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
   }
 
   try {
-    const series = await executor.execute(compiled);
+    let series: WarehouseRow[];
+    let estimatedCostUsd: number | null = null;
+    if (supportsQueryStats(executor)) {
+      const executed = await executor.executeWithStats(compiled);
+      series = executed.rows;
+      estimatedCostUsd = executed.stats.estimatedCostUsd;
+    } else {
+      series = await executor.execute(compiled);
+    }
     cache.set(cacheKey, series, cacheTtlSeconds);
-    await logCostAttempt(params.organizationId, params.projectId, 'executed', compiled.definitionRefs);
+    await logCostAttempt(params.organizationId, params.projectId, 'executed', compiled.definitionRefs, estimatedCostUsd);
     return { series, definitionRefs: compiled.definitionRefs, cacheHit: false };
   } catch (error) {
     const outcome = error instanceof WarehouseNotConfiguredError ? 'warehouse_not_configured' : 'executed';

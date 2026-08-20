@@ -1,6 +1,47 @@
 import { BigQuery } from '@google-cloud/bigquery';
 import type { CompiledMetricQuery, CompilerParamValue } from '@growthos/shared';
-import { WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from './query-executor';
+import { WarehouseQueryFailedError, type WarehouseQueryExecutorWithStats, type WarehouseQueryStats, type WarehouseRow } from './query-executor';
+
+/**
+ * BigQuery's public on-demand analysis price as of this writing — $6.25 per
+ * TiB scanned (see https://cloud.google.com/bigquery/pricing#analysis_pricing_models).
+ * A best-effort estimate only: ignores the free monthly tier, flat-rate/
+ * reservation pricing, and any org-specific discount, matching the "honest
+ * estimate, not fabricated precision" posture `QueryCostLogEntryModel`'s own
+ * doc comment already established for this field.
+ */
+const ON_DEMAND_USD_PER_TEBIBYTE = 6.25;
+const BYTES_PER_TEBIBYTE = 2 ** 40;
+
+function estimateOnDemandCostUsd(bytesProcessed: number | undefined): number | null {
+  if (bytesProcessed === undefined || !Number.isFinite(bytesProcessed) || bytesProcessed < 0) {
+    return null;
+  }
+  return (bytesProcessed / BYTES_PER_TEBIBYTE) * ON_DEMAND_USD_PER_TEBIBYTE;
+}
+
+/**
+ * BigQuery's `GetQueryResultsResponse` (the REST response `query()` resolves
+ * through — verified against the real `@google-cloud/bigquery@9.0.2` source:
+ * `Job#getQueryResults` calls back `(err, rows, nextQuery, apiResponse)`, and
+ * `@google-cloud/promisify` turns every non-error callback arg into an array
+ * when there's more than one, i.e. `[rows, nextQuery, apiResponse]` — the
+ * response `createRealBigQueryClient` normalizes into {@link BigQueryQueryClient}'s
+ * own second tuple slot) includes `totalBytesProcessed` as a stringified
+ * int64 alongside the rows — this reads it off that slot without assuming
+ * any other shape from it.
+ */
+function extractBytesProcessed(response: unknown): number | undefined {
+  if (!response || typeof response !== 'object') {
+    return undefined;
+  }
+  const raw = (response as Record<string, unknown>).totalBytesProcessed;
+  if (typeof raw !== 'string' && typeof raw !== 'number') {
+    return undefined;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
 
 /**
  * The exact option shape this executor passes to a BigQuery query call —
@@ -25,11 +66,24 @@ export interface BigQueryQueryClient {
   query(options: BigQueryQueryOptions): Promise<[Record<string, unknown>[], unknown?]>;
 }
 
-/** Wraps a real `@google-cloud/bigquery` `BigQuery` instance behind {@link BigQueryQueryClient}. */
+/**
+ * Wraps a real `@google-cloud/bigquery` `BigQuery` instance behind
+ * {@link BigQueryQueryClient}. `bigquery.query()` itself promise-resolves to
+ * a 3-element array — `[rows, nextQuery, apiResponse]`, per
+ * `@google-cloud/promisify`'s array-of-remaining-callback-args behavior for
+ * `Job#getQueryResults`'s `(err, rows, nextQuery, apiResponse)` callback —
+ * not the 2-element `[rows, apiResponse]` `BigQueryQueryClient` narrows down
+ * to; this normalizes that discrepancy right here at the SDK boundary
+ * (dropping the middling `nextQuery`, which this executor never paginates
+ * through) rather than leaking the SDK's own tuple shape into every caller.
+ */
 export function createRealBigQueryClient(projectId?: string): BigQueryQueryClient {
   const bigquery = new BigQuery(projectId ? { projectId } : undefined);
   return {
-    query: (options) => bigquery.query(options) as unknown as Promise<[Record<string, unknown>[], unknown?]>,
+    query: async (options) => {
+      const [rows, , apiResponse] = (await bigquery.query(options)) as unknown as [Record<string, unknown>[], unknown, unknown];
+      return [rows, apiResponse];
+    },
   };
 }
 
@@ -52,7 +106,7 @@ export interface BigQueryWarehouseQueryExecutorConfig {
  * param infers `STRING`, a `readonly string[]` infers `ARRAY<STRING>`,
  * matching every `IN UNNEST(@param)` the compiler emits for an `in` filter).
  */
-export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutor {
+export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutorWithStats {
   private readonly client: BigQueryQueryClient;
 
   private readonly dataset: string;
@@ -69,9 +123,20 @@ export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutor {
   }
 
   async execute(query: CompiledMetricQuery): Promise<WarehouseRow[]> {
-    let rows: Record<string, unknown>[];
+    const { rows } = await this.runQuery(query);
+    return rows;
+  }
+
+  async executeWithStats(query: CompiledMetricQuery): Promise<{ rows: WarehouseRow[]; stats: WarehouseQueryStats }> {
+    const { rows, response } = await this.runQuery(query);
+    return { rows, stats: { estimatedCostUsd: estimateOnDemandCostUsd(extractBytesProcessed(response)) } };
+  }
+
+  private async runQuery(query: CompiledMetricQuery): Promise<{ rows: WarehouseRow[]; response: unknown }> {
+    let rawRows: Record<string, unknown>[];
+    let response: unknown;
     try {
-      [rows] = await this.client.query({
+      [rawRows, response] = await this.client.query({
         query: query.sql,
         params: toBigQueryParams(query.params),
         defaultDataset: { datasetId: this.dataset, ...(this.datasetProjectId ? { projectId: this.datasetProjectId } : {}) },
@@ -88,7 +153,7 @@ export class BigQueryWarehouseQueryExecutor implements WarehouseQueryExecutor {
       const message = error instanceof Error ? error.message : String(error);
       throw new WarehouseQueryFailedError(`BigQuery rejected the compiled metric query: ${message}`, error);
     }
-    return rows.map(normalizeRow);
+    return { rows: rawRows.map(normalizeRow), response };
   }
 }
 

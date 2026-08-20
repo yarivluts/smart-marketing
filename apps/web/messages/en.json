@@ -565,6 +565,8 @@
     "logEntrySummary": "{outcome} · {executedAt}",
     "logEntryDefinitions": "Metrics: {definitions}",
     "logEntryNoDefinitions": "No metric definitions recorded for this attempt.",
+    "logEntryCost": "Estimated cost: {cost}",
+    "logEntryCostUnknown": "Estimated cost: not available",
     "logCapNote": "Showing the {count} most recent query cost log entries.",
     "outcomeExecuted": "Executed",
     "outcomeBlockedQuotaExceeded": "Blocked — quota exceeded",

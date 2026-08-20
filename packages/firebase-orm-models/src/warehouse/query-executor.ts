@@ -15,6 +15,30 @@ export interface WarehouseQueryExecutor {
   execute(query: CompiledMetricQuery): Promise<WarehouseRow[]>;
 }
 
+/** Per-execution metadata a {@link WarehouseQueryExecutorWithStats} can report alongside a query's rows — currently just a cost estimate (KAN-39), but shaped to grow (e.g. row/byte counts) without another interface bump. */
+export interface WarehouseQueryStats {
+  /** Best-effort dollar cost of this one execution, when the executor can compute one from the warehouse's own reported usage (e.g. BigQuery's bytes-processed x its on-demand list price) — `null` when the executor supports stats in general but couldn't determine a cost for this particular call. */
+  estimatedCostUsd: number | null;
+}
+
+/**
+ * An optional richer capability a {@link WarehouseQueryExecutor} MAY also
+ * implement: run the query and report {@link WarehouseQueryStats} alongside
+ * its rows, so a caller like `queryMetrics` can log a real per-query cost
+ * estimate (KAN-39) instead of always logging `null`. Kept as a separate,
+ * optional interface — rather than changing `execute`'s own return shape —
+ * so every executor that has no stats to report (`NotConfiguredWarehouseQueryExecutor`,
+ * every test fake) needs no change at all.
+ */
+export interface WarehouseQueryExecutorWithStats extends WarehouseQueryExecutor {
+  executeWithStats(query: CompiledMetricQuery): Promise<{ rows: WarehouseRow[]; stats: WarehouseQueryStats }>;
+}
+
+/** Narrows a plain {@link WarehouseQueryExecutor} to {@link WarehouseQueryExecutorWithStats} when it actually implements the optional `executeWithStats` method. */
+export function supportsQueryStats(executor: WarehouseQueryExecutor): executor is WarehouseQueryExecutorWithStats {
+  return typeof (executor as Partial<WarehouseQueryExecutorWithStats>).executeWithStats === 'function';
+}
+
 export class WarehouseNotConfiguredError extends Error {
   constructor() {
     super('Warehouse query execution is not configured yet — no BigQuery project exists until KAN-18 provisions one.');

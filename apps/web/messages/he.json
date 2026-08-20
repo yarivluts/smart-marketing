@@ -565,6 +565,8 @@
     "logEntrySummary": "{outcome} · {executedAt}",
     "logEntryDefinitions": "מדדים: {definitions}",
     "logEntryNoDefinitions": "לא נרשמו הגדרות מדדים עבור ניסיון זה.",
+    "logEntryCost": "עלות משוערת: {cost}",
+    "logEntryCostUnknown": "עלות משוערת: לא זמינה",
     "logCapNote": "מוצגות {count} רשומות יומן העלות האחרונות.",
     "outcomeExecuted": "בוצע",
     "outcomeBlockedQuotaExceeded": "נחסם — חריגה ממכסה",

@@ -16,6 +16,8 @@ import {
   setProjectCostQuota,
   WarehouseNotConfiguredError,
   type WarehouseQueryExecutor,
+  type WarehouseQueryExecutorWithStats,
+  type WarehouseQueryStats,
   type WarehouseRow,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -48,6 +50,20 @@ class FakeWarehouseQueryExecutor implements WarehouseQueryExecutor {
   execute(): Promise<WarehouseRow[]> {
     this.callCount += 1;
     return Promise.resolve(this.rows);
+  }
+}
+
+/** Same as {@link FakeWarehouseQueryExecutor} but also implements `executeWithStats`, standing in for the real `BigQueryWarehouseQueryExecutor` (KAN-18) to prove `queryMetrics` actually threads a real cost estimate into the logged entry rather than always logging `null`. */
+class FakeWarehouseQueryExecutorWithStats implements WarehouseQueryExecutorWithStats {
+  public callCount = 0;
+  constructor(private readonly rows: WarehouseRow[], private readonly estimatedCostUsd: number | null) {}
+  execute(): Promise<WarehouseRow[]> {
+    this.callCount += 1;
+    return Promise.resolve(this.rows);
+  }
+  executeWithStats(): Promise<{ rows: WarehouseRow[]; stats: WarehouseQueryStats }> {
+    this.callCount += 1;
+    return Promise.resolve({ rows: this.rows, stats: { estimatedCostUsd: this.estimatedCostUsd } });
   }
 }
 
@@ -251,6 +267,56 @@ describe('queryMetrics', () => {
     expect(entries).toHaveLength(1);
     expect(entries[0].outcome).toBe('executed');
     expect(entries[0].definition_refs).toEqual({ ad_spend: 'metric:ad_spend@v1' });
+    expect(entries[0].estimated_cost_usd).toBeNull();
+  });
+
+  it('logs the executor-reported estimated cost when the executor supports query stats (KAN-39, real BigQuery)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Cost Log Stats Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutorWithStats([{ bucket_date: '2026-01-01', ad_spend: 100 }], 1.23);
+
+    const result = await queryMetrics({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(result.series).toEqual([{ bucket_date: '2026-01-01', ad_spend: 100 }]);
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].estimated_cost_usd).toBe(1.23);
+  });
+
+  it('logs null when a stats-capable executor could not determine a cost for this call', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Cost Log Stats Null Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutorWithStats([{ bucket_date: '2026-01-01', ad_spend: 100 }], null);
+
+    await queryMetrics({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
     expect(entries[0].estimated_cost_usd).toBeNull();
   });
 

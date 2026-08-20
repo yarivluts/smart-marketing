@@ -5,7 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { checkProjectQueryQuota, getProjectCostQuota, listOrgProjects, listQueryCostLogEntriesForProject } from '@/lib/orgs/queries';
-import { formatLabels, outcomeLabelKey, toProjectCostQuotaView, toQueryCostLogEntryView } from '@/lib/orgs/cost-guardrail-view';
+import { formatEstimatedCostUsd, formatLabels, outcomeLabelKey, toProjectCostQuotaView, toQueryCostLogEntryView } from '@/lib/orgs/cost-guardrail-view';
 import { SetCostQuotaForm } from '@/components/orgs/set-cost-quota-form';
 
 type PageProps = Readonly<{
@@ -95,6 +95,9 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
                   {Object.keys(entry.definitionRefs).length > 0
                     ? t('logEntryDefinitions', { definitions: Object.values(entry.definitionRefs).join(', ') })
                     : t('logEntryNoDefinitions')}
+                </span>
+                <span className="text-muted-foreground">
+                  {entry.estimatedCostUsd !== null ? t('logEntryCost', { cost: formatEstimatedCostUsd(entry.estimatedCostUsd) }) : t('logEntryCostUnknown')}
                 </span>
               </li>
             ))}

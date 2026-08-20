@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import type { CompiledMetricQuery } from '@growthos/shared';
 import { BigQueryWarehouseQueryExecutor } from './bigquery-query-executor';
 import {
   defaultWarehouseQueryExecutor,
   NotConfiguredWarehouseQueryExecutor,
   readWarehouseEnvConfig,
   resolveWarehouseQueryExecutorFromEnv,
+  supportsQueryStats,
   WarehouseNotConfiguredError,
+  type WarehouseQueryExecutor,
+  type WarehouseRow,
 } from './query-executor';
 
 describe('NotConfiguredWarehouseQueryExecutor', () => {
@@ -48,5 +52,39 @@ describe('resolveWarehouseQueryExecutorFromEnv', () => {
     expect(
       resolveWarehouseQueryExecutorFromEnv({ GOOGLE_CLOUD_PROJECT: 'growthos-g2w84', GROWTHOS_BIGQUERY_CORE_DATASET: 'growthos_core' }),
     ).toBeInstanceOf(BigQueryWarehouseQueryExecutor);
+  });
+});
+
+class PlainExecutor implements WarehouseQueryExecutor {
+  execute(): Promise<WarehouseRow[]> {
+    return Promise.resolve([]);
+  }
+}
+
+describe('supportsQueryStats', () => {
+  it('is false for an executor with no executeWithStats method (e.g. NotConfiguredWarehouseQueryExecutor, a plain test fake)', () => {
+    expect(supportsQueryStats(new NotConfiguredWarehouseQueryExecutor())).toBe(false);
+    expect(supportsQueryStats(new PlainExecutor())).toBe(false);
+  });
+
+  it('is true for the real BigQueryWarehouseQueryExecutor', () => {
+    const executor = new BigQueryWarehouseQueryExecutor({
+      client: { query: async () => [[]] },
+      dataset: 'growthos_core',
+    });
+    expect(supportsQueryStats(executor)).toBe(true);
+  });
+
+  it('narrows the type so executeWithStats is callable without a cast', async () => {
+    const executor: WarehouseQueryExecutor = new BigQueryWarehouseQueryExecutor({
+      client: { query: async () => [[{ ad_spend: 1 }]] },
+      dataset: 'growthos_core',
+    });
+    const compiled: CompiledMetricQuery = { sql: 'SELECT 1', params: {} };
+    expect(supportsQueryStats(executor)).toBe(true);
+    if (supportsQueryStats(executor)) {
+      const { rows } = await executor.executeWithStats(compiled);
+      expect(rows).toEqual([{ ad_spend: 1 }]);
+    }
   });
 });

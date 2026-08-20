@@ -3,14 +3,14 @@ import type { CompiledMetricQuery } from '@growthos/shared';
 import { BigQueryWarehouseQueryExecutor, type BigQueryQueryClient, type BigQueryQueryOptions } from './bigquery-query-executor';
 import { WarehouseQueryFailedError } from './query-executor';
 
-function fakeClient(rows: Record<string, unknown>[]): { client: BigQueryQueryClient; calls: BigQueryQueryOptions[] } {
+function fakeClient(rows: Record<string, unknown>[], response?: unknown): { client: BigQueryQueryClient; calls: BigQueryQueryOptions[] } {
   const calls: BigQueryQueryOptions[] = [];
   return {
     calls,
     client: {
       query: async (options) => {
         calls.push(options);
-        return [rows];
+        return [rows, response];
       },
     },
   };
@@ -99,6 +99,75 @@ describe('BigQueryWarehouseQueryExecutor', () => {
   });
 });
 
+describe('BigQueryWarehouseQueryExecutor.executeWithStats', () => {
+  it('estimates cost from the response totalBytesProcessed at $6.25/TiB', async () => {
+    // 1 TiB exactly, so the estimate should land exactly on the documented per-TiB price.
+    const { client } = fakeClient([{ ad_spend: 100 }], { totalBytesProcessed: String(2 ** 40) });
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { rows, stats } = await executor.executeWithStats(compiled);
+
+    expect(rows).toEqual([{ ad_spend: 100 }]);
+    expect(stats.estimatedCostUsd).toBeCloseTo(6.25, 10);
+  });
+
+  it('scales linearly with a fractional-TiB byte count', async () => {
+    const { client } = fakeClient([], { totalBytesProcessed: String(2 ** 39) }); // 0.5 TiB
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeCloseTo(3.125, 10);
+  });
+
+  it('accepts a numeric totalBytesProcessed, not just a stringified one', async () => {
+    const { client } = fakeClient([], { totalBytesProcessed: 2 ** 40 });
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeCloseTo(6.25, 10);
+  });
+
+  it('reports a null estimate when the response has no totalBytesProcessed', async () => {
+    const { client } = fakeClient([], {});
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeNull();
+  });
+
+  it('reports a null estimate when the client returns no second response element at all', async () => {
+    const { client } = fakeClient([]);
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeNull();
+  });
+
+  it('reports a null estimate for a non-numeric totalBytesProcessed instead of throwing or returning NaN', async () => {
+    const { client } = fakeClient([], { totalBytesProcessed: 'not-a-number' });
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeNull();
+  });
+
+  it('still wraps a BigQuery-side rejection in WarehouseQueryFailedError', async () => {
+    const client: BigQueryQueryClient = {
+      query: async () => {
+        throw new Error('Not found: Table growthos-g2w84:growthos_core.fact_ad_spend was not found');
+      },
+    };
+    const executor = new BigQueryWarehouseQueryExecutor({ client, dataset: 'growthos_core' });
+
+    await expect(executor.executeWithStats(compiled)).rejects.toThrow(WarehouseQueryFailedError);
+  });
+});
+
 describe('createRealBigQueryClient', () => {
   it('constructs a BigQuery client scoped to the given project id', async () => {
     vi.resetModules();
@@ -112,6 +181,48 @@ describe('createRealBigQueryClient', () => {
 
     expect(bigQueryCtor).toHaveBeenCalledWith({ projectId: 'growthos-g2w84' });
     expect(queryMock).toHaveBeenCalledWith({ query: 'SELECT 1' });
+
+    vi.doUnmock('@google-cloud/bigquery');
+    vi.resetModules();
+  });
+
+  it('normalizes the real SDK\'s 3-element [rows, nextQuery, apiResponse] resolution into [rows, apiResponse] — the exact shape a real bigquery.query() call resolves to (verified against @google-cloud/bigquery@9.0.2\'s own Job#getQueryResults callback + @google-cloud/promisify)', async () => {
+    vi.resetModules();
+    const apiResponse = { totalBytesProcessed: String(2 ** 40), schema: {}, jobComplete: true };
+    // The real SDK's query() promise-resolves [rows, nextQuery, apiResponse] — nextQuery
+    // (here `null`, no further pages) sits at index 1, NOT the response object.
+    const queryMock = vi.fn().mockResolvedValue([[{ ad_spend: 100 }], null, apiResponse]);
+    const bigQueryCtor = vi.fn().mockImplementation(() => ({ query: queryMock }));
+    vi.doMock('@google-cloud/bigquery', () => ({ BigQuery: bigQueryCtor }));
+
+    const { createRealBigQueryClient: createRealBigQueryClientFresh } = await import('./bigquery-query-executor');
+    const client = createRealBigQueryClientFresh('growthos-g2w84');
+    const [rows, response] = await client.query({ query: 'SELECT 1' });
+
+    expect(rows).toEqual([{ ad_spend: 100 }]);
+    // The regression this guards: reading index 1 (nextQuery, `null`) instead
+    // of index 2 (the real apiResponse) would silently make every real cost
+    // estimate come back null forever.
+    expect(response).toBe(apiResponse);
+
+    vi.doUnmock('@google-cloud/bigquery');
+    vi.resetModules();
+  });
+
+  it('feeds a real end-to-end estimated cost through BigQueryWarehouseQueryExecutor.executeWithStats via the normalized client', async () => {
+    vi.resetModules();
+    const apiResponse = { totalBytesProcessed: String(2 ** 40) };
+    const queryMock = vi.fn().mockResolvedValue([[{ ad_spend: 100 }], null, apiResponse]);
+    const bigQueryCtor = vi.fn().mockImplementation(() => ({ query: queryMock }));
+    vi.doMock('@google-cloud/bigquery', () => ({ BigQuery: bigQueryCtor }));
+
+    const { createRealBigQueryClient: createRealBigQueryClientFresh, BigQueryWarehouseQueryExecutor: ExecutorFresh } = await import('./bigquery-query-executor');
+    const client = createRealBigQueryClientFresh('growthos-g2w84');
+    const executor = new ExecutorFresh({ client, dataset: 'growthos_core' });
+
+    const { stats } = await executor.executeWithStats(compiled);
+
+    expect(stats.estimatedCostUsd).toBeCloseTo(6.25, 10);
 
     vi.doUnmock('@google-cloud/bigquery');
     vi.resetModules();
