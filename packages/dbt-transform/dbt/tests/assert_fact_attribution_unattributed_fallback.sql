@@ -1,5 +1,7 @@
--- BigQuery-disabled alongside the identity/attribution chain it tests --
--- see stg_identity_key_observations.sql's own config comment.
+-- DuckDB-only: uses the `with cte(cols) as (values ...)` form BigQuery
+-- rejects, and/or asserts fixture-seed semantics -- the chain itself now
+-- builds on BigQuery too (envelope-fields leg), these assertions just
+-- can't run there.
 {{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. `proj_1`'s `cust_1` signup
 -- and activated events (`seeds/raw_records.csv`) have no registered identity
