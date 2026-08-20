@@ -6,7 +6,7 @@ select
     environment_id,
     schema_name as event_type,
     client_id as entity_id,
-    payload as properties,
+    properties,
     occurred_at,
     landed_at
 from {{ ref('stg_events') }}
