@@ -6,6 +6,7 @@ import {
   createOrganizationWithOwner,
   ensureUserForFirebaseSession,
   inviteMemberToOrganization,
+  listAuditLogEntriesForOrg,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST } from './route';
@@ -102,6 +103,12 @@ describe('POST /api/orgs/[orgId]/projects', () => {
     const { request, params } = projectRequest(organization.id, { name: 'Website' });
     const response = await POST(request, { params });
     expect(response.status).toBe(201);
-    expect(await response.json()).toMatchObject({ projectId: expect.any(String) });
+    const { projectId } = (await response.json()) as { projectId: string };
+    expect(projectId).toEqual(expect.any(String));
+
+    const auditEntries = await listAuditLogEntriesForOrg(organization.id);
+    expect(auditEntries).toContainEqual(
+      expect.objectContaining({ action: 'project.create', target_id: projectId, actor_id: owner.id }),
+    );
   });
 });

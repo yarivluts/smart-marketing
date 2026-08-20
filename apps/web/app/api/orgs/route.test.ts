@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { listMembershipsWithOrganizations } from '@growthos/firebase-orm-models';
+import { listAuditLogEntriesForOrg, listMembershipsWithOrganizations } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST } from './route';
 
@@ -79,6 +79,11 @@ describe('POST /api/orgs', () => {
     const memberships = await listMembershipsWithOrganizations(user.id);
     expect(memberships).toContainEqual(
       expect.objectContaining({ organizationId, role: 'org_owner', status: 'active' }),
+    );
+
+    const auditEntries = await listAuditLogEntriesForOrg(organizationId);
+    expect(auditEntries).toContainEqual(
+      expect.objectContaining({ action: 'organization.create', target_id: organizationId, actor_id: user.id }),
     );
   });
 });

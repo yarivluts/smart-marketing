@@ -13,6 +13,7 @@ import {
   inviteMemberToOrganization,
   InviteNotFoundError,
   LastOwnerError,
+  listAuditLogEntriesForOrg,
   listEnvironmentsForProject,
   listMembershipsForUser,
   listMembershipsWithOrganizations,
@@ -71,6 +72,26 @@ describe('createOrganizationWithOwner', () => {
     expect(bindings).toHaveLength(1);
     expect(bindings[0].role).toBe('org_owner');
   });
+
+  it('records an organization.create audit log entry (KAN-44)', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('audit-owner'),
+    });
+
+    const { organization } = await createOrganizationWithOwner({ name: 'Audited Org', ownerUserId: owner.id });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        action: 'organization.create',
+        target_type: 'organization',
+        target_id: organization.id,
+        actor_id: owner.id,
+        actor_type: 'user',
+      }),
+    );
+  });
 });
 
 describe('cross-org membership listing', () => {
@@ -107,6 +128,45 @@ describe('createProject', () => {
 
     const projects = await listOrgProjects(organization.id);
     expect(projects.map((p) => p.id)).toContain(project.id);
+  });
+
+  it('records a project.create audit log entry when a creator is given (KAN-44)', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('project-audit-owner'),
+    });
+    const { organization } = await createOrganizationWithOwner({ name: 'Project Audit Org', ownerUserId: owner.id });
+
+    const { project } = await createProject({
+      organizationId: organization.id,
+      name: 'Audited Project',
+      createdByUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        action: 'project.create',
+        target_type: 'project',
+        target_id: project.id,
+        project_id: project.id,
+        actor_id: owner.id,
+        actor_type: 'user',
+      }),
+    );
+  });
+
+  it('does not record an audit log entry when no creator is given (test-fixture callers)', async () => {
+    const owner = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: uniqueEmail('project-no-audit-owner'),
+    });
+    const { organization } = await createOrganizationWithOwner({ name: 'No Audit Project Org', ownerUserId: owner.id });
+
+    const { project } = await createProject({ organizationId: organization.id, name: 'Unaudited Project' });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.some((entry) => entry.action === 'project.create' && entry.target_id === project.id)).toBe(false);
   });
 });
 

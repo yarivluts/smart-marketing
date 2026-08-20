@@ -85,7 +85,7 @@ describe('GET /api/orgs/[orgId]/audit-log', () => {
     expect((await GET(request, { params })).status).toBe(403);
   });
 
-  it('lets an org_owner list an empty audit log', async () => {
+  it('lets an org_owner list an audit log with just its own organization.create entry', async () => {
     const ownerSession = await sessionFor(unique('uid'), uniqueEmail('audit-empty-owner'));
     const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
     const { organization } = await createOrganizationWithOwner({ name: 'Audit Empty Org', ownerUserId: owner.id });
@@ -94,7 +94,10 @@ describe('GET /api/orgs/[orgId]/audit-log', () => {
     const { request, params } = auditLogRequest(organization.id);
     const response = await GET(request, { params });
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ entries: [], chain: { valid: true, entryCount: 0 } });
+    const body = (await response.json()) as { entries: Array<Record<string, unknown>>; chain: { valid: boolean; entryCount: number } };
+    expect(body.entries).toHaveLength(1);
+    expect(body.entries[0]).toMatchObject({ action: 'organization.create', actorId: owner.id });
+    expect(body.chain).toEqual({ valid: true, entryCount: 1 });
   });
 
   it('surfaces an entry recorded by another service (mintApiKey) with a valid chain', async () => {
@@ -118,8 +121,9 @@ describe('GET /api/orgs/[orgId]/audit-log', () => {
     const response = await GET(request, { params });
     expect(response.status).toBe(200);
     const body = (await response.json()) as { entries: Array<Record<string, unknown>>; chain: { valid: boolean; entryCount: number } };
-    expect(body.entries).toHaveLength(1);
+    // Newest first: the api_key.mint entry, then this test's own organization.create entry.
+    expect(body.entries).toHaveLength(2);
     expect(body.entries[0]).toMatchObject({ action: 'api_key.mint', actorId: owner.id, projectId: project.id });
-    expect(body.chain).toEqual({ valid: true, entryCount: 1 });
+    expect(body.chain).toEqual({ valid: true, entryCount: 2 });
   });
 });

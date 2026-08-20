@@ -10,7 +10,7 @@ interface RouteParams {
 /** Creates a project in an org — requires `project.manage` at the org scope. */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'project.manage');
+  const { user, error } = await requireOrgPermission(orgId, 'project.manage');
   if (error) {
     return error;
   }
@@ -24,6 +24,6 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return NextResponse.json({ error: 'name_required' }, { status: 400 });
   }
 
-  const { project } = await createProject({ organizationId: orgId, name: name.trim() });
+  const { project } = await createProject({ organizationId: orgId, name: name.trim(), createdByUserId: user.id });
   return NextResponse.json({ projectId: project.id }, { status: 201 });
 }
