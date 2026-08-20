@@ -28,7 +28,7 @@ select
     schema_name,
     client_id as entity_id,
     {{ surrogate_key(['organization_id', 'project_id', 'environment_id', 'schema_name', 'client_id']) }} as entity_key,
-    payload as properties,
+    attributes as properties,
     landed_at as last_seen_at
 from ranked
 where recency_rank = 1

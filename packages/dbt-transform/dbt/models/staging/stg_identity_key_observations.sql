@@ -39,8 +39,8 @@ with event_records as (
             {{ growthos_try_cast(json_text_field('payload', "'ts'"), dbt.type_timestamp()) }},
             landed_at
         ) as observed_at,
-        {{ json_text_field('payload', "'anon_id'") }} as anon_id_value,
-        {{ json_text_field('payload', "'customer_id'") }} as customer_id_value
+        {{ json_text_field(json_object_field('payload', "'properties'"), "'anon_id'") }} as anon_id_value,
+        {{ json_text_field(json_object_field('payload', "'properties'"), "'customer_id'") }} as customer_id_value
     from {{ ref('stg_raw_records') }}
     where kind = 'event'
 )
@@ -97,13 +97,13 @@ select
         r.landed_at
     ) as observed_at,
     f.field_name,
-    {{ json_text_field('r.payload', 'f.field_name') }} as field_value
+    {{ json_text_field(json_object_field('r.payload', "'properties'"), 'f.field_name') }} as field_value
 from {{ ref('stg_raw_records') }} r
 inner join {{ ref('schema_identity_fields') }} f
     on r.organization_id = f.organization_id
     and r.project_id = f.project_id
     and r.kind = f.kind
     and r.schema_name = f.schema_name
-where {{ json_text_field('r.payload', 'f.field_name') }} is not null
+where {{ json_text_field(json_object_field('r.payload', "'properties'"), 'f.field_name') }} is not null
 
 {% endif %}
