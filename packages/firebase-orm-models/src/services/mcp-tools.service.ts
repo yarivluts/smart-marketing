@@ -3,6 +3,7 @@ import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
 import { getOnboardingState } from './onboarding.service';
+import { runQuotaGatedWarehouseQuery } from './cost-guardrail.service';
 
 /**
  * Read-only data adapters backing three of the MCP server's tools (KAN-75,
@@ -19,7 +20,11 @@ import { getOnboardingState } from './onboarding.service';
  * `{ sql, params }`, so this is legitimate reuse of that interface's own
  * contract, not a new escape hatch bypassing it. Each throws
  * `WarehouseNotConfiguredError` in an environment with no warehouse wired up
- * (the default until KAN-18 provisions a real BigQuery project).
+ * (the default until KAN-18 provisions a real BigQuery project), and — since
+ * KAN-39 — `ProjectQueryQuotaExceededError` once the project has spent its
+ * daily query quota (`runQuotaGatedWarehouseQuery`, same guardrail
+ * `queryMetrics` enforces); both are already mapped to a caller-readable MCP
+ * tool error by `apps/api`'s `describeMetricsError`.
  */
 
 export class InvalidMcpToolRequestError extends Error {
@@ -115,7 +120,9 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
   }
 
   const sql = `SELECT entity_id, schema_name, properties, last_seen_at FROM entities WHERE ${filters.join(' AND ')} ORDER BY last_seen_at DESC LIMIT ${limit}`;
-  const rows = await executor.execute({ sql, params: queryParams });
+  const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'search_customers' }, () =>
+    executor.execute({ sql, params: queryParams }),
+  );
   return rows.map(rowToCustomerResult);
 }
 
@@ -172,7 +179,9 @@ export async function queryProjectCohortRetention(params: QueryProjectCohortRete
   }
 
   const sql = `SELECT cohort_month, period_number, cohort_size, retained_count, retention_rate FROM fact_cohort_retention WHERE ${filters.join(' AND ')} ORDER BY cohort_month DESC, period_number ASC LIMIT ${limit}`;
-  const rows = await executor.execute({ sql, params: queryParams });
+  const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'query_cohort' }, () =>
+    executor.execute({ sql, params: queryParams }),
+  );
   return rows.map(rowToCohortRetentionRow);
 }
 
@@ -255,7 +264,9 @@ export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsPar
   filters.push(`event_type IN (${boundSchemaParams.join(', ')})`);
 
   const sql = `SELECT event_type, COUNT(DISTINCT entity_id) AS customer_count FROM events WHERE ${filters.join(' AND ')} GROUP BY event_type`;
-  const rows = await executor.execute({ sql, params: queryParams });
+  const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'query_funnel' }, () =>
+    executor.execute({ sql, params: queryParams }),
+  );
 
   const countByEventType = new Map<string, number>();
   for (const row of rows) {

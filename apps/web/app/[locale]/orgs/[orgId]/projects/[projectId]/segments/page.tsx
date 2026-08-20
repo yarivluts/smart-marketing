@@ -102,7 +102,9 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
                       ? t('memberCount', { count: memberCountView.count })
                       : memberCountView?.kind === 'warehouse_not_configured'
                         ? t('memberCountNotConfigured')
-                        : t('memberCountError')}
+                        : memberCountView?.kind === 'quota_exceeded'
+                          ? t('memberCountQuotaExceeded')
+                          : t('memberCountError')}
                   </div>
                 </li>
               );

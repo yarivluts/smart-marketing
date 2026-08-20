@@ -845,6 +845,7 @@
     "createError": "Could not create the segment. Please try again.",
     "memberCount": "{count, plural, one {# member} other {# members}}",
     "memberCountNotConfigured": "Member count unavailable (warehouse not configured yet)",
+    "memberCountQuotaExceeded": "Member count unavailable (daily query quota reached)",
     "memberCountError": "Member count unavailable",
     "deleteConfirm": "Delete this segment? This cannot be undone.",
     "deleteButton": "Delete",

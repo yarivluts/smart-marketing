@@ -7,6 +7,7 @@ import { recordAuditLogEntry } from './audit-log.service';
 import { getActiveSchemaDefinition } from './schema-registry.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { escapeLikePattern } from './mcp-tools.service';
+import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor } from '../warehouse/query-executor';
 
 export class InvalidSegmentError extends Error {
@@ -199,10 +200,10 @@ export interface CountSegmentMembersParams {
   executor?: WarehouseQueryExecutor;
 }
 
-/** Mirrors `GoalProgressOutcome`/`BoardTileQueryOutcome`'s exact shape and reason vocabulary — a segment's member-count badge degrades on the segments page the same way a goal thermometer or board tile does, rather than crashing the page, for the same expected-not-buggy failure modes (no warehouse yet, or the warehouse rejected the query). Unlike those two, there is no cost-guardrail quota check here — `countSegmentMembers` reuses `mcp-tools.service.ts`'s own hand-written-SQL-over-`WarehouseQueryExecutor` convention (bypassing `queryMetrics`, and so its quota enforcement) rather than `board.service.ts`/`goal.service.ts`'s `queryMetrics`-wrapping one, since a segment count isn't a registered metric query; wiring quota enforcement into that whole hand-written-SQL family (also `searchProjectCustomers`/`queryProjectCohortRetention`/`queryProjectFunnelSteps`) is a separate, larger, not-yet-scoped follow-up. */
+/** Mirrors `GoalProgressOutcome`/`BoardTileQueryOutcome`'s exact shape and reason vocabulary — a segment's member-count badge degrades on the segments page the same way a goal thermometer or board tile does, rather than crashing the page, for the same expected-not-buggy failure modes (no warehouse yet, the project's spent its daily query quota, or the warehouse rejected the query). Since KAN-39's quota guardrail was wired into this whole hand-written-SQL family (`runQuotaGatedWarehouseQuery` — also used by `searchProjectCustomers`/`queryProjectCohortRetention`/`queryProjectFunnelSteps`), `quota_exceeded` degrades the same way `queryBoardTile`/`queryGoalProgress` already do rather than throwing outright — the segments page can't "fail the whole page" the way an MCP tool call can just error out. */
 export type SegmentMemberCountOutcome =
   | { ok: true; count: number }
-  | { ok: false; reason: 'warehouse_not_configured' | 'query_error'; message: string };
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
 
 /**
  * Counts how many `entities` rows (KAN-37's canonical current-state table)
@@ -241,11 +242,16 @@ export async function countSegmentMembers(params: CountSegmentMembersParams): Pr
 
   const sql = `SELECT COUNT(*) AS member_count FROM entities WHERE ${filters.join(' AND ')}`;
   try {
-    const rows = await executor.execute({ sql, params: queryParams });
+    const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'count_segment_members' }, () =>
+      executor.execute({ sql, params: queryParams }),
+    );
     return { ok: true, count: Number(rows[0]?.member_count ?? 0) };
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { ok: false, reason: 'warehouse_not_configured', message: error.message };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded', message: error.message };
     }
     if (error instanceof WarehouseQueryFailedError) {
       return { ok: false, reason: 'query_error', message: error.message };

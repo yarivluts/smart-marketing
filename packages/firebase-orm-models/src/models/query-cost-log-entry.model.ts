@@ -17,11 +17,14 @@ export const QUERY_COST_LOG_OUTCOMES = ['executed', 'blocked_quota_exceeded', 'w
 export type QueryCostLogOutcome = (typeof QUERY_COST_LOG_OUTCOMES)[number];
 
 /**
- * One `queryMetrics` call's cost-guardrail log entry (KAN-39, plan `13
- * §E4.3`: "query cost logging"). Append-only, one entry per non-cache-hit
- * call — a cache hit incurs no real (or would-be) warehouse cost, so it's
- * never logged here, mirroring why it also never touches the daily quota
- * count.
+ * One warehouse-query attempt's cost-guardrail log entry (KAN-39, plan `13
+ * §E4.3`: "query cost logging") — a `queryMetrics` call, or a hand-written-SQL
+ * read gated by `runQuotaGatedWarehouseQuery` (`cost-guardrail.service.ts`).
+ * Append-only, one entry per non-cache-hit call — a cache hit incurs no real
+ * (or would-be) warehouse cost, so it's never logged here, mirroring why it
+ * also never touches the daily quota count. (Only `queryMetrics` has a result
+ * cache to hit at all — every hand-written-SQL read gated by
+ * `runQuotaGatedWarehouseQuery` logs on every call.)
  */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/query_cost_log_entries',
@@ -37,7 +40,15 @@ export class QueryCostLogEntryModel extends BaseModel {
   @Field({ is_required: true })
   public outcome!: QueryCostLogOutcome;
 
-  /** `metric:<name>@v<version>` per metric the query depended on — the same shape `queryMetrics` already returns as `definitionRefs`. */
+  /**
+ * `metric:<name>@v<version>` per metric the query depended on, for a
+ * `queryMetrics` call — the same shape it already returns as
+ * `definitionRefs`. For a hand-written-SQL warehouse read gated by
+ * `runQuotaGatedWarehouseQuery` (`cost-guardrail.service.ts`) instead — a
+ * customer search, a cohort/funnel query, a segment's live member count —
+ * there's no metric definition to name, so this identifies which read ran
+ * instead (e.g. `{ tool: 'search_customers' }`).
+ */
   @Field({ is_required: true })
   public definition_refs!: Record<string, string>;
 
