@@ -17,6 +17,55 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-60 follow-up closed: board settings/tiles/delete now audit-log (PR #110)
+
+- **Last completed:**
+  - Re-checked `TASKS.md` top to bottom: every KAN-17..KAN-78 row is still `done`/`in-progress`/
+    `needs-human`/`blocked-by`, no `todo` row exists — consistent with the last several runs. Per
+    the now-established "mine `done` rows' own named follow-up gaps" approach, picked **KAN-60**'s
+    own row: it explicitly named `updateBoardSettings`/`saveBoardTiles`/`deleteBoard` as not
+    audit-logged, unlike `createBoard` and every sibling in-place-update/delete surface in this
+    codebase (`updateWinRule`/`deleteWinRule`, `deleteGoal`, `setProjectCostQuota`, schema/metric-def
+    evolve, ...).
+  - **PR #110**: wired all three into `recordAuditLogEntry` (`board.settings_update` /
+    `board.tiles_save` / `board.delete`), same best-effort `try {...} catch {}` pattern the rest of
+    `board.service.ts`/this package already uses. `deleteBoard` gained a `deletedByUserId` parameter
+    (threaded through its one caller, the board `DELETE` route, via `apps/web/lib/orgs/mutations.ts`)
+    the same way `deleteGoal`/`deleteWinRule` already take one; corrected its doc comment's "a board
+    ... has no audit-trail requirement of its own" claim, which was inconsistent with those same
+    goal/win-rule siblings' own doc comments. No admin UI changes needed — the KAN-44 org audit-log
+    page already renders any `action`/`summary` generically (verified by reading it, not assumed).
+  - New assertions added to `board.emulator.test.ts` for all three actions against the real
+    Firestore emulator. `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green locally
+    before opening the PR (firebase-orm-models 844/844; apps/web 916 unit + 23/24 e2e green, the one
+    failure — `resource-library.spec.ts` — a pre-existing, previously-documented Playwright timing
+    flake unrelated to this change, passed on its automatic retry).
+  - Note on this run's own starting state: this container's local `main` branch ref was badly stale
+    (~50 commits behind `origin/main`, diverged rather than a fast-forward — last real work on it
+    was PR #80). `origin/main`'s content matched the real, current `PROGRESS.md`/`TASKS.md` already
+    on disk at session start (up through PR #108), so branched directly off `origin/main` rather than
+    trying to reconcile the stale local ref. Worth a human's attention if it recurs: something about
+    this container's git state isn't tracking `origin/main` reliably between sessions.
+  - Branch `kan-60-board-audit-log-gaps`, PR #110, CI green (`success`), merged into `main` by Yariv
+    directly from the PR (this run had scheduled a check-in to merge it itself but the human beat it
+    to it — confirmed via `merged_by`). `main` now at `85a9117`. Branch not deleted — same known,
+    pre-existing limitation this file has documented since 2026-07-04 (no delete-branch GitHub MCP
+    tool available in this session).
+- **In progress (exact stopping point):** none — PR merged, `main` green.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's per-command-approved interactive session or
+  external approval.
+- **Next step:** same "mine the follow-up notes on `done` rows" approach still has candidates for a
+  future run, all code-only and infra-free: KAN-26's noted apps/api 404-vs-403 gap (still not
+  actionable — apps/api has no org-scoped routes yet); KAN-56's unported `schema_identity_fields`
+  seed (would need a real warehouse export design, not a quick follow-up). Also re-check open PRs
+  and whether Yariv has weighed in on the still-unanswered KAN-38 "Run now" unattended-prod-write
+  policy question from run 11.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — KAN-54 follow-up closed: apply a saved field mapping to a delivery for real (PR #109)
 
 - **Last completed:**
