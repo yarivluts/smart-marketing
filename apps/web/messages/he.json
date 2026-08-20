@@ -280,6 +280,7 @@
     "mcpConnectionActiveLabel": "מחובר",
     "mcpConnectionPendingLabel": "אושר — ממתין להשלמת החיבור על ידי הלקוח",
     "mcpConnectionRevokedLabel": "בוטל",
+    "mcpConnectionRevokedDueToTokenReuseLabel": "בוטל אוטומטית — טוקן רענון של חיבור זה נעשה בו שימוש חוזר לאחר סבב החלפה, סימן אפשרי לגניבה",
     "mcpConnectionLastUsedLabel": "שימוש אחרון {lastUsedAt}",
     "mcpConnectionNeverUsedLabel": "מעולם לא נעשה בו שימוש",
     "mcpConnectionGrantedLabel": "אושר בתאריך {createdAt}",

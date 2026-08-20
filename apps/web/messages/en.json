@@ -280,6 +280,7 @@
     "mcpConnectionActiveLabel": "Connected",
     "mcpConnectionPendingLabel": "Approved — waiting for the client to finish connecting",
     "mcpConnectionRevokedLabel": "Revoked",
+    "mcpConnectionRevokedDueToTokenReuseLabel": "Revoked automatically — a refresh token for this connection was reused after rotation, a possible sign of theft",
     "mcpConnectionLastUsedLabel": "Last used {lastUsedAt}",
     "mcpConnectionNeverUsedLabel": "Never used",
     "mcpConnectionGrantedLabel": "Granted {createdAt}",

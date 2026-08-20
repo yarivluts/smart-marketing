@@ -72,6 +72,23 @@ export class McpOAuthGrantModel extends BaseModel {
   @Field()
   public refresh_token_expires_at?: string;
 
+  /**
+   * Every refresh-token hash this grant has ever rotated *out of* — appended
+   * to (never removed from) on each rotation in `mintTokenPair`, right
+   * before `refresh_token_hash` is overwritten with the newly-minted one.
+   * `refreshMcpAccessToken` checks a presented token against this array
+   * whenever it isn't the current live one: a match means someone is
+   * replaying a refresh token that was already rotated away, the classic
+   * OAuth 2.1 §4.3.1 "refresh token reuse" theft signal, and the whole grant
+   * is revoked immediately rather than just rejecting that one request.
+   * Unbounded growth is not a practical concern: an access token is only
+   * good for an hour, so even a client that refreshes every single time it
+   * expires accrues on the order of a few hundred entries before the
+   * refresh token's own 30-day TTL ends the grant's rotation history.
+   */
+  @Field()
+  public used_refresh_token_hashes?: string[];
+
   @Field({ is_required: true })
   public created_at!: string;
 

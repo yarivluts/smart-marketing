@@ -227,6 +227,9 @@ function mintTokenPair(grant: McpOAuthGrantModel, now: Date): { accessToken: str
   const refreshToken = generateOpaqueSecret(TOKEN_BYTES);
   grant.access_token_hash = hashSecret(accessToken);
   grant.access_token_expires_at = new Date(now.getTime() + ACCESS_TOKEN_TTL_MS).toISOString();
+  if (grant.refresh_token_hash) {
+    grant.used_refresh_token_hashes = [...(grant.used_refresh_token_hashes ?? []), grant.refresh_token_hash];
+  }
   grant.refresh_token_hash = hashSecret(refreshToken);
   grant.refresh_token_expires_at = new Date(now.getTime() + REFRESH_TOKEN_TTL_MS).toISOString();
   return { accessToken, refreshToken };
@@ -243,7 +246,8 @@ export type McpOAuthTokenFailureReason =
   | 'invalid_client'
   | 'invalid_grant'
   | 'invalid_code_verifier'
-  | 'grant_revoked';
+  | 'grant_revoked'
+  | 'refresh_token_reuse_detected';
 
 export interface McpOAuthTokenFailure {
   reason: McpOAuthTokenFailureReason;
@@ -265,6 +269,12 @@ async function findGrantByCodeHash(codeHash: string): Promise<McpOAuthGrantModel
 
 async function findGrantByRefreshTokenHash(refreshTokenHash: string): Promise<McpOAuthGrantModel | undefined> {
   const matches = await McpOAuthGrantModel.query().where('refresh_token_hash', '==', refreshTokenHash).limit(1).get();
+  return matches[0];
+}
+
+/** Looks up a grant by a *rotated-out* refresh-token hash — used only to detect reuse of a stale token once {@link findGrantByRefreshTokenHash} has already failed to find it as the current one. */
+async function findGrantByUsedRefreshTokenHash(refreshTokenHash: string): Promise<McpOAuthGrantModel | undefined> {
+  const matches = await McpOAuthGrantModel.query().where('used_refresh_token_hashes', 'array-contains', refreshTokenHash).limit(1).get();
   return matches[0];
 }
 
@@ -329,14 +339,48 @@ export interface RefreshMcpAccessTokenParams {
   clientId: string;
 }
 
+/** `revoked_by` sentinel for an automated revocation with no acting human — distinguishes a reuse-triggered revoke from `revokeMcpOAuthGrant`'s always-a-real-user-id convention in the audit trail and grant-summary UI. */
+const REFRESH_TOKEN_REUSE_REVOKER = 'system:refresh-token-reuse-detected';
+
+/**
+ * A presented refresh token matched a hash in `used_refresh_token_hashes` —
+ * i.e. it was once live but has since been rotated away — rather than the
+ * grant's current one. Per OAuth 2.1 §4.3.1's refresh-token-reuse guidance,
+ * this is treated as a theft signal (not just an expired/stale request) and
+ * the entire grant is revoked immediately: both the legitimate client and
+ * whoever replayed the old token are locked out, forcing a fresh
+ * `/oauth/authorize` consent round-trip rather than silently trusting
+ * either party to be the real one.
+ */
+async function revokeGrantForRefreshTokenReuse(grant: McpOAuthGrantModel): Promise<void> {
+  grant.revoked_at = new Date().toISOString();
+  grant.revoked_by = REFRESH_TOKEN_REUSE_REVOKER;
+  await grant.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: grant.organization_id,
+      projectId: grant.project_id,
+      actorType: 'system',
+      actorId: REFRESH_TOKEN_REUSE_REVOKER,
+      action: 'mcp_oauth_grant.refresh_token_reuse_detected',
+      targetType: 'mcp_oauth_grant',
+      targetId: grant.id,
+      summary: `Revoked MCP connection (client ${grant.client_id}) after detecting reuse of a rotated-out refresh token`,
+    });
+  } catch {
+    // Best-effort — see the comment in issueMcpAuthorizationCode above.
+  }
+}
+
 /**
  * Rotates both the access and refresh token together (OAuth 2.1 §4.3.1
  * recommends refresh-token rotation for public clients) — the presented
- * `refreshToken` is invalidated the instant a new pair is minted, so a
- * stolen-and-replayed refresh token can be used at most once before the
- * legitimate client's next refresh silently invalidates it too (a
- * detectable "refresh token reuse" signal a future story could alert on;
- * not built here). Same not-transactional read-then-write caveat as
+ * `refreshToken` is invalidated the instant a new pair is minted. Replaying
+ * a since-rotated-out refresh token is detected via
+ * `used_refresh_token_hashes` and immediately revokes the whole grant (see
+ * {@link revokeGrantForRefreshTokenReuse}) rather than just rejecting that
+ * one request. Same not-transactional read-then-write caveat as
  * {@link exchangeMcpAuthorizationCode} above — two concurrent refreshes of
  * the exact same token would race on which write wins, so "used at most
  * once" is a design intent this doc comment states honestly, not a
@@ -345,8 +389,20 @@ export interface RefreshMcpAccessTokenParams {
 export async function refreshMcpAccessToken(
   params: RefreshMcpAccessTokenParams,
 ): Promise<Result<McpOAuthTokenResult, McpOAuthTokenFailure>> {
-  const grant = await findGrantByRefreshTokenHash(hashSecret(params.refreshToken));
+  const presentedHash = hashSecret(params.refreshToken);
+  const grant = await findGrantByRefreshTokenHash(presentedHash);
   if (!grant) {
+    const reusedGrant = await findGrantByUsedRefreshTokenHash(presentedHash);
+    if (reusedGrant && !reusedGrant.revoked_at) {
+      // Knowing the raw secret behind `presentedHash` is proof enough of reuse regardless of
+      // what client_id the request claims — revoke unconditionally rather than letting a
+      // mismatched client_id dodge the theft response.
+      await revokeGrantForRefreshTokenReuse(reusedGrant);
+      return err({
+        reason: 'refresh_token_reuse_detected',
+        message: 'This refresh token was already rotated out. The authorization has been revoked as a precaution.',
+      });
+    }
     return err({ reason: 'invalid_grant', message: 'Unknown refresh token.' });
   }
   if (grant.revoked_at) {
@@ -442,6 +498,8 @@ export interface McpOAuthGrantSummary {
   createdAt: string;
   lastUsedAt?: string;
   revokedAt?: string;
+  /** True when `revokedAt` was set by {@link revokeGrantForRefreshTokenReuse} (a detected stolen/replayed refresh token) rather than a human clicking "Revoke" — the admin UI surfaces this as a security warning instead of the generic "revoked" label. */
+  revokedDueToTokenReuse: boolean;
   /**
    * Whether this grant is currently usable: a code was redeemed for an
    * access token at some point (not still "pending" — a grant approved on
@@ -469,6 +527,7 @@ function toGrantSummary(grant: McpOAuthGrantModel): McpOAuthGrantSummary {
     createdAt: grant.created_at,
     lastUsedAt: grant.last_used_at,
     revokedAt: grant.revoked_at,
+    revokedDueToTokenReuse: grant.revoked_by === REFRESH_TOKEN_REUSE_REVOKER,
     isActive: Boolean(grant.access_token_hash) && !grant.revoked_at && isLive,
   };
 }

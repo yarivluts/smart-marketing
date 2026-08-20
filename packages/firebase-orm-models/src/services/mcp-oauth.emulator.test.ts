@@ -319,6 +319,84 @@ describe('refreshMcpAccessToken', () => {
     const staleRefresh = await refreshMcpAccessToken({ refreshToken: exchanged.value.refreshToken, clientId: client.id });
     expect(staleRefresh.ok).toBe(false);
   });
+
+  it('detects reuse of a rotated-out refresh token and revokes the whole grant immediately', async () => {
+    const { owner, organization, project } = await setupProjectWithOwner('Refresh Reuse Org');
+    const client = await setupClient();
+    const { codeVerifier, codeChallenge } = makePkcePair();
+
+    const { code, grant } = await issueMcpAuthorizationCode({
+      clientId: client.id,
+      redirectUri: client.redirect_uris[0],
+      codeChallenge,
+      codeChallengeMethod: 'S256',
+      organizationId: organization.id,
+      projectId: project.id,
+      grantedByUserId: owner.id,
+    });
+    const exchanged = await exchangeMcpAuthorizationCode({ code, clientId: client.id, redirectUri: client.redirect_uris[0], codeVerifier });
+    if (!exchanged.ok) throw new Error('exchange failed');
+    const originalRefreshToken = exchanged.value.refreshToken;
+
+    // The legitimate client rotates once.
+    const refreshed = await refreshMcpAccessToken({ refreshToken: originalRefreshToken, clientId: client.id });
+    expect(refreshed.ok).toBe(true);
+    if (!refreshed.ok) return;
+
+    // An attacker (or a retry race) replays the now-rotated-out original refresh token.
+    const replay = await refreshMcpAccessToken({ refreshToken: originalRefreshToken, clientId: client.id });
+    expect(replay.ok).toBe(false);
+    if (!replay.ok) {
+      expect(replay.error.reason).toBe('refresh_token_reuse_detected');
+    }
+
+    // The whole grant is now revoked — even the legitimate client's freshly-rotated refresh token is dead.
+    const legitimateRetry = await refreshMcpAccessToken({ refreshToken: refreshed.value.refreshToken, clientId: client.id });
+    expect(legitimateRetry.ok).toBe(false);
+    if (!legitimateRetry.ok) {
+      expect(legitimateRetry.error.reason).toBe('grant_revoked');
+    }
+
+    const summaries = await listMcpOAuthGrantsForProject(organization.id, project.id);
+    const summary = summaries.find((s) => s.id === grant.id);
+    expect(summary?.revokedAt).toBeTruthy();
+    expect(summary?.revokedDueToTokenReuse).toBe(true);
+  });
+
+  it('does not treat a rotated-out token from an already-revoked grant as a fresh reuse detection', async () => {
+    const { owner, organization, project } = await setupProjectWithOwner('Refresh Reuse Already Revoked Org');
+    const client = await setupClient();
+    const { codeVerifier, codeChallenge } = makePkcePair();
+
+    const { code, grant } = await issueMcpAuthorizationCode({
+      clientId: client.id,
+      redirectUri: client.redirect_uris[0],
+      codeChallenge,
+      codeChallengeMethod: 'S256',
+      organizationId: organization.id,
+      projectId: project.id,
+      grantedByUserId: owner.id,
+    });
+    const exchanged = await exchangeMcpAuthorizationCode({ code, clientId: client.id, redirectUri: client.redirect_uris[0], codeVerifier });
+    if (!exchanged.ok) throw new Error('exchange failed');
+    const originalRefreshToken = exchanged.value.refreshToken;
+
+    const refreshed = await refreshMcpAccessToken({ refreshToken: originalRefreshToken, clientId: client.id });
+    expect(refreshed.ok).toBe(true);
+
+    await revokeMcpOAuthGrant({ organizationId: organization.id, projectId: project.id, grantId: grant.id, revokedByUserId: owner.id });
+
+    const replay = await refreshMcpAccessToken({ refreshToken: originalRefreshToken, clientId: client.id });
+    expect(replay.ok).toBe(false);
+    if (!replay.ok) {
+      expect(replay.error.reason).toBe('invalid_grant');
+    }
+
+    const summaries = await listMcpOAuthGrantsForProject(organization.id, project.id);
+    const summary = summaries.find((s) => s.id === grant.id);
+    // The manual revoke, not the later replay, is what revoked it — must not be misattributed.
+    expect(summary?.revokedDueToTokenReuse).toBe(false);
+  });
 });
 
 describe('revokeMcpOAuthGrant + listMcpOAuthGrantsForProject', () => {

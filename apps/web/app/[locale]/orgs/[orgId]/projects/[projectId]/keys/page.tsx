@@ -139,7 +139,9 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
                   <span className="text-muted-foreground">{t('mcpConnectionGrantedLabel', { createdAt: grant.createdAt })}</span>
                   <span className="text-muted-foreground">
                     {grant.revokedAt
-                      ? t('mcpConnectionRevokedLabel')
+                      ? grant.revokedDueToTokenReuse
+                        ? t('mcpConnectionRevokedDueToTokenReuseLabel')
+                        : t('mcpConnectionRevokedLabel')
                       : grant.isActive
                         ? grant.lastUsedAt
                           ? t('mcpConnectionLastUsedLabel', { lastUsedAt: grant.lastUsedAt })
