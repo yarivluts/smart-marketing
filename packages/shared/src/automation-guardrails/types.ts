@@ -12,7 +12,7 @@ export interface AutomationGuardrailPolicy {
   spendCeilingUsd: number | null;
   /** Target ids automation may never modify, regardless of any other guardrail. */
   protectedTargetIds: readonly string[];
-  /** UTC hour-of-day window automation may execute in. `startHourUtc > endHourUtc` means the window wraps past midnight. */
+  /** UTC hour-of-day window automation may execute in. `startHourUtc > endHourUtc` means the window wraps past midnight; `startHourUtc === endHourUtc` means unrestricted (24h), not a zero-width window. */
   allowedHours: { startHourUtc: number; endHourUtc: number } | null;
   /** Max automation actions this project may execute per UTC calendar day. */
   maxActionsPerDay: number | null;
