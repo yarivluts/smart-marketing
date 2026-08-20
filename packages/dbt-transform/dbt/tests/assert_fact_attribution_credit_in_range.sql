@@ -1,6 +1,3 @@
--- BigQuery-disabled alongside the identity/attribution chain it tests --
--- see stg_identity_key_observations.sql's own config comment.
-{{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. `credit` is a share of a
 -- conversion's total attribution weight -- both models here award a single
 -- touchpoint the whole conversion, but the column exists for the linear/

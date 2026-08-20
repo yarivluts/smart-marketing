@@ -54,15 +54,80 @@ Template for each entry:
     (`Received message larger than max`), not this change (which is `firebase-orm-models`-only). Confirmed
     a flake by re-running that exact test file in isolation under its own emulator: **6/6 pass**. The
     `firebase-orm-models` package's own tests are all green.
-- **In progress (exact stopping point):** PR #134 opened from branch `fix/mart-reserved-field-names`;
-  merge once CI is green, then delete the branch. This PROGRESS entry rides the same PR.
-- **Blocked + why:** unchanged standing items only.
-- **Next step:** land #134 once CI green. A future run should still **check open PRs first** (the
-  concurrent-session collision pattern persists — 3 open at this run's start). Remaining self-identified
-  headless-buildable follow-ups are thin now; deeper KAN-18/KAN-19 scope needs the interactive
-  per-command-approved GCP pattern, not a headless run.
+  - **Rebased onto `main` after #131/#132/#133 landed concurrently:** merged `origin/main` into this
+    branch; the only real conflict was this file (two entries both prepended at the top — resolved by
+    keeping both, this one first). `schema-registry.service.ts` auto-merged cleanly (this change's
+    `validateFields`/`MART_INTRINSIC_COLUMNS` work and #131's `validateAggregationAgainstRegisteredSchema`
+    touch disjoint parts of the file).
+- **In progress (exact stopping point):** PR #134 rebased onto current `main`; pushing now, then
+  waiting for CI (it never ran on the pre-rebase head — GitHub doesn't check a `dirty`-mergeable-state
+  PR — this is likely why: confirm CI actually starts post-push) before merging and deleting the branch.
+- **Blocked + why:** nothing but CI turnaround.
+- **Next step:** once #134 is green and merged, a future run should still **check open PRs first** (the
+  concurrent-session collision pattern persists — 4 PRs landed/open around this run). Remaining
+  self-identified headless-buildable follow-ups are thin now; deeper KAN-18/KAN-19 scope needs the
+  interactive per-command-approved GCP pattern, not a headless run. Also worth a look: #131's own entry
+  below flags that #133 ("identity/attribution chain on BigQuery") may have already closed the
+  `fact_landing_page_performance`/`lp_*` BigQuery gap it scoped out — unverified as of this entry.
 - **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
   live-infra sub-items).
+
+---
+
+## 2026-08-20 — Metric registry validates aggregation columns against custom-schema marts (PR #131)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked `list_pull_requests(state: open)`
+    first**: only **#128** (leap-day `computeCompareWindow` clamp) was open, owned by a concurrent
+    session — did not touch it.
+  - Dispatched a research agent at a flagged-but-unstarted `PROGRESS.md` follow-up: "`lp_*` metrics
+    need a real measure-schema redesign (`landing_page_visitor` is a 1-field entity schema with no
+    numeric fields)". It found the bug is more general than that one pack:
+    `registerMetricDefinition`/`evolveMetricDefinition` never validated an aggregation's
+    `column`/`timeColumn` against the actual fields of the custom (measure/entity) schema its `table`
+    resolves to at query time (`mapCustomSchemaTables` in `metrics-compiler.service.ts`) — a metric
+    naming a nonexistent column, or a `sum`/`avg` over a non-numeric field, registered cleanly and
+    only failed **silently at query time** (empty board tile, no diagnostic).
+  - **Fix (PR #131, branch `fix/metric-agg-schema-column-validation`):**
+    `metric-registry.service.ts` now looks up the active measure/entity schema matching an
+    aggregation's `table` name (new `getActiveMartSchemaByName` in `schema-registry.service.ts` — one
+    indexed two-equality-filter query) and validates `column`/`timeColumn` exist on it (plus the two
+    intrinsic mart columns, `client_id`/`landed_at`), requiring a numeric field for `sum`/`avg`. A
+    table matching no registered schema (a dbt core table like `fact_ad_spend`) is left unchecked,
+    mirroring the compiler's own scope. 7 new regression tests in `metric-registry.emulator.test.ts`,
+    including the exact `landing_page_visitor`-shaped case (entity schema, no numeric field, `sum`
+    rejected).
+  - **Caught during full-suite verification, not review:** an earlier two-query version (measure
+    lookup, then entity lookup) tipped 4 already-flaky `saas-metric-pack/default-boards.emulator.test`
+    cases (which register ~11 metrics each) over their 120s timeout under full-worker contention —
+    collapsed to the single `getActiveMartSchemaByName` query, full suite (912/912, 87/87 files) reran
+    clean with no timeouts.
+  - Verified before opening the PR: `pnpm lint`/`typecheck`/`build` green; `pnpm test` in
+    `firebase-orm-models` (full suite, real Firestore emulator via `firebase emulators:exec`) green.
+    Deliberately left the deeper root cause — `fact_landing_page_performance` (and the whole
+    identity/attribution dbt chain) being disabled on BigQuery pending a real `schema_identity_fields`
+    warehouse export — out of scope as a separately-tracked, much larger KAN-18 follow-up.
+  - **Merged 2026-08-20:** PR #131 squash-merged into `main` (`0b2028b`) after both required checks
+    (`lint · typecheck · test · build`, `terraform fmt · validate`) passed and `mergeable_state`
+    settled to `clean`; no review comments. Branch `fix/metric-agg-schema-column-validation` could
+    **not** be deleted from this scheduled run — the git-over-HTTPS push-delete hit the same proxy
+    HTTP 403 every prior merged branch has hit; harmless, a human can prune it.
+  - **Noted, not investigated further:** two other PRs landed on `main` concurrently with this run
+    (**#132** "codify every live Firestore composite index in firestore.indexes.json", **#133**
+    "identity/attribution chain on BigQuery via the fixed-path envelope leg") — #133's title strongly
+    suggests it ports the very `schema_identity_fields` warehouse export this run explicitly scoped
+    out of #131. A future run should confirm #133's actual scope against `fact_landing_page_performance`
+    before assuming the `enabled=(target.type == 'duckdb')` gate is fully lifted.
+- **In progress (exact stopping point):** none — #131 fully landed.
+- **Blocked + why:** unchanged standing items only.
+- **Next step:** confirm what #132/#133 actually delivered (their own PROGRESS.md entries weren't
+  present as of this run's start) before picking new work — #133 in particular may have already
+  closed the `lp_*`/`fact_landing_page_performance` BigQuery gap this run's own investigation flagged
+  as out of scope. If so, verify the "Landing page performance" board renders on a real project rather
+  than assuming from the PR title alone.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; prune the undeletable `fix/metric-agg-schema-column-validation` branch).
 
 ---
 

@@ -437,3 +437,25 @@ export async function getActiveSchemaDefinition(
   const active = await findActiveVersion(organizationId, projectId, kind, name);
   return active ?? null;
 }
+
+/**
+ * The active measure/entity schema registered under `name` in a project, or
+ * `null` — the schema whose auto-generated mart view (`warehouse/schema-mart.ts`)
+ * a metric's aggregation would actually query. One indexed query (two
+ * equality filters, so no composite index needed); a same-named `event`
+ * schema, which is not mart-backed, is filtered out in memory. `measure` is
+ * preferred over `entity` when both exist, matching the mart system's own
+ * measure-first fact orientation. Used by the metric registry to validate an
+ * aggregation's column against the mart that would back it.
+ */
+export async function getActiveMartSchemaByName(
+  organizationId: string,
+  projectId: string,
+  name: string,
+): Promise<SchemaDefModel | null> {
+  const matches = await SchemaDefModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('name', '==', name)
+    .where('status', '==', 'active')
+    .get();
+  return matches.find((def) => def.kind === 'measure') ?? matches.find((def) => def.kind === 'entity') ?? null;
+}
