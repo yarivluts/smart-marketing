@@ -17,6 +17,49 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Custom-schema marts shipped: the original marketing boards now render REAL data
+
+- **Last completed:** the full arc from "mart generation designed" to "Ad Creative Comparison
+  shows real CTR/CPC/spend computed from real ingested data, screenshot-verified" — Yariv's
+  original ask (campaigns / ad comparison / landing pages / ROI on real data) demonstrated end to
+  end, not just plumbing-proven.
+  - **PR #123 (merged + deployed):** generic mart generation — every ACTIVE measure/entity schema
+    gets an auto-generated BigQuery view over `stg_raw_records` (typed columns per declared field),
+    name-mangled per project (`m_<tenant hash>_<name>`, Yariv's architecture call), with the
+    compiler transparently rewriting metric table names; register/evolve keep views synced; a
+    "Sync warehouse views" button on the schema registry page is the backfill. Views are live
+    reads — board numbers update seconds after ingest, no dbt tick.
+  - **PR #124 (merged + deployed):** the shared metric editor's FIXED input ids were duplicated
+    across simultaneously-mounted instances (register + evolve forms), so label/id-driven input
+    landed in the wrong form's state — an evolve could silently submit the previous version's
+    aggregation. React useId per-instance + a two-instance regression test. (A follow-up
+    "second evolve bug" report was decoded as the QA script having the two instances swapped —
+    the prefilled-value tell + server-vs-client useId formats proved it; scoped-form targeting
+    confirmed evolve works.)
+  - **Mart-view qualification fix (merged + deployed):** a stored view's body resolves no
+    defaultDataset at query time, so the generator's unqualified `FROM stg_raw_records` broke
+    100% of mart-backed queries — caught by session-B via `bq show` on the live view. View name +
+    source now fully qualified from `GROWTHOS_BIGQUERY_CORE_DATASET`.
+  - **Missing composite index** (pipeline_messages: status+enqueued_at, needed by a concurrent
+    session's queued-sweep query) crashed the ingest-health page on first real traffic — created
+    live per the established gcloud methodology, page recovered.
+  - Session-B's closing verification: pushed real `ad_performance_daily` measures through ingest
+    (after self-caught payload-shape and env-key/date-range issues — the latter two being the
+    environment-isolation design working as intended), and the board lit up immediately:
+    CTR=0.05 (50/1000), CPC=1.51 (75.5/50), spend bar rendering — all correct, all live.
+- **In progress (exact stopping point):** none — the arc is closed and verified.
+- **Blocked + why:** nothing for this scope.
+- **Next step / follow-ups recorded:**
+  - Docs gap (real): the measures ingest shape genuinely differs from events (`measure` not
+    `schema`, required top-level `value`, dimension fields at top level not under `properties`)
+    and is undocumented — session B had to discover it by trial and error.
+  - `lp_*` metrics need a real measure-schema redesign (landing_page_visitor is a 1-field entity
+    schema with no numeric fields) — flagged, not started.
+  - Standing: KAN-43 (long-lead), Redis cost decision, physical env dataset split, query-cost
+    logging, Pub/Sub, staging.
+- **Waiting on human:** standing items only.
+
+
 ## 2026-08-20 — Metrics compiler: inclusive `end` date silently dropped the last day for timestamp time columns (PR #126)
 
 - **Last completed:**
