@@ -1,5 +1,6 @@
 'use client';
 
+import { useId } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -113,6 +114,16 @@ export interface MetricDefinitionEditorProps {
 /** The aggregation/formula/dimensions/filters builder (KAN-40) shared by the register and evolve metric-def forms. */
 export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEditorProps): React.ReactElement {
   const t = useTranslations('MetricRegistry');
+  // Per-instance id prefix: this editor is mounted more than once on the
+  // metric registry page (the always-present register form + any open
+  // evolve form(s)), and the previous fixed ids ("metric-def-table", ...)
+  // were duplicated across instances — a <label htmlFor>/getElementById hit
+  // whichever instance came first in the DOM, so typing via a label (or any
+  // id-driven automation) could edit one form while submitting another
+  // (session-B QA, 2026-08-20: an evolve submit silently carried the
+  // previous version's aggregation because the typed values landed in a
+  // different instance's state).
+  const idBase = useId();
 
   function updateFilter(index: number, patch: Partial<MetricFilterRow>): void {
     onChange({ ...state, filters: state.filters.map((filter, i) => (i === index ? { ...filter, ...patch } : filter)) });
@@ -125,11 +136,11 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
   return (
     <fieldset className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="metric-def-kind">
+        <label className="text-sm font-medium" htmlFor={`${idBase}-kind`}>
           {t('kindLabel')}
         </label>
         <select
-          id="metric-def-kind"
+          id={`${idBase}-kind`}
           value={state.kind}
           onChange={(event) => onChange({ ...state, kind: event.target.value as MetricDefinitionKindRow })}
           className="h-10 rounded-md border border-input bg-background px-2 text-sm"
@@ -145,10 +156,10 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
       {state.kind === 'aggregation' ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="metric-def-function">
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-function`}>
               {t('functionLabel')}
               <select
-                id="metric-def-function"
+                id={`${idBase}-function`}
                 value={state.aggFunction}
                 onChange={(event) => onChange({ ...state, aggFunction: event.target.value as MetricAggFunctionRow })}
                 className="h-10 rounded-md border border-input bg-background px-2 text-sm"
@@ -160,23 +171,23 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
                 ))}
               </select>
             </label>
-            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="metric-def-table">
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-table`}>
               {t('tableLabel')}
-              <Input id="metric-def-table" placeholder={t('tablePlaceholder')} value={state.table} onChange={(event) => onChange({ ...state, table: event.target.value })} />
+              <Input id={`${idBase}-table`} placeholder={t('tablePlaceholder')} value={state.table} onChange={(event) => onChange({ ...state, table: event.target.value })} />
             </label>
-            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="metric-def-column">
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-column`}>
               {t('columnLabel')}
               <Input
-                id="metric-def-column"
+                id={`${idBase}-column`}
                 placeholder={t('columnPlaceholder')}
                 value={state.column}
                 onChange={(event) => onChange({ ...state, column: event.target.value })}
               />
             </label>
-            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor="metric-def-time-column">
+            <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-time-column`}>
               {t('timeColumnLabel')}
               <Input
-                id="metric-def-time-column"
+                id={`${idBase}-time-column`}
                 placeholder={t('timeColumnPlaceholder')}
                 value={state.timeColumn}
                 onChange={(event) => onChange({ ...state, timeColumn: event.target.value })}
@@ -224,11 +235,11 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" htmlFor="metric-def-formula">
+          <label className="text-sm font-medium" htmlFor={`${idBase}-formula`}>
             {t('formulaLabel')}
           </label>
           <Input
-            id="metric-def-formula"
+            id={`${idBase}-formula`}
             placeholder={t('formulaPlaceholder')}
             value={state.formula}
             onChange={(event) => onChange({ ...state, formula: event.target.value })}
@@ -237,11 +248,11 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
       )}
 
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium" htmlFor="metric-def-dimensions">
+        <label className="text-sm font-medium" htmlFor={`${idBase}-dimensions`}>
           {t('dimensionsLabel')}
         </label>
         <Input
-          id="metric-def-dimensions"
+          id={`${idBase}-dimensions`}
           placeholder={t('dimensionsPlaceholder')}
           value={state.dimensions}
           onChange={(event) => onChange({ ...state, dimensions: event.target.value })}
