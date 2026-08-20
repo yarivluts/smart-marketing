@@ -17,6 +17,77 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-54 follow-up closed: apply a saved field mapping to a delivery for real (PR #109)
+
+- **Last completed:**
+  - Session start found `TASKS.md` in the now-familiar all-`done`-except-standing-blockers state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). Found and
+    reviewed **PR #108** (KAN-75's `query_funnel` MCP tool + `fact_funnel_step` dbt model) already
+    open — independently re-verified it locally (`pnpm lint/typecheck/test/build` all green on its
+    branch) and merged it. A concurrent run of this same session picked up the identical PR and
+    wrote its own PROGRESS.md entry (now directly above this one) in the same few-minute window —
+    same overlapping-schedule race this file has documented since 2026-07-04 (KAN-20) and
+    2026-08-19 (KAN-44). Only one merge landed (`fffc502`); no duplicate work, just a duplicate
+    write-up, left as-is rather than removed.
+  - With `TASKS.md` still showing zero `todo` rows, applied the same "mine the follow-up notes on
+    `done` rows" approach the last several runs established. Delegated a codebase-wide sweep
+    (Explore agent) for genuinely open, infra-free, single-PR-sized gaps, explicitly excluding
+    candidates already ruled out (KAN-26's apps/api 404-vs-403 gap — not actionable yet; KAN-56's
+    unported `schema_identity_fields` seed — needs a real warehouse-export design; KAN-60's "only
+    createBoard audit-logs" note — read `board.service.ts` myself first and found `deleteBoard`'s
+    own doc comment already declares boards need no audit trail, so that note looks superseded by a
+    deliberate decision, not a live gap). The agent's top candidate: KAN-54's own row said
+    `testRunFieldMapping` only ever previews a mapping — "test-run only (no auto-apply-to-delivery
+    yet)" — confirmed for real by reading `hook.service.ts`/`field-mapping.service.ts` myself
+    (`setHookDeliveryStatus`'s doc comment: "the human side of the review queue, since KAN-54's
+    mapping engine doesn't exist yet to consume these automatically" — stale, since KAN-54 does now
+    exist).
+  - **PR #109**: closed that gap. `field-mapping.service.ts` gained a `runFieldMapping` helper
+    factored out of `testRunFieldMapping`'s own body (a genuine reuse win, not just refactoring for
+    its own sake — it's what guarantees a preview and a real apply can never silently disagree about
+    validity) and a new `applyFieldMappingToDelivery` built on top of it: once validation comes back
+    clean, it feeds the mapped record through the existing `ingestBatch` (KAN-32/33) as a real
+    one-record batch and marks the delivery `reviewed` + a new `applied_at`/`applied_by`/
+    `applied_field_mapping_id`/`applied_batch_id` on `HookDeliveryModel`. Refuses a disabled mapping,
+    a discarded delivery, or re-applying an already-applied delivery (each a deliberate, tested
+    guard, not an oversight). New `POST .../field-mappings/[fieldMappingId]/apply` route in
+    `apps/web`, gated on `ingest.write` like every sibling route, covered by the existing KAN-26
+    isolation-guard test plus a new `isolation.test.ts` scenario. UI: an "Apply to delivery" button
+    appears on `TestRunFieldMappingPanel` once a test-run against a real selected delivery comes
+    back clean — shows the ingest accept/quarantine/duplicate summary and refreshes the page; the
+    Hooks review-queue page shows a small "Mapped and ingested (batch …)" note on an applied
+    delivery. New `en`/`he` translation keys (no hard-coded strings, no Hebrew in code).
+  - Test coverage: 5 new emulator tests for `applyFieldMappingToDelivery` (clean apply+ingest,
+    validation-failure leaves the delivery untouched, disabled mapping, discarded delivery,
+    already-applied), 8 new route tests, a new isolation scenario, and 5 new component tests for the
+    apply button (including the "re-validation disagreed with the earlier preview" edge case).
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green locally (ran the full suite,
+    not just the touched packages) before opening the PR, and again green in CI before merging.
+    Branch `kan-54-apply-field-mapping-to-delivery` merged, squash, into `main`. Remote branch
+    deletion failed with the same recurring HTTP 403 this file has documented since 2026-07-04 (not
+    new, needs a human with direct repo push access to clean up in bulk someday).
+- **In progress (exact stopping point):** none — clean stopping point, `main` green at `63b611c`.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's long-lead approval or per-command-approved
+  interactive session.
+- **Next step:** the "mine follow-up notes on `done` rows" approach is getting thinner but not dry —
+  remaining candidates a future run surfaced but didn't pursue this run: KAN-56's unported
+  `schema_identity_fields` seed (needs a real warehouse-export design, larger than a quick
+  follow-up); resource-attachment auto-approval for org-admin-pushed attachments
+  (`resource-library.service.ts`'s own doc comment on `requestResourceAttachment` flags it as
+  speculative — "once there's a UI need for it" — worth confirming that need exists before building
+  it); a metric-pack board-seeding retry/re-provision surface
+  (`metric-pack-dispatch.service.ts`'s own doc comment, also explicitly hedged as speculative). None
+  of these looked as clearly "real, mechanical, and wanted" as KAN-54's gap did — worth a future
+  run's own judgment call, or a fresh sweep, rather than assuming this list is exhaustive. Also
+  re-check each run: open PRs, and whether Yariv has weighed in on the still-open KAN-38 "Run now"
+  unattended-prod-write policy question from run 11 (may be moot given PR #105's scheduled-refresh
+  path, per 2026-08-19's entries, but still unconfirmed).
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — KAN-75 follow-up closed: query_funnel MCP tool + fact_funnel_step dbt model (PR #108); PR #107 (Yariv's own snippet-envelope fix) merged
 
 - **Last completed:**
