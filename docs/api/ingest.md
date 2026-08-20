@@ -140,7 +140,9 @@ separate object.
 - The schema family is the record's own **`measure`** value.
 - `dimensions` holds the schema-validated fields. The measure's numeric `value` is **not** a
   schema field — do not declare it on the measure schema, and do not put it inside
-  `dimensions`.
+  `dimensions`. The generated warehouse mart exposes the envelope's `value` and `ts` as
+  columns of their own, so a metric aggregates them directly (`column: "value"`,
+  `timeColumn: "ts"`); both names are reserved on a measure schema for that reason.
 - Measures carry no client id. Their dedup key is a natural key derived from
   `measure` + `ts` + canonicalized `dimensions`, so re-sending the identical aggregate is
   idempotent (see [§7](#7-idempotency--dedup)).

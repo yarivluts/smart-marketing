@@ -143,9 +143,10 @@ describe('registerSchemaDefinition', () => {
   it('rejects a measure/entity field name colliding with a mart view\'s own intrinsic column, but allows the same name on an event schema (which never gets a mart view)', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Schema Mart Reserved Field Org');
 
-    // `client_id` is one of `MART_INTRINSIC_COLUMNS` (warehouse/schema-mart.ts)
-    // — declaring it on a measure schema would make the generated mart
-    // view's own SELECT list carry two `client_id` columns.
+    // `client_id` is one of the mart's intrinsic columns
+    // (`martIntrinsicColumnNames`, warehouse/schema-mart.ts) — declaring it on
+    // a measure schema would make the generated mart view's own SELECT list
+    // carry two `client_id` columns.
     await expect(
       registerSchemaDefinition({
         organizationId: organization.id,
@@ -183,6 +184,33 @@ describe('registerSchemaDefinition', () => {
       createdByUserId: owner.id,
     });
     expect(eventSchema.field_defs.map((f) => f.name)).toEqual(['client_id']);
+  });
+
+  it('reserves the measure envelope\'s own value/ts on a measure schema only — an entity mart carries neither, so an entity may declare fields by those names', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Measure Envelope Reserved Field Org');
+
+    for (const name of ['value', 'ts']) {
+      await expect(
+        registerSchemaDefinition({
+          organizationId: organization.id,
+          projectId: project.id,
+          kind: 'measure',
+          name: 'ad_spend_daily',
+          fields: [{ name, type: 'number', isRequired: true, isPii: false, isIdentityKey: false }],
+          createdByUserId: owner.id,
+        }),
+      ).rejects.toThrow(InvalidSchemaDefinitionError);
+    }
+
+    const entitySchema = await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'contract',
+      fields: [{ name: 'value', type: 'number', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+    expect(entitySchema.field_defs.map((f) => f.name)).toEqual(['value']);
   });
 });
 
