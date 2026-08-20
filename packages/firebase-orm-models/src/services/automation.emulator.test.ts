@@ -158,6 +158,11 @@ describe('ensureAutomationTargetSeeded', () => {
     expect(second.id).toBe(first.id);
     expect(second.daily_budget_usd).toBe(100);
     expect(second.label).toBe('Summer Sale');
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const seedEntries = entries.filter((entry) => entry.action === 'automation_target.seed' && entry.target_id === first.id);
+    expect(seedEntries).toHaveLength(1);
+    expect(seedEntries[0].actor_id).toBe(owner.id);
   });
 
   it('lists every seeded target for a project', async () => {

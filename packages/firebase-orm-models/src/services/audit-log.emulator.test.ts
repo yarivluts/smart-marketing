@@ -50,8 +50,18 @@ async function setupProject(orgName: string) {
 }
 
 describe('recordAuditLogEntry: hash chain', () => {
-  it('links the first entry onto an empty prev_entry_hash, and the second entry onto the first', async () => {
+  it('links the first entry onto an empty prev_entry_hash, and every entry after onto the previous one', async () => {
     const { owner, organization } = await setupProject('Chain Org');
+
+    // `setupProject` -> `createOrganizationWithOwner` already wrote the org's
+    // genesis entry (`organization.create`, KAN-44 follow-up) — assert the
+    // empty-prev_entry_hash genesis behavior directly against it, rather than
+    // assuming this test's own first `recordAuditLogEntry` call is the org's
+    // first entry ever.
+    const [genesis] = await listAuditLogEntriesForOrg(organization.id);
+    expect(genesis.action).toBe('organization.create');
+    expect(genesis.prev_entry_hash).toBe('');
+    expect(genesis.entry_hash).toMatch(/^[0-9a-f]{64}$/);
 
     const first = await recordAuditLogEntry({
       organizationId: organization.id,
@@ -62,7 +72,7 @@ describe('recordAuditLogEntry: hash chain', () => {
       targetId: 'a',
       summary: 'first',
     });
-    expect(first.prev_entry_hash).toBe('');
+    expect(first.prev_entry_hash).toBe(genesis.entry_hash);
     expect(first.entry_hash).toMatch(/^[0-9a-f]{64}$/);
 
     const second = await recordAuditLogEntry({
@@ -95,8 +105,10 @@ describe('recordAuditLogEntry: hash chain', () => {
     // Verification re-reads the entry from Firestore and recomputes its hash
     // from scratch — this only passes if `canonicalize` produces the exact
     // same content both at write time and after a real round-trip.
+    // entryCount is 2, not 1: `setupProject` itself records one
+    // `organization.create` entry (KAN-44 follow-up) ahead of this one.
     const result = await verifyAuditLogChainForOrg(organization.id);
-    expect(result).toEqual({ valid: true, entryCount: 1 });
+    expect(result).toEqual({ valid: true, entryCount: 2 });
   });
 
   it('round-trips client_type/client_id (KAN-77) and keeps the chain valid alongside entries that omit them', async () => {
@@ -127,8 +139,10 @@ describe('recordAuditLogEntry: hash chain', () => {
     expect(second.client_type).toBeUndefined();
     expect(second.client_id).toBeUndefined();
 
+    // entryCount is 3, not 2: `setupProject` itself records one
+    // `organization.create` entry (KAN-44 follow-up) ahead of the two above.
     const result = await verifyAuditLogChainForOrg(organization.id);
-    expect(result).toEqual({ valid: true, entryCount: 2 });
+    expect(result).toEqual({ valid: true, entryCount: 3 });
 
     const entries = await listAuditLogEntriesForOrg(organization.id);
     const mcpEntry = entries.find((entry) => entry.action === 'mcp.tool_call');
@@ -170,8 +184,10 @@ describe('listAuditLogEntriesForOrg', () => {
       summary: 'stray',
     });
 
+    // `setupProject` itself records an `organization.create` entry (KAN-44
+    // follow-up) — scope this assertion to the entries this test wrote.
     const entries = await listAuditLogEntriesForOrg(organization.id);
-    expect(entries.map((e) => e.action)).toEqual(['test.two', 'test.one']);
+    expect(entries.filter((e) => e.action.startsWith('test.')).map((e) => e.action)).toEqual(['test.two', 'test.one']);
   });
 });
 
@@ -197,13 +213,15 @@ describe('verifyAuditLogChainForOrg', () => {
       summary: 'two',
     });
 
+    // Chain length is 3, not 2: `setupProject` itself records one
+    // `organization.create` entry (KAN-44 follow-up) ahead of the two below.
     const result = await verifyAuditLogChainForOrg(organization.id);
-    expect(result).toEqual({ valid: true, entryCount: 2 });
+    expect(result).toEqual({ valid: true, entryCount: 3 });
   });
 
-  it('reports valid for an org with no entries at all', async () => {
+  it('reports valid for an org with no entries beyond its own organization.create', async () => {
     const { organization } = await setupProject('Empty Chain Org');
-    expect(await verifyAuditLogChainForOrg(organization.id)).toEqual({ valid: true, entryCount: 0 });
+    expect(await verifyAuditLogChainForOrg(organization.id)).toEqual({ valid: true, entryCount: 1 });
   });
 
   it('detects a hash_mismatch when an entry is edited directly after being written', async () => {
@@ -300,8 +318,9 @@ describe('audit-log wiring into mutation call sites (KAN-44)', () => {
     await revokeApiKey({ organizationId: organization.id, projectId: project.id, apiKeyId: apiKey.id, revokedByUserId: owner.id });
 
     const entries = await listAuditLogEntriesForOrg(organization.id);
-    expect(entries.map((e) => e.action)).toEqual(['api_key.revoke', 'api_key.mint']);
-    expect(entries.every((e) => e.target_id === apiKey.id && e.actor_id === owner.id)).toBe(true);
+    const keyEntries = entries.filter((e) => e.action.startsWith('api_key.'));
+    expect(keyEntries.map((e) => e.action)).toEqual(['api_key.revoke', 'api_key.mint']);
+    expect(keyEntries.every((e) => e.target_id === apiKey.id && e.actor_id === owner.id)).toBe(true);
   });
 
   it('records schema_def.register and schema_def.evolve', async () => {
@@ -328,8 +347,9 @@ describe('audit-log wiring into mutation call sites (KAN-44)', () => {
     });
 
     const entries = await listAuditLogEntriesForOrg(organization.id);
-    expect(entries.map((e) => e.action)).toEqual(['schema_def.evolve', 'schema_def.register']);
-    expect(entries[1].target_id).toBe(schemaDef.id);
+    const schemaEntries = entries.filter((e) => e.action.startsWith('schema_def.'));
+    expect(schemaEntries.map((e) => e.action)).toEqual(['schema_def.evolve', 'schema_def.register']);
+    expect(schemaEntries[1].target_id).toBe(schemaDef.id);
   });
 
   it('records membership.role_granted on invite acceptance and membership.removed on removal', async () => {
@@ -351,9 +371,10 @@ describe('audit-log wiring into mutation call sites (KAN-44)', () => {
     await removeOrgMember(organization.id, invitation.id, owner.id);
 
     const entries = await listAuditLogEntriesForOrg(organization.id);
-    expect(entries.map((e) => e.action)).toEqual(['membership.removed', 'membership.role_granted']);
-    expect(entries[1].actor_id).toBe(member.id);
-    expect(entries[0].actor_id).toBe(owner.id);
+    const membershipEntries = entries.filter((e) => e.action.startsWith('membership.'));
+    expect(membershipEntries.map((e) => e.action)).toEqual(['membership.removed', 'membership.role_granted']);
+    expect(membershipEntries[1].actor_id).toBe(member.id);
+    expect(membershipEntries[0].actor_id).toBe(owner.id);
   });
 
   it('records quarantined_record.replay', async () => {
