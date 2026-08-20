@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-20 — Reject measure/entity fields colliding with mart-view intrinsic columns (PR #133)
+## 2026-08-20 — Reject measure/entity fields colliding with mart-view intrinsic columns (PR #134)
 
 - **Last completed:**
   - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
@@ -54,10 +54,10 @@ Template for each entry:
     (`Received message larger than max`), not this change (which is `firebase-orm-models`-only). Confirmed
     a flake by re-running that exact test file in isolation under its own emulator: **6/6 pass**. The
     `firebase-orm-models` package's own tests are all green.
-- **In progress (exact stopping point):** PR #133 opened from branch `fix/mart-reserved-field-names`;
+- **In progress (exact stopping point):** PR #134 opened from branch `fix/mart-reserved-field-names`;
   merge once CI is green, then delete the branch. This PROGRESS entry rides the same PR.
 - **Blocked + why:** unchanged standing items only.
-- **Next step:** land #133 once CI green. A future run should still **check open PRs first** (the
+- **Next step:** land #134 once CI green. A future run should still **check open PRs first** (the
   concurrent-session collision pattern persists — 3 open at this run's start). Remaining self-identified
   headless-buildable follow-ups are thin now; deeper KAN-18/KAN-19 scope needs the interactive
   per-command-approved GCP pattern, not a headless run.
