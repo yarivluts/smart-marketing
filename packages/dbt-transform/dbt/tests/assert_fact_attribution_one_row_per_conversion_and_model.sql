@@ -1,6 +1,3 @@
--- BigQuery-disabled alongside the identity/attribution chain it tests --
--- see stg_identity_key_observations.sql's own config comment.
-{{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. Every (conversion_event_id,
 -- model) pair must resolve to exactly one attribution row -- more than one
 -- would double- (or under-) count a conversion in a channel breakdown; the

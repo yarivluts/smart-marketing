@@ -1,5 +1,7 @@
--- BigQuery-disabled alongside the identity/attribution chain it tests --
--- see stg_identity_key_observations.sql's own config comment.
+-- DuckDB-only: uses the `with cte(cols) as (values ...)` form BigQuery
+-- rejects, and/or asserts fixture-seed semantics -- the chain itself now
+-- builds on BigQuery too (envelope-fields leg), these assertions just
+-- can't run there.
 {{ config(enabled=(target.type == 'duckdb')) }}
 -- A dbt test query returning zero rows passes. Guards that
 -- `fact_attribution.landing_page` is the *crediting* touchpoint's own entry
