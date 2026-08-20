@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-76 follow-up closed: live segment member counts (PR #111)
+
+- **Last completed:**
+  - Session start found the now-familiar all-`done`-except-standing-blockers `TASKS.md` state
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). Found and
+    merged **PR #110** (KAN-60's board settings/tiles/delete audit-log follow-up, already open and
+    CI-green from a concurrent run of this same task) after reviewing the diff. Then delegated a
+    codebase-wide sweep (Explore agent) for genuinely open, infra-free, single-PR-sized follow-up
+    gaps, explicitly excluding candidates prior runs already ruled out (KAN-56's unported
+    `schema_identity_fields` seed, resource-attachment auto-approval, a metric-pack
+    board-seeding retry surface, KAN-26's apps/api 404-vs-403 gap, and KAN-60's audit-log gap —
+    just fixed). The agent's top candidate: KAN-76's `segment-filter.ts` own doc comment — "No
+    query executor reads this shape yet either ... 'config now, execution later'" — a saved
+    segment had zero execution path, unlike `MetricDefModel`/`BoardModel`'s own eventual compiler.
+  - **PR #111**: built `countSegmentMembers` (`packages/firebase-orm-models/src/services/
+    segment.service.ts`) — translates a segment's ANDed filter conditions into a parameterized
+    `SELECT COUNT(*)` against the `entities` core dbt table's JSON `properties` column, typed per
+    the segment's currently-active schema field types (`LAX_STRING`/`LAX_FLOAT64`/`LAX_BOOL`
+    extraction, `SAFE_CAST` on the bound parameter for numeric/boolean fields, wildcard-escaped
+    `LIKE` for `contains`, falling back to a plain string extraction for a field the active schema
+    no longer declares). Follows the exact hand-written-SQL-over-`WarehouseQueryExecutor` pattern
+    `mcp-tools.service.ts` already established three times over (`searchProjectCustomers`/
+    `queryProjectCohortRetention`/`queryProjectFunnelSteps`) — exported that file's own
+    `escapeLikePattern` for reuse instead of duplicating it. Returns a `GoalProgressOutcome`/
+    `BoardTileQueryOutcome`-shaped `{ ok, ... }` outcome rather than a bare throw, since this backs
+    a page badge (not an MCP tool call that can just fail outright) — mirrors `queryBoardTile`/
+    `queryGoalProgress`'s own degrade-not-crash posture for an unconfigured/rejecting warehouse.
+    Admin UI: the Segments page now shows a member-count badge per segment, fetched in parallel
+    (the same documented per-tile fan-out posture `board.service.ts` already uses), with degraded
+    states for "warehouse not configured"/"query failed". New `en`/`he` translation keys.
+  - **Self-review caught a real gap before merge**: `isValidSegmentFilterCondition` (the shape
+    check `createSegment` and the MCP `create_segment` tool both run every filter through) only
+    checked that `field` was a non-empty string — no character-set restriction. `countSegmentMembers`
+    compiles `field` straight into a SQL/JSON-subscript expression and has its own defensive
+    safe-identifier check for exactly that reason, but that check would have thrown an uncaught
+    `InvalidSegmentError` on an already-*saved* segment at count time (past the outcome-wrapping
+    try/catch, which only handles warehouse errors) — crashing the segments page instead of
+    failing at creation. Fixed by tightening `isValidSegmentFilterCondition` itself to require a
+    safe identifier, so an unsafe field name is rejected up front by `createSegment`'s own
+    "collect every validation failure" pass, before it can ever be persisted — pushed as a second
+    commit on the same PR, with 3 new regression tests (`segment-filter.test.ts`) pinning the
+    rejection (a SQL-injection-shaped field, a dotted/nested field, a field starting with a digit).
+  - Emulator test coverage: 8 new `countSegmentMembers` cases in `segment.emulator.test.ts` (typed
+    clause per field type incl. boolean `SAFE_CAST`, `contains` → escaped `LIKE`, unknown-field
+    fallback, environment filter, empty-result count, both degrade outcomes, `SegmentNotFoundError`
+    for a cross-org/project id) via a fake `WarehouseQueryExecutor`, the same posture
+    `mcp-tools.emulator.test.ts` uses for its own adapters.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green locally at every step (ran
+    twice — once before the self-review fix, once after) before/after pushing: firebase-orm-models
+    emulator suite 56/56 incl. new tests, `packages/shared` 387/387 incl. the 3 new field-safety
+    tests, full monorepo `pnpm test` 11/11 turbo tasks green (one known pre-existing Playwright
+    timing flake — `orgs.spec.ts`'s invite-accept test — passed on its automatic retry, unrelated).
+    CI on the PR itself also green. Branch `kan-76-segment-member-count`, PR #111, merged into
+    `main` (squash) by a concurrent run of this same session while this run was mid-wait on CI —
+    the same overlapping-schedule pattern this file has documented since 2026-07-04 (KAN-20).
+    Remote branch deletion: no delete-branch GitHub MCP tool available in this session, same
+    known, pre-existing limitation documented since 2026-07-04.
+- **In progress (exact stopping point):** none — clean stopping point, `main` green at `309b4cb`.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's long-lead approval or per-command-approved
+  interactive session.
+- **Next step:** the "mine follow-up notes on `done` rows" approach is thinning further but not
+  dry — the Explore agent's two other candidates this run didn't pursue (ranked below its top pick,
+  which this run took): (1) MCP refresh-token reuse detection (`mcp-oauth.service.ts`'s own doc
+  comment: `mintTokenPair` overwrites `refresh_token_hash` on rotation with no history of prior
+  hashes kept, so a stolen-and-replayed old token can't be distinguished from a fresh one, and
+  there's no automatic grant revocation on detected reuse — a standard OAuth 2.1 practice; moderate
+  size, touches the grant model shape); (2) a per-family schema version-history UI
+  (`schema-registry.service.ts`'s `listSchemaDefinitionVersions` is built/tested but never called
+  by any route or page — smallest of the three but weakest justification, closer to the
+  "speculative, no confirmed UI need" items already ruled out elsewhere). Worth a future run's own
+  judgment call, or a fresh sweep, rather than assuming this list is exhaustive.
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-20 — KAN-60 follow-up closed: board settings/tiles/delete now audit-log (PR #110)
 
 - **Last completed:**
