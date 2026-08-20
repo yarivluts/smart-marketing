@@ -1,4 +1,4 @@
-import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor } from '../warehouse/query-executor';
+import { defaultWarehouseQueryExecutor, readWarehouseEnvConfig, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor } from '../warehouse/query-executor';
 import { buildMartViewSql, martViewName } from '../warehouse/schema-mart';
 import type { SchemaDefKind, SchemaDefModel } from '../models/schema-def.model';
 import { listSchemaDefinitionsForProject } from './schema-registry.service';
@@ -12,6 +12,8 @@ export interface SyncSchemaMartViewParams {
   schemaDef: Pick<SchemaDefModel, 'kind' | 'name' | 'field_defs'>;
   /** Defaults to {@link defaultWarehouseQueryExecutor} — overridable so tests can inject a fake executor. */
   executor?: WarehouseQueryExecutor;
+  /** The dataset the view + its source live in — defaults to `GROWTHOS_BIGQUERY_CORE_DATASET` from the environment; overridable for tests. Unset (dev/CI) counts as "warehouse not configured". */
+  dataset?: string;
 }
 
 export type SchemaMartSyncOutcome =
@@ -33,6 +35,10 @@ export async function syncSchemaMartView(params: SyncSchemaMartViewParams): Prom
   if (!MART_KINDS.includes(params.schemaDef.kind)) {
     return { status: 'skipped_kind' };
   }
+  const dataset = params.dataset ?? readWarehouseEnvConfig().dataset;
+  if (!dataset) {
+    return { status: 'skipped_not_configured' };
+  }
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
   const sql = buildMartViewSql({
     organizationId: params.organizationId,
@@ -40,6 +46,7 @@ export async function syncSchemaMartView(params: SyncSchemaMartViewParams): Prom
     kind: params.schemaDef.kind,
     schemaName: params.schemaDef.name,
     fieldDefs: params.schemaDef.field_defs,
+    dataset,
   });
 
   try {

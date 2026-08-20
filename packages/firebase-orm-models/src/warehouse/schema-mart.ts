@@ -86,6 +86,17 @@ export interface BuildMartViewSqlParams {
   kind: SchemaDefKind;
   schemaName: string;
   fieldDefs: readonly SchemaFieldDef[];
+  /**
+   * The dataset both the view and its `stg_raw_records` source live in
+   * (`GROWTHOS_BIGQUERY_CORE_DATASET`, `growthos_core` in the real project).
+   * A view's BODY cannot use unqualified table names — unlike an ad-hoc
+   * query, a stored view doesn't inherit any `defaultDataset` at query time,
+   * so `FROM \`stg_raw_records\`` creates fine but every later SELECT
+   * against the view fails with "must be qualified with a dataset" (found
+   * live by session-B QA the first time a mart-backed metric was queried,
+   * 2026-08-20).
+   */
+  dataset: string;
 }
 
 /**
@@ -100,10 +111,11 @@ export interface BuildMartViewSqlParams {
  * time column even when the schema declares none.
  */
 export function buildMartViewSql(params: BuildMartViewSqlParams): string {
+  const dataset = assertMartSafe(params.dataset, 'dataset');
   const viewName = martViewName(params.organizationId, params.projectId, params.schemaName);
   const fieldSelects = params.fieldDefs.map((field) => `  ${fieldExpression(field)}`);
   return [
-    `CREATE OR REPLACE VIEW \`${viewName}\` AS`,
+    `CREATE OR REPLACE VIEW \`${dataset}.${viewName}\` AS`,
     'SELECT',
     [
       '  organization_id',
@@ -113,7 +125,7 @@ export function buildMartViewSql(params: BuildMartViewSqlParams): string {
       '  landed_at',
       ...fieldSelects,
     ].join(',\n'),
-    'FROM `stg_raw_records`',
+    `FROM \`${dataset}.stg_raw_records\``,
     `WHERE kind = '${params.kind}' AND schema_name = '${assertMartSafe(params.schemaName, 'schema name')}'`,
     `  AND organization_id = '${assertLiteralSafe(params.organizationId, 'organization id')}' AND project_id = '${assertLiteralSafe(params.projectId, 'project id')}'`,
   ].join('\n');

@@ -25,11 +25,14 @@ describe('martViewName', () => {
 });
 
 describe('buildMartViewSql', () => {
-  const sql = buildMartViewSql({ organizationId: 'org-1', projectId: 'proj-1', kind: 'measure', schemaName: 'ad_performance_daily', fieldDefs: fields });
+  const sql = buildMartViewSql({ organizationId: 'org-1', projectId: 'proj-1', kind: 'measure', schemaName: 'ad_performance_daily', fieldDefs: fields, dataset: 'growthos_core' });
 
   it('creates-or-replaces the mangled view over stg_raw_records, filtered by kind + schema + tenant', () => {
-    expect(sql).toContain(`CREATE OR REPLACE VIEW \`${martViewName('org-1', 'proj-1', 'ad_performance_daily')}\``);
-    expect(sql).toContain('FROM `stg_raw_records`');
+    expect(sql).toContain(`CREATE OR REPLACE VIEW \`growthos_core.${martViewName('org-1', 'proj-1', 'ad_performance_daily')}\``);
+    // Fully qualified source: a stored view's body resolves no defaultDataset
+    // at query time — an unqualified ref creates fine but fails every later
+    // SELECT (found live by session-B QA, 2026-08-20).
+    expect(sql).toContain('FROM `growthos_core.stg_raw_records`');
     expect(sql).toContain("kind = 'measure' AND schema_name = 'ad_performance_daily'");
     expect(sql).toContain("organization_id = 'org-1' AND project_id = 'proj-1'");
   });
@@ -50,7 +53,7 @@ describe('buildMartViewSql', () => {
 
   it('rejects a field name that could smuggle SQL through the JSON path', () => {
     const evil: SchemaFieldDef[] = [{ name: "x') OR 1=1--", type: 'string', is_required: false, is_pii: false, is_identity_key: false }];
-    expect(() => buildMartViewSql({ organizationId: 'org-1', projectId: 'proj-1', kind: 'measure', schemaName: 'ok_name', fieldDefs: evil })).toThrow(
+    expect(() => buildMartViewSql({ organizationId: 'org-1', projectId: 'proj-1', kind: 'measure', schemaName: 'ok_name', fieldDefs: evil, dataset: 'growthos_core' })).toThrow(
       UnsafeMartIdentifierError,
     );
   });
