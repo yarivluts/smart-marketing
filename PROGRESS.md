@@ -17,6 +17,80 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-75 follow-up closed: query_funnel MCP tool + fact_funnel_step dbt model (PR #108); PR #107 (Yariv's own snippet-envelope fix) merged
+
+- **Last completed:**
+  - **PR #107** (`fix/implicit-event-envelope-fields`, Yariv's own interactive-session commit,
+    open with CI already green when this run found it): the tracking snippet's own `anon_id`/
+    `customer_id` envelope fields were being universally quarantined by any event schema that
+    didn't explicitly re-declare them — `validateAgainstSchema` now implicitly (and still
+    type-checked) accepts them on `event`-kind records only, explicit declarations still win.
+    Reviewed the diff (clean, well-tested, real bug) and squash-merged.
+  - Re-read `TASKS.md` top to bottom: every KAN-17..KAN-78 row is `done`/`in-progress`/
+    `needs-human`/`blocked-by` — no `todo` row exists, the same state prior idle-check-in runs
+    (10-14) already established. Per the 2026-08-19 KAN-44 run's own insight ("a `done` row's
+    named follow-up gaps are still real, buildable work"), re-scanned `done` rows for open
+    follow-ups instead of concluding the backlog is dry. **KAN-75**'s own row named one directly:
+    `query_funnel` was never built — "no `fact_funnel_*` dbt model exists yet."
+  - **PR #108**: closed that gap end to end, entirely infra-free (no live BigQuery needed, same
+    DuckDB-fixture posture every other core dbt model uses):
+    - New `fact_funnel_step` core dbt model (`packages/dbt-transform`): one row per (customer,
+      funnel stage) first reached. Reuses `fact_attribution.conversion_event`'s own label
+      derivation (payload's `event_name` field, falling back to schema/event_type) rather than
+      re-deriving it, matched against a new `funnel_step_mappings` seed — a stand-in for a
+      warehouse export of KAN-68's onboarding-confirmed `OnboardingStateModel.funnel_steps`
+      (`eventSchemaName`/`stageKey`/`order`), same "buildable-today, real export lands later"
+      posture `schema_identity_fields.csv` already established for `bridge_identity`. Gated
+      DuckDB-only for the identical reason. New fixture-matches dbt test against `proj_11`'s
+      existing signup→activation→conversion scenario (5/2/2 customers per stage, including a
+      customer who reaches `conversion` having skipped `activation` — the model reports observed
+      stages, it doesn't require or synthesize a skipped one).
+    - New `queryProjectFunnelSteps` adapter (`packages/firebase-orm-models`'s `mcp-tools.service.ts`):
+      per-stage distinct-customer counts ordered by step, each stage's count also expressed as a
+      conversion rate off the first step (computed in TS over the small aggregated result, not in
+      SQL) — follows `queryProjectCohortRetention`/`fact_cohort_retention`'s exact pattern.
+    - New `query_funnel` MCP tool in `apps/api`, wired through the same audit/isolation machinery
+      every other read tool uses; added to the KAN-77 tool-registry isolation test
+      (`mcp-tool-isolation.spec.ts`), the e2e tool-list assertion, and a new isolation-relevant e2e
+      test (asserts a clean tool error with no warehouse configured, same as `query_cohort`/
+      `search_customers`).
+    - Docs: `docs/mcp/README.md` tool table (dropped the "not built yet" follow-up note),
+      `packages/dbt-transform/README.md`'s layer list, `TASKS.md`'s KAN-75 row.
+  - Caught one real bug in my own new test during the first full run: asserted
+    `queryProjectFunnelSteps`'s default-environment call had no `environmentId` param, but
+    `resolveDefaultQueryEnvironment` genuinely resolves one for a real test project (same as
+    `queryProjectCohortRetention`'s/`searchProjectCustomers`'s own tests, which never assert its
+    absence for that reason) — fixed the test assertion, not the source.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green locally before opening the
+    PR (dbt 134/134 incl. the new fixture test; firebase-orm-models 844/844; apps/api's mcp suite
+    44/44; apps/web 916 unit + 21/23 e2e green with 2 known-flaky retries unrelated to this change
+    — `hooks.spec.ts`/`resource-library.spec.ts`, both pre-existing Playwright timing flakes, both
+    passed on their automatic retry). CI on the PR itself also green (`pnpm exec firebase
+    emulators:exec` needed `pnpm install && pnpm build` first — `@growthos/shared` wasn't built in
+    this fresh sandbox checkout, a one-time setup step, not a code issue).
+  - Branch `kan-75-query-funnel-tool`, PR #108, merged into `main` (squash) after CI went green
+    (~21 min queued+run). Remote branch deletion: no delete-branch GitHub MCP tool is available in
+    this session — same known, pre-existing limitation this file has documented since 2026-07-04
+    (a human with direct repo access, or enabling "automatically delete head branches" in repo
+    settings, should clean up the growing pile of merged-but-undeleted branches in bulk someday).
+- **In progress (exact stopping point):** none — both PRs merged, `main` green at `fffc502`.
+- **Blocked + why:** unchanged standing items — KAN-43 (long-lead API approvals) and KAN-18/KAN-19's
+  remaining live-infra sub-items still need a human's per-command-approved interactive session or
+  external approval.
+- **Next step:** the "mine the follow-up notes on `done` rows" approach still has candidates for a
+  future run, all code-only and infra-free: KAN-26's noted apps/api 404-vs-403 gap (still not
+  actionable — apps/api has no org-scoped routes yet); KAN-56's unported `schema_identity_fields`
+  seed (would need a real warehouse export design, not a quick follow-up); KAN-60's note that only
+  `createBoard` audit-logs, not `updateBoardSettings`/`saveBoardTiles`/`deleteBoard`. Worth a future
+  run's judgment call on which is most valuable before picking. Also re-check: open PRs, and
+  whether Yariv has weighed in on the still-unanswered KAN-38 "Run now" unattended-prod-write policy
+  question from run 11 (2026-08-19 entries note it may be moot given PR #105's separate scheduled-
+  refresh path, but that hasn't been confirmed).
+- **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items).
+
+---
+
 ## 2026-08-19 — KAN-44 audit-log coverage completed: vault secrets + resource attachments (PR #104, hardened in PR #106)
 
 - **Last completed:**
