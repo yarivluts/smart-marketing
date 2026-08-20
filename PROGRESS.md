@@ -17,6 +17,53 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — metrics-compiler: previous_year compare window leap-day overflow (PR #128, merged)
+
+- **Last completed:**
+  - Session start found the standing all-`done`-except-blockers `TASKS.md` state (KAN-18/KAN-19
+    `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). Per the repeated advice in the
+    entries below, **checked open PRs before implementing anything** — and found **PR #126** already
+    open and mid-CI from a concurrent session (the metrics-compiler inclusive-end-date fix). Left it
+    alone rather than duplicating it; instead picked the *distinct, unclaimed* follow-up bug that PR
+    #126's own description named as the next candidate. This is the first run in several to avoid a
+    collision by checking first, rather than discovering one at merge time.
+  - **The bug:** `computeCompareWindow`'s `previous_year` path (`packages/shared/src/metrics-compiler/
+    time.ts`) shifted `start`/`end` back a calendar year via `Date#setUTCFullYear`. On a Feb 29
+    boundary the target year has no Feb 29, so the built-in overflows into the next month — a window
+    ending `2024-02-29` became `2023-03-01` instead of clamping to `2023-02-28`, spilling the
+    previous-year compare window a day into March and returning a wrong comparison bucket for any
+    query whose range starts or ends on a leap day.
+  - **Fix:** `addYearsUtc` now detects the month rollover after the shift and clamps to the last day
+    of the intended month via `setUTCDate(0)` (which rolls back to the final day of the previous
+    month). Two lines, no new abstraction; `DATE(...)`-based compilation elsewhere untouched.
+  - **Self-review caught a latent trap in my own first attempt:** the initial fix rebuilt the date
+    with `Date.UTC(targetYear, month, day)`, which silently maps years 0-99 to 1900-1999. Not
+    reachable for realistic query ranges, but the `setUTCFullYear` + `setUTCDate(0)` form avoids the
+    trap entirely *and* is a smaller diff — switched before committing.
+  - **Test coverage gap closed:** `computeCompareWindow` had **no dedicated unit file** at all; its
+    behavior was only incidentally exercised through the golden-fixture compiler tests, which are
+    change-detectors and never asserted calendar semantics — which is exactly why this survived. New
+    `time.test.ts` (7 cases) pins the leap-day clamp on both the end-side and start-side, the
+    ordinary `previous_year`/`previous_period` shifts, the no-compare passthrough, and both
+    `MetricCompilerError` validation paths.
+  - `pnpm lint && pnpm typecheck && pnpm test && pnpm build` all green across the monorepo
+    (`packages/shared` 394, `apps/web` 943 unit + 23 Playwright e2e). One full-suite run hit the
+    known Playwright `webServer` 120s boot timeout; reran and it passed clean — the same pre-existing
+    flake prior entries document, unrelated to this change. **CI green; PR #128 merged to `main`**
+    (`382ba86`).
+- **In progress (exact stopping point):** none — clean stopping point, PR merged and `main` green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next run re-reads `TASKS.md`/`PROGRESS.md`, **checks `list_pull_requests(state:
+  open)` first** (it demonstrably pays off — it's what kept this run off PR #126's toes), then picks
+  the next unblocked item. With the backlog `done`, that again means a self-identified follow-up.
+  Note that `time.ts` is now well covered; the compiler's remaining untested surface is
+  `formula-parser.ts` if a future sweep wants a candidate.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still open).
+  - **KAN-18** — remaining live-infra sub-items (still open).
+
+---
+
 ## 2026-08-20 (late) — Quality batch: indexes codified, identity chain on BigQuery, real-envelope bug fixed
 
 - **Last completed:** the three non-human-gated items from the "what's next" list (Yariv approved
