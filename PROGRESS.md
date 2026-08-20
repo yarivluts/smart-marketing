@@ -60,17 +60,28 @@ Template for each entry:
     (`orgs.spec.ts` invite-revoke, `resource-library.spec.ts` — both unrelated to this change) flaked
     once under heavy concurrent machine load and passed on retry #1; reported as "2 flaky", run still
     exit 0.
-- **In progress (exact stopping point):** PR #136 opened; CI green (`terraform fmt · validate` and
-  `lint · typecheck · test · build` both passed on the conflict-free head); merging now.
+- **Merged 2026-08-20:** PR #136 squash-merged into `main` (`3940398`) after both checks
+  (`lint · typecheck · test · build`, `terraform fmt · validate`) passed on a conflict-free head and
+  `mergeable_state` settled to `clean`; no review comments. Local branch cleaned up. The **remote**
+  branch delete hit the same git-over-HTTPS proxy **HTTP 403** every prior merged branch from a
+  scheduled run has hit — harmless, a human can prune `fix/query-funnel-real-warehouse` along with the
+  others.
+  - Rebased onto `origin/main` **twice** mid-run as concurrent sessions landed #134 then (separately)
+    its own PROGRESS.md-record commit: both times the only conflict was this file (two entries
+    prepended at the same anchor), resolved by keeping both, newest first. No code conflict either
+    time — `mcp-tools.service.ts`/`.emulator.test.ts`/`mcp.controller.e2e.spec.ts` weren't touched by
+    #134/#128's changes (`schema-mart.ts`, `schema-registry.service.ts`, `metrics-compiler/time.ts`).
+    Same "PROGRESS.md prepend conflict, same shape, twice" pattern #134's own entry (below) documents.
+- **In progress (exact stopping point):** none — #136 fully landed.
 - **Blocked + why:** nothing.
-- **Next step:** Remaining unclaimed follow-ups a future run could pick (from the same research pass,
-  all still real as of this run): the schema-mart JSON-level bug (mart views extract declared fields
-  from `$.field` at the payload top level, but the real ingest envelope nests them under
-  `properties`/`attributes`/`dimensions` — the TS twin of the #135 dbt fix; **#134 has now landed**,
-  so this no longer needs to wait) and its measure-`value`/`ts` sibling; the engagement-pack metrics
-  targeting a nonexistent `fact_funnel_event` table; and the unbounded in-memory metric result cache.
-  Also note the same "PROGRESS.md prepend conflict" pattern #134's own entry documents recurred here
-  too (twice, resolved the same way — keep both entries, newest first).
+- **Next step:** next run picks the next unblocked task. Remaining unclaimed follow-ups from this
+  run's own research pass, all still real: the schema-mart JSON-level bug (mart views extract declared
+  fields from `$.field` at the payload top level, but the real ingest envelope nests them under
+  `properties`/`attributes`/`dimensions` — the TS twin of the #135 dbt fix; #134 has landed, so this no
+  longer needs to wait) and its measure-`value`/`ts` sibling; the engagement-pack metrics targeting a
+  nonexistent `fact_funnel_event` table; and the unbounded in-memory metric result cache. Also: **PR
+  #137** (docs-only, records #128) was still open as of this run's end — check whether it landed before
+  picking the next task, to avoid re-treading the same PROGRESS.md-conflict dance.
 - **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
   live-infra sub-items; prune merged feature branches the proxy blocks this run from deleting).
 
