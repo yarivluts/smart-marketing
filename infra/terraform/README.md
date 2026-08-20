@@ -78,3 +78,34 @@ CI runs exactly this (`fmt -check` + `validate`) on every PR that touches
 `infra/terraform/**` — it proves the HCL is syntactically/type valid, not
 that it matches the real project. Only a human with real GCP credentials can
 verify that via the import + plan steps above.
+
+## Firestore composite indexes — `firestore.indexes.json` (repo root)
+
+The repo's single source of truth for every composite index the codebase's
+compound queries need is [`../../firestore.indexes.json`](../../firestore.indexes.json)
+(with a minimal `firebase.json` beside it so `firebase deploy --only
+firestore:indexes` works). It was seeded 2026-08-20 by reading back the
+**live** index set (`gcloud firestore indexes composite list`) after the
+missing-composite-index production crash had recurred **seven times** —
+each index in that file was originally discovered as a `FAILED_PRECONDITION`
+crash in a deployed environment, because the Firestore **emulator does not
+enforce composite indexes**, so CI can never catch a missing one.
+
+The standing rule for new code: any compound query (a `.where(...)` equality
+plus an `.orderBy(...)` on a *different* field, or 2+ `.where(...)`s with an
+`.orderBy(...)`) **must add its index to `firestore.indexes.json` in the same
+PR**, and whoever deploys runs:
+
+```bash
+firebase deploy --only firestore:indexes --project growthos-g2w84
+# or, per index, the gcloud equivalent:
+gcloud firestore indexes composite create --project growthos-g2w84 \
+  --collection-group=<collection> --query-scope=COLLECTION \
+  --field-config field-path=<f1>,order=ascending \
+  --field-config field-path=<f2>,order=descending
+```
+
+Composite indexes are deliberately *not* modeled in Terraform: the
+`firestore.indexes.json` format is the canonical, tooling-supported home for
+them, and mixing the two would give the same index two competing sources of
+truth.
