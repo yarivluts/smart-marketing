@@ -17,6 +17,58 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — Collided with a concurrent run on the same KAN-44 gap; no net change (PR #121, closed)
+
+- **Last completed:**
+  - Session start found the same standing `TASKS.md` state prior runs have documented repeatedly
+    (KAN-18/KAN-19 `in-progress`, KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`, no `todo` row).
+    Picked up the same "still open" follow-up candidates a prior run's own sweep had named:
+    `createOrganizationWithOwner`/`createProject` never wrote a KAN-44 audit-log entry despite being
+    the two most foundational config-changing events in the app. Implemented `organization.create`/
+    `project.create` audit entries (owner/creator as actor, `project.create` gated on an optional
+    `createdByUserId` so `createProject`'s ~40 other emulator-test call sites — which use it purely
+    as a fixture helper — stay unaffected), updated every test that asserted an org's audit log
+    started empty (it no longer does — `organization.create` is now always the chain's genesis
+    entry), added new coverage, and caught a real bug in self-review: passing `project.vertical`
+    (often `undefined`) straight into the audit entry's `after` object made Firestore's `setDoc()`
+    reject the write outright, which the best-effort `try/catch` then silently swallowed — so no
+    `project.create` entry would ever have been recorded for the common no-vertical case. Fixed by
+    only including `vertical` in `after` when defined.
+  - Full monorepo `pnpm lint && pnpm typecheck && pnpm build` green, `packages/firebase-orm-models`
+    (885/885) and `apps/web` (938/938) unit-test suites green against the real Firestore/Auth
+    emulators, opened as **PR #121**. While the full `pnpm test` (incl. `apps/api` + Playwright e2e)
+    ran in the background to confirm before merge, discovered that **PR #119** — opened and merged
+    by a different concurrent session about 35 minutes before PR #121 was opened — had independently
+    implemented the *exact same fix*: `organization.create`/`project.create` audit entries with the
+    identical optional-`createdByUserId` design (plus two more gaps, `setHookDeliveryStatus` and
+    `ensureAutomationTargetSeeded`, that this run didn't get to). `main` had moved 4 commits ahead of
+    this run's branch point by the time its own tests finished.
+  - Closed **PR #121** without merging (comment explaining the collision + pointing at #119),
+    unsubscribed from its PR activity, deleted the local branch. Remote branch deletion hit the same
+    HTTP 403 this sandbox's git remote has rejected every prior run's delete attempt with since
+    2026-07-04 (documented standing limitation, not new). Net result: **no change landed on `main`**
+    from this run — `main` already had the fix via #119 before this run could merge its own.
+- **In progress (exact stopping point):** none — clean stopping point, `main` unchanged by this run
+  and already green post-#119/#120.
+- **Blocked + why:** unchanged standing items only.
+- **Next step:** the CI run history shows unusually heavy concurrent-session activity today (>20 CI
+  runs in a few hours, several sessions independently picking the same sweep candidates within
+  minutes of each other — this run and #119's author both landed on the identical KAN-44 gap
+  independently). Worth a human's attention: either the scheduled cadence is tighter than intended
+  right now, or several manually-started sessions are overlapping with the schedule. A future run
+  hitting this same "no `todo` row, sweep for a gap" situation should check recent CI/PR history
+  (`list_workflow_runs`/`list_pull_requests` on `main`, last 1-2 hours) *before* spending a full
+  implementation cycle, not just at merge time, to catch a collision earlier and cheaper. The
+  remaining named-but-unstarted candidates from prior sweeps (`setHookDeliveryStatus` audit gap,
+  `ensureAutomationTargetSeeded` audit gap) are now both closed by #119 — confirm against `main`
+  before re-investigating either.
+- **Waiting on human:**
+  - standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra sub-items).
+  - Optional: delete the abandoned `kan-44-org-project-create-audit` branch on GitHub (same 403 this
+    sandbox's remote always hits on branch deletes).
+
+---
+
 ## 2026-08-20 — Fresh sweep found a new follow-up: stuck queued pipeline messages (PR #120)
 
 - **Last completed:**
