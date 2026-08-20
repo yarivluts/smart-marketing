@@ -68,8 +68,8 @@ export interface CustomerSearchResult {
 const DEFAULT_CUSTOMER_SEARCH_LIMIT = 20;
 const MAX_CUSTOMER_SEARCH_LIMIT = 100;
 
-/** Escapes `LIKE`'s own wildcard metacharacters (`%`/`_`, with `\` as BigQuery's implicit default escape character) so a caller searching for a literal `%`/`_` — a real character in an email, a discount code, anything — gets a literal substring match instead of the wildcard silently matching "any characters"/"any single character" there. */
-function escapeLikePattern(value: string): string {
+/** Escapes `LIKE`'s own wildcard metacharacters (`%`/`_`, with `\` as BigQuery's implicit default escape character) so a caller searching for a literal `%`/`_` — a real character in an email, a discount code, anything — gets a literal substring match instead of the wildcard silently matching "any characters"/"any single character" there. Exported for `segment.service.ts`'s `countSegmentMembers`, which needs the exact same escaping for its own `contains` filter operator. */
+export function escapeLikePattern(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/%/g, '\\%').replace(/_/g, '\\_');
 }
 

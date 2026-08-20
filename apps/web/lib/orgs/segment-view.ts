@@ -1,4 +1,4 @@
-import type { SegmentModel } from '@growthos/firebase-orm-models';
+import type { SegmentMemberCountOutcome, SegmentModel } from '@growthos/firebase-orm-models';
 
 /** A segment's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface SegmentSummaryView {
@@ -17,4 +17,14 @@ export function toSegmentSummaryView(segment: SegmentModel): SegmentSummaryView 
     filterCount: segment.filters.length,
     createdAt: segment.created_at,
   };
+}
+
+/** Mirrors `GoalThermometerView`'s (`goal-view.ts`) ok/degraded-outcome split — a segment's member-count badge degrades the same way a goal thermometer does, rather than crashing the page, for the same expected-not-buggy failure modes. */
+export type SegmentMemberCountView = { kind: 'ok'; count: number } | { kind: 'warehouse_not_configured' } | { kind: 'query_error' };
+
+export function buildSegmentMemberCountView(outcome: SegmentMemberCountOutcome): SegmentMemberCountView {
+  if (!outcome.ok) {
+    return { kind: outcome.reason };
+  }
+  return { kind: 'ok', count: outcome.count };
 }

@@ -822,7 +822,10 @@
     "addFilterButton": "הוסף מסנן",
     "removeFilterButton": "הסר",
     "createButton": "צור פלח",
-    "createError": "לא ניתן היה ליצור את הפלח. נסה שוב."
+    "createError": "לא ניתן היה ליצור את הפלח. נסה שוב.",
+    "memberCount": "{count, plural, one {חבר #} other {# חברים}}",
+    "memberCountNotConfigured": "ספירת חברים אינה זמינה (מחסן הנתונים טרם הוגדר)",
+    "memberCountError": "ספירת חברים אינה זמינה"
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

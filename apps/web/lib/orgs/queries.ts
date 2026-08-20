@@ -2,6 +2,7 @@ import 'server-only';
 import { cache } from 'react';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
+  countSegmentMembers as countSegmentMembersInOrganization,
   getActiveAutomationGuardrailPolicy as getActiveAutomationGuardrailPolicyInOrganization,
   getAutomationKillSwitchStatus as getAutomationKillSwitchStatusInOrganization,
   getBoard as getBoardInOrganization,
@@ -92,6 +93,7 @@ import {
   type ResourceTemplateModel,
   type Role,
   type SchemaDefModel,
+  type SegmentMemberCountOutcome,
   type SegmentModel,
   type SharedCredentialModel,
   type TrackingAlertModel,
@@ -387,6 +389,12 @@ export async function listGoalsForProject(organizationId: string, projectId: str
 export async function listSegmentsForProject(organizationId: string, projectId: string): Promise<SegmentModel[]> {
   await ensureFirestoreOrm();
   return listSegmentsForProjectInOrganization(organizationId, projectId);
+}
+
+/** One segment's live member count (or a typed, renderable "why not" outcome — see `SegmentMemberCountOutcome`'s own doc comment) for the Segments page's own member-count badge. */
+export async function countSegmentMembers(organizationId: string, projectId: string, segmentId: string): Promise<SegmentMemberCountOutcome> {
+  await ensureFirestoreOrm();
+  return countSegmentMembersInOrganization({ organizationId, projectId, segmentId });
 }
 
 export async function getGoal(organizationId: string, projectId: string, goalId: string): Promise<GoalModel | null> {

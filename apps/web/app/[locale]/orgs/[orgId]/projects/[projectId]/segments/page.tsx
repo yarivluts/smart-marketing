@@ -5,8 +5,8 @@ import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
-import { toSegmentSummaryView } from '@/lib/orgs/segment-view';
+import { countSegmentMembers, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
+import { buildSegmentMemberCountView, toSegmentSummaryView, type SegmentMemberCountView } from '@/lib/orgs/segment-view';
 import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
 
 type PageProps = Readonly<{
@@ -58,6 +58,19 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const t = await getTranslations('Segments');
 
+  // Fanned out per segment via `Promise.all` — the same known, deliberately
+  // deferred "N independent queries" posture `board.service.ts`'s own doc
+  // comment documents for its per-tile fan-out, rather than a new batched
+  // execution path for this one page.
+  const memberCountViews = new Map<string, SegmentMemberCountView>(
+    await Promise.all(
+      segments.map(async (segment): Promise<[string, SegmentMemberCountView]> => [
+        segment.id,
+        buildSegmentMemberCountView(await countSegmentMembers(orgId, projectId, segment.id)),
+      ]),
+    ),
+  );
+
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
@@ -68,18 +81,28 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
           <p className="text-muted-foreground">{t('noSegments')}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {segments.map((segment) => (
-              <li key={segment.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{segment.name}</span>
-                  <span className="text-xs text-muted-foreground">{t('filterCount', { count: segment.filterCount })}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>{t('schemaLabel', { schemaName: segment.schemaName })}</span>
-                  <span>{t('createdByLabel', { createdAt: segment.createdAt })}</span>
-                </div>
-              </li>
-            ))}
+            {segments.map((segment) => {
+              const memberCountView = memberCountViews.get(segment.id);
+              return (
+                <li key={segment.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{segment.name}</span>
+                    <span className="text-xs text-muted-foreground">{t('filterCount', { count: segment.filterCount })}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>{t('schemaLabel', { schemaName: segment.schemaName })}</span>
+                    <span>{t('createdByLabel', { createdAt: segment.createdAt })}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground" data-testid="segment-member-count">
+                    {memberCountView?.kind === 'ok'
+                      ? t('memberCount', { count: memberCountView.count })
+                      : memberCountView?.kind === 'warehouse_not_configured'
+                        ? t('memberCountNotConfigured')
+                        : t('memberCountError')}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
