@@ -62,6 +62,53 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 — KAN-53 follow-up: dual-secret grace window for hook signing-secret rotation (PR #125, merged)
+
+- **Last completed:**
+  - Session start found `TASKS.md` all-`done` except the standing `needs-human` blockers (KAN-18,
+    KAN-43), so picked the highest-value self-identified follow-up: KAN-53's
+    `setHookEndpointSigningSecret` doc comment explicitly named "no dual-secret grace window" as out
+    of scope, meaning rotating an `hmac_sha256` hook endpoint's signing secret invalidated the old
+    one *instantly* — every in-flight sender's deliveries were rejected until a human updated the
+    sending SaaS's config.
+  - Implemented the grace window: a rotation now moves the displaced secret into
+    `HookEndpointModel.previous_signing_secret_encrypted`/`previous_signing_secret_expires_at` (24h),
+    and `receiveHookPayload` accepts a signature verified against *either* the live or the previous
+    secret while the window is live. The first secret ever set has no prior secret, so no window is
+    created. Once a delivery verifies cleanly against the live secret again *after* the window has
+    lapsed, the previous secret's ciphertext is opportunistically cleared so it doesn't sit at rest
+    indefinitely on an endpoint that never rotates again.
+  - Admin surface (per CLAUDE.md's "everything user-manageable gets an admin surface"): the hooks
+    page shows a "previous secret still accepted until `<time>`" notice under the rotate-secret form
+    while the window is live. New `en`/`he` translation keys only — no hard-coded strings.
+  - **Self-review caught a real bug before the PR opened:** the cleanup path initially cleared the
+    previous secret with `= undefined`, which `@arbel/firebase-orm`'s `getDocumentData()` omits from
+    the object handed to Firestore's `updateDoc()` — leaving the *stale ciphertext* in the document
+    forever rather than clearing it. Fixed to an explicit `= null` (the same gotcha
+    `BoardModel.compare` and `PluginSourceRunModel.cursor_before` already document), the model fields
+    widened to `| null`, and a new emulator test added that asserts the fields are actually falsy in
+    Firestore after the cleanup fires.
+  - Five emulator tests cover the behaviour end to end (first-set creates no window; a rotation does,
+    future-dated; the displaced secret still verifies inside the window; it is rejected once expired;
+    the ciphertext is cleared after a live-secret delivery past expiry). `pnpm lint && pnpm typecheck
+    && pnpm test && pnpm build` all green across the monorepo (19/19 in `hook.emulator.test.ts`, 942
+    `apps/web` unit tests, all 23 Playwright e2e specs — two pre-existing flakes unrelated to this
+    change passed on retry). CI green on both jobs; **PR #125 squash-merged to `main`** (`9f2cafb`).
+- **In progress (exact stopping point):** none — clean stopping point, PR merged and `main` green.
+- **Blocked + why:** nothing blocking the next code task. Note: `git push --delete` of the merged
+  branch returned HTTP 403 in this environment and no branch-delete tool was available, so
+  `kan-53-hook-secret-rotation-grace-window` is still present on the remote despite being merged —
+  harmless, but a human can delete it from the GitHub UI.
+- **Next step:** next run re-reads `TASKS.md`/`PROGRESS.md` and picks the next unblocked item; with
+  the backlog all `done`, that again means choosing the highest-value self-identified follow-up.
+  **Check for concurrently-open PRs before implementing** — prior entries below record two separate
+  duplicate-work collisions from skipping that check.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD, still open).
+  - **KAN-18** — create GCP/Firebase projects + billing + secrets (still open).
+
+---
+
 ## 2026-08-20 — Independently implemented the same ad-platform budget-resource-lookup fix; superseded by a concurrent session's PR #122
 
 - **Last completed:**

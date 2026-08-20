@@ -37,6 +37,9 @@ export class HookEndpointNotHmacModeError extends Error {
 // *entire* credential protecting this endpoint's receive URL.
 const HOOK_ID_BYTES = 24;
 
+/** How long a just-rotated-out signing secret still verifies (see `HookEndpointModel.previous_signing_secret_encrypted`) — the same "named `_TTL_MS` constant, ISO-string expiry" convention `tv-pairing.service.ts` establishes. */
+const SIGNING_SECRET_GRACE_TTL_MS = 24 * 60 * 60 * 1000;
+
 async function requireProjectInOrg(organizationId: string, projectId: string): Promise<ProjectModel> {
   const project = await ProjectModel.init(projectId, { organization_id: organizationId });
   if (!project || project.organization_id !== organizationId) {
@@ -180,16 +183,23 @@ export interface SetHookEndpointSigningSecretParams {
 }
 
 /**
- * Sets (or rotates — same operation, overwriting whatever was there) an
- * `hmac_sha256` endpoint's signing secret (KAN-29 vault, same posture
- * `setSharedCredentialSecret` establishes). Callers must re-configure the
- * sending SaaS with the new value — there is no dual-secret grace window
- * (out of scope for KAN-53's buildable-today version).
+ * Sets (or rotates) an `hmac_sha256` endpoint's signing secret (KAN-29
+ * vault, same posture `setSharedCredentialSecret` establishes). A *rotation*
+ * (a secret already existed) keeps the displaced secret verifiable for
+ * `SIGNING_SECRET_GRACE_TTL_MS` — the sending SaaS keeps working with its
+ * still-configured old value until the human updates it or the window
+ * lapses, rather than every delivery failing signature verification the
+ * instant the secret changes. The very first set (no prior secret) has
+ * nothing to grace-period.
  */
 export async function setHookEndpointSigningSecret(params: SetHookEndpointSigningSecretParams): Promise<HookEndpointModel> {
   const endpoint = await loadHookEndpoint(params.organizationId, params.projectId, params.hookEndpointId);
   if (endpoint.signature_mode !== 'hmac_sha256') {
     throw new HookEndpointNotHmacModeError();
+  }
+  if (endpoint.signing_secret_encrypted) {
+    endpoint.previous_signing_secret_encrypted = endpoint.signing_secret_encrypted;
+    endpoint.previous_signing_secret_expires_at = new Date(Date.now() + SIGNING_SECRET_GRACE_TTL_MS).toISOString();
   }
   endpoint.signing_secret_encrypted = await encryptSecret(
     params.signingSecret,
@@ -272,11 +282,35 @@ export async function receiveHookPayload(params: ReceiveHookPayloadParams): Prom
     if (!signatureHeaderValue || !endpoint.signing_secret_encrypted || !params.kms) {
       return err('invalid_signature');
     }
-    const secret = await decryptSecret(endpoint.signing_secret_encrypted, endpointBindingId(endpoint.organization_id, endpoint.id), params.kms);
-    if (!verifyGenericHmacSignature(params.rawBody, signatureHeaderValue, secret)) {
+    const bindingId = endpointBindingId(endpoint.organization_id, endpoint.id);
+    const secret = await decryptSecret(endpoint.signing_secret_encrypted, bindingId, params.kms);
+    const nowIso = new Date().toISOString();
+    if (verifyGenericHmacSignature(params.rawBody, signatureHeaderValue, secret)) {
+      signatureVerified = true;
+      if (endpoint.previous_signing_secret_expires_at && endpoint.previous_signing_secret_expires_at <= nowIso) {
+        // Opportunistic cleanup: the sending SaaS is verifying fine against the live secret again
+        // (its own grace window has lapsed), so there's no reason to keep the displaced ciphertext
+        // around any longer — best-effort, never fails the delivery itself.
+        try {
+          endpoint.previous_signing_secret_encrypted = null;
+          endpoint.previous_signing_secret_expires_at = null;
+          await endpoint.save();
+        } catch {
+          // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+        }
+      }
+    } else if (endpoint.previous_signing_secret_encrypted && endpoint.previous_signing_secret_expires_at && endpoint.previous_signing_secret_expires_at > nowIso) {
+      // Rejected against the live secret — still within a rotation's grace window (see
+      // `setHookEndpointSigningSecret`), so give the just-displaced secret one more try before
+      // failing the delivery outright.
+      const previousSecret = await decryptSecret(endpoint.previous_signing_secret_encrypted, bindingId, params.kms);
+      if (verifyGenericHmacSignature(params.rawBody, signatureHeaderValue, previousSecret)) {
+        signatureVerified = true;
+      }
+    }
+    if (!signatureVerified) {
       return err('invalid_signature');
     }
-    signatureVerified = true;
   }
 
   const delivery = new HookDeliveryModel();

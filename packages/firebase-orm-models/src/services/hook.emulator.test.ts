@@ -17,6 +17,7 @@ import {
   listHookEndpointsForProject,
   MissingSignatureHeaderNameError,
   ProjectNotFoundError,
+  HookEndpointModel,
   receiveHookPayload,
   setHookDeliveryStatus,
   setHookEndpointSigningSecret,
@@ -138,6 +139,66 @@ describe('setHookEndpointSigningSecret', () => {
         actedByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(HookEndpointNotHmacModeError);
+  });
+
+  it('does not populate a previous-secret grace window on the very first set', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook First Set Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'x',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Signature',
+      createdByUserId: owner.id,
+    });
+
+    const afterFirstSet = await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'first-secret',
+      kms: kms(),
+      actedByUserId: owner.id,
+    });
+
+    expect(afterFirstSet.previous_signing_secret_encrypted).toBeUndefined();
+    expect(afterFirstSet.previous_signing_secret_expires_at).toBeUndefined();
+  });
+
+  it('a rotation moves the displaced secret into a future-dated grace window', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Rotate Grace Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'x',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Signature',
+      createdByUserId: owner.id,
+    });
+    const secretKms = kms();
+    await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'old-secret',
+      kms: secretKms,
+      actedByUserId: owner.id,
+    });
+
+    const rotated = await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'new-secret',
+      kms: secretKms,
+      actedByUserId: owner.id,
+    });
+
+    expect(rotated.previous_signing_secret_encrypted).toBeDefined();
+    expect(rotated.previous_signing_secret_expires_at).toBeTruthy();
+    expect(new Date(rotated.previous_signing_secret_expires_at!).getTime()).toBeGreaterThan(Date.now());
   });
 });
 
@@ -326,6 +387,149 @@ describe('receiveHookPayload', () => {
     if (!result.ok) {
       expect(result.error).toBe('invalid_signature');
     }
+  });
+
+  it('still accepts a signature made with the just-rotated-out secret while its grace window is live', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Grace Accept Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Rotated webhook',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Signature',
+      createdByUserId: owner.id,
+    });
+    const secretKms = kms();
+    await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'old-secret',
+      kms: secretKms,
+      actedByUserId: owner.id,
+    });
+    await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'new-secret',
+      kms: secretKms,
+      actedByUserId: owner.id,
+    });
+
+    const rawBody = JSON.stringify({ ping: true });
+    const oldSignature = `sha256=${createHmac('sha256', 'old-secret').update(rawBody).digest('hex')}`;
+
+    const accepted = await receiveHookPayload({
+      hookId: endpoint.hook_id,
+      rawBody,
+      headers: { 'x-signature': oldSignature },
+      kms: secretKms,
+    });
+    expect(accepted.ok).toBe(true);
+    if (accepted.ok) {
+      expect(accepted.value.delivery.signature_verified).toBe(true);
+    }
+  });
+
+  it('rejects the old secret once its grace window has expired', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Grace Expired Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Rotated webhook',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Signature',
+      createdByUserId: owner.id,
+    });
+    const secretKms = kms();
+    await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'old-secret',
+      kms: secretKms,
+      actedByUserId: owner.id,
+    });
+    await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'new-secret',
+      kms: secretKms,
+      actedByUserId: owner.id,
+    });
+
+    const stored = await HookEndpointModel.init(endpoint.id, { organization_id: organization.id, project_id: project.id });
+    expect(stored).not.toBeNull();
+    stored!.previous_signing_secret_expires_at = new Date(Date.now() - 1000).toISOString();
+    await stored!.save();
+
+    const rawBody = JSON.stringify({ ping: true });
+    const oldSignature = `sha256=${createHmac('sha256', 'old-secret').update(rawBody).digest('hex')}`;
+
+    const result = await receiveHookPayload({
+      hookId: endpoint.hook_id,
+      rawBody,
+      headers: { 'x-signature': oldSignature },
+      kms: secretKms,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBe('invalid_signature');
+    }
+  });
+
+  it('opportunistically clears an already-expired previous secret once a delivery verifies against the live one', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Grace Cleanup Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Rotated webhook',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Signature',
+      createdByUserId: owner.id,
+    });
+    const secretKms = kms();
+    await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'old-secret',
+      kms: secretKms,
+      actedByUserId: owner.id,
+    });
+    await setHookEndpointSigningSecret({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      signingSecret: 'new-secret',
+      kms: secretKms,
+      actedByUserId: owner.id,
+    });
+
+    const stored = await HookEndpointModel.init(endpoint.id, { organization_id: organization.id, project_id: project.id });
+    expect(stored).not.toBeNull();
+    stored!.previous_signing_secret_expires_at = new Date(Date.now() - 1000).toISOString();
+    await stored!.save();
+
+    const rawBody = JSON.stringify({ ping: true });
+    const newSignature = `sha256=${createHmac('sha256', 'new-secret').update(rawBody).digest('hex')}`;
+
+    const accepted = await receiveHookPayload({
+      hookId: endpoint.hook_id,
+      rawBody,
+      headers: { 'x-signature': newSignature },
+      kms: secretKms,
+    });
+    expect(accepted.ok).toBe(true);
+
+    const afterCleanup = await HookEndpointModel.init(endpoint.id, { organization_id: organization.id, project_id: project.id });
+    expect(afterCleanup!.previous_signing_secret_encrypted).toBeFalsy();
+    expect(afterCleanup!.previous_signing_secret_expires_at).toBeFalsy();
   });
 });
 
