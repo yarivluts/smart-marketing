@@ -49,9 +49,14 @@ Template for each entry:
   - Verified locally before opening the PR: `packages/shared` unit (389, compiler 18→20),
     `metrics-compiler.emulator` (real registry→compiler, 5), `board.emulator`+`goal.emulator`
     (metric-query consumers, 44), and full-monorepo `pnpm lint`/`typecheck`/`build` all green.
-- **In progress (exact stopping point):** PR #126 opened, awaiting CI; subscribed for drive-to-green.
+- **Merged 2026-08-20:** PR #126 is green and **squash-merged into `main`** (`0623504`); both required
+  checks (`lint · typecheck · test · build`, `terraform fmt · validate`) passed. The head branch
+  `fix/metrics-compiler-inclusive-end-timestamp` could **not** be deleted from a scheduled run — the
+  git-over-HTTPS push-delete is denied by proxy org policy (HTTP 403), the same environment limitation
+  that has left every prior merged `kan-*` branch undeleted; harmless, a human can prune it.
+- **In progress (exact stopping point):** none — #126 fully landed.
 - **Blocked + why:** unchanged standing items only.
-- **Next step:** land #126 once CI is green (merge + record). The compiler review also surfaced a
+- **Next step:** the compiler review also surfaced a
   **separate, unfixed** bug kept out of #126 to stay one-task-scoped: `time.ts`
   `computeCompareWindow`'s `previous_year` uses `setUTCFullYear(y-1)`, so a window ending
   `2024-02-29` rolls forward to `2023-03-01` (JS leap-day overflow) instead of `2023-02-28`, spilling
