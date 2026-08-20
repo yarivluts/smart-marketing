@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 (late) — Quality batch: indexes codified, identity chain on BigQuery, real-envelope bug fixed
+
+- **Last completed:** the three non-human-gated items from the "what's next" list (Yariv approved
+  starting them; items 1/4 are his own actions).
+  - **#2 ingest docs — already done** by a concurrent scheduled run (PR #130, `docs/api/ingest.md`),
+    covering exactly the shapes session B had to reverse-engineer. Pointed session B at it.
+  - **#5 indexes codified (PR #132, merged):** `firestore.indexes.json` + `firebase.json` mirror the
+    complete live composite-index set (read back via `gcloud firestore indexes composite list`), and
+    `infra/terraform/README.md` documents the standing rule — a new compound query adds its index in
+    the same PR. This closes a bug class that had recurred SEVEN times, always found in production
+    because the emulator doesn't enforce composite indexes.
+  - **#3 lp_* — reframed and solved deeper than scoped (PRs #133 + the envelope fix, both merged):**
+    the pack's own lp_* metrics were correctly defined all along against
+    `fact_landing_page_performance`; that model was simply BigQuery-disabled because the identity
+    chain extracts registered identity keys by a data-driven JSON path BigQuery can't express.
+    Added a compile-time BigQuery leg restricted to the tracking snippet's FIXED-path identity
+    envelope (`anon_id`/`customer_id`), which is exactly what a snippet-instrumented site produces —
+    so `bridge_identity` → `fact_attribution` → `fact_landing_page_performance` now build on the
+    real warehouse (registered custom identity keys stay DuckDB-only, documented).
+  - **The real find of the batch:** driving session-B's live touchpoint + conversion events through
+    the newly-enabled chain produced `(unknown) | (none) | visitors=1 | conversions=0`. Root cause:
+    every model treated `raw_records.payload` as the user's flat field map, but ingest stores the
+    whole ENVELOPE (`{event, event_id, ts, properties}` / `{id, attributes}` /
+    `{measure, ts, value, dimensions}`). The FIXTURE SEED encoded the same wrong assumption, so
+    DuckDB/CI had been green forever while real data silently produced garbage. Fixed with a
+    portable `json_object_field` macro, envelope-aware staging/core models, and — critically — the
+    fixture rewritten into real envelope shapes so DuckDB now tests what production stores.
+    Live proof on session-B's own data: `/pricing | brand | paid_search | visitors=1 |
+    conversions=1` — the full touchpoint → identity → attribution → landing-page chain resolving
+    correctly, conversion attributed.
+  - Scheduled `dbt-refresh` job image rebuilt twice so hourly ticks carry both changes.
+- **In progress (exact stopping point):** session B verifying the pack's Landing page performance
+  board renders 1/1/100%, and re-checking the ad-side tiles (unaffected by the envelope bug — mart
+  views read raw payload directly — but worth confirming).
+- **Blocked + why:** nothing.
+- **Next step:** whatever the relay surfaces; the remaining "what's next" tiers are Yariv-gated
+  (snippet paste, KAN-43 applications) or bigger bets (funnel analysis, AI Analyst, real ad plugins).
+- **Waiting on human:** standing only (KAN-43, Redis cost decision).
+
+
 ## 2026-08-20 — Metric registry validates aggregation columns against custom-schema marts (PR #131)
 
 - **Last completed:**
