@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
+  getWarehouseFreshnessForProject,
   listEnvironmentsForProject,
   listFailedPipelineMessagesForProject,
   listOrchestrationRunsForProject,
@@ -65,13 +66,14 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
     notFound();
   }
 
-  const [projects, batches, environments, quarantinedRecords, failedPipelineMessages, orchestrationRuns] = await Promise.all([
+  const [projects, batches, environments, quarantinedRecords, failedPipelineMessages, orchestrationRuns, warehouseFreshness] = await Promise.all([
     listOrgProjects(orgId),
     listRecentIngestBatchesForProject(orgId, projectId),
     listEnvironmentsForProject(orgId, projectId),
     listQuarantinedRecordsForProject(orgId, projectId),
     listFailedPipelineMessagesForProject(orgId, projectId),
     listOrchestrationRunsForProject(orgId, projectId),
+    getWarehouseFreshnessForProject({ organizationId: orgId, projectId }),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -187,6 +189,30 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{t('orchestrationHeading')}</h2>
           <TriggerOrchestrationRunButton orgId={orgId} projectId={projectId} />
+        </div>
+
+        {/* Live warehouse freshness (KAN-38 follow-up): read from the real
+          warehouse itself, so it reflects EVERY refresh mechanism — the
+          hourly scheduled dbt-refresh Cloud Run Job included — not just the
+          in-app "Run now" history below, which only tracks its own runs
+          (session-B QA, 2026-08-20: this panel looked permanently empty
+          while the scheduled refresh ran like clockwork). */}
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">{t('warehouseFreshnessHeading')}</h3>
+          {warehouseFreshness.status === 'ok' ? (
+            <p className="text-sm text-muted-foreground">
+              {warehouseFreshness.latestLandedAt
+                ? t('warehouseFreshnessLine', {
+                    latestLandedAt: warehouseFreshness.latestLandedAt,
+                    count: warehouseFreshness.landedRecordCount,
+                  })
+                : t('warehouseFreshnessEmpty')}
+            </p>
+          ) : warehouseFreshness.status === 'not_configured' ? (
+            <p className="text-sm text-muted-foreground">{t('warehouseFreshnessNotConfigured')}</p>
+          ) : (
+            <p className="text-sm text-destructive">{t('warehouseFreshnessError', { message: warehouseFreshness.message })}</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

@@ -41,6 +41,8 @@ import {
   listMetricsCatalogForProject as listMetricsCatalogForProjectInOrganization,
   listOrgMembersWithProfiles,
   listOrchestrationRunsForProject as listOrchestrationRunsForProjectInOrganization,
+  getWarehouseFreshnessForProject as getWarehouseFreshnessForProjectInOrganization,
+  type WarehouseFreshnessResult,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
   listBuiltinMetricPacks,
@@ -261,6 +263,14 @@ export async function listOrchestrationRunsForProject(
 ): Promise<OrchestrationRunModel[]> {
   await ensureFirestoreOrm();
   return listOrchestrationRunsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function getWarehouseFreshnessForProject(params: {
+  organizationId: string;
+  projectId: string;
+}): Promise<WarehouseFreshnessResult> {
+  await ensureFirestoreOrm();
+  return getWarehouseFreshnessForProjectInOrganization(params);
 }
 
 export async function verifyAuditLogChainForOrg(organizationId: string): Promise<AuditLogChainVerification> {

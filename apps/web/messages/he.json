@@ -536,7 +536,12 @@
     "orchestrationRunError": "שגיאה: {message}",
     "orchestrationRunStatusRunning": "פועל",
     "orchestrationRunStatusSucceeded": "הצליח",
-    "orchestrationRunStatusFailed": "נכשל"
+    "orchestrationRunStatusFailed": "נכשל",
+    "warehouseFreshnessHeading": "עדכניות מחסן הנתונים (חי)",
+    "warehouseFreshnessLine": "הרשומה האחרונה נחתה: {latestLandedAt} UTC — {count} רשומות נחתו בסביבת הייצור. מתרענן כל שעה על ידי משימת המחסן המתוזמנת.",
+    "warehouseFreshnessEmpty": "מחסן הנתונים מחובר אך טרם נחתו רשומות עבור סביבת הייצור של הפרויקט הזה.",
+    "warehouseFreshnessNotConfigured": "טרם הוגדר מחסן נתונים לפריסה הזו — העדכניות תופיע כאן ברגע ש-BigQuery יחובר.",
+    "warehouseFreshnessError": "לא ניתן היה לקרוא את עדכניות מחסן הנתונים: {message}"
   },
   "CostGuardrails": {
     "metaTitle": "בקרות עלות",

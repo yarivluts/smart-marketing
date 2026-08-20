@@ -536,7 +536,12 @@
     "orchestrationRunError": "Error: {message}",
     "orchestrationRunStatusRunning": "Running",
     "orchestrationRunStatusSucceeded": "Succeeded",
-    "orchestrationRunStatusFailed": "Failed"
+    "orchestrationRunStatusFailed": "Failed",
+    "warehouseFreshnessHeading": "Warehouse freshness (live)",
+    "warehouseFreshnessLine": "Latest landed record: {latestLandedAt} UTC — {count} records landed in the production environment. Refreshed hourly by the scheduled warehouse job.",
+    "warehouseFreshnessEmpty": "The warehouse is connected but no records have landed for this project's production environment yet.",
+    "warehouseFreshnessNotConfigured": "No warehouse is configured for this deployment yet — freshness will appear here once BigQuery is connected.",
+    "warehouseFreshnessError": "Couldn't read warehouse freshness: {message}"
   },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",
