@@ -45,16 +45,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
   }
 }
 
-/** Deletes a board outright (see `deleteBoard`'s own doc comment for why a board, unlike most lifecycle models in this codebase, has no keep-forever audit requirement). */
+/** Deletes a board outright (audit-logged — see `deleteBoard`'s own doc comment). */
 export async function DELETE(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, boardId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
   if (error) {
     return error;
   }
 
   try {
-    await deleteBoard(orgId, projectId, boardId);
+    await deleteBoard(orgId, projectId, boardId, user.id);
     return new NextResponse(null, { status: 204 });
   } catch (err) {
     if (err instanceof BoardNotFoundError) {

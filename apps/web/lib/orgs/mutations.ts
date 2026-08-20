@@ -794,9 +794,9 @@ export async function saveBoardTiles(input: SaveBoardTilesInput): Promise<BoardM
   return saveBoardTilesInOrganization(input);
 }
 
-export async function deleteBoard(organizationId: string, projectId: string, boardId: string): Promise<void> {
+export async function deleteBoard(organizationId: string, projectId: string, boardId: string, deletedByUserId: string): Promise<void> {
   await ensureFirestoreOrm();
-  return deleteBoardInOrganization(organizationId, projectId, boardId);
+  return deleteBoardInOrganization(organizationId, projectId, boardId, deletedByUserId);
 }
 
 interface CreateGoalInput {

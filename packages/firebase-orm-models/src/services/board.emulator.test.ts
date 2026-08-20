@@ -10,6 +10,7 @@ import {
   getBoard,
   InMemoryMetricQueryResultCache,
   InvalidBoardError,
+  listAuditLogEntriesForOrg,
   listBoardsForProject,
   ProjectNotFoundError,
   queryBoardTile,
@@ -222,6 +223,9 @@ describe('updateBoardSettings', () => {
     expect(withFilters.compare).toBe('previous_period');
     expect(withFilters.global_filters).toEqual([{ field: 'channel', operator: '=', value: 'google' }]);
     expect(withFilters.name).toBe('Revenue');
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.filter((entry) => entry.action === 'board.settings_update' && entry.target_id === board.id)).toHaveLength(2);
   });
 
   it('clears compare when explicitly set to null, and rejects an inverted date range', async () => {
@@ -282,6 +286,9 @@ describe('saveBoardTiles', () => {
 
     const reloaded = await getBoard(organization.id, project.id, board.id);
     expect(reloaded?.tiles).toEqual(tiles);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.some((entry) => entry.action === 'board.tiles_save' && entry.target_id === board.id)).toBe(true);
   });
 
   it('accepts a funnel tile with two or more ordered metric steps', async () => {
@@ -491,10 +498,13 @@ describe('deleteBoard', () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Delete Org');
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
 
-    await deleteBoard(organization.id, project.id, board.id);
+    await deleteBoard(organization.id, project.id, board.id, owner.id);
 
     expect(await getBoard(organization.id, project.id, board.id)).toBeNull();
     expect(await listBoardsForProject(organization.id, project.id)).toEqual([]);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.some((entry) => entry.action === 'board.delete' && entry.target_id === board.id)).toBe(true);
   });
 
   it('throws BoardNotFoundError for a board that does not belong to this org+project', async () => {
@@ -502,7 +512,7 @@ describe('deleteBoard', () => {
     const { organization: otherOrg, project: otherProject } = await setupOrgWithProject('Board Delete Other Org');
     const board = await createBoard({ organizationId: otherOrg.id, projectId: otherProject.id, name: 'Marketing', createdByUserId: owner.id });
 
-    await expect(deleteBoard(organization.id, project.id, board.id)).rejects.toBeInstanceOf(BoardNotFoundError);
+    await expect(deleteBoard(organization.id, project.id, board.id, owner.id)).rejects.toBeInstanceOf(BoardNotFoundError);
   });
 });
 
