@@ -51,9 +51,19 @@ function addDaysUtc(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 86_400_000);
 }
 
+/**
+ * Shifts a UTC calendar date by whole years, clamping a Feb 29 that lands on a
+ * non-leap target year to Feb 28 instead of overflowing into March (the
+ * behavior `Date#setUTCFullYear` has on that date: e.g. 2024-02-29 minus one
+ * year becomes 2023-03-01, not 2023-02-28).
+ */
 function addYearsUtc(date: Date, years: number): Date {
+  const month = date.getUTCMonth();
   const result = new Date(date.getTime());
   result.setUTCFullYear(result.getUTCFullYear() + years);
+  if (result.getUTCMonth() !== month) {
+    result.setUTCDate(0);
+  }
   return result;
 }
 
