@@ -59,16 +59,31 @@ Template for each entry:
     keeping both, this one first). `schema-registry.service.ts` auto-merged cleanly (this change's
     `validateFields`/`MART_INTRINSIC_COLUMNS` work and #131's `validateAggregationAgainstRegisteredSchema`
     touch disjoint parts of the file).
-- **In progress (exact stopping point):** PR #134 rebased onto current `main`; pushing now, then
-  waiting for CI (it never ran on the pre-rebase head — GitHub doesn't check a `dirty`-mergeable-state
-  PR — this is likely why: confirm CI actually starts post-push) before merging and deleting the branch.
-- **Blocked + why:** nothing but CI turnaround.
-- **Next step:** once #134 is green and merged, a future run should still **check open PRs first** (the
-  concurrent-session collision pattern persists — 4 PRs landed/open around this run). Remaining
+  - **Lesson worth keeping — a PR with a merge conflict never gets CI at all.** #134 sat ~30 min with
+    `total_count: 0` check runs and an empty `list_workflow_runs` for its branch, which reads exactly
+    like "CI is slow to queue". It wasn't: `mergeable_state` was `dirty`, and GitHub does not schedule
+    `pull_request` workflow runs for an unmergeable head. The tell is `mergeable_state`, not the check
+    list — **when checks are missing rather than pending, read `pull_request_read: get` first.**
+    Resolving the conflict and pushing queued CI within seconds. Main moved twice mid-run (#131/#132/#133,
+    then #135 + a record commit), so this happened twice; both conflicts were the same shape — two runs
+    prepending a PROGRESS.md entry at the same anchor — and both resolved by keeping both entries, newest
+    first. No code conflict either time (`schema-registry.service.ts` auto-merged cleanly against #131's
+    `validateAggregationAgainstRegisteredSchema`, which touches a disjoint part of the file).
+  - **Merged 2026-08-20:** PR #134 squash-merged into `main` (`df454da`) after CI ran green on the
+    conflict-free head; no review comments. Verified the fix on `main` post-merge
+    (`MART_INTRINSIC_COLUMNS` exported, `rejectMartIntrinsicNames` gating `validateFields`). Local
+    branch deleted; the **remote** branch delete hit the same git-over-HTTPS proxy **HTTP 403** every
+    prior merged branch has hit from a scheduled run — harmless, a human can prune
+    `fix/mart-reserved-field-names` along with the others.
+- **In progress (exact stopping point):** none — #134 fully landed.
+- **Blocked + why:** nothing.
+- **Next step:** a future run should still **check open PRs first** (the concurrent-session collision
+  pattern persists — 5 PRs landed/open around this run: #128, #131, #132, #133, #135). Remaining
   self-identified headless-buildable follow-ups are thin now; deeper KAN-18/KAN-19 scope needs the
   interactive per-command-approved GCP pattern, not a headless run. Also worth a look: #131's own entry
   below flags that #133 ("identity/attribution chain on BigQuery") may have already closed the
-  `fact_landing_page_performance`/`lp_*` BigQuery gap it scoped out — unverified as of this entry.
+  `fact_landing_page_performance`/`lp_*` BigQuery gap it scoped out — and the later quality-batch entry
+  says it did, with live proof; a run wanting to confirm should check the board renders, not the titles.
 - **Waiting on human:** standing items only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
   live-infra sub-items).
 
