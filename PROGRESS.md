@@ -17,6 +17,66 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 (later still) — `allowedHours` guardrail: equal start/end silently blocked all automation (PR #139)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked open PRs first**: **#138**
+    (mart views reading the wrong JSON level) was open and actively being driven by a concurrent
+    session — reviewed it, confirmed it was sound (already covered the top-priority follow-up this
+    run would otherwise have picked), and deliberately left it alone rather than duplicate work.
+    It merged mid-run. **#137** (docs-only, records #128) was also open, untouched, unrelated to
+    anything below.
+  - Picked the next-highest-value **unclaimed** follow-up from #138's own "not taken here" list
+    (item 5): `checkAllowedHours` (`packages/shared/src/automation-guardrails/evaluate.ts`)
+    evaluated a `[start, end)` half-open interval, wrapping past midnight when
+    `startHourUtc > endHourUtc`. When `startHourUtc === endHourUtc` it took the non-wrapping branch
+    and collapsed to `hour >= s && hour < s` — `false` for every hour, silently blocking automation
+    project-wide, every hour of every day — while the violation message
+    (`Automation is only allowed between 9:00 and 9:00 UTC.`) reads as though a window is open. The
+    admin form (`automation-guardrail-policy-form.tsx`) only validates "both or neither are set",
+    not `start !== end`, so a human can trivially land in this state (including by never touching
+    the fields' shared default).
+  - **Fix:** `startHourUtc === endHourUtc` is now treated as **unrestricted (24h)**, not a
+    zero-width window — the only reading consistent with how the violation message describes the
+    window, and the safer default for a guardrail meant to *protect* automation windows rather than
+    silently disable automation with a misleading message. Documented the new semantics on
+    `AutomationGuardrailPolicy.allowedHours`'s doc comment alongside the existing wrap-around note.
+  - **Tests:** new case in `evaluate.test.ts` — `{ startHourUtc: 9, endHourUtc: 9 }` now allows a
+    budget-change action at 09:00, 00:00, and 23:00 UTC (previously all three were rejected). 22/22
+    `automation-guardrails` tests pass.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` all green. `pnpm test`: `packages/shared`
+    passes directly (this package has no Firestore dependency at all). The full monorepo run hit one
+    unrelated flake — `firebase-orm-models`'s `metric-pack-dispatch.emulator.test.ts` (9 tests) timed
+    out under full-suite concurrency with the same `RESOURCE_EXHAUSTED: Received message larger than
+    max` Firestore-emulator-overload class documented in earlier entries; re-ran that file alone and
+    got 10/10 pass in 124s, confirming it wasn't this change.
+  - **Rebase note:** opened the PR branch off `main` before #138 merged; after #138 landed mid-run,
+    confirmed via `git merge-tree` there was no real conflict (disjoint files — #138 touched
+    `warehouse/schema-mart.ts`/`schema-registry.service.ts`/`metric-registry.service.ts`, this touched
+    only `automation-guardrails/`) rather than pre-emptively rebasing; GitHub's `mergeable_state` went
+    `unstable` -> `clean` on its own once CI reran against the moved base.
+  - **Merged 2026-08-20:** PR #139 squash-merged into `main` (`5ce1090`) after both checks
+    (`lint · typecheck · test · build`, `terraform fmt · validate`) passed and `mergeable_state`
+    settled to `clean`; no review comments. The **remote** branch delete hit the same git-over-HTTPS
+    proxy **HTTP 403** every prior merged branch from a scheduled run has hit — harmless, a human can
+    prune `fix/allowed-hours-equal-bounds` along with the others already queued for cleanup.
+- **In progress (exact stopping point):** none — #139 fully landed.
+- **Blocked + why:** nothing.
+- **Next step:** #138's own entry (below) lists four more unclaimed, verified-no-live-infra-needed
+  follow-ups a future run can pick without re-deriving them: (1) tracking alerts/event-volume
+  sparklines not filtering by `environment_id` (needs a new composite index in the same PR); (2) the
+  SaaS pack targeting four nonexistent warehouse tables — scoping to `fact_ad_spend` alone would
+  light up several real metrics; (3) four hand-written warehouse readers bypassing the cost
+  quota/log; (4) a pack whose board seeding half-fails leaves a permanently blank board with no
+  repair action. Also still open and untouched: **PR #137** (docs-only, records #128) — check
+  whether it landed before picking the next task.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting).
+
+---
+
 ## 2026-08-20 (later) — Mart views read the wrong JSON level: every custom measure/entity column was NULL
 
 - **Last completed:**
