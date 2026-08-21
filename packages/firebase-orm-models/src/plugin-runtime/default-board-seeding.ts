@@ -51,6 +51,18 @@ export interface EnsurePackDefaultBoardsSeededResult {
  * - A board with this name exists, tagged as this pack's own, and already
  *   has tiles → already fully seeded by an earlier call; left untouched.
  *   Also reported as `alreadyPresent`.
+ *
+ * Known, accepted trade-off: this function only ever runs again on an
+ * explicit reinstall (`installPluginAndProvisionBuiltins` calls it once,
+ * right after install), which is already documented elsewhere as the
+ * deliberate way to converge a partially-provisioned pack. So the one case
+ * this can't tell apart from an interrupted seed is a human who, after a
+ * successful install, deliberately removed every tile from one of this
+ * pack's own boards (leaving it intentionally blank) and *then* reinstalls
+ * the pack — that reinstall repopulates the default tiles rather than
+ * respecting the deliberate clear. Reinstalling to "fix" a pack's own
+ * provisioning is exactly what this function exists to support, so this
+ * reads as the right default rather than a gap worth its own tracking field.
  */
 export async function ensurePackDefaultBoardsSeeded(
   pluginId: string,
