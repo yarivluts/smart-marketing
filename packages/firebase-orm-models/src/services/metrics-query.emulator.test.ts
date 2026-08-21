@@ -7,6 +7,7 @@ import {
   evolveMetricDefinition,
   getMetricCatalogDetail,
   InMemoryMetricQueryResultCache,
+  KNOWN_UNBUILT_WAREHOUSE_TABLES,
   listEnvironmentsForProject,
   listMetricsCatalogForProject,
   listQueryCostLogEntriesForProject,
@@ -384,6 +385,46 @@ describe('queryMetrics', () => {
 
   it('fails fast with MetricTargetsUnbuiltWarehouseTableError for a metric targeting a known-unbuilt table, without touching the executor, cache, or cost-quota log', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Unbuilt Table Org');
+    // `KNOWN_UNBUILT_WAREHOUSE_TABLES` is empty today (see its own doc
+    // comment) — everything it used to list, including `fact_funnel_event`,
+    // now has a real dbt core model (2026-08-21 KAN-59 follow-up). This test
+    // exercises the generic mechanism against a table added just for it.
+    const fixtureOnlyUnbuiltTable = 'fixture_only_unbuilt_table_for_test';
+    KNOWN_UNBUILT_WAREHOUSE_TABLES.add(fixtureOnlyUnbuiltTable);
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'count_distinct', table: fixtureOnlyUnbuiltTable, column: 'customer_id', timeColumn: 'ts', filters: [{ field: 'step', operator: '=', value: 'signup' }] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-01-01', signups: 5 }]);
+
+    try {
+      await expect(
+        queryMetrics({
+          organizationId: organization.id,
+          projectId: project.id,
+          request: { metrics: ['signups'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+          executor,
+          cache: new InMemoryMetricQueryResultCache(),
+        }),
+      ).rejects.toThrowError(expect.objectContaining({ name: 'MetricTargetsUnbuiltWarehouseTableError', metricName: 'signups', table: fixtureOnlyUnbuiltTable }));
+    } finally {
+      KNOWN_UNBUILT_WAREHOUSE_TABLES.delete(fixtureOnlyUnbuiltTable);
+    }
+
+    expect(executor.callCount).toBe(0);
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries).toEqual([]);
+  });
+
+  it('actually reaches the executor for signups (fact_funnel_event) now that a real core model backs it (2026-08-21 KAN-59 follow-up)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Event Now Real Org');
     await registerMetricDefinition({
       organizationId: organization.id,
       projectId: project.id,
@@ -397,19 +438,16 @@ describe('queryMetrics', () => {
     });
     const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-01-01', signups: 5 }]);
 
-    await expect(
-      queryMetrics({
-        organizationId: organization.id,
-        projectId: project.id,
-        request: { metrics: ['signups'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
-        executor,
-        cache: new InMemoryMetricQueryResultCache(),
-      }),
-    ).rejects.toThrowError(expect.objectContaining({ name: 'MetricTargetsUnbuiltWarehouseTableError', metricName: 'signups', table: 'fact_funnel_event' }));
+    const result = await queryMetrics({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['signups'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
 
-    expect(executor.callCount).toBe(0);
-    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
-    expect(entries).toEqual([]);
+    expect(executor.callCount).toBe(1);
+    expect(result.series).toEqual([{ bucket_date: '2026-01-01', signups: 5 }]);
   });
 });
 

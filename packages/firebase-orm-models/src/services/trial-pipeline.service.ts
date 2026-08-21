@@ -56,11 +56,13 @@ export interface GetTrialPipelineSummaryParams {
  * warehouse configured yet, the project's daily quota is spent, the
  * request/catalog itself is invalid — e.g. the SaaS pack was never
  * installed in this project, so `trials_active`/`trial_conversion_rate`
- * aren't registered — or, today, always: `trials_active`/`trial_starts`/
- * `trial_conversions` target `dim_subscription`/`fact_subscription_event`,
- * both in `MetricTargetsUnbuiltWarehouseTableError`'s known-unbuilt list, so
- * this widget currently degrades to `not_yet_backed` in every real project
- * until a real dbt model backs those tables).
+ * aren't registered — or its metrics target a table in
+ * `MetricTargetsUnbuiltWarehouseTableError`'s known-unbuilt list). As of the
+ * 2026-08-21 KAN-59 follow-up that gave `trials_active`/`trial_starts`/
+ * `trial_conversions` real `dim_subscription`/`fact_subscription_event` core
+ * models, that list is empty — this widget now resolves against a real
+ * warehouse like every other query, `not_yet_backed` only fires again if a
+ * future metric pack registers against a genuinely-not-yet-built table.
  */
 export async function getTrialPipelineSummary(params: GetTrialPipelineSummaryParams): Promise<TrialPipelineOutcome> {
   const request: MetricQueryRequest = {

@@ -13,15 +13,18 @@ export interface LandingPagePackMetricDefinition {
 
 /**
  * Every metric here aggregates `fact_landing_page_performance` — a table
- * that, unlike the SaaS/Engagement packs' `fact_funnel_event`/`fact_revenue_
- * event`/etc. (plan `04 §1`'s canonical-but-aspirational schema, pending a
- * real warehouse in KAN-18), **actually exists in `@growthos/dbt-transform`**
- * and is built and tested against fixture data on every `pnpm test`. So
- * these three are the first pack metrics whose SQL targets a table the
- * pipeline really produces end to end. (The SaaS pack's own `ad_spend` later
- * gained a second, different route to a real relation — a self-provisioned
- * measure-schema mart view rather than a dbt-built table — see that pack's
- * own `metrics.ts` doc comment on `AD_SPEND`.)
+ * that **actually exists in `@growthos/dbt-transform`** and is built and
+ * tested against fixture data on every `pnpm test`, unlike the SaaS/
+ * Engagement packs' `fact_funnel_event`/`fact_revenue_event`/etc. were when
+ * this pack was first built (plan `04 §1`'s canonical-but-then-aspirational
+ * schema, pending a real warehouse in KAN-18 — that follow-up landed
+ * 2026-08-21, so those tables are real dbt core models too now; see the SaaS
+ * pack's own `metrics.ts` doc comment). So these three were the first pack
+ * metrics whose SQL targeted a table the pipeline really produced end to
+ * end. (The SaaS pack's own `ad_spend` separately gained a route to a real
+ * relation via a self-provisioned measure-schema mart view rather than a
+ * dbt-built table — see that pack's own `metrics.ts` doc comment on
+ * `AD_SPEND`.)
  *
  * The three dimensions are the columns that table really carries, per the
  * SaaS pack's own rule ("declare a dimension only where the aggregation

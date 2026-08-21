@@ -24,7 +24,15 @@ seeds:
       deliberately distinct activity-day counts — 10/3/1/6 out of the
       2026-04-01..2026-04-28 window — so both the daily DAU/stickiness table
       and the days-active histogram have hand-computable, mutually distinct
-      expected values) — isolated the same way.
+      expected values) — isolated the same way. `proj_13`'s rows are a
+      synthetic Stripe subscription/charge history (2026-08-21 KAN-59
+      follow-up: `dim_subscription`/`fact_subscription_event`/`fact_revenue_
+      event`) — three subscriptions' full snapshot histories (`sub_1301`:
+      trial -> convert -> upgrade -> cancel; `sub_1302`: new -> cancel ->
+      reactivate; `sub_1303`: new -> past_due -> reactivate, covering the
+      "reactivation from a non-canceled status" branch a canceled-only
+      fixture wouldn't exercise) plus four charges (two customers, one
+      failed charge) — isolated the same way.
     columns:
       - name: organization_id
         tests:

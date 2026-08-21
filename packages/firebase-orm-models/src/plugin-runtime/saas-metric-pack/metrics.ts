@@ -18,16 +18,17 @@ import type { MetricDefinitionInput } from '../../services/metric-registry.servi
  *
  * Table/column names follow plan `04 §1`'s canonical warehouse schema
  * (`fact_funnel_event`, `fact_revenue_event`, `dim_subscription`,
- * `fact_subscription_event`) — the same aspirational-but-canonical
- * convention `metrics-compiler`'s `test-catalog.ts` already established,
- * since no real BigQuery warehouse exists yet (KAN-18) and `dbt-transform`'s
- * actual core tables (`entities`/`events`/`measures`) are a deliberately
- * generalized, un-normalized stand-in the compiler can't yet reach into (no
- * join graph, no JSON-column extraction — see `metrics-compiler/
- * compiler.ts`'s own doc comment). `ad_spend` is the one deliberate
- * exception: it targets a self-provisioned `measure` schema mart view (a
- * real, queryable relation today) rather than an aspirational table — see
- * its own doc comment below. Dimensions are declared **only** when they
+ * `fact_subscription_event`) — real `dbt-transform` core models as of the
+ * 2026-08-21 KAN-59 follow-up (`packages/dbt-transform/dbt/models/core/`),
+ * derived from the generic `entities`/`events` tables plus Stripe's own
+ * subscription-snapshot history (see `stg_stripe_subscription_history`'s own
+ * doc comment). Before that follow-up these were aspirational-but-canonical
+ * names with no real dbt model behind them — `metrics-compiler`'s
+ * `test-catalog.ts` still uses that older convention for its own,
+ * intentionally-unbuilt fixture tables. `ad_spend` is the one metric in this
+ * pack that was never one of plan `04 §1`'s `fact_*`/`dim_*` tables at all:
+ * it targets a self-provisioned `measure` schema mart view instead — see its
+ * own doc comment below. Dimensions are declared **only** when they
  * correspond to a real column on that metric's own aggregation table (plan
  * `04 §1`'s per-table column lists, or `ad_spend`'s own declared schema
  * fields) — e.g. `signups`/`new_paying` (backed by `fact_funnel_event`/
@@ -325,9 +326,9 @@ const FAILED_CHARGE_RATE: SaasMetricPackDefinition = {
  * trial-pipeline war-room widget's "in trial now -> converting at X%".
  * `fact_subscription_event` is a new aggregation table for this pack (plan
  * `09 §2`'s own spine, distinct from `fact_revenue_event`'s charge/refund
- * ledger and `dim_subscription`'s current-state snapshot) — same aspirational-
- * but-canonical posture this module's own doc comment already established
- * for every other table here; no real warehouse or dbt model backs it yet.
+ * ledger and `dim_subscription`'s current-state snapshot) — a real
+ * `dbt-transform` core model as of the 2026-08-21 KAN-59 follow-up, same as
+ * every other table this module's own doc comment describes.
  */
 const REACTIVATIONS: SaasMetricPackDefinition = {
   name: 'reactivations',

@@ -228,6 +228,116 @@ models:
         tests:
           - not_null
 
+  - name: fact_funnel_event
+    description: >
+      Generic funnel-event fact (plan `04 §1`, 2026-08-21 KAN-59 follow-up):
+      append-only, one row per non-touchpoint event, labeled by the
+      payload's own `event_name` (falling back to `event_type`). Feeds the
+      SaaS pack's `signups` metric and the engagement pack's `dau`/`wau`/
+      `mau`. See the model's own doc comment for how this differs from
+      `fact_funnel_step`.
+    columns:
+      - name: funnel_event_key
+        description: Composite (project_id, environment_id, event_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: step
+        tests:
+          - not_null
+      - name: ts
+        tests:
+          - not_null
+
+  - name: dim_subscription
+    description: >
+      Subscription dimension (plan `04 §1`, 2026-08-21 KAN-59 follow-up):
+      current-state snapshot per Stripe subscription (KAN-49). Feeds the
+      SaaS pack's `mrr`/`trials_active` metrics.
+    columns:
+      - name: subscription_key
+        description: Surrogate over (organization_id, project_id, environment_id, schema_name, subscription_id) — inherited from `entities.entity_key`.
+        tests:
+          - not_null
+          - unique
+      - name: subscription_id
+        tests:
+          - not_null
+      - name: customer_id
+        tests:
+          - not_null
+      - name: status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['active', 'trialing', 'past_due', 'canceled', 'unpaid', 'incomplete', 'incomplete_expired', 'paused']
+      - name: started_at
+        tests:
+          - not_null
+
+  - name: fact_subscription_event
+    description: >
+      Subscription lifecycle-transition fact (plan `04 §1`, 2026-08-21
+      KAN-59 follow-up): one row per detected trial_start/convert/
+      reactivate transition, derived by diffing consecutive landed
+      subscription snapshots. Feeds the SaaS pack's `reactivations`/
+      `trial_starts`/`trial_conversions` metrics. See
+      `stg_stripe_subscription_history`'s own doc comment for the exact
+      transition rules.
+    columns:
+      - name: subscription_event_key
+        tests:
+          - not_null
+          - unique
+      - name: subscription_id
+        tests:
+          - not_null
+      - name: customer_id
+        tests:
+          - not_null
+      - name: type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['trial_start', 'convert', 'reactivate']
+      - name: ts
+        tests:
+          - not_null
+
+  - name: fact_revenue_event
+    description: >
+      Revenue event fact (plan `04 §1`, 2026-08-21 KAN-59 follow-up): one
+      row per dollar-denominated commerce event — a Stripe charge outcome
+      (`charge`/`first_charge`) or a subscription MRR movement (`new`/
+      `upgrade`/`downgrade`). Feeds the SaaS pack's `mrr_movements`/
+      `expansion_mrr`/`churned_mrr`/`collected_revenue`/`total_charges`/
+      `failed_charges`/`attributed_gross_profit`/`new_paying` metrics. See
+      the model's own doc comment for which columns are populated for which
+      `type`.
+    columns:
+      - name: revenue_event_key
+        description: Composite (project_id, environment_id, revenue_event_id, type) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: type
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['charge', 'first_charge', 'new', 'upgrade', 'downgrade']
+      - name: ts
+        tests:
+          - not_null
+
   - name: fact_landing_page_performance
     description: >
       Visitors and last-touch attributed conversions per

@@ -57,6 +57,8 @@ const SUBSCRIPTION_FIELDS: SchemaFieldInput[] = [
   { name: 'mrr_normalized', type: 'number', isRequired: true, isPii: false, isIdentityKey: false },
   { name: 'current_period_end', type: 'timestamp', isRequired: true, isPii: false, isIdentityKey: false },
   { name: 'cancel_at_period_end', type: 'boolean', isRequired: true, isPii: false, isIdentityKey: false },
+  { name: 'started_at', type: 'timestamp', isRequired: true, isPii: false, isIdentityKey: false },
+  { name: 'plan_interval', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
   { name: 'canceled_at', type: 'timestamp', isRequired: false, isPii: false, isIdentityKey: false },
 ];
 
