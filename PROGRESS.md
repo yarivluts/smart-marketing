@@ -17,6 +17,73 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 5) — Plugin-manifest semver comparator coverage (PR #167)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two docs-only PRs were open, both recording already-merged code PRs in
+    `PROGRESS.md`: **#165** (records PR #162, TV-pairing rate-limit coverage) and **#166** (records
+    PR #163, warehouse-freshness cost-quota wiring) — both had inserted their new entry at the exact
+    same anchor point right after the template's `---`, so merging #165 first left #166 with a real
+    textual conflict. Reviewed both diffs directly (pure additive `PROGRESS.md` text, no code, no
+    content overlap), merged #165, then rebased #166 locally (`git rebase origin/main`), resolved the
+    conflict by keeping both entries in date order, force-pushed, and merged once the diff was clean.
+  - **CI was extremely slow-to-stalled for both this run**: the `lint · typecheck · test · build`
+    job sat `in_progress` on the `Test` step for 30-60+ minutes on both #165 and #166 (and again
+    briefly on #166 after the rebase) with zero step progress across many polls, despite both being
+    pure-docs diffs — CI here runs the full fixed suite regardless of diff content, so a docs-only PR
+    gets no shortcut. This matches the exact stuck-runner shape a prior run documented for PR #160
+    (~2h stall on an identical pure-`PROGRESS.md`-append PR); followed the same precedent both times:
+    reviewed the diff by hand and merged directly rather than waiting indefinitely. Worth flagging for
+    future runs — this sandbox's/repo's CI runners appear to intermittently stall for very long
+    stretches on the `Test` step specifically, independent of what changed.
+  - Delegated a fresh Explore-agent sweep for a new, non-overlapping follow-up. First candidate
+    (`apps/web/lib/orgs/tv-viewer-auth.ts`'s `extractTvDeviceToken`/`requireTvViewer`) turned out to
+    already be claimed by a concurrent session: `git fetch` surfaced an unmerged remote branch
+    `test/tv-viewer-auth-coverage` (commit `d5c14ed`) with a more thorough version of the same test
+    (covers `requireTvViewer`'s full 401 branch matrix too, via a mocked `requireClaimedTvPairing`,
+    not just the pure `extractTvDeviceToken` cases this session had already written). Discarded this
+    session's duplicate attempt without pushing it and left that file alone for the other session.
+  - A second sweep (explicitly told to avoid that file) surfaced
+    `packages/firebase-orm-models/src/services/plugin-registry.service.ts`'s `compareSemver` (private,
+    lines 73-82): the numeric `major.minor.patch` comparator `getLatestPluginManifestVersion`'s
+    "which version is latest" `reduce` and `listPluginManifestsForOrg`'s sort both depend on. It had
+    zero dedicated test — the only indirect coverage (`plugin-registry.emulator.test.ts`) compares
+    `'1.0.0'` vs `'1.1.0'`, a case where a regression to lexicographic string comparison would
+    coincidentally still pass; nothing exercised the two-digit-vs-one-digit segments (`'10.0.0'` vs
+    `'9.0.0'`, `'1.10.0'` vs `'1.9.0'`) where numeric and lexicographic ordering actually disagree.
+  - **Fix (PR #167, branch `test/plugin-registry-semver-coverage`):** exported `compareSemver` (was
+    module-private) and added `plugin-registry.test.ts` (7 cases): equal versions, numeric ordering at
+    each of major/minor/patch, higher-priority-segment short-circuiting, a mixed-list `.sort()`, and
+    the exact `reduce` pattern `getLatestPluginManifestVersion` uses. No production behavior changed —
+    traced every branch by hand first; existing behavior is already correct on all of them.
+  - **Checks:** `pnpm --filter @growthos/firebase-orm-models exec vitest run
+    src/services/plugin-registry.test.ts` (7/7) first, then `tsc --noEmit` + `eslint` on the changed
+    files (both clean), then a full `pnpm --filter @growthos/firebase-orm-models build` (clean) and
+    the package's full emulator-backed `pnpm test` (91 files, 976/976 green, ~171s). PR #167's own CI
+    (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~25 minutes this
+    time (no repeat of the earlier stall) before merging normally.
+  - **Merged 2026-08-21:** #165 (`14bcdd9`), #166 (`ea3e82b`), and #167 (`afe5ab6`) all merged into
+    `main`, in that order; `main` is green. Local branches for all three deleted; remote branch
+    deletion not attempted for #165/#166 (their branches belonged to other sessions) and hit the
+    same recurring git-over-HTTPS-proxy HTTP 403 for this session's own `test/plugin-registry-semver-
+    coverage` — branch merged and dead but not deleted remotely.
+- **In progress (exact stopping point):** none — #165/#166/#167 all fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. A future run should do a fresh unclaimed-
+  follow-up sweep — this run's own Explore sweep's runner-up candidates were
+  `apps/api/src/mcp/mcp-act-authorization.ts`'s `mcpCallerHasPermission` (a real security-boundary
+  function with zero dedicated test, only exercised incidentally through broader e2e/isolation specs
+  — worth a look) and `apps/api/src/authz/policy-request.ts`'s `resourceScopeFromParams` (a 3-line
+  object literal, weakest of the three, only worth it if nothing better turns up). Also worth checking
+  whether the concurrent session's `test/tv-viewer-auth-coverage` branch (commit `d5c14ed`) ever got a
+  PR opened and merged — as of this run's last check it hadn't yet.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/plugin-registry-semver-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 4) — Warehouse-freshness reads now wired into the daily cost quota (PR #163)
 
 - **Last completed:**
