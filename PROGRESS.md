@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 — ad_spend made queryable against a real warehouse mart view (PR #145)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked open PRs first**: three were open,
+    each matching one of the three unclaimed follow-up items the 2026-08-20 "mart views" research
+    pass had listed — **#141** (tracking-alerts environment isolation) and **#142** (cost-guardrail
+    quota wiring) were both green/clean; reviewed both diffs and **merged them**. **#143** (pack
+    board-seed repair) was still mid-CI, owned by a concurrent session — left alone; it merged
+    itself mid-run.
+  - Delegated a research pass (subagent) into the one remaining unclaimed item from that list: "the
+    SaaS pack targets four warehouse tables that don't exist … scoping to `fact_ad_spend` alone
+    would light up `ad_spend`/`cost_per_signup`/`cac`/`troi`." The research confirmed the root cause
+    but corrected the framing: `ad_spend`'s aggregation (`saas-metric-pack/metrics.ts`) targeted
+    `fact_ad_spend.reporting_spend`/`date`, a dbt core table that was never built (confirmed against
+    `dbt-transform`'s actual 10 core models — no `fact_ad_spend`, nor `fact_funnel_event`/
+    `fact_revenue_event`/`dim_subscription`/`fact_subscription_event`, which the other 21 pack
+    metrics still target). But `cost_per_signup`/`cac`/`troi` are formulas whose *other* dependencies
+    (`signups`/`new_paying`/`attributed_gross_profit`) are just as broken, so scoping to `ad_spend`
+    alone only actually lights up `ad_spend` itself (and its own two Marketing-board tiles) — not
+    those three formula metrics, contrary to the original research pass's more optimistic framing.
+  - **Fix, scoped accordingly:** rather than inventing a new dbt model for one metric, `ad_spend` now
+    rides the existing generic ingest-measures + mart-view mechanism (KAN-31/KAN-18) Stripe/GA4
+    already self-provision schemas into. New `saas-metric-pack/schemas.ts`:
+    `ensureSaasMetricPackSchemasRegistered` idempotently registers an `ad_spend` **measure** schema
+    (`channel_id`/`campaign_id`/`adset_id`/`ad_id` fields only — no field for the spend amount or
+    event time, since a measure schema's `value`/`ts` are reserved intrinsic mart columns per
+    `docs/api/ingest.md` §3.3, whose own worked example already assumed exactly this shape).
+    `AD_SPEND`'s aggregation now targets `table: 'ad_spend', column: 'value', timeColumn: 'ts'` —
+    `mapCustomSchemaTables` (`metrics-compiler.service.ts`) transparently rewrites that to the
+    project's real BigQuery mart view at query-compile time. Wired the new schema-registration call
+    into `installPluginAndProvisionBuiltins`, running before `ensureSaasMetricPackRegistered` (same
+    schema-before-metrics ordering `ensureStripeCommerceSchemasRegistered` establishes) and bumped
+    the manifest's scopes to `[metrics:write, schema:write]` (Stripe/GA4's own scope pair for a
+    self-provisioning connector).
+  - **What this does *not* fix**, stated explicitly rather than left implicit: `signups`, `mrr`,
+    `mrr_movements`, `collected_revenue`, `failed_charge_rate`, `net_mrr_churn`, `troi`,
+    `cost_per_signup`, `cac`, and the KAN-66 trial/reactivation metrics all still target genuinely
+    nonexistent tables — a separate, larger follow-up (likely a real dbt model for the funnel/
+    revenue/subscription event streams, not another mart-view shim).
+  - **Tests:** new `schemas.emulator.test.ts` — schema registration (right fields, no `value`/`ts`),
+    idempotency, human-pre-registered-schema-untouched, and a real end-to-end case proving
+    `compileMetricQueryForProject({ metrics: ['ad_spend'] })`'s compiled SQL contains the project's
+    actual `martViewName(...)` rather than the literal schema name (this is what actually proves the
+    fix works, not just that the schema registers). Updated `saas-metric-pack.emulator.test.ts`'s
+    `ad_spend` assertion and every `consentedScopes` call site across
+    `metric-pack-dispatch.emulator.test.ts` and `apps/web`'s `plugins/route.test.ts` for the new
+    scope. Fixed a stale doc comment in `landing-page-pack/metrics.ts` that still named
+    `fact_ad_spend` as aspirational-alongside-its-own-real-table (no longer accurate once `ad_spend`
+    got its own different route to a real relation).
+  - **Rebase note:** opened the PR branch off `main` before #143 merged; after #143 landed mid-run,
+    rebased onto it — one real conflict (both changed the same `metric-pack-dispatch.service.ts` doc
+    comment paragraph), resolved by merging both explanations; re-ran the full affected test suites
+    post-rebase to confirm nothing broke.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` all green across the whole monorepo.
+    `pnpm test` green: `packages/firebase-orm-models` full suite (939 tests), `packages/shared` (397
+    tests), `apps/web` unit/component suite under firestore+auth emulators (946 tests) — re-verified
+    after the #143 rebase. `RESOURCE_EXHAUSTED` lines in emulator output are the documented benign
+    Firestore-emulator-under-load warning prior PRs have recorded, not failures.
+  - **Merged 2026-08-21:** PR #145 merged into `main` (`7a240e8`, `merged_by: yarivluts`) after both
+    checks (`lint · typecheck · test · build`, `terraform fmt · validate`) passed; no review comments.
+- **In progress (exact stopping point):** none — #145 fully landed.
+- **Blocked + why:** nothing.
+- **Next step:** the SaaS/Engagement packs' remaining aspirational-table metrics (`signups`, `mrr`,
+  `cac`, `troi`, etc. — see "what this does not fix" above) need a real dbt model for the funnel/
+  revenue/subscription event streams before they can resolve against a real warehouse; that's a
+  larger, not-yet-scoped follow-up, not a one-PR fix like `ad_spend` was. **PR #144** (docs-only,
+  records #141) was open and `mergeable_state: unstable` (the recurring "two runs prepend a
+  PROGRESS.md entry at the same anchor" conflict) at the time this entry was written — left alone
+  for its owning session; a future run should check whether it landed before assuming this entry is
+  the newest.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting).
+
+---
+
 ## 2026-08-20 (even later) — Cost-guardrail quota wired into every hand-written-SQL warehouse read (PR #142)
 
 - **Last completed:**
