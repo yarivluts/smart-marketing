@@ -152,6 +152,20 @@ describe('createBoard', () => {
     expect(board.date_range.grain).toBe('day');
     expect(board.date_range.start < board.date_range.end).toBe(true);
     expect(board.created_by).toBe(owner.id);
+    expect(board.seeded_by_plugin_id).toBeNull();
+  });
+
+  it('tags a board with the seeding pack\'s plugin id when one is given', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Seeded Tag Org');
+    const board = await createBoard({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Marketing',
+      createdByUserId: owner.id,
+      seededByPluginId: 'com.growthos.example-pack',
+    });
+
+    expect(board.seeded_by_plugin_id).toBe('com.growthos.example-pack');
   });
 
   it('rejects an empty name', async () => {
