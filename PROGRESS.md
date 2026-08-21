@@ -17,6 +17,67 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 7) — mrr's dimension declaration fixed to match dim_subscription's real column (PR #171)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two PRs were open: **#168** (vault KMS keyring validation coverage) and
+    **#169** (docs-only, records PR #167) — both from concurrent sessions with CI still in progress,
+    different files, no overlap — left alone entirely per the established convention for another
+    session's in-flight work. Both had merged (`d6f3f56`, `292a097`, plus their own docs follow-ups
+    `c4cc075`) by the time this run finished its own work, confirmed via `git log origin/main`.
+  - Delegated a fresh Explore-agent investigation into this run's own prior "Next step" flag: whether
+    the SaaS/Engagement pack metrics unblocked by PR #151's new dbt core models (`fact_revenue_event`,
+    `fact_subscription_event`, `dim_subscription`, `fact_funnel_event`) now actually resolve, or still
+    need their own wiring the way `ad_spend` did in PR #145.
+  - It surfaced a real bug: `mrr` (`packages/firebase-orm-models/src/plugin-runtime/saas-metric-pack/
+    metrics.ts`) declared `dimensions: ['plan']` against `table: 'dim_subscription'`, but
+    `dim_subscription.sql` (`packages/dbt-transform/dbt/models/core/`) has no `plan` column — only
+    `plan_interval`. Every other `plan`-dimensioned metric in this pack targets `fact_revenue_event`,
+    which *does* alias its billing-interval column to `plan` at that model's own SQL layer;
+    `dim_subscription` never got the same alias. The compiler splices declared dimension names as
+    literal column identifiers with no join/rename layer, so a caller requesting `mrr` broken down by
+    `plan` would compile valid SQL that fails at the warehouse with a missing-column error — the same
+    class of bug PR #145 fixed for `ad_spend`, one level down (a column mismatch, not a whole
+    nonexistent table). The default boards never request a `plan` breakdown on `mrr` itself (only on
+    `mrr_movements`, which is fine), so nothing built today hit this — but it was a real, silent trap
+    for any custom board or MCP `query_metric` call using `mrr`'s own declared capability. Every other
+    SaaS-pack metric (signups, cost_per_signup, cac, conversion_to_paying, mrr_movements,
+    net_mrr_churn, troi, collected_revenue, failed_charge_rate, and KAN-66's reactivations/
+    trials_active/trial_conversion_rate) was traced by hand and confirmed to resolve correctly against
+    PR #151's real tables/columns.
+  - **Fix (PR #171, branch `fix/mrr-dimension-column-mismatch`):** changed `mrr`'s declared dimension
+    from `plan` to `plan_interval` (the real column name), with a doc comment on why `mrr` differs from
+    its `fact_revenue_event`-backed siblings; added a regression assertion to
+    `saas-metric-pack.emulator.test.ts` pinning `mrr`'s dimensions to `['plan_interval']`.
+  - **Checks:** `firebase emulators:exec --only firestore "vitest run src/plugin-runtime/saas-metric-pack"`
+    (55/55) first, then `pnpm lint && pnpm typecheck && pnpm build` (all green). This sandbox started
+    with no `node_modules`/build output at all this run (fresh container) — ran `pnpm install` +
+    `pnpm --filter @growthos/shared build` before anything else would resolve. Ran the full suite
+    per-package rather than the memory-straining concurrent `turbo pnpm test` (per prior entries'
+    documented guidance): `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api` 132/132
+    (one `RESOURCE_EXHAUSTED`-emulator warning logged mid-run, same documented flake class, no test
+    failed), `@growthos/firebase-orm-models` 976/976, `@growthos/web` unit 1015/1015 — all green. Web
+    e2e not run locally (this change touches no `apps/web` file); CI's own job covers it.
+  - **Merged 2026-08-21:** PR #171 squash-merged into `main` (`2795563`) once both checks
+    (`lint · typecheck · test · build`, `terraform fmt · validate`) passed. Remote branch deletion hit
+    the same recurring HTTP 403 from this sandbox's git remote every prior merged branch has hit; local
+    branch deleted cleanly.
+- **In progress (exact stopping point):** none — #171 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. This run's own investigation confirmed every
+  other SaaS-pack metric already resolves correctly against PR #151's tables, so that particular
+  follow-up vein is now closed. A future run should do a fresh unclaimed-follow-up sweep — e.g. other
+  hand-written-SQL readers not yet migrated to `runQuotaGatedWarehouseQuery` (the vein #142/#163
+  established), other pure helpers/view-mappers without dedicated test files, or a fresh careful read
+  of a recently-touched service for a real correctness issue.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `fix/mrr-dimension-column-mismatch`).
+
+---
+
 ## 2026-08-21 (later still, 6) — loadLocalKmsKeyRingFromEnv's validation branches now covered (PR #168)
 
 - **Last completed:**
