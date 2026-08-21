@@ -17,6 +17,47 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 12) — MCP OAuth consent route coverage (PR #181)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). No open PRs from concurrent sessions.
+  - Followed the prior run's own "Next step" note: `apps/web/app/api/oauth/mcp/consent/route.ts`
+    (KAN-75's MCP OAuth 2.1 consent step — the open-redirect-sensitive boundary that re-validates
+    `client_id`/`redirect_uri` registration itself before ever building a redirect, and re-checks
+    `mcp.read` before minting a code) had zero dedicated tests. Traced every branch by hand first —
+    existing behavior is already correct on every case, so no production code changed.
+  - **Fix (PR #181, branch `test/mcp-consent-route-coverage`):** new `route.test.ts` (9 cases, real
+    Firestore emulator + a mocked `getServerSession`, mirroring `apps/web/app/api/orgs/route.test.ts`'s
+    established pattern): missing required fields -> 400, an unregistered client/redirect_uri pair
+    rejected before auth is even checked (asserted `getServerSession` isn't called), unauthenticated
+    -> 401, deny/any-non-approve decision -> `access_denied` redirect preserving `state`, a malformed
+    `target` -> `invalid_request` redirect, insufficient `mcp.read` -> `access_denied` redirect, an
+    unknown project -> `access_denied` redirect, and the full happy path minting a real
+    `McpOAuthGrantModel` and redirecting with `code`+`state`. One bug caught during implementation
+    (test-only, never reached CI): used `UserModel`'s Firestore field name `firebase_uid` instead of
+    its actual TS property `firebaseUid` when building fake sessions — surfaced immediately as a
+    `where() called with invalid data: undefined` emulator error, fixed before the first green run.
+  - **Checks:** `npx vitest run app/api/oauth/mcp/consent/route.test.ts` via the Firestore/Auth
+    emulator wrapper (9/9) first, then full monorepo `pnpm lint && pnpm typecheck && pnpm build`
+    green, then `pnpm test` across all packages (`@growthos/api` 140/140 incl. its e2e suite,
+    `@growthos/web` full unit/component + 23/23 Playwright e2e specs) — all green, no regressions.
+  - **Merged 2026-08-21:** PR #181 merged into `main` (squash, `079b0a3`) after CI went green
+    (subscribed via `subscribe_pr_activity`, unsubscribed after merge). Remote branch deletion for
+    `test/mcp-consent-route-coverage` hit the same recurring git-over-HTTPS-proxy HTTP 403 every
+    prior merged branch from a scheduled run has hit; local branch deleted cleanly.
+- **In progress (exact stopping point):** none — #181 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep for either a real
+  correctness bug or another genuine coverage gap (same posture this run and its predecessor took).
+  No specific runner-up candidate was surfaced this run — start with a fresh Explore-agent sweep of
+  `apps/web/app/api/` and `apps/api/src/` for route handlers / services with no adjacent `.test.ts`.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/mcp-consent-route-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 11) — TV viewer auth token guard coverage (PR #178), plus merging three concurrent-session PRs
 
 - **Last completed:**
