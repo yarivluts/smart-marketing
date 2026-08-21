@@ -17,6 +17,96 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 — Built real fact_funnel_event/fact_revenue_event/dim_subscription/fact_subscription_event core models (PR #151)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). Two PRs were open: **#147** (not-yet-backed
+    degrade state) and **#148** (bounded in-memory caches), both from concurrent sessions, both
+    green (`lint · typecheck · test · build` + `terraform fmt · validate` passed) with no review
+    comments — reviewed both diffs directly (correctness, tests, conventions) and merged them
+    before starting new work, the same "check open PRs first" pattern established by prior runs.
+  - With `TASKS.md` itself fully exhausted (every remaining row `done`/`needs-human`/`blocked-by`),
+    picked up the standing, explicitly-named follow-up from PROGRESS.md's own PR #145/#147 entries:
+    the SaaS/Engagement metric packs' `signups`, `mrr`, `mrr_movements`, `expansion_mrr`,
+    `churned_mrr`, `net_mrr_churn`, `collected_revenue`, `total_charges`, `failed_charges`,
+    `failed_charge_rate`, `new_paying`, `cost_per_signup`, `cac`, `conversion_to_paying`, `troi`,
+    `reactivations`, `trial_starts`, `trial_conversions`, `trial_conversion_rate`, `trials_active`
+    (plus the engagement pack's `dau`/`wau`/`mau`) all targeted four plan-`04 §1` warehouse tables
+    (`fact_funnel_event`, `fact_revenue_event`, `dim_subscription`, `fact_subscription_event`) that
+    no dbt core model actually built — PR #147 gave that state a clean `not_yet_backed` label, but
+    it was still permanent until this follow-up.
+  - **Fix (PR #151, branch `kan-59-warehouse-facts-signups-mrr-troi`):** four new real
+    `packages/dbt-transform` core models. `fact_funnel_event` — every non-touchpoint event, labeled
+    the same way `fact_attribution`/`fact_funnel_step` already derive their own event label, no
+    human-confirmed-funnel dependency (unlike `fact_funnel_step`), so `signups`/`dau`/`wau`/`mau`
+    work in any project. `dim_subscription` — current-state snapshot off `entities` filtered to
+    `schema_name = 'stripe_subscription'`. `fact_subscription_event`/`fact_revenue_event` — Stripe's
+    connector only lands a subscription's *current* state per sync (no dedicated "plan changed"/
+    "trial converted" event exists), so a new staging model, `stg_stripe_subscription_history`,
+    replays the full undeduped landed-snapshot history and diffs each snapshot against its
+    immediately-preceding one to detect `trial_start`/`convert`/`reactivate` lifecycle transitions
+    and `new`/`upgrade`/`downgrade` MRR movements; `fact_revenue_event` also carries Stripe charge
+    outcomes (`charge`/`first_charge`, the latter marking a customer's first *succeeded* charge —
+    what `new_paying` counts). The Stripe mapper (`mapSubscriptionToEntityRecord`) gained two new
+    entity attributes: `started_at` (real Stripe `created` timestamp, needed for `trials_active`'s
+    time bucketing) and `plan_interval` (billing interval — the only "plan" dimension Stripe's
+    minimal API shape gives this connector, feeding `mrr_movements`' own `plan` breakdown).
+  - **Real correctness fix found during self-review, not just new coverage:** the first version of
+    `stg_stripe_subscription_history`'s movement/lifecycle detection only special-cased
+    `trialing`→`active` and `canceled`→`active` as "new" MRR contributions — a `past_due`→`active`
+    recovery (a real, common Stripe transition after a failed payment retries successfully) would
+    have silently and permanently dropped that MRR (subtracted on the way to `past_due`, never
+    re-added on the way back). Generalized both `movement_type` and `lifecycle_event_type` to key
+    off "did status become/leave `active`" rather than enumerating specific prior statuses (also
+    simplifying the SQL), and added a third fixture subscription (`proj_13`'s `sub_1303`) exercising
+    exactly this branch so the fix is regression-proof, not just reasoned about.
+  - `KNOWN_UNBUILT_WAREHOUSE_TABLES` (`metrics-compiler.service.ts`) is now an empty `Set` — every
+    table it used to list has a real dbt model. Left in place (not deleted) since the mechanism
+    itself is real, reusable infrastructure for a future metric pack's own genuinely-not-yet-built
+    table. Every test that exercised the `not_yet_backed` degrade using these four tables as its
+    fixture now either exercises the generic mechanism against a table added to the `Set` just for
+    that one test (cleaned up in a `finally`), or is a new positive test proving the real table now
+    resolves successfully.
+  - **Tests:** four new dbt fixture tests (`assert_fact_funnel_event_fixture_matches_expected.sql`
+    reusing `proj_2`'s existing fixture; `assert_dim_subscription_/fact_subscription_event_/
+    fact_revenue_event_fixture_matches_expected.sql` against a new `proj_13` fixture — three
+    subscriptions' full snapshot histories incl. the `past_due` recovery case, plus four Stripe
+    charges). New/updated Stripe mapper unit tests. Updated every emulator test that depended on
+    these four tables being unbuilt (`metrics-compiler`/`metrics-query`/`board`/`goal`/
+    `trial-pipeline`) with new positive "now works" tests alongside the generic-mechanism ones.
+  - **Checks:** `dbt build` 171/171 pass; `dbt parse --target prod` against a real `dbt-bigquery`
+    adapter (throwaway venv, same posture prior KAN-18 BigQuery-port PRs used) clean. `pnpm lint`,
+    `pnpm typecheck`, `pnpm build` green across the whole monorepo. `pnpm test` green:
+    `packages/dbt-transform` (171/171), `packages/firebase-orm-models` (967/967),
+    `packages/shared` (397/397), `apps/api` (114/114), `apps/web` unit/component (946/946) +
+    Playwright e2e (22/23, one pre-existing flaky UI-timing test — `resource-library.spec.ts`,
+    unrelated to this change — self-healed on Playwright's own retry).
+  - **CI note:** the PR's first `lint · typecheck · test · build` run failed on an unrelated test
+    (`plugins/builtin/route.test.ts`) with a Firestore-emulator internal assertion crash
+    (`FIRESTORE INTERNAL ASSERTION FAILED: Unexpected state`) plus a 120s timeout — the same
+    documented emulator-under-load flake class prior PROGRESS.md entries have recorded. Re-ran the
+    failed job once (per the "confirm it's a flake, at most once" rule); it passed clean on retry,
+    confirming this PR's own diff wasn't the cause.
+  - **Merged 2026-08-21:** PR #151 squash-merged into `main` (`6a89a27`) after both checks passed,
+    `mergeable_state: clean`, no review comments. Remote branch deletion hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch cleaned up.
+- **In progress (exact stopping point):** none — #151 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` has no remaining unblocked `todo` row. A future run should do a fresh
+  sweep for unclaimed, infra-free follow-ups (the same posture this run and #148's own run used) —
+  nothing specific is currently flagged as outstanding beyond the standing human-action queue below.
+  Once KAN-18's remaining live-infra items land (real BigQuery `dbt build --target prod` against
+  the now-four-more-populated `growthos_core` dataset, scheduled orchestration beyond manual
+  "run now"), these four new tables' data should be spot-checked against real Stripe-synced
+  subscriptions to confirm the movement/lifecycle detection holds up outside the fixture.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `kan-59-warehouse-facts-signups-mrr-troi`).
+
+---
+
 ## 2026-08-21 — Bounded the two unbounded in-memory Redis stand-ins (PR #148)
 
 - **Last completed:**
