@@ -80,9 +80,14 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     // KAN-36: the registered event schema shows up in the volume/tracking-alerts
     // section, honestly reporting "never received a record" since this test never
     // ingests any real data — and a manual "Check now" leaves it that way (nothing
-    // to have "broken" yet).
-    await expect(page.getByText('order_completed', { exact: true })).toBeVisible();
-    await expect(page.getByText('Never received a record.')).toBeVisible();
+    // to have "broken" yet). Every project gets a dev/staging/prod environment, and
+    // tracking is scoped per environment, so the sparkline list has one
+    // "<schemaName> (<environment>)" row per environment — scope to the `dev` row
+    // (first alphabetically) rather than asserting on the page as a whole, since
+    // "Never received a record." legitimately repeats once per environment row.
+    const devEventVolumeRow = page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev\)/ });
+    await expect(devEventVolumeRow).toBeVisible();
+    await expect(devEventVolumeRow.getByText('Never received a record.')).toBeVisible();
     await expect(page.getByText('No tracking alerts for this project yet.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Check now' }).click();
