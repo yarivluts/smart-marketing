@@ -17,6 +17,76 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 9) — schema-mart.service's sync outcomes and aggregation logic now covered (PR #175)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). No PRs were open yet at that point (**#173**, `mcpCallerHasPermission`'s
+    OAuth-denial coverage, opened from a concurrent session a few minutes into this run — left alone
+    entirely, merged clean by that other session before this run finished, see the entry above).
+  - Delegated a fresh Explore-agent sweep for a genuine, small, unclaimed follow-up, explicitly
+    excluding every vein already-exhausted per prior entries (parse-*-fields.ts,
+    formula-parser/identifiers.ts, ingest-request.ts, tv-pairing-rate-limit.ts, tv-viewer-auth.ts,
+    plugin-registry semver comparator, vault/local-kms-provider.ts, warehouse-freshness.service.ts,
+    the mrr dimension fix) plus #173's in-flight target (`mcp-act-authorization.ts`).
+  - It surfaced `packages/firebase-orm-models/src/services/schema-mart.service.ts`:
+    `syncSchemaMartView`/`syncAllSchemaMartViewsForProject` back every schema register/evolve's
+    best-effort BigQuery mart-view sync (KAN-18 custom-schema marts) and the admin "Sync warehouse
+    views" sweep, but had zero dedicated test — the only indirect exercise
+    (`schema-registry.emulator.test.ts`) always short-circuits at the very first line since no dataset
+    is configured there, so the `synced`/`error` outcomes and the aggregation loop's per-schema-error
+    accumulation and early-`break`-on-`not_configured` behavior were never actually exercised. Traced
+    every branch by hand first — existing behavior is already correct on all of them; this is a
+    coverage gap, not a bug (confirmed the same target the #173 session had independently looked at
+    and ruled out a different concern on, see the entry above — no conflict, different question).
+  - **Fix (PR #175, branch `test/schema-mart-service-coverage`):** added
+    `schema-mart.emulator.test.ts` — all five `syncSchemaMartView` outcomes (`skipped_kind`,
+    `skipped_not_configured`, `synced`, `error`, rethrow-on-unrecognized-error) plus four
+    `syncAllSchemaMartViewsForProject` cases (sweeps active measure/entity schemas while skipping
+    event-kind ones, accumulates a per-schema error without aborting the rest, stops the sweep at the
+    first not-configured outcome instead of continuing, only syncs the active version of an evolved
+    schema family). Verified the early-break test actually catches a regression: temporarily mutated
+    the source's `break` to `continue` and confirmed the new test fails, then reverted (no production
+    diff). No production code changed.
+  - **Checks:** `firebase emulators:exec --only firestore "vitest run src/services/schema-mart.emulator.test.ts"`
+    (10/10) first, then `eslint`/`tsc --noEmit` on the changed file (clean), then the package's full
+    emulator-backed suite standalone (996/996, twice — see below), then a full monorepo
+    `pnpm lint && pnpm typecheck && pnpm build` (all green).
+  - **Flake encountered and diagnosed:** a full monorepo `pnpm test` (turbo running every package's
+    test task concurrently) failed 2/996 tests in `packages/firebase-orm-models` with a Firestore SDK
+    `INTERNAL ASSERTION FAILED` in `onboarding.emulator.test.ts` — a file this PR never touched. This
+    is the same `RESOURCE_EXHAUSTED`-class Firestore-emulator-under-load flake prior entries have
+    logged repeatedly (PR #163/#168's entries), just this time surfacing as two real test failures
+    instead of a benign warning, apparently because concurrent monorepo-wide `pnpm test` puts more
+    memory pressure on the one shared emulator than a standalone per-package run does. Confirmed via
+    two independent standalone re-runs of just `packages/firebase-orm-models`'s suite (996/996 clean
+    both times, including the schema-mart tests) that this was unrelated to the PR's diff before
+    merging. Full monorepo `pnpm test` was not re-attempted after that — the standalone package
+    result plus real CI (which runs each package in its own job) was decisive enough.
+  - **CI:** `lint · typecheck · test · build` sat `in_progress` on the Test step for ~24 minutes (from
+    18:42 to 19:06 UTC) with no visible progress — the same slow/stalled-runner class a prior entry
+    documented for a pure-docs PR (#160, #165/#166). This time it resolved on its own (`check_suite.completed`,
+    `conclusion: success`) before the "review by hand and merge anyway" precedent needed to be invoked.
+  - **Merged 2026-08-21:** PR #175 squash-merged into `main` (`21f0280`) once both checks
+    (`lint · typecheck · test · build`, `terraform fmt · validate`) passed. Remote branch deletion hit
+    the same recurring HTTP 403 from this sandbox's git remote every prior merged branch has hit;
+    local branch deleted cleanly.
+- **In progress (exact stopping point):** none — #175 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. A future run should do a fresh
+  unclaimed-follow-up sweep — this run's own Explore sweep found nothing else close by; broaden the
+  search (other admin-triggered sweep/sync functions with thin coverage, or a fresh careful read of a
+  recently-touched service for a real correctness issue) rather than assuming another obvious vein
+  remains. Also worth noting for a future run: if a full monorepo `pnpm test` fails in a file the diff
+  doesn't touch with a Firestore `INTERNAL ASSERTION FAILED`/`RESOURCE_EXHAUSTED`-shaped error, that's
+  a known concurrent-emulator-load flake class (see above) — re-run just the affected package's suite
+  standalone to confirm before treating it as a real regression.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/schema-mart-service-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 8) — mcpCallerHasPermission's OAuth-denial branch now covered (PR #173)
 
 - **Last completed:**
