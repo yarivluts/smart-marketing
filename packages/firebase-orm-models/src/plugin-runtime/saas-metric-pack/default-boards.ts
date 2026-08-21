@@ -1,5 +1,6 @@
 import type { BoardTile } from '../../models/board.model';
-import { createBoard, listBoardsForProject, saveBoardTiles } from '../../services/board.service';
+import { ensurePackDefaultBoardsSeeded, type EnsurePackDefaultBoardsSeededResult } from '../default-board-seeding';
+import { SAAS_METRIC_PACK_PLUGIN_ID } from './manifest';
 
 /** One board this pack seeds on install. `name` is also this function's own idempotency key — see {@link ensureSaasMetricPackDefaultBoardsSeeded}. */
 export interface SaasMetricPackDefaultBoard {
@@ -150,12 +151,7 @@ const FUNNEL_BOARD: SaasMetricPackDefaultBoard = {
 /** The three boards KAN-59's own AC names by vertical: "Marketing, Revenue/MRR, Funnel" (plan `13 §E11.3`). */
 export const SAAS_METRIC_PACK_DEFAULT_BOARDS: readonly SaasMetricPackDefaultBoard[] = [MARKETING_BOARD, REVENUE_MRR_BOARD, FUNNEL_BOARD];
 
-export interface EnsureSaasMetricPackDefaultBoardsSeededResult {
-  /** Board names newly created by this call. */
-  seeded: string[];
-  /** Board names that already existed in this project — by name, since these boards have no other stable identifier a re-run could key off. Left untouched, same "don't overwrite a human's own edits" posture `ensureSaasMetricPackRegistered` takes for a pre-existing metric definition. */
-  alreadyPresent: string[];
-}
+export type EnsureSaasMetricPackDefaultBoardsSeededResult = EnsurePackDefaultBoardsSeededResult;
 
 /**
  * Idempotently seeds this pack's three default boards (KAN-61, plan
@@ -168,50 +164,16 @@ export interface EnsureSaasMetricPackDefaultBoardsSeededResult {
  * catalog once that call has registered it, and `saveBoardTiles` rejects a
  * tile referencing an unregistered metric.
  *
- * Idempotency is name-keyed rather than a dedicated marker field, matching
- * `ensureSaasMetricPackRegistered`'s own "a human's pre-existing state wins,
- * silently skip it" posture: a board a human already created (or renamed
- * from) with one of these exact names is left completely untouched — this
- * function never edits an existing board's tiles, so a human free to
- * customize "Marketing" after the first install won't have their edits
- * clobbered by a re-install.
- *
- * Known gap this name-keyed check can't distinguish: `createBoard` and
- * `saveBoardTiles` below are two separate writes, not one transaction. If
- * the process dies (or Firestore errors) between them, the board persists
- * with `tiles: []`, and every future call sees its name already present and
- * skips it forever — indistinguishable from a human's own deliberate
- * customization. `installPluginAndProvisionBuiltins`'s own doc comment
- * documents this as a real, not-yet-remediable gap (unlike its sibling
- * metric-registration half, `uninstallPlugin` doesn't delete boards, so
- * "uninstall and reinstall" doesn't actually retry a stuck-empty board).
+ * Thin wrapper over the shared {@link ensurePackDefaultBoardsSeeded} — see
+ * that function's own doc comment for the create/repair/leave-alone
+ * semantics (a board a human created directly under one of these exact
+ * names is always left completely untouched; only a board this pack itself
+ * created and never finished populating gets repaired on a later call).
  */
 export async function ensureSaasMetricPackDefaultBoardsSeeded(
   organizationId: string,
   projectId: string,
   createdByUserId: string,
 ): Promise<EnsureSaasMetricPackDefaultBoardsSeededResult> {
-  const existingBoards = await listBoardsForProject(organizationId, projectId);
-  const existingNames = new Set(existingBoards.map((board) => board.name));
-
-  const seeded: string[] = [];
-  const alreadyPresent: string[] = [];
-
-  for (const defaultBoard of SAAS_METRIC_PACK_DEFAULT_BOARDS) {
-    if (existingNames.has(defaultBoard.name)) {
-      alreadyPresent.push(defaultBoard.name);
-      continue;
-    }
-    const board = await createBoard({ organizationId, projectId, name: defaultBoard.name, createdByUserId });
-    await saveBoardTiles({
-      organizationId,
-      projectId,
-      boardId: board.id,
-      tiles: [...defaultBoard.tiles],
-      updatedByUserId: createdByUserId,
-    });
-    seeded.push(defaultBoard.name);
-  }
-
-  return { seeded, alreadyPresent };
+  return ensurePackDefaultBoardsSeeded(SAAS_METRIC_PACK_PLUGIN_ID, SAAS_METRIC_PACK_DEFAULT_BOARDS, organizationId, projectId, createdByUserId);
 }

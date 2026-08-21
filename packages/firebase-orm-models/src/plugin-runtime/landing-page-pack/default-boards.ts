@@ -1,5 +1,6 @@
 import type { BoardTile } from '../../models/board.model';
-import { createBoard, listBoardsForProject, saveBoardTiles } from '../../services/board.service';
+import { ensurePackDefaultBoardsSeeded, type EnsurePackDefaultBoardsSeededResult } from '../default-board-seeding';
+import { LANDING_PAGE_PACK_PLUGIN_ID } from './manifest';
 
 /** One board this pack seeds on install. `name` is also the idempotency key — see {@link ensureLandingPagePackDefaultBoardsSeeded}. */
 export interface LandingPagePackDefaultBoard {
@@ -76,47 +77,22 @@ const LANDING_PAGE_BOARD: LandingPagePackDefaultBoard = {
 
 export const LANDING_PAGE_PACK_DEFAULT_BOARDS: readonly LandingPagePackDefaultBoard[] = [LANDING_PAGE_BOARD];
 
-export interface EnsureLandingPagePackDefaultBoardsSeededResult {
-  /** Board names newly created by this call. */
-  seeded: string[];
-  /** Board names a prior call (or a human) already created — not an error. */
-  alreadyPresent: string[];
-}
+export type EnsureLandingPagePackDefaultBoardsSeededResult = EnsurePackDefaultBoardsSeededResult;
 
 /**
- * Idempotently seeds this pack's default board, name-keyed exactly like
- * `ensureSaasMetricPackDefaultBoardsSeeded` (see that function for the
- * shared caveat: a board created but left un-tiled by a mid-way failure is
- * skipped by the name check on a later reinstall). Must run *after* the
- * pack's metrics are registered — `saveBoardTiles` rejects a tile naming a
- * metric that isn't in the project's active catalog.
+ * Idempotently seeds this pack's default board. Thin wrapper over the
+ * shared {@link ensurePackDefaultBoardsSeeded} — see that function's own
+ * doc comment for the create/repair/leave-alone semantics (a board a human
+ * created directly under this exact name is always left completely
+ * untouched; only a board this pack itself created and never finished
+ * populating gets repaired on a later call). Must run *after* the pack's
+ * metrics are registered — `saveBoardTiles` rejects a tile naming a metric
+ * that isn't in the project's active catalog.
  */
 export async function ensureLandingPagePackDefaultBoardsSeeded(
   organizationId: string,
   projectId: string,
   createdByUserId: string,
 ): Promise<EnsureLandingPagePackDefaultBoardsSeededResult> {
-  const existingBoards = await listBoardsForProject(organizationId, projectId);
-  const existingNames = new Set(existingBoards.map((board) => board.name));
-
-  const seeded: string[] = [];
-  const alreadyPresent: string[] = [];
-
-  for (const defaultBoard of LANDING_PAGE_PACK_DEFAULT_BOARDS) {
-    if (existingNames.has(defaultBoard.name)) {
-      alreadyPresent.push(defaultBoard.name);
-      continue;
-    }
-    const board = await createBoard({ organizationId, projectId, name: defaultBoard.name, createdByUserId });
-    await saveBoardTiles({
-      organizationId,
-      projectId,
-      boardId: board.id,
-      tiles: [...defaultBoard.tiles],
-      updatedByUserId: createdByUserId,
-    });
-    seeded.push(defaultBoard.name);
-  }
-
-  return { seeded, alreadyPresent };
+  return ensurePackDefaultBoardsSeeded(LANDING_PAGE_PACK_PLUGIN_ID, LANDING_PAGE_PACK_DEFAULT_BOARDS, organizationId, projectId, createdByUserId);
 }

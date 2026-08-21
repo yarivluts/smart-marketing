@@ -134,6 +134,20 @@ export class BoardModel extends BaseModel {
   @Field({ is_required: true })
   public global_filters!: CompilerFilter[];
 
+  /**
+   * The built-in pack plugin id whose default-board seeding created this
+   * board (e.g. `com.growthos.saas-marketing-metrics`), or `null` for a
+   * board a human created directly. Lets a pack's own re-seed routine tell
+   * "this board is mine and still empty because a prior seed attempt was
+   * interrupted before `saveBoardTiles` ran" apart from "a human created a
+   * board that happens to share this exact name" — the two are otherwise
+   * indistinguishable by name + tile-count alone. `null`, not `undefined`,
+   * for the same `getDocumentData()`-omits-`undefined` reason `compare`
+   * above is always assigned explicitly.
+   */
+  @Field({ is_required: false })
+  public seeded_by_plugin_id!: string | null;
+
   @Field({ is_required: true })
   public created_by!: string;
 
