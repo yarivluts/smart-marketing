@@ -25,4 +25,16 @@ describe('resolveRedirectTarget', () => {
   it('rejects a path with no leading slash', () => {
     expect(resolveRedirectTarget('dashboard')).toBe('/dashboard');
   });
+
+  it('rejects a leading-backslash protocol-relative bypass (open-redirect vector)', () => {
+    expect(resolveRedirectTarget('/\\evil.example.com')).toBe('/dashboard');
+  });
+
+  it('rejects a backslash-prefixed path even with a following slash', () => {
+    expect(resolveRedirectTarget('/\\/evil.example.com')).toBe('/dashboard');
+  });
+
+  it('rejects a same-app path containing a backslash anywhere', () => {
+    expect(resolveRedirectTarget('/en/settings\\evil.example.com')).toBe('/dashboard');
+  });
 });
