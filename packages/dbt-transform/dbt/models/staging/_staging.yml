@@ -60,6 +60,21 @@ models:
           - not_null
           - unique
 
+  - name: stg_stripe_subscription_history
+    description: >
+      Every landed `stripe_subscription` entity snapshot (not deduped to the
+      latest, unlike `entities`), with the previous snapshot's status/MRR
+      lagged alongside and the detected MRR-movement/lifecycle-transition
+      type — see the model's own doc comment for the full derivation.
+    columns:
+      - name: raw_record_key
+        tests:
+          - not_null
+          - unique
+      - name: subscription_id
+        tests:
+          - not_null
+
   - name: stg_identity_key_observations
     description: >
       One row per (raw_record_key, field_name) pivoted out of a record's

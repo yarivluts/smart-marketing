@@ -11,6 +11,7 @@ import {
   GoalNotFoundError,
   InMemoryMetricQueryResultCache,
   InvalidGoalError,
+  KNOWN_UNBUILT_WAREHOUSE_TABLES,
   listAuditLogEntriesForOrg,
   listGoalsForProject,
   ProjectNotFoundError,
@@ -44,12 +45,10 @@ async function setupOrgWithProject(orgName: string) {
 }
 
 /**
- * A real (non-`KNOWN_UNBUILT_WAREHOUSE_TABLES`) table, deliberately not
- * `fact_funnel_event` (the SaaS pack's own real `signups` table): these
- * fixtures exist to exercise `queryGoalProgress`'s own executor/cache/quota
- * plumbing, which is only reachable once a query compiles past the
- * "buildable table" fast-fail. The dedicated `not_yet_backed` test below
- * registers against the real table to cover that behavior.
+ * A "signups"-named metric against an unrelated real table — these fixtures
+ * exist purely to exercise `queryGoalProgress`'s own executor/cache/quota
+ * plumbing, independent of whichever table the SaaS pack's actual `signups`
+ * metric targets.
  */
 async function registerSignups(organizationId: string, projectId: string, createdByUserId: string) {
   return registerMetricDefinition({
@@ -522,8 +521,56 @@ describe('queryGoalProgress', () => {
     expect(second.ok === false && second.reason).toBe('quota_exceeded');
   });
 
-  it('degrades to a "not yet backed" outcome for a metric targeting a known-unbuilt table (fact_funnel_event), without touching the executor', async () => {
+  it('degrades to a "not yet backed" outcome for a metric targeting a known-unbuilt table, without touching the executor', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Goal Query Unbuilt Table Org');
+    // `KNOWN_UNBUILT_WAREHOUSE_TABLES` is empty today (everything it used to list, including
+    // `fact_funnel_event` — see the next test — now has a real dbt core model, 2026-08-21 KAN-59
+    // follow-up), so this test exercises the generic mechanism against a table added just for it.
+    const fixtureOnlyUnbuiltTable = 'fixture_only_unbuilt_table_for_test';
+    KNOWN_UNBUILT_WAREHOUSE_TABLES.add(fixtureOnlyUnbuiltTable);
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'real_signups',
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: fixtureOnlyUnbuiltTable, timeColumn: 'ts', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Goal',
+      metricName: 'real_signups',
+      direction: 'maximize',
+      targetValue: 100,
+      startDate: '2026-01-01',
+      deadline: '2026-02-01',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-01-01', real_signups: 1 }]);
+
+    try {
+      const outcome = await queryGoalProgress({
+        organizationId: organization.id,
+        projectId: project.id,
+        goal,
+        executor,
+        cache: new InMemoryMetricQueryResultCache(),
+      });
+
+      expect(outcome.ok).toBe(false);
+      expect(outcome.ok === false && outcome.reason).toBe('not_yet_backed');
+      expect(executor.callCount).toBe(0);
+    } finally {
+      KNOWN_UNBUILT_WAREHOUSE_TABLES.delete(fixtureOnlyUnbuiltTable);
+    }
+  });
+
+  it('succeeds for a goal against signups (fact_funnel_event) now that a real core model backs it (2026-08-21 KAN-59 follow-up)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Query Funnel Event Now Real Org');
     await registerMetricDefinition({
       organizationId: organization.id,
       projectId: project.id,
@@ -556,9 +603,8 @@ describe('queryGoalProgress', () => {
       cache: new InMemoryMetricQueryResultCache(),
     });
 
-    expect(outcome.ok).toBe(false);
-    expect(outcome.ok === false && outcome.reason).toBe('not_yet_backed');
-    expect(executor.callCount).toBe(0);
+    expect(outcome.ok).toBe(true);
+    expect(executor.callCount).toBe(1);
   });
 
   it('caps the queried window at the goal deadline even when asOfDate is past it', async () => {

@@ -89,7 +89,25 @@ export function mapRefundToEventRecord(refund: StripeRefund): Record<string, unk
   };
 }
 
-/** Maps one Stripe subscription to its `stripe_subscription` entity record — current-state, keyed by the subscription's own id (an entity landing re-lands the same id on every sync, overwriting the prior snapshot downstream). */
+/**
+ * Maps one Stripe subscription to its `stripe_subscription` entity record —
+ * current-state, keyed by the subscription's own id (an entity landing
+ * re-lands the same id on every sync, overwriting the prior snapshot
+ * downstream). Every sync's landing is kept in the raw ingest history
+ * (only the *entity* current-state table dedupes to the latest), so
+ * `dim_subscription`/`fact_subscription_event`/`fact_revenue_event`
+ * (`packages/dbt-transform`) can replay a subscription's lifecycle by
+ * diffing consecutive landed snapshots.
+ *
+ * `started_at` is the subscription's own Stripe `created` timestamp (not a
+ * sync/landing time) — `dim_subscription`'s `trials_active` metric buckets
+ * by it, so it must reflect when the subscription itself began, not when
+ * this connector happened to first observe it. `plan_interval` is the
+ * billing interval (`month`/`year`/...) of the subscription's first item —
+ * a real, if coarse, "plan" dimension `mrr_movements` can break down by,
+ * since Stripe's own API gives this connector no plan/product display name
+ * to work with (see `StripeSubscriptionItem`'s own minimal shape).
+ */
 export function mapSubscriptionToEntityRecord(subscription: StripeSubscription): Record<string, unknown> {
   return {
     id: subscription.id,
@@ -100,6 +118,8 @@ export function mapSubscriptionToEntityRecord(subscription: StripeSubscription):
       mrr_normalized: computeSubscriptionMrrNormalized(subscription),
       current_period_end: toIso(subscription.current_period_end),
       cancel_at_period_end: subscription.cancel_at_period_end,
+      started_at: toIso(subscription.created),
+      plan_interval: subscription.items.data[0]?.price.recurring.interval ?? '',
       ...(subscription.canceled_at !== null ? { canceled_at: toIso(subscription.canceled_at) } : {}),
     },
   };

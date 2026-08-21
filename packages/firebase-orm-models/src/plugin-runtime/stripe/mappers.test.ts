@@ -138,7 +138,7 @@ describe('mapSubscriptionToEntityRecord', () => {
     items: { data: [{ price: { unit_amount: 24000, currency: 'usd', recurring: { interval: 'year', interval_count: 1 } }, quantity: 1 }] },
   };
 
-  it('maps a subscription to a stripe_subscription entity including mrr_normalized', () => {
+  it('maps a subscription to a stripe_subscription entity including mrr_normalized, started_at, and plan_interval', () => {
     expect(mapSubscriptionToEntityRecord(SUBSCRIPTION)).toEqual({
       id: 'sub_1',
       attributes: {
@@ -148,6 +148,8 @@ describe('mapSubscriptionToEntityRecord', () => {
         mrr_normalized: 2000,
         current_period_end: '2023-11-14T22:13:20.000Z',
         cancel_at_period_end: false,
+        started_at: '2023-07-22T04:26:40.000Z',
+        plan_interval: 'year',
       },
     });
   });
@@ -156,5 +158,11 @@ describe('mapSubscriptionToEntityRecord', () => {
     const canceled: StripeSubscription = { ...SUBSCRIPTION, canceled_at: 1_695_000_000 };
     const record = mapSubscriptionToEntityRecord(canceled);
     expect((record.attributes as Record<string, unknown>).canceled_at).toBe('2023-09-18T01:20:00.000Z');
+  });
+
+  it('falls back to an empty plan_interval when the subscription has no items', () => {
+    const noItems: StripeSubscription = { ...SUBSCRIPTION, items: { data: [] } };
+    const record = mapSubscriptionToEntityRecord(noItems);
+    expect((record.attributes as Record<string, unknown>).plan_interval).toBe('');
   });
 });
