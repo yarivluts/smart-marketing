@@ -1,6 +1,7 @@
 import { ProjectModel } from '../models/project.model';
 import { ProjectCostQuotaModel } from '../models/project-cost-quota.model';
 import { QueryCostLogEntryModel, type QueryCostLogOutcome } from '../models/query-cost-log-entry.model';
+import { WarehouseNotConfiguredError } from '../warehouse/query-executor';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 
@@ -205,4 +206,69 @@ export async function checkProjectQueryQuota(
     limit: quota.dailyQueryLimit,
     attemptedToday,
   };
+}
+
+/** Best-effort cost-log write — same swallowed-failure posture `recordOrchestrationRunAudit` already established for audit entries, so a Firestore hiccup here never masks {@link runQuotaGatedWarehouseQuery}'s own outcome. */
+async function logCostAttemptBestEffort(
+  organizationId: string,
+  projectId: string,
+  outcome: QueryCostLogOutcome,
+  definitionRefs: Record<string, string>,
+): Promise<void> {
+  try {
+    await recordQueryCostLogEntry({ organizationId, projectId, outcome, definitionRefs });
+  } catch {
+    // Best-effort — see this function's own doc comment.
+  }
+}
+
+/**
+ * Runs a hand-written-SQL warehouse read behind the same KAN-39 cost
+ * guardrail `queryMetrics` (`metrics-query.service.ts`) already enforces for
+ * every registered-metric query: checks the project's daily quota first
+ * (throwing {@link ProjectQueryQuotaExceededError} and logging
+ * `blocked_quota_exceeded` if it's already spent), then runs `run` and logs
+ * `executed` (or `warehouse_not_configured` when `run` rejects with a
+ * {@link WarehouseNotConfiguredError}) before returning its result or
+ * rethrowing its error.
+ *
+ * `mcp-tools.service.ts`'s `searchProjectCustomers`/`queryProjectCohortRetention`/
+ * `queryProjectFunnelSteps` and `segment.service.ts`'s `countSegmentMembers`
+ * each hand-write parameterized SQL straight over a {@link WarehouseQueryExecutor}
+ * rather than going through `queryMetrics` (there's no registered metric
+ * definition for a customer search, a cohort matrix, a funnel, or a segment's
+ * live member count) — which meant none of them ever checked or logged
+ * against this same quota, so an MCP client (or the segments page) could run
+ * unbounded warehouse scans invisible to the cost-guardrails admin page. This
+ * gives all four the same guardrail without duplicating `queryMetrics`'s own
+ * cache-aware version of this logic (a hand-written read has no result cache
+ * to consult first).
+ *
+ * `definitionRefs` plays the same role `queryMetrics`'s own `compiled.
+ * definitionRefs` does on the cost log — here it identifies which
+ * hand-written read ran (e.g. `{ tool: 'search_customers' }`) rather than
+ * which metric *definitions* it depended on, since none of these reads
+ * depend on the metric registry at all.
+ */
+export async function runQuotaGatedWarehouseQuery<T>(
+  organizationId: string,
+  projectId: string,
+  definitionRefs: Record<string, string>,
+  run: () => Promise<T>,
+): Promise<T> {
+  const quota = await checkProjectQueryQuota(organizationId, projectId);
+  if (!quota.allowed) {
+    await logCostAttemptBestEffort(organizationId, projectId, 'blocked_quota_exceeded', definitionRefs);
+    throw new ProjectQueryQuotaExceededError(quota.limit);
+  }
+
+  try {
+    const result = await run();
+    await logCostAttemptBestEffort(organizationId, projectId, 'executed', definitionRefs);
+    return result;
+  } catch (error) {
+    const outcome = error instanceof WarehouseNotConfiguredError ? 'warehouse_not_configured' : 'executed';
+    await logCostAttemptBestEffort(organizationId, projectId, outcome, definitionRefs);
+    throw error;
+  }
 }

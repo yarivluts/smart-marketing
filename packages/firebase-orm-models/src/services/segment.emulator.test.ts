@@ -9,10 +9,12 @@ import {
   ensureUserForFirebaseSession,
   InvalidSegmentError,
   listAuditLogEntriesForOrg,
+  listQueryCostLogEntriesForProject,
   listSegmentsForProject,
   ProjectNotFoundError,
   registerSchemaDefinition,
   SegmentNotFoundError,
+  setProjectCostQuota,
   WarehouseNotConfiguredError,
   WarehouseQueryFailedError,
   type SchemaFieldInput,
@@ -430,6 +432,48 @@ describe('countSegmentMembers', () => {
 
     const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
     expect(outcome).toEqual({ ok: false, reason: 'query_error', message: 'table not found' });
+  });
+
+  it('logs an "executed" cost-log entry against the project\'s daily quota (KAN-39)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Quota Log Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ member_count: 3 }]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].outcome).toBe('executed');
+    expect(entries[0].definition_refs).toEqual({ tool: 'count_segment_members' });
+  });
+
+  it('degrades to a "quota_exceeded" outcome instead of throwing once the project has spent its daily quota, mirroring queryBoardTile/queryGoalProgress', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Quota Blocked Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([{ member_count: 3 }]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+    const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(outcome).toEqual({ ok: false, reason: 'quota_exceeded', message: expect.any(String) });
+    expect(executor.calls).toHaveLength(1);
   });
 
   it('throws SegmentNotFoundError for a segment that does not belong to this org+project', async () => {

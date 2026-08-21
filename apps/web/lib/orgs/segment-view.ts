@@ -20,7 +20,7 @@ export function toSegmentSummaryView(segment: SegmentModel): SegmentSummaryView 
 }
 
 /** Mirrors `GoalThermometerView`'s (`goal-view.ts`) ok/degraded-outcome split — a segment's member-count badge degrades the same way a goal thermometer does, rather than crashing the page, for the same expected-not-buggy failure modes. */
-export type SegmentMemberCountView = { kind: 'ok'; count: number } | { kind: 'warehouse_not_configured' } | { kind: 'query_error' };
+export type SegmentMemberCountView = { kind: 'ok'; count: number } | { kind: 'warehouse_not_configured' } | { kind: 'quota_exceeded' } | { kind: 'query_error' };
 
 export function buildSegmentMemberCountView(outcome: SegmentMemberCountOutcome): SegmentMemberCountView {
   if (!outcome.ok) {

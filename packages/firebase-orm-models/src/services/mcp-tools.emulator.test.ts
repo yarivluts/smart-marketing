@@ -7,9 +7,12 @@ import {
   ensureUserForFirebaseSession,
   InvalidMcpToolRequestError,
   listProjectInsights,
+  listQueryCostLogEntriesForProject,
+  ProjectQueryQuotaExceededError,
   queryProjectCohortRetention,
   queryProjectFunnelSteps,
   searchProjectCustomers,
+  setProjectCostQuota,
   TrackingAlertModel,
   WinEventModel,
   type WarehouseQueryExecutor,
@@ -288,5 +291,80 @@ describe('listProjectInsights', () => {
 
     const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, limit: 2 });
     expect(insights).toHaveLength(2);
+  });
+});
+
+describe('KAN-39 cost-guardrail quota, wired via runQuotaGatedWarehouseQuery', () => {
+  it('search_customers logs an "executed" cost-log entry and counts against the daily quota', async () => {
+    const { organization, project } = await setupOrgWithProject('Search Customers Quota Log Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
+
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].outcome).toBe('executed');
+    expect(entries[0].definition_refs).toEqual({ tool: 'search_customers' });
+  });
+
+  it('search_customers throws ProjectQueryQuotaExceededError once the project has spent its daily quota, without reaching the executor', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Search Customers Quota Blocked Org');
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
+    await expect(
+      searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'other', executor }),
+    ).rejects.toThrow(ProjectQueryQuotaExceededError);
+
+    expect(executor.calls).toHaveLength(1);
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries.map((entry) => entry.outcome).sort()).toEqual(['blocked_quota_exceeded', 'executed']);
+  });
+
+  it('query_cohort throws ProjectQueryQuotaExceededError once the project has spent its daily quota', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Cohort Quota Blocked Org');
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await queryProjectCohortRetention({ organizationId: organization.id, projectId: project.id, executor });
+    await expect(queryProjectCohortRetention({ organizationId: organization.id, projectId: project.id, executor })).rejects.toThrow(
+      ProjectQueryQuotaExceededError,
+    );
+
+    expect(executor.calls).toHaveLength(1);
+  });
+
+  it('query_funnel throws ProjectQueryQuotaExceededError once the project has spent its daily quota', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Quota Blocked Org');
+    await confirmOnboardingFunnelSteps({
+      organizationId: organization.id,
+      projectId: project.id,
+      userId: owner.id,
+      steps: [{ eventSchemaName: 'signup', stageKey: 'signup', order: 0 }],
+    });
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([{ event_type: 'signup', customer_count: 3 }]);
+
+    await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+    await expect(queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor })).rejects.toThrow(
+      ProjectQueryQuotaExceededError,
+    );
+
+    expect(executor.calls).toHaveLength(1);
+  });
+
+  it('query_funnel never touches the quota when no funnel is confirmed (no warehouse call to gate)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Quota Unconfirmed Org');
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    // Two calls, no confirmed funnel either time — neither should ever reach the quota check or the executor.
+    await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+    await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(executor.calls).toHaveLength(0);
+    const entries = await listQueryCostLogEntriesForProject(organization.id, project.id);
+    expect(entries).toHaveLength(0);
   });
 });

@@ -846,6 +846,7 @@
     "createError": "לא ניתן היה ליצור את הפלח. נסה שוב.",
     "memberCount": "{count, plural, one {חבר #} other {# חברים}}",
     "memberCountNotConfigured": "ספירת חברים אינה זמינה (מחסן הנתונים טרם הוגדר)",
+    "memberCountQuotaExceeded": "ספירת חברים אינה זמינה (מכסת השאילתות היומית מוצתה)",
     "memberCountError": "ספירת חברים אינה זמינה",
     "deleteConfirm": "למחוק את הפלח הזה? לא ניתן לבטל פעולה זו.",
     "deleteButton": "מחק",
