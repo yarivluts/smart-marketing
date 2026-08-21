@@ -17,6 +17,86 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 13) — automation execute route coverage (PR #183)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#182** (docs-only, records PR #181's coverage) from a
+    concurrent session, different file (`PROGRESS.md`), left alone per the established convention —
+    it merged clean (`6071e77`) before this run opened its own PR, confirmed via `git fetch`.
+  - Delegated a fresh sweep (Explore agent) for the next unclaimed coverage/bug target, explicitly
+    excluding every surface prior runs already covered (tv-viewer-auth, tv-pairing-rate-limit,
+    mcpCallerHasPermission, schema-mart.service, setAutomationGuardrailPolicy, the oauth/mcp/consent
+    route, ingest-request parser, warehouse-freshness quota wiring). It surfaced
+    `apps/web/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/[actionId]/execute/route.ts`
+    — the ad-spend-executing endpoint fronting KAN-71/72/73's automation pipeline (real Google
+    Ads/Meta Ads execution via KMS-decrypted credentials) — with **zero dedicated test coverage**.
+    Every prior automation PR (#171/#177) tested only the `packages/firebase-orm-models` service
+    layer; the entire `apps/web/.../automation/` route subtree had no `route.test.ts` at all, and
+    `isolation.test.ts` only incidentally imports `execute/route.ts` for its narrow cross-org
+    non-enumeration property.
+  - Traced every branch of the route by hand against `automation.service.ts` and
+    `automation-executor-resolver.service.ts` before writing anything: confirmed the route's own
+    `if (err instanceof InvalidAutomationActionError)` branch is only reachable via a
+    `campaign_activation` action executing against a target with no `campaign_resource_name` (a
+    materially different action-type setup than `budget_change`, which every other reachable branch
+    in this route uses) — documented as a follow-up gap rather than chased into this PR.
+  - **Fix (PR #183, branch `test/automation-execute-route-coverage`):** new `route.test.ts` (12
+    cases, real Firestore/Auth emulator, mirroring the sibling `plugins/[installId]/run/route.test.ts`
+    convention): 401 unauthenticated; 403 for a `viewer` lacking `automation.execute`; 404 for an
+    unknown action id; 409 `invalid_state`/`kill_switch_engaged`; 409 `insufficient_write_tier`
+    (deliberately using a `stripe`-provider connection so `resolveAutomationActionExecutorForTarget`
+    falls back to the simulated executor instead of throwing its own plugin-not-installed error
+    first — a `google_ads`/`meta_ads`-linked target hits that error before the write-tier check is
+    ever reached); 409 `google_ads_plugin_not_installed`/`meta_plugin_not_installed`; 409
+    `google_ads_credential_not_configured`/`meta_ads_credential_not_configured` (both asserting the
+    `reason` field, triggered by deleting `GROWTHOS_VAULT_KEYS` around the call with a `finally`
+    restore, matching the one existing precedent in `resources/credentials/[credentialId]/secret/
+    route.test.ts`); the 200 success path; and a dedicated test pinning the best-effort KMS
+    resolution (a simulated/unlinked target still executes successfully when the vault isn't
+    configured at all, since `VaultNotConfiguredError` is swallowed). No production code changed.
+  - Independent self-review via a subagent pass (fresh context, given only the diff + the service
+    files it exercises): confirmed every 409 test is genuinely isolated to the branch it claims
+    (traced the exact call order in `apps/web/lib/orgs/mutations.ts` — the executor resolver runs
+    *before* the service's own invalid_state/kill_switch/write_tier checks), confirmed the env-var
+    try/finally isolation is race-free (no `concurrent` in `vitest.config.ts`, `getServerKmsProvider`
+    reads the env var fresh every call), and confirmed the `seedTargetWithConnection` helper matches
+    `automation.emulator.test.ts`'s own version field-for-field. No bugs found.
+  - **Checks:** fresh container this run (no `node_modules`/build output) — `pnpm install` +
+    `pnpm build` (full monorepo, all 7 packages incl. a real `dbt build`) first. New test file
+    12/12 in isolation via the `firebase emulators:exec` wrapper, then `pnpm typecheck` (10/10) and
+    `pnpm lint` (6/6) clean. Full suite per package (per prior entries' documented memory-pressure
+    guidance, not one concurrent `turbo pnpm test`): `@growthos/shared` 438/438,
+    `@growthos/tracking-sdk` 21/21, `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform`
+    171/171, `@growthos/api` 140/140 (the documented `RESOURCE_EXHAUSTED` Firestore-emulator warning
+    logged mid-run, no test failed), `@growthos/firebase-orm-models` 1006/1006,
+    `@growthos/web` unit 1048/1048 + e2e 23/23 (one test in the new file logged the same
+    `RESOURCE_EXHAUSTED` warning, still passed). All green before opening the PR.
+  - PR #183's own CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in
+    ~25 minutes (checked via `subscribe_pr_activity`, no review comments); merged 2026-08-21 (squash,
+    `d8d7535`). Remote branch deletion hit the same recurring git-over-HTTPS-proxy HTTP 403 every
+    prior merged branch from a scheduled run has hit; local branch deleted cleanly after syncing to
+    `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #183 fully landed, `main` green (also picked up
+  #182, the concurrent session's PROGRESS.md record for PR #181, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep. Two concrete leads from
+  this run: (1) `execute/route.ts`'s sibling automation routes — `approve/route.ts`, `reject/
+  route.ts`, `rollback/route.ts`, `verify/route.ts`, and `guardrail-policy/route.ts` (its own
+  **route-level** input validation, distinct from and untested by PR #177's service-level
+  `setAutomationGuardrailPolicy` coverage) — are in the exact same zero-coverage state this run
+  found `execute/route.ts` in; `approve/route.ts` is the most natural next pick (shares almost all
+  of this run's setup helpers). (2) The documented gap this run left open: no test exercises
+  `execute/route.ts`'s `InvalidAutomationActionError -> 400` branch (only reachable via a
+  `campaign_activation` action against a target with no `campaign_resource_name`) — a smaller,
+  standalone follow-up once `approve/route.ts` or another campaign-activation-shaped test exists to
+  build the setup from.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/automation-execute-route-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 12) — MCP OAuth consent route coverage (PR #181)
 
 - **Last completed:**
