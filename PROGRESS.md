@@ -17,6 +17,64 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 — Bounded the two unbounded in-memory Redis stand-ins (PR #148)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). One PR was open: **#147** ("not backed by
+    real data yet" degraded state for the SaaS/engagement pack's unbuilt warehouse tables), opened
+    seconds earlier by a concurrent session, `mergeable_state: unknown`, zero CI checks yet — left
+    alone entirely (own scope, own session; it merged itself mid-run, confirmed via `git log
+    origin/main` before this entry was written).
+  - Delegated a sweep (Explore agent) for a genuine, small, infra-free follow-up not overlapping
+    PR #147's scope. It surfaced a real, previously-flagged-but-unclaimed gap: **PR #136's own entry
+    (2026-08-20) had named `InMemoryMetricQueryResultCache`'s unbounded `Map` as a follow-up and it
+    was never picked up** (file untouched since its KAN-42 creation commit). Verified directly:
+    `result-cache.ts`'s `store` is a plain `Map<string, CacheEntry>` with no size cap and no
+    proactive expiry sweep — an entry is only removed lazily if that exact key is re-read after its
+    TTL elapses, so every distinct org+project+definition-versions+params combination ever queried
+    stays resident in process memory for the life of the server. The sweep also found the identical
+    bug shape, previously unflagged, in `token-bucket.ts`'s `InMemoryTokenBucketRateLimiter.buckets`
+    (one entry per API key/credential id, never evicted) — same doc-comment pattern ("in-process
+    stand-in for Redis until KAN-18"), same fix.
+  - **Fix:** a new shared `BoundedLruMap<K, V>` (`packages/firebase-orm-models/src/util/`) — a `Map`
+    wrapper that evicts the least-recently-used entry once `maxEntries` would be exceeded (`get`
+    refreshes recency, `set` inserts/updates then evicts from the front if over capacity). Wired into
+    both: `InMemoryMetricQueryResultCache` takes a new optional `maxEntries` constructor param
+    (default `DEFAULT_METRIC_QUERY_RESULT_CACHE_MAX_ENTRIES = 5_000`, positional after the existing
+    `now`, so every no-arg/one-arg call site keeps compiling unchanged); `TokenBucketRateLimiterOptions`
+    gains an optional `maxKeys` field (default `DEFAULT_MAX_TRACKED_KEYS = 50_000`). Both defaults are
+    placeholders pending real traffic data, same posture the existing rate-limit capacity/refill
+    constants already document for their own numbers. No caller outside these two files changed —
+    same public interfaces (`MetricQueryResultCache`, `RateLimiter`).
+  - **Tests:** new `bounded-lru-map.test.ts` (store/retrieve, overwrite-in-place, LRU eviction once
+    over capacity, `get` refreshing recency to protect a key from the next eviction, `delete`).
+    New eviction-regression cases in `result-cache.test.ts` and `token-bucket.test.ts` (the latter
+    traced through by hand to account for eviction cascading across multiple `consume()` calls once
+    the map is at capacity, so the assertions match actual LRU order rather than a naive guess).
+  - **Checks:** `pnpm lint && pnpm typecheck && pnpm build` green across the whole monorepo. Targeted
+    `pnpm test` run (the three touched suites) green first; then a full `pnpm test` run kicked off
+    before opening the PR to catch any unrelated regression.
+  - **Merged 2026-08-21:** PR #148 (`fix/bounded-in-memory-caches`) merged into `main` (`24bfad3`)
+    after `lint · typecheck · test · build` and `terraform fmt · validate` both passed. **#147 merged
+    independently in parallel** (`0ae74fb`), no file overlap. Remote branch deletion for
+    `fix/bounded-in-memory-caches` hit the same recurring HTTP 403 from this sandbox's git remote
+    prior runs have documented (not a GitHub permissions issue) — branch is merged and dead but not
+    deleted; a human with direct repo access can delete it, or a future run can retry.
+- **In progress (exact stopping point):** none — #148 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** no other unclaimed, infra-free follow-up turned up in this run's sweep beyond the
+  bounded-map fix above (everything else found was already resolved by an earlier PR, explicitly
+  deferred as bigger than a single-PR fix by a prior session, or squarely inside #147's territory).
+  A future run should do a fresh sweep rather than assume this list is exhaustive — TASKS.md itself
+  has no remaining unblocked `todo` row.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision — once real Redis exists, both `InMemoryMetricQueryResultCache` and
+  `InMemoryTokenBucketRateLimiter` are the two call sites that would swap to it; prune merged feature
+  branches the proxy blocks scheduled runs from deleting, now including `fix/bounded-in-memory-caches`).
+
+---
+
 ## 2026-08-21 — ad_spend made queryable against a real warehouse mart view (PR #145)
 
 - **Last completed:**
