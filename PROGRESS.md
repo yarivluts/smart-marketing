@@ -17,6 +17,73 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 6) — loadLocalKmsKeyRingFromEnv's validation branches now covered (PR #168)
+
+- **Last completed:**
+  - Continuing the same session that landed PR #163 (warehouse-freshness cost-quota wiring, see the
+    entry below). After #163 and its docs-only follow-up (#166) both merged, checked open PRs again:
+    **#167** (dedicated coverage for a plugin-manifest semver comparator in
+    `packages/firebase-orm-models`) was open from a concurrent session — different file, left alone;
+    it later merged clean with a real one-line production fix alongside its tests (`plugin-registry.
+    service.ts`, `afe5ab6` — not this session's work, confirmed via `git log` before writing this
+    entry). Also discovered a concurrent session had pushed an unopened branch
+    `test/tv-viewer-auth-coverage` covering the *exact* gap this session's own second sweep had found
+    and started implementing (`apps/web/lib/orgs/tv-viewer-auth.ts`, 8 tests already passing locally)
+    — rather than race a competing PR for the same file, discarded this session's local duplicate
+    work entirely and re-swept for a different target.
+  - Delegated a third Explore-agent sweep, explicitly excluding every file already claimed (this
+    session's own #163/#161/#162/tv-viewer-auth, plus #167's target). It surfaced
+    `packages/firebase-orm-models/src/vault/local-kms-provider.ts`'s `loadLocalKmsKeyRingFromEnv` —
+    the real bootstrap path both `apps/web/lib/vault/kms-provider.ts` and `apps/api/src/vault/
+    kms-provider.ts` call to construct the production `LocalKmsProvider` that encrypts/decrypts every
+    vaulted OAuth token/secret (KAN-29). Verified directly against `vault.test.ts`'s existing
+    `describe('loadLocalKmsKeyRingFromEnv', ...)` block: only well-formed input, an unset env var,
+    malformed JSON, and one wrong-byte-length key were exercised. Three real, distinct validation
+    branches had zero coverage — the compound top-level shape check (non-object top level, `null`,
+    missing/non-string `currentKeyId`, missing/non-object `keys`), a per-key non-string value, and a
+    `currentKeyId` absent from its own `keys` map.
+  - **Fix (PR #168, branch `test/vault-kms-keyring-validation-coverage`):** added cases for all three
+    gaps to the existing `describe` block — a parameterized `it.each` for the eight compound-shape
+    sub-cases, plus two dedicated cases for the non-string-value and currentKeyId-not-in-keys checks,
+    asserting the exact error-message substring the same way the existing cases already do. No
+    production code changed — every branch traced by hand against the source first; existing behavior
+    is already correct on every case. Closes a coverage gap, not a bug.
+  - **Checks:** `npx vitest run src/vault/vault.test.ts` (22/22) first, then `pnpm lint && pnpm
+    typecheck && pnpm build` green, then a full `pnpm test` (11/11 tasks green, including apps/web's
+    e2e suite after Playwright's own retries). PR #168's own CI failed once on
+    `lint · typecheck · test · build` — but not on this change: `packages/firebase-orm-models`'s own
+    979/979 tests (including the 22 new vault cases) passed cleanly in that same run; the job then
+    crashed abruptly ("An unexpected error has occurred") ~2s into `apps/web`'s `firebase emulators:exec
+    --only auth,firestore` step, immediately after the memory-heavy `firebase-orm-models` suite
+    finished under visible `RESOURCE_EXHAUSTED` strain (the same documented Firestore-emulator-under
+    -load class prior entries record, this time apparently exhausting enough runner memory/resources
+    to crash the *next* package's emulator at startup rather than just flaking a query mid-test).
+    Re-ran the failed job once via `actions_run_trigger`'s `rerun_failed_jobs` — went green.
+  - **Merged 2026-08-21:** PR #168 squash-merged into `main` (`d6f3f56`) after both checks passed and
+    `mergeable_state` settled to `clean`; no review comments. Remote branch deletion hit the same
+    recurring HTTP 403 from this sandbox's git remote every prior merged branch has hit; local branch
+    cleaned up.
+- **In progress (exact stopping point):** none — #163, #166, and #168 (this session's three PRs) are
+  all fully landed, `main` green. Also confirmed (not this session's work, but observed landing during
+  it): #161, #162, #164, #165 (four more scheduled-run PRs from concurrent sessions) and #167 all
+  merged clean with no file overlap.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. Given how many concurrent sessions are active
+  right now (at least 3-4 distinct scheduled runs landing PRs within the same hour), a future run
+  should check open PRs *and* recently-merged PRs (not just `TASKS.md`) before sweeping, to avoid
+  duplicate work — this session hit that exact collision once (`tv-viewer-auth.ts`) and avoided
+  shipping a competing PR only by discarding its own unpushed local work in time. The
+  parse-*-fields.ts, formula-parser/identifiers.ts, ingest-request.ts, tv-pairing-rate-limit.ts,
+  plugin-registry semver comparator, and vault/local-kms-provider.ts coverage veins are now all
+  exhausted; a future sweep will need to search more broadly (see this run's own sweep prompts for the
+  growing exclusion list) or turn to a different category of follow-up (real bugs, previously-
+  documented-but-unclaimed items) rather than assuming another untested-pure-function vein remains.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now also including `test/vault-kms-keyring-validation-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 5) — Plugin-manifest semver comparator coverage (PR #167)
 
 - **Last completed:**
