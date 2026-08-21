@@ -17,6 +17,64 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 — Dedicated test coverage for the metric formula parser (PR #153)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done`/`needs-human`/`blocked-by` (no unblocked row) — same
+    exhausted-backlog state prior runs have been hitting. Checked open PRs first: **#151** (real
+    `fact_funnel_event`/`fact_revenue_event`/`dim_subscription`/`fact_subscription_event` warehouse
+    models, a concurrent session's implementation) and **#150** (docs-only, records PR #147) were
+    both open — left both alone (own scope, own sessions); both merged themselves mid-run
+    (confirmed via `git log origin/main` before this entry: `f44b010`/`7d17a0a`/`6a89a27` land after
+    this run's own `781108e` base).
+  - Delegated a sweep (Explore agent) for a genuine, small, infra-free follow-up not overlapping
+    #151/#150's scope. It surfaced a real, previously-flagged-but-unclaimed gap: PR #128's own
+    PROGRESS.md entry (2026-08-20) named `formula-parser.ts` as the metric compiler's "remaining
+    untested surface" once `time.ts` got its own dedicated test file — and nobody had picked it up
+    in the ~25 PRs since. Verified directly: `formula-parser.ts` (the recursive-descent parser
+    behind formula metrics like `cac = ad_spend / new_paying`) had zero dedicated test file; its
+    precedence/associativity/parens/unary-minus/error-branch behavior was only exercised indirectly
+    through 3 golden-fixture cases in `compiler.test.ts`.
+  - **Fix (PR #153, branch `test/formula-parser-coverage`):** new `formula-parser.test.ts` (23
+    cases) — traced each expected AST/error by hand against the parser before asserting it, the
+    same discipline prior runs used for `time.ts`, rather than asserting whatever the parser
+    happened to already produce. Covers: numbers/identifiers; `*`/`/` binding tighter than `+`/`-`;
+    left-associativity of same-precedence operators; parens overriding precedence (incl. nested);
+    unary minus (single, double, combined with `*`, applied to a paren group); whitespace tolerance;
+    `collectIdentifiers` (order-preserving, duplicate-keeping traversal across binary/unary/nested
+    nodes); and all four error branches (`Unable to parse formula`, `Unexpected end of formula`,
+    `Expected ")" in formula`, `Unexpected trailing content`). One test-authoring bug caught by the
+    trace-first discipline itself: an initial "missing closing paren" case actually hit the
+    end-of-input branch (`Unexpected end of formula`) rather than the intended `Expected ")" `
+    branch, since `TokenStream.next()` checks for a missing token before `parseFactor` gets to check
+    its kind — split into two separate cases (unterminated-at-EOF vs. wrong-token-follows-paren) so
+    both real error branches are actually exercised. No production code changed — confirmed the
+    parser's existing behavior is already correct on every case (no latent bug found, notably
+    including cross-checking its `[a-z][a-z0-9_]*` identifier grammar against
+    `metric-registry.service.ts`'s own `METRIC_NAME_PATTERN` — both lowercase-start-only, so no
+    valid-but-unparseable metric name exists).
+  - **Checks:** `pnpm --filter @growthos/shared test -- formula-parser` (23/23) first, then the
+    full monorepo `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — all green (946 web
+    unit tests + 25 Playwright e2e specs; the 2 e2e specs prior entries have already flagged as
+    occasionally flaky under this sandbox's load passed on Playwright's own automatic retry, same
+    as every prior run that's hit them).
+  - **Merged 2026-08-21:** PR #153 merged into `main` (`f44b010`) after CI (`lint · typecheck ·
+    test · build`) passed. Remote branch deletion for `test/formula-parser-coverage` hit the same
+    recurring HTTP 403 from this sandbox's git remote prior runs have documented (not a GitHub
+    permissions issue) — branch is merged and dead but not deleted; local branch deleted cleanly.
+- **In progress (exact stopping point):** none — #153 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row (KAN-59's own remaining pack metrics are now
+  fully unblocked by #151 — worth spot-checking the SaaS/Engagement default boards actually render
+  real numbers end to end against a live warehouse next, rather than just the dbt-model-level fixture
+  tests #151 already covers). Otherwise, a future run should do a fresh unclaimed-follow-up sweep
+  rather than assume this list is exhaustive.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/formula-parser-coverage`).
+
+---
+
 ## 2026-08-21 — Built real fact_funnel_event/fact_revenue_event/dim_subscription/fact_subscription_event core models (PR #151)
 
 - **Last completed:**
