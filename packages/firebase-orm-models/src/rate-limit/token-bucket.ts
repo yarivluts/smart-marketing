@@ -1,4 +1,5 @@
 import type { RateLimiter, RateLimitResult } from './rate-limiter';
+import { BoundedLruMap } from '../util/bounded-lru-map';
 
 export class InvalidTokenBucketConfigError extends Error {
   constructor(reason: string) {
@@ -14,7 +15,19 @@ export interface TokenBucketRateLimiterOptions {
   refillPerSecond: number;
   /** Injectable clock for tests; defaults to `Date.now`. */
   now?: () => number;
+  /** Maximum distinct keys tracked at once; defaults to {@link DEFAULT_MAX_TRACKED_KEYS}. */
+  maxKeys?: number;
 }
+
+/**
+ * The largest number of distinct keys (API key ids / credential ids) a limiter tracks at once,
+ * evicting the least-recently-used one past that — otherwise a limiter's bucket map grows by one
+ * entry per new key for the lifetime of the process, never shrinking, the same unbounded-memory
+ * shape `InMemoryMetricQueryResultCache` had until it gained the same `BoundedLruMap` bound. A
+ * placeholder pending real traffic data, same posture `DEFAULT_API_KEY_RATE_LIMIT_CAPACITY`
+ * documents for its own number.
+ */
+export const DEFAULT_MAX_TRACKED_KEYS = 50_000;
 
 interface Bucket {
   tokens: number;
@@ -36,7 +49,7 @@ interface Bucket {
  * one; that gap closes with the same Redis swap.
  */
 export class InMemoryTokenBucketRateLimiter implements RateLimiter {
-  private readonly buckets = new Map<string, Bucket>();
+  private readonly buckets: BoundedLruMap<string, Bucket>;
   private readonly capacity: number;
   private readonly refillPerSecond: number;
   private readonly now: () => number;
@@ -51,6 +64,7 @@ export class InMemoryTokenBucketRateLimiter implements RateLimiter {
     this.capacity = options.capacity;
     this.refillPerSecond = options.refillPerSecond;
     this.now = options.now ?? Date.now;
+    this.buckets = new BoundedLruMap(options.maxKeys ?? DEFAULT_MAX_TRACKED_KEYS);
   }
 
   consume(key: string, cost = 1): RateLimitResult {

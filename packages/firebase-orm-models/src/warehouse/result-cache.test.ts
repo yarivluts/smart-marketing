@@ -56,4 +56,14 @@ describe('InMemoryMetricQueryResultCache', () => {
     // Still within the fresh 10s window from the overwrite, even though 11s have passed since the first set.
     expect(cache.get('key-a')).toEqual(updatedRows);
   });
+
+  it('evicts the least-recently-used entry once over the configured maxEntries, instead of growing without bound', () => {
+    const cache = new InMemoryMetricQueryResultCache(Date.now, 2);
+    cache.set('key-a', ROWS, 60);
+    cache.set('key-b', ROWS, 60);
+    cache.set('key-c', ROWS, 60); // 'key-a' is least-recently-used -> evicted.
+    expect(cache.get('key-a')).toBeUndefined();
+    expect(cache.get('key-b')).toEqual(ROWS);
+    expect(cache.get('key-c')).toEqual(ROWS);
+  });
 });
