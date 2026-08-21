@@ -165,11 +165,11 @@ describe('a full GA4 backfill sync', () => {
     expect(run.records_accepted).toBe(2);
     expect(run.records_quarantined).toBe(0);
 
-    const landedSession = await getMostRecentRawRecordForSchema(organization.id, project.id, 'event', 'ga4_session');
+    const landedSession = await getMostRecentRawRecordForSchema(organization.id, project.id, environment.id, 'event', 'ga4_session');
     expect(landedSession).not.toBeNull();
     expect((landedSession!.payload.properties as Record<string, unknown>).source).toBe('google');
 
-    const landedEvent = await getMostRecentRawRecordForSchema(organization.id, project.id, 'event', 'ga4_event');
+    const landedEvent = await getMostRecentRawRecordForSchema(organization.id, project.id, environment.id, 'event', 'ga4_event');
     expect(landedEvent).not.toBeNull();
     expect((landedEvent!.payload.properties as Record<string, unknown>).event_name).toBe('purchase');
   });

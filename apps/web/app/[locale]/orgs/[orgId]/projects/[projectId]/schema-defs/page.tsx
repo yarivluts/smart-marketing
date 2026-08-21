@@ -6,6 +6,7 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   getEventVolumeOverviewForProject,
+  listEnvironmentsForProject,
   listOrgProjects,
   listSchemaDefinitionsForProject,
   listTrackingAlertsForProject,
@@ -74,10 +75,11 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [projects, schemaDefs, trackingAlerts] = await Promise.all([
+  const [projects, schemaDefs, trackingAlerts, environments] = await Promise.all([
     listOrgProjects(orgId),
     listSchemaDefinitionsForProject(orgId, projectId),
     listTrackingAlertsForProject(orgId, projectId),
+    listEnvironmentsForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -90,10 +92,15 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
   const eventVolumeOverview = await getEventVolumeOverviewForProject(orgId, projectId, { precomputedSchemaDefs: schemaDefs });
 
   const families = groupIntoFamilies(schemaDefs.map(toSchemaDefView));
-  const trackingAlertViews = trackingAlerts.map(toTrackingAlertView);
+  // `TrackingAlertModel` only stores `environment_id` — resolve the display name server-side,
+  // same "build an id->name lookup, pass plain strings across the RSC boundary" pattern the
+  // keys page's own `environmentNameById` map already uses.
+  const environmentNameById = new Map(environments.map((environment) => [environment.id, environment.name]));
+  const trackingAlertViews = trackingAlerts.map((alert) => toTrackingAlertView(alert, environmentNameById.get(alert.environment_id) ?? alert.environment_id));
   const touchpointSchemaRegistered = schemaDefs.some((schemaDef) => schemaDef.kind === 'event' && schemaDef.name === 'touchpoint');
 
   const t = await getTranslations('SchemaRegistry');
+  const tEnv = await getTranslations('EnvBadge');
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
@@ -143,9 +150,14 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
         ) : (
           <ul className="flex flex-col gap-2">
             {eventVolumeOverview.map((entry) => (
-              <li key={entry.schemaName} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
+              <li
+                key={`${entry.schemaName}:${entry.environmentId}`}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm"
+              >
                 <div className="flex flex-col gap-1">
-                  <span className="font-medium">{entry.schemaName}</span>
+                  <span className="font-medium">
+                    {t('eventVolumeSchemaEnvironmentLabel', { schemaName: entry.schemaName, environmentName: tEnv(entry.environmentName) })}
+                  </span>
                   <span className="text-xs text-muted-foreground">
                     {entry.lastSeenAt === null ? t('eventNeverSeen') : t('eventLastSeen', { lastSeenAt: entry.lastSeenAt })}
                   </span>
@@ -165,7 +177,11 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
               {trackingAlertViews.map((alert) => (
                 <li key={alert.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
                   <span className="font-medium">
-                    {t('trackingAlertSummary', { schemaName: alert.schemaName, status: t(trackingAlertStatusLabelKey(alert.status)) })}
+                    {t('trackingAlertSummary', {
+                      schemaName: alert.schemaName,
+                      environmentName: tEnv(alert.environmentName),
+                      status: t(trackingAlertStatusLabelKey(alert.status)),
+                    })}
                   </span>
                   <span className="text-xs text-muted-foreground">{t('trackingAlertLastSeen', { lastSeenAt: alert.lastSeenAt })}</span>
                 </li>

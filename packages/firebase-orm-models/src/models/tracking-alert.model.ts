@@ -20,20 +20,21 @@ export const TRACKING_ALERT_TRIGGERS = ['manual'] as const;
 export type TrackingAlertTrigger = (typeof TRACKING_ALERT_TRIGGERS)[number];
 
 /**
- * One "tracking broke" episode for a registered event schema (KAN-36: plan
- * `13 §E3.6` / `14` gap 7 — "dropping an event type to zero fires an alert
- * within an hour"). One document per episode: created the first time a
- * check finds the event silent past the threshold (`status: 'active'`),
- * updated in place on every later check while it stays silent
- * (`last_checked_at`), and flipped to `status: 'resolved'` the first time a
- * check finds the event flowing again — the same "one document, updated
- * across its own lifecycle" posture `OrchestrationRunModel` (KAN-38) already
- * established, rather than a fresh document per check.
+ * One "tracking broke" episode for a registered event schema, scoped to one
+ * environment (KAN-36: plan `13 §E3.6` / `14` gap 7 — "dropping an event
+ * type to zero fires an alert within an hour"). One document per episode:
+ * created the first time a check finds the event silent past the threshold
+ * (`status: 'active'`), updated in place on every later check while it stays
+ * silent (`last_checked_at`), and flipped to `status: 'resolved'` the first
+ * time a check finds the event flowing again — the same "one document,
+ * updated across its own lifecycle" posture `OrchestrationRunModel`
+ * (KAN-38) already established, rather than a fresh document per check.
  *
- * Scoped to a project (not per-environment), matching every other
- * project-level admin rollup in this codebase (`IngestBatchModel`,
- * `QuarantinedRecordModel`, `OrchestrationRunModel`) — they all fold every
- * environment into one admin view rather than splitting by one.
+ * Scoped per-environment (not folded project-wide like `IngestBatchModel`/
+ * `QuarantinedRecordModel`/`OrchestrationRunModel`): a project's
+ * environments carry independent traffic, so folding them together would
+ * let a `dev` key's test events keep an event "healthy" while its `prod`
+ * key has gone silent — exactly the failure this alert exists to catch.
  */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/tracking_alerts',
@@ -45,6 +46,9 @@ export class TrackingAlertModel extends BaseModel {
 
   @Field({ is_required: true })
   public project_id!: string;
+
+  @Field({ is_required: true })
+  public environment_id!: string;
 
   /** The event schema's `name` (`SchemaDefModel.name`, kind `event`) this alert is about. */
   @Field({ is_required: true })

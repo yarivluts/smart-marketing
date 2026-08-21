@@ -1,10 +1,12 @@
 import { ProjectModel } from '../models/project.model';
+import type { EnvironmentModel } from '../models/environment.model';
 import type { SchemaDefModel } from '../models/schema-def.model';
 import { TrackingAlertModel } from '../models/tracking-alert.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { activeSchemaNamesForKind, listSchemaDefinitionsForProject } from './schema-registry.service';
 import { getMostRecentRawRecordForSchema, listRawRecordsForSchemaSince } from './pipeline.service';
+import { listEnvironmentsForProject } from './organization.service';
 
 /** KAN-36 AC: "dropping an event type to zero fires an alert within an hour." */
 export const TRACKING_ALERT_SILENCE_THRESHOLD_MS = 60 * 60 * 1000;
@@ -67,6 +69,8 @@ export interface EventVolumeDailyBucket {
 
 export interface EventVolumeOverviewEntry {
   schemaName: string;
+  environmentId: string;
+  environmentName: string;
   /** Oldest day first, one bucket per day in the window (including empty days). */
   dailyCounts: EventVolumeDailyBucket[];
   /** The event's own most recent landed-record timestamp, or `null` if it has never landed a single record. */
@@ -95,6 +99,7 @@ function dailyBucketKeys(windowStartOfDayMs: number, windowDays: number): string
 async function computeEventVolumeEntry(
   organizationId: string,
   projectId: string,
+  environment: EnvironmentModel,
   schemaName: string,
   nowMs: number,
   windowDays: number,
@@ -104,6 +109,7 @@ async function computeEventVolumeEntry(
   const records = await listRawRecordsForSchemaSince(
     organizationId,
     projectId,
+    environment.id,
     'event',
     schemaName,
     new Date(windowStartOfDayMs).toISOString(),
@@ -121,20 +127,24 @@ async function computeEventVolumeEntry(
   let lastSeenAt = records.length > 0 ? records[0].landed_at : null;
   if (lastSeenAt === null) {
     // Nothing landed within the window — check further back before concluding this event has never flowed at all.
-    const mostRecentEver = await getMostRecentRawRecordForSchema(organizationId, projectId, 'event', schemaName);
+    const mostRecentEver = await getMostRecentRawRecordForSchema(organizationId, projectId, environment.id, 'event', schemaName);
     lastSeenAt = mostRecentEver?.landed_at ?? null;
   }
 
-  return { schemaName, dailyCounts, lastSeenAt };
+  return { schemaName, environmentId: environment.id, environmentName: environment.name, dailyCounts, lastSeenAt };
 }
 
 /**
- * Per-event volume sparklines for every active event schema in a project
- * (KAN-36's "per-event volume sparklines" half of the AC) — a daily-bucketed
- * count over the trailing window plus each event's own last-seen timestamp.
- * Purely a read: computed fresh on every call from bounded Firestore queries,
- * nothing persisted, the same "recompute view-side, don't store a rollup"
- * posture `computeIngestHealthSummary` (KAN-35) already uses.
+ * Per-event volume sparklines for every active event schema in every
+ * environment of a project (KAN-36's "per-event volume sparklines" half of
+ * the AC) — a daily-bucketed count over the trailing window plus each
+ * event's own last-seen timestamp, one entry per (schema, environment) pair.
+ * Split by environment for the same reason `getMostRecentRawRecordForSchema`
+ * is: a project's environments carry independent traffic, so folding them
+ * together would let `dev` noise hide `prod` going quiet. Purely a read:
+ * computed fresh on every call from bounded Firestore queries, nothing
+ * persisted, the same "recompute view-side, don't store a rollup" posture
+ * `computeIngestHealthSummary` (KAN-35) already uses.
  *
  * `precomputedSchemaDefs` lets a caller that already fetched
  * `listSchemaDefinitionsForProject` for the same render (e.g. the schema
@@ -152,16 +162,28 @@ export async function getEventVolumeOverviewForProject(
   const now = options?.now ?? Date.now();
   const windowDays = options?.windowDays ?? DEFAULT_EVENT_VOLUME_WINDOW_DAYS;
 
-  const schemaDefs = options?.precomputedSchemaDefs ?? (await listSchemaDefinitionsForProject(organizationId, projectId));
+  const [schemaDefs, environments] = await Promise.all([
+    options?.precomputedSchemaDefs ? Promise.resolve(options.precomputedSchemaDefs) : listSchemaDefinitionsForProject(organizationId, projectId),
+    listEnvironmentsForProject(organizationId, projectId),
+  ]);
   const eventNames = activeSchemaNamesForKind(schemaDefs, 'event');
 
-  return Promise.all(eventNames.map((schemaName) => computeEventVolumeEntry(organizationId, projectId, schemaName, now, windowDays)));
+  const entries = await Promise.all(
+    environments.flatMap((environment) =>
+      eventNames.map((schemaName) => computeEventVolumeEntry(organizationId, projectId, environment, schemaName, now, windowDays)),
+    ),
+  );
+  return entries.sort(
+    (a, b) => a.schemaName.localeCompare(b.schemaName) || a.environmentName.localeCompare(b.environmentName),
+  );
 }
 
 export type TrackingAlertCheckAction = 'fired' | 'still_active' | 'resolved' | 'healthy';
 
 export interface TrackingAlertCheckOutcome {
   schemaName: string;
+  environmentId: string;
+  environmentName: string;
   action: TrackingAlertCheckAction;
   alert: TrackingAlertModel | null;
   lastSeenAt: string | null;
@@ -175,15 +197,18 @@ export interface TrackingAlertCheckResult {
 async function evaluateEventForAlert(
   organizationId: string,
   projectId: string,
+  environment: EnvironmentModel,
   schemaName: string,
   nowMs: number,
   nowIso: string,
   existingAlert: TrackingAlertModel | undefined,
 ): Promise<TrackingAlertCheckOutcome> {
-  const mostRecent = await getMostRecentRawRecordForSchema(organizationId, projectId, 'event', schemaName);
+  const environmentId = environment.id;
+  const environmentName = environment.name;
+  const mostRecent = await getMostRecentRawRecordForSchema(organizationId, projectId, environmentId, 'event', schemaName);
   if (!mostRecent) {
     // Registered but has never landed a single record — nothing has "broken" yet, so nothing to alert on.
-    return { schemaName, action: 'healthy', alert: existingAlert ?? null, lastSeenAt: null };
+    return { schemaName, environmentId, environmentName, action: 'healthy', alert: existingAlert ?? null, lastSeenAt: null };
   }
 
   const lastSeenAt = mostRecent.landed_at;
@@ -193,11 +218,12 @@ async function evaluateEventForAlert(
     if (existingAlert) {
       existingAlert.last_checked_at = nowIso;
       await existingAlert.save();
-      return { schemaName, action: 'still_active', alert: existingAlert, lastSeenAt };
+      return { schemaName, environmentId, environmentName, action: 'still_active', alert: existingAlert, lastSeenAt };
     }
     const alert = new TrackingAlertModel();
     alert.organization_id = organizationId;
     alert.project_id = projectId;
+    alert.environment_id = environmentId;
     alert.schema_name = schemaName;
     alert.status = 'active';
     alert.trigger = MANUAL_TRIGGER;
@@ -206,7 +232,7 @@ async function evaluateEventForAlert(
     alert.last_checked_at = nowIso;
     alert.setPathParams({ organization_id: organizationId, project_id: projectId });
     await alert.save();
-    return { schemaName, action: 'fired', alert, lastSeenAt };
+    return { schemaName, environmentId, environmentName, action: 'fired', alert, lastSeenAt };
   }
 
   if (existingAlert) {
@@ -214,10 +240,10 @@ async function evaluateEventForAlert(
     existingAlert.resolved_at = nowIso;
     existingAlert.last_checked_at = nowIso;
     await existingAlert.save();
-    return { schemaName, action: 'resolved', alert: existingAlert, lastSeenAt };
+    return { schemaName, environmentId, environmentName, action: 'resolved', alert: existingAlert, lastSeenAt };
   }
 
-  return { schemaName, action: 'healthy', alert: null, lastSeenAt };
+  return { schemaName, environmentId, environmentName, action: 'healthy', alert: null, lastSeenAt };
 }
 
 /** Best-effort audit entry for one check that changed at least one alert's state — see `recordAuditLogEntry`'s own doc comment for why a failure here is swallowed. Skipped entirely when there's no human actor or nothing changed, the same "no synthetic system actor, no noise entry for a no-op check" posture `recordOrchestrationRunAudit` (KAN-38) already uses. */
@@ -239,8 +265,10 @@ async function recordTrackingAlertCheckAudit(
       action: 'tracking_alert.check',
       targetType: 'project',
       targetId: projectId,
-      summary: `Checked event-volume tracking alerts -> ${changed.map((outcome) => `${outcome.schemaName}:${outcome.action}`).join(', ')}`,
-      after: { changes: changed.map((outcome) => ({ schemaName: outcome.schemaName, action: outcome.action })) },
+      summary: `Checked event-volume tracking alerts -> ${changed.map((outcome) => `${outcome.schemaName}[${outcome.environmentName}]:${outcome.action}`).join(', ')}`,
+      after: {
+        changes: changed.map((outcome) => ({ schemaName: outcome.schemaName, environmentName: outcome.environmentName, action: outcome.action })),
+      },
     });
   } catch {
     // Best-effort — see recordAuditLogEntry's own doc comment.
@@ -257,25 +285,27 @@ export interface CheckTrackingAlertsParams {
 }
 
 /**
- * Manually checks every active event schema's volume for a project "right
- * now" — KAN-36's buildable-today stand-in for a real hourly scheduled check
- * (deferred until KAN-18 provisions somewhere to run a real cron on, the
- * same posture `triggerOrchestrationRun`'s own doc comment already
- * documents for KAN-38's "scheduled runs" AC). For each active event schema:
- * an event silent for at least {@link TRACKING_ALERT_SILENCE_THRESHOLD_MS}
- * gets a `TrackingAlertModel` created (first time) or refreshed (still
- * silent); an event that's flowing again resolves its own open episode. An
- * event that's never landed a single record is left alone — there's nothing
- * to have "broken" yet.
+ * Manually checks every active event schema's volume, in every environment
+ * of a project, "right now" — KAN-36's buildable-today stand-in for a real
+ * hourly scheduled check (deferred until KAN-18 provisions somewhere to run
+ * a real cron on, the same posture `triggerOrchestrationRun`'s own doc
+ * comment already documents for KAN-38's "scheduled runs" AC). For each
+ * (event schema, environment) pair: silent for at least
+ * {@link TRACKING_ALERT_SILENCE_THRESHOLD_MS} gets a `TrackingAlertModel`
+ * created (first time) or refreshed (still silent); flowing again resolves
+ * its own open episode. A pair that's never landed a single record is left
+ * alone — there's nothing to have "broken" yet. Checked per-environment (not
+ * folded project-wide) so a `dev` key's test traffic can never mask `prod`
+ * going silent, or vice versa — see `TrackingAlertModel`'s own doc comment.
  *
  * Not transactional, the same deliberately-deferred gap
  * `registerSchemaDefinition`'s own doc comment documents for its own
  * existence check: two concurrent checks for the same project can both read
- * "no active alert" for a schema before either writes, and both create their
- * own `active` episode for it. A duplicate stays independently updatable
- * (the newer of the two just never gets picked up by a later check's
- * `activeAlertByName` map, since a `Map` only keeps one entry per
- * `schema_name`) rather than silently vanishing, so it's a visible nuisance
+ * "no active alert" for a (schema, environment) pair before either writes,
+ * and both create their own `active` episode for it. A duplicate stays
+ * independently updatable (the newer of the two just never gets picked up
+ * by a later check's `activeAlertByKey` map, since a `Map` only keeps one
+ * entry per key) rather than silently vanishing, so it's a visible nuisance
  * (an orphaned, unresolvable alert row) rather than a lost signal — flagged
  * here as known and out of scope for the same "no raw Firestore SDK access
  * outside `firestore-connection.ts`" reason a transaction would require.
@@ -285,16 +315,28 @@ export async function checkTrackingAlertsForProject(params: CheckTrackingAlertsP
   const nowMs = params.now ?? Date.now();
   const nowIso = new Date(nowMs).toISOString();
 
-  const [schemaDefs, existingActiveAlerts] = await Promise.all([
+  const [schemaDefs, environments, existingActiveAlerts] = await Promise.all([
     listSchemaDefinitionsForProject(params.organizationId, params.projectId),
+    listEnvironmentsForProject(params.organizationId, params.projectId),
     listActiveTrackingAlertsForProject(params.organizationId, params.projectId),
   ]);
   const eventNames = activeSchemaNamesForKind(schemaDefs, 'event');
-  const activeAlertByName = new Map(existingActiveAlerts.map((alert) => [alert.schema_name, alert]));
+  const alertKey = (schemaName: string, environmentId: string): string => `${schemaName}:${environmentId}`;
+  const activeAlertByKey = new Map(existingActiveAlerts.map((alert) => [alertKey(alert.schema_name, alert.environment_id), alert]));
 
   const outcomes = await Promise.all(
-    eventNames.map((schemaName) =>
-      evaluateEventForAlert(params.organizationId, params.projectId, schemaName, nowMs, nowIso, activeAlertByName.get(schemaName)),
+    environments.flatMap((environment) =>
+      eventNames.map((schemaName) =>
+        evaluateEventForAlert(
+          params.organizationId,
+          params.projectId,
+          environment,
+          schemaName,
+          nowMs,
+          nowIso,
+          activeAlertByKey.get(alertKey(schemaName, environment.id)),
+        ),
+      ),
     ),
   );
 
