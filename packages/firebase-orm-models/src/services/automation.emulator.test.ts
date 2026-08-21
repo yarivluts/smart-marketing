@@ -277,6 +277,121 @@ describe('proposeAutomationBudgetChangeAction', () => {
   });
 });
 
+describe('setAutomationGuardrailPolicy input validation', () => {
+  // A fully-valid baseline — every negative/invalid-input test below overrides exactly one field,
+  // so a thrown error can only be attributed to the field under test rather than some other one
+  // also being invalid.
+  function validPolicyParams(organizationId: string, projectId: string, setByUserId: string) {
+    return {
+      organizationId,
+      projectId,
+      maxDailyBudgetChangePct: 25,
+      spendCeilingUsd: 500,
+      protectedTargetIds: [],
+      allowedHours: null as { startHourUtc: number; endHourUtc: number } | null,
+      maxActionsPerDay: 10,
+      maxGuardedMetricRegressionPct: 20,
+      setByUserId,
+    };
+  }
+
+  it('rejects a negative maxDailyBudgetChangePct', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Neg Pct Org');
+    await expect(
+      setAutomationGuardrailPolicy({ ...validPolicyParams(organization.id, project.id, owner.id), maxDailyBudgetChangePct: -1 }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects a non-finite maxDailyBudgetChangePct', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation NaN Pct Org');
+    await expect(
+      setAutomationGuardrailPolicy({
+        ...validPolicyParams(organization.id, project.id, owner.id),
+        maxDailyBudgetChangePct: Number.POSITIVE_INFINITY,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects a negative spendCeilingUsd', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Neg Ceiling Org');
+    await expect(
+      setAutomationGuardrailPolicy({ ...validPolicyParams(organization.id, project.id, owner.id), spendCeilingUsd: -100 }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects a negative maxActionsPerDay', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Neg Actions Org');
+    await expect(
+      setAutomationGuardrailPolicy({ ...validPolicyParams(organization.id, project.id, owner.id), maxActionsPerDay: -1 }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects a negative maxGuardedMetricRegressionPct', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Neg Regression Org');
+    await expect(
+      setAutomationGuardrailPolicy({
+        ...validPolicyParams(organization.id, project.id, owner.id),
+        maxGuardedMetricRegressionPct: -5,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects non-integer allowedHours bounds', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Fractional Hours Org');
+    await expect(
+      setAutomationGuardrailPolicy({
+        ...validPolicyParams(organization.id, project.id, owner.id),
+        allowedHours: { startHourUtc: 9.5, endHourUtc: 17 },
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects an out-of-range allowedHours start hour', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Negative Hour Org');
+    await expect(
+      setAutomationGuardrailPolicy({
+        ...validPolicyParams(organization.id, project.id, owner.id),
+        allowedHours: { startHourUtc: -1, endHourUtc: 17 },
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects an out-of-range allowedHours end hour', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Hour Overflow Org');
+    await expect(
+      setAutomationGuardrailPolicy({
+        ...validPolicyParams(organization.id, project.id, owner.id),
+        allowedHours: { startHourUtc: 9, endHourUtc: 24 },
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('accepts equal start/end allowedHours as "the whole day" rather than rejecting it', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Equal Hours Org');
+    const policy = await setAutomationGuardrailPolicy({
+      ...validPolicyParams(organization.id, project.id, owner.id),
+      allowedHours: { startHourUtc: 9, endHourUtc: 9 },
+    });
+    expect(policy.allowed_hours_start_hour_utc).toBe(9);
+    expect(policy.allowed_hours_end_hour_utc).toBe(9);
+  });
+
+  it('persists every field of a fully-populated policy and records an audit log entry', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Guardrail Validation Persist Org');
+    const policy = await setAutomationGuardrailPolicy(validPolicyParams(organization.id, project.id, owner.id));
+
+    expect(policy.max_daily_budget_change_pct).toBe(25);
+    expect(policy.spend_ceiling_usd).toBe(500);
+    expect(policy.max_actions_per_day).toBe(10);
+    expect(policy.max_guarded_metric_regression_pct).toBe(20);
+    expect(policy.allowed_hours_start_hour_utc).toBeNull();
+    expect(policy.allowed_hours_end_hour_utc).toBeNull();
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.find((entry) => entry.action === 'automation_guardrail_policy.set')).toBeDefined();
+  });
+});
+
 describe('approveAutomationAction / rejectAutomationAction', () => {
   it('approves an awaiting_approval action', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Approve Org');
