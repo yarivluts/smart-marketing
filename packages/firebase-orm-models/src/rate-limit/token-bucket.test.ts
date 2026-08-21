@@ -86,4 +86,17 @@ describe('InMemoryTokenBucketRateLimiter', () => {
     const rejected = limiter.consume('key-a', 3);
     expect(rejected.allowed).toBe(false);
   });
+
+  it('evicts the least-recently-used key once over the configured maxKeys, giving the evicted key a fresh bucket again', () => {
+    const clock = fakeClock(0);
+    const limiter = new InMemoryTokenBucketRateLimiter({ capacity: 1, refillPerSecond: 1, now: clock.now, maxKeys: 2 });
+
+    expect(limiter.consume('key-a').allowed).toBe(true); // key-a's bucket is now empty (0 tokens).
+    expect(limiter.consume('key-b').allowed).toBe(true); // key-b's bucket is now empty too; key-a is now least-recently-used.
+    expect(limiter.consume('key-a').allowed).toBe(false); // reading key-a's still-empty bucket also makes it most-recently-used again.
+    expect(limiter.consume('key-c').allowed).toBe(true); // key-b is now least-recently-used -> evicted; key-c gets a fresh bucket.
+
+    // key-b was evicted, so it gets a brand-new full bucket rather than reusing its emptied one.
+    expect(limiter.consume('key-b').allowed).toBe(true);
+  });
 });

@@ -1,4 +1,5 @@
 import type { WarehouseRow } from './query-executor';
+import { BoundedLruMap } from '../util/bounded-lru-map';
 
 /**
  * Result cache for compiled metric queries (KAN-42 AC: "Redis result cache,
@@ -21,20 +22,32 @@ interface CacheEntry {
 }
 
 /**
+ * The largest number of distinct cache keys (org+project+definition-versions+params
+ * combinations) kept resident at once. A placeholder pending real traffic data, same posture
+ * `DEFAULT_API_KEY_RATE_LIMIT_CAPACITY` documents for its own number — large enough that eviction
+ * is a non-event under normal load, small enough to bound this process's memory for the lifetime
+ * of a long-running server instead of growing without limit.
+ */
+export const DEFAULT_METRIC_QUERY_RESULT_CACHE_MAX_ENTRIES = 5_000;
+
+/**
  * In-process stand-in for a real Redis result cache. Like
  * `InMemoryTokenBucketRateLimiter`, this only dedupes within a single API
  * server instance — a real deployment behind multiple instances needs a
  * shared Redis (or similar) cache for the "cached" half of the AC's own
  * "p95 < 1.5s on cached" latency target to hold across instances, not just
- * within one.
+ * within one. Bounded to `maxEntries` distinct keys via `BoundedLruMap`, so a
+ * long-running process's memory doesn't grow without limit as new org/project/param
+ * combinations get queried over its lifetime.
  */
 export class InMemoryMetricQueryResultCache implements MetricQueryResultCache {
-  private readonly store = new Map<string, CacheEntry>();
+  private readonly store: BoundedLruMap<string, CacheEntry>;
   private readonly now: () => number;
 
   /** `now` is injectable (defaults to the real clock) so tests can exercise TTL expiry deterministically, the same pattern `InMemoryTokenBucketRateLimiter` uses. */
-  constructor(now: () => number = Date.now) {
+  constructor(now: () => number = Date.now, maxEntries: number = DEFAULT_METRIC_QUERY_RESULT_CACHE_MAX_ENTRIES) {
     this.now = now;
+    this.store = new BoundedLruMap(maxEntries);
   }
 
   get(key: string): WarehouseRow[] | undefined {
