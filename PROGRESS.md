@@ -17,6 +17,67 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 4) — Warehouse-freshness reads now wired into the daily cost quota (PR #163)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#161** (dedicated test coverage for
+    `apps/api/src/ingest/ingest-request.ts`'s parsers), created seconds before this session started —
+    left alone entirely for its own session; by the time this run went to check on it again it had
+    already merged (`65dfe33`), along with a concurrent session's **PR #162** (`tv-pairing-rate-limit.ts`
+    test coverage) — both confirmed via `git log origin/main`, neither touched by this run.
+  - Delegated a fresh Explore-agent sweep for a genuine, small, infra-free follow-up not overlapping
+    #161. It surfaced `packages/firebase-orm-models/src/services/warehouse-freshness.service.ts`:
+    `getWarehouseFreshnessForProject` hand-writes SQL straight over a `WarehouseQueryExecutor` instead
+    of going through `queryMetrics` — the identical shape PR #142 ("wire the daily quota into
+    hand-written-SQL warehouse reads") already found and fixed for four other readers
+    (`mcp-tools.service.ts`'s `searchProjectCustomers`/`queryProjectCohortRetention`/
+    `queryProjectFunnelSteps`, `segment.service.ts`'s `countSegmentMembers`) via a shared
+    `runQuotaGatedWarehouseQuery` helper (`cost-guardrail.service.ts`). This function predates #142
+    (`14b1807`, well before `f876af8`) and was missed by that sweep — it runs unconditionally on every
+    render of the ingest-health page, so every page view ran an unbounded, unlogged warehouse scan
+    invisible to the KAN-39 cost-guardrails admin page.
+  - **Fix (PR #163, branch `fix/warehouse-freshness-cost-quota`):** wrapped the existing
+    `executor.execute(...)` call in `runQuotaGatedWarehouseQuery(organizationId, projectId, { tool:
+    'warehouse_freshness' }, ...)`. A `ProjectQueryQuotaExceededError` degrades into the function's
+    existing `{ status: 'error', message }` state — the ingest-health page already renders that message
+    verbatim, so no new UI/i18n state was needed (smallest diff that closes the gap).
+  - **Tests:** the daily-quota check now reads a real project + cost-quota config from Firestore
+    regardless of which executor is injected, so the previously-pure fake-executor test file
+    (`warehouse-freshness.service.test.ts`) no longer worked standalone — converted to an
+    emulator-backed `warehouse-freshness.emulator.test.ts` (same pattern `segment.emulator.test.ts`
+    established for `countSegmentMembers` in #142): all 5 original cases preserved against real
+    org/project fixtures, plus two new ones — an `executed` cost-log entry with `{ tool:
+    'warehouse_freshness' }`, and degrading to `error` once the project's daily quota is spent.
+  - **Checks:** `firebase emulators:exec --only firestore "vitest run warehouse-freshness.emulator.test.ts
+    segment.emulator.test.ts"` (28/28) first, then full `pnpm lint && pnpm typecheck && pnpm build`
+    green, then a full `pnpm test` run. Two `apps/web` e2e specs (`cost-guardrails.spec.ts`,
+    `schema-registry.spec.ts` — neither touches this change's files) failed on their first attempt;
+    reran both in isolation under a fresh emulator + dev server and both passed on retry #1 — confirmed
+    as the same documented cold-dev-server-compile flake class prior entries record, not a regression.
+  - **Merged 2026-08-21:** PR #163 squash-merged into `main` (`d9c543a`) after both checks
+    (`lint · typecheck · test · build`, `terraform fmt · validate`) passed and `mergeable_state`
+    settled to `clean`; no review comments. By merge time `main` had also picked up a large, unrelated
+    concurrent landing: the SaaS/Engagement packs' real `fact_revenue_event`/`fact_subscription_event`/
+    `dim_subscription`/`fact_funnel_event` dbt core models (PR #151) — the bigger follow-up several
+    prior entries had flagged as not-yet-scoped — confirmed merged and unrelated to this PR's files.
+    Remote branch deletion for `fix/warehouse-freshness-cost-quota` hit the same recurring HTTP 403
+    from this sandbox's git remote every prior merged branch has hit (not a GitHub permissions issue,
+    and no GitHub-API-level delete-branch tool is available either) — branch is merged and dead but not
+    deleted; a human with direct repo access can delete it, or a future run can retry.
+- **In progress (exact stopping point):** none — #163 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. A future run should do a fresh unclaimed-
+  follow-up sweep; with PR #151 now landed, it's worth checking whether the SaaS/Engagement pack
+  metrics that previously targeted those nonexistent tables (`signups`, `mrr`, `cac`, `troi`, etc. —
+  see the 2026-08-21 "ad_spend made queryable" entry's own "what this does not fix" list) now resolve
+  against the real dbt models, or still need their own wiring.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `fix/warehouse-freshness-cost-quota`).
+
+---
+
 ## 2026-08-21 (later still still) — Dedicated coverage for the TV-pairing rate limiter (PR #162)
 
 - **Last completed:**
