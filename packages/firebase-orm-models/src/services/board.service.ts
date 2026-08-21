@@ -11,7 +11,7 @@ import {
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { listMetricsCatalogForProject, queryMetrics, type MetricCatalogEntry } from './metrics-query.service';
-import { MetricNotRegisteredError } from './metrics-compiler.service';
+import { MetricNotRegisteredError, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import type { MetricQueryResultCache } from '../warehouse/result-cache';
@@ -342,7 +342,7 @@ export async function deleteBoard(organizationId: string, projectId: string, boa
 
 export type BoardTileQueryOutcome =
   | { ok: true; series: WarehouseRow[] }
-  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
 
 export interface QueryBoardTileParams {
   organizationId: string;
@@ -441,6 +441,15 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
     }
     if (error instanceof ProjectQueryQuotaExceededError) {
       return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    // A metric whose aggregation targets a known-aspirational table (see
+    // `MetricTargetsUnbuiltWarehouseTableError`'s own doc comment) can never
+    // succeed against a real warehouse — surfaced as its own distinct
+    // `not_yet_backed` reason (rather than folded into `query_error` below)
+    // so the tile can render a "not backed by real data yet" label instead
+    // of a raw, technical-looking compiler/warehouse error message.
+    if (error instanceof MetricTargetsUnbuiltWarehouseTableError) {
+      return { ok: false, reason: 'not_yet_backed', message: error.message };
     }
     // Every other *expected* failure mode `queryMetrics` itself documents
     // throwing (see its own doc comment): an invalid/incompatible request

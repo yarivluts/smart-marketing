@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { collectIdentifiers, parseFormula, type CompilerParamValue, type MetricQueryRequest } from '@growthos/shared';
 import type { MetricAggregationDef, MetricDefinitionKind } from '../models/metric-def.model';
-import { compileMetricQueryForProject } from './metrics-compiler.service';
+import { compileMetricQueryForProject, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { getActiveMetricDefinition, listMetricDefinitionsForProject } from './metric-registry.service';
 import { checkProjectQueryQuota, recordQueryCostLogEntry, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
@@ -99,15 +99,19 @@ async function logCostAttempt(
 /**
  * `POST /v1/metrics/query`'s integration point (KAN-42, plan `13 §E5.3`):
  * resolves + compiles the request via KAN-41's `compileMetricQueryForProject`,
- * serves a cached result when one exists for the same definition
+ * fails fast with `MetricTargetsUnbuiltWarehouseTableError` if the compiled
+ * query depends on a known-unbuilt warehouse table (see that error's own doc
+ * comment — cheaper and cleaner than a doomed warehouse round trip),
+ * otherwise serves a cached result when one exists for the same definition
  * versions+params, otherwise checks the project's KAN-39 cost-guardrail quota
  * before executing the compiled SQL via a {@link WarehouseQueryExecutor} and
  * caching the result. Throws whatever `compileMetricQueryForProject` throws
  * (`ProjectNotFoundError`, `MetricNotRegisteredError`, `MetricCompilerError`)
- * for an invalid request, `ProjectQueryQuotaExceededError` once the project
- * has spent its daily quota of real (non-cache-hit) query attempts, and
- * whatever the executor itself throws (typically `WarehouseNotConfiguredError`
- * from the default executor) once the request clears both checks.
+ * for an invalid request, `MetricTargetsUnbuiltWarehouseTableError` per
+ * above, `ProjectQueryQuotaExceededError` once the project has spent its
+ * daily quota of real (non-cache-hit) query attempts, and whatever the
+ * executor itself throws (typically `WarehouseNotConfiguredError` from the
+ * default executor) once the request clears every check.
  *
  * A cache hit is neither logged nor counted against the quota — it incurs no
  * real (or would-be) warehouse cost, so KAN-39's cost log only ever records
@@ -139,6 +143,11 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     ...(environmentId !== null ? { environmentId } : {}),
     request: params.request,
   });
+
+  if (compiled.unbuiltWarehouseTables.length > 0) {
+    const { metricName, table } = compiled.unbuiltWarehouseTables[0];
+    throw new MetricTargetsUnbuiltWarehouseTableError(metricName, table);
+  }
 
   const cacheKey = buildResultCacheKey(params.organizationId, params.projectId, environmentId, compiled.definitionRefs, compiled.params);
   const cached = cache.get(cacheKey);

@@ -16,6 +16,7 @@ import {
   getMetricCatalogDetail,
   listMetricsCatalogForProject,
   MetricNotRegisteredError,
+  MetricTargetsUnbuiltWarehouseTableError,
   ProjectNotFoundError,
   ProjectQueryQuotaExceededError,
   queryMetrics,
@@ -81,7 +82,10 @@ export class MetricsController {
       // (table not built yet, unknown column, ...) — an upstream failure the
       // caller's own metric registration usually explains, not a bug in this
       // API. See WarehouseQueryFailedError's doc comment.
-      if (error instanceof WarehouseQueryFailedError) {
+      // `MetricTargetsUnbuiltWarehouseTableError` is the same "upstream table
+      // doesn't exist yet" story, just caught before a real warehouse round
+      // trip — see that error's own doc comment.
+      if (error instanceof WarehouseQueryFailedError || error instanceof MetricTargetsUnbuiltWarehouseTableError) {
         throw new HttpException(error.message, HttpStatus.BAD_GATEWAY);
       }
       if (error instanceof ProjectQueryQuotaExceededError) {

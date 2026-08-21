@@ -571,7 +571,18 @@ describe('queryBoardTile', () => {
   it('degrades to a "quota exceeded" outcome once the project’s daily quota is spent', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Query Quota Org');
     await registerAdSpend(organization.id, project.id, owner.id);
-    await registerSignups(organization.id, project.id, owner.id);
+    // A second, distinct metric on its own real (non-aspirational) table — deliberately not
+    // `registerSignups` (`fact_funnel_event`, one of `KNOWN_UNBUILT_WAREHOUSE_TABLES`), which
+    // would now fail fast with `not_yet_backed` before the quota check ever runs, masking the
+    // behavior this test actually wants to exercise.
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'landing_page_views',
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
     await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
 
@@ -589,12 +600,32 @@ describe('queryBoardTile', () => {
       organizationId: organization.id,
       projectId: project.id,
       board,
-      tile: bigNumberTile({ metricNames: ['signups'], title: 'Signups' }),
-      executor: new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, signups: 1 }]),
+      tile: bigNumberTile({ metricNames: ['landing_page_views'], title: 'Landing page views' }),
+      executor: new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, landing_page_views: 1 }]),
       cache: new InMemoryMetricQueryResultCache(),
     });
     expect(second.ok).toBe(false);
     expect(second.ok === false && second.reason).toBe('quota_exceeded');
+  });
+
+  it('degrades to a "not yet backed" outcome for a metric targeting a known-unbuilt table (signups/fact_funnel_event), without touching the executor', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Query Unbuilt Table Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Funnel', createdByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, signups: 1 }]);
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ metricNames: ['signups'], title: 'Signups' }),
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('not_yet_backed');
+    expect(executor.callCount).toBe(0);
   });
 
   it('returns a cohort_month x period_number matrix series for a heatmap tile, ignoring any board-level compare', async () => {

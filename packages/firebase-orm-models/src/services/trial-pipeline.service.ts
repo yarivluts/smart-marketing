@@ -2,7 +2,7 @@ import { MetricCompilerError } from '@growthos/shared';
 import type { MetricQueryRequest } from '@growthos/shared';
 import { ProjectNotFoundError } from './resource-library.service';
 import { queryMetrics } from './metrics-query.service';
-import { MetricNotRegisteredError } from './metrics-compiler.service';
+import { MetricNotRegisteredError, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import type { MetricQueryResultCache } from '../warehouse/result-cache';
@@ -37,7 +37,7 @@ function trailingWindow(days: number): { start: string; end: string } {
 
 export type TrialPipelineOutcome =
   | { ok: true; series: WarehouseRow[] }
-  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
 
 export interface GetTrialPipelineSummaryParams {
   organizationId: string;
@@ -50,13 +50,17 @@ export interface GetTrialPipelineSummaryParams {
 
 /**
  * Resolves + runs the trial-pipeline widget's own metric query, degrading to
- * a structured outcome instead of throwing — the exact same three-reason
- * shape `queryBoardTile` (`board.service.ts`) already established for "a
- * tile couldn't load", reused here since the failure modes are identical
- * (no warehouse configured yet, the project's daily quota is spent, or the
+ * a structured outcome instead of throwing — the exact same reason shape
+ * `queryBoardTile` (`board.service.ts`) already established for "a tile
+ * couldn't load", reused here since the failure modes are identical (no
+ * warehouse configured yet, the project's daily quota is spent, the
  * request/catalog itself is invalid — e.g. the SaaS pack was never
  * installed in this project, so `trials_active`/`trial_conversion_rate`
- * aren't registered).
+ * aren't registered — or, today, always: `trials_active`/`trial_starts`/
+ * `trial_conversions` target `dim_subscription`/`fact_subscription_event`,
+ * both in `MetricTargetsUnbuiltWarehouseTableError`'s known-unbuilt list, so
+ * this widget currently degrades to `not_yet_backed` in every real project
+ * until a real dbt model backs those tables).
  */
 export async function getTrialPipelineSummary(params: GetTrialPipelineSummaryParams): Promise<TrialPipelineOutcome> {
   const request: MetricQueryRequest = {
@@ -79,6 +83,11 @@ export async function getTrialPipelineSummary(params: GetTrialPipelineSummaryPar
     }
     if (error instanceof ProjectQueryQuotaExceededError) {
       return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    // Same `not_yet_backed` degrade as `queryBoardTile` — see
+    // `MetricTargetsUnbuiltWarehouseTableError`'s own doc comment.
+    if (error instanceof MetricTargetsUnbuiltWarehouseTableError) {
+      return { ok: false, reason: 'not_yet_backed', message: error.message };
     }
     // See `queryBoardTile`'s own doc comment on why an unrecognized error
     // rethrows instead of degrading silently.

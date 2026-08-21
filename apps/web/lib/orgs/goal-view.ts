@@ -23,7 +23,7 @@ export function toGoalSummaryView(goal: GoalModel): GoalSummaryView {
 }
 
 /** Mirrors `BoardTileUnavailableReason` (`board-view.ts`) — `queryGoalProgress`'s own degraded-outcome reason union. */
-export type GoalProgressUnavailableReason = 'warehouse_not_configured' | 'quota_exceeded' | 'query_error';
+export type GoalProgressUnavailableReason = 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error';
 
 const STATUS_COLOR: Record<GoalPaceStatus, 'green' | 'amber' | 'red'> = {
   on_track: 'green',
@@ -45,6 +45,7 @@ export type GoalThermometerView =
     }
   | { kind: 'warehouse_not_configured' }
   | { kind: 'quota_exceeded'; message: string }
+  | { kind: 'not_yet_backed'; message: string }
   | { kind: 'query_error'; message: string };
 
 /**

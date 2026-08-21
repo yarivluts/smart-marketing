@@ -59,7 +59,7 @@ export interface FunnelStep {
 }
 
 /** Mirrors `BoardTileQueryOutcome`'s own `reason` union (`board.service.ts`) — not derived via a conditional type since that union is only ever seen through the `ok: false` branch, and spelling it out here is clearer than an `Extract<...>` gymnastic. */
-export type BoardTileUnavailableReason = 'warehouse_not_configured' | 'quota_exceeded' | 'query_error';
+export type BoardTileUnavailableReason = 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error';
 
 /**
  * Data older than this renders its freshness badge as "stale" rather than

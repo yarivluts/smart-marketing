@@ -21,6 +21,63 @@ export class MetricNotRegisteredError extends Error {
   }
 }
 
+/**
+ * Warehouse tables plan `04 §1` documents as the SaaS/marketing metric
+ * pack's canonical schema but that no dbt core model actually builds
+ * (`packages/dbt-transform`'s real core tables are `entities`/`events`/
+ * `measures`/`bridge_identity`/`fact_attribution`/`fact_cohort_retention`/
+ * `fact_engagement_daily`/`fact_engagement_depth_histogram`/
+ * `fact_funnel_step`/`fact_landing_page_performance` — none of these four).
+ * A metric whose (possibly mart-view-mapped, see `mapCustomSchemaTables`)
+ * aggregation still targets one of these can never succeed against a real
+ * warehouse today, no matter how well-formed the compiled query is — see
+ * {@link CompiledProjectMetricQuery.unbuiltWarehouseTables}, which callers
+ * that actually execute a query (`queryMetrics`) use to fail fast, *before*
+ * spending a warehouse round trip (and a KAN-39 cost-quota slot) on a query
+ * that's certain to come back "table not found". Deliberately reported
+ * rather than thrown here: `compileMetricQueryForProject` itself stays a
+ * pure "resolve + compile" step whose success doesn't depend on whether the
+ * real warehouse happens to have caught up yet (its own existing tests
+ * compile `fact_funnel_event`-shaped requests successfully) — only a caller
+ * that's about to actually run the query needs to care. `fact_ad_spend` is
+ * deliberately absent from the set below: the SaaS pack's own `ad_spend`
+ * metric was given a real self-provisioned mart-view route instead
+ * (2026-08-21 follow-up — see `saas-metric-pack/schemas.ts`). A maintained
+ * allowlist, not a generic "does this table exist in the warehouse" check:
+ * nothing in this codebase inspects the real warehouse's live schema at
+ * compile time (KAN-18's own buildable-today posture), so this only ever
+ * answers for the specific tables this codebase already knows are
+ * aspirational-only — a metric targeting some other, genuinely-missing
+ * table still surfaces as the existing `WarehouseQueryFailedError` degrade,
+ * just one warehouse round trip later.
+ */
+export const KNOWN_UNBUILT_WAREHOUSE_TABLES = new Set(['fact_funnel_event', 'fact_revenue_event', 'dim_subscription', 'fact_subscription_event']);
+
+/** One metric (by name) whose aggregation targets a table in {@link KNOWN_UNBUILT_WAREHOUSE_TABLES}. */
+export interface UnbuiltWarehouseTableRef {
+  metricName: string;
+  table: string;
+}
+
+/** Thrown by execution-layer callers of `compileMetricQueryForProject` (e.g. `queryMetrics`) when the compiled query targets a table in {@link KNOWN_UNBUILT_WAREHOUSE_TABLES} — see that constant's own doc comment. */
+export class MetricTargetsUnbuiltWarehouseTableError extends Error {
+  constructor(public readonly metricName: string, public readonly table: string) {
+    super(`Metric "${metricName}" targets warehouse table "${table}", which the warehouse pipeline doesn't build yet.`);
+    this.name = 'MetricTargetsUnbuiltWarehouseTableError';
+  }
+}
+
+/** Every aggregation-kind entry in `catalog` (deterministic resolution order) whose table is in {@link KNOWN_UNBUILT_WAREHOUSE_TABLES} — called with the already mart-view-mapped catalog, so a human who self-provisions a measure/entity schema literally named e.g. `dim_subscription` correctly stops matching (its table is rewritten to a real mart view name before this runs). */
+function collectUnbuiltWarehouseTables(catalog: MetricCatalog): UnbuiltWarehouseTableRef[] {
+  const refs: UnbuiltWarehouseTableRef[] = [];
+  for (const [name, definition] of catalog) {
+    if (definition.aggregation && KNOWN_UNBUILT_WAREHOUSE_TABLES.has(definition.aggregation.table)) {
+      refs.push({ metricName: name, table: definition.aggregation.table });
+    }
+  }
+  return refs;
+}
+
 async function requireProjectInOrg(organizationId: string, projectId: string): Promise<ProjectModel> {
   const project = await ProjectModel.init(projectId, { organization_id: organizationId });
   if (!project || project.organization_id !== organizationId) {
@@ -103,6 +160,8 @@ export interface CompileMetricQueryForProjectParams {
 export interface CompiledProjectMetricQuery extends CompiledMetricQuery {
   /** `metric:<name>@v<version>` for every metric (requested or transitively referenced by a formula) the compiled SQL depends on — the plan `12 §3` `definition_ref` shape, generalized to every dependency a multi-metric/formula query can have rather than just one. */
   definitionRefs: Record<string, string>;
+  /** Every dependency of this compiled query whose table is a {@link KNOWN_UNBUILT_WAREHOUSE_TABLES} entry — empty for the overwhelmingly common case. Non-empty doesn't mean this compile *failed* (it didn't — `sql`/`params` above are still a fully valid compiled query); it's a signal for a caller about to actually execute the query (`queryMetrics`) that doing so is certain to fail against any real warehouse today, so it can fail fast with a clean `MetricTargetsUnbuiltWarehouseTableError` instead. */
+  unbuiltWarehouseTables: UnbuiltWarehouseTableRef[];
 }
 
 /**
@@ -117,13 +176,14 @@ export async function compileMetricQueryForProject(params: CompileMetricQueryFor
 
   const { catalog, definitionRefs } = await resolveCatalog(params.organizationId, params.projectId, params.request.metrics);
   const mappedCatalog = await mapCustomSchemaTables(params.organizationId, params.projectId, catalog);
+  const unbuiltWarehouseTables = collectUnbuiltWarehouseTables(mappedCatalog);
   const compiled = compileMetricQuery(mappedCatalog, params.request, {
     organizationId: params.organizationId,
     projectId: params.projectId,
     ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
   });
 
-  return { ...compiled, definitionRefs };
+  return { ...compiled, definitionRefs, unbuiltWarehouseTables };
 }
 
 /**
