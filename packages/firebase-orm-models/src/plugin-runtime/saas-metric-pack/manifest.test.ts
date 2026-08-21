@@ -8,7 +8,7 @@ describe('SAAS_METRIC_PACK_MANIFEST_YAML', () => {
     const manifest = parsePluginManifest(SAAS_METRIC_PACK_MANIFEST_YAML);
     expect(manifest.id).toBe(SAAS_METRIC_PACK_PLUGIN_ID);
     expect(manifest.type).toBe('metric_pack');
-    expect(manifest.scopes).toEqual(['metrics:write']);
+    expect(manifest.scopes).toEqual(['metrics:write', 'schema:write']);
     expect(manifest.configSchema).toEqual({});
     expect(manifest.registers.entities).toEqual([]);
     expect(manifest.registers.events).toEqual([]);

@@ -17,16 +17,20 @@ import type { MetricDefinitionInput } from '../../services/metric-registry.servi
  * a third phase.
  *
  * Table/column names follow plan `04 §1`'s canonical warehouse schema
- * (`fact_ad_spend`, `fact_funnel_event`, `fact_revenue_event`,
- * `dim_subscription`) — the same aspirational-but-canonical convention
- * `metrics-compiler`'s `test-catalog.ts` already established, since no real
- * BigQuery warehouse exists yet (KAN-18) and `dbt-transform`'s actual core
- * tables (`entities`/`events`/`measures`) are a deliberately generalized,
- * un-normalized stand-in the compiler can't yet reach into (no join graph,
- * no JSON-column extraction — see `metrics-compiler/compiler.ts`'s own doc
- * comment). Dimensions are declared **only** when they correspond to a real
- * column on that metric's own aggregation table (plan `04 §1`'s per-table
- * column lists) — e.g. `signups`/`new_paying` (backed by `fact_funnel_event`/
+ * (`fact_funnel_event`, `fact_revenue_event`, `dim_subscription`,
+ * `fact_subscription_event`) — the same aspirational-but-canonical
+ * convention `metrics-compiler`'s `test-catalog.ts` already established,
+ * since no real BigQuery warehouse exists yet (KAN-18) and `dbt-transform`'s
+ * actual core tables (`entities`/`events`/`measures`) are a deliberately
+ * generalized, un-normalized stand-in the compiler can't yet reach into (no
+ * join graph, no JSON-column extraction — see `metrics-compiler/
+ * compiler.ts`'s own doc comment). `ad_spend` is the one deliberate
+ * exception: it targets a self-provisioned `measure` schema mart view (a
+ * real, queryable relation today) rather than an aspirational table — see
+ * its own doc comment below. Dimensions are declared **only** when they
+ * correspond to a real column on that metric's own aggregation table (plan
+ * `04 §1`'s per-table column lists, or `ad_spend`'s own declared schema
+ * fields) — e.g. `signups`/`new_paying` (backed by `fact_funnel_event`/
  * `fact_revenue_event`, neither of which carries a `channel`-shaped column)
  * deliberately have no dimensions yet, rather than declaring a breakdown the
  * compiler can't honestly compile. Known, documented simplifications below
@@ -39,13 +43,32 @@ export interface SaasMetricPackDefinition {
   definition: MetricDefinitionInput;
 }
 
+/**
+ * Unlike every other aggregation-kind metric in this pack, `ad_spend` does
+ * *not* target one of plan `04 §1`'s aspirational `fact_*`/`dim_*` tables —
+ * a spend series has no append-only-event or current-state-snapshot shape
+ * those need; it's exactly what the generic ingest-measures path (KAN-31/33)
+ * already models. `table: 'ad_spend'` names the `measure` schema
+ * `./schemas.ts`'s `ensureSaasMetricPackSchemasRegistered` self-provisions on
+ * install, which `mapCustomSchemaTables` (`metrics-compiler.service.ts`)
+ * transparently rewrites to a real warehouse mart view at query-compile
+ * time — the same live path the landing-page pack's `fact_landing_page_
+ * performance` metric would use if it weren't already backed by a real dbt
+ * model. `column: 'value'`/`timeColumn: 'ts'` are that mart's own reserved
+ * intrinsic columns (every measure schema gets them for free — see
+ * `schemas.ts`), not fields declared on the schema itself. This makes
+ * `ad_spend` (and its own two board tiles) queryable against a real
+ * warehouse today, unlike `signups`/`cac`/`cost_per_signup`/`troi`/etc.,
+ * which still target genuinely nonexistent tables — see this module's own
+ * doc comment.
+ */
 const AD_SPEND: SaasMetricPackDefinition = {
   name: 'ad_spend',
   featured: true,
   dimensions: ['channel_id', 'campaign_id', 'adset_id', 'ad_id'],
   definition: {
     kind: 'aggregation',
-    aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] },
+    aggregation: { function: 'sum', table: 'ad_spend', column: 'value', timeColumn: 'ts', filters: [] },
   },
 };
 

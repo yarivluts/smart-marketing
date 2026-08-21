@@ -3,6 +3,7 @@ import { SAAS_METRIC_PACK_METRICS, type SaasMetricPackDefinition } from './metri
 
 export * from './manifest';
 export * from './metrics';
+export * from './schemas';
 export * from './default-boards';
 
 export interface EnsureSaasMetricPackRegisteredResult {

@@ -69,10 +69,10 @@ describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
     expect(defs.every((def) => def.version === 1 && def.status === 'active')).toBe(true);
   });
 
-  it('registers ad_spend: sum(fact_ad_spend.reporting_spend) broken down by channel/campaign/adset/ad', async () => {
+  it('registers ad_spend: sum(ad_spend.value) broken down by channel/campaign/adset/ad, against its own self-provisioned measure schema mart', async () => {
     const metric = await activeMetric('ad_spend');
     expect(metric?.definition_kind).toBe('aggregation');
-    expect(metric?.aggregation).toEqual({ function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] });
+    expect(metric?.aggregation).toEqual({ function: 'sum', table: 'ad_spend', column: 'value', timeColumn: 'ts', filters: [] });
     expect(metric?.dimensions).toEqual(['channel_id', 'campaign_id', 'adset_id', 'ad_id']);
   });
 
@@ -202,8 +202,10 @@ describe('ensureSaasMetricPackRegistered — idempotency and isolation', () => {
       organizationId: organization.id,
       projectId: project.id,
       name: 'ad_spend',
-      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
-      dimensions: ['region'], // deliberately different from the pack's own dimensions, to prove this pre-existing version is left untouched
+      // Deliberately a different shape from the pack's own `ad_spend` definition (table/column/timeColumn
+      // and dimensions), to prove this pre-existing human-registered version is left untouched.
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'legacy_ad_spend_export', column: 'total_spend', timeColumn: 'reported_on', filters: [] } },
+      dimensions: ['region'],
       createdByUserId: owner.id,
     });
 
