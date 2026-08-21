@@ -90,6 +90,93 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 — Default-board seeding now repairs a stuck-empty board from an interrupted install (PR #143)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked open PRs first**, per the standing
+    rule: **#141** (tracking-alert environment isolation) and **#142** (cost-quota wiring for
+    hand-written warehouse readers) were both open, freshly created by concurrent sessions minutes
+    earlier, covering two of the four unclaimed follow-ups this file's last entry listed. Left both
+    alone rather than duplicate work; both went CI-green during this run but were left for their
+    own sessions to merge.
+  - Ran a research pass (a background `Explore` agent) on the two remaining unclaimed follow-ups
+    from the 2026-08-20 (later) entry. **Important correction to that entry's own premise**: it
+    claimed "scoping the SaaS metric pack to `fact_ad_spend` alone would light up several real
+    metrics" — this is wrong. `fact_ad_spend` doesn't exist as a dbt core table either; none of the
+    SaaS pack's 22 metrics (across all 5 tables it references: `fact_ad_spend`,
+    `fact_revenue_event`, `fact_subscription_event`, `dim_subscription`, `fact_funnel_event`) are
+    backed by a real warehouse table today. dbt deliberately built three generic tables
+    (`entities`/`events`/`measures`) instead of these plan-doc-specified per-domain fact tables,
+    pending real ad/billing connectors landing data to build them from (KAN-18/19-gated). Making
+    any of these real needs a new dbt core model fed by an actual source connector — out of scope
+    for a single headless run; flagged below for whoever picks up ad-spend ingestion.
+  - Picked the other unclaimed follow-up instead: **default-board seeding's stuck-empty-board gap**
+    (`ensureSaasMetricPackDefaultBoardsSeeded`/`ensureLandingPagePackDefaultBoardsSeeded` create a
+    board then populate its tiles as two separate Firestore writes; if the process died between
+    them, the board persisted with `tiles: []` forever, and every future call's name-only
+    idempotency check saw it already existed and silently skipped it — indistinguishable from a
+    human's own deliberate customization). Both functions' own doc comments, and
+    `installPluginAndProvisionBuiltins`'s, already flagged this as a known, not-yet-remediable gap.
+  - **Fix:** added `BoardModel.seeded_by_plugin_id` (`string | null`, `null` for a human-created
+    board) — a provenance marker set only when a pack's own seeding routine creates the board, via
+    a new `createBoard({ ..., seededByPluginId })` param. This is what lets a later call tell "my
+    own board, still empty because `saveBoardTiles` never landed" apart from "a human's board that
+    happens to share this exact name" — the existing regression test
+    (`leaves a human-renamed-to-match board completely untouched`) specifically pins the latter case
+    and passes unchanged, since a human-created board never carries the tag.
+  - Extracted the two packs' near-identical seeding loops (previously duplicated) into one shared
+    `ensurePackDefaultBoardsSeeded` (`packages/firebase-orm-models/src/plugin-runtime/
+    default-board-seeding.ts`); each pack's own `default-boards.ts` is now a thin wrapper passing
+    its plugin id + board list. Fixed once instead of twice, and any future pack with default boards
+    gets the repair behavior for free.
+  - **Self-review found one accepted trade-off**, documented directly in the new helper's doc
+    comment: a human who deliberately clears every tile from one of a pack's own boards and *then*
+    reinstalls that pack will have the default tiles repopulated (repair fires on any tagged board
+    with zero tiles, which can't distinguish "interrupted seed" from "human emptied it on purpose").
+    Judged the right default rather than worth its own tracking field, since reinstalling a pack is
+    already the documented way a human converges its provisioning.
+  - **Tests:** new emulator test per pack simulating the interrupted-seed state directly (creates a
+    board tagged with the pack's plugin id, skips the `saveBoardTiles` call) and asserts a later
+    call repairs it in place (same board id, tiles now match the pack's defaults, reported under a
+    new `repaired` result field), followed by a third call confirming no re-repair/duplication.
+    Added `landing-page-pack/default-boards.emulator.test.ts` from scratch — this pack's
+    board-seeding function had **zero** emulator coverage before this change; mirrored the SaaS
+    pack's full suite (seed, idempotency, human-board-untouched, repair, per-project isolation).
+    Two new `board.emulator.test.ts` cases for `createBoard`'s new param.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` all green. `packages/firebase-orm-models`
+    full emulator suite green (88 files / 932 tests). Full monorepo `pnpm test` surfaced one Playwright
+    failure (`onboarding.spec.ts`, KAN-68) and 4 flaky-but-passed-on-retry specs (`orgs.spec.ts`,
+    `resource-library.spec.ts`, `schema-registry.spec.ts`, `tv-pairing.spec.ts`) — all under the
+    full suite's own Firestore-emulator resource contention (30+ prior entries document this exact
+    `RESOURCE_EXHAUSTED`-class flake). Re-ran `onboarding.spec.ts` alone and it passed cleanly
+    (1.5m), confirming this was the documented flake (e.g. PR #76's own root-cause), not a
+    regression from this change.
+  - **Merged 2026-08-21:** PR #143 squash-merged into `main` (`e8a2180`) after CI passed
+    (`mergeable_state: clean`, no review comments). **Remote** branch delete hit the same
+    git-over-HTTPS proxy **HTTP 403** every prior merged branch from a scheduled run has hit —
+    harmless, a human can prune `fix/pack-board-seed-repair` along with the others already queued.
+- **In progress (exact stopping point):** none — #143 fully landed. #141/#142 (concurrent sessions'
+  PRs) were both CI-green as of this run's end but not merged by this run — check whether they
+  landed before starting the next task.
+- **Blocked + why:** nothing.
+- **Next step:** the SaaS metric pack's entire metric/board surface (22 metrics, 3 default boards)
+  is non-functional against a real warehouse today — every referenced table (`fact_ad_spend`,
+  `fact_revenue_event`, `fact_subscription_event`, `dim_subscription`, `fact_funnel_event`) is
+  unbuilt. A real fix needs either (a) a new dbt core model fed by an actual ad-spend/billing source
+  connector (KAN-18/19-adjacent — check whether any ad-platform connector lands spend data
+  anywhere yet before committing to this), or (b) the engagement-pack precedent: purpose-built dbt
+  models (`fact_engagement_daily`-style) rather than trying to reuse the generic `entities`/
+  `events`/`measures` tables. Until then, installing the SaaS pack silently seeds 3 boards whose
+  tiles will all error/blank out once a project has a real BigQuery warehouse configured — worth
+  a follow-up to at least surface that state clearly (e.g. a "not yet backed by real data" label)
+  rather than only fixing the underlying tables, which is a much bigger lift.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; Redis cost decision; prune merged feature branches the proxy blocks
+  scheduled runs from deleting).
+
+---
+
 ## 2026-08-20 (later still) — `allowedHours` guardrail: equal start/end silently blocked all automation (PR #139)
 
 - **Last completed:**
