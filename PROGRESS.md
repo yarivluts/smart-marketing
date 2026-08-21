@@ -17,6 +17,79 @@ Template for each entry:
 
 ---
 
+## 2026-08-20 (even later) — Cost-guardrail quota wired into every hand-written-SQL warehouse read (PR #142)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`, KAN-43
+    `needs-human`, KAN-50/KAN-51 `blocked-by`). Checked open PRs: only **#137** (docs-only, records
+    #128) was open. Picked the `allowedHours`-equal-bounds bug the top PROGRESS.md entry (#138's) own
+    follow-up list flagged, opened **PR #140** fixing it by *rejecting* the degenerate config at write
+    time. Mid-flight, a concurrent session's **PR #139** (same bug, opposite fix: treat equal bounds
+    as *unrestricted* rather than invalid) merged first — the two PRs' own test cases directly
+    contradicted each other (`evaluate.test.ts` asserting "closed all day" vs. "open all day" for the
+    same input), so rather than unilaterally picking a side beyond what was already merged, closed
+    #140 as superseded with a comment explaining both interpretations and why #139's (matching the
+    violation message's own wording) already landed. No wasted code: the finding was real, just
+    resolved by another session first.
+  - Re-synced to `main` (now `3bed8ad`, includes #139/#134/#136/#138) and picked the next unclaimed
+    follow-up from #138's own list: **four hand-written-SQL warehouse reads bypassed the KAN-39 cost
+    quota and cost log** — `searchProjectCustomers`/`queryProjectCohortRetention`/
+    `queryProjectFunnelSteps` (`mcp-tools.service.ts`) and `countSegmentMembers` (`segment.service.ts`)
+    each run parameterized SQL straight over a `WarehouseQueryExecutor` instead of through
+    `queryMetrics` (no registered metric definition exists for a customer search, a cohort matrix, a
+    funnel, or a segment's live member count), so none of them ever checked or logged against a
+    project's daily quota — an MCP client (or the segments page) could run unbounded BigQuery scans
+    invisible to the cost-guardrails admin page. `segment.service.ts`'s own doc comment already named
+    this as a deliberately-deferred, not-yet-scoped follow-up.
+  - **Fix (PR #142, branch `fix/warehouse-readers-cost-quota`):** new `runQuotaGatedWarehouseQuery`
+    helper in `cost-guardrail.service.ts` — checks the quota first (throwing
+    `ProjectQueryQuotaExceededError` + logging `blocked_quota_exceeded` if already spent), then runs
+    the caller's read and logs `executed`/`warehouse_not_configured` — the same guardrail
+    `queryMetrics` already enforces, without duplicating its cache-aware version (a hand-written read
+    has no result cache). Wired into all four readers. The three MCP tools just let the error
+    propagate — `apps/api`'s `describeMetricsError` already mapped `ProjectQueryQuotaExceededError` to
+    a caller-readable MCP message *before* this change (dead code path until now, confirmed by
+    grepping `apps/api/src/mcp/mcp-tools.ts`), so no `apps/api` changes were needed.
+    `countSegmentMembers` instead degrades to a new `'quota_exceeded'` outcome (mirroring
+    `queryBoardTile`/`queryGoalProgress`'s existing per-tile-recoverable pattern, since the segments
+    page can't fail outright the way an MCP tool call can) — threaded through `apps/web`'s
+    `SegmentMemberCountOutcome`/`SegmentMemberCountView`/`buildSegmentMemberCountView` plus a new
+    translated badge message (en/he). `queryProjectFunnelSteps`'s existing "no confirmed funnel ->
+    `[]` without touching the warehouse" early-out now also skips the quota check, consistent with
+    never touching the warehouse. Updated `QueryCostLogEntryModel.definition_refs`'s doc comment: no
+    longer only `queryMetrics`'s `metric:<name>@v<version>` shape — a hand-written read logs
+    `{ tool: '<name>' }` instead.
+  - **Tests:** new emulator cases for all four readers (quota-exceeded throw/degrade + an `'executed'`
+    cost-log entry with the right `{ tool: ... }` ref), plus a new `segment-view.test.ts` (that view
+    mapper had zero test coverage before this) covering every `buildSegmentMemberCountView` branch
+    incl. the new `quota_exceeded` kind.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` all green. `pnpm test`: one unrelated flake
+    (`metric-pack-dispatch.emulator.test.ts`, the same documented Firestore-emulator
+    `RESOURCE_EXHAUSTED`-under-load class every recent run has hit) reproduced only under full-suite
+    concurrency and passed 10/10 in isolation.
+  - **Merged 2026-08-21:** PR #142 squash-merged into `main` (`f876af8`) after both checks passed and
+    `mergeable_state` settled to `clean`; no review comments. A concurrent session's **PR #141**
+    (tracking-alerts per-environment isolation — #138's *other* remaining follow-up) merged
+    independently in parallel with no file overlap. Remote branch delete hit the same
+    git-over-HTTPS-proxy **HTTP 403** every prior merged branch from a scheduled run has hit; local
+    branch cleaned up.
+- **In progress (exact stopping point):** none — #142 fully landed, #140 cleanly closed as superseded.
+- **Blocked + why:** nothing.
+- **Next step:** of #138's original four-item follow-up list, #141 took the environment-isolation item
+  and this run took the cost-quota item — the two remaining, still verified-no-live-infra-needed:
+  1. **The SaaS pack targets four warehouse tables that don't exist** (`fact_revenue_event`,
+     `fact_subscription_event`, `dim_subscription`, `fact_funnel_event`), so KAN-59/61's headline AC
+     can't be met. Scoping one run to `fact_ad_spend` alone would light up `ad_spend`/
+     `cost_per_signup`/`cac`/`troi` and the Marketing board's spend tiles.
+  2. **A pack whose board seeding half-fails leaves a permanently blank board** — name-only
+     idempotency in `ensureSaasMetricPackDefaultBoardsSeeded` skips a tiles-empty board on reinstall,
+     with no admin repair action.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting).
+
+---
+
 ## 2026-08-21 — Tracking alerts + event-volume sparklines now scoped per environment (PR #141)
 
 - **Last completed:**
