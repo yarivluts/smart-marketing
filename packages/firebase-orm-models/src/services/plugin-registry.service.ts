@@ -70,7 +70,7 @@ async function requireProjectInOrg(organizationId: string, projectId: string): P
 }
 
 /** Ascending numeric compare of two `major.minor.patch` strings — `parsePluginManifest` already guarantees this shape, so no fallback for a malformed string is needed here. */
-function compareSemver(a: string, b: string): number {
+export function compareSemver(a: string, b: string): number {
   const partsA = a.split('.').map(Number);
   const partsB = b.split('.').map(Number);
   for (let i = 0; i < 3; i++) {
