@@ -116,6 +116,11 @@ describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
       timeColumn: 'started_at',
       filters: [{ field: 'status', operator: '=', value: 'active' }],
     });
+    // Regression: `dim_subscription` (packages/dbt-transform/dbt/models/core/dim_subscription.sql)
+    // has no `plan` column — only `plan_interval` — unlike `fact_revenue_event`, which aliases its
+    // own billing-interval column to `plan`. A `dimensions: ['plan']` declaration here would compile
+    // a `GROUP BY "plan"` against a table without that column.
+    expect(metric?.dimensions).toEqual(['plan_interval']);
   });
 
   it('registers mrr_movements: sum(fact_revenue_event.mrr_delta) broken down by type/plan', async () => {
