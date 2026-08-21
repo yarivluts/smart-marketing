@@ -17,6 +17,78 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 8) — mcpCallerHasPermission's OAuth-denial branch now covered (PR #173)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#172** (docs-only, records PR #171's mrr-dimension fix)
+    from a concurrent session, CI still in progress — different file (`PROGRESS.md`, same anchor
+    point this session would also target), left alone per the established convention for another
+    session's in-flight work. It merged clean (`27955631` -> head) partway through this run.
+  - Delegated an Explore-agent sweep for a fresh, unclaimed follow-up, explicitly excluding every
+    vein prior entries already flagged as exhausted (parse-*-fields.ts, formula-parser/identifiers.ts,
+    ingest-request.ts, tv-pairing-rate-limit.ts, tv-viewer-auth.ts, plugin-registry semver comparator,
+    vault/local-kms-provider.ts, the mrr dimension fix). It also checked a candidate this session
+    investigated directly first — `schema-mart.service.ts`'s `syncSchemaMartView` calls
+    `executor.execute()` without going through `runQuotaGatedWarehouseQuery` the way every other
+    hand-written-SQL warehouse read in this codebase now does — and confirmed that's *not* a bug: it
+    issues a `CREATE OR REPLACE VIEW` DDL statement (no bytes scanned, no real BigQuery cost), not a
+    read, so gating it behind the same daily read-quota guardrail `queryMetrics`/`runQuotaGatedWarehouseQuery`
+    enforce would incorrectly spend a project's read budget on an unrelated admin action.
+  - It surfaced a real, previously-flagged-but-unpicked-up gap: `apps/api/src/mcp/mcp-act-authorization.ts`'s
+    `mcpCallerHasPermission` — the per-call authorization gate every KAN-76 act tool
+    (`propose_action`/`approve_action`/`create_goal`/`create_segment`) checks beyond the
+    connection-level `mcp.read` gate — had zero dedicated unit test file. `mcp.controller.e2e.spec.ts`
+    covers the `api_key`-scope branch (grant + two denial shapes) and the OAuth *success* path (an org
+    owner) end to end, but never an OAuth-authenticated caller whose live role bindings do **not**
+    grant the requested permission — the direction that actually prevents privilege escalation via a
+    lower-privileged human's MCP OAuth grant, and the one meaningfully untested branch of a
+    security-boundary function.
+  - **Fix (PR #173, branch `test/mcp-act-authorization-oauth-denial`):** added
+    `mcp-act-authorization.spec.ts` (mirrors `mcp-auth.guard.spec.ts`'s `jest.mock('@growthos/firebase-orm-models', ...)`
+    style, mocking only `listRoleBindingsForUser` and using the real `toPolicyBindings`/`can` for
+    higher-fidelity coverage than mocking the policy engine too): api_key grant/deny/no-scopes-array,
+    oauth with no `userId` (fail-closed without even querying bindings — defensive, since
+    `McpAuthGuard` always populates `userId` on the real oauth path, but cheap to pin), oauth grant via
+    a live `project_admin` binding, oauth deny via a live `editor` binding (has `dashboards.write` but
+    not `automation.approve`/`automation.execute` — the actual privilege-escalation-prevention case),
+    oauth deny via a binding scoped to a different project (no sideways grant, exercises `can()`'s real
+    `bindingCoversResource`), and deny-by-default with zero bindings. No production code changed —
+    every branch traced by hand first; existing behavior is already correct on all of them.
+  - **Checks:** `pnpm --filter @growthos/api test` (this sandbox started with no `node_modules`/build
+    output at all this run — fresh container — so `pnpm install` + `pnpm --filter @growthos/shared
+    build` + `pnpm --filter @growthos/firebase-orm-models build` ran first): new spec 8/8 in isolation,
+    then the full `firebase emulators:exec ... jest` run: 139/140 (one failure, an unrelated
+    pre-existing timeout in `mcp.controller.e2e.spec.ts`'s "no tool argument can override..." test —
+    passed cleanly in isolation on retry, 583ms, confirming the documented resource-contention flake
+    class rather than a real regression). `pnpm lint` (6/6), `pnpm typecheck` (10/10), and `pnpm build`
+    (7/7) all green — `typecheck`/`build` both needed a retry after two unrelated transient sandbox
+    issues surfaced along the way and were confirmed non-issues rather than assumed away: (1)
+    `dbt-transform`'s venv-provisioning `ensurepip` step failed once under concurrent turbo task
+    contention, succeeded cleanly on a solo re-run; (2) `apps/web`'s `.next/types` directory was a
+    stale/partial leftover (missing several route `.d.ts` files `tsconfig.json`'s `.next/types/**/*.ts`
+    include expects once populated) from build activity predating this session in this container —
+    deleting `.next` and letting a fresh `next build` regenerate it fixed it, matching what a genuinely
+    fresh CI checkout (no `.next` at all) would do.
+  - PR #173's own CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in
+    ~24 minutes; merged 2026-08-21 (squash, `75b8f55`). Remote branch deletion hit the same recurring
+    HTTP 403 from this sandbox's git remote every prior merged branch has hit; local branch deleted
+    cleanly after a hard-reset onto `origin/main`.
+- **In progress (exact stopping point):** none — #173 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. A future run should do a fresh unclaimed-
+  follow-up sweep — this run's own investigation closed out the `schema-mart.service.ts` cost-quota
+  question (not a gap) and the `mcp-act-authorization.ts` coverage gap; no other specific candidate is
+  flagged yet. Worth trying a genuinely different category next (a careful adversarial read of a
+  recently-touched service for a real correctness bug, rather than another coverage-only sweep) since
+  the untested-pure-function vein is showing diminishing returns after ~8 consecutive coverage-only
+  PRs across sessions.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now also including `test/mcp-act-authorization-oauth-denial`).
+
+---
+
 ## 2026-08-21 (later still, 7) — mrr's dimension declaration fixed to match dim_subscription's real column (PR #171)
 
 - **Last completed:**
