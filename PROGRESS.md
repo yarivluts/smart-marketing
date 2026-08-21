@@ -177,6 +177,89 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 — Tracking alerts + event-volume sparklines now scoped per environment (PR #141)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). **Checked open PRs first**: **#140**
+    (`fix/automation-allowed-hours-equal-bounds`) was open, based on the commit immediately before
+    #139 merged, and resolved the same equal-`allowedHours` bug with the **opposite** semantics
+    (reject at write time vs. #139's already-merged "treat as unrestricted") — closed as superseded
+    by #139 with an explanation, since rebasing it would have reasserted behavior #139 deliberately
+    reversed rather than layering cleanly on top. **#137** (docs-only, records #128) was open and
+    green but had a stale `mergeable_state: dirty` (the recurring "two runs prepend a PROGRESS.md
+    entry at the same anchor" conflict prior entries document) — resolved the conflict (kept both
+    entries, newest first), pushed, and merged it once CI came back green.
+  - Picked the next-highest-value **unclaimed** follow-up from the "mart views" entry's own research
+    pass (item 1): `getMostRecentRawRecordForSchema`/`listRawRecordsForSchemaSince`
+    (`packages/firebase-orm-models/src/services/pipeline.service.ts`) folded every environment of a
+    project into one project-wide "most recent record" lookup. A project's environments carry
+    independent traffic (KAN-28's `gos_live_`/`gos_test_` keys are minted per environment), so a
+    `dev` key's test traffic could keep an event schema looking healthy while its `prod` key had gone
+    silent for hours — the exact failure KAN-36's tracking alerts exist to catch — and the production
+    silence alert would never fire.
+  - **Fix:** both functions now take a required `environmentId` and filter on it.
+    `checkTrackingAlertsForProject`/`getEventVolumeOverviewForProject` fan out per (event schema,
+    environment) pair instead of folding every environment into one read. `TrackingAlertModel` gained
+    a required `environment_id` field; alert episodes are now keyed per (schema, environment) pair, so
+    a silent `prod` environment gets its own episode even while `dev`/`staging` stay healthy. Added a
+    composite index for the new `environment_id` equality filter on `raw_records` in
+    `firestore.indexes.json` (replaces the old `kind`/`schema_name`/`landed_at` index — the only two
+    queries that used it both now filter `environment_id` too, so nothing else needed it).
+  - Admin UI (schema registry page's "Event volume & tracking alerts" section) now shows the
+    environment next to each sparkline row and each alert summary (`eventVolumeSchemaEnvironmentLabel`
+    / updated `trackingAlertSummary` translation keys, en/he) — each schema now gets one row per
+    environment instead of one row total.
+  - **Tests:** new regression case pinning the actual bug — `checkTrackingAlertsForProject` fires a
+    `prod` alert while a still-flowing `dev` environment stays healthy for the same event schema, and
+    a matching case for `getEventVolumeOverviewForProject` (a busy `dev` environment must not mask a
+    quiet `prod` one). Updated every existing `tracking-alert.emulator.test.ts` assertion to filter by
+    `environmentId` (each now legitimately returns one outcome/entry per environment). Updated
+    `ga4-plugin.emulator.test.ts`/`stripe-plugin.emulator.test.ts` call sites for the new required
+    `environmentId` parameter and `apps/web/lib/orgs/tracking-alert-view.test.ts` for the new
+    `environmentName` field.
+  - **Caught by a real local Playwright run before opening the PR** (this run deliberately ran the full
+    `apps/web` e2e suite locally rather than relying on CI alone, since a rendering-shape change like
+    this is exactly what unit tests miss): `e2e/schema-registry.spec.ts` asserted an exact-match on the
+    bare schema name and a single "Never received a record." node — both assumptions broke once a
+    schema legitimately gets one row per environment. Fixed the spec to scope to the `dev` row
+    (alphabetically first) rather than assuming one match; pushed as a second commit before CI ran.
+  - **Also learned mid-run (and worth the note for future runs):** running `git checkout -b` in the
+    same working directory as a still-running background `pnpm test` is unsafe — it swaps files out
+    from under the live test process. Discovered when an earlier background full-suite run silently
+    inherited stale state after a mid-run branch switch; killed it, cleaned up a zombie Firestore
+    emulator process left holding its ports (`java ... cloud-firestore-emulator`), and re-ran cleanly
+    on a stable branch before trusting the result.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` all green. `pnpm test`: full monorepo run
+    green (927 `firebase-orm-models` tests incl. the new regression cases, 114 `apps/api`, all
+    `apps/web` unit/component tests); a separate full local `apps/web` e2e run (23 Playwright specs)
+    passed clean after the spec fix above, with 3 unrelated pre-existing cold-compile-timing flakes
+    (`orgs.spec.ts`, `resource-library.spec.ts`, `tv-pairing.spec.ts` — all passed on retry, the same
+    documented flake class earlier entries describe) recovering on Playwright's own retry.
+  - **Merged 2026-08-21:** PR #141 squash-merged into `main` (`cd6d79e`) after both checks passed and
+    `mergeable_state` settled to `clean`; no review comments. Two concurrent sessions merged
+    unrelated, non-colliding follow-ups from the same research-pass list around the same time: **PR
+    #142** (item 3 — wired the daily cost quota into the four hand-written-SQL warehouse readers) and
+    **PR #143** (item 4 — repairs a pack's board seeding stuck half-failed), both opened and merged by
+    other sessions during this run. Local + remote branch cleanup: remote branch delete hit the same
+    git-over-HTTPS proxy **HTTP 403** every prior merged branch from a scheduled run has hit —
+    harmless, a human can prune `fix/tracking-alerts-environment-isolation` along with the others.
+- **In progress (exact stopping point):** none — #141 fully landed, this entry is the only remaining
+  step, and this run stops here.
+- **Blocked + why:** nothing.
+- **Next step:** the "mart views" entry's original 4-item research-pass list is now down to one
+  unclaimed item: **the engagement-pack metrics targeting a nonexistent `fact_funnel_event` table**
+  (also separately flagged in the `query_funnel` entry below) — the SaaS pack's own equivalent gap
+  (scoping to `fact_ad_spend`) was item 2 and may already be picked up; check open/recently-merged PRs
+  before re-deriving. Otherwise this run found no new unclaimed follow-up to hand off — the next run
+  should do its own fresh research pass over `PROGRESS.md`/`TASKS.md`/the codebase once the standing
+  list is exhausted.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting).
+
+---
+
 ## 2026-08-20 (later still) — `allowedHours` guardrail: equal start/end silently blocked all automation (PR #139)
 
 - **Last completed:**
