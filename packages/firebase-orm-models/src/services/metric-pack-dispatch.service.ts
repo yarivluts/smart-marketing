@@ -2,6 +2,7 @@ import type { PluginInstallModel } from '../models/plugin-install.model';
 import {
   ensureSaasMetricPackDefaultBoardsSeeded,
   ensureSaasMetricPackRegistered,
+  ensureSaasMetricPackSchemasRegistered,
   SAAS_METRIC_PACK_MANIFEST_YAML,
   SAAS_METRIC_PACK_PLUGIN_ID,
 } from '../plugin-runtime/saas-metric-pack';
@@ -40,26 +41,32 @@ import { getLatestPluginManifestVersion, installPlugin, registerPluginManifest, 
  * `ensureSaasMetricPackRegistered`, since every default board's tiles
  * reference metric names that must already be active in the project's
  * catalog (`saveBoardTiles` rejects a tile referencing an unregistered
- * metric).
+ * metric). `ensureSaasMetricPackSchemasRegistered` runs first of all three:
+ * it self-provisions the `ad_spend` measure schema that metric's own
+ * aggregation `table` names, mirroring `ensureStripeCommerceSchemasRegistered`'s
+ * schema-before-metrics ordering for the same reason (`metrics.ts`'s own doc
+ * comment on `AD_SPEND`).
  *
  * Not transactional, the same documented, deliberately-deferred tradeoff
  * `registerMetricDefinition`/`registerSchemaDefinition` already accept: the
- * install is saved *before* `ensureSaasMetricPackRegistered`/
- * `ensureSaasMetricPackDefaultBoardsSeeded` run, so a failure partway
- * through (a transient Firestore error, not the expected
- * `DuplicateMetricDefinitionError` path, which is swallowed) leaves an
- * `installed` `PluginInstallModel` with only some of its metrics/boards
- * provisioned, and a re-POST to install the same plugin id in the same
- * project throws `PluginAlreadyInstalledError` rather than resuming — there
- * is no retry surface yet. `ensureSaasMetricPackRegistered` is fully
- * retry-safe (each metric is one atomic write, so a human can uninstall and
- * reinstall to converge on all twenty-two registered). Board seeding is now
- * equally retry-safe: `ensurePackDefaultBoardsSeeded` (shared by every pack
- * with default boards) tags each board it creates with the seeding pack's
- * plugin id, so a later call can tell "my own board, still empty because
- * `saveBoardTiles` never landed" apart from "a human's board that happens
- * to share this exact name" and repair only the former — see that
- * function's own doc comment.
+ * install is saved *before* `ensureSaasMetricPackSchemasRegistered`/
+ * `ensureSaasMetricPackRegistered`/`ensureSaasMetricPackDefaultBoardsSeeded`
+ * run, so a failure partway through (a transient Firestore error, not the
+ * expected `DuplicateMetricDefinitionError`/`DuplicateSchemaDefinitionError`
+ * path, which is swallowed) leaves an `installed` `PluginInstallModel` with
+ * only some of its schema/metrics/boards provisioned, and a re-POST to
+ * install the same plugin id in the same project throws
+ * `PluginAlreadyInstalledError` rather than resuming — there is no retry
+ * surface yet. `ensureSaasMetricPackSchemasRegistered`/
+ * `ensureSaasMetricPackRegistered` are both fully retry-safe (each
+ * schema/metric is one atomic write, so a human can uninstall and reinstall
+ * to converge on all of them registered). Board seeding is now equally
+ * retry-safe: `ensurePackDefaultBoardsSeeded` (shared by every pack with
+ * default boards) tags each board it creates with the seeding pack's plugin
+ * id, so a later call can tell "my own board, still empty because
+ * `saveBoardTiles` never landed" apart from "a human's board that happens to
+ * share this exact name" and repair only the former — see that function's
+ * own doc comment.
  *
  * The built-in Engagement pack (KAN-63) follows the same "registers metrics,
  * nothing to sync" shape as the SaaS pack, minus default boards (not part
@@ -70,6 +77,12 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
   const install = await installPlugin(params);
 
   if (install.plugin_id === SAAS_METRIC_PACK_PLUGIN_ID) {
+    // Schemas first: `ensureSaasMetricPackRegistered`'s own `ad_spend` metric names this schema
+    // as its aggregation `table`, and `validateAggregationAgainstRegisteredSchema`
+    // (`metric-registry.service.ts`) can only check its `column`/`timeColumn` against a schema
+    // that already exists — same ordering `ensureStripeCommerceSchemasRegistered` establishes
+    // relative to that connector's own metric registration.
+    await ensureSaasMetricPackSchemasRegistered(params.organizationId, params.projectId, params.installedByUserId);
     await ensureSaasMetricPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
     await ensureSaasMetricPackDefaultBoardsSeeded(params.organizationId, params.projectId, params.installedByUserId);
   } else if (install.plugin_id === ENGAGEMENT_PACK_PLUGIN_ID) {

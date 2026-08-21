@@ -174,7 +174,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins', () => {
       const { request, params } = pluginInstallsRequest(organization.id, project.id, {
         pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
         version: '1.0.0',
-        consentedScopes: ['metrics:write'],
+        consentedScopes: ['metrics:write', 'schema:write'],
         config: {},
       });
       const response = await POST(request, { params });

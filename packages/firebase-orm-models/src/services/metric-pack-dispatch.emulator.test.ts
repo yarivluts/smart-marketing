@@ -61,7 +61,7 @@ describe('installPluginAndProvisionBuiltins', () => {
       projectId: project.id,
       pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
       version: '1.0.0',
-      consentedScopes: ['metrics:write'],
+      consentedScopes: ['metrics:write', 'schema:write'],
       config: {},
       installedByUserId: owner.id,
     });
@@ -107,7 +107,7 @@ describe('installPluginAndProvisionBuiltins', () => {
       projectId: project.id,
       pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
       version: '1.0.0',
-      consentedScopes: ['metrics:write'],
+      consentedScopes: ['metrics:write', 'schema:write'],
       config: {},
       installedByUserId: owner.id,
     });
@@ -118,7 +118,7 @@ describe('installPluginAndProvisionBuiltins', () => {
       projectId: project.id,
       pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
       version: '1.0.0',
-      consentedScopes: ['metrics:write'],
+      consentedScopes: ['metrics:write', 'schema:write'],
       config: {},
       installedByUserId: owner.id,
     });
@@ -141,7 +141,7 @@ describe('installPluginAndProvisionBuiltins', () => {
         projectId: project.id,
         pluginId: SAAS_METRIC_PACK_PLUGIN_ID,
         version: '1.0.0',
-        consentedScopes: [], // doesn't match the manifest's declared `[metrics:write]`
+        consentedScopes: [], // doesn't match the manifest's declared `[metrics:write, schema:write]`
         config: {},
         installedByUserId: owner.id,
       }),
