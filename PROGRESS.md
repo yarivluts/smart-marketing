@@ -17,6 +17,55 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still) — Direct coverage for the schema-fields request-body parser (PR #157)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#155** (four `parse-*.ts` parsers + the metric-def
+    form-state mapper, a concurrent session's implementation) — green (`lint · typecheck · test ·
+    build` + `terraform fmt · validate`), `mergeable_state: clean`, reviewed the diff directly and
+    merged it (`d84ba0d`) before starting new work.
+  - Delegated a fresh sweep (Explore agent) for a genuine, small, infra-free follow-up, explicitly
+    told to avoid re-suggesting anything PR #153/#155 already covered. It found the one remaining
+    gap in that same family: of the 8 `apps/web/lib/orgs/parse-*-fields.ts` request-body parsers,
+    `parse-schema-fields.ts` was the only one with zero dedicated test file — only exercised
+    indirectly through `schema-defs/route.test.ts` and `schema-defs/evolve/route.test.ts`.
+  - **Fix (PR #157, branch `test/schema-fields-parser-coverage`):** new `parse-schema-fields.test.ts`
+    (16 cases), tracing each validation branch by hand against the source before asserting it, same
+    discipline and `new NextRequest(...)` pattern as the other `parse-*-fields.test.ts` siblings.
+    Covers `parseSchemaFieldsBody` (non-array/empty rejection, non-object/missing-name/missing-type
+    entry rejection, boolean-coercion defaults + truthy-non-boolean coercion for
+    `isRequired`/`isPii`/`isIdentityKey`, mixed valid+invalid array rejection) and
+    `parseSchemaDefRequestBody` (invalid JSON, missing/invalid `kind`, all three valid kinds,
+    missing/blank `name` with trim-on-success, and propagation of a `fields`-shape error). No
+    production code changed — confirmed the parser's existing behavior is already correct on every
+    case, no latent bug found.
+  - **Checks:** `pnpm --filter web exec vitest run lib/orgs/parse-schema-fields.test.ts` (16/16)
+    first, then the full monorepo `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — all
+    green (11/11 turbo tasks; web's e2e suite had 4 flaky specs — `cost-guardrails.spec.ts`,
+    `orgs.spec.ts`, `resource-library.spec.ts`, `tv-pairing.spec.ts` — unrelated to this change,
+    self-healed on Playwright's own retry, same documented flake class prior entries have recorded).
+  - **Merged 2026-08-21:** PR #157 merged into `main` (`9ff25a1`) after CI passed — merged itself
+    (by the time this run polled again the PR was already closed/merged; no separate merge call was
+    needed from this session). Remote branch deletion for `test/schema-fields-parser-coverage` hit
+    the same recurring HTTP 403 from this sandbox's git remote prior runs have documented (not a
+    GitHub permissions issue) — branch is merged and dead but not deleted; local branch deleted
+    cleanly.
+- **In progress (exact stopping point):** none — #157 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** the `parse-*-fields.ts` family in `apps/web/lib/orgs/` now has full dedicated test
+  coverage (all 8 siblings). A future run should do a fresh unclaimed-follow-up sweep across other
+  areas (e.g. `packages/firebase-orm-models/src/**` pure helpers, other view-mappers) rather than
+  assume this specific gap-shape is exhausted — or, once an interactive/human-approved session with
+  live GCP credentials is available, spot-check the SaaS/Engagement default boards actually render
+  real numbers end to end against the live BigQuery warehouse (flagged by the 2026-08-21 PR #153
+  entry, still outstanding — not executable from this headless sandbox, no GCP credentials here).
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/schema-fields-parser-coverage`).
+
+---
+
 ## 2026-08-21 (later) — Direct coverage for four untested request-body parsers + a form-state mapper (PR #155)
 
 - **Last completed:**
