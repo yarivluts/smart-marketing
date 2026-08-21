@@ -116,10 +116,23 @@ const NEW_PAYING: SaasMetricPackDefinition = {
   },
 };
 
+/**
+ * Unlike every other `plan`-dimensioned metric in this pack, `mrr` targets
+ * `dim_subscription` rather than `fact_revenue_event` — and `dim_subscription`
+ * (`packages/dbt-transform/dbt/models/core/dim_subscription.sql`) has no
+ * `plan` column; its billing-interval column is named `plan_interval`
+ * (`fact_revenue_event`'s own `plan` column is an alias applied at that
+ * model's own SQL layer, not a name `dim_subscription` shares). Declaring
+ * `dimensions: ['plan']` here would violate this module's own rule (dimensions
+ * must correspond to a real column on the metric's aggregation table) and
+ * compile a `GROUP BY "plan"` against a table without that column — the same
+ * class of bug fixed for `ad_spend` in PR #145, just column- rather than
+ * table-level.
+ */
 const MRR: SaasMetricPackDefinition = {
   name: 'mrr',
   featured: true,
-  dimensions: ['plan'],
+  dimensions: ['plan_interval'],
   definition: {
     kind: 'aggregation',
     aggregation: {
