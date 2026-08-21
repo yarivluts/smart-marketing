@@ -17,6 +17,63 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later) — Direct coverage for four untested request-body parsers + a form-state mapper (PR #155)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Checked open PRs first: **#150** (docs-only, records PR #147) and **#154**
+    (docs-only, records PR #153) were both open, both green (`lint · typecheck · test · build` +
+    `terraform fmt · validate`), `mergeable_state: clean`, no overlapping content with each other or
+    with anything already in `PROGRESS.md` (verified via `git grep`/`grep` that neither PR's entry
+    already existed under any date heading) — reviewed and merged both (`ef58083`, `0529c06`).
+  - With the backlog and both PRs exhausted, delegated a fresh sweep (Explore agent) for a genuine,
+    small, infra-free follow-up. It confirmed every "next step" pointer at the top of this file was
+    already closed (cross-checked against `git log`) and surfaced a new, previously-unclaimed gap in
+    the same shape PR #153 (formula-parser.ts) had just closed: four `apps/web/lib/orgs/parse-*.ts`
+    request-body parsers — `parse-metric-def-fields.ts`, `parse-field-mapping-rules.ts`,
+    `parse-segment-fields.ts`, `parse-tv-pairing-fields.ts` — had zero dedicated test files, each only
+    exercised indirectly through 1-2 combined assertions inside its own route's `route.test.ts`.
+    `metricDefinitionFormStateToRequestBody` (`components/orgs/metric-definition-editor.tsx`), a pure
+    exported form-state-to-request-body mapper, had no coverage anywhere either.
+  - **Fix (PR #155, branch `test/orgs-parser-form-state-coverage`):** one new test file per parser
+    (`parse-metric-def-fields.test.ts`, `parse-field-mapping-rules.test.ts`,
+    `parse-segment-fields.test.ts`, `parse-tv-pairing-fields.test.ts`, 45 cases total) plus
+    `metric-definition-editor.test.ts` for the form-state mapper — reusing the exact
+    `new NextRequest(url, {method, body})` construction pattern and per-branch `describe`/`it`
+    structure `parse-goal-fields.test.ts`/`parse-win-rule-fields.test.ts` already established. Every
+    branch (missing/blank required field, wrong type, malformed nested array/object entry, unknown
+    enum value, happy path, optional-field omission-when-blank) was traced by hand against the parser
+    source before asserting it, the same discipline PR #153 used. Two assertions initially accessed a
+    union-typed success field directly (`parsed.filters`, `blank.hookEndpointId`) without first
+    narrowing the `{ error } | { ...fields }` return type — caught immediately by `pnpm typecheck`,
+    fixed with a local cast after confirming `parsed.error` was undefined, same non-issue every sibling
+    parser test already routes around via `'field' in parsed` checks. No production code changed — all
+    four parsers and the mapper already behaved correctly on every traced case; this closes a coverage
+    gap, not a bug.
+  - **Checks:** `pnpm --filter web exec vitest run` on the 5 new files (45/45 pass) first, then the
+    full monorepo `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — all green. `pnpm test`:
+    991 web unit tests + 23 Playwright e2e specs (1 pre-existing flaky spec —
+    `resource-library.spec.ts`, unrelated to this change — self-healed on Playwright's own retry, the
+    same documented flake class prior entries have recorded).
+  - **Merged 2026-08-21:** PR #155 merged into `main` (`d84ba0d`) by Yariv, one minute after CI
+    (`lint · typecheck · test · build` + `terraform fmt · validate`) both passed. Remote branch
+    deletion for `test/orgs-parser-form-state-coverage` hit the same recurring git-over-HTTPS-proxy
+    HTTP 403 every prior merged branch from a scheduled run has hit; local branch cleaned up.
+- **In progress (exact stopping point):** none — #155 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. A future run should do a fresh unclaimed-
+  follow-up sweep rather than assume this list is exhaustive — the Explore agent's own rejected
+  candidates from this run were `board.service.ts`'s documented per-tile N+1 Firestore-read
+  inefficiency (real, but needs threading state through the public `queryMetrics`/
+  `compileMetricQueryForProject` MCP path — too large for a single scoped PR) and
+  `resource-library.service.ts`'s "no auto-approve for org-admin-pushed attachments" (no UI need yet to
+  build against).
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/orgs-parser-form-state-coverage`).
+
+---
+
 ## 2026-08-21 — Dedicated test coverage for the metric formula parser (PR #153)
 
 - **Last completed:**
