@@ -17,6 +17,78 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 11) — TV viewer auth token guard coverage (PR #178), plus merging three concurrent-session PRs
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Three PRs were open from concurrent sessions: **#161** (ingest
+    request-body parser coverage, `apps/api/src/ingest/ingest-request.ts`), **#162** (TV-pairing
+    rate-limiter coverage, `apps/web/lib/orgs/tv-pairing-rate-limit.ts`), and **#163** (wiring the
+    KAN-39 daily cost quota into `warehouse-freshness.service.ts`'s hand-written SQL read via the
+    existing `runQuotaGatedWarehouseQuery` helper — the same shape PR #142 already fixed for four
+    other readers, this function predated that sweep). Reviewed all three diffs directly: #161/#162
+    were green/clean and non-overlapping — merged both. #163 was still mid-CI (~40min, slower than
+    usual but not stuck — confirmed via `get_workflow_run`); reviewed its diff independently while
+    waiting (correct, matches the established pattern) and left it for its own session, which merged
+    it once green shortly after.
+  - Delegated a fresh sweep (Explore agent) for a genuine, small, infra-free follow-up not
+    overlapping any of the above or any previously-exhausted vein. It also independently confirmed
+    the "hand-written SQL bypassing the KAN-39 cost quota" vein is now fully closed — grepped every
+    remaining `executor.execute(...)` caller in `packages/firebase-orm-models/src/services/`:
+    `schema-mart.service.ts`'s is `CREATE OR REPLACE VIEW` DDL (no bytes scanned, not a genuine
+    guardrail gap, correctly not touched by #163); `goal.service.ts`/`trial-pipeline.service.ts`
+    already route through the gated `queryMetrics()`; everything else already had
+    `runQuotaGatedWarehouseQuery` wired in.
+  - It surfaced `apps/web/lib/orgs/tv-viewer-auth.ts`: the session-less auth guard every
+    `app/api/tv-pairing/*` route (win feed, board data) uses to authenticate a paired TV browser by
+    its device token instead of a GrowthOS session — same security-boundary shape as `identifiers.ts`
+    and `tv-pairing-rate-limit.ts`, both already covered. Zero dedicated test file:
+    `tv-viewer-isolation.test.ts` only asserts two rejection paths produce byte-identical responses
+    (the non-enumeration property); `tv-viewer-route-guard.test.ts` is pure static analysis (`grep`s
+    route files for `requireTvViewer`), not a behavior test.
+  - **Fix (PR #178, branch `test/tv-viewer-auth-coverage`):** new `tv-viewer-auth.test.ts` (12
+    cases) — `extractTvDeviceToken`'s `Authorization: Bearer` extraction (case-insensitive scheme),
+    its `?token=` query-param fallback (for `win-feed`'s `EventSource` caller, which can't set
+    custom headers), header-over-query precedence, and the malformed-header/no-token cases;
+    `requireTvViewer`'s three 401 branches (no token, unclaimed/invalid/expired token, defense-in-
+    depth null-check on a claimed pairing missing org/project ids) plus the success path — mocking
+    `requireClaimedTvPairing` via the same `vi.hoisted`/`vi.mock` pattern `access.test.ts` already
+    establishes for `requireOrgPermission`. No production code changed — traced each branch by hand
+    first; existing behavior already correct on every case. One typecheck fixup during
+    implementation: the fake `TvPairingModel` fixture needed `as unknown as TvPairingModel` (it's a
+    firebase-orm model class instance, not a plain object shape — direct `as` cast doesn't overlap).
+  - **Checks:** `npx vitest run lib/orgs/tv-viewer-auth.test.ts` (12/12) first, then the full
+    monorepo `pnpm lint && pnpm typecheck && pnpm build` green, then `pnpm test` per package
+    (`@growthos/shared` 438/438, `@growthos/api` 132/132, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171,
+    `@growthos/firebase-orm-models` 967/967, `@growthos/web` via the proper
+    `firebase emulators:exec --only auth,firestore "vitest run && playwright test"` wrapper — all
+    unit/component tests + 23/23 e2e specs green, 2 specs (`orgs.spec.ts`, `resource-library.spec.ts`)
+    hit the documented cold-dev-server-compile flake class, both passed on Playwright's own retry).
+    A first attempt running `vitest run` directly against `apps/web` (without the emulator wrapper)
+    produced 195 false failures — not a regression, just missing Firestore/Auth emulators; re-ran
+    correctly via `pnpm test`.
+  - **Merged 2026-08-21:** PR #178 merged into `main` (`7ac66c6`) after its own CI went green
+    (subscribed via `subscribe_pr_activity`, unsubscribed after merge). Remote branch deletion for
+    `test/tv-viewer-auth-coverage` hit the same recurring git-over-HTTPS-proxy HTTP 403 every prior
+    merged branch from a scheduled run has hit; local branch deleted cleanly.
+- **In progress (exact stopping point):** none — #178 fully landed, `main` green (also picked up
+  #173/#174 (`mcpCallerHasPermission` OAuth-denial coverage), #175/#176 (schema-mart.service
+  coverage), and #177 (`setAutomationGuardrailPolicy` input-validation coverage) from concurrent
+  sessions along the way, all already merged by the time this run rebased onto `main`).
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep. The Explore agent's own
+  runner-up candidate from this run was `apps/web/app/api/oauth/mcp/consent/route.ts` (zero tests in
+  `apps/web/app/api/oauth/` at all — real open-redirect guard logic: redirect_uri pre-validation,
+  malformed `target` split, three exception types all collapsing to one `access_denied` redirect) —
+  a weaker fit than `tv-viewer-auth.ts` only because the branching lives inline in a route handler
+  (needs 4 mocked deps) rather than an extracted pure module, not because it's a dead end.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/tv-viewer-auth-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 10) — setAutomationGuardrailPolicy's own input validation now covered (PR #177)
 
 - **Last completed:**
