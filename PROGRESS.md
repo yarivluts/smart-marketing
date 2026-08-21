@@ -17,6 +17,81 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 10) — setAutomationGuardrailPolicy's own input validation now covered (PR #177)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#176** (docs-only, records PR #175's schema-mart
+    coverage) from a concurrent session, different file (`PROGRESS.md`), left alone per the
+    established convention for another session's in-flight work — it merged clean (`0795f97`)
+    partway through this run, confirmed via `git fetch` before opening this session's own PR.
+  - Per this run's own prior "Next step" note (favor a real correctness bug over another
+    coverage-only sweep), spent the bulk of this run on a direct adversarial read — not delegated —
+    of the automation/guardrail domain, the highest-value remaining "financial/security-boundary"
+    surface not yet covered by a prior run's exclusion list: `automation.service.ts` (propose/
+    approve/execute/rollback/verify state machine, write-tier gating, blast-radius counting),
+    `automation-guardrail.service.ts`, `automation-kill-switch.service.ts`, the pure
+    `@growthos/shared` guardrail-evaluation functions (`evaluate.ts` — protected-target/spend-
+    ceiling/allowed-hours/blast-radius checks), `cost-guardrail.service.ts` (KAN-39 daily quota),
+    `metrics-compiler.service.ts` (catalog resolution + mart-view rewriting), the GA4 connector's
+    cursor/executor day-advance logic, and the Stripe subscription-history dbt models (MRR-movement/
+    lifecycle-transition detection PR #151 added). Traced every branch by hand against its own
+    source and doc comments; found no real bug — every edge case considered (the `startHourUtc ===
+    endHourUtc` "whole day" convention, the `past_due -> active` MRR-recovery case PR #151's own
+    self-review already fixed, the blast-radius off-by-one, the GA4 day-boundary comparison) was
+    already handled correctly.
+  - Falling back to the coverage-gap category (per this run's own instructions, an acceptable
+    fallback after a solid bug-hunting effort): `automation-guardrail.service.ts`'s
+    `setAutomationGuardrailPolicy` is the KAN-71 guardrail-policy config setter every
+    `propose*`/`approve`/`execute` automation call enforces against — a security/financial-boundary
+    function. Its own input validation (`requireNonNegative` on all four numeric fields, plus the
+    `allowedHours` integer/0-23-range check) had zero dedicated coverage: `automation.emulator.
+    test.ts` calls it 6 times, always with fully-valid params (to set up guardrail-*behavior* tests,
+    not to test the setter's own validation), and the `apps/web` route that fronts it has no test
+    file at all.
+  - **Fix (PR #177, branch `test/automation-guardrail-policy-validation-coverage`):** added a
+    `describe('setAutomationGuardrailPolicy input validation', ...)` block to `automation.emulator.
+    test.ts` covering: negative/non-finite `maxDailyBudgetChangePct`, `spendCeilingUsd`,
+    `maxActionsPerDay`, `maxGuardedMetricRegressionPct`; non-integer and out-of-range `allowedHours`
+    bounds; the deliberate `startHourUtc === endHourUtc` "whole day" edge case `evaluate.ts` already
+    documents (asserting it's accepted, not rejected, as a positive/negative pairing with the
+    out-of-range cases); and a full-persist + audit-log-entry assertion for a fully-valid policy
+    (`automation_guardrail_policy.set`). No production code changed — every branch traced by hand
+    against the source first; existing behavior is already correct on all of them.
+  - **Checks:** this sandbox started with no `node_modules`/build output at all this run (fresh
+    container) — ran `pnpm install` + `pnpm --filter @growthos/shared build` + `pnpm --filter
+    @growthos/firebase-orm-models build` first. New tests: 48/48 in `automation.emulator.test.ts`
+    (10 new + 38 existing) in isolation, then `pnpm --filter @growthos/firebase-orm-models`'s full
+    suite (1006/1006) via `firebase emulators:exec ... vitest`. Ran the rest per-package rather than
+    one concurrent `turbo pnpm test` (per prior entries' documented memory-pressure guidance):
+    `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21, `@growthos/mcp-headless-example`
+    8/8, `@growthos/dbt-transform` 171/171, `@growthos/api` 140/140 (one `RESOURCE_EXHAUSTED`
+    Firestore-emulator warning logged mid-run, the same documented flake class, no test failed),
+    `@growthos/web` unit 1015/1015 (web e2e not run locally — this change touches no `apps/web`
+    file, same posture PR #171's entry used). `pnpm lint` (6/6), `pnpm typecheck` (10/10), and
+    `pnpm build` (7/7) all green, no retries needed this run.
+  - PR #177's own CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in
+    ~23 minutes; merged 2026-08-21 (squash, `2fed9e0`). Remote branch deletion hit the same
+    recurring HTTP 403 from this sandbox's git remote every prior merged branch has hit; local
+    branch deleted cleanly after a hard-reset onto `origin/main`.
+- **In progress (exact stopping point):** none — #177 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. This run's own direct adversarial read
+  closes out the automation/guardrail domain as a bug-hunting target for now (propose/approve/
+  execute/rollback/verify, guardrail evaluation, kill switch, cost quota, metrics-compiler catalog
+  resolution, GA4 cursor, Stripe subscription-history dbt models — all traced by hand, no bug
+  found). A future run should pick a different domain for its own adversarial bug-hunt (e.g. the
+  segment-filter/mapping-engine pure functions in `packages/shared`, the ingest pipeline's dedup/
+  quarantine services, or the plugin-runtime executors for GA4/Google Ads/Meta Ads not yet read
+  closely) before falling back to another coverage-only sweep — the coverage vein is still
+  available but this run's own instructions flagged bug-hunting as the preferred category first.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; Redis cost decision; prune merged feature branches the proxy blocks
+  scheduled runs from deleting, now also including `test/automation-guardrail-policy-validation-
+  coverage`).
+
+---
+
 ## 2026-08-21 (later still, 9) — schema-mart.service's sync outcomes and aggregation logic now covered (PR #175)
 
 - **Last completed:**
