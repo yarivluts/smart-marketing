@@ -17,6 +17,69 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 3) — Dedicated coverage for the ingest request-body parsers (PR #161)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#160** (docs-only, records PR #159) — its CI had been
+    stuck `in_progress` for ~2 hours (a hung runner, not a real failure); the change was a pure
+    `PROGRESS.md` append with no code touched, so reviewed the diff directly and merged it (`e232480`)
+    rather than waiting indefinitely on a stalled check.
+  - Delegated a fresh Explore-agent sweep for a genuine, small, infra-free follow-up, since the
+    `apps/web/lib/orgs/parse-*-fields.ts` and `packages/shared/src/metrics-compiler/` test-coverage
+    veins (PRs #153/#155/#157/#159) are now both fully exhausted. It surfaced
+    `apps/api/src/ingest/ingest-request.ts`: `parseEventsRequestBody`/`parseEntitiesRequestBody`/
+    `parseMeasuresRequestBody` are the ingest API's request-envelope validators for
+    `POST /v1/ingest/(events|entities|measures)` (missing/malformed `batch`/`records`/`type` → 400,
+    per plan `08 §2`) — the `apps/api` sibling of the now-fully-covered `apps/web` parser family, but
+    with zero dedicated test file of its own: only reachable through `ingest.controller.e2e.spec.ts`'s
+    single generic "malformed body → 400" case, none of the three functions' individual branches
+    traced directly.
+  - **Fix (PR #161, branch `test/ingest-request-parser-coverage`):** new `ingest-request.spec.ts`
+    (18 cases, mirroring `metrics-request.spec.ts`'s existing `describe`-per-function convention) —
+    valid-envelope parsing incl. empty-array acceptance, non-object body, missing/non-array
+    `batch`/`records`, and for entities specifically missing/non-string/blank `type` plus which check
+    reports first when both `type` and `records` are invalid. No production code changed — traced the
+    three functions' branches by hand against the source first; existing behavior already correct on
+    every case. This closes a coverage gap, not a bug.
+  - **Checks:** `npx jest ingest-request` (18/18) first, then a full local
+    `pnpm install && pnpm build && pnpm test` (needed a fresh `pnpm install` + monorepo build — this
+    sandbox started with no `node_modules`/dist output). The one full-suite `pnpm test` run showed 2
+    `apps/web` e2e specs (`audit-log.spec.ts`, `schema-registry.spec.ts`) failing outright rather than
+    self-healing on Playwright's own retry; reran both in isolation with a clean emulator + dev server
+    and both passed (one on its own first retry) — confirmed as the same documented Firestore-emulator
+    -under-load flake class, unrelated to this change (which touches only `apps/api/src/ingest/`).
+  - PR #161's own CI hit the same flake class from the other direction: `packages/firebase-orm-models`'s
+    `audit-log.emulator.test.ts > verifyAuditLogChainForOrg > detects a chain_break …` timed out at
+    120s under a visibly overloaded runner (`RESOURCE_EXHAUSTED: Received message larger than max`
+    gRPC errors, otherwise-millisecond tests taking 40-80s). Unrelated to this PR's diff; re-ran the
+    failed job once via `actions_run_trigger`'s `rerun_failed_jobs` rather than pushing anything.
+  - **Merged 2026-08-21:** PR #161 merged into `main` (`65dfe33`) — by the time this run polled again
+    after the rerun, CI had gone green and the PR was already merged (no separate merge call needed
+    from this session). A concurrent session independently found and closed the sibling gap this run's
+    own Explore-agent sweep had flagged as runner-up-candidate #1 — `apps/web/lib/orgs/
+    tv-pairing-rate-limit.ts` (the TV-pairing mint/claim rate limiter) — merged as **PR #162**
+    (`d555250`), no overlap with this PR's files.
+- **In progress (exact stopping point):** none — #161 and #162 both fully landed, `main` green.
+  Neither has its own docs-only "record PR #N in PROGRESS.md" follow-up yet (per the established
+  two-PR convention) beyond this entry, which covers #161; #162's own entry is still owed by whichever
+  run picks it up next, unless the concurrent session that opened #162 gets to it first.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. A future run should do a fresh unclaimed-
+  follow-up sweep — the Explore agent's own runner-up ranking this run has now been fully claimed
+  (candidate #1, `tv-pairing-rate-limit.ts`, closed as #162; candidate #2, the `toXxxView` mappers /
+  `touchpoint-schema.ts`, remain explicitly deprioritized as near-tautological). Also worth noting for
+  the next run: this sandbox's full concurrent `turbo`-driven `pnpm test` genuinely strained the
+  Firestore emulator under load (RESOURCE_EXHAUSTED gRPC errors, not just the usual Playwright-level
+  flakiness) — if a future run hits the same shape of failure, isolating the affected package's test
+  command (or re-running the specific failed spec) rather than assuming a real regression is the
+  faster diagnosis path, same as this run and PR #162's own entry both independently did.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/ingest-request-parser-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 2) — Dedicated coverage for the metrics-compiler identifier safety guard (PR #159)
 
 - **Last completed:**
