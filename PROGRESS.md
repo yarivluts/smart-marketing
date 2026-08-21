@@ -17,6 +17,70 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later) — Metrics targeting known-unbuilt warehouse tables now degrade cleanly instead of a raw error (PR #147)
+
+- **Last completed:**
+  - Session start: `TASKS.md` all-`done` except standing blockers (KAN-18/KAN-19 `in-progress`,
+    KAN-43 `needs-human`, KAN-50/KAN-51 `blocked-by`). Checked open PRs first: **#144** (docs-only,
+    recording #141) and **#145** (ad_spend mart-view fix, this session's own prior merge) were both
+    open; reviewed #145 (CI green, clean, sound) and merged it. #144 was left for its own session.
+  - Picked up the other still-open item from #145's own entry: the 2026-08-21 default-board-repair
+    entry had already flagged that installing the SaaS pack "silently seeds boards whose tiles will
+    all error/blank out" against a real warehouse, and suggested "at least surface that state clearly
+    (e.g. a 'not yet backed by real data' label)" as a smaller, scoped follow-up short of the bigger
+    "build real dbt models for the funnel/revenue/subscription streams" fix.
+  - **Fix:** `signups`/`mrr`/`mrr_movements`/`cac`/`troi`/`trials_active`/etc. still target
+    `fact_funnel_event`/`fact_revenue_event`/`dim_subscription`/`fact_subscription_event` — none of
+    which any dbt model builds. Before this fix, querying one of these against a real (KAN-18)
+    BigQuery warehouse reached the executor, spent a KAN-39 cost-quota slot, and only then failed with
+    a raw `WarehouseQueryFailedError` ("BigQuery rejected the compiled metric query: ...") one
+    warehouse round trip later. Added a maintained `KNOWN_UNBUILT_WAREHOUSE_TABLES` allowlist
+    (`metrics-compiler.service.ts`) — deliberately excludes `fact_ad_spend`, which #145 just gave a
+    real mart-view route. `compileMetricQueryForProject` now *reports* (doesn't throw)
+    `unbuiltWarehouseTables` on its return value — kept the compiler itself a pure "resolve + compile"
+    step whose success doesn't depend on warehouse readiness (its own existing tests still compile
+    `fact_funnel_event`-shaped requests successfully). `queryMetrics` is the one execution-layer caller
+    that acts on it: fails fast with a new `MetricTargetsUnbuiltWarehouseTableError`, before the cache
+    check and before the quota check, so a doomed query never spends a quota slot or a warehouse round
+    trip. Wired a new `not_yet_backed` outcome reason into every `queryMetrics` caller that already had
+    a per-tile/per-widget degrade posture — `queryBoardTile` (board.service.ts), `queryGoalProgress`
+    (goal.service.ts), and `getTrialPipelineSummary` (trial-pipeline.service.ts, KAN-66's war-room
+    widget — its own `trials_active`/`trial_starts`/`trial_conversions` target exactly this list, so it
+    degrades to `not_yet_backed` in every real project today) — plus `apps/api`'s `MetricsController`
+    (502, same bucket as `WarehouseQueryFailedError`) and the MCP `describeMetricsError` helper. New
+    translated `not_yet_backed` label (en/he) on the board-tile/goal-thermometer/trial-pipeline-widget
+    unavailable-reason keys, replacing what would otherwise be a raw technical error string.
+  - **Test fixture ripple, deliberately fixed rather than routed around:** several existing tests
+    across `metrics-query`/`board`/`goal`/`trial-pipeline` emulator suites (plus two `apps/web` route
+    tests) had fixtures registering their happy-path/quota/cache test metrics against exactly these
+    four table names (`fact_funnel_event` etc.), since nothing before this PR made that meaningful.
+    Repointed each to a real, non-aspirational table (mostly `fact_landing_page_performance`) so those
+    tests keep exercising what they're actually meant to (executor/cache/quota plumbing) instead of
+    now tripping the new fast-fail — and added one dedicated `not_yet_backed` test per surface using
+    the real SaaS-pack-shaped table names, so the actual production behavior has direct coverage too.
+  - **Checks:** `pnpm lint`, `pnpm typecheck`, `pnpm build` all green across the whole monorepo.
+    `pnpm test` green (full turbo run across all packages, including `apps/web`'s Playwright e2e
+    suite); the only warnings were the documented benign Firestore-emulator `RESOURCE_EXHAUSTED`
+    lines under full-suite concurrency, not failures.
+  - **Merged 2026-08-21:** PR #147 merged into `main` (`0ae74fb`) after checks passed with no review
+    comments. A concurrent session's **PR #148** (bounding `InMemoryMetricQueryResultCache`/
+    `InMemoryTokenBucketRateLimiter` with an LRU cap — a real, unclaimed follow-up PR #136's own entry
+    had flagged) and **PR #146** (docs-only, recording #145) both merged independently around the same
+    time, no file overlap with this change.
+- **In progress (exact stopping point):** none — #147 fully landed.
+- **Blocked + why:** nothing.
+- **Next step:** the bigger, not-yet-scoped fix is still open: `signups`/`mrr`/`cac`/`troi`/the
+  KAN-66 trial metrics need a real dbt core model backing the funnel/revenue/subscription event
+  streams (or the engagement-pack precedent of purpose-built fact tables) before they can resolve
+  against a real warehouse at all — this PR only made the *interim* state honest and quota-safe, it
+  didn't build the missing tables. No other unclaimed follow-up is currently flagged anywhere in this
+  file as of this entry; a future run should re-scan recent entries for anything newly surfaced.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting).
+
+---
+
 ## 2026-08-21 — Bounded the two unbounded in-memory Redis stand-ins (PR #148)
 
 - **Last completed:**
