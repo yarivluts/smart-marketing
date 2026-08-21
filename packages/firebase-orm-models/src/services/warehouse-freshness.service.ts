@@ -1,5 +1,6 @@
 import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor } from '../warehouse/query-executor';
 import { resolveDefaultQueryEnvironment } from './organization.service';
+import { ProjectQueryQuotaExceededError, runQuotaGatedWarehouseQuery } from './cost-guardrail.service';
 
 export interface GetWarehouseFreshnessParams {
   organizationId: string;
@@ -34,6 +35,16 @@ export type WarehouseFreshnessResult =
  * like clockwork (session-B QA, 2026-08-20). Freshness read from the
  * warehouse itself answers the actual question regardless of WHICH
  * mechanism refreshed it.
+ *
+ * Runs behind the same KAN-39 cost guardrail every other hand-written-SQL
+ * warehouse read does ({@link runQuotaGatedWarehouseQuery}, wired in for
+ * `searchProjectCustomers`/`queryProjectCohortRetention`/`queryProjectFunnelSteps`/
+ * `countSegmentMembers` in PR #142) — this function predates that PR and was
+ * missed by its sweep, so every ingest-health page view ran an unbounded,
+ * unlogged warehouse scan invisible to the cost-guardrails admin page. A
+ * quota-exceeded attempt degrades into the existing `error` state (the panel
+ * already renders `WarehouseFreshnessResult['error'].message` verbatim) rather
+ * than adding a new UI state for one more way a warehouse read can fail.
  */
 export async function getWarehouseFreshnessForProject(params: GetWarehouseFreshnessParams): Promise<WarehouseFreshnessResult> {
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
@@ -49,7 +60,9 @@ export async function getWarehouseFreshnessForProject(params: GetWarehouseFreshn
   const sql = `SELECT CAST(MAX(landed_at) AS STRING) AS latest_landed_at, COUNT(*) AS landed_record_count FROM stg_raw_records WHERE ${filters.join(' AND ')}`;
 
   try {
-    const [row] = await executor.execute({ sql, params: queryParams });
+    const [row] = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'warehouse_freshness' }, () =>
+      executor.execute({ sql, params: queryParams }),
+    );
     const latest = row?.latest_landed_at;
     return {
       status: 'ok',
@@ -59,6 +72,9 @@ export async function getWarehouseFreshnessForProject(params: GetWarehouseFreshn
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { status: 'not_configured' };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { status: 'error', message: error.message };
     }
     if (error instanceof WarehouseQueryFailedError) {
       return { status: 'error', message: error.message };
