@@ -22,14 +22,23 @@ export class MetricNotRegisteredError extends Error {
 }
 
 /**
- * Warehouse tables plan `04 §1` documents as the SaaS/marketing metric
- * pack's canonical schema but that no dbt core model actually builds
- * (`packages/dbt-transform`'s real core tables are `entities`/`events`/
- * `measures`/`bridge_identity`/`fact_attribution`/`fact_cohort_retention`/
- * `fact_engagement_daily`/`fact_engagement_depth_histogram`/
- * `fact_funnel_step`/`fact_landing_page_performance` — none of these four).
+ * Warehouse tables plan `04 §1` documents as canonical schema but that no
+ * dbt core model actually builds. Empty as of the 2026-08-21 follow-up that
+ * built real `fact_funnel_event`/`fact_revenue_event`/`dim_subscription`/
+ * `fact_subscription_event` core models (`packages/dbt-transform`) — every
+ * SaaS/Engagement-pack metric that used to target one of those four now
+ * resolves against a real relation, so nothing is currently known-aspirational.
+ * Left in place (rather than deleted along with the now-empty set) because
+ * the mechanism itself is still real infrastructure: a future metric pack
+ * can add its own genuinely-not-yet-built table name here to get the same
+ * clean `not_yet_backed` degrade (`MetricTargetsUnbuiltWarehouseTableError`
+ * below) instead of a raw `WarehouseQueryFailedError` "table not found" once
+ * the real warehouse is live, the same way `ad_spend`
+ * (`saas-metric-pack/schemas.ts`) and now these four tables graduated out of
+ * this set rather than needing it deleted and rebuilt from scratch.
+ *
  * A metric whose (possibly mart-view-mapped, see `mapCustomSchemaTables`)
- * aggregation still targets one of these can never succeed against a real
+ * aggregation targets an entry here can never succeed against a real
  * warehouse today, no matter how well-formed the compiled query is — see
  * {@link CompiledProjectMetricQuery.unbuiltWarehouseTables}, which callers
  * that actually execute a query (`queryMetrics`) use to fail fast, *before*
@@ -37,21 +46,17 @@ export class MetricNotRegisteredError extends Error {
  * that's certain to come back "table not found". Deliberately reported
  * rather than thrown here: `compileMetricQueryForProject` itself stays a
  * pure "resolve + compile" step whose success doesn't depend on whether the
- * real warehouse happens to have caught up yet (its own existing tests
- * compile `fact_funnel_event`-shaped requests successfully) — only a caller
- * that's about to actually run the query needs to care. `fact_ad_spend` is
- * deliberately absent from the set below: the SaaS pack's own `ad_spend`
- * metric was given a real self-provisioned mart-view route instead
- * (2026-08-21 follow-up — see `saas-metric-pack/schemas.ts`). A maintained
- * allowlist, not a generic "does this table exist in the warehouse" check:
- * nothing in this codebase inspects the real warehouse's live schema at
- * compile time (KAN-18's own buildable-today posture), so this only ever
- * answers for the specific tables this codebase already knows are
- * aspirational-only — a metric targeting some other, genuinely-missing
- * table still surfaces as the existing `WarehouseQueryFailedError` degrade,
- * just one warehouse round trip later.
+ * real warehouse happens to have caught up yet — only a caller that's about
+ * to actually run the query needs to care. A maintained allowlist, not a
+ * generic "does this table exist in the warehouse" check: nothing in this
+ * codebase inspects the real warehouse's live schema at compile time
+ * (KAN-18's own buildable-today posture), so this only ever answers for the
+ * specific tables this codebase already knows are aspirational-only — a
+ * metric targeting some other, genuinely-missing table still surfaces as the
+ * existing `WarehouseQueryFailedError` degrade, just one warehouse round
+ * trip later.
  */
-export const KNOWN_UNBUILT_WAREHOUSE_TABLES = new Set(['fact_funnel_event', 'fact_revenue_event', 'dim_subscription', 'fact_subscription_event']);
+export const KNOWN_UNBUILT_WAREHOUSE_TABLES = new Set<string>([]);
 
 /** One metric (by name) whose aggregation targets a table in {@link KNOWN_UNBUILT_WAREHOUSE_TABLES}. */
 export interface UnbuiltWarehouseTableRef {

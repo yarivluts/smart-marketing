@@ -10,6 +10,7 @@ import {
   getBoard,
   InMemoryMetricQueryResultCache,
   InvalidBoardError,
+  KNOWN_UNBUILT_WAREHOUSE_TABLES,
   listAuditLogEntriesForOrg,
   listBoardsForProject,
   ProjectNotFoundError,
@@ -571,10 +572,9 @@ describe('queryBoardTile', () => {
   it('degrades to a "quota exceeded" outcome once the project’s daily quota is spent', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Query Quota Org');
     await registerAdSpend(organization.id, project.id, owner.id);
-    // A second, distinct metric on its own real (non-aspirational) table — deliberately not
-    // `registerSignups` (`fact_funnel_event`, one of `KNOWN_UNBUILT_WAREHOUSE_TABLES`), which
-    // would now fail fast with `not_yet_backed` before the quota check ever runs, masking the
-    // behavior this test actually wants to exercise.
+    // A second, distinct metric — the quota test needs two independent metrics (the first call
+    // spends the quota, the second must be a genuinely different query to prove the *project's*
+    // quota, not a per-metric cache, is what's exhausted).
     await registerMetricDefinition({
       organizationId: organization.id,
       projectId: project.id,
@@ -608,8 +608,44 @@ describe('queryBoardTile', () => {
     expect(second.ok === false && second.reason).toBe('quota_exceeded');
   });
 
-  it('degrades to a "not yet backed" outcome for a metric targeting a known-unbuilt table (signups/fact_funnel_event), without touching the executor', async () => {
+  it('degrades to a "not yet backed" outcome for a metric targeting a known-unbuilt table, without touching the executor', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Board Query Unbuilt Table Org');
+    // `KNOWN_UNBUILT_WAREHOUSE_TABLES` is empty today (everything it used to list, including
+    // `fact_funnel_event` — see the next test — now has a real dbt core model, 2026-08-21 KAN-59
+    // follow-up), so this test exercises the generic mechanism against a table added just for it.
+    const fixtureOnlyUnbuiltTable = 'fixture_only_unbuilt_table_for_test';
+    KNOWN_UNBUILT_WAREHOUSE_TABLES.add(fixtureOnlyUnbuiltTable);
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups',
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: fixtureOnlyUnbuiltTable, timeColumn: 'ts', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Funnel', createdByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, signups: 1 }]);
+
+    try {
+      const outcome = await queryBoardTile({
+        organizationId: organization.id,
+        projectId: project.id,
+        board,
+        tile: bigNumberTile({ metricNames: ['signups'], title: 'Signups' }),
+        executor,
+        cache: new InMemoryMetricQueryResultCache(),
+      });
+
+      expect(outcome.ok).toBe(false);
+      expect(outcome.ok === false && outcome.reason).toBe('not_yet_backed');
+      expect(executor.callCount).toBe(0);
+    } finally {
+      KNOWN_UNBUILT_WAREHOUSE_TABLES.delete(fixtureOnlyUnbuiltTable);
+    }
+  });
+
+  it('succeeds for signups (fact_funnel_event) now that a real core model backs it (2026-08-21 KAN-59 follow-up)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Query Funnel Event Now Real Org');
     await registerSignups(organization.id, project.id, owner.id);
     const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Funnel', createdByUserId: owner.id });
     const executor = new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, signups: 1 }]);
@@ -623,9 +659,8 @@ describe('queryBoardTile', () => {
       cache: new InMemoryMetricQueryResultCache(),
     });
 
-    expect(outcome.ok).toBe(false);
-    expect(outcome.ok === false && outcome.reason).toBe('not_yet_backed');
-    expect(executor.callCount).toBe(0);
+    expect(outcome.ok).toBe(true);
+    expect(executor.callCount).toBe(1);
   });
 
   it('returns a cohort_month x period_number matrix series for a heatmap tile, ignoring any board-level compare', async () => {

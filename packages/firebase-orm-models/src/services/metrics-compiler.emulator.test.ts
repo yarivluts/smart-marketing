@@ -5,6 +5,7 @@ import {
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  KNOWN_UNBUILT_WAREHOUSE_TABLES,
   MetricNotRegisteredError,
   ProjectNotFoundError,
   registerMetricDefinition,
@@ -153,28 +154,38 @@ describe('compileMetricQueryForProject', () => {
 
   it('still compiles successfully but reports unbuiltWarehouseTables when a metric targets a known-unbuilt table (compiling is not the same as being executable)', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Compiler Unbuilt Table Org');
-    await registerMetricDefinition({
-      organizationId: organization.id,
-      projectId: project.id,
-      name: 'signups',
-      definition: {
-        kind: 'aggregation',
-        aggregation: { function: 'count_distinct', table: 'fact_funnel_event', column: 'customer_id', timeColumn: 'ts', filters: [{ field: 'step', operator: '=', value: 'signup' }] },
-      },
-      dimensions: [],
-      createdByUserId: owner.id,
-    });
+    // `KNOWN_UNBUILT_WAREHOUSE_TABLES` is empty today (every table it used to
+    // list — see its own doc comment — now has a real dbt core model), so
+    // this test exercises the generic mechanism itself against a
+    // deliberately fabricated table name, added just for this one test.
+    const fixtureOnlyUnbuiltTable = 'fixture_only_unbuilt_table_for_test';
+    KNOWN_UNBUILT_WAREHOUSE_TABLES.add(fixtureOnlyUnbuiltTable);
+    try {
+      await registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'signups',
+        definition: {
+          kind: 'aggregation',
+          aggregation: { function: 'count_distinct', table: fixtureOnlyUnbuiltTable, column: 'customer_id', timeColumn: 'ts', filters: [{ field: 'step', operator: '=', value: 'signup' }] },
+        },
+        dimensions: [],
+        createdByUserId: owner.id,
+      });
 
-    const compiled = await compileMetricQueryForProject({
-      organizationId: organization.id,
-      projectId: project.id,
-      request: { metrics: ['signups'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
-    });
+      const compiled = await compileMetricQueryForProject({
+        organizationId: organization.id,
+        projectId: project.id,
+        request: { metrics: ['signups'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      });
 
-    // Compiles fine — this is a pure "resolve + compile" step, decoupled from whether the real
-    // warehouse can actually run it (that's the execution layer's own concern, `queryMetrics`).
-    expect(compiled.sql).toContain('`fact_funnel_event`');
-    expect(compiled.unbuiltWarehouseTables).toEqual([{ metricName: 'signups', table: 'fact_funnel_event' }]);
+      // Compiles fine — this is a pure "resolve + compile" step, decoupled from whether the real
+      // warehouse can actually run it (that's the execution layer's own concern, `queryMetrics`).
+      expect(compiled.sql).toContain(`\`${fixtureOnlyUnbuiltTable}\``);
+      expect(compiled.unbuiltWarehouseTables).toEqual([{ metricName: 'signups', table: fixtureOnlyUnbuiltTable }]);
+    } finally {
+      KNOWN_UNBUILT_WAREHOUSE_TABLES.delete(fixtureOnlyUnbuiltTable);
+    }
   });
 
   it('reports no unbuilt tables for a metric registered against a real (non-aspirational) table', async () => {
@@ -192,6 +203,29 @@ describe('compileMetricQueryForProject', () => {
       organizationId: organization.id,
       projectId: project.id,
       request: { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+    });
+
+    expect(compiled.unbuiltWarehouseTables).toEqual([]);
+  });
+
+  it('reports no unbuilt tables for signups (fact_funnel_event) now that a real core model backs it (2026-08-21 KAN-59 follow-up)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Compiler Funnel Event Now Real Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'count_distinct', table: 'fact_funnel_event', column: 'customer_id', timeColumn: 'ts', filters: [{ field: 'step', operator: '=', value: 'signup' }] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const compiled = await compileMetricQueryForProject({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['signups'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
     });
 
     expect(compiled.unbuiltWarehouseTables).toEqual([]);

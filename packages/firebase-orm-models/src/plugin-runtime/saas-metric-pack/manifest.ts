@@ -11,10 +11,11 @@ export const SAAS_METRIC_PACK_PLUGIN_ID = 'com.growthos.saas-marketing-metrics';
  *
  * `type: metric_pack` (unlike Stripe/GA4's `type: source`): this pack has no
  * sync/webhook endpoint and lands no raw records — it only registers metric
- * definitions against the canonical warehouse tables (plan `04 §1`) plus one
- * self-provisioned `measure` schema (`schemas.ts`'s `ad_spend`, the one
- * metric backed by a real mart view instead of an aspirational table), so
- * `endpoints` is omitted and `scopes` covers `metrics:write` and
+ * definitions against the canonical warehouse tables (plan `04 §1`, real
+ * `dbt-transform` core models as of the 2026-08-21 KAN-59 follow-up) plus
+ * one self-provisioned `measure` schema (`schemas.ts`'s `ad_spend`, backed
+ * by a mart view rather than one of those core models), so `endpoints` is
+ * omitted and `scopes` covers `metrics:write` and
  * `schema:write` — the same scope pair Stripe/GA4 carry for their own
  * schema-self-provisioning connectors. No `config_schema`: unlike a source
  * connector, this pack needs no per-install credential.
