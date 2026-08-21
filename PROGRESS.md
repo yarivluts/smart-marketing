@@ -17,6 +17,59 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still, 2) — Dedicated coverage for the metrics-compiler identifier safety guard (PR #159)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two PRs were open: **#156** (docs-only, records PR #155) and **#157**
+    (schema-fields parser test coverage, a concurrent session's implementation) — both green
+    (`lint · typecheck · test · build`), `mergeable_state: clean`, no overlapping content — reviewed
+    and merged both (`9f0affd`, `9ff25a1`) before starting new work. (A concurrent session then also
+    opened and merged **#158**, the docs entry for #157, before this run got to it.)
+  - With the `apps/web/lib/orgs/parse-*-fields.ts` test-coverage vein now fully exhausted (every
+    sibling has a dedicated test file after #153/#155/#157), delegated a fresh Explore-agent sweep,
+    explicitly told to avoid re-proposing the two candidates PR #155's entry already rejected
+    (`board.service.ts`'s N+1 Firestore reads — real, but too large for one scoped PR;
+    `resource-library.service.ts`'s missing auto-approve — no UI need yet). It surfaced
+    `packages/shared/src/metrics-compiler/identifiers.ts`: `assertSafeIdentifier`/`quoteIdentifier`
+    are the compiler's SQL-injection boundary for every table/column/dimension/filter-field name
+    spliced into generated SQL (`compiler.ts`), including user-supplied `request.dimensions`/
+    `request.filters` on `POST /v1/metrics/query` and the MCP `query_metric` tool. It was the one
+    sibling in `metrics-compiler/` (alongside `time.ts` and `formula-parser.ts`, both previously
+    flagged-and-fixed the same way) with zero dedicated test coverage — only indirectly reachable
+    through `compiler.test.ts`'s golden fixtures, none of which exercise the rejection path.
+  - **Fix (PR #159, branch `test/metrics-compiler-identifiers-coverage`):** new
+    `identifiers.test.ts` (18 cases) — valid identifiers (lowercase, digits, leading underscore,
+    single-char, mixed-case) and rejections for a leading digit, empty string, whitespace-only,
+    embedded space, dot (schema-qualified name), backtick (identifier-quote escape), semicolon
+    injection, comment injection, trailing whitespace, plus the exact error-message format;
+    `quoteIdentifier` coverage confirms it wraps in backticks and does not itself validate (callers
+    must run `assertSafeIdentifier` first). Traced the regex
+    (`^[A-Za-z_][A-Za-z0-9_]*$`) against every case by hand before asserting — no production code
+    changed, existing behavior already correct on all of them; this closes a coverage gap on the
+    compiler's injection boundary, not a bug.
+  - **Checks:** `pnpm --filter @growthos/shared test -- identifiers` (18/18) first, then the full
+    monorepo `pnpm lint && pnpm typecheck && pnpm test && pnpm build` — all green (1007 web unit
+    tests + 23/23 Playwright e2e specs, no flakes this run; CI on the PR itself also green before
+    merge).
+  - **Merged 2026-08-21:** PR #159 merged into `main` (`391eea8`) by Yariv shortly after CI passed.
+    Remote branch deletion for `test/metrics-compiler-identifiers-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch cleaned up.
+- **In progress (exact stopping point):** none — #159 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. A future run should do a fresh unclaimed-
+  follow-up sweep — the Explore agent's own runner-up candidates from this run were the "toXxxView"
+  mappers in `apps/web/lib/orgs/` (near-tautological field renames, low genuine test value) and
+  `touchpoint-schema.ts` (a static const array, not real logic to exercise) — both explicitly
+  ranked lower than `identifiers.ts`, not proven dead ends, so worth a second look only if nothing
+  better turns up.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/metrics-compiler-identifiers-coverage`).
+
+---
+
 ## 2026-08-21 (later still) — Direct coverage for the schema-fields request-body parser (PR #157)
 
 - **Last completed:**
