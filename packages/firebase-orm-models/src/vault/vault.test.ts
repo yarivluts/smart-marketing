@@ -131,6 +131,38 @@ describe('loadLocalKmsKeyRingFromEnv', () => {
       } as NodeJS.ProcessEnv),
     ).toThrow(VaultNotConfiguredError);
   });
+
+  it.each([
+    ['a non-object top level (a JSON number)', '5'],
+    ['a non-object top level (a JSON array)', '[]'],
+    ['null', 'null'],
+    ['a missing currentKeyId', JSON.stringify({ keys: { v1: 'x' } })],
+    ['a non-string currentKeyId', JSON.stringify({ currentKeyId: 1, keys: { v1: 'x' } })],
+    ['a missing keys object', JSON.stringify({ currentKeyId: 'v1' })],
+    ['a non-object keys value', JSON.stringify({ currentKeyId: 'v1', keys: 'not-an-object' })],
+    ['a null keys value', JSON.stringify({ currentKeyId: 'v1', keys: null })],
+  ])('throws VaultNotConfiguredError for %s', (_label, raw) => {
+    expect(() => loadLocalKmsKeyRingFromEnv({ GROWTHOS_VAULT_KEYS: raw } as NodeJS.ProcessEnv)).toThrow(
+      VaultNotConfiguredError,
+    );
+  });
+
+  it('throws VaultNotConfiguredError when a key value is not a string', () => {
+    expect(() =>
+      loadLocalKmsKeyRingFromEnv({
+        GROWTHOS_VAULT_KEYS: JSON.stringify({ currentKeyId: 'v1', keys: { v1: 12345 } }),
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/must be a base64 string/);
+  });
+
+  it('throws VaultNotConfiguredError when currentKeyId is not present in its own keys map', () => {
+    const v1 = randomKey().toString('base64');
+    expect(() =>
+      loadLocalKmsKeyRingFromEnv({
+        GROWTHOS_VAULT_KEYS: JSON.stringify({ currentKeyId: 'v2', keys: { v1 } }),
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/currentKeyId "v2" is not present in "keys"/);
+  });
 });
 
 function randomKey(): Buffer {
