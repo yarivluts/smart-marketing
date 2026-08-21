@@ -764,6 +764,7 @@
     "tileUnavailableReason": {
       "warehouse_not_configured": "Warehouse not configured yet",
       "quota_exceeded": "Daily query quota reached",
+      "not_yet_backed": "Not backed by real data yet",
       "query_error": "Couldn't load this tile"
     },
     "sessionReplayLinkTitle": "Open the session recordings for this landing page"
@@ -818,6 +819,7 @@
     "thermometerUnavailableReason": {
       "warehouse_not_configured": "Warehouse not configured yet",
       "quota_exceeded": "Daily query quota reached",
+      "not_yet_backed": "Not backed by real data yet",
       "query_error": "Couldn't load this goal's progress"
     }
   },
@@ -909,6 +911,7 @@
     "unavailable": {
       "warehouse_not_configured": "Trial pipeline data needs a connected warehouse.",
       "quota_exceeded": "This project's daily query quota is exhausted. Try again tomorrow.",
+      "not_yet_backed": "Trial pipeline data isn't backed by real warehouse data yet.",
       "query_error": "Couldn't load trial pipeline data. Install the SaaS metric pack to see it here."
     }
   },

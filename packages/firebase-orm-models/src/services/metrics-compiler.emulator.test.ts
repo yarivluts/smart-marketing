@@ -150,4 +150,50 @@ describe('compileMetricQueryForProject', () => {
       expect.objectContaining({ names: expect.arrayContaining(['missing_one', 'missing_two']) }),
     );
   });
+
+  it('still compiles successfully but reports unbuiltWarehouseTables when a metric targets a known-unbuilt table (compiling is not the same as being executable)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Compiler Unbuilt Table Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'count_distinct', table: 'fact_funnel_event', column: 'customer_id', timeColumn: 'ts', filters: [{ field: 'step', operator: '=', value: 'signup' }] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const compiled = await compileMetricQueryForProject({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['signups'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+    });
+
+    // Compiles fine — this is a pure "resolve + compile" step, decoupled from whether the real
+    // warehouse can actually run it (that's the execution layer's own concern, `queryMetrics`).
+    expect(compiled.sql).toContain('`fact_funnel_event`');
+    expect(compiled.unbuiltWarehouseTables).toEqual([{ metricName: 'signups', table: 'fact_funnel_event' }]);
+  });
+
+  it('reports no unbuilt tables for a metric registered against a real (non-aspirational) table', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Compiler Built Table Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const compiled = await compileMetricQueryForProject({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+    });
+
+    expect(compiled.unbuiltWarehouseTables).toEqual([]);
+  });
 });

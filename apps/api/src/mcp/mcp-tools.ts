@@ -7,6 +7,7 @@ import {
   listMetricsCatalogForProject,
   listProjectInsights,
   MetricNotRegisteredError,
+  MetricTargetsUnbuiltWarehouseTableError,
   ProjectNotFoundError,
   ProjectQueryQuotaExceededError,
   queryMetrics,
@@ -147,7 +148,7 @@ function describeMetricsError(error: unknown): string {
   if (error instanceof ProjectNotFoundError) {
     return 'Project not found.';
   }
-  if (error instanceof MetricNotRegisteredError || error instanceof MetricCompilerError) {
+  if (error instanceof MetricNotRegisteredError || error instanceof MetricCompilerError || error instanceof MetricTargetsUnbuiltWarehouseTableError) {
     return error.message;
   }
   if (error instanceof WarehouseNotConfiguredError) {

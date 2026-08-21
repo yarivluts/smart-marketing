@@ -43,12 +43,20 @@ async function setupOrgWithProject(orgName: string) {
   return { owner, organization, project };
 }
 
+/**
+ * A real (non-`KNOWN_UNBUILT_WAREHOUSE_TABLES`) table, deliberately not
+ * `fact_funnel_event` (the SaaS pack's own real `signups` table): these
+ * fixtures exist to exercise `queryGoalProgress`'s own executor/cache/quota
+ * plumbing, which is only reachable once a query compiles past the
+ * "buildable table" fast-fail. The dedicated `not_yet_backed` test below
+ * registers against the real table to cover that behavior.
+ */
 async function registerSignups(organizationId: string, projectId: string, createdByUserId: string) {
   return registerMetricDefinition({
     organizationId,
     projectId,
     name: 'signups',
-    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [] } },
+    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
     dimensions: [],
     createdByUserId,
   });
@@ -59,7 +67,7 @@ async function registerCostPerSignup(organizationId: string, projectId: string, 
     organizationId,
     projectId,
     name: 'cost_per_signup',
-    definition: { kind: 'aggregation', aggregation: { function: 'avg', table: 'fact_funnel_event', column: 'cost_per_signup', timeColumn: 'ts', filters: [] } },
+    definition: { kind: 'aggregation', aggregation: { function: 'avg', table: 'fact_landing_page_performance', column: 'cost_per_signup', timeColumn: 'date', filters: [] } },
     dimensions: [],
     createdByUserId,
   });
@@ -512,6 +520,45 @@ describe('queryGoalProgress', () => {
     });
     expect(second.ok).toBe(false);
     expect(second.ok === false && second.reason).toBe('quota_exceeded');
+  });
+
+  it('degrades to a "not yet backed" outcome for a metric targeting a known-unbuilt table (fact_funnel_event), without touching the executor', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Query Unbuilt Table Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'real_signups',
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Goal',
+      metricName: 'real_signups',
+      direction: 'maximize',
+      targetValue: 100,
+      startDate: '2026-01-01',
+      deadline: '2026-02-01',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-01-01', real_signups: 1 }]);
+
+    const outcome = await queryGoalProgress({
+      organizationId: organization.id,
+      projectId: project.id,
+      goal,
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('not_yet_backed');
+    expect(executor.callCount).toBe(0);
   });
 
   it('caps the queried window at the goal deadline even when asOfDate is past it', async () => {

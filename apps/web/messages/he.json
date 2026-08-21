@@ -764,6 +764,7 @@
     "tileUnavailableReason": {
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",
+      "not_yet_backed": "עדיין לא מגובה בנתונים אמיתיים",
       "query_error": "לא ניתן היה לטעון אריח זה"
     },
     "sessionReplayLinkTitle": "צפייה בהקלטות של דף הנחיתה הזה"
@@ -818,6 +819,7 @@
     "thermometerUnavailableReason": {
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",
+      "not_yet_backed": "עדיין לא מגובה בנתונים אמיתיים",
       "query_error": "לא ניתן היה לטעון את התקדמות היעד"
     }
   },
@@ -909,6 +911,7 @@
     "unavailable": {
       "warehouse_not_configured": "נתוני צינור הניסיונות דורשים מחסן נתונים מחובר.",
       "quota_exceeded": "מכסת השאילתות היומית של הפרויקט מוצתה. נסה שוב מחר.",
+      "not_yet_backed": "נתוני צינור הניסיונות עדיין לא מגובים בנתוני מחסן אמיתיים.",
       "query_error": "לא ניתן היה לטעון את נתוני צינור הניסיונות. התקן את חבילת המדדים של SaaS כדי לראות אותם כאן."
     }
   },

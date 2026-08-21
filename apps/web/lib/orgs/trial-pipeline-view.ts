@@ -3,7 +3,7 @@ import { sumMetric } from './board-view';
 
 export type TrialPipelineWidgetView =
   | { status: 'ok'; activeTrials: number; conversionRatePct: number | null }
-  | { status: 'unavailable'; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error' };
+  | { status: 'unavailable'; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error' };
 
 /**
  * Maps the trial-pipeline query outcome to the widget's own render shape:

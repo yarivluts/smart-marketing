@@ -47,7 +47,10 @@ async function setupOrgProjectGoal(orgName: string) {
     organizationId: organization.id,
     projectId: project.id,
     name: 'signups',
-    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [] } },
+    // A real (non-`KNOWN_UNBUILT_WAREHOUSE_TABLES`) table, deliberately not `fact_funnel_event` (the
+    // SaaS pack's own real `signups` table) — this fixture exercises the "no warehouse configured"
+    // degrade, which is only reachable once a query compiles past the "buildable table" fast-fail.
+    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
     dimensions: [],
     createdByUserId: owner.id,
   });

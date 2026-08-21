@@ -11,6 +11,7 @@ import {
   type WarehouseQueryExecutor,
   type WarehouseRow,
 } from '../index';
+import { KNOWN_UNBUILT_WAREHOUSE_TABLES } from './metrics-compiler.service';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
 /**
@@ -40,6 +41,17 @@ async function setupOrgWithProject(orgName: string) {
   return { owner, organization, project };
 }
 
+/**
+ * Deliberately targets non-`KNOWN_UNBUILT_WAREHOUSE_TABLES` table names
+ * (unlike the SaaS pack's own real `trials_active`/`trial_starts`/
+ * `trial_conversions` registration, which targets `dim_subscription`/
+ * `fact_subscription_event` — both on that list): this fixture exists to
+ * exercise `getTrialPipelineSummary`'s own executor/cache/quota plumbing
+ * against a fake executor, which is only reachable once a query compiles
+ * past the "does this even query a buildable table" fast-fail. The dedicated
+ * `not_yet_backed` test below registers the real SaaS-pack-shaped
+ * definitions to cover that behavior.
+ */
 async function registerTrialPipelineMetrics(organizationId: string, projectId: string, createdByUserId: string) {
   await registerMetricDefinition({
     organizationId,
@@ -47,7 +59,7 @@ async function registerTrialPipelineMetrics(organizationId: string, projectId: s
     name: 'trials_active',
     definition: {
       kind: 'aggregation',
-      aggregation: { function: 'count_distinct', table: 'dim_subscription', column: 'subscription_id', timeColumn: 'started_at', filters: [{ field: 'status', operator: '=', value: 'trialing' }] },
+      aggregation: { function: 'count_distinct', table: 'trial_pipeline_fixture_subscriptions', column: 'subscription_id', timeColumn: 'started_at', filters: [{ field: 'status', operator: '=', value: 'trialing' }] },
     },
     dimensions: [],
     createdByUserId,
@@ -58,7 +70,7 @@ async function registerTrialPipelineMetrics(organizationId: string, projectId: s
     name: 'trial_starts',
     definition: {
       kind: 'aggregation',
-      aggregation: { function: 'count_distinct', table: 'fact_subscription_event', column: 'subscription_id', timeColumn: 'ts', filters: [{ field: 'type', operator: '=', value: 'trial_start' }] },
+      aggregation: { function: 'count_distinct', table: 'trial_pipeline_fixture_subscription_events', column: 'subscription_id', timeColumn: 'ts', filters: [{ field: 'type', operator: '=', value: 'trial_start' }] },
     },
     dimensions: [],
     createdByUserId,
@@ -69,7 +81,7 @@ async function registerTrialPipelineMetrics(organizationId: string, projectId: s
     name: 'trial_conversions',
     definition: {
       kind: 'aggregation',
-      aggregation: { function: 'count_distinct', table: 'fact_subscription_event', column: 'subscription_id', timeColumn: 'ts', filters: [{ field: 'type', operator: '=', value: 'convert' }] },
+      aggregation: { function: 'count_distinct', table: 'trial_pipeline_fixture_subscription_events', column: 'subscription_id', timeColumn: 'ts', filters: [{ field: 'type', operator: '=', value: 'convert' }] },
     },
     dimensions: [],
     createdByUserId,
@@ -160,5 +172,65 @@ describe('getTrialPipelineSummary', () => {
     });
     expect(second.ok).toBe(false);
     expect(second.ok === false && second.reason).toBe('quota_exceeded');
+  });
+
+  it('degrades to a "not yet backed" outcome for the real SaaS-pack-shaped registration (dim_subscription/fact_subscription_event, both known-unbuilt tables)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Trial Pipeline Unbuilt Table Org');
+    expect(KNOWN_UNBUILT_WAREHOUSE_TABLES.has('dim_subscription')).toBe(true);
+    expect(KNOWN_UNBUILT_WAREHOUSE_TABLES.has('fact_subscription_event')).toBe(true);
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'trials_active',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'count_distinct', table: 'dim_subscription', column: 'subscription_id', timeColumn: 'started_at', filters: [{ field: 'status', operator: '=', value: 'trialing' }] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'trial_starts',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'count_distinct', table: 'fact_subscription_event', column: 'subscription_id', timeColumn: 'ts', filters: [{ field: 'type', operator: '=', value: 'trial_start' }] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'trial_conversions',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'count_distinct', table: 'fact_subscription_event', column: 'subscription_id', timeColumn: 'ts', filters: [{ field: 'type', operator: '=', value: 'convert' }] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'trial_conversion_rate',
+      definition: { kind: 'formula', formula: 'trial_conversions / trial_starts' },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-07-11', trials_active: 1, trial_conversion_rate: 0.5 }]);
+    const outcome = await getTrialPipelineSummary({
+      organizationId: organization.id,
+      projectId: project.id,
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('not_yet_backed');
+    // Never reached the executor at all — this is a compile-time fast-fail, not a would-be warehouse round trip.
+    expect(executor.callCount).toBe(0);
   });
 });
