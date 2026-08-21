@@ -53,16 +53,13 @@ import { getLatestPluginManifestVersion, installPlugin, registerPluginManifest, 
  * project throws `PluginAlreadyInstalledError` rather than resuming — there
  * is no retry surface yet. `ensureSaasMetricPackRegistered` is fully
  * retry-safe (each metric is one atomic write, so a human can uninstall and
- * reinstall to converge on all twenty-two registered). Board seeding is
- * *not* equally retry-safe, and `uninstallPlugin` only flips the install's
- * own `status` — it never deletes what got provisioned: if
- * `ensureSaasMetricPackDefaultBoardsSeeded` creates a board but then fails
- * before `saveBoardTiles` populates it (see that function's own doc comment
- * on its name-keyed idempotency), that board is stuck empty forever — a
- * reinstall's name check sees it already exists and skips it, same as it
- * would for a human's own real customization. A dedicated re-provision
- * action (or a tiles-empty-means-retry check) is a reasonable follow-up if
- * this proves to matter in practice.
+ * reinstall to converge on all twenty-two registered). Board seeding is now
+ * equally retry-safe: `ensurePackDefaultBoardsSeeded` (shared by every pack
+ * with default boards) tags each board it creates with the seeding pack's
+ * plugin id, so a later call can tell "my own board, still empty because
+ * `saveBoardTiles` never landed" apart from "a human's board that happens
+ * to share this exact name" and repair only the former — see that
+ * function's own doc comment.
  *
  * The built-in Engagement pack (KAN-63) follows the same "registers metrics,
  * nothing to sync" shape as the SaaS pack, minus default boards (not part

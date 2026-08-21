@@ -61,6 +61,8 @@ export interface CreateBoardParams {
   projectId: string;
   name: string;
   createdByUserId: string;
+  /** Set only by a built-in pack's own default-board seeding — see {@link BoardModel.seeded_by_plugin_id}. Omitted (→ `null`) for every human-initiated create. */
+  seededByPluginId?: string;
 }
 
 /** Creates an empty board (no tiles yet) with a default trailing-30-day date range — the AC's "build a board ... without code" starting point. */
@@ -81,6 +83,7 @@ export async function createBoard(params: CreateBoardParams): Promise<BoardModel
   board.date_range = defaultDateRange();
   board.compare = null;
   board.global_filters = [];
+  board.seeded_by_plugin_id = params.seededByPluginId ?? null;
   board.created_by = params.createdByUserId;
   board.created_at = now;
   board.updated_by = params.createdByUserId;

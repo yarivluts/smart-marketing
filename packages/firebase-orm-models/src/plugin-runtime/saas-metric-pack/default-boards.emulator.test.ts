@@ -4,6 +4,7 @@ import { createOrganizationWithOwner, createProject, ensureUserForFirebaseSessio
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { ensureSaasMetricPackDefaultBoardsSeeded, SAAS_METRIC_PACK_DEFAULT_BOARDS } from './default-boards';
 import { ensureSaasMetricPackRegistered } from './index';
+import { SAAS_METRIC_PACK_PLUGIN_ID } from './manifest';
 
 /** Emulator-backed tests for KAN-61's default-board seeding. */
 
@@ -73,6 +74,40 @@ describe('ensureSaasMetricPackDefaultBoardsSeeded', () => {
     const marketing = boards.find((board) => board.name === 'Marketing');
     expect(marketing?.id).toBe(preExisting.id);
     expect(marketing?.tiles).toEqual([]); // left exactly as the human created it — no tiles clobbered in
+  });
+
+  it('repairs a board this pack itself created but never finished populating (an interrupted prior seed)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Interrupted Seed Org');
+    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
+
+    // Simulates `ensureSaasMetricPackDefaultBoardsSeeded`'s own `createBoard` succeeding on some
+    // earlier call, then the process dying (or Firestore erroring) before the follow-up
+    // `saveBoardTiles` populated it — the board persists tagged as this pack's own, with zero tiles.
+    const { createBoard } = await import('../../index');
+    const stuck = await createBoard({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Marketing',
+      createdByUserId: owner.id,
+      seededByPluginId: SAAS_METRIC_PACK_PLUGIN_ID,
+    });
+    expect(stuck.tiles).toEqual([]);
+
+    const result = await ensureSaasMetricPackDefaultBoardsSeeded(organization.id, project.id, owner.id);
+    expect(result.repaired).toEqual(['Marketing']);
+    expect(result.seeded).toEqual(['Revenue / MRR', 'Funnel']);
+    expect(result.alreadyPresent).toEqual([]);
+
+    const boards = await listBoardsForProject(organization.id, project.id);
+    const marketing = boards.find((board) => board.name === 'Marketing');
+    expect(marketing?.id).toBe(stuck.id); // repaired in place, not recreated as a duplicate
+    expect(marketing?.tiles).toEqual(SAAS_METRIC_PACK_DEFAULT_BOARDS.find((board) => board.name === 'Marketing')?.tiles);
+
+    // A subsequent call now sees it fully seeded — no re-repair, no duplicate.
+    const third = await ensureSaasMetricPackDefaultBoardsSeeded(organization.id, project.id, owner.id);
+    expect(third.repaired).toEqual([]);
+    expect(third.seeded).toEqual([]);
+    expect(third.alreadyPresent).toEqual(['Marketing', 'Revenue / MRR', 'Funnel']);
   });
 
   it('is isolated per project: seeding in one project leaves a sibling project untouched', async () => {
