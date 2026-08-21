@@ -27,10 +27,12 @@ seeds:
       expected values) — isolated the same way. `proj_13`'s rows are a
       synthetic Stripe subscription/charge history (2026-08-21 KAN-59
       follow-up: `dim_subscription`/`fact_subscription_event`/`fact_revenue_
-      event`) — two subscriptions' full snapshot histories (`sub_1301`:
+      event`) — three subscriptions' full snapshot histories (`sub_1301`:
       trial -> convert -> upgrade -> cancel; `sub_1302`: new -> cancel ->
-      reactivate) plus four charges (two customers, one failed charge) —
-      isolated the same way.
+      reactivate; `sub_1303`: new -> past_due -> reactivate, covering the
+      "reactivation from a non-canceled status" branch a canceled-only
+      fixture wouldn't exercise) plus four charges (two customers, one
+      failed charge) — isolated the same way.
     columns:
       - name: organization_id
         tests:

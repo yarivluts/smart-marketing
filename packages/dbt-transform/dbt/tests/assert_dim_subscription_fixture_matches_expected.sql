@@ -14,10 +14,13 @@
 --             zero out a canceled subscription's `mrr` column).
 --   sub_1302: active (mrr 80) -> canceled -> active (mrr 80, reactivated).
 --             Current state: active, mrr 80.
+--   sub_1303: active (mrr 60) -> past_due -> active (mrr 60, reactivated
+--             from `past_due`, not `canceled`). Current state: active, mrr 60.
 with expected(subscription_id, status, mrr, plan_interval) as (
     values
         ('sub_1301', 'canceled', 150.0, 'month'),
-        ('sub_1302', 'active', 80.0, 'year')
+        ('sub_1302', 'active', 80.0, 'year'),
+        ('sub_1303', 'active', 60.0, 'month')
 ),
 actual as (
     select subscription_id, status, mrr, plan_interval

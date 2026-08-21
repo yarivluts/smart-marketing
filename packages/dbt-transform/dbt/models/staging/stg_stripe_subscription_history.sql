@@ -25,20 +25,30 @@
 -- `mrr_normalized` didn't move) — most landed snapshots carry neither:
 --
 --   movement_type:
---     'new'      — first-ever snapshot lands `active`, OR a `trialing` ->
---                   `active` conversion, OR a `canceled` -> `active`
---                   reactivation. `mrr_delta` = the new `mrr_normalized`
---                   (nothing was being contributed before).
+--     'new'      — lands `active` from anything other than `active` (a
+--                   first-ever snapshot, a `trialing` conversion, or a
+--                   reactivation from `canceled`/`past_due`/`unpaid`/etc.).
+--                   `mrr_delta` = the new `mrr_normalized` (nothing was
+--                   being contributed before). Deliberately keyed off
+--                   "did status become `active`", not off which specific
+--                   status it came from — a `past_due` subscription that
+--                   recovers to `active` re-contributes its MRR the same
+--                   way a `canceled` one reactivating does; narrowing this
+--                   to only `trialing`/`canceled` would silently drop that
+--                   MRR forever (subtracted on the way to `past_due`, never
+--                   re-added on the way back).
 --     'upgrade'  — `active` -> `active` with `mrr_normalized` increased.
 --     'downgrade'— `active` -> `active` with `mrr_normalized` decreased, OR
---                   `active` -> anything-else (a cancellation is a full
---                   downgrade to zero). `mrr_delta` is the (negative)
---                   change, or `-1 * prev_mrr_normalized` for a full
---                   cancellation.
+--                   `active` -> anything-else (a cancellation, a lapse into
+--                   `past_due`/`unpaid`/etc., is a full downgrade to zero —
+--                   symmetric with `new`'s own "any non-active status"
+--                   rule). `mrr_delta` is the (negative) change, or
+--                   `-1 * prev_mrr_normalized` for a full loss.
 --   lifecycle_event_type:
 --     'trial_start' — first-ever snapshot lands `trialing`.
 --     'convert'     — `trialing` -> `active`.
---     'reactivate'  — `canceled` -> `active`.
+--     'reactivate'  — any non-`active`/non-`trialing` status -> `active`
+--                     (not just `canceled` — `past_due`/`unpaid`/etc. too).
 --
 -- A `trialing`-first-ever snapshot deliberately gets no `movement_type`
 -- (nothing has been billed yet); a first-ever snapshot landing directly as
@@ -97,26 +107,22 @@ select
     started_at,
     landed_at,
     case
-        when prev_status is null and status = 'active' then 'new'
-        when prev_status = 'trialing' and status = 'active' then 'new'
-        when prev_status = 'canceled' and status = 'active' then 'new'
-        when prev_status = 'active' and status = 'active' and mrr_normalized > prev_mrr_normalized then 'upgrade'
-        when prev_status = 'active' and status = 'active' and mrr_normalized < prev_mrr_normalized then 'downgrade'
-        when prev_status = 'active' and status != 'active' then 'downgrade'
+        when status = 'active' and (prev_status is null or prev_status != 'active') then 'new'
+        when status = 'active' and prev_status = 'active' and mrr_normalized > prev_mrr_normalized then 'upgrade'
+        when status = 'active' and prev_status = 'active' and mrr_normalized < prev_mrr_normalized then 'downgrade'
+        when status != 'active' and prev_status = 'active' then 'downgrade'
         else null
     end as movement_type,
     case
-        when prev_status is null and status = 'active' then mrr_normalized
-        when prev_status = 'trialing' and status = 'active' then mrr_normalized
-        when prev_status = 'canceled' and status = 'active' then mrr_normalized
-        when prev_status = 'active' and status = 'active' and mrr_normalized != prev_mrr_normalized then mrr_normalized - prev_mrr_normalized
-        when prev_status = 'active' and status != 'active' then -1 * prev_mrr_normalized
+        when status = 'active' and (prev_status is null or prev_status != 'active') then mrr_normalized
+        when status = 'active' and prev_status = 'active' and mrr_normalized != prev_mrr_normalized then mrr_normalized - prev_mrr_normalized
+        when status != 'active' and prev_status = 'active' then -1 * prev_mrr_normalized
         else null
     end as mrr_delta,
     case
         when prev_status is null and status = 'trialing' then 'trial_start'
         when prev_status = 'trialing' and status = 'active' then 'convert'
-        when prev_status = 'canceled' and status = 'active' then 'reactivate'
+        when prev_status is not null and prev_status not in ('active', 'trialing') and status = 'active' then 'reactivate'
         else null
     end as lifecycle_event_type
 from with_prev

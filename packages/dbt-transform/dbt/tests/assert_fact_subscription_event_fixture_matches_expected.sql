@@ -14,11 +14,17 @@
 --             a cancellation isn't itself a lifecycle-event type).
 --   sub_1302: first snapshot lands `active` directly (no trial observed)
 --             -> no lifecycle row. Cancels, then reactivates -> `reactivate`.
+--   sub_1303: first snapshot lands `active` directly -> no lifecycle row.
+--             Lapses to `past_due` (not itself a lifecycle event — see
+--             `stg_stripe_subscription_history`'s own doc comment), then
+--             recovers to `active` -> `reactivate` (the generalized rule
+--             this fixture exists to prove: not just `canceled` -> `active`).
 with expected(subscription_id, type) as (
     values
         ('sub_1301', 'trial_start'),
         ('sub_1301', 'convert'),
-        ('sub_1302', 'reactivate')
+        ('sub_1302', 'reactivate'),
+        ('sub_1303', 'reactivate')
 ),
 actual as (
     select subscription_id, type
