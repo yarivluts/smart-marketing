@@ -240,7 +240,7 @@ describe('getTrialPipelineSummary', () => {
   });
 
   it('succeeds for the real SaaS-pack-shaped registration (dim_subscription/fact_subscription_event) now that real dbt core models back them (2026-08-21 KAN-59 follow-up)', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Trial Pipeline Funnel Event Now Real Org');
+    const { owner, organization, project } = await setupOrgWithProject('Trial Pipeline Subscription Tables Now Real Org');
     await registerMetricDefinition({
       organizationId: organization.id,
       projectId: project.id,
