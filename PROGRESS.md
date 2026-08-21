@@ -17,6 +17,69 @@ Template for each entry:
 
 ---
 
+## 2026-08-21 (later still still) — Dedicated coverage for the TV-pairing rate limiter (PR #162)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two PRs were open: **#158** (docs-only, records PR #157) and **#159**
+    (metrics-compiler identifier-guard test coverage) — both green, `mergeable_state: clean`,
+    non-overlapping with each other or anything already in `PROGRESS.md`; reviewed and merged both
+    (`71ccc32`, `391eea8`) before starting new work.
+  - Delegated a fresh sweep (Explore agent, explicitly told which veins were already exhausted:
+    every `apps/web/lib/orgs/parse-*-fields.ts` parser, and `packages/shared/src/metrics-compiler/`'s
+    `time.ts`/`formula-parser.ts`/`identifiers.ts`) for a genuine, small, infra-free follow-up. It
+    surfaced `apps/web/lib/orgs/tv-pairing-rate-limit.ts`: `checkMintPairingRateLimit`/
+    `checkClaimPairingRateLimit` throttle KAN-67's two TV-pairing write surfaces (anonymous minting,
+    code-guessing on claim) and had zero dedicated test file — only exercised indirectly through
+    `app/api/tv-pairing/route.test.ts`'s single happy-path case plus one 429-exhaustion case, always
+    driven via a single `x-forwarded-for` header. Verified directly against the source before
+    committing to it: `clientIpKey`'s three-way fallback (`x-forwarded-for` first-hop-of-multi-hop →
+    `x-real-ip` → shared `'unknown'` bucket) had two of its three branches completely untested.
+  - **Fix (PR #162, branch `test/tv-pairing-rate-limit-coverage`):** new
+    `tv-pairing-rate-limit.test.ts` (8 cases), each using its own IP/user id so the shared
+    module-level token buckets (mint capacity 20, claim capacity 10) never trip across unrelated
+    cases — same convention `route.test.ts` already establishes for this module. Covers the full
+    `clientIpKey` fallback chain (multi-hop `x-forwarded-for` first-hop extraction with whitespace
+    trimming, `x-real-ip` fallback, the shared `'unknown'` bucket verified not to throw), the 429
+    response shape (`Retry-After` header, `{error: 'rate_limited'}` body), and
+    `checkClaimPairingRateLimit`'s per-user bucket isolation. No production code changed — traced
+    every branch by hand against the source first; existing behavior is already correct on all of
+    them. This closes a coverage gap, not a bug.
+  - **Checks:** `pnpm --filter web exec vitest run lib/orgs/tv-pairing-rate-limit.test.ts` (8/8)
+    first, then `pnpm lint && pnpm typecheck && pnpm build` (all green). Running the full monorepo
+    `pnpm test` via `turbo` hit severe memory contention in this sandbox — `firebase-orm-models` and
+    `web`'s emulator-backed suites running concurrently pushed the box to 14/15 GB used and one run
+    stalled for 100+ minutes at steady CPU with zero progress (classic GC-thrash symptom, not a real
+    hang: killing it and re-running each package's suite one at a time confirmed everything is
+    green). Also found and cleaned up two unrelated stale processes from this run's own earlier
+    commands still holding Firestore-emulator ports 8080/8090 — a self-inflicted side effect of an
+    interrupted duplicate test invocation earlier in the run, not a pre-existing issue. Verified every
+    package individually instead: `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api` 114/114
+    (one `RESOURCE_EXHAUSTED`-emulator flake on the first run, confirmed via a clean rerun per the
+    documented flake class), `@growthos/firebase-orm-models` 967/967, `@growthos/web` 1015 unit +
+    23/23 e2e — all green.
+  - **Merged 2026-08-21:** PR #162 merged into `main` (`d555250`) once CI (`lint · typecheck · test ·
+    build` + `terraform fmt · validate`) passed clean. PR #161 (`test(api): add dedicated coverage for
+    the ingest request-body parsers`, a concurrent session's own work) landed in between with no
+    overlap. Remote branch deletion hit the same recurring git-over-HTTPS-proxy HTTP 403 every prior
+    merged branch from a scheduled run has hit; local branch deleted cleanly.
+- **In progress (exact stopping point):** none — #162 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** `TASKS.md` still has no unblocked row. A future run should do a fresh unclaimed-
+  follow-up sweep — this run's own Explore agent confirmed the `parse-*-fields.ts` and
+  `metrics-compiler/*` veins are now both fully exhausted, so look elsewhere (e.g. other pure
+  helpers under `packages/firebase-orm-models/src/**`, other view-mappers, or a fresh careful read of
+  a recently-touched service file for a real correctness issue). If running the full `pnpm test`
+  again in this sandbox, prefer invoking each package's test script individually rather than the
+  root `turbo`-parallelized `pnpm test` — running `firebase-orm-models` and `web`'s emulator-backed
+  suites concurrently reliably starves this box's memory.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/tv-pairing-rate-limit-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 2) — Dedicated coverage for the metrics-compiler identifier safety guard (PR #159)
 
 - **Last completed:**
