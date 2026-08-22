@@ -1,8 +1,10 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  assignSegmentOwner,
   countSegmentMembers,
   createOrganizationWithOwner,
+  createOrgPerson,
   createProject,
   createSegment,
   deleteSegment,
@@ -15,6 +17,7 @@ import {
   registerSchemaDefinition,
   SegmentNotFoundError,
   setProjectCostQuota,
+  updateSegmentStatus,
   WarehouseNotConfiguredError,
   WarehouseQueryFailedError,
   type SchemaFieldInput,
@@ -95,6 +98,8 @@ describe('createSegment', () => {
       { field: 'mrr_usd', op: '>', value: 200 },
     ]);
     expect(segment.created_by).toBe(owner.id);
+    expect(segment.owner_person_id).toBeNull();
+    expect(segment.status).toBe('open');
   });
 
   it('audits the create as actor type "user" by default', async () => {
@@ -270,6 +275,202 @@ describe('deleteSegment', () => {
     });
 
     await expect(deleteSegment(organization.id, project.id, segment.id, owner.id)).rejects.toBeInstanceOf(SegmentNotFoundError);
+  });
+});
+
+describe('assignSegmentOwner', () => {
+  it('assigns an org person as the segment owner', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Assign Owner Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Alex Rep', createdByUserId: owner.id });
+
+    const updated = await assignSegmentOwner({
+      organizationId: organization.id,
+      projectId: project.id,
+      segmentId: segment.id,
+      ownerPersonId: person.id,
+      actorUserId: owner.id,
+    });
+
+    expect(updated.owner_person_id).toBe(person.id);
+  });
+
+  it('unassigns the owner when ownerPersonId is null', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Unassign Owner Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Alex Rep', createdByUserId: owner.id });
+    await assignSegmentOwner({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, ownerPersonId: person.id, actorUserId: owner.id });
+
+    const unassigned = await assignSegmentOwner({
+      organizationId: organization.id,
+      projectId: project.id,
+      segmentId: segment.id,
+      ownerPersonId: null,
+      actorUserId: owner.id,
+    });
+
+    expect(unassigned.owner_person_id).toBeNull();
+  });
+
+  it('rejects an owner that does not belong to this organization', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Assign Owner Wrong Org');
+    const { organization: otherOrg } = await setupOrgWithProject('Segment Assign Owner Other Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const otherOrgPerson = await createOrgPerson({ organizationId: otherOrg.id, name: 'Rep', createdByUserId: owner.id });
+
+    await expect(
+      assignSegmentOwner({
+        organizationId: organization.id,
+        projectId: project.id,
+        segmentId: segment.id,
+        ownerPersonId: otherOrgPerson.id,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidSegmentError);
+  });
+
+  it('throws SegmentNotFoundError for a segment that does not exist', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Assign Owner Missing Org');
+
+    await expect(
+      assignSegmentOwner({
+        organizationId: organization.id,
+        projectId: project.id,
+        segmentId: 'does-not-exist',
+        ownerPersonId: null,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(SegmentNotFoundError);
+  });
+
+  it('records a segment.assign_owner audit log entry with before/after owner', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Assign Owner Audit Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Alex Rep', createdByUserId: owner.id });
+
+    await assignSegmentOwner({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, ownerPersonId: person.id, actorUserId: owner.id });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'segment.assign_owner' && candidate.target_id === segment.id);
+    expect(entry?.actor_id).toBe(owner.id);
+    expect(entry?.before).toEqual({ ownerPersonId: null });
+    expect(entry?.after).toEqual({ ownerPersonId: person.id });
+  });
+});
+
+describe('updateSegmentStatus', () => {
+  it('ticks the segment status', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Status Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateSegmentStatus({
+      organizationId: organization.id,
+      projectId: project.id,
+      segmentId: segment.id,
+      status: 'in_progress',
+      actorUserId: owner.id,
+    });
+
+    expect(updated.status).toBe('in_progress');
+  });
+
+  it('rejects an unknown status', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Status Invalid Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      updateSegmentStatus({
+        organizationId: organization.id,
+        projectId: project.id,
+        segmentId: segment.id,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deliberately an invalid status to exercise the validation path
+        status: 'archived' as any,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidSegmentError);
+  });
+
+  it('throws SegmentNotFoundError for a segment that does not exist', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Status Missing Org');
+
+    await expect(
+      updateSegmentStatus({
+        organizationId: organization.id,
+        projectId: project.id,
+        segmentId: 'does-not-exist',
+        status: 'done',
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(SegmentNotFoundError);
+  });
+
+  it('records a segment.update_status audit log entry with before/after status', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Status Audit Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    await updateSegmentStatus({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, status: 'done', actorUserId: owner.id });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'segment.update_status' && candidate.target_id === segment.id);
+    expect(entry?.actor_id).toBe(owner.id);
+    expect(entry?.before).toEqual({ status: 'open' });
+    expect(entry?.after).toEqual({ status: 'done' });
   });
 });
 

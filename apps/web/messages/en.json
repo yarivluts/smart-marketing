@@ -873,7 +873,16 @@
     "memberCountError": "Member count unavailable",
     "deleteConfirm": "Delete this segment? This cannot be undone.",
     "deleteButton": "Delete",
-    "deleteError": "Could not delete the segment. Please try again."
+    "deleteError": "Could not delete the segment. Please try again.",
+    "ownerLabel": "Owner",
+    "unassignedOption": "Unassigned",
+    "statusLabel": "Status",
+    "statusOption": {
+      "open": "Open",
+      "in_progress": "In progress",
+      "done": "Done"
+    },
+    "workListUpdateError": "Could not update the segment. Please try again."
   },
   "WinRules": {
     "metaTitle": "Win rules",

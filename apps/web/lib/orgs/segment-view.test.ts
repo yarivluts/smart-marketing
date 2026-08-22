@@ -14,14 +14,22 @@ function segment(overrides: Partial<SegmentModel> & Pick<SegmentModel, 'id'>): S
 
 describe('toSegmentSummaryView', () => {
   it('projects a SegmentModel onto its list-page card shape', () => {
-    const view: SegmentSummaryView = toSegmentSummaryView(segment({ id: 'segment-1' }));
+    const view: SegmentSummaryView = toSegmentSummaryView(segment({ id: 'segment-1', owner_person_id: 'person-1', status: 'in_progress' }));
     expect(view).toEqual({
       id: 'segment-1',
       name: 'Paying, no demo',
       schemaName: 'customer',
       filterCount: 1,
       createdAt: '2026-08-01T00:00:00.000Z',
+      ownerPersonId: 'person-1',
+      status: 'in_progress',
     });
+  });
+
+  it('defaults owner to null and status to "open" for a segment saved before KAN-81 added those fields', () => {
+    const view: SegmentSummaryView = toSegmentSummaryView(segment({ id: 'segment-1' }));
+    expect(view.ownerPersonId).toBeNull();
+    expect(view.status).toBe('open');
   });
 });
 

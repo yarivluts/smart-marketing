@@ -5,10 +5,11 @@ import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { countSegmentMembers, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
+import { countSegmentMembers, listOrgPeople, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
 import { buildSegmentMemberCountView, toSegmentSummaryView, type SegmentMemberCountView } from '@/lib/orgs/segment-view';
 import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
 import { DeleteSegmentButton } from '@/components/orgs/delete-segment-button';
+import { SegmentWorkListControls } from '@/components/orgs/segment-work-list-controls';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -28,6 +29,7 @@ export async function generateMetadata({ params }: PageProps) {
  * (`segment.service.ts`), so there is exactly one segment definition, not
  * two. Gated on `dashboards.write`, reusing the goals/boards features'
  * permission (same reasoning `goals/page.tsx` documents for its own reuse).
+ * Each row also carries KAN-81's work-list owner/status controls.
  */
 export default async function SegmentsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -52,9 +54,10 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
 
   // Only reached once `projectId` is confirmed to belong to this org — same
   // reasoning `goals/page.tsx`'s own comment gives for `listGoalsForProject`.
-  const [segments, schemaDefs] = await Promise.all([
+  const [segments, schemaDefs, people] = await Promise.all([
     listSegmentsForProject(orgId, projectId).then((rows) => rows.map(toSegmentSummaryView)),
     listSchemaDefinitionsForProject(orgId, projectId),
+    listOrgPeople(orgId),
   ]);
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const t = await getTranslations('Segments');
@@ -106,6 +109,14 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
                           ? t('memberCountQuotaExceeded')
                           : t('memberCountError')}
                   </div>
+                  <SegmentWorkListControls
+                    orgId={orgId}
+                    projectId={projectId}
+                    segmentId={segment.id}
+                    ownerPersonId={segment.ownerPersonId}
+                    status={segment.status}
+                    people={people.map((person) => ({ id: person.id, name: person.name }))}
+                  />
                 </li>
               );
             })}

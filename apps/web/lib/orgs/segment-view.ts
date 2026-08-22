@@ -1,4 +1,5 @@
 import type { SegmentMemberCountOutcome, SegmentModel } from '@growthos/firebase-orm-models';
+import type { SegmentWorkListStatus } from '@growthos/shared';
 
 /** A segment's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface SegmentSummaryView {
@@ -7,8 +8,11 @@ export interface SegmentSummaryView {
   schemaName: string;
   filterCount: number;
   createdAt: string;
+  ownerPersonId: string | null;
+  status: SegmentWorkListStatus;
 }
 
+/** `owner_person_id`/`status` default to `null`/`'open'` when absent — a segment saved before KAN-81 added these fields loads with them simply missing, never throws. */
 export function toSegmentSummaryView(segment: SegmentModel): SegmentSummaryView {
   return {
     id: segment.id,
@@ -16,6 +20,8 @@ export function toSegmentSummaryView(segment: SegmentModel): SegmentSummaryView 
     schemaName: segment.schema_name,
     filterCount: segment.filters.length,
     createdAt: segment.created_at,
+    ownerPersonId: segment.owner_person_id ?? null,
+    status: segment.status ?? 'open',
   };
 }
 

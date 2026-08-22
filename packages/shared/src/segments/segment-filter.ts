@@ -1,12 +1,11 @@
 /**
  * A saved segment's filter shape (KAN-76, E22.2, plan `13 §13.13.2` "create_segment").
  * Deliberately minimal: a segment is a **definition** — a named, ANDed set of
- * conditions over one entity schema's fields — not a live, materialized list
- * with owner/status/CRM-sync (that fuller "work list" feature is plan
- * `14 §Gap 5`, a separate, not-yet-scheduled Phase 2 epic; nothing here
- * builds toward it). No query executor reads this shape yet either — same
- * "config now, execution later" split `MetricDefModel`/`BoardModel` already
- * establish elsewhere in this codebase.
+ * conditions over one entity schema's fields. The fuller "work list" feature
+ * plan `14 §Gap 5` describes (owner assignment + status, live record feeds,
+ * CRM-sync) is KAN-81 — see `segment-work-list.ts` for the owner/status slice
+ * of it now built on top of this definition; the live record feeds and
+ * CRM-sync action plugin are still deferred.
  */
 
 export const SEGMENT_FILTER_OPERATORS = ['=', '!=', '>', '>=', '<', '<=', 'contains'] as const;
