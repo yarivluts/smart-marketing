@@ -147,6 +147,14 @@ export default async function OrgDetailPage({
                       {t('projectFieldMappingsLink')}
                     </Link>
                   ) : null}
+                  {canViewIngestHealth ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/billing-ops-feed`}
+                    >
+                      {t('projectBillingOpsFeedLink')}
+                    </Link>
+                  ) : null}
                   {canManageProjects ? (
                     <Link
                       className="text-sm underline"

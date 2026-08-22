@@ -52,6 +52,8 @@ import {
   listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
+  listRecentBillingEventsForProject as listRecentBillingEventsForProjectInOrganization,
+  type RawRecordModel,
   listSourcePluginRunsForInstall as listSourcePluginRunsForInstallInOrganization,
   listQueryCostLogEntriesForProject as listQueryCostLogEntriesForProjectInOrganization,
   listRecentIngestBatchesForProject as listRecentIngestBatchesForProjectInOrganization,
@@ -241,6 +243,15 @@ export async function listQuarantinedRecordsForProject(
 ): Promise<QuarantinedRecordModel[]> {
   await ensureFirestoreOrm();
   return listQuarantinedRecordsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listRecentBillingEventsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listRecentBillingEventsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export async function listFailedPipelineMessagesForProject(

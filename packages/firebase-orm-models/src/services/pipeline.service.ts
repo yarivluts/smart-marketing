@@ -4,6 +4,11 @@ import { RawRecordModel } from '../models/raw-record.model';
 import type { SchemaDefKind } from '../models/schema-def.model';
 import { publishPipelineMessage } from '../pipeline/transport';
 import { defaultWarehouseSink, type WarehouseSink } from '../pipeline/sink';
+import {
+  STRIPE_CHARGE_EVENT_NAME,
+  STRIPE_FAILED_PAYMENT_EVENT_NAME,
+  STRIPE_REFUND_EVENT_NAME,
+} from '../plugin-runtime/stripe/schemas';
 import { recordAuditLogEntry } from './audit-log.service';
 import { ProjectNotFoundError } from './resource-library.service';
 
@@ -245,6 +250,57 @@ export async function listRawRecordsForSchemaSince(
     .orderBy('landed_at', 'desc')
     .limit(limit)
     .get();
+}
+
+/**
+ * The event schema names surfaced by the billing-ops feed (KAN-80, gap-analysis Gap 5+15: "new
+ * charges / failed charges / refunds as a browsable record feed"). Currently only Stripe's (KAN-49);
+ * a future second billing connector adds its event names to this one list rather than growing a
+ * parallel feed. Deliberately excludes `stripe_invoice` (a billing-cycle record, not itself an
+ * actionable charge/failure/refund event) and the `stripe_subscription` entity (current-state, not an
+ * append-only event this feed's "most recent N" framing fits).
+ */
+export const BILLING_OPS_FEED_EVENT_SCHEMA_NAMES = [
+  STRIPE_CHARGE_EVENT_NAME,
+  STRIPE_FAILED_PAYMENT_EVENT_NAME,
+  STRIPE_REFUND_EVENT_NAME,
+] as const;
+
+/** Same load-bounding reasoning as `DEFAULT_INGEST_HEALTH_BATCH_LIMIT` — this is a Firestore-backed stand-in until a real warehouse query exists. */
+export const DEFAULT_BILLING_OPS_FEED_LIMIT = 100;
+
+/**
+ * The most recent billing events (charges, failed payments, refunds) landed for a project, newest
+ * first, folded across every environment — same "whole project, one admin view" posture as
+ * `listRecentIngestBatchesForProject`. One bounded query per schema name (Firestore has no native
+ * "kind == 'event' AND schema_name IN [...]" + orderBy composite this ORM exposes), merged and
+ * re-sorted client-side, then trimmed to `limit` — so a burst in one schema can't silently starve the
+ * merged feed of another's more recent records purely by fetch order. Each per-schema fetch needs a
+ * composite Firestore index (`kind`, `schema_name`, `landed_at`) in a real (non-emulator) project, same
+ * documented requirement every other `RawRecordModel` query in this file already carries.
+ */
+export async function listRecentBillingEventsForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = DEFAULT_BILLING_OPS_FEED_LIMIT,
+): Promise<RawRecordModel[]> {
+  await requireProjectInOrg(organizationId, projectId);
+
+  const perSchemaResults = await Promise.all(
+    BILLING_OPS_FEED_EVENT_SCHEMA_NAMES.map((schemaName) =>
+      RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
+        .where('kind', '==', 'event')
+        .where('schema_name', '==', schemaName)
+        .orderBy('landed_at', 'desc')
+        .limit(limit)
+        .get(),
+    ),
+  );
+
+  return perSchemaResults
+    .flat()
+    .sort((a, b) => (a.landed_at < b.landed_at ? 1 : a.landed_at > b.landed_at ? -1 : 0))
+    .slice(0, limit);
 }
 
 /**
