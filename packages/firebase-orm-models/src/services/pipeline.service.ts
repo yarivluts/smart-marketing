@@ -269,27 +269,38 @@ export const BILLING_OPS_FEED_EVENT_SCHEMA_NAMES = [
 /** Same load-bounding reasoning as `DEFAULT_INGEST_HEALTH_BATCH_LIMIT` — this is a Firestore-backed stand-in until a real warehouse query exists. */
 export const DEFAULT_BILLING_OPS_FEED_LIMIT = 100;
 
+/** Same load-bounding default as {@link DEFAULT_BILLING_OPS_FEED_LIMIT} — kept as its own named constant since a generic record feed (KAN-81) isn't billing-specific. */
+export const DEFAULT_RECORD_FEED_LIMIT = 100;
+
+export interface ListRecentRecordsForSchemasParams {
+  organizationId: string;
+  projectId: string;
+  kind: SchemaDefKind;
+  /** One or more registered schema names of the same `kind` to fold into one feed — e.g. every billing event schema, or just the one schema a record-feed page's picker selected. */
+  schemaNames: readonly string[];
+  limit?: number;
+}
+
 /**
- * The most recent billing events (charges, failed payments, refunds) landed for a project, newest
+ * The most recent raw records landed for one or more schemas of the same `kind` in a project, newest
  * first, folded across every environment — same "whole project, one admin view" posture as
  * `listRecentIngestBatchesForProject`. One bounded query per schema name (Firestore has no native
- * "kind == 'event' AND schema_name IN [...]" + orderBy composite this ORM exposes), merged and
- * re-sorted client-side, then trimmed to `limit` — so a burst in one schema can't silently starve the
- * merged feed of another's more recent records purely by fetch order. Each per-schema fetch needs a
- * composite Firestore index (`kind`, `schema_name`, `landed_at`) in a real (non-emulator) project, same
- * documented requirement every other `RawRecordModel` query in this file already carries.
+ * "kind == X AND schema_name IN [...]" + orderBy composite this ORM exposes), merged and re-sorted
+ * client-side, then trimmed to `limit` — so a burst in one schema can't silently starve the merged feed
+ * of another's more recent records purely by fetch order. Each per-schema fetch needs a composite
+ * Firestore index (`kind`, `schema_name`, `landed_at`) in a real (non-emulator) project, same documented
+ * requirement every other `RawRecordModel` query in this file already carries. The general-purpose
+ * building block behind both `listRecentBillingEventsForProject` (KAN-80, a fixed Stripe schema set)
+ * and the KAN-81 record-feed page (a human-picked single schema).
  */
-export async function listRecentBillingEventsForProject(
-  organizationId: string,
-  projectId: string,
-  limit: number = DEFAULT_BILLING_OPS_FEED_LIMIT,
-): Promise<RawRecordModel[]> {
-  await requireProjectInOrg(organizationId, projectId);
+export async function listRecentRecordsForSchemas(params: ListRecentRecordsForSchemasParams): Promise<RawRecordModel[]> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const limit = params.limit ?? DEFAULT_RECORD_FEED_LIMIT;
 
   const perSchemaResults = await Promise.all(
-    BILLING_OPS_FEED_EVENT_SCHEMA_NAMES.map((schemaName) =>
-      RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
-        .where('kind', '==', 'event')
+    params.schemaNames.map((schemaName) =>
+      RawRecordModel.initPath({ organization_id: params.organizationId, project_id: params.projectId })
+        .where('kind', '==', params.kind)
         .where('schema_name', '==', schemaName)
         .orderBy('landed_at', 'desc')
         .limit(limit)
@@ -301,6 +312,18 @@ export async function listRecentBillingEventsForProject(
     .flat()
     .sort((a, b) => (a.landed_at < b.landed_at ? 1 : a.landed_at > b.landed_at ? -1 : 0))
     .slice(0, limit);
+}
+
+/**
+ * The most recent billing events (charges, failed payments, refunds) landed for a project — the
+ * `BILLING_OPS_FEED_EVENT_SCHEMA_NAMES`-scoped specialization of {@link listRecentRecordsForSchemas}.
+ */
+export async function listRecentBillingEventsForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = DEFAULT_BILLING_OPS_FEED_LIMIT,
+): Promise<RawRecordModel[]> {
+  return listRecentRecordsForSchemas({ organizationId, projectId, kind: 'event', schemaNames: BILLING_OPS_FEED_EVENT_SCHEMA_NAMES, limit });
 }
 
 /**

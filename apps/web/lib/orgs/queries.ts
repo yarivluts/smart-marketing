@@ -53,7 +53,9 @@ import {
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
   listRecentBillingEventsForProject as listRecentBillingEventsForProjectInOrganization,
+  listRecentRecordsForSchemas as listRecentRecordsForSchemasInOrganization,
   type RawRecordModel,
+  type SchemaDefKind,
   listSourcePluginRunsForInstall as listSourcePluginRunsForInstallInOrganization,
   listQueryCostLogEntriesForProject as listQueryCostLogEntriesForProjectInOrganization,
   listRecentIngestBatchesForProject as listRecentIngestBatchesForProjectInOrganization,
@@ -252,6 +254,17 @@ export async function listRecentBillingEventsForProject(
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
   return listRecentBillingEventsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+/** The generic, single-schema record feed (KAN-81) — a project-scoped view of any registered schema's recently landed records. */
+export async function listRecentRecordsForSchema(
+  organizationId: string,
+  projectId: string,
+  kind: SchemaDefKind,
+  schemaName: string,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName] });
 }
 
 export async function listFailedPipelineMessagesForProject(

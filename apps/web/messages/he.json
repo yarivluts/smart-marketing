@@ -95,6 +95,7 @@
     "projectHooksLink": "וֶבְּהוּקים נכנסים",
     "projectFieldMappingsLink": "מיפויי שדות",
     "projectBillingOpsFeedLink": "פיד אירועי חיוב",
+    "projectRecordFeedLink": "פיד רשומות",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
@@ -577,6 +578,18 @@
     "landedAtLine": "נקלט ב-{landedAt}",
     "clientIdLine": "מזהה {clientId}",
     "capNote": "מוצגים {count} אירועי החיוב האחרונים."
+  },
+  "RecordFeed": {
+    "metaTitle": "פיד רשומות",
+    "title": "פיד רשומות עבור {projectName}",
+    "description": "עיין ברשומות האחרונות שנקלטו עבור כל סכימת אירוע רשומה בפרויקט זה.",
+    "schemaPickerLabel": "סכימת אירוע",
+    "noEventSchemasRegistered": "יש לרשום סכימת אירוע תחילה כדי לעיין בפיד רשומות.",
+    "empty": "טרם נקלטו רשומות עבור סכימה זו.",
+    "fieldLine": "{name}: {value}",
+    "landedAtLine": "נקלט ב-{landedAt}",
+    "clientIdLine": "מזהה {clientId}",
+    "capNote": "מוצגות {count} הרשומות האחרונות."
   },
   "CostGuardrails": {
     "metaTitle": "בקרות עלות",

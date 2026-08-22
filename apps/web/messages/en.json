@@ -95,6 +95,7 @@
     "projectHooksLink": "Inbound hooks",
     "projectFieldMappingsLink": "Field mappings",
     "projectBillingOpsFeedLink": "Billing ops feed",
+    "projectRecordFeedLink": "Record feed",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
@@ -577,6 +578,18 @@
     "landedAtLine": "Landed {landedAt}",
     "clientIdLine": "id {clientId}",
     "capNote": "Showing the {count} most recent billing events."
+  },
+  "RecordFeed": {
+    "metaTitle": "Record feed",
+    "title": "Record feed for {projectName}",
+    "description": "Browse the most recently landed records for any registered event schema in this project.",
+    "schemaPickerLabel": "Event schema",
+    "noEventSchemasRegistered": "Register an event schema first to browse a record feed.",
+    "empty": "No records landed for this schema yet.",
+    "fieldLine": "{name}: {value}",
+    "landedAtLine": "Landed {landedAt}",
+    "clientIdLine": "id {clientId}",
+    "capNote": "Showing the {count} most recent records."
   },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",
