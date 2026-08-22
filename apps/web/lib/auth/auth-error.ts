@@ -2,6 +2,7 @@ export type AuthErrorMessageKey =
   | 'invalidCredentialsError'
   | 'emailInUseError'
   | 'weakPasswordError'
+  | 'invalidOrExpiredTokenError'
   | 'genericError';
 
 const CODE_TO_KEY: Record<string, AuthErrorMessageKey> = {
@@ -11,6 +12,11 @@ const CODE_TO_KEY: Record<string, AuthErrorMessageKey> = {
   'auth/wrong-password': 'invalidCredentialsError',
   'auth/email-already-in-use': 'emailInUseError',
   'auth/weak-password': 'weakPasswordError',
+  // A custom token (`/login/token`) that's expired (~1hr lifetime),
+  // already-consumed-and-revoked, or was minted for a mismatched Firebase
+  // project.
+  'auth/invalid-custom-token': 'invalidOrExpiredTokenError',
+  'auth/custom-token-mismatch': 'invalidOrExpiredTokenError',
 };
 
 function hasErrorCode(error: unknown): error is { code: string } {

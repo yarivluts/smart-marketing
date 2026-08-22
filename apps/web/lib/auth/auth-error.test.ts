@@ -9,6 +9,8 @@ describe('authErrorMessageKey', () => {
     ['auth/wrong-password', 'invalidCredentialsError'],
     ['auth/email-already-in-use', 'emailInUseError'],
     ['auth/weak-password', 'weakPasswordError'],
+    ['auth/invalid-custom-token', 'invalidOrExpiredTokenError'],
+    ['auth/custom-token-mismatch', 'invalidOrExpiredTokenError'],
   ])('maps Firebase code %s to %s', (code, key) => {
     expect(authErrorMessageKey({ code })).toBe(key);
   });

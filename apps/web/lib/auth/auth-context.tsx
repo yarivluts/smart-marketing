@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   sendEmailVerification,
+  signInWithCustomToken,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut as firebaseSignOut,
@@ -30,6 +31,18 @@ export interface AuthContextValue {
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  /**
+   * Exchanges a Firebase custom token (`Admin.auth().createCustomToken(uid)`)
+   * for a real session — the passwordless-account / support-impersonation
+   * path (`/login/token`). A custom token can only ever be minted by
+   * someone holding this project's Admin SDK service-account credentials;
+   * no client can forge one, so this adds no new attack surface beyond what
+   * Admin SDK access already grants. Firebase expires a custom token
+   * ~1 hour after minting, and it's single-purpose (exchanging it here is
+   * the only thing it's good for) — never store one longer than needed to
+   * use it once.
+   */
+  signInWithToken: (token: string) => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -115,6 +128,15 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
         setSessionSyncing(true);
         try {
           const credential = await signInWithPopup(getFirebaseAuth(), new GoogleAuthProvider());
+          await establishSessionOrRollBack(credential.user);
+        } finally {
+          setSessionSyncing(false);
+        }
+      },
+      async signInWithToken(token) {
+        setSessionSyncing(true);
+        try {
+          const credential = await signInWithCustomToken(getFirebaseAuth(), token);
           await establishSessionOrRollBack(credential.user);
         } finally {
           setSessionSyncing(false);
