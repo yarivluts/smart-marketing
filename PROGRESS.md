@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-22 (later still, 10) — campaign-drafts route coverage (PR #213); a concurrent-session duplicate on sync-marts
+## 2026-08-22 (later still, 11) — campaign-drafts route coverage (PR #213)
 
 - **Last completed:**
   - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
@@ -26,18 +26,13 @@ Template for each entry:
   - Picked candidate (5) from PR #205/#207/#209's risk-ranked "next step" list:
     `schema-defs/sync-marts/route.ts` — opened as **PR #211** (branch `test/schema-defs-sync-marts-
     route-coverage`, 6 cases, `pnpm lint/typecheck/build/test` all green, `@growthos/web` 1192/1192).
-    While its CI was running, **a concurrent session opened PR #212 against the exact same route** and
-    found a real bug this session's own version had only pinned as expected behavior: unlike its
-    sibling `schema-defs/route.ts` GET, this route never checked `projectId` belongs to `orgId` before
-    syncing, so a wrong-org/nonexistent project id silently returned `200` instead of the `404` every
-    sibling route on this resource returns. #212 fixed it properly (added the same `listOrgProjects`
-    check); this session's own #211 only asserted the gap as a regression-pinning test. The other
-    session closed #211 as superseded by #212 (with a comment explaining exactly this), which is the
-    right call — keeping the fix over the pin. This session left #212 alone (per the established
-    "leave a concurrent session's own PR alone" convention) rather than re-implementing the same fix;
-    it merged cleanly on its own (`f9914aa..` — confirmed via a later `git fetch`) before this run
-    ended. Local/remote cleanup for the superseded `test/schema-defs-sync-marts-route-coverage` branch
-    done (remote delete hit the usual git-proxy 403, local deleted).
+    A concurrent session independently picked the exact same candidate and opened **PR #212** while
+    #211's CI was still running, fixing a real wrong-project-404 isolation gap that #211 had only
+    pinned as expected behavior — see that session's own entry immediately below for the full story.
+    The other session closed #211 as superseded and merged #212; this session left it alone per the
+    "leave a concurrent session's own PR alone" convention, confirmed clean via a later `git fetch`.
+    Local/remote cleanup for the superseded `test/schema-defs-sync-marts-route-coverage` branch done
+    (remote delete hit the usual git-proxy 403, local deleted).
   - Moved to the next candidate instead: PR #201/#203's own flagged item,
     `automation/actions/campaign-drafts/route.ts` — its `InvalidAutomationActionError` catch uniquely
     forwards `err.message` in the response body, untested. Traced `proposeCampaignDraftCreateAction`
@@ -88,6 +83,84 @@ Template for each entry:
   sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
   deleting, now including `test/campaign-drafts-route-coverage` and the superseded, unmerged
   `test/schema-defs-sync-marts-route-coverage`).
+
+---
+
+## 2026-08-22 (later still, 10) — schema-defs sync-marts route coverage + a wrong-project isolation fix (PR #212)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two PRs were open: **#210** (a concurrent session's docs-only record of PR
+    #209) and, discovered only after this run tried to push its own branch, **#211** (a *different*
+    concurrent session's route-coverage PR for the exact same candidate this run had independently
+    picked — same branch name, which is what surfaced the collision on push).
+  - Picked candidate (5) from PR #205/#207/#209's own risk-ranked "next step" list:
+    `schema-defs/sync-marts/route.ts` (POST) — KAN-18's admin "Sync warehouse views" backfill/repair
+    sweep for BigQuery mart views, gated on `schema.write`, zero test coverage.
+  - Traced the route and `syncAllSchemaMartViewsForProject`/`listSchemaDefinitionsForProject`
+    (`packages/firebase-orm-models`) by hand before writing anything, and — unlike every prior route in
+    this series — found a **real, unfixed isolation gap**: this route never checked `projectId` belongs
+    to `orgId` before calling the service, and `listSchemaDefinitionsForProject` itself only queries a
+    Firestore path scoped by `organization_id`/`project_id` without ever verifying the project exists.
+    A project id from a *different* org (or a nonexistent one) silently returned `200` with an empty
+    sync result instead of the `404` every sibling route on this resource (`schema-defs/route.ts`'s own
+    GET, `register-touchpoint/route.ts`) returns for the same input — the exact asymmetry
+    `schema-defs/route.ts`'s own docstring warns against repeating.
+  - **Fix (branch `test/schema-defs-sync-marts-isolation-fix`):** added the same `listOrgProjects`
+    existence check the sibling GET route already uses (404 before calling the service); new
+    `route.test.ts` (6 cases, real Firestore/Auth emulator) covering 401, 404 non-membership, 403
+    viewer-without-`schema.write`, the new 404 for a wrong-org project id, and the sync-result happy
+    path with zero/one active schema (`warehouseConfigured: false` once there's a schema to sync, since
+    this test env has no `GROWTHOS_BIGQUERY_CORE_DATASET`, same as real dev/CI).
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. New test file 6/6 via the `firebase emulators:exec` wrapper, `pnpm turbo lint typecheck`
+    clean, full `@growthos/web` suite 1192/1192 (209 files). `pnpm test` at the repo root additionally
+    surfaced one **unrelated** `@growthos/api` failure (`MetricsController (e2e) › returns (429) once
+    the project has spent its KAN-39 daily query quota`, a 30s Jest timeout alongside Firestore-emulator
+    `RESOURCE_EXHAUSTED` warnings) — the same CI-runner resource-pressure flake class PR #203/#205/#207
+    already documented, in yet another suite; confirmed as a flake via one full retry of
+    `@growthos/api`'s own test script (140/140 clean the second time), not this PR's own diff (which
+    touches only one new `apps/web` test file).
+  - **Duplicate-PR reconciliation:** discovered PR #211 only when `git push` for this run's own branch
+    (also named `test/schema-defs-sync-marts-route-coverage`) was rejected — a second, independent
+    session had picked the exact same candidate concurrently. #211's own test suite documented the same
+    isolation gap this run found but *pinned it as expected behavior* (a regression test asserting `200`
+    for a nonexistent project id) rather than fixing it. Renamed this run's branch to
+    `test/schema-defs-sync-marts-isolation-fix`, rebased onto latest `main` (which by then included
+    #210), and opened **PR #212** explicitly noting it supersedes #211 and why (fixes the gap instead of
+    pinning it, matching every sibling route's convention). Commented on #211 explaining the close and
+    closed it via `update_pull_request`(state: closed) rather than merging it — same "reconcile,
+    don't stack" pattern KAN-20/KAN-32's duplicate-PR history established, just resolved within a single
+    run this time instead of needing a human decision, since the two implementations' correctness
+    differed in a concrete, non-judgment-call way.
+  - PR #212's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green (confirmed
+    via `subscribe_pr_activity` + two `send_later` self-check-ins rather than polling), `mergeable_state:
+    clean`, no reviews. Merged 2026-08-22 (squash, `de5ddde`). Remote branch deletion for
+    `test/schema-defs-sync-marts-isolation-fix` hit the same recurring git-over-HTTPS-proxy HTTP 403
+    every prior merged branch from a scheduled run has hit; local branch deleted cleanly after syncing
+    to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #212 fully landed, `main` green, #211 closed as
+  superseded (comment left explaining why, not merged).
+- **Blocked + why:** nothing.
+- **Next step:** remaining candidates from PR #201/#205/#207/#209's risk-ranked sweep: PR #203's own
+  flagged `automation/actions/campaign-drafts/route.ts` (its `InvalidAutomationActionError` catch
+  uniquely forwards `err.message` in the response body, untested) and a pre-existing, untested edge case
+  in `ensureAutomationTargetSeeded`'s validate-before-lookup ordering. The remaining five thin-wrapper
+  routes from PR #201's original sweep (`ingest-health/replay-failed-pipeline-messages`,
+  `sweep-queued-pipeline-messages`, `trigger-orchestration-run`, `quarantined-records/.../replay`,
+  `schema-defs/check-tracking-alerts`) are lower priority, same shape of gap — but this run's own
+  experience (a real isolation bug found on the sync-marts route, on top of nearly every other
+  route-coverage PR in this series finding something) suggests even the "lower priority" ones are worth
+  a pass rather than skipping. A future run should pick the highest-priority open item, or do a fresh
+  sweep of a different subtree (e.g. `apps/api/` or non-API `apps/web` components) if this list runs
+  dry. Given multiple concurrent sessions have now independently picked the same candidate more than
+  once (KAN-20-style), a future run finding its target branch name already taken on `git push` should
+  follow this run's own playbook: compare the two diffs on their merits (does one fix a real bug the
+  other only documents? is one's coverage a strict superset?) and reconcile immediately rather than
+  opening a second, less-informed duplicate.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/schema-defs-sync-marts-isolation-fix`).
 
 ---
 
