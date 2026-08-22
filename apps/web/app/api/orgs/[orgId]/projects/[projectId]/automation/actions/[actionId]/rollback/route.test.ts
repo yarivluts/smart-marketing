@@ -6,6 +6,7 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
   acceptInvite,
   approveAutomationAction,
+  AutomationActionModel,
   createOrganizationWithOwner,
   createProject,
   createSharedCredential,
@@ -158,6 +159,41 @@ async function approvedBudgetChangeAction(organizationId: string, projectId: str
 async function executedBudgetChangeAction(organizationId: string, projectId: string, targetId: string, ownerId: string) {
   const approved = await approvedBudgetChangeAction(organizationId, projectId, targetId, ownerId);
   return executeAutomationAction({ organizationId, projectId, actionId: approved.id, executedByUserId: ownerId });
+}
+
+/**
+ * Directly persists an already-`executed` `campaign_activation` action against a target with no
+ * `campaign_resource_name` — a state `proposeCampaignActivationAction` itself refuses to create
+ * (it requires the target to already have a paused campaign, see the emulator test's "refuses to
+ * propose an activation for a target with no campaign created yet"), so the only way to reach this
+ * shape at all is a direct write, standing in for data corruption/a bypass of the normal propose
+ * flow. Exercises `rollbackActionByType`'s own `InvalidAutomationActionError` guard, which (unlike
+ * `execute/route.ts`'s sibling check) is not wrapped in a try/catch that would turn it into a
+ * terminal `failed` status instead — see `rollbackAutomationAction` in `automation.service.ts`.
+ */
+async function executedCampaignActivationWithNoCampaignResourceName(
+  organizationId: string,
+  projectId: string,
+  target: { id: string; label: string; environment_id: string },
+  requestedByUserId: string,
+) {
+  const action = new AutomationActionModel();
+  action.organization_id = organizationId;
+  action.project_id = projectId;
+  action.environment_id = target.environment_id;
+  action.action_type = 'campaign_activation';
+  action.target_id = target.id;
+  action.target_label = target.label;
+  action.before = { status: 'paused' };
+  action.after = { status: 'enabled' };
+  action.status = 'executed';
+  action.guardrail_violations = [];
+  action.requested_by_user_id = requestedByUserId;
+  action.proposed_at = new Date().toISOString();
+  action.executed_at = new Date().toISOString();
+  action.setPathParams({ organization_id: organizationId, project_id: projectId });
+  await action.save();
+  return action;
 }
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/[actionId]/rollback', () => {
@@ -327,5 +363,17 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/[action
     } finally {
       process.env.GROWTHOS_VAULT_KEYS = previousVaultKeys;
     }
+  });
+
+  it('returns 400 invalid_action for a campaign_activation action against a target with no campaign resource name to roll back', async () => {
+    const { ownerSession, owner, organization, project } = await setupOrgWithProject('Rollback Route Invalid Action Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+    const action = await executedCampaignActivationWithNoCampaignResourceName(organization.id, project.id, target, owner.id);
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = rollbackRequest(organization.id, project.id, action.id);
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: 'invalid_action' });
   });
 });

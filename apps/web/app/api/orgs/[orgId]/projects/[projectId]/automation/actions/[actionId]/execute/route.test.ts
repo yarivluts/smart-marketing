@@ -6,6 +6,7 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
   acceptInvite,
   approveAutomationAction,
+  AutomationActionModel,
   createOrganizationWithOwner,
   createProject,
   createSharedCredential,
@@ -152,6 +153,43 @@ async function approvedBudgetChangeAction(organizationId: string, projectId: str
     requestedByUserId: ownerId,
   });
   return approveAutomationAction({ organizationId, projectId, actionId: proposed.id, approverId: ownerId });
+}
+
+/**
+ * Directly persists an already-`approved` `campaign_activation` action against a target with no
+ * `campaign_resource_name` — a state `proposeCampaignActivationAction` itself refuses to create (it
+ * requires the target to already have a paused campaign), so the only way to reach this shape at all
+ * is a direct write, standing in for data corruption/a bypass of the normal propose flow. Unlike
+ * `rollback/route.ts`'s identical guard (see its own test file), `executeActionByType`'s
+ * `InvalidAutomationActionError` throw here is swallowed by `executeAutomationAction`'s own
+ * try/catch and turned into a terminal `failed` status rather than propagating — so this exercises
+ * that failure path, not the route's `invalid_action` 400 mapping (see the test below for why that
+ * branch is not reachable via this trigger).
+ */
+async function approvedCampaignActivationWithNoCampaignResourceName(
+  organizationId: string,
+  projectId: string,
+  target: { id: string; label: string; environment_id: string },
+  requestedByUserId: string,
+) {
+  const action = new AutomationActionModel();
+  action.organization_id = organizationId;
+  action.project_id = projectId;
+  action.environment_id = target.environment_id;
+  action.action_type = 'campaign_activation';
+  action.target_id = target.id;
+  action.target_label = target.label;
+  action.before = { status: 'paused' };
+  action.after = { status: 'enabled' };
+  action.status = 'approved';
+  action.guardrail_violations = [];
+  action.requested_by_user_id = requestedByUserId;
+  action.proposed_at = new Date().toISOString();
+  action.approved_by_user_id = requestedByUserId;
+  action.approved_at = new Date().toISOString();
+  action.setPathParams({ organization_id: organizationId, project_id: projectId });
+  await action.save();
+  return action;
 }
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/[actionId]/execute', () => {
@@ -358,5 +396,26 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/[action
     } finally {
       process.env.GROWTHOS_VAULT_KEYS = previousVaultKeys;
     }
+  });
+
+  it('returns 200 with a failed status (not the invalid_action 400) for a campaign_activation action against a target with no campaign resource name to activate', async () => {
+    // executeActionByType's InvalidAutomationActionError throw for this exact case is caught
+    // inside executeAutomationAction's own try/catch (same as any other executor failure) and
+    // turned into a terminal `failed` status rather than propagating to this route's own
+    // `invalid_action` 400 mapping — that mapping is reachable in `rollback/route.ts` (see its own
+    // test file) but not here, since `rollbackActionByType`'s identical check is not wrapped the
+    // same way.
+    const { ownerSession, owner, organization, project } = await setupOrgWithProject('Execute Route Invalid Action Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+    const action = await approvedCampaignActivationWithNoCampaignResourceName(organization.id, project.id, target, owner.id);
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = executeRequest(organization.id, project.id, action.id);
+    const response = await POST(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { id: string; status: string; failureReason: string | null };
+    expect(body.id).toBe(action.id);
+    expect(body.status).toBe('failed');
+    expect(body.failureReason).toContain('this target has no campaign resource name to activate');
   });
 });
