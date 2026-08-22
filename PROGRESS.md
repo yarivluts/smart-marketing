@@ -17,6 +17,64 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 16) — automation campaign-activations route coverage (PR #225)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row. Started from PR #201/#216's
+    risk-ranked `apps/web/app/api/` coverage sweep, whose remaining candidates
+    (`trigger-orchestration-run`, `check-tracking-alerts`) turned out to already be claimed by
+    concurrent sessions: independently picked `trigger-orchestration-run` too and wrote a full route
+    test for it, but a `git push` rejection revealed a concurrent session had already pushed an
+    identically-named branch with its own PR open (**#223**, merged during this run as `06d9c6b`, plus
+    its own `chore: record` PR **#224**) — abandoned the local duplicate unpushed, per this file's
+    "leave concurrent PRs alone" convention. Re-synced to `origin/main` and re-swept
+    `apps/web/app/api/` by hand (every `route.ts` without a sibling `route.test.ts`) rather than trust
+    the now-stale candidate list.
+  - Found exactly one remaining zero-coverage route: `automation/actions/campaign-activations/route.ts`
+    (KAN-72's activation dry-run-diff step) — confirmed no open PR already covered it. Traced every
+    branch by hand: `requireOrgPermission(orgId, 'automation.execute')` (401/404 non-enumeration/403),
+    `parseJsonBody` (400 `invalid_json`), `targetId` presence (400 `target_id_required`),
+    `proposeCampaignActivationAction`'s own `requireProjectInOrg`/`loadTargetForAction` (404 `not_found`
+    for both a bad project and a bad target id) and its "target has no paused campaign" guard (400
+    `invalid_action`). Every branch was already correctly implemented — **no production code changed**,
+    coverage only.
+  - **Fix (PR #225, branch `test/campaign-activations-route-coverage`):** new `route.test.ts` (9 cases,
+    real Firestore/Auth emulator, mirroring the sibling `campaign-drafts/route.test.ts` convention):
+    401, 404 non-membership, 403 for a viewer without `automation.execute`, 400
+    `invalid_json`/`target_id_required`, 404 for a nonexistent project and a nonexistent target, 400
+    `invalid_action` for a target with no paused campaign, and the 201 happy path — propose + approve +
+    execute a real `campaign_draft_create` action to get a paused campaign, then propose the
+    activation, landing `awaiting_approval` with no guardrail violations.
+  - **Checks:** fresh container this run — `pnpm install` + full `pnpm build` (all 8 packages) +
+    `pnpm turbo lint typecheck` all green. New test file 9/9, run twice in isolation for stability (no
+    flake). Full monorepo `pnpm test`: the `vitest run && playwright test` chain confirms every vitest
+    suite (including this new file) passed outright — Playwright never runs otherwise — but the
+    Playwright e2e half hit 1 failed + 7 flaky specs spanning entirely unrelated features
+    (`schema-registry`, `audit-log`, `ingest-health`, `keys`, `orgs` invite/revoke, `resource-library`,
+    `tv-pairing` — none touching automation/campaign-activations), matching this sandbox's extensively
+    pre-documented local-full-suite e2e flakiness under resource contention. Opened the PR and watched
+    real CI instead: `lint · typecheck · test · build` and `terraform fmt · validate` both green in
+    ~24 minutes, `mergeable_state: clean`. Merged (squash, `3f5fe21`). Remote branch deletion for
+    `test/campaign-activations-route-coverage` hit the same recurring git-over-HTTPS-proxy HTTP 403
+    every prior merged branch from a scheduled run has hit; local branch deleted cleanly after syncing
+    to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #225 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** with #225 (and the concurrent session's #223) both landed, the `apps/web/app/api/`
+  zero-coverage sweep that's driven the last ~16 runs is **fully exhausted** — every `route.ts` now has
+  a sibling `route.test.ts` (confirmed by hand during this run's re-sweep, not just by list). A future
+  run should pick a different kind of work: either a KAN-18/KAN-19 follow-up (per-environment dataset
+  split, scheduled dbt orchestration against real BigQuery, `estimated_cost_usd` refinements, terraform
+  import/apply reconciliation), a pass through `docs/plan/` for a forward-looking story not yet
+  mirrored into `TASKS.md`, or a CI-stabilization pass for the well-documented e2e flakiness (on real
+  CI, not just this sandbox) now that the coverage sweep itself has run its course — worth weighing
+  given how many consecutive runs have hit it.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/campaign-activations-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 15) — trigger-orchestration-run route coverage, closing out PR #201's original sweep (PR #223)
 
 - **Last completed:**
