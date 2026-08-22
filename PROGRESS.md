@@ -17,6 +17,63 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 12) — quarantined-records replay route coverage (PR #216)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two PRs were open from a concurrent session: **#213** (campaign-drafts route
+    coverage) and **#214** (docs-only record of PR #212) — left alone per the established convention;
+    both merged clean (`8037eb2`/plus a `#215` re-record of #213) before this run's own PR, confirmed
+    via `list_pull_requests` after opening this run's PR.
+  - Picked the next candidate from PR #201/#213's own risk-ranked "next step" list:
+    `quarantined-records/[quarantinedRecordId]/replay/route.ts` (POST) — KAN-34's admin "replay after
+    schema fix" action. The underlying service (`replayQuarantinedRecord`) already had full emulator
+    coverage (`quarantine.emulator.test.ts`, incl. a cross-project isolation case), but the route's own
+    auth/permission gate and not-found mapping had zero coverage.
+  - Traced every branch by hand before writing anything: `requireOrgPermission(orgId, 'ingest.write')`
+    (401/404 non-enumeration/403), and `replayQuarantinedRecord`'s own org/project-scoped lookup —
+    `QuarantinedRecordModel.init(id, {organization_id, project_id})` resolves against a path already
+    scoped by both ids, so a wrong project or a cross-org record id can never resolve to someone else's
+    record; the route's `QuarantinedRecordNotFoundError` catch turns that into the same 404 `not_found`
+    every sibling route uses. Unlike PR #212's sync-marts route, this route needs no separate
+    project-existence check — the record's own path scoping already closes that gap. Every branch was
+    already correctly implemented — **no production code changed**, this is coverage only.
+  - **Fix (PR #216, branch `test/quarantined-record-replay-route-coverage`):** new `route.test.ts` (7
+    cases, real Firestore/Auth emulator, mirroring the sibling `hook-deliveries/[hookDeliveryId]/
+    route.test.ts` convention): 401, 404 non-membership, 403 for a viewer without `ingest.write`, 404 for
+    an unknown record id and for a record id belonging to a sibling org's project, and the `accepted`/
+    `still_quarantined` outcomes end to end through a real ingest -> quarantine -> schema-evolve ->
+    replay flow (a helper quarantines a record via a real `ingestBatch` call with an unregistered
+    field, matching the service-level emulator test's own setup pattern).
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 8 packages) first, both
+    green. New test file 7/7 via the `firebase emulators:exec` wrapper on the first run (no bug found).
+    `pnpm turbo lint typecheck` clean. Full suite per package: `@growthos/web` 1199/1199 (210 files, incl.
+    Playwright e2e), `@growthos/firebase-orm-models` 1006/1006, `@growthos/shared` 438/438,
+    `@growthos/tracking-sdk` 21/21, `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform`
+    171/171, `@growthos/api` all green — 11/11 turbo tasks successful.
+  - PR #216's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~24
+    minutes on the first run (confirmed via `subscribe_pr_activity` + a `send_later` self-check-in rather
+    than polling), both check runs `success`. Merged 2026-08-22 (squash, `9b6a0d7`). Remote branch
+    deletion for `test/quarantined-record-replay-route-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local branch
+    deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #216 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** remaining candidates from PR #201's original risk-ranked sweep: the three other
+  thin-wrapper routes it named — `ingest-health/replay-failed-pipeline-messages`,
+  `ingest-health/sweep-queued-pipeline-messages`, `ingest-health/trigger-orchestration-run`,
+  `schema-defs/check-tracking-alerts` — same shape of gap (route-level auth/permission + error-mapping
+  coverage over an already-tested service). Once that list runs dry, a future run should do a fresh
+  Explore-agent sweep of `apps/web/app/api/` for the next zero-coverage subtree, or consider whether the
+  coverage sweep itself has reached diminishing returns and a different kind of work (e.g. an actual
+  KAN-18/KAN-19 follow-up, or picking through `docs/plan/` for a forward-looking story not yet in
+  `TASKS.md`) is more valuable for the next several runs.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/quarantined-record-replay-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 11) — campaign-drafts route coverage (PR #213)
 
 - **Last completed:**
