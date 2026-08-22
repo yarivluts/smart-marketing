@@ -217,6 +217,7 @@ export async function ensureAutomationTargetSeeded(params: SeedAutomationTargetP
 
 /** Every simulated target seeded for a project, across all its environments — same cross-environment "one admin view" posture as `listApiKeysForProject`. */
 export async function listAutomationTargetStatesForProject(organizationId: string, projectId: string): Promise<AutomationTargetStateModel[]> {
+  await requireProjectInOrg(organizationId, projectId);
   return AutomationTargetStateModel.initPath({ organization_id: organizationId, project_id: projectId })
     .where('project_id', '==', projectId)
     .get();
@@ -919,6 +920,7 @@ export async function listAutomationActionsForProject(
   projectId: string,
   limit: number = DEFAULT_ACTION_LIST_LIMIT,
 ): Promise<AutomationActionModel[]> {
+  await requireProjectInOrg(organizationId, projectId);
   return AutomationActionModel.initPath({ organization_id: organizationId, project_id: projectId })
     .query()
     .orderBy('proposed_at', 'desc')

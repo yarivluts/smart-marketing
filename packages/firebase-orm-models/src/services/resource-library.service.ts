@@ -347,6 +347,7 @@ export async function listAttachmentsForProject(
   organizationId: string,
   projectId: string,
 ): Promise<ResourceAttachmentModel[]> {
+  await requireProjectInOrg(organizationId, projectId);
   return ResourceAttachmentModel.initPath({ organization_id: organizationId })
     .where('project_id', '==', projectId)
     .get();

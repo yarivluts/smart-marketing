@@ -142,14 +142,14 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/automation/targets', () => 
     expect(response.status).toBe(403);
   });
 
-  it('returns an empty targets list for a project id that does not exist in the org (no project-existence check on the read path)', async () => {
+  it('returns 404 not_found for a project id that does not exist in the org', async () => {
     const { ownerSession, organization } = await setupOrgWithProject('Targets GET Missing Project Org');
     getServerSessionMock.mockResolvedValue(ownerSession);
 
     const { request, params } = getRequest(organization.id, 'does-not-exist');
     const response = await GET(request, { params });
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ targets: [] });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'not_found' });
   });
 
   it('returns the full mapped target shape for every target seeded in the project', async () => {

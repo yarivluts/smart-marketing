@@ -53,6 +53,40 @@ function attachmentsRequest(
   };
 }
 
+describe('GET /api/orgs/[orgId]/projects/[projectId]/resource-attachments', () => {
+  it('rejects an unauthenticated caller', async () => {
+    getServerSessionMock.mockResolvedValue(null);
+    const { request, params } = attachmentsRequest('org-1', 'project-1');
+    expect((await GET(request, { params })).status).toBe(401);
+  });
+
+  it('returns 404 for a caller with no active membership in the org', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('attach-get-no-membership-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'GET No Membership Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Project A' });
+
+    const strangerSession = await sessionFor(unique('uid'), uniqueEmail('attach-get-stranger'));
+    await ensureUserForFirebaseSession({ firebaseUid: strangerSession.uid, email: strangerSession.email as string });
+    getServerSessionMock.mockResolvedValue(strangerSession);
+
+    const { request, params } = attachmentsRequest(organization.id, project.id);
+    expect((await GET(request, { params })).status).toBe(404);
+  });
+
+  it('returns 404 not_found for a project id that does not exist in the org', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('attach-get-missing-project-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'GET Missing Project Org', ownerUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = attachmentsRequest(organization.id, 'does-not-exist');
+    const response = await GET(request, { params });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: 'not_found' });
+  });
+});
+
 describe('POST /api/orgs/[orgId]/projects/[projectId]/resource-attachments', () => {
   it('rejects an unauthenticated caller', async () => {
     getServerSessionMock.mockResolvedValue(null);

@@ -17,26 +17,33 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
     return error;
   }
 
-  const actions = await listAutomationActionsForProject(orgId, projectId);
-  return NextResponse.json({
-    actions: actions.map((action) => ({
-      id: action.id,
-      targetId: action.target_id,
-      targetLabel: action.target_label,
-      before: action.before,
-      after: action.after,
-      status: action.status,
-      guardrailViolations: action.guardrail_violations,
-      proposedAt: action.proposed_at,
-      approvedAt: action.approved_at,
-      executedAt: action.executed_at,
-      failureReason: action.failure_reason,
-      verifiedAt: action.verified_at,
-      guardedMetricRegressionPct: action.guarded_metric_regression_pct,
-      rolledBackAt: action.rolled_back_at,
-      rollbackReason: action.rollback_reason,
-    })),
-  });
+  try {
+    const actions = await listAutomationActionsForProject(orgId, projectId);
+    return NextResponse.json({
+      actions: actions.map((action) => ({
+        id: action.id,
+        targetId: action.target_id,
+        targetLabel: action.target_label,
+        before: action.before,
+        after: action.after,
+        status: action.status,
+        guardrailViolations: action.guardrail_violations,
+        proposedAt: action.proposed_at,
+        approvedAt: action.approved_at,
+        executedAt: action.executed_at,
+        failureReason: action.failure_reason,
+        verifiedAt: action.verified_at,
+        guardedMetricRegressionPct: action.guarded_metric_regression_pct,
+        rolledBackAt: action.rolled_back_at,
+        rollbackReason: action.rollback_reason,
+      })),
+    });
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    throw err;
+  }
 }
 
 /** Proposes a simulated budget-change action — KAN-71's dry-run-diff step. Lands as `blocked` or `awaiting_approval` depending on the project's guardrail policy. */
