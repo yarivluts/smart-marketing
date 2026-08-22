@@ -254,41 +254,6 @@ export async function listRawRecordsForSchemaSince(
 }
 
 /**
- * The most recently landed raw records across a set of schema names for one `kind`, newest first,
- * folded across every environment — the shared query shape behind every "recent record feed" this
- * codebase builds (KAN-80's billing-ops feed; KAN-81's churn feed). One bounded query per schema name
- * (Firestore has no native "kind == X AND schema_name IN [...]" + orderBy composite this ORM
- * exposes), merged and re-sorted client-side, then trimmed to `limit` — so a burst in one schema
- * can't silently starve the merged feed of another's more recent records purely by fetch order. Each
- * per-schema fetch needs a composite Firestore index (`kind`, `schema_name`, `landed_at`) in a real
- * (non-emulator) project, same documented requirement every other `RawRecordModel` query in this file
- * already carries. Callers are responsible for their own `requireProjectInOrg` check.
- */
-async function listRecentRawRecordsForSchemas(
-  organizationId: string,
-  projectId: string,
-  kind: SchemaDefKind,
-  schemaNames: readonly string[],
-  limit: number,
-): Promise<RawRecordModel[]> {
-  const perSchemaResults = await Promise.all(
-    schemaNames.map((schemaName) =>
-      RawRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
-        .where('kind', '==', kind)
-        .where('schema_name', '==', schemaName)
-        .orderBy('landed_at', 'desc')
-        .limit(limit)
-        .get(),
-    ),
-  );
-
-  return perSchemaResults
-    .flat()
-    .sort((a, b) => (a.landed_at < b.landed_at ? 1 : a.landed_at > b.landed_at ? -1 : 0))
-    .slice(0, limit);
-}
-
-/**
  * The event schema names surfaced by the billing-ops feed (KAN-80, gap-analysis Gap 5+15: "new
  * charges / failed charges / refunds as a browsable record feed"). Currently only Stripe's (KAN-49);
  * a future second billing connector adds its event names to this one list rather than growing a
@@ -305,18 +270,62 @@ export const BILLING_OPS_FEED_EVENT_SCHEMA_NAMES = [
 /** Same load-bounding reasoning as `DEFAULT_INGEST_HEALTH_BATCH_LIMIT` — this is a Firestore-backed stand-in until a real warehouse query exists. */
 export const DEFAULT_BILLING_OPS_FEED_LIMIT = 100;
 
+/** Same load-bounding default as {@link DEFAULT_BILLING_OPS_FEED_LIMIT} — kept as its own named constant since a generic record feed (KAN-81) isn't billing-specific. */
+export const DEFAULT_RECORD_FEED_LIMIT = 100;
+
+export interface ListRecentRecordsForSchemasParams {
+  organizationId: string;
+  projectId: string;
+  kind: SchemaDefKind;
+  /** One or more registered schema names of the same `kind` to fold into one feed — e.g. every billing event schema, every churn-signal entity schema, or just the one schema a record-feed page's picker selected. */
+  schemaNames: readonly string[];
+  limit?: number;
+}
+
 /**
- * The most recent billing events (charges, failed payments, refunds) landed for a project, newest
+ * The most recent raw records landed for one or more schemas of the same `kind` in a project, newest
  * first, folded across every environment — same "whole project, one admin view" posture as
- * `listRecentIngestBatchesForProject`.
+ * `listRecentIngestBatchesForProject`. One bounded query per schema name (Firestore has no native
+ * "kind == X AND schema_name IN [...]" + orderBy composite this ORM exposes), merged and re-sorted
+ * client-side, then trimmed to `limit` — so a burst in one schema can't silently starve the merged feed
+ * of another's more recent records purely by fetch order. Each per-schema fetch needs a composite
+ * Firestore index (`kind`, `schema_name`, `landed_at`) in a real (non-emulator) project, same documented
+ * requirement every other `RawRecordModel` query in this file already carries. The general-purpose
+ * building block behind `listRecentBillingEventsForProject` (KAN-80, a fixed Stripe schema set),
+ * `listRecentChurnedSubscriptionsForProject` (KAN-81, a fixed entity schema set), and the KAN-81
+ * record-feed page (a human-picked single schema).
+ */
+export async function listRecentRecordsForSchemas(params: ListRecentRecordsForSchemasParams): Promise<RawRecordModel[]> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const limit = params.limit ?? DEFAULT_RECORD_FEED_LIMIT;
+
+  const perSchemaResults = await Promise.all(
+    params.schemaNames.map((schemaName) =>
+      RawRecordModel.initPath({ organization_id: params.organizationId, project_id: params.projectId })
+        .where('kind', '==', params.kind)
+        .where('schema_name', '==', schemaName)
+        .orderBy('landed_at', 'desc')
+        .limit(limit)
+        .get(),
+    ),
+  );
+
+  return perSchemaResults
+    .flat()
+    .sort((a, b) => (a.landed_at < b.landed_at ? 1 : a.landed_at > b.landed_at ? -1 : 0))
+    .slice(0, limit);
+}
+
+/**
+ * The most recent billing events (charges, failed payments, refunds) landed for a project — the
+ * `BILLING_OPS_FEED_EVENT_SCHEMA_NAMES`-scoped specialization of {@link listRecentRecordsForSchemas}.
  */
 export async function listRecentBillingEventsForProject(
   organizationId: string,
   projectId: string,
   limit: number = DEFAULT_BILLING_OPS_FEED_LIMIT,
 ): Promise<RawRecordModel[]> {
-  await requireProjectInOrg(organizationId, projectId);
-  return listRecentRawRecordsForSchemas(organizationId, projectId, 'event', BILLING_OPS_FEED_EVENT_SCHEMA_NAMES, limit);
+  return listRecentRecordsForSchemas({ organizationId, projectId, kind: 'event', schemaNames: BILLING_OPS_FEED_EVENT_SCHEMA_NAMES, limit });
 }
 
 /**
@@ -361,15 +370,13 @@ export async function listRecentChurnedSubscriptionsForProject(
   projectId: string,
   limit: number = DEFAULT_CHURN_FEED_LIMIT,
 ): Promise<RawRecordModel[]> {
-  await requireProjectInOrg(organizationId, projectId);
-
-  const candidates = await listRecentRawRecordsForSchemas(
+  const candidates = await listRecentRecordsForSchemas({
     organizationId,
     projectId,
-    'entity',
-    CHURN_FEED_ENTITY_SCHEMA_NAMES,
-    Math.max(limit, CHURN_FEED_CANDIDATE_WINDOW),
-  );
+    kind: 'entity',
+    schemaNames: CHURN_FEED_ENTITY_SCHEMA_NAMES,
+    limit: Math.max(limit, CHURN_FEED_CANDIDATE_WINDOW),
+  });
 
   return candidates.filter((record) => isChurnSignal(record.payload)).slice(0, limit);
 }

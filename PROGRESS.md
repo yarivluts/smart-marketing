@@ -17,6 +17,97 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 23) — generic record feed, fourth KAN-81 slice, reconciled with a concurrent duplicate (PR #238)
+
+- **Last completed:**
+  - Session start: picked up where PROGRESS.md's own "next step" note (below, from the prior run)
+    pointed — KAN-81 stayed `in-progress`, with "live record feeds" flagged as the most natural next
+    slice. First checked out `main`, but it had *also* moved since that prior entry: **PR #233**
+    (segment work-list owner+status) was already merged.
+  - **Duplicate-work collision #1 (segments):** independently started the exact same KAN-81 "owner
+    assignment + status ticking" slice as PR #233 before noticing it was already merged — opened as
+    PR #235, then discovered PR #233 had landed moments earlier from a parallel session. Diffed the
+    two implementations (mine: `updateSegmentWorklist` combined function, 4-value status incl.
+    `dismissed`, `updated_by`/`updated_at` audit fields, and a real `@arbel/firebase-orm` bug fix —
+    `auto_time`'s default silently overwrites `updated_at` with a raw epoch-ms number on every
+    `save()`; #233: `assignSegmentOwner`/`updateSegmentStatus` split functions, 3-value status). Not
+    worth reconciling two field-level-conflicting implementations of the same feature — closed PR
+    #235 as superseded (comment explains the diff and flags the `auto_time` bug for awareness) rather
+    than merge duplicate/conflicting segment worklist code.
+  - Moved to the actually-remaining KAN-81 slice: **live record feeds for payments/churn/failed**
+    (generalizing KAN-80's billing-ops-feed per-schema-name query pattern) — confirmed via a research
+    subagent that no shared "list records by schema names" helper existed yet, only the billing-ops
+    feed's own hand-rolled copy, and scoped this run to a schema-agnostic generalization: any
+    registered `event` schema, not just the fixed Stripe billing set.
+  - **Delivered (this run, branch `kan-81-record-feed`, PR #238):** `packages/firebase-orm-models`
+    gained `listRecentRecordsForSchemas` (object-params, `kind` + one-or-more `schemaNames`, optional
+    `limit`) — `listRecentBillingEventsForProject` refactored to delegate to it. New project-scoped
+    `/record-feed` admin page: a human picks any registered `event` schema (link-pill picker, same
+    `ProjectSwitcher`-style server-rendered nav-as-links convention, no client JS) and browses its
+    most recently landed records, newest first, folded across every environment — rendered generically
+    from the schema's own `SchemaDefModel.field_defs` (name/type/`is_pii`) rather than a per-schema
+    view mapper the way the billing feed's `billing-ops-view.ts` is. A field flagged `is_pii` is never
+    read into the server-rendered view at all (`record-feed-view.ts`'s `toRecordFeedEntryView`
+    substitutes a fixed redaction placeholder before the projection leaves the server) — the one piece
+    of defense-in-depth this run added beyond the literal ask, since the schema registry already
+    carries exactly the flag needed and no PII-redaction convention existed anywhere else in this
+    codebase to reuse. Gated on `ingest.write`, matching billing-ops-feed/ingest-health's own
+    "whole feature is admin-only" posture. New i18n `RecordFeed` namespace (en/he) + nav entry (new
+    `Rows3` icon registered in `AppShell`'s icon map).
+  - **Duplicate-work collision #2 (pipeline.service.ts), mid-flight:** after opening this second PR,
+    `main` moved *again* — **PR #236** (a parallel session) had independently generalized the exact
+    same `listRecentBillingEventsForProject` pattern into a private `listRecentRawRecordsForSchemas`
+    helper and used it to add a churn feed (most recently landed `stripe_subscription` entities showing
+    a churn signal — canceled or scheduled to cancel — as a new section on the *existing*
+    billing-ops-feed page), landing directly in the same function this run had just refactored. Unlike
+    the segments collision, this one wasn't a full duplicate — PR #236's churn feed and this run's
+    generic schema-picker page are genuinely different, complementary surfaces — so rather than close
+    this PR too, merged `main` into this branch and hand-reconciled the conflict: kept PR #236's churn
+    feed feature (`CHURN_FEED_ENTITY_SCHEMA_NAMES`/`listRecentChurnedSubscriptionsForProject`/
+    `isChurnSignal` etc.) but replaced its private, positional-args `listRecentRawRecordsForSchemas`
+    helper with this run's public, object-params `listRecentRecordsForSchemas` — so
+    `listRecentBillingEventsForProject`, `listRecentChurnedSubscriptionsForProject`, and the new
+    record-feed page all now share exactly one generalized query function instead of two
+    near-duplicate copies. Both emulator test files' new `describe` blocks (this run's
+    `listRecentRecordsForSchemas` tests, #236's `listRecentChurnedSubscriptionsForProject` tests) were
+    kept side by side, not merged into one.
+  - **Duplicate-work collision #3 (PROGRESS.md/TASKS.md), on merge:** by the time this PR's own CI
+    came back green and it was ready to merge, **PR #239** (a third parallel session, "AI-suggested
+    segments") had already merged first — this PR's squash-merge (`cb9a641`) landed on top of it with
+    no code conflict (disjoint files), only the expected `PROGRESS.md`/`TASKS.md` top-of-file journal
+    conflict, resolved the same way this file's own prior entries document (keep both entries,
+    renumber so they don't collide, newest on top; TASKS.md's KAN-81 row notes combined into one).
+  - **Checks:** `pnpm build && pnpm typecheck && pnpm lint` green post-reconciliation. Targeted
+    verification (full monorepo `pnpm test` hit unrelated e2e flakiness under this sandbox's load —
+    see below) — `pipeline.emulator.test.ts` 23/23 green (both `describe` blocks), `record-feed-
+    view.test.ts` 4/4, `churn-feed-view.test.ts` 3/3 green in isolation. Real CI (`lint · typecheck ·
+    test · build` + `terraform fmt · validate`) came back green.
+  - **e2e flake investigation:** this run's new `record-feed.spec.ts` failed 3/3 attempts in this
+    sandbox, but the failure was at the *pre-existing* "create project → onboarding redirect" step
+    (never reached this run's own new code) — reproduced the identical timeout against the unmodified,
+    already-merged `billing-ops-feed.spec.ts` run alongside it, confirming this sandbox's dev-server
+    cold-compile cost (a documented, known flake class per `playwright.config.ts`'s own comments) was
+    the cause, not a regression. Real CI (no shared sandbox load) came back green, confirming this.
+  - Squash-merged (`cb9a641`), unsubscribed. Local branch deleted; remote branch deletion hit the same
+    recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit.
+- **In progress (exact stopping point):** none — #238 fully landed, `main` green at `cb9a641`.
+- **Blocked + why:** nothing.
+- **Next step:** KAN-81 stays `in-progress` — per-field filtering within a feed (Gap 5 says
+  "filterable" — today only a schema picker), or the CRM-sync action plugin, are the remaining
+  slices, or move to the next `todo` row (KAN-82..88) if KAN-81 is deliberately left mid-epic for a
+  later run. Worth flagging for a human or a future run: **three separate concurrent-session
+  collisions on KAN-81 in one day** (this run's own two, plus #233 arriving mid-flight for the
+  previous run, plus #239 merging concurrently with this one) suggests either the scheduled-run
+  cadence is overlapping too tightly for a single large multi-slice story, or KAN-81 specifically
+  should be claimed more explicitly (e.g. a `TASKS.md` "claimed by session X" marker) before a run
+  sinks time into it.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged/closed feature branches the proxy blocks scheduled runs
+  from deleting — now also `kan-81-segment-worklist` (closed, PR #235), `kan-81-record-feed`, and
+  `feat/kan-81-ai-suggested-segments`).
+
+---
+
 ## 2026-08-22 (later still, 22) — AI-suggested segments, third KAN-81 slice (PR #239)
 
 - **Last completed:**
@@ -105,6 +196,8 @@ Template for each entry:
   - Optional: delete the merged `feat/kan-81-ai-suggested-segments` branch on GitHub (this sandbox's
     git remote rejected the delete with a 403, same as every prior scheduled-run merge).
 
+---
+
 ## 2026-08-22 (later still, 21) — churn feed, second KAN-81 slice (PR #236)
 
 - **Last completed:**
@@ -172,6 +265,8 @@ Template for each entry:
     — still outstanding, not blocking any buildable-today story.
   - Optional: delete the merged `feat/kan-81-churn-feed` branch on GitHub (this sandbox's git remote
     rejected the delete with a 403, same as every prior scheduled-run merge).
+
+---
 
 ## 2026-08-22 (later still, 20) — segment work-list owner + status, first KAN-81 slice (PR #233)
 

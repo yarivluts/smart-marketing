@@ -155,6 +155,11 @@ export default async function ProjectLayout({
             label: t('projectBillingOpsFeedLink'),
             icon: 'Receipt' as const,
           },
+          {
+            href: `${base}/record-feed`,
+            label: t('projectRecordFeedLink'),
+            icon: 'Rows3' as const,
+          },
         ]
       : []),
   ];
