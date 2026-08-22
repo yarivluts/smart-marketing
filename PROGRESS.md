@@ -17,6 +17,95 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 6) — automation targets route (GET+POST) coverage (PR #203)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#202** (docs-only, records PR #201's write-tier route
+    coverage) from a concurrent session — left alone per the established convention; it merged clean
+    (`4601683`) before this run's own PR, confirmed via `git fetch` after merging.
+  - Followed the next lead from PR #199's own "next step" note: of the four zero-coverage automation-
+    config routes that Explore-agent sweep ranked, `automation/targets/route.ts` (GET+POST, KAN-71's
+    simulated target seeding/listing) was picked (the write-tier route, another of the four, was
+    already closed by PR #201 in the meantime).
+  - Traced every branch of both `GET` and `POST` by hand against `automation.service.ts`'s
+    `ensureAutomationTargetSeeded`/`listAutomationTargetStatesForProject` before writing anything:
+    confirmed GET has no project-existence check (same asymmetry the sibling `actions` route already
+    has documented), and that budget-range/resourceAttachmentId validation genuinely isolates a
+    route-level type/presence check from a service-level semantic check (a negative
+    `initialDailyBudgetUsd` and a well-formed-but-nonexistent `resourceAttachmentId` both pass the
+    route's own checks and only fail inside the service, mapped to the same generic 400
+    `invalid_request`).
+  - **Fix (PR #203, branch `test/automation-targets-route-coverage`):** new `route.test.ts` (21
+    cases, real Firestore/Auth emulator, mirroring the sibling automation routes' established
+    convention): GET's 401/403, the no-project-existence-check-on-read behavior, and the full mapped
+    target shape for multiple seeded targets; POST's 401/403, `invalid_json`, every required-field
+    400 (`target_id_required` incl. blank string, `environment_id_required`, `target_type_required`,
+    `label_required`, `initial_daily_budget_usd_required` incl. wrong type),
+    `invalid_resource_attachment_id` (blank string), 404 `not_found` for a missing project,
+    `invalid_request` for the negative-budget and bad-resourceAttachmentId route/service-isolation
+    cases, a clean 201 create, seeding linked to an approved credential connection (KAN-74), and the
+    documented **idempotent get-or-create** semantics (POSTing the same `targetId` twice returns the
+    original target unchanged, ignoring the second call's different `label`/budget — verified via
+    both the second POST's own response and a follow-up GET). No production code changed — existing
+    behavior already correct on every case.
+  - One incidental finding pinned in a test comment (not a bug, not fixed): `AutomationTargetStateModel
+    .updated_at` is typed `string` in the model, but `@arbel/firebase-orm`'s `BaseModel` treats
+    `updated_at` as a reserved field name and overwrites it with `Date.getTime()` (a number) on every
+    `.save()`, regardless of the model's own field type or what application code assigns before
+    saving — the GET route's JSON response reflects that real runtime type (`expect.any(Number)`,
+    not `String`). This is a pre-existing, cross-cutting ORM behavior affecting every model with an
+    `updated_at` field, not unique to this one; out of scope for a test-coverage-only PR.
+  - Independent self-review via a fresh-context subagent (given the route, the service, and the new
+    test file) retraced all 21 cases by hand, confirmed the idempotency test and the two
+    route-check-passes/service-check-fails isolation tests genuinely fail if the underlying behavior
+    regresses, and found no bugs and no test-hygiene issues (unique org name per test, proper
+    `getServerSessionMock` reset). It separately noted (not a test bug, out of scope) that
+    `ensureAutomationTargetSeeded` validates budget/resourceAttachmentId *before* its existing-target
+    lookup, so a second "idempotent" call with an invalid field on an already-seeded `targetId` would
+    throw instead of returning the existing target untouched — untested edge case, pre-existing
+    design, left as a lead for a future run.
+  - **Checks:** fresh container this run — `pnpm install` first (green), then `pnpm typecheck`/
+    `pnpm lint`/`pnpm build` across all packages (green) before iterating on the test file itself.
+    New test file 21/21 via the `firebase emulators:exec` wrapper. Full `apps/web` suite (per prior
+    entries' documented memory-pressure guidance): 1152/1152 unit tests across 205 files green.
+    `@growthos/shared`, `@growthos/tracking-sdk`, `@growthos/mcp-headless-example`,
+    `@growthos/dbt-transform` (171/171, one `--force` re-run needed after a transient duckdb-file-lock
+    flake from two concurrent local `turbo test` invocations racing on the same lockfile — not a real
+    failure), `@growthos/api` (140/140) — all green.
+  - This run's stop hook auto-committed and pushed the working tree once the test file was green
+    locally, and PR #203 was opened from that push. Its first CI run failed on a `hookTimeout` in
+    `@growthos/firebase-orm-models`'s `engagement-pack.emulator.test.ts` (120s hook timeout,
+    unrelated file, alongside CI-log `RESOURCE_EXHAUSTED` Firestore-emulator warnings across several
+    other unrelated suites in the same run — a resource-pressure flake class distinct from but
+    consistent with the memory-pressure flakes documented elsewhere in this file). Re-ran the failed
+    job once via `actions_run_trigger`/`rerun_failed_jobs`; the rerun went green
+    (`lint · typecheck · test · build` + `terraform fmt · validate`, ~21 minutes). No unresolved
+    review comments. Merged 2026-08-22 (squash, `21abc7b`). Remote branch deletion for
+    `test/automation-targets-route-coverage` hit the same recurring git-over-HTTPS-proxy HTTP 403
+    every prior merged branch from a scheduled run has hit; local branch deleted cleanly after
+    syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #203 fully landed, `main` green (also picked up
+  #202, a concurrent session's PROGRESS.md record for PR #201, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** two of the four zero-coverage automation-config routes PR #199 originally ranked are
+  now closed (write-tier via #201, targets via #203); still open: `automation/kill-switch/route.ts`
+  (GET+POST engage/disengage, the org-wide automation pause/resume safety mechanism) and
+  `automation/actions/campaign-drafts/route.ts` (notably, its `InvalidAutomationActionError` catch
+  uniquely forwards `err.message` in the response body, untested). Separately, this run's own minor
+  untested edge case (low priority, cheap to close if a future run is already in the file):
+  `ensureAutomationTargetSeeded` validating budget/resourceAttachmentId before its existing-target
+  lookup means a second idempotent-intent call with an invalid field on an already-seeded `targetId`
+  throws rather than returning the existing target — no test pins this either way. `apps/api/src/**`
+  still has no gap (every controller already has e2e coverage). A future run can pick either
+  remaining candidate in priority order, or do a fresh sweep of its own if a concurrent session has
+  claimed one.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/automation-targets-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 5) — resource-attachment write-tier route coverage (PR #201)
 
 - **Last completed:**
