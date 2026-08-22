@@ -14,6 +14,7 @@ import {
   listFailedPipelineMessagesForProject,
   listQueuedPipelineMessagesForProject,
   listRawRecordsForBatch,
+  ProjectNotFoundError,
   replayFailedPipelineMessagesForProject,
   sweepQueuedPipelineMessagesForProject,
   type BigQueryInsertClient,
@@ -338,6 +339,15 @@ describe('KAN-34 pipeline DLQ: listFailedPipelineMessagesForProject + replayFail
 
     expect(await listFailedPipelineMessagesForProject(other.organization.id, other.project.id)).toHaveLength(0);
   });
+
+  it('rejects a project id that belongs to a different organization instead of silently no-oping', async () => {
+    const { organization } = await setupProject('DLQ Cross-Org Org A');
+    const other = await setupProject('DLQ Cross-Org Org B');
+
+    await expect(replayFailedPipelineMessagesForProject(organization.id, other.project.id)).rejects.toThrow(
+      ProjectNotFoundError,
+    );
+  });
 });
 
 describe('listQueuedPipelineMessagesForProject + sweepQueuedPipelineMessagesForProject', () => {
@@ -413,6 +423,15 @@ describe('listQueuedPipelineMessagesForProject + sweepQueuedPipelineMessagesForP
 
     // The sibling project's own stuck message is untouched by the other project's sweep.
     expect(await listQueuedPipelineMessagesForProject(organization.id, project.id)).toHaveLength(1);
+  });
+
+  it('rejects a project id that belongs to a different organization instead of silently no-oping', async () => {
+    const { organization } = await setupProject('Sweep Cross-Org Org A');
+    const other = await setupProject('Sweep Cross-Org Org B');
+
+    await expect(sweepQueuedPipelineMessagesForProject(organization.id, other.project.id)).rejects.toThrow(
+      ProjectNotFoundError,
+    );
   });
 });
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { replayFailedPipelineMessagesForProject } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 
@@ -17,10 +18,17 @@ export async function POST(_request: Request, { params }: RouteParams): Promise<
     return error;
   }
 
-  const result = await replayFailedPipelineMessagesForProject({
-    organizationId: orgId,
-    projectId,
-    performedByUserId: user.id,
-  });
-  return NextResponse.json(result);
+  try {
+    const result = await replayFailedPipelineMessagesForProject({
+      organizationId: orgId,
+      projectId,
+      performedByUserId: user.id,
+    });
+    return NextResponse.json(result);
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    throw err;
+  }
 }

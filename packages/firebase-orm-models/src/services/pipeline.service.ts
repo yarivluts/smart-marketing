@@ -1,12 +1,22 @@
 import { PipelineMessageModel } from '../models/pipeline-message.model';
+import { ProjectModel } from '../models/project.model';
 import { RawRecordModel } from '../models/raw-record.model';
 import type { SchemaDefKind } from '../models/schema-def.model';
 import { publishPipelineMessage } from '../pipeline/transport';
 import { defaultWarehouseSink, type WarehouseSink } from '../pipeline/sink';
 import { recordAuditLogEntry } from './audit-log.service';
+import { ProjectNotFoundError } from './resource-library.service';
 
 /** Bounds one `drainPendingPipelineMessages` call — same load-bounding reasoning as `MAX_INGEST_BATCH_SIZE`. */
 export const MAX_PIPELINE_DRAIN_BATCH_SIZE = 500;
+
+async function requireProjectInOrg(organizationId: string, projectId: string): Promise<ProjectModel> {
+  const project = await ProjectModel.init(projectId, { organization_id: organizationId });
+  if (!project || project.organization_id !== organizationId) {
+    throw new ProjectNotFoundError();
+  }
+  return project;
+}
 
 export interface AcceptedPipelineRecord {
   clientId: string;
@@ -266,7 +276,10 @@ export async function listQueuedPipelineMessagesForProject(
  * `drainPendingPipelineMessages`'s single-environment sweep, same "ops use, not on the hot ingest
  * path" posture that function's own doc comment already establishes. Reuses `landMessages` directly
  * (not `drainPendingPipelineMessages` per environment) so one call sweeps the whole project in a
- * single pass rather than requiring a caller to already know every environment id.
+ * single pass rather than requiring a caller to already know every environment id. Validates
+ * `projectId` belongs to `organizationId` first (throws {@link ProjectNotFoundError} otherwise) —
+ * unlike the read-only list functions in this file, this mutates state on the caller's behalf, so a
+ * project id from a different org must not silently no-op against an unrelated project's messages.
  */
 export async function sweepQueuedPipelineMessagesForProject(
   organizationId: string,
@@ -275,6 +288,7 @@ export async function sweepQueuedPipelineMessagesForProject(
   sink?: WarehouseSink,
   performedByUserId?: string,
 ): Promise<DrainPipelineResult> {
+  await requireProjectInOrg(organizationId, projectId);
   const queued = await listQueuedPipelineMessagesForProject(organizationId, projectId, limit);
   const result = await landMessages(queued, sink ?? defaultWarehouseSink);
 
@@ -321,7 +335,8 @@ export async function listFailedPipelineMessagesForProject(
  * Retries every currently-failed pipeline message in a project (KAN-34 AC: DLQ + replay) — re-runs the
  * exact same landing attempt `landPipelineMessages` made originally. A message that fails again simply
  * stays `failed` with its `failure_reason` refreshed, available for a later replay; nothing here is
- * lost or dropped on a repeat failure.
+ * lost or dropped on a repeat failure. Validates `projectId` belongs to `organizationId` first (throws
+ * {@link ProjectNotFoundError} otherwise), same reasoning as `sweepQueuedPipelineMessagesForProject`.
  */
 export async function replayFailedPipelineMessagesForProject(
   organizationId: string,
@@ -330,6 +345,7 @@ export async function replayFailedPipelineMessagesForProject(
   sink?: WarehouseSink,
   performedByUserId?: string,
 ): Promise<DrainPipelineResult> {
+  await requireProjectInOrg(organizationId, projectId);
   const failed = await listFailedPipelineMessagesForProject(organizationId, projectId, limit);
   const result = await landMessages(failed, sink ?? defaultWarehouseSink);
 
