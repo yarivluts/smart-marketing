@@ -17,6 +17,59 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later) — automation reject route coverage (PR #187)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#185** (automation approve route coverage), CI still
+    pending, from a concurrent session — left alone per the established convention (different file,
+    already in flight); it merged clean (squash, `2f9f749`, plus its own PROGRESS.md follow-up
+    `921df38`) partway through this run, confirmed via `git fetch` before opening this run's own PR.
+  - Followed PR #185's own "Next step" note directly: `apps/web/app/api/orgs/[orgId]/projects/
+    [projectId]/automation/actions/[actionId]/reject/route.ts` — the endpoint that rejects a
+    `blocked` or `awaiting_approval` action, gated on `automation.approve` same as approve — had zero
+    dedicated test coverage, the last of the two `automation.approve`-gated routes (verify/rollback
+    still open, see below).
+  - Traced `automation.service.ts`'s `rejectAutomationAction` by hand first: unlike
+    approve/execute, it has **no** kill-switch or write-tier check at all — it accepts either
+    `awaiting_approval` or `blocked` and always succeeds once the state check passes. No production
+    code changed; existing behavior already correct.
+  - **Fix (PR #187, branch `test/automation-reject-route-coverage`):** new `route.test.ts` (6 cases,
+    real Firestore/Auth emulator, mirroring `execute/route.test.ts`/`approve/route.test.ts`'s
+    convention): 401 unauthenticated; 403 for a `viewer` lacking `automation.approve`; 404 for an
+    unknown action id; 409 `invalid_state` for an action already approved (reject only accepts
+    `awaiting_approval`/`blocked`); a dedicated test proving reject has no kill-switch gate — engages
+    the org kill switch *before* proposing (landing the action `blocked`), then rejects it
+    successfully; and the 200 success path from `awaiting_approval`.
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. New test file 6/6 via the `firebase emulators:exec` wrapper, then `pnpm typecheck` and
+    `pnpm lint` clean. Full suite per package (per prior entries' documented memory-pressure
+    guidance): `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api`
+    140/140, `@growthos/firebase-orm-models` 1006/1006, `@growthos/web` unit + e2e 22/23 e2e passed
+    outright, 1 flaky (`resource-library.spec.ts`, the same documented cold-dev-server-compile flake
+    class every recent run has hit, passed on Playwright's own retry) — all green, exit code 0.
+  - PR #187's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~24
+    minutes (via `subscribe_pr_activity`); merged 2026-08-22 (squash, `734626c`). Remote branch
+    deletion for `test/automation-reject-route-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #187 fully landed, `main` green (also picked up
+  #185/#186, the concurrent session's approve-route PR and its PROGRESS.md record, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep. Concrete leads still open:
+  `rollback/route.ts` and `verify/route.ts` (the two remaining automation-action sibling routes with
+  zero coverage) and `guardrail-policy/route.ts` (its own **route-level** input validation, distinct
+  from PR #177's service-level `setAutomationGuardrailPolicy` coverage) — same zero-coverage state
+  `reject/route.ts` was in before this run. Separately, `execute/route.ts`'s own documented gap
+  remains open: no test exercises its `InvalidAutomationActionError -> 400` branch (only reachable
+  via a `campaign_activation` action against a target with no `campaign_resource_name`).
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/automation-reject-route-coverage`).
+
+---
+
 ## 2026-08-22 — automation approve route coverage (PR #185)
 
 - **Last completed:**
