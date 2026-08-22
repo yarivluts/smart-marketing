@@ -1,9 +1,19 @@
 import { PipelineMessageModel } from '../models/pipeline-message.model';
+import { ProjectModel } from '../models/project.model';
 import { RawRecordModel } from '../models/raw-record.model';
 import type { SchemaDefKind } from '../models/schema-def.model';
 import { publishPipelineMessage } from '../pipeline/transport';
 import { defaultWarehouseSink, type WarehouseSink } from '../pipeline/sink';
 import { recordAuditLogEntry } from './audit-log.service';
+import { ProjectNotFoundError } from './resource-library.service';
+
+/** Same "404-not-403, real project + wrong org indistinguishable from nonexistent" check every other project-scoped service uses — see `orchestration.service.ts`'s own copy for the KAN-26 reasoning. */
+async function requireProjectInOrg(organizationId: string, projectId: string): Promise<void> {
+  const project = await ProjectModel.init(projectId, { organization_id: organizationId });
+  if (!project || project.organization_id !== organizationId) {
+    throw new ProjectNotFoundError();
+  }
+}
 
 /** Bounds one `drainPendingPipelineMessages` call — same load-bounding reasoning as `MAX_INGEST_BATCH_SIZE`. */
 export const MAX_PIPELINE_DRAIN_BATCH_SIZE = 500;
@@ -275,6 +285,7 @@ export async function sweepQueuedPipelineMessagesForProject(
   sink?: WarehouseSink,
   performedByUserId?: string,
 ): Promise<DrainPipelineResult> {
+  await requireProjectInOrg(organizationId, projectId);
   const queued = await listQueuedPipelineMessagesForProject(organizationId, projectId, limit);
   const result = await landMessages(queued, sink ?? defaultWarehouseSink);
 
@@ -330,6 +341,7 @@ export async function replayFailedPipelineMessagesForProject(
   sink?: WarehouseSink,
   performedByUserId?: string,
 ): Promise<DrainPipelineResult> {
+  await requireProjectInOrg(organizationId, projectId);
   const failed = await listFailedPipelineMessagesForProject(organizationId, projectId, limit);
   const result = await landMessages(failed, sink ?? defaultWarehouseSink);
 
