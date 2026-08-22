@@ -17,6 +17,85 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 3) — execute/rollback no-campaign-resource-name coverage + corrected a stale assumption (PR #197)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#196** (docs-only, records PR #195's guardrail-policy
+    route coverage) from a concurrent session — left alone per the established convention; it merged
+    clean (`3a19736`) before this run opened its own PR, confirmed via `git fetch`.
+  - Followed PR #195's own "next step" lead directly: `execute/route.ts`'s and `rollback/route.ts`'s
+    documented gap — no test exercises either route's `InvalidAutomationActionError -> 400` branch,
+    said to be reachable only via a `campaign_activation` action against a target with no
+    `campaign_resource_name`.
+  - Traced both routes against `automation.service.ts` by hand before writing anything, and found
+    **the two routes do not actually behave the same way for this trigger** — the assumption that
+    both had an identical untested 400 gap, repeated across several prior entries (PR #183/#190/#193/
+    #195), was only half right:
+    - `rollbackActionByType`'s `InvalidAutomationActionError` throw (`automation.service.ts` line
+      ~814) is not wrapped in a try/catch inside `rollbackAutomationAction`, so it propagates
+      straight out to `rollback/route.ts`'s own `invalid_action` 400 mapping — genuinely reachable.
+    - `executeActionByType`'s identical throw (line ~724) sits *inside* `executeAutomationAction`'s
+      own try/catch (the same mechanism the route's own doc comment already describes: "always
+      returns 200 with the action's resulting status even when the executor itself failed") — it
+      gets swallowed and turned into a terminal `failed` status with a `failureReason`, never
+      reaching `execute/route.ts`'s `InvalidAutomationActionError` catch clause at all. That branch
+      is unreachable via this trigger, and I found no other path to it either (traced every earlier
+      throw site: kill-switch check, write-tier check, and the mutations.ts executor-resolution call
+      all throw different, distinct error types).
+    - Also confirmed via `automation.emulator.test.ts`'s existing "refuses to propose an activation
+      for a target with no campaign created yet" test that `proposeCampaignActivationAction` itself
+      never allows this state to be reached through the normal propose flow — the only way to
+      construct it at all (for either route) is a direct `AutomationActionModel` write bypassing
+      propose, standing in for data corruption / a schema-bypassing caller, the same posture other
+      defensive-check tests in this codebase already use for similarly-unreachable-via-the-UI cases.
+  - **Fix (PR #197, branch `test/automation-execute-rollback-no-campaign-resource`):** no production
+    code changed — both routes' existing behavior is already correct given their current design; this
+    is coverage plus a documentation correction. Added one test per route, each directly persisting
+    the malformed `campaign_activation` action (approved for execute, executed for rollback) via a
+    small `new AutomationActionModel()` + `setPathParams` + `save()` helper local to each test file
+    (mirroring the file's existing self-contained-helpers convention): `rollback/route.test.ts` now
+    asserts the genuine 400 `invalid_action`; `execute/route.test.ts` now asserts the real, verified
+    behavior (200, `status: 'failed'`, `failureReason` containing "this target has no campaign
+    resource name to activate") rather than repeating the incorrect "400" expectation prior entries'
+    notes implied.
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. The two new/updated test files 24/24 via the `firebase emulators:exec` wrapper, then
+    `pnpm typecheck` and `pnpm lint` clean. Full suite per package (per prior entries' documented
+    memory-pressure guidance): `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api`
+    140/140, `@growthos/firebase-orm-models` 1006/1006, `@growthos/web` unit 1106/1106 + e2e 22/23
+    outright (1 flaky, `resource-library.spec.ts` — the same documented cold-dev-server-compile
+    flake class every recent run has hit, passed on Playwright's own retry, unrelated to this
+    change since this PR touches only two automation route test files) — all green, exit code 0.
+  - PR #197's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~16
+    minutes (via `subscribe_pr_activity` + a scheduled 15-minute check-in rather than polling);
+    merged 2026-08-22 (squash, `a0a2a53`). Remote branch deletion for
+    `test/automation-execute-rollback-no-campaign-resource` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #197 fully landed, `main` green (also picked up
+  #196, a concurrent session's PROGRESS.md record for PR #195, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** every automation-action sibling route named across the last several entries
+  (`approve`/`reject`/`execute`/`rollback`/`verify`/`guardrail-policy`) now has dedicated coverage,
+  and every specific gap those entries flagged is now either closed or (for execute's `invalid_action`
+  branch) correctly documented as unreachable rather than left as a stale TODO. A future run should
+  do a fresh, broader Explore-agent sweep across `apps/web/app/api/` outside the `automation/`
+  subtree for zero-coverage routes or real bugs, the same kind of sweep that originally found the
+  automation subtree (PR #183) and the redirect-target bypass (PR #189) — no more concrete leads are
+  left open in this immediate area. Separately worth a look if a future run is in the area: whether
+  `execute/route.ts`'s now-confirmed-unreachable `InvalidAutomationActionError` 400 catch clause is
+  worth removing (dead code, unreachable given the current try/catch design) or is intentionally kept
+  for symmetry/future-proofing with its sibling routes — a judgment call, not a mechanical fix, left
+  as-is this run since the route's own doc comment explicitly documents the current swallow-into-
+  `failed` behavior as deliberate.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; Redis cost decision; prune merged feature branches the proxy blocks
+  scheduled runs from deleting, now including `test/automation-execute-rollback-no-campaign-resource`).
+
+---
+
 ## 2026-08-22 (later still, 2) — automation guardrail-policy route coverage (PR #195)
 
 - **Last completed:**
