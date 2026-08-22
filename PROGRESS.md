@@ -17,6 +17,78 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 7) — mcp-grants revoke route coverage (PR #205)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#203** (a concurrent session's automation-targets route
+    coverage) — left alone per the established convention; it merged clean (`6d0fef7`, plus its own
+    `#204` PROGRESS.md record) before this run's own PR, confirmed via `git fetch` after merging.
+  - Followed PR #201's own risk-ranked "next step" list (the `apps/web/app/api/`-wide Explore-agent
+    sweep, distinct from PR #199/#203's narrower automation-config-routes list): picked candidate #2,
+    `mcp-grants/[grantId]/route.ts` `DELETE` — the only mechanism to revoke a leaked/compromised MCP
+    OAuth connection (KAN-75), zero test coverage.
+  - Traced the route and `revokeMcpOAuthGrant`/`loadGrantInProject`
+    (`packages/firebase-orm-models/src/services/mcp-oauth.service.ts`) by hand before writing
+    anything: auth (401), `keys.manage` permission (403), an unknown grant id (404
+    `McpOAuthGrantNotFoundError`), a real grant belonging to a *different project in the same org*
+    (404 — `loadGrantInProject` checks `project_id`, not just `organization_id`, so this is genuine
+    project-scoping coverage beyond what the sibling write-tier route's org-scoping test established),
+    the happy path (200 + an audit-log entry, revocable by any project member with `keys.manage`, not
+    only the user who originally approved the consent screen — the service's own doc comment's
+    claim), and a re-revoke of an already-revoked grant (the service has no idempotency guard, so it
+    genuinely succeeds again rather than 404ing — pinned as actual behavior, not assumed). Every
+    branch was already correctly implemented — **no production code changed**, this is coverage only.
+  - **Fix (PR #205, branch `test/mcp-grants-revoke-route-coverage`):** new `route.test.ts` (6 cases,
+    real Firestore/Auth emulator, mirroring the sibling `keys/[apiKeyId]/route.test.ts` and
+    `resource-attachments/.../write-tier/route.test.ts` conventions), built via `issueMcpAuthorizationCode`
+    (no need to exchange for a token — the route only needs a grant to exist) to set up each grant.
+  - **Checks:** `pnpm install` + `pnpm build` (all 7 packages) first, both green. New test file 6/6 via
+    the `firebase emulators:exec` wrapper, then `pnpm lint` (caught and fixed one unused-destructure
+    lint error) and `pnpm typecheck` clean. Full suite per package (memory-pressure guidance):
+    `@growthos/shared`/`@growthos/tracking-sdk`/`@growthos/mcp-headless-example`/`@growthos/dbt-transform`
+    all green, `@growthos/firebase-orm-models` 1006/1006, `@growthos/api` 140/140, `@growthos/web` unit
+    + e2e 22/23 outright (1 flaky, `resource-library.spec.ts`, a 45s timeout — different spec and
+    failure mode than prior documented flake classes, passed on Playwright's own retry, unrelated to
+    this change) — all green. `pnpm turbo lint typecheck` across the whole monorepo also green.
+  - PR #205's first CI run failed: an unrelated `onboarding/pack/route.test.ts` test
+    (`installing "saas_marketing" provisions the pack's starter boards`) hit a 60s Vitest timeout,
+    alongside several `RESOURCE_EXHAUSTED` Firestore-emulator warnings in the same run — the same
+    CI-runner resource-pressure flake class PR #203 documented, this time in a different suite. This
+    PR's diff touches only one new, isolated test file with no relation to onboarding — ruled out as
+    this PR's own failure per the CI-red rules, re-ran the failed job once via
+    `actions_run_trigger`/`rerun_failed_jobs`; the rerun went green (`lint · typecheck · test · build`
+    + `terraform fmt · validate`, ~23 minutes, confirmed via `subscribe_pr_activity` events + two
+    `send_later` self-check-ins rather than polling). No review comments. Merged 2026-08-22 (squash,
+    `a7dc621`). Remote branch deletion for `test/mcp-grants-revoke-route-coverage` hit the same
+    recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit;
+    local branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after
+    merge.
+- **In progress (exact stopping point):** none — #205 fully landed, `main` green (also picked up #203/
+  #204, a concurrent session's automation-targets route coverage + its own PROGRESS.md record, along
+  the way).
+- **Blocked + why:** nothing.
+- **Next step:** remaining candidates from PR #201's risk-ranked sweep: (3) `automation/kill-switch/route.ts`
+  — org-wide pause-all-automation HTTP layer (the underlying service already has emulator tests, but
+  the route's own `engaged`/`reason` validation and permission gate don't — also independently flagged
+  by PR #203's own "next step" from its narrower automation-config-routes list, so likely the
+  highest-value pick for whichever run gets there next); (4) `session-replay/route.ts` — the route's
+  own wiring around the well-tested `buildSessionReplayLink` XSS-scheme-check helper; (5)
+  `schema-defs/sync-marts/route.ts` — a bulk BigQuery-mart-regeneration action gated only by
+  `schema.write`, untested. The remaining five thin-wrapper routes from PR #201's sweep
+  (`ingest-health/replay-failed-pipeline-messages`, `sweep-queued-pipeline-messages`,
+  `trigger-orchestration-run`, `quarantined-records/.../replay`, `schema-defs/check-tracking-alerts`)
+  are lower priority, same shape of gap. PR #203 separately flagged
+  `automation/actions/campaign-drafts/route.ts` (its `InvalidAutomationActionError` catch uniquely
+  forwards `err.message` in the response body, untested) and a pre-existing, untested edge case in
+  `ensureAutomationTargetSeeded`'s validate-before-lookup ordering. A future run should pick the
+  highest-priority open item, or do a fresh sweep of a different subtree if this list runs dry.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/mcp-grants-revoke-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 6) — automation targets route (GET+POST) coverage (PR #203)
 
 - **Last completed:**
