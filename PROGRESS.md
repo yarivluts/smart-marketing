@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 8) — automation kill-switch route coverage (PR #207)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#205** (a concurrent session's mcp-grants revoke route
+    coverage) — left alone per the established convention; it merged clean (`a7dc621`, plus its own
+    `#206` PROGRESS.md record) before this run's own PR, confirmed via `git fetch` after merging.
+  - Picked candidate (3) from PR #205's own risk-ranked "next step" list, independently flagged by
+    PR #203 too: `orgs/[orgId]/automation/kill-switch/route.ts` (GET+POST) — KAN-71's org-wide
+    "pause all automation" emergency stop. The underlying service (`automation-kill-switch.service.ts`)
+    already had emulator tests, but the route's own auth/permission gate and `engaged`/`reason`
+    validation had zero coverage.
+  - Traced every branch by hand before writing anything: `requireOrgPermission(orgId,
+    'automation.execute')` (401 unauthenticated, 404 `not_found` for no active membership — KAN-26
+    non-enumeration, 403 for a member without the permission, e.g. `viewer`), `parseJsonBody`'s
+    `invalid_json`, `engaged_required` (missing or wrong type), `reason_required` (only checked when
+    `engaged === true`, missing or blank string), and the two success shapes: `engageAutomationKillSwitch`
+    returns `{engaged: true, reason, engagedByUserId}` directly (no `engagedAt` — that only appears on
+    a subsequent GET, which re-queries the newest event), `disengageAutomationKillSwitch` returns the
+    bare `{engaged: false}` regardless of any stray `reason` field in the request body. Every branch
+    was already correctly implemented — **no production code changed**, this is coverage only.
+  - **Fix (PR #207, branch `test/automation-kill-switch-route-coverage`):** new `route.test.ts` (16
+    cases, real Firestore/Auth emulator, mirroring the sibling `guardrail-policy/route.test.ts`
+    convention but simplified to the org-only scope this route uses — no project needed).
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. New test file 16/16 via the `firebase emulators:exec` wrapper, then `pnpm typecheck` and
+    `pnpm lint` clean across all packages. Full `apps/web` unit suite: 1168/1168 passing across 206
+    files (previously 1152/205, confirming the +16 tests/+1 file delta).
+  - Independent self-review via a fresh-context subagent (given the route, the service, `access.ts`,
+    and the new test file) re-derived every status code/response body by hand, confirmed the
+    `engagedAt`-present-on-GET-but-absent-on-engage-response distinction is respected precisely, and
+    found no bugs. It flagged two pre-existing, non-blocking gaps shared with the sibling
+    `guardrail-policy` test file (no test for a dangling-membership `OrganizationNotFoundError`
+    500, and only the `owner` role — not e.g. `operator` — is used for happy-path tests) — same
+    established pattern as every sibling route test, not unique to this file.
+  - PR #207's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~27
+    minutes on the first run (confirmed via `subscribe_pr_activity` + a `send_later` self-check-in
+    rather than polling). No review comments. Merged 2026-08-22 (squash, `1cd60e9`). Remote branch
+    deletion for `test/automation-kill-switch-route-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local branch
+    deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #207 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** every automation-config route candidate from PR #199/#203's narrower list is now
+  closed. Remaining from PR #201/#205's broader `apps/web/app/api/`-wide sweep: (4)
+  `session-replay/route.ts` — the route's own wiring around the well-tested `buildSessionReplayLink`
+  XSS-scheme-check helper; (5) `schema-defs/sync-marts/route.ts` — a bulk BigQuery-mart-regeneration
+  action gated only by `schema.write`, untested. The remaining five thin-wrapper routes from that
+  sweep (`ingest-health/replay-failed-pipeline-messages`, `sweep-queued-pipeline-messages`,
+  `trigger-orchestration-run`, `quarantined-records/.../replay`, `schema-defs/check-tracking-alerts`)
+  are lower priority, same shape of gap. PR #203 separately flagged
+  `automation/actions/campaign-drafts/route.ts` (its `InvalidAutomationActionError` catch uniquely
+  forwards `err.message` in the response body, untested) and a pre-existing, untested edge case in
+  `ensureAutomationTargetSeeded`'s validate-before-lookup ordering. A future run should pick the
+  highest-priority open item, or do a fresh sweep of a different subtree (e.g. `apps/api/` or
+  non-API `apps/web` components) if this list runs dry.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/automation-kill-switch-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 7) — mcp-grants revoke route coverage (PR #205)
 
 - **Last completed:**
