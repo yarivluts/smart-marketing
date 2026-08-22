@@ -181,7 +181,17 @@ function evaluateArchetype(
 }
 
 export interface SuggestSegmentCandidatesOptions {
-  /** A suggestion is dropped if its confidence (the weakest of its matched concepts) falls below this — the same "propose nothing over a wrong guess" posture `suggestFieldMappingRules`'s own `minConfidence` establishes. Defaults to `0.5`, just below the substring-match tier so every accepted match is at least a whole-token hit. */
+  /**
+   * A suggestion is dropped if its confidence (the weakest of its matched
+   * concepts) falls below this — the same "propose nothing over a wrong
+   * guess" posture `suggestFieldMappingRules`'s own `minConfidence`
+   * establishes. `scoreFieldAgainstKeywords` only ever produces `0` (no
+   * match — already excluded by `bestFieldForConcept`), `0.7` (substring
+   * match), `0.85` (whole-token match), or `1` (last-token match), so the
+   * default of `0.5` doesn't filter anything beyond that "no match at all"
+   * case; raise it above `0.7` to require at least a whole-token hit, or
+   * above `0.85` to require an exact last-token match.
+   */
   minConfidence?: number;
   /** Injectable so callers/tests get deterministic date-relative filter values (e.g. "canceled in the last 30 days") without depending on wall-clock time. Defaults to `new Date()`. */
   now?: Date;
