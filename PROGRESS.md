@@ -17,6 +17,82 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 4) — automation actions route (GET+POST) coverage (PR #199)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#198** (docs-only, records PR #197's execute/rollback
+    coverage) from a concurrent session — left alone per the established convention; it merged clean
+    before this run's own PR, confirmed via `git pull` picking it up as a fast-forward alongside this
+    run's own merge.
+  - PR #197's own "next step" note said every named automation-action sibling route was now covered
+    and pointed at a fresh, broader Explore-agent sweep across `apps/web/app/api/` outside the
+    `automation/actions/[actionId]/` subtree. Delegated exactly that sweep to a fresh-context Explore
+    agent rather than assuming the subtree was fully exhausted — it found the sweep's own premise had
+    a gap: `automation/actions/route.ts` (the GET list + POST propose endpoint *sibling* to the
+    already-covered `[actionId]/*` routes — the entry point every one of them depends on) had zero
+    dedicated route-level test coverage, missed by the "named sibling routes" framing in prior entries
+    since it isn't itself named `approve`/`reject`/`execute`/etc.
+  - Traced every branch by hand against `automation.service.ts`'s `proposeAutomationBudgetChangeAction`
+    (project/target lookup, non-negative budget validation, guardrail evaluation incl. the default 25%
+    `maxDailyBudgetChangePct` threshold) and `listAutomationActionsForProject`, plus
+    `apps/web/lib/orgs/access.ts`'s `requireOrgPermission` for the 401/403/404 semantics. Confirmed a
+    real, intentional asymmetry: GET does no project-existence check at all (a bogus `projectId` under
+    a real org returns `200 { actions: [] }`), while POST's `proposeAutomationBudgetChangeAction` does
+    (`ProjectNotFoundError` -> 404) — no bug, just an asymmetry worth pinning explicitly since it's easy
+    to assume symmetric behavior across a GET/POST pair.
+  - **Fix (PR #199, branch `test/automation-actions-route-coverage`):** new `route.test.ts` (16 cases,
+    real Firestore/Auth emulator, mirroring the sibling routes' established convention): GET's 401/403,
+    the pinned no-project-existence-check-on-read behavior above, and the full mapped-action-shape/
+    newest-first-ordering case (two proposals, asserts response ordering and every mapped field incl.
+    the never-set optional ones coming back falsy/omitted rather than an incorrect literal `null`);
+    POST's 401/403, `invalid_json`, `target_id_required` (missing + blank string),
+    `after_daily_budget_usd_required` (missing + wrong type), 404 `not_found` for both a missing
+    project and a missing target, `invalid_after_daily_budget_usd` (a negative value passing the
+    route's own `typeof` check but failing the service's non-negative range check — the route/service
+    double-check-isolation pattern several prior automation-route PRs have specifically tested for),
+    and the two guardrail-branching success paths (a clean 20% change landing `awaiting_approval`, a
+    100% change past the default 25% threshold landing `blocked` with a non-empty
+    `guardrailViolations`). No production code changed — existing behavior already correct on every
+    case.
+  - Independent self-review via a fresh-context subagent (given the diff + route + every service it
+    calls) retraced every status code/body against the real implementation and the guardrail math by
+    hand, and independently confirmed the no-project-existence-check-on-GET behavior is real rather
+    than a bug this test file was papering over. It found one cosmetic issue — two unrelated test cases
+    had copy-pasted the same `setupOrgWithProject` org name, making failures harder to tell apart by
+    org name alone — fixed in a follow-up commit on the same branch/PR.
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. New test file 16/16 via the `firebase emulators:exec` wrapper (hit the documented,
+    mitigated gRPC `RESOURCE_EXHAUSTED` emulator flake once mid-run, all 16 still passed via the
+    existing retry/timeout defenses), then `pnpm typecheck` and `pnpm lint` clean. Full `apps/web` unit
+    suite (not split per-package this run, per prior entries' documented memory-pressure guidance being
+    a mitigation rather than a requirement): 1122/1122 passing across 203/203 files.
+  - PR #199's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~25
+    minutes (via `subscribe_pr_activity` + a scheduled 45-minute check-in rather than polling); merged
+    2026-08-22 (squash, `b864cd4`). Remote branch deletion for `test/automation-actions-route-coverage`
+    hit the same recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run
+    has hit; local branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity
+    after merge.
+- **In progress (exact stopping point):** none — #199 fully landed, `main` green (also picked up #198,
+  a concurrent session's PROGRESS.md record for PR #197, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** the Explore-agent sweep this run ran also ranked four more zero-coverage candidates
+  in the same automation-config area, all still open: `automation/targets/route.ts` (GET+POST, target
+  seeding/listing — 6 POST validation branches plus `ProjectNotFoundError`/`InvalidAutomationActionError`
+  catches and `ensureAutomationTargetSeeded`'s idempotent get-or-create semantics), the org-scoped
+  `resource-attachments/[attachmentId]/write-tier/route.ts` (4 error branches incl. a route-vs-service
+  `invalid_tier` double-check-isolation case, security-relevant since it gates live-change permission
+  per KAN-74), `automation/kill-switch/route.ts` (GET+POST engage/disengage, the org-wide automation
+  pause/resume safety mechanism), and `automation/actions/campaign-drafts/route.ts` (notably, its
+  `InvalidAutomationActionError` catch uniquely forwards `err.message` in the response body, untested).
+  `apps/api/src/**` has no gap — every controller already has e2e coverage. A future run can pick any
+  of the four in priority order, or do a fresh sweep of its own if a concurrent session has claimed one.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/automation-actions-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 3) — execute/rollback no-campaign-resource-name coverage + corrected a stale assumption (PR #197)
 
 - **Last completed:**
