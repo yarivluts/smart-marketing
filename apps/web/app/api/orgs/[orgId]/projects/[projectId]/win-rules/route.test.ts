@@ -110,6 +110,14 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/win-rules', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ winRules: [] });
   });
+
+  it("returns 404 for a project id that doesn't belong to this org", async () => {
+    const { ownerSession, organization } = await setupOrgProject('Win Rule List Wrong Project Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = winRulesRequest(organization.id, 'does-not-exist-project');
+    const response = await GET(request, { params });
+    expect(response.status).toBe(404);
+  });
 });
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/win-rules', () => {
