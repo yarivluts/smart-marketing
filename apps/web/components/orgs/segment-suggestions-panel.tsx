@@ -23,18 +23,16 @@ function suggestionKey(suggestion: SegmentSuggestion): string {
  * `POST .../segments` route `CreateSegmentForm` uses, so there is exactly one segment-creation path;
  * `router.refresh()` re-fetches both the segments list and this panel's own suggestions, which
  * naturally drops the accepted row (`suggestSegmentsForProject` excludes any suggestion whose filter
- * already exists on a saved segment).
+ * already exists on a saved segment). Always renders the section (with an explicit empty state when
+ * there's nothing to propose), the same posture this page's own segments list and create-form sections
+ * already establish for their own empty states.
  */
-export function SegmentSuggestionsPanel({ orgId, projectId, suggestions }: SegmentSuggestionsPanelProps): React.ReactElement | null {
+export function SegmentSuggestionsPanel({ orgId, projectId, suggestions }: SegmentSuggestionsPanelProps): React.ReactElement {
   const t = useTranslations('Segments');
   const tCategory = useTranslations('Segments.suggestionCategory');
   const router = useRouter();
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
-
-  if (suggestions.length === 0) {
-    return null;
-  }
 
   async function handleCreate(suggestion: SegmentSuggestion): Promise<void> {
     const key = suggestionKey(suggestion);
@@ -64,27 +62,31 @@ export function SegmentSuggestionsPanel({ orgId, projectId, suggestions }: Segme
     <section className="flex flex-col gap-3">
       <h2 className="text-lg font-semibold">{t('suggestionsHeading')}</h2>
       <p className="text-xs text-muted-foreground">{t('suggestionsIntro')}</p>
-      <ul className="flex flex-col gap-2">
-        {suggestions.map((suggestion) => {
-          const key = suggestionKey(suggestion);
-          return (
-            <li key={key} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium">{tCategory(suggestion.category)}</span>
-                <Button type="button" size="sm" disabled={pendingKey === key} onClick={() => handleCreate(suggestion)}>
-                  {t('suggestionCreateButton')}
-                </Button>
-              </div>
-              <span className="text-xs text-muted-foreground">{t('suggestionFieldLabel', { schemaName: suggestion.schemaName, field: suggestion.field })}</span>
-              {errorKey === key ? (
-                <p role="alert" className="text-sm text-destructive">
-                  {t('suggestionCreateError')}
-                </p>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+      {suggestions.length === 0 ? (
+        <p className="text-xs text-muted-foreground">{t('noSuggestions')}</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {suggestions.map((suggestion) => {
+            const key = suggestionKey(suggestion);
+            return (
+              <li key={key} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{tCategory(suggestion.category)}</span>
+                  <Button type="button" size="sm" disabled={pendingKey === key} onClick={() => handleCreate(suggestion)}>
+                    {t('suggestionCreateButton')}
+                  </Button>
+                </div>
+                <span className="text-xs text-muted-foreground">{t('suggestionFieldLabel', { schemaName: suggestion.schemaName, field: suggestion.field })}</span>
+                {errorKey === key ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {t('suggestionCreateError')}
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </section>
   );
 }

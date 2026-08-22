@@ -41,13 +41,10 @@ describe('SegmentSuggestionsPanel', () => {
     vi.stubGlobal('fetch', vi.fn());
   });
 
-  it('renders nothing when there are no suggestions', () => {
-    const { container } = render(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <SegmentSuggestionsPanel orgId="org-1" projectId="project-1" suggestions={[]} />
-      </NextIntlClientProvider>,
-    );
-    expect(container).toBeEmptyDOMElement();
+  it('shows the empty state when there are no suggestions', () => {
+    renderPanel([]);
+    expect(screen.getByText('No high-value list suggestions right now.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create list' })).not.toBeInTheDocument();
   });
 
   it('renders one row per suggestion with its category label and source field', () => {

@@ -892,6 +892,7 @@
     "workListUpdateError": "לא ניתן היה לעדכן את הפלח. נסה שוב.",
     "suggestionsHeading": "רשימות מוצעות",
     "suggestionsIntro": "מוצע מתוך שדות שכבר נרשמו בסכימות הישויות של הפרויקט. סקור וצור את הפלחים השמורים שברצונך לשמור.",
+    "noSuggestions": "אין כרגע הצעות לרשימות בעלות ערך גבוה.",
     "suggestionCategory": {
       "churn_risk": "סיכון נטישה",
       "payment_risk": "סיכון תשלום",

@@ -892,6 +892,7 @@
     "workListUpdateError": "Could not update the segment. Please try again.",
     "suggestionsHeading": "Suggested lists",
     "suggestionsIntro": "Proposed from fields already registered on this project's entity schemas. Review and create the ones you want as saved segments.",
+    "noSuggestions": "No high-value list suggestions right now.",
     "suggestionCategory": {
       "churn_risk": "Churn risk",
       "payment_risk": "Payment risk",
