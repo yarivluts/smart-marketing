@@ -4,8 +4,14 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listEnvironmentsForProject, listOrgProjects, listRecentBillingEventsForProject } from '@/lib/orgs/queries';
+import {
+  listEnvironmentsForProject,
+  listOrgProjects,
+  listRecentBillingEventsForProject,
+  listRecentChurnedSubscriptionsForProject,
+} from '@/lib/orgs/queries';
 import { billingOpsFeedEntryTypeLabelKey, toBillingOpsFeedEntryView } from '@/lib/orgs/billing-ops-view';
+import { toChurnFeedEntryView } from '@/lib/orgs/churn-feed-view';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -26,6 +32,10 @@ export async function generateMetadata({ params }: PageProps) {
  * per-customer payment failures, operationally sensitive the same way a quarantined record's raw
  * payload is. Dunning-status tracking (the gap doc's stretch goal) is deliberately out of scope — no
  * subscription-lifecycle/dunning model exists yet to attach a status to.
+ *
+ * A second section (KAN-81, generalizing this same page + query pattern per plan `14 §Gap 5`'s "live
+ * record feeds ... churn") lists the most recently landed `stripe_subscription` entities showing a
+ * churn signal — already canceled or scheduled to cancel at period end.
  */
 export default async function BillingOpsFeedPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -42,9 +52,10 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [projects, rawRecords, environments] = await Promise.all([
+  const [projects, rawRecords, churnRecords, environments] = await Promise.all([
     listOrgProjects(orgId),
     listRecentBillingEventsForProject(orgId, projectId),
+    listRecentChurnedSubscriptionsForProject(orgId, projectId),
     listEnvironmentsForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -53,6 +64,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
   }
 
   const entries = rawRecords.map(toBillingOpsFeedEntryView);
+  const churnEntries = churnRecords.map(toChurnFeedEntryView);
 
   const t = await getTranslations('BillingOpsFeed');
   const tEnv = await getTranslations('EnvBadge');
@@ -92,6 +104,42 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
           </ul>
         )}
         <p className="text-xs text-muted-foreground">{t('capNote', { count: entries.length })}</p>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-xl font-semibold tracking-tight">{t('churnHeading')}</h2>
+        {churnEntries.length === 0 ? (
+          <p className="text-muted-foreground">{t('churnEmpty')}</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {churnEntries.map((entry) => (
+              <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium">
+                    {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('churnUnknownCustomer')}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
+                  </span>
+                </div>
+                <span className="text-muted-foreground">
+                  {entry.mrrNormalized === null || entry.currency === null
+                    ? t('amountUnknown')
+                    : t('mrrLine', { amount: entry.mrrNormalized, currency: entry.currency.toUpperCase() })}
+                </span>
+                {entry.canceledAt ? (
+                  <span className="text-destructive">{t('canceledAtLine', { canceledAt: entry.canceledAt })}</span>
+                ) : entry.cancelAtPeriodEnd ? (
+                  <span className="text-destructive">{t('cancelAtPeriodEndLine', { currentPeriodEnd: entry.currentPeriodEnd ?? '' })}</span>
+                ) : null}
+                <span className="text-xs text-muted-foreground">
+                  {`${t('landedAtLine', { landedAt: entry.landedAt })} · ${t('clientIdLine', { clientId: entry.clientId })}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="text-xs text-muted-foreground">{t('churnCapNote', { count: churnEntries.length })}</p>
       </section>
     </main>
   );
