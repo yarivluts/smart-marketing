@@ -64,6 +64,13 @@ Template for each entry:
     the same recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has
     hit; local branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity
     after merge.
+  - **Duplicate-PR reconciliation:** a concurrent session opened **PR #219** against the exact same two
+    routes with the identical fix (same `requireProjectInOrg` approach), based on `main` from just
+    before #218 merged. Closed #219 as superseded with a comment pointing to #218 (already on `main`)
+    — its diff additionally had two cross-org rejection tests directly in `pipeline.emulator.test.ts`
+    at the service layer, noted in the closing comment as a worthwhile follow-up for anyone who wants
+    that extra layer of pinning, but not essential given the route-level regression tests and the
+    re-verified pre-existing service suite already cover the same behavior change.
 - **In progress (exact stopping point):** none — #218 fully landed, `main` green.
 - **Blocked + why:** nothing.
 - **Next step:** two candidates remain from PR #201's original five-route list: `ingest-health/
