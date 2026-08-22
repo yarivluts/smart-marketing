@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-22 (later still, 19) — segment work-list owner + status, first KAN-81 slice (PR #233)
+## 2026-08-22 (later still, 20) — segment work-list owner + status, first KAN-81 slice (PR #233)
 
 - **Last completed:**
   - Session start: every KAN-17..80 story is `done`/`needs-human`/`in-progress`-on-infra/`blocked-by`
@@ -76,6 +76,75 @@ Template for each entry:
 - **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
   sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
   deleting).
+
+---
+
+## 2026-08-22 (later still, 19) — billing ops feed (KAN-80), first gap-analysis story off the exhausted route-coverage sweep (PR #230)
+
+- **Last completed:**
+  - Session start: `TASKS.md` had no unblocked `todo` row (all done/needs-human/blocked-by KAN-43/
+    KAN-18/KAN-19), and the `apps/web/app/api/**` zero-coverage route-coverage sweep that drove roughly
+    the last 18 runs was independently re-confirmed exhausted (a fresh `git status`/`git log` sync and a
+    hand recheck of recent PRs #227/#229 both post-date the last PROGRESS.md entry I could see). Rather
+    than start a fourth kind of coverage sweep on a narrow, heavily-contended candidate list, picked
+    option (c) from PR #225's own "next step" list: a forward-looking story from
+    `docs/plan/14-gap-analysis.md`'s "New backlog items", none of which were yet mirrored into
+    `TASKS.md`.
+  - Added **KAN-80..KAN-88** to `TASKS.md`, mirroring the gap doc's remaining un-built epics (E14.x/
+    E14.y/E14.z/E15.x/E16.x/E17.x/E18.x/E19.x/E20.x) with their own gap-doc effort estimates and
+    dependency notes, so future runs (once route-coverage work stops being productive) have real,
+    already-scoped candidates instead of re-discovering the same doc from scratch.
+  - Picked the cheapest, most self-contained one to actually build this run: **KAN-80 (E14.z Billing-ops
+    feeds)** — Gap 5+15's "new charges / failed charges / refunds as a browsable record feed". A
+    research subagent surveyed the exact conventions to follow first (`RawRecordModel`'s shape, the
+    KAN-36 `getEventVolumeOverviewForProject` bounded-read precedent, the Stripe connector's exact
+    schema/field names, the permission catalog's own documented "gate a read surface on the nearest
+    write permission" convention, and the nav/i18n wiring pattern) before writing any code.
+  - **Delivered (PR #230, branch `feat/kan-80-billing-ops-feed`):** a project-scoped Billing ops feed
+    admin page — recent Stripe charges/failed payments/refunds, newest first, folded across every
+    environment. No new schema/ingest work needed: it reads the same landed `RawRecordModel`s KAN-36's
+    sparkline already reads, scoped to KAN-49's `stripe_charge`/`stripe_failed_payment`/`stripe_refund`
+    event schemas. `packages/firebase-orm-models` gained `listRecentBillingEventsForProject` (one bounded
+    per-schema Firestore query, merged + re-sorted client-side, trimmed to `limit` — same "whole
+    project, one admin view" posture as `listRecentIngestBatchesForProject`) +
+    `BILLING_OPS_FEED_EVENT_SCHEMA_NAMES`. Gated on `ingest.write` (no dedicated billing-read permission
+    exists; reused the codebase's own documented convention rather than inventing one). Dunning status
+    and the CRM-sync/saved-segment-as-worklist half of Gap 5 are explicitly out of scope, filed as
+    KAN-81.
+  - **A real bug caught by this run's own e2e test, before merge:** the project nav-link list is
+    duplicated in two places — `projects/[projectId]/layout.tsx` (the shared shell) and a second,
+    separate copy inside `orgs/[orgId]/page.tsx` (used when a project is selected via `?project=` from
+    the org page, which is how the onboarding-wizard redirect flow and this run's own e2e test both
+    reach a project's pages). The first pass only added the new "Billing ops feed" link to the layout
+    copy; the e2e test correctly failed (link never found) until both copies were updated — the exact
+    kind of duplicated-nav gap PR #221-era runs also had to work around.
+  - **Checks:** fresh container this run — `pnpm install`, `pnpm turbo lint typecheck` clean across all
+    packages, full `pnpm build` clean across all 8 packages (one transient `next build` failure mid-run
+    was a local resource collision with a concurrently-running `next dev` test server, reproduced and
+    confirmed clean once serialized — not a real bug). Full `pnpm test`: `@growthos/firebase-orm-models`
+    1009/1009 (92 files, real Firestore emulator); `@growthos/web` 1249/1249 vitest + 23/23 Playwright
+    e2e, run twice end-to-end for stability (one unrelated pre-existing spec — `resource-library.spec.ts`
+    once, `schema-registry.spec.ts` once across the two runs — flaked and passed on retry, the same
+    documented sandbox flakiness pattern, not caused by this change; this run's own new
+    `billing-ops-feed.spec.ts` passed cleanly both times once the nav-duplication bug above was fixed).
+  - PR #230's real CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green
+    (`mergeable_state: clean`, no review comments) in about 24 minutes — watched via `subscribe_pr_activity`
+    + two `send_later` self-check-ins rather than polling. Merged (squash, `777e23a`). Remote branch
+    deletion for `feat/kan-80-billing-ops-feed` hit the same recurring git-over-HTTPS-proxy HTTP 403
+    every prior merged branch from a scheduled run has hit; local branch deleted cleanly after syncing
+    to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #230 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** KAN-81 (E14.x Ops Lists & Feeds, ~10d) is the natural next slice in the same area — live
+  record feeds beyond billing, saved segments as owned work lists, CRM-sync — but is a much bigger story
+  than KAN-80; a future run should either scope it down to a first slice (e.g. just the "saved segment as
+  a live list with owner/status" half, reusing KAN-76's segments) or pick a different KAN-8x item
+  (KAN-84's churn-reason capture is rated cheap/high-value in the gap doc and doesn't depend on anything
+  else landing first). Route-coverage-sweep work (option (a)/(b) from PR #225) is still available too if
+  a future run prefers that instead.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now also including `feat/kan-80-billing-ops-feed`).
 
 ---
 
