@@ -17,6 +17,76 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 2) — automation guardrail-policy route coverage (PR #195)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two docs-only "record PR #X in PROGRESS.md" PRs were open from concurrent
+    sessions (**#191**, recording PR #189's redirect-bypass fix; **#194**, recording PR #193's
+    verify-route coverage) — left alone per the established convention; both merged clean
+    (`0b84b99`, `4dff004`) before or during this run, confirmed via `git fetch`. Also confirmed
+    `de6b5dc` (PR #193, automation verify-route coverage) was already on `main` at session start —
+    the prior run's own "next step" lead was already closed out by a concurrent session.
+  - Followed the next lead still open from PR #187/#190's own notes: `guardrail-policy/route.ts`
+    (the KAN-71 guardrail-policy GET/POST endpoint) had zero dedicated route-level test coverage.
+    PR #177 only covered `setAutomationGuardrailPolicy`'s own input validation at the *service*
+    layer (`automation-guardrail.service.ts`) — the route has its own upstream validation layer
+    (protectedTargetIds array/type checks, a generic per-field numeric-type loop,
+    `allowed_hours_must_be_set_together`) that ran completely untested, plus GET's
+    default-vs-explicit-policy resolution and both handlers' auth/permission/not-found gates.
+  - Traced every branch of both `GET` and `POST` by hand against the route and the service before
+    writing anything: confirmed `-5` for a numeric field passes the route's own `typeof !== 'number'`
+    check (numbers can be negative) and only fails at the service's `requireNonNegative` — the
+    `invalid_policy` 400 genuinely isolates the service-level range check from the route's own
+    type check, not a redundant test of the same branch. No production code changed; existing
+    behavior already correct on every case.
+  - **Fix (PR #195, branch `test/automation-guardrail-policy-route-coverage`):** new `route.test.ts`
+    (15 cases, real Firestore/Auth emulator, mirroring `reject/route.test.ts`'s/`verify/route.test.ts`'s
+    established convention): 401/403/404 for both GET and POST; GET's documented-default policy
+    shape (matches `DEFAULT_AUTOMATION_GUARDRAIL_POLICY` exactly, `setAt: null`) and its round-trip
+    read-back after a POST; POST's `invalid_json`, `invalid_protected_target_ids` (non-array, and an
+    array holding a non-string element), `invalid_<field>` type check, `allowed_hours_must_be_set_together`
+    (only one of start/end hour provided), `invalid_policy` (negative value), and the 201 success path.
+  - Independent self-review via a fresh-context subagent (given only the route, the service, and the
+    new test file) retraced every case by hand, including the two subtle ones above — confirmed no
+    bugs, no test pollution (`setupOrgWithProject` gives every test its own uniquely-named org), and
+    correct branch isolation throughout. It flagged two minor, non-blocking gaps: no test hits
+    `InvalidAutomationActionError` via the `allowedHours`-out-of-range branch specifically (only the
+    `requireNonNegative` branch is exercised for `invalid_policy` — both funnel to the same 400), and
+    the numeric-type-check loop is only exercised via one of its six fields (shared generic code, a
+    reasonable simplification not a real gap).
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. New test file 15/15 via the `firebase emulators:exec` wrapper, then `pnpm typecheck` and
+    `pnpm lint` clean. Full suite per package (per prior entries' documented memory-pressure
+    guidance): `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api`
+    140/140, `@growthos/firebase-orm-models` 1006/1006, `@growthos/web` unit + e2e 22/23 e2e passed
+    outright, 1 flaky (`resource-library.spec.ts`, the same documented cold-dev-server-compile flake
+    class every recent run has hit, passed on Playwright's own retry) — all green, exit code 0.
+  - PR #195's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~21
+    minutes; merged 2026-08-22 (squash, `aeaecc1`). Remote branch deletion for
+    `test/automation-guardrail-policy-route-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch deleted cleanly. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #195 fully landed, `main` green (also picked up
+  #191 and #194, two concurrent sessions' PROGRESS.md records, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep. Concrete leads still
+  open from prior entries: `execute/route.ts`'s and `rollback/route.ts`'s own documented gap — no
+  test exercises either route's `InvalidAutomationActionError -> 400` branch (only reachable via a
+  `campaign_activation` action against a target with no `campaign_resource_name`, a materially
+  different action-type setup than the budget-change actions their existing tests use). Separately,
+  this run's own minor gap: no test hits `setAutomationGuardrailPolicy`'s `allowedHours`
+  out-of-range branch specifically (distinct from the `requireNonNegative` branch this run's
+  `invalid_policy` test exercises) — low value (same 400 either way) but cheap to close if a future
+  run is already in that file. No other zero-coverage automation-action route remains as of this
+  run — `approve`/`reject`/`rollback`/`verify`/`guardrail-policy` are now all covered.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; Redis cost decision; prune merged feature branches the proxy blocks
+  scheduled runs from deleting, now including `test/automation-guardrail-policy-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still) — closed an open-redirect bypass in resolveRedirectTarget (PR #189)
 
 - **Last completed:**
