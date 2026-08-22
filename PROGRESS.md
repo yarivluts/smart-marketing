@@ -17,6 +17,94 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 22) — AI-suggested segments, third KAN-81 slice (PR #239)
+
+- **Last completed:**
+  - Session start: local `main` was stale again (same recurring leftover-branch-ref-from-an-earlier-
+    container issue documented in the prior two entries) — reset with `git reset --hard origin/main`
+    (working tree was clean) to pick up `origin/main` at `cb217ab` (PR #236/#237, the second KAN-81
+    slice). A `list_pull_requests` check found PR #238 (`kan-81-record-feed`, a concurrent session's
+    "generic record feed for any registered event schema" slice) open against the live-record-feeds
+    piece of KAN-81 — left it untouched per this file's "leave concurrent PRs alone" convention, and
+    picked a different, non-overlapping deferred piece instead.
+  - Of the three deferred KAN-81 pieces this file's own prior entries name (live record feeds, CRM-sync
+    action plugin, AI-suggested lists), picked **AI-suggested lists** (plan `14 §Gap 9`) — no file
+    overlap with PR #238, and (per research) fits the same "deterministic heuristic stand-in for a real
+    LLM call" posture KAN-55 (`suggestFieldMappingRules`) and KAN-68 (`proposeFunnelSteps`) already
+    establish, rather than CRM-sync's "needs a first-of-its-kind outbound action-plugin executor
+    interface" — a bigger, less self-contained slice.
+  - **Delivered (PR #239, branch `feat/kan-81-ai-suggested-segments`, squash-merged `3a1c571`):**
+    - New `packages/shared/src/segment-suggestion` module: `suggestSegmentCandidates(fieldDefs,
+      options)` — a small curated library of 5 marketing/SaaS list archetypes (recently churned,
+      trial-expiring-soon, high-value, inactive, new-signups), each expressed as one or more field
+      *concepts* (a keyword lexicon + allowed schema field types + a `buildFilter` that produces a
+      ready-to-save `SegmentFilterCondition`, date-relative ones taking an injectable `now: Date` for
+      determinism). Concepts within one archetype are ANDed — a multi-concept archetype (trial-expiring)
+      is dropped entirely unless every concept finds an acceptable field, since a segment suggestion is
+      meant to be a complete, ready-to-review definition. Field-vs-keyword scoring reuses the same
+      3-tier scorer `funnel-suggestion`'s `matchStage` established (last-token exact match / any-token
+      match / long-keyword substring match), independently duplicated per this codebase's own "each
+      proposer's semantics differ slightly" convention rather than shared.
+    - `packages/firebase-orm-models` gained `suggestSegments({ organizationId, projectId, schemaName })`
+      (`segment.service.ts`): loads the project's active entity schema (`getActiveSchemaDefinition`,
+      the same lookup `createSegment` already does) and runs the heuristic against its declared fields.
+      Nothing persisted.
+    - New `POST .../segments/suggest` route, gated on `dashboards.write` (the same permission every
+      other segment route already reuses — confirmed via research that the catalog's own `ai.use`
+      permission has zero precedent as an actual gate anywhere in this codebase, so introducing it now
+      would have been a deviation, not a reuse).
+    - Admin UI: a new collapsed-by-default `SuggestSegmentsPanel` on the create-segment form, mirroring
+      `SuggestFieldMappingsPanel`'s (KAN-55) exact interaction shape but with one difference: a segment
+      suggestion is already a complete definition (name + full ANDed filter set), not one row per
+      target field, so there's a single "Use this" action per suggestion (replaces the form's filter
+      rows outright, fills the name only if still blank) rather than a per-row "Apply" + "Apply all".
+      New `en`/`he` keys under the existing `Segments` namespace.
+  - **Checks:** fresh container — `pnpm install`, `pnpm build` (turbo, all 8 packages) clean, `pnpm
+    --filter @growthos/shared --filter @growthos/firebase-orm-models --filter @growthos/web` lint +
+    typecheck clean. `packages/shared` full suite 26 files/450 tests green (new `suggest.test.ts`, 12
+    cases: archetype matching per type, multi-concept AND-drop, type-gating, tie-break on equal scores,
+    `minConfidence` filtering, sort order, injected-vs-default `now`). `firebase-orm-models` full suite
+    92 files/1025 tests green (real Firestore emulator; new `suggestSegments` cases: real-schema happy
+    path, empty-result, unregistered-schema rejection, cross-org `ProjectNotFoundError`).
+    `apps/web` full suite (unit + e2e) run via its own `pnpm test`: unit 222 files/1293 tests green
+    (new route tests — auth/permission/validation/happy-path — and component tests for
+    `SuggestSegmentsPanel` in isolation plus a `CreateSegmentForm` integration case covering the
+    name-prefill-only-if-blank and filter-replacement wiring); e2e had 2 failures
+    (`resource-library.spec.ts`, `schema-registry.spec.ts`), both reproducing the exact documented
+    sandbox dev-server cold-compile flake this file has already recorded for other PRs (neither test
+    touches segments code, and no e2e spec exists for the segments feature at all — confirmed via a
+    `grep` before treating them as unrelated) — not a regression from this diff.
+  - Self-reviewed the full diff before opening the PR: caught and fixed one real doc-comment bug —
+    `SuggestSegmentCandidatesOptions.minConfidence`'s doc comment claimed the `0.5` default excluded
+    the substring-match tier, but the scorer only ever emits `0`/`0.7`/`0.85`/`1`, so `0.5` doesn't
+    filter anything beyond the already-excluded "no match at all" case; corrected the comment (pushed
+    as a second commit) rather than changing the default and rewriting the already-green test suite's
+    behavioral expectations.
+  - Opened PR #239, subscribed to its activity. Real CI (`lint · typecheck · test · build` +
+    `terraform fmt · validate`) came back fully green in ~25 minutes, `mergeable_state: clean` — no
+    flakiness this run. Squash-merged (`3a1c571`), unsubscribed. Local branch deleted; remote branch
+    deletion hit the same recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a
+    scheduled run has hit (harmless — a human with direct repo access can delete it when convenient).
+- **In progress (exact stopping point):** none — #239 fully landed, `main` green and fast-forwarded
+  locally to `3a1c571`.
+- **Blocked + why:** nothing.
+- **Next step:** KAN-81 stays `in-progress` in `TASKS.md` (three slices done now: work-list
+  owner/status, live payments/churn/failed feeds, AI-suggested segment lists — plus PR #238, a
+  concurrent session's generic-schema record-feed page, likely merged or still in flight by the next
+  run). The one KAN-81 piece with no PR anywhere yet is the **CRM-sync action plugin** — research first
+  whether anything KAN-71/72/73 built is genuinely reusable or whether it needs a first-of-its-kind
+  outbound action-plugin executor interface, per this file's own prior entries. Otherwise the usual
+  candidates remain: KAN-18/KAN-19 infra follow-ups (all `needs-human`-gated), KAN-82..88 (~4-8d each
+  per the gap doc, all `todo`, no blockers).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — remaining infra follow-ups (scheduled dbt orchestration against real BigQuery,
+    per-environment dataset split, terraform import/apply reconciliation, Pub/Sub, Redis, staging env)
+    — still outstanding, not blocking any buildable-today story.
+  - Optional: delete the merged `feat/kan-81-ai-suggested-segments` branch on GitHub (this sandbox's
+    git remote rejected the delete with a 403, same as every prior scheduled-run merge).
+
 ## 2026-08-22 (later still, 21) — churn feed, second KAN-81 slice (PR #236)
 
 - **Last completed:**
