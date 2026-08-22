@@ -577,7 +577,14 @@
     "refundReasonLine": "סיבה: {reason}",
     "landedAtLine": "נקלט ב-{landedAt}",
     "clientIdLine": "מזהה {clientId}",
-    "capNote": "מוצגים {count} אירועי החיוב האחרונים."
+    "capNote": "מוצגים {count} אירועי החיוב האחרונים.",
+    "churnHeading": "מנויים שבוטלו ובסיכון ביטול",
+    "churnEmpty": "טרם נקלטו מנויים שבוטלו או בסיכון ביטול עבור פרויקט זה.",
+    "churnUnknownCustomer": "לקוח לא ידוע",
+    "mrrLine": "{amount} {currency} הכנסה חודשית חוזרת",
+    "canceledAtLine": "בוטל ב-{canceledAt}",
+    "cancelAtPeriodEndLine": "מתוכנן לביטול בסוף התקופה הנוכחית ({currentPeriodEnd})",
+    "churnCapNote": "מוצגים {count} המנויים שבוטלו או בסיכון הביטול האחרונים."
   },
   "RecordFeed": {
     "metaTitle": "פיד רשומות",

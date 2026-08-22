@@ -8,6 +8,7 @@ import {
   STRIPE_CHARGE_EVENT_NAME,
   STRIPE_FAILED_PAYMENT_EVENT_NAME,
   STRIPE_REFUND_EVENT_NAME,
+  STRIPE_SUBSCRIPTION_ENTITY_NAME,
 } from '../plugin-runtime/stripe/schemas';
 import { recordAuditLogEntry } from './audit-log.service';
 import { ProjectNotFoundError } from './resource-library.service';
@@ -258,7 +259,7 @@ export async function listRawRecordsForSchemaSince(
  * a future second billing connector adds its event names to this one list rather than growing a
  * parallel feed. Deliberately excludes `stripe_invoice` (a billing-cycle record, not itself an
  * actionable charge/failure/refund event) and the `stripe_subscription` entity (current-state, not an
- * append-only event this feed's "most recent N" framing fits).
+ * append-only event this feed's "most recent N" framing fits — see the churn feed below instead).
  */
 export const BILLING_OPS_FEED_EVENT_SCHEMA_NAMES = [
   STRIPE_CHARGE_EVENT_NAME,
@@ -276,7 +277,7 @@ export interface ListRecentRecordsForSchemasParams {
   organizationId: string;
   projectId: string;
   kind: SchemaDefKind;
-  /** One or more registered schema names of the same `kind` to fold into one feed — e.g. every billing event schema, or just the one schema a record-feed page's picker selected. */
+  /** One or more registered schema names of the same `kind` to fold into one feed — e.g. every billing event schema, every churn-signal entity schema, or just the one schema a record-feed page's picker selected. */
   schemaNames: readonly string[];
   limit?: number;
 }
@@ -290,8 +291,9 @@ export interface ListRecentRecordsForSchemasParams {
  * of another's more recent records purely by fetch order. Each per-schema fetch needs a composite
  * Firestore index (`kind`, `schema_name`, `landed_at`) in a real (non-emulator) project, same documented
  * requirement every other `RawRecordModel` query in this file already carries. The general-purpose
- * building block behind both `listRecentBillingEventsForProject` (KAN-80, a fixed Stripe schema set)
- * and the KAN-81 record-feed page (a human-picked single schema).
+ * building block behind `listRecentBillingEventsForProject` (KAN-80, a fixed Stripe schema set),
+ * `listRecentChurnedSubscriptionsForProject` (KAN-81, a fixed entity schema set), and the KAN-81
+ * record-feed page (a human-picked single schema).
  */
 export async function listRecentRecordsForSchemas(params: ListRecentRecordsForSchemasParams): Promise<RawRecordModel[]> {
   await requireProjectInOrg(params.organizationId, params.projectId);
@@ -324,6 +326,59 @@ export async function listRecentBillingEventsForProject(
   limit: number = DEFAULT_BILLING_OPS_FEED_LIMIT,
 ): Promise<RawRecordModel[]> {
   return listRecentRecordsForSchemas({ organizationId, projectId, kind: 'event', schemaNames: BILLING_OPS_FEED_EVENT_SCHEMA_NAMES, limit });
+}
+
+/**
+ * The entity schema name(s) surfaced by the churn feed (KAN-81, generalizing KAN-80's billing-ops
+ * feed pattern to plan `14 §Gap 5`'s "live record feeds ... churn"). Currently only Stripe's
+ * subscription entity; a future second billing connector adds its entity name here rather than
+ * growing a parallel feed.
+ */
+export const CHURN_FEED_ENTITY_SCHEMA_NAMES = [STRIPE_SUBSCRIPTION_ENTITY_NAME] as const;
+
+/** Same load-bounding reasoning as `DEFAULT_BILLING_OPS_FEED_LIMIT`. */
+export const DEFAULT_CHURN_FEED_LIMIT = 100;
+
+/**
+ * How many of the most recently landed `stripe_subscription` entity records to scan for a churn
+ * signal before giving up. Unlike the billing-ops feed's `event`-kind records (each one already an
+ * actionable charge/failure/refund), a subscription `entity` record is a current-state snapshot
+ * re-landed on every update — no dedicated append-only "subscription canceled" event schema exists to
+ * query directly (see `STRIPE_COMMERCE_SCHEMAS`) — so most of a naively-fetched recent window are
+ * healthy, unrelated renewals. Scanning a wider candidate window than the feed's own `limit` before
+ * filtering keeps a quiet cancellation from being starved out by a burst of unrelated subscription
+ * updates. Same fixed load-bounding posture as `MAX_PIPELINE_DRAIN_BATCH_SIZE`; a project with more
+ * than this many subscription updates landed more recently than its oldest unscanned churn signal
+ * would miss that signal — a known, documented limitation of this Firestore-backed stand-in, same
+ * posture every other "buildable today" feed in this file already carries.
+ */
+const CHURN_FEED_CANDIDATE_WINDOW = 500;
+
+/** A subscription entity record counts as a churn signal once it's canceled or scheduled to cancel — mirrors the `mrr_movements` "downgrade" slice `CHURNED_MRR` (`saas-metric-pack/metrics.ts`) uses at the warehouse layer, at the raw-record level. */
+function isChurnSignal(payload: Record<string, unknown>): boolean {
+  return payload.cancel_at_period_end === true || typeof payload.canceled_at === 'string';
+}
+
+/**
+ * The most recently landed Stripe subscriptions showing a churn signal — already canceled
+ * (`canceled_at` set) or scheduled to cancel at the end of the current billing period
+ * (`cancel_at_period_end`) — newest first, folded across every environment (KAN-81). See
+ * `CHURN_FEED_CANDIDATE_WINDOW` for why this over-fetches before filtering.
+ */
+export async function listRecentChurnedSubscriptionsForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = DEFAULT_CHURN_FEED_LIMIT,
+): Promise<RawRecordModel[]> {
+  const candidates = await listRecentRecordsForSchemas({
+    organizationId,
+    projectId,
+    kind: 'entity',
+    schemaNames: CHURN_FEED_ENTITY_SCHEMA_NAMES,
+    limit: Math.max(limit, CHURN_FEED_CANDIDATE_WINDOW),
+  });
+
+  return candidates.filter((record) => isChurnSignal(record.payload)).slice(0, limit);
 }
 
 /**

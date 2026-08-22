@@ -53,6 +53,7 @@ import {
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
   listRecentBillingEventsForProject as listRecentBillingEventsForProjectInOrganization,
+  listRecentChurnedSubscriptionsForProject as listRecentChurnedSubscriptionsForProjectInOrganization,
   listRecentRecordsForSchemas as listRecentRecordsForSchemasInOrganization,
   type RawRecordModel,
   type SchemaDefKind,
@@ -265,6 +266,15 @@ export async function listRecentRecordsForSchema(
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
   return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName] });
+}
+
+export async function listRecentChurnedSubscriptionsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listRecentChurnedSubscriptionsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export async function listFailedPipelineMessagesForProject(

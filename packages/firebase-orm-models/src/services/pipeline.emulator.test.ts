@@ -15,6 +15,7 @@ import {
   listQueuedPipelineMessagesForProject,
   listRawRecordsForBatch,
   listRecentBillingEventsForProject,
+  listRecentChurnedSubscriptionsForProject,
   listRecentRecordsForSchemas,
   ProjectNotFoundError,
   RawRecordModel,
@@ -516,6 +517,7 @@ async function landRawRecord(params: {
   schemaName: string;
   landedAt: string;
   payload?: Record<string, unknown>;
+  kind?: 'event' | 'entity' | 'measure';
 }): Promise<RawRecordModel> {
   const record = new RawRecordModel();
   record.organization_id = params.organizationId;
@@ -523,7 +525,7 @@ async function landRawRecord(params: {
   record.environment_id = params.environmentId;
   record.partition_date = params.landedAt.slice(0, 10);
   record.batch_id = unique('batch');
-  record.kind = 'event';
+  record.kind = params.kind ?? 'event';
   record.schema_name = params.schemaName;
   record.client_id = unique('client');
   record.payload = params.payload ?? {};
@@ -691,5 +693,86 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
     await expect(
       listRecentRecordsForSchemas({ organizationId: orgA.id, projectId: projectB.id, kind: 'event', schemaNames: ['signup_completed'] }),
     ).rejects.toBeInstanceOf(ProjectNotFoundError);
+  });
+});
+
+describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
+  it('surfaces only subscriptions with a churn signal, newest first, folded across every environment', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Churn Feed Org');
+
+    // Healthy, active subscription -- no churn signal, must never show up in the feed.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'stripe_subscription',
+      kind: 'entity',
+      landedAt: '2026-08-22T09:00:00.000Z',
+      payload: { customer_id: 'cus_active', status: 'active', currency: 'usd', mrr_normalized: 4900, cancel_at_period_end: false },
+    });
+    // Scheduled to cancel at period end.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      schemaName: 'stripe_subscription',
+      kind: 'entity',
+      landedAt: '2026-08-22T10:00:00.000Z',
+      payload: { customer_id: 'cus_scheduled', status: 'active', currency: 'usd', mrr_normalized: 2900, cancel_at_period_end: true },
+    });
+    // Already canceled.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'stripe_subscription',
+      kind: 'entity',
+      landedAt: '2026-08-22T11:00:00.000Z',
+      payload: { customer_id: 'cus_canceled', status: 'canceled', currency: 'usd', mrr_normalized: 0, cancel_at_period_end: false, canceled_at: '2026-08-22T11:00:00.000Z' },
+    });
+    // A non-subscription entity must never show up in the feed either.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'crm_account',
+      kind: 'entity',
+      landedAt: '2026-08-22T12:00:00.000Z',
+      payload: { cancel_at_period_end: true },
+    });
+
+    const entries = await listRecentChurnedSubscriptionsForProject(organization.id, project.id);
+
+    expect(entries.map((entry) => entry.payload.customer_id)).toEqual(['cus_canceled', 'cus_scheduled']);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id, devEnvironment.id]);
+  });
+
+  it('bounds the merged, filtered result to `limit`', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Churn Feed Cap Org');
+
+    for (let i = 0; i < 5; i += 1) {
+      await landRawRecord({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: prodEnvironment.id,
+        schemaName: 'stripe_subscription',
+        kind: 'entity',
+        landedAt: `2026-08-22T10:0${i}:00.000Z`,
+        payload: { customer_id: `cus_${i}`, canceled_at: `2026-08-22T10:0${i}:00.000Z` },
+      });
+    }
+
+    const entries = await listRecentChurnedSubscriptionsForProject(organization.id, project.id, 3);
+
+    expect(entries).toHaveLength(3);
+    expect(entries[0].payload.customer_id).toBe('cus_4');
+    expect(entries[2].payload.customer_id).toBe('cus_2');
+  });
+
+  it('throws ProjectNotFoundError for a project id that does not belong to the given org', async () => {
+    const { organization: orgA } = await setupProject('Churn Feed Org A');
+    const { project: projectB } = await setupProject('Churn Feed Org B');
+
+    await expect(listRecentChurnedSubscriptionsForProject(orgA.id, projectB.id)).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 });
