@@ -199,7 +199,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions', () =>
   });
 
   it('returns 400 target_id_required when targetId is missing', async () => {
-    const { ownerSession, organization, project } = await setupOrgWithProject('Actions POST Missing Target Org');
+    const { ownerSession, organization, project } = await setupOrgWithProject('Actions POST Missing Target Field Org');
     getServerSessionMock.mockResolvedValue(ownerSession);
 
     const { request, params } = postRequest(organization.id, project.id, JSON.stringify({ afterDailyBudgetUsd: 10 }));
