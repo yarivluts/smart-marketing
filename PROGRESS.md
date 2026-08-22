@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-22 (later still, 21) — generic record feed, second KAN-81 slice, reconciled with a concurrent duplicate (PR #236 + this run)
+## 2026-08-22 (later still, 22) — generic record feed, third KAN-81 slice, reconciled with a concurrent duplicate (PR #236 + this run)
 
 - **Last completed:**
   - Session start: picked up where PROGRESS.md's own "next step" note (below, from the prior run)
@@ -106,6 +106,76 @@ Template for each entry:
   sub-items; Redis cost decision; prune merged/closed feature branches the proxy blocks scheduled runs
   from deleting — now also `kan-81-segment-worklist` (closed, PR #235) and, once this PR merges,
   `kan-81-record-feed`).
+
+---
+
+## 2026-08-22 (later still, 21) — churn feed, second KAN-81 slice (PR #236)
+
+- **Last completed:**
+  - Session start: local `main` was stale (a leftover branch ref from an earlier container, pointing
+    at a completely disjoint history from `origin/main` — `git merge-base` found no common ancestor).
+    Reset it with `git branch -f main origin/main` (a bare ref update, no working-tree changes, nothing
+    destructive) so it tracked `origin/main` at `a412252` (PR #233/#234, the first KAN-81 slice) again.
+  - Picked up **KAN-81** where the prior run's PROGRESS entry left off: of the three deferred pieces
+    (live record feeds, CRM-sync action plugin, AI-suggested lists), live record feeds was flagged as
+    "the most natural next slice (it reuses the billing-ops-feed pattern... already mapped in detail)".
+    Researched via a subagent what "payments/churn/failed" actually map to in this codebase: payments
+    and failed already exist (`stripe_charge`/`stripe_failed_payment`/`stripe_refund`, KAN-80's
+    billing-ops feed); no raw "churn" event schema exists anywhere — churn is a computed warehouse
+    metric (`CHURNED_MRR`/`NET_MRR_CHURN` in `saas-metric-pack/metrics.ts`) with no raw-record
+    counterpart. Scoped this run to the buildable-today gap: a churn feed reading the `stripe_subscription`
+    **entity** (KAN-49), filtered to a churn signal (`canceled_at` set or `cancel_at_period_end`).
+  - **Delivered (PR #236, branch `feat/kan-81-churn-feed`, squash-merged `b53ba9f`):**
+    `packages/firebase-orm-models/src/services/pipeline.service.ts` — extracted a private
+    `listRecentRawRecordsForSchemas(orgId, projectId, kind, schemaNames, limit)` helper from
+    `listRecentBillingEventsForProject`'s own per-schema-query-and-merge body (behavior-preserving
+    refactor, no change to the existing billing-ops feed), then built
+    `listRecentChurnedSubscriptionsForProject` on top of it: since a subscription `entity` record is a
+    current-state snapshot re-landed on every update (not an append-only event), it over-fetches a
+    bounded `CHURN_FEED_CANDIDATE_WINDOW` (500) of the most recent `stripe_subscription` records and
+    filters client-side to the churn signal, newest-first, folded across environments — same "buildable
+    today, documented limitation" posture every other Firestore-backed feed in this file already
+    carries. Admin UI: a second section on the existing project-scoped billing-ops-feed page (same
+    `ingest.write` gate — no new route/permission), a new `apps/web/lib/orgs/churn-feed-view.ts`
+    view-mapper, new `en`/`he` translation keys under the existing `BillingOpsFeed` namespace.
+  - **Left out of scope** (still open under KAN-81): the CRM-sync action plugin (needs a new,
+    first-time outbound action-plugin executor interface) and AI-suggested lists (should follow the
+    KAN-55 "deterministic heuristic stand-in for a real LLM call" posture). The "payments" and "failed"
+    thirds of "live record feeds (payments/churn/failed)" were already fully covered by KAN-80's
+    existing billing-ops feed — nothing further to build there.
+  - **Checks:** fresh container — `pnpm install`, `pnpm --filter @growthos/shared --filter
+    @growthos/firebase-orm-models build` clean, `pnpm turbo lint typecheck --filter=@growthos/shared
+    --filter=@growthos/firebase-orm-models --filter=@growthos/web` clean. `firebase-orm-models` full
+    suite 92 files/1021 tests green (real Firestore emulator; new churn-feed-signal-filtering/
+    limit-bounding/`ProjectNotFoundError` cases). `apps/web` full suite 220 files/1278 tests green
+    (real Firestore+Auth emulators; new `toChurnFeedEntryView` mapper tests). Full `pnpm build` green
+    across all 7 packages. Self-reviewed the diff (read every changed line) before opening the PR — no
+    findings; the refactor to `listRecentBillingEventsForProject` is behavior-preserving and its own
+    existing tests caught any regression there.
+  - Opened PR #236, subscribed to its activity. Real CI (`lint · typecheck · test · build` +
+    `terraform fmt · validate`) ran ~27 minutes (lint/typecheck ~1.5min, the full emulator test suite
+    the rest) and came back fully green, `mergeable_state: clean` — no flakiness this run, unlike the
+    prior two entries' documented CI-runner Firestore-emulator contention. Squash-merged (`b53ba9f`),
+    unsubscribed. Remote branch deletion hit the same recurring git-over-HTTPS-proxy HTTP 403 every
+    prior merged branch from a scheduled run has hit (`feat/kan-81-churn-feed` merged and dead but not
+    deleted; harmless, a human with direct repo access can delete it when convenient).
+- **In progress (exact stopping point):** none — #236 fully landed, `main` green and fast-forwarded
+  locally to `b53ba9f`.
+- **Blocked + why:** nothing.
+- **Next step:** KAN-81 stays `in-progress` in `TASKS.md` (two slices done: work-list owner/status,
+  live payments/churn/failed feeds). The next run on this story should pick up the CRM-sync action
+  plugin (needs a new outbound action-plugin executor interface — research first whether anything
+  KAN-71/72/73 built is reusable, or whether it's genuinely first-of-its-kind) or AI-suggested lists.
+  Otherwise the usual candidates remain: KAN-18/KAN-19 infra follow-ups (all `needs-human`-gated),
+  KAN-82..88 (~4-8d each per the gap doc, all `todo`, no blockers).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18** — remaining infra follow-ups (scheduled dbt orchestration against real BigQuery,
+    per-environment dataset split, terraform import/apply reconciliation, Pub/Sub, Redis, staging env)
+    — still outstanding, not blocking any buildable-today story.
+  - Optional: delete the merged `feat/kan-81-churn-feed` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403, same as every prior scheduled-run merge).
 
 ---
 
