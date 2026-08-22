@@ -16,6 +16,7 @@ import {
   listRawRecordsForBatch,
   listRecentBillingEventsForProject,
   listRecentChurnedSubscriptionsForProject,
+  listRecentRecordsForSchemas,
   ProjectNotFoundError,
   RawRecordModel,
   replayFailedPipelineMessagesForProject,
@@ -605,6 +606,93 @@ describe('listRecentBillingEventsForProject (KAN-80 billing-ops feed)', () => {
     const { project: projectB } = await setupProject('Billing Ops Org B');
 
     await expect(listRecentBillingEventsForProject(orgA.id, projectB.id)).rejects.toBeInstanceOf(ProjectNotFoundError);
+  });
+});
+
+describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
+  it('scopes to exactly the given schema name(s) and kind, newest first, folded across every environment', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Record Feed Org');
+
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T10:00:00.000Z',
+      payload: { plan: 'pro' },
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T11:00:00.000Z',
+      payload: { plan: 'free' },
+    });
+    // A different schema — must never show up when only 'signup_completed' is requested.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'order_completed',
+      landedAt: '2026-08-22T12:00:00.000Z',
+      payload: { net: 42 },
+    });
+
+    const entries = await listRecentRecordsForSchemas({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      schemaNames: ['signup_completed'],
+    });
+
+    expect(entries.map((entry) => entry.schema_name)).toEqual(['signup_completed', 'signup_completed']);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([devEnvironment.id, prodEnvironment.id]);
+  });
+
+  it('folds multiple schema names into one merged, re-sorted feed, bounded to limit', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Record Feed Multi Schema Org');
+
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T10:00:00.000Z',
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'trial_started',
+      landedAt: '2026-08-22T11:00:00.000Z',
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'trial_started',
+      landedAt: '2026-08-22T12:00:00.000Z',
+    });
+
+    const entries = await listRecentRecordsForSchemas({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      schemaNames: ['signup_completed', 'trial_started'],
+      limit: 2,
+    });
+
+    expect(entries.map((entry) => entry.landed_at)).toEqual(['2026-08-22T12:00:00.000Z', '2026-08-22T11:00:00.000Z']);
+  });
+
+  it('throws ProjectNotFoundError for a project id that does not belong to the given org', async () => {
+    const { organization: orgA } = await setupProject('Record Feed Org A');
+    const { project: projectB } = await setupProject('Record Feed Org B');
+
+    await expect(
+      listRecentRecordsForSchemas({ organizationId: orgA.id, projectId: projectB.id, kind: 'event', schemaNames: ['signup_completed'] }),
+    ).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 });
 
