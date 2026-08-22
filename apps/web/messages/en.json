@@ -889,7 +889,18 @@
       "in_progress": "In progress",
       "done": "Done"
     },
-    "workListUpdateError": "Could not update the segment. Please try again."
+    "workListUpdateError": "Could not update the segment. Please try again.",
+    "suggestionsHeading": "Suggested lists",
+    "suggestionsIntro": "Proposed from fields already registered on this project's entity schemas. Review and create the ones you want as saved segments.",
+    "suggestionCategory": {
+      "churn_risk": "Churn risk",
+      "payment_risk": "Payment risk",
+      "trial": "Active trial",
+      "vip": "High-value"
+    },
+    "suggestionFieldLabel": "Based on {schemaName}.{field}",
+    "suggestionCreateButton": "Create list",
+    "suggestionCreateError": "Could not create this list. Please try again."
   },
   "WinRules": {
     "metaTitle": "Win rules",

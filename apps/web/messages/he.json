@@ -889,7 +889,18 @@
       "in_progress": "בטיפול",
       "done": "הושלם"
     },
-    "workListUpdateError": "לא ניתן היה לעדכן את הפלח. נסה שוב."
+    "workListUpdateError": "לא ניתן היה לעדכן את הפלח. נסה שוב.",
+    "suggestionsHeading": "רשימות מוצעות",
+    "suggestionsIntro": "מוצע מתוך שדות שכבר נרשמו בסכימות הישויות של הפרויקט. סקור וצור את הפלחים השמורים שברצונך לשמור.",
+    "suggestionCategory": {
+      "churn_risk": "סיכון נטישה",
+      "payment_risk": "סיכון תשלום",
+      "trial": "ניסיון פעיל",
+      "vip": "ערך גבוה"
+    },
+    "suggestionFieldLabel": "מבוסס על {schemaName}.{field}",
+    "suggestionCreateButton": "צור רשימה",
+    "suggestionCreateError": "לא ניתן היה ליצור את הרשימה. נסה שוב."
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

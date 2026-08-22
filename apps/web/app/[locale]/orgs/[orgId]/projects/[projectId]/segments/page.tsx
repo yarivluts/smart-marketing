@@ -5,11 +5,12 @@ import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { countSegmentMembers, listOrgPeople, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
+import { countSegmentMembers, listOrgPeople, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject, suggestSegmentsForProject } from '@/lib/orgs/queries';
 import { buildSegmentMemberCountView, toSegmentSummaryView, type SegmentMemberCountView } from '@/lib/orgs/segment-view';
 import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
 import { DeleteSegmentButton } from '@/components/orgs/delete-segment-button';
 import { SegmentWorkListControls } from '@/components/orgs/segment-work-list-controls';
+import { SegmentSuggestionsPanel } from '@/components/orgs/segment-suggestions-panel';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -54,10 +55,11 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
 
   // Only reached once `projectId` is confirmed to belong to this org — same
   // reasoning `goals/page.tsx`'s own comment gives for `listGoalsForProject`.
-  const [segments, schemaDefs, people] = await Promise.all([
+  const [segments, schemaDefs, people, suggestions] = await Promise.all([
     listSegmentsForProject(orgId, projectId).then((rows) => rows.map(toSegmentSummaryView)),
     listSchemaDefinitionsForProject(orgId, projectId),
     listOrgPeople(orgId),
+    suggestSegmentsForProject(orgId, projectId),
   ]);
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const t = await getTranslations('Segments');
@@ -123,6 +125,8 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
           </ul>
         )}
       </section>
+
+      <SegmentSuggestionsPanel orgId={orgId} projectId={projectId} suggestions={suggestions} />
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('createHeading')}</h2>

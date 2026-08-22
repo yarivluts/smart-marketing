@@ -1,11 +1,11 @@
-import { isSegmentFilterOperator, isSegmentWorkListStatus, isValidSegmentFilterCondition, type SegmentFilterCondition, type SegmentWorkListStatus } from '@growthos/shared';
+import { isSegmentFilterOperator, isSegmentWorkListStatus, isValidSegmentFilterCondition, proposeSegmentSuggestions, type SegmentFilterCondition, type SegmentSuggestion, type SegmentWorkListStatus } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import { SegmentModel } from '../models/segment.model';
 import { OrgPersonModel } from '../models/org-person.model';
 import type { SchemaFieldType } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
-import { getActiveSchemaDefinition } from './schema-registry.service';
+import { getActiveSchemaDefinition, listSchemaDefinitionsForProject } from './schema-registry.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { escapeLikePattern } from './mcp-tools.service';
 import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
@@ -122,6 +122,45 @@ export async function listSegmentsForProject(organizationId: string, projectId: 
     .where('project_id', '==', projectId)
     .get();
   return segments.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/**
+ * Proposes high-value work lists (KAN-81, plan `14 §Gap 5`: "AI proposes new high-value lists")
+ * from every active `entity`-kind schema registered in this project, via the deterministic
+ * `proposeSegmentSuggestions` heuristic (`@growthos/shared`). A suggestion whose exact filter
+ * (`schemaName` + `field` + `op` + `value`) already appears on some saved segment in this project is
+ * dropped — once a human accepts a suggestion (by saving it as a real segment through the normal
+ * `createSegment` path), it should stop being re-proposed, the same "propose only what's still
+ * actionable" posture `listFailedPipelineMessagesForProject`'s own DLQ listing establishes for its
+ * "only what's still unresolved" filter. Sorted by confidence descending (the pure heuristic's own
+ * ordering, preserved across schemas by a stable re-sort).
+ */
+export async function suggestSegmentsForProject(organizationId: string, projectId: string): Promise<SegmentSuggestion[]> {
+  await requireProjectInOrg(organizationId, projectId);
+
+  const [schemaDefs, existingSegments] = await Promise.all([
+    listSchemaDefinitionsForProject(organizationId, projectId),
+    listSegmentsForProject(organizationId, projectId),
+  ]);
+
+  const alreadySaved = new Set<string>();
+  for (const segment of existingSegments) {
+    for (const filter of segment.filters) {
+      alreadySaved.add(`${segment.schema_name}|${filter.field}|${filter.op}|${String(filter.value)}`);
+    }
+  }
+
+  const activeEntitySchemas = schemaDefs.filter((schemaDef) => schemaDef.kind === 'entity' && schemaDef.status === 'active');
+  const suggestions = activeEntitySchemas.flatMap((schemaDef) =>
+    proposeSegmentSuggestions(
+      schemaDef.name,
+      schemaDef.field_defs.map((field) => ({ name: field.name, type: field.type })),
+    ),
+  );
+
+  return suggestions
+    .filter((suggestion) => !suggestion.filters.some((filter) => alreadySaved.has(`${suggestion.schemaName}|${filter.field}|${filter.op}|${String(filter.value)}`)))
+    .sort((a, b) => b.confidence - a.confidence || a.schemaName.localeCompare(b.schemaName) || a.field.localeCompare(b.field));
 }
 
 /** The segment's own doc, scoped and existence-checked — the same `.init` + field-match pattern `board.service.ts`'s `loadBoard` uses for its own project-child lookup. */

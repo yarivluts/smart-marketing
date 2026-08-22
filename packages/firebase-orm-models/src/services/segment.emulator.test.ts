@@ -17,6 +17,7 @@ import {
   registerSchemaDefinition,
   SegmentNotFoundError,
   setProjectCostQuota,
+  suggestSegmentsForProject,
   updateSegmentStatus,
   WarehouseNotConfiguredError,
   WarehouseQueryFailedError,
@@ -220,6 +221,75 @@ describe('listSegmentsForProject', () => {
     const segments = await listSegmentsForProject(organization.id, project.id);
     expect(segments.map((segment) => segment.id).sort()).toEqual([first.id, second.id].sort());
     expect(segments.every((segment) => segment.project_id === project.id)).toBe(true);
+  });
+});
+
+const subscriptionFieldsV1: SchemaFieldInput[] = [
+  { name: 'subscription_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+  { name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
+  { name: 'cancel_at_period_end', type: 'boolean', isRequired: true, isPii: false, isIdentityKey: false },
+  { name: 'is_delinquent', type: 'boolean', isRequired: true, isPii: false, isIdentityKey: false },
+  { name: 'is_active', type: 'boolean', isRequired: true, isPii: false, isIdentityKey: false },
+];
+
+describe('suggestSegmentsForProject', () => {
+  it('proposes a suggestion per matching boolean field across every active entity schema, dropping fields with no confident match', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Suggest Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'subscription',
+      fields: subscriptionFieldsV1,
+      createdByUserId: owner.id,
+    });
+
+    const suggestions = await suggestSegmentsForProject(organization.id, project.id);
+
+    expect(suggestions).toEqual([
+      { schemaName: 'subscription', field: 'cancel_at_period_end', category: 'churn_risk', filters: [{ field: 'cancel_at_period_end', op: '=', value: true }], confidence: 1 },
+      { schemaName: 'subscription', field: 'is_delinquent', category: 'payment_risk', filters: [{ field: 'is_delinquent', op: '=', value: true }], confidence: 1 },
+    ]);
+  });
+
+  it('drops a suggestion whose exact filter already exists on a saved segment', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Suggest Dedup Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'subscription',
+      fields: subscriptionFieldsV1,
+      createdByUserId: owner.id,
+    });
+    await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Already tracked churn risk',
+      schemaName: 'subscription',
+      filters: [{ field: 'cancel_at_period_end', op: '=', value: true }],
+      createdByUserId: owner.id,
+    });
+
+    const suggestions = await suggestSegmentsForProject(organization.id, project.id);
+
+    expect(suggestions.map((s) => s.field)).toEqual(['is_delinquent']);
+  });
+
+  it('returns no suggestions for a project with no registered entity schemas', async () => {
+    const { organization, project } = await setupOrgWithProject('Segment Suggest Empty Org');
+
+    const suggestions = await suggestSegmentsForProject(organization.id, project.id);
+
+    expect(suggestions).toEqual([]);
+  });
+
+  it('rejects a project id that does not belong to the organization', async () => {
+    const { organization } = await setupOrgWithProject('Segment Suggest Wrong Org');
+    const { project: otherProject } = await setupOrgWithProject('Segment Suggest Other Org');
+
+    await expect(suggestSegmentsForProject(organization.id, otherProject.id)).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 });
 

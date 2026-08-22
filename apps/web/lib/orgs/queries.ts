@@ -68,6 +68,7 @@ import {
   proposeOnboardingFunnelSteps as proposeOnboardingFunnelStepsInOrganization,
   queryBoardTile as queryBoardTileInOrganization,
   queryGoalProgress as queryGoalProgressInOrganization,
+  suggestSegmentsForProject as suggestSegmentsForProjectInOrganization,
   UserModel,
   verifyAuditLogChainForOrg as verifyAuditLogChainForOrgInOrganization,
   type AuditLogChainVerification,
@@ -116,7 +117,7 @@ import {
   type WinEventModel,
   type WinRuleModel,
 } from '@growthos/firebase-orm-models';
-import type { FunnelStepSuggestion, Result } from '@growthos/shared';
+import type { FunnelStepSuggestion, Result, SegmentSuggestion } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 export async function listOrgMembers(organizationId: string): Promise<OrgMemberSummary[]> {
@@ -436,6 +437,12 @@ export async function listSegmentsForProject(organizationId: string, projectId: 
 export async function countSegmentMembers(organizationId: string, projectId: string, segmentId: string): Promise<SegmentMemberCountOutcome> {
   await ensureFirestoreOrm();
   return countSegmentMembersInOrganization({ organizationId, projectId, segmentId });
+}
+
+/** AI-suggested high-value lists (KAN-81) for the Segments page's own "Suggested lists" panel — see `suggestSegmentsForProject`'s own doc comment for the heuristic and the already-saved dedup. */
+export async function suggestSegmentsForProject(organizationId: string, projectId: string): Promise<SegmentSuggestion[]> {
+  await ensureFirestoreOrm();
+  return suggestSegmentsForProjectInOrganization(organizationId, projectId);
 }
 
 export async function getGoal(organizationId: string, projectId: string, goalId: string): Promise<GoalModel | null> {
