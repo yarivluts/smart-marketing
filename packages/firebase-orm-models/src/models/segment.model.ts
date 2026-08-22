@@ -1,14 +1,13 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { SegmentFilterCondition } from '@growthos/shared';
+import type { SegmentFilterCondition, SegmentWorkListStatus } from '@growthos/shared';
 
 /**
  * A project-scoped saved segment (KAN-76, E22.2): a named, ANDed set of
- * filter conditions over one registered entity schema. Stores only the
- * segment's own definition — no live query executor or materialized member
- * list exists yet (see `@growthos/shared`'s `segment-filter.ts` doc comment
- * for why that fuller "work list" feature is deliberately out of scope
- * here), the same "config in Firestore, execution deferred" split
- * `MetricDefModel`/`GoalModel` already establish.
+ * filter conditions over one registered entity schema, plus (KAN-81, E14.x)
+ * a work-list owner and status. Stores only the segment's own definition —
+ * no live query executor or materialized member list exists yet, the same
+ * "config in Firestore, execution deferred" split `MetricDefModel`/
+ * `GoalModel` already establish.
  */
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/segments',
@@ -37,4 +36,28 @@ export class SegmentModel extends BaseModel {
 
   @Field({ is_required: true })
   public created_at!: string;
+
+  /**
+   * References `OrgPersonModel.id`; `null` when unassigned. Same
+   * null-vs-undefined convention `GoalModel`'s nullable fields document —
+   * always assigned explicitly (never left `undefined`) so a later
+   * `updateDoc()` can actually clear a previously-set owner, but marked
+   * `is_required: false` so `verifyRequiredFields()` doesn't treat an
+   * explicit `null` as a missing required field and silently skip the
+   * whole `save()` call.
+   */
+  @Field({ is_required: false })
+  public owner_person_id!: string | null;
+
+  /**
+   * Work-list status (KAN-81). `is_required: false` despite always being
+   * assigned at creation, for two reasons: the same explicit-`null`-safety
+   * posture as {@link owner_person_id} above, and so a segment saved by an
+   * earlier run of this app (before this field existed) still loads
+   * cleanly with `status` simply absent — callers treat a missing value as
+   * `'open'` (see `segment-view.ts`'s `toSegmentSummaryView`), never throw
+   * on it.
+   */
+  @Field({ is_required: false })
+  public status!: SegmentWorkListStatus;
 }

@@ -1,9 +1,18 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createOrganizationWithOwner, createProject, createSegment, ensureUserForFirebaseSession, registerSchemaDefinition } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createOrganizationWithOwner,
+  createOrgPerson,
+  createProject,
+  createSegment,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+  registerSchemaDefinition,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
-import { DELETE } from './route';
+import { DELETE, PATCH } from './route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -69,6 +78,22 @@ function deleteRequest(
   };
 }
 
+function patchRequest(
+  orgId: string,
+  projectId: string,
+  segmentId: string,
+  body: unknown,
+): { request: NextRequest; params: Promise<{ orgId: string; projectId: string; segmentId: string }> } {
+  return {
+    request: new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/segments/${segmentId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+    params: Promise.resolve({ orgId, projectId, segmentId }),
+  };
+}
+
 describe('DELETE /api/orgs/[orgId]/projects/[projectId]/segments/[segmentId]', () => {
   it('rejects an unauthenticated caller', async () => {
     getServerSessionMock.mockResolvedValue(null);
@@ -94,5 +119,110 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/segments/[segmentId]', (
 
     const second = deleteRequest(organization.id, project.id, segment.id);
     expect((await DELETE(second.request, { params: second.params })).status).toBe(404);
+  });
+});
+
+describe('PATCH /api/orgs/[orgId]/projects/[projectId]/segments/[segmentId]', () => {
+  it('rejects an unauthenticated caller', async () => {
+    getServerSessionMock.mockResolvedValue(null);
+    const { request, params } = patchRequest('org-1', 'project-1', 'segment-1', { status: 'done' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects a member whose role doesn't hold dashboards.write (viewer)", async () => {
+    const { owner, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Viewer Org');
+    const viewerEmail = uniqueEmail('segment-patch-viewer');
+    const invitation = await inviteMemberToOrganization({ organizationId: organization.id, email: viewerEmail, role: 'viewer', invitedByUserId: owner.id });
+    const viewerSession = await sessionFor(unique('uid'), viewerEmail);
+    const viewerUser = await ensureUserForFirebaseSession({ firebaseUid: viewerSession.uid, email: viewerEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: viewerUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(viewerSession);
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { status: 'done' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(403);
+  });
+
+  it('returns 404 for a segment id that does not exist', async () => {
+    const { ownerSession, organization, project } = await setupOrgProjectSegment('Segment Patch Missing Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, 'does-not-exist', { status: 'done' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(404);
+  });
+
+  it('rejects a body with neither ownerPersonId nor status', async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch No Fields Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, {});
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('no_fields_to_update');
+  });
+
+  it('rejects an unknown status', async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Invalid Status Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { status: 'archived' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('invalid_status');
+  });
+
+  it('rejects an owner that does not belong to this organization', async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Bad Owner Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { ownerPersonId: 'does-not-exist' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('invalid_segment');
+  });
+
+  it('assigns the owner and returns the updated segment', async () => {
+    const { ownerSession, owner, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Owner Org');
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Alex Rep', createdByUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { ownerPersonId: person.id });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    expect((await response.json()).segment.ownerPersonId).toBe(person.id);
+  });
+
+  it('unassigns the owner with ownerPersonId: null', async () => {
+    const { ownerSession, owner, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Unassign Owner Org');
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Alex Rep', createdByUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const assign = patchRequest(organization.id, project.id, segment.id, { ownerPersonId: person.id });
+    await PATCH(assign.request, { params: assign.params });
+
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { ownerPersonId: null });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    expect((await response.json()).segment.ownerPersonId).toBeNull();
+  });
+
+  it('ticks the status and returns the updated segment', async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Status Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { status: 'in_progress' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    expect((await response.json()).segment.status).toBe('in_progress');
+  });
+
+  it('updates owner and status together in one request', async () => {
+    const { ownerSession, owner, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Both Org');
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Alex Rep', createdByUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { ownerPersonId: person.id, status: 'done' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()).segment;
+    expect(body.ownerPersonId).toBe(person.id);
+    expect(body.status).toBe('done');
   });
 });

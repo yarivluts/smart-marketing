@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isSegmentFilterOperator } from '@growthos/shared';
+import { isSegmentFilterOperator, isSegmentWorkListStatus, type SegmentWorkListStatus } from '@growthos/shared';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 export interface ParsedCreateSegmentFields {
@@ -72,4 +72,56 @@ export async function parseCreateSegmentRequestBody(request: NextRequest): Promi
   }
 
   return { name: body.name, schemaName: body.schemaName, filters };
+}
+
+export interface ParsedUpdateSegmentWorkListFields {
+  /** `undefined` when the request didn't touch the owner at all — distinct from `null`, which explicitly unassigns it. */
+  ownerPersonId?: string | null;
+  status?: SegmentWorkListStatus;
+}
+
+export type ParsedUpdateSegmentWorkListRequest = (ParsedUpdateSegmentWorkListFields & { error?: undefined }) | { error: NextResponse };
+
+interface RawUpdateSegmentWorkListBody {
+  ownerPersonId?: unknown;
+  status?: unknown;
+}
+
+/**
+ * Field-*shape* validation for the KAN-81 "assign owner / tick status"
+ * PATCH — same "shape here, business rules (owner-exists check) in the
+ * service" split `parseCreateSegmentRequestBody` documents for its own
+ * sibling. At least one of `ownerPersonId`/`status` must be present so a
+ * no-op PATCH is rejected rather than silently doing nothing.
+ */
+export async function parseUpdateSegmentWorkListRequestBody(request: NextRequest): Promise<ParsedUpdateSegmentWorkListRequest> {
+  const parsed = await parseJsonBody<RawUpdateSegmentWorkListBody>(request);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+  const body = parsed.body;
+
+  const hasOwner = Object.prototype.hasOwnProperty.call(body, 'ownerPersonId');
+  const hasStatus = Object.prototype.hasOwnProperty.call(body, 'status');
+  if (!hasOwner && !hasStatus) {
+    return invalid('no_fields_to_update');
+  }
+
+  const result: ParsedUpdateSegmentWorkListFields = {};
+
+  if (hasOwner) {
+    if (body.ownerPersonId !== null && (typeof body.ownerPersonId !== 'string' || body.ownerPersonId.trim().length === 0)) {
+      return invalid('invalid_owner_person_id');
+    }
+    result.ownerPersonId = body.ownerPersonId as string | null;
+  }
+
+  if (hasStatus) {
+    if (typeof body.status !== 'string' || !isSegmentWorkListStatus(body.status)) {
+      return invalid('invalid_status');
+    }
+    result.status = body.status;
+  }
+
+  return result;
 }

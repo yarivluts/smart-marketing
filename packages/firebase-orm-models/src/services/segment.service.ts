@@ -1,6 +1,7 @@
-import { isSegmentFilterOperator, isValidSegmentFilterCondition, type SegmentFilterCondition } from '@growthos/shared';
+import { isSegmentFilterOperator, isSegmentWorkListStatus, isValidSegmentFilterCondition, type SegmentFilterCondition, type SegmentWorkListStatus } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import { SegmentModel } from '../models/segment.model';
+import { OrgPersonModel } from '../models/org-person.model';
 import type { SchemaFieldType } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
@@ -90,6 +91,8 @@ export async function createSegment(params: CreateSegmentParams): Promise<Segmen
   segment.filters = validFilters;
   segment.created_by = params.createdByUserId;
   segment.created_at = now;
+  segment.owner_person_id = null;
+  segment.status = 'open';
   segment.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await segment.save();
 
@@ -149,6 +152,102 @@ export async function deleteSegment(organizationId: string, projectId: string, s
   } catch {
     // Best-effort — audit logging must never turn a successful delete into a failure for the caller.
   }
+}
+
+/** Confirms `ownerPersonId` resolves to an `OrgPersonModel` belonging to `organizationId` — the same `.init` + org-match pattern `goal.service.ts`'s own `validateOrgPersonInOrg` uses for `GoalModel.owner_person_id`. */
+async function requireOrgPersonInOrg(organizationId: string, ownerPersonId: string): Promise<void> {
+  const person = await OrgPersonModel.init(ownerPersonId, { organization_id: organizationId });
+  if (!person || person.organization_id !== organizationId) {
+    throw new InvalidSegmentError([`Owner "${ownerPersonId}" does not exist in this organization.`]);
+  }
+}
+
+export interface AssignSegmentOwnerParams {
+  organizationId: string;
+  projectId: string;
+  segmentId: string;
+  /** `null` unassigns the segment's owner. */
+  ownerPersonId: string | null;
+  actorUserId: string;
+}
+
+/**
+ * Assigns (or clears) a saved segment's work-list owner (KAN-81, E14.x) —
+ * the "owner assignment" half of plan `14 §Gap 5`'s "live list" upgrade.
+ * Audit-logged like every other in-place config change in this file.
+ */
+export async function assignSegmentOwner(params: AssignSegmentOwnerParams): Promise<SegmentModel> {
+  const segment = await loadSegment(params.organizationId, params.projectId, params.segmentId);
+
+  if (params.ownerPersonId !== null) {
+    await requireOrgPersonInOrg(params.organizationId, params.ownerPersonId);
+  }
+
+  const previousOwnerPersonId = segment.owner_person_id;
+  segment.owner_person_id = params.ownerPersonId;
+  await segment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'segment.assign_owner',
+      targetType: 'segment',
+      targetId: segment.id,
+      summary: `Assigned segment "${segment.name}" owner to ${params.ownerPersonId ?? '(unassigned)'}`,
+      before: { ownerPersonId: previousOwnerPersonId },
+      after: { ownerPersonId: params.ownerPersonId },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful update into a failure for the caller.
+  }
+
+  return segment;
+}
+
+export interface UpdateSegmentStatusParams {
+  organizationId: string;
+  projectId: string;
+  segmentId: string;
+  status: SegmentWorkListStatus;
+  actorUserId: string;
+}
+
+/**
+ * Ticks a saved segment's work-list status (KAN-81, E14.x) — the "status
+ * ticking" half of plan `14 §Gap 5`'s "live list" upgrade. Audit-logged
+ * like every other in-place config change in this file.
+ */
+export async function updateSegmentStatus(params: UpdateSegmentStatusParams): Promise<SegmentModel> {
+  if (!isSegmentWorkListStatus(params.status)) {
+    throw new InvalidSegmentError([`Unknown segment status "${params.status}".`]);
+  }
+
+  const segment = await loadSegment(params.organizationId, params.projectId, params.segmentId);
+  const previousStatus = segment.status ?? 'open';
+  segment.status = params.status;
+  await segment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'segment.update_status',
+      targetType: 'segment',
+      targetId: segment.id,
+      summary: `Updated segment "${segment.name}" status to "${params.status}"`,
+      before: { status: previousStatus },
+      after: { status: params.status },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful update into a failure for the caller.
+  }
+
+  return segment;
 }
 
 /** Same identifier-safety posture `packages/shared`'s metrics compiler applies to every compiled column reference (`assertSafeIdentifier`) — a segment's filter `field` is user-supplied and gets spliced directly into the JSON-subscript expression below, so only letters/digits/underscores are allowed through. */

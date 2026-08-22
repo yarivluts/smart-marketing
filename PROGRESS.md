@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 20) — segment work-list owner + status, first KAN-81 slice (PR #233)
+
+- **Last completed:**
+  - Session start: every KAN-17..80 story is `done`/`needs-human`/`in-progress`-on-infra/`blocked-by`
+    KAN-43; `main` had also picked up two PRs merged directly by the human (yariv.luts@gmail.com)
+    since the last run in this file — **#230** (KAN-80 billing ops feed) and **#231** (a passwordless
+    `/login/token` sign-in path he added himself for an unrelated QA need, not tied to any KAN story).
+    One concurrent-session docs PR (**#232**, `chore: record PR #230`) was open and left untouched
+    per this file's own "leave concurrent PRs alone" convention.
+  - With no unblocked `todo` remaining in KAN-17..80, moved to the next row: **KAN-81** ("E14.x Ops
+    Lists & Feeds: live record feeds, saved segments with owners+statuses, CRM-sync action plugin,
+    AI-suggested lists", ~10d per the gap doc). Too large for one run, so scoped a first
+    buildable-today slice — the same split-into-phases posture KAN-18/KAN-27/KAN-46-48 already
+    establish — and picked **saved segments become work lists: owner assignment + status ticking**,
+    the half of plan `14 §Gap 5` that builds cleanly on KAN-76's existing `SegmentModel` without
+    inventing new event/schema semantics (unlike the live record feeds) or a first-of-its-kind
+    outbound action-plugin runtime (unlike CRM-sync — confirmed via research that KAN-71/72/73's
+    `AutomationActionModel` pipeline is ad-platform-specific and a poor fit to extend for this).
+  - **Delivered (PR #233, branch `feat/segment-work-list-owner-status`):** `SegmentModel` gained
+    `owner_person_id` (references `OrgPersonModel`, same convention `GoalModel.owner_person_id`
+    already established) and `status` (`open`/`in_progress`/`done`) — both `is_required: false` so a
+    segment saved before this change still loads cleanly (defaults to unassigned/`open`, see
+    `segment-view.ts`). New `segment.service.ts` functions `assignSegmentOwner` (validates the owner
+    belongs to the org; `null` unassigns) and `updateSegmentStatus`, both audit-logged
+    (`segment.assign_owner`/`segment.update_status`) like every other in-place config change in that
+    file. New `PATCH .../segments/[segmentId]` (same `dashboards.write` gate as every other segment
+    mutation) accepting either or both fields in one request. Admin UI: new
+    `SegmentWorkListControls` component adds an owner picker + status select to each row on the
+    existing Segments page. New `Segments` i18n keys in both `en.json`/`he.json`.
+  - **Left out of scope** (follow-up work still under KAN-81): the live record feeds for
+    payments/churn/failed (generalizing KAN-80's billing-ops-feed per-schema-name query pattern —
+    confirmed during research that no shared "list records by schema names" helper exists yet, only
+    the billing-ops-feed's own hand-rolled copy), the CRM-sync action plugin (needs a new, first-time
+    outbound action-plugin executor interface — nothing to extend), and AI-suggested lists (should
+    follow the KAN-55 "deterministic heuristic stand-in for a real LLM call" posture once built).
+  - **Checks:** fresh container this run — `pnpm install`, `pnpm --filter @growthos/shared --filter
+    @growthos/firebase-orm-models build`, full `pnpm build` (8 packages) clean, `pnpm turbo lint
+    typecheck --filter=@growthos/shared --filter=@growthos/firebase-orm-models --filter=@growthos/web`
+    clean. `firebase-orm-models` full suite 92 files/1018 tests green (new `assignSegmentOwner`/
+    `updateSegmentStatus` emulator tests: valid assign, unassign, owner-not-in-org rejection,
+    not-found, audit-log before/after). `apps/web` full suite first found one real pre-existing-test
+    break — `lib/orgs/segment-view.test.ts` pinned the old `SegmentSummaryView` shape and failed once
+    `ownerPersonId`/`status` were added — fixed it (asserts the new fields plus a dedicated
+    "defaults for a pre-KAN-81 segment" case) and re-ran: 219 files/1275 tests green, including new
+    PATCH route tests (401/403/404/400×3/200×4) and a new `SegmentWorkListControls` component test.
+    `messages/messages.test.ts` (en/he key parity) green.
+  - Opened PR #233, subscribed to its activity. Ending this run's turn here to let CI confirm before
+    merge, per the babysit-PR convention every recent run in this file follows.
+- **In progress (exact stopping point):** PR #233 open, subscribed, awaiting CI (`lint · typecheck ·
+  test · build` + `terraform fmt · validate`). Will merge (squash) and delete the branch once green.
+- **Blocked + why:** nothing blocking; just waiting on CI to land.
+- **Next step:** once #233 merges, KAN-81 stays `in-progress` in `TASKS.md` (not `done`) — the next
+  run on this story should pick up one of the three deferred pieces above, live record feeds being
+  the most natural next slice (it reuses the billing-ops-feed pattern this run's research already
+  mapped in detail). Otherwise the usual candidates remain: a KAN-18/KAN-19 infra follow-up, or the
+  next `todo` row (KAN-82..88) if KAN-81 is deliberately left mid-epic for a later run.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting).
+
+---
+
 ## 2026-08-22 (later still, 19) — billing ops feed (KAN-80), first gap-analysis story off the exhausted route-coverage sweep (PR #230)
 
 - **Last completed:**

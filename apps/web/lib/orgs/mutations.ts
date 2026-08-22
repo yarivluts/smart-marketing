@@ -65,6 +65,8 @@ import {
   type GoalModel,
   createSegment as createSegmentInOrganization,
   deleteSegment as deleteSegmentInOrganization,
+  assignSegmentOwner as assignSegmentOwnerInOrganization,
+  updateSegmentStatus as updateSegmentStatusInOrganization,
   type SegmentModel,
   createWinRule as createWinRuleInOrganization,
   updateWinRule as updateWinRuleInOrganization,
@@ -140,6 +142,7 @@ import {
   type RequestTvPairingResult,
   type TvPairingModel,
 } from '@growthos/firebase-orm-models';
+import type { SegmentWorkListStatus } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 interface CreateOrganizationInput {
@@ -885,6 +888,30 @@ export async function createSegment(input: CreateSegmentInput): Promise<SegmentM
 export async function deleteSegment(organizationId: string, projectId: string, segmentId: string, deletedByUserId: string): Promise<void> {
   await ensureFirestoreOrm();
   return deleteSegmentInOrganization(organizationId, projectId, segmentId, deletedByUserId);
+}
+
+/** Assigns (or clears, with `ownerPersonId: null`) a segment's work-list owner (KAN-81). */
+export async function assignSegmentOwner(
+  organizationId: string,
+  projectId: string,
+  segmentId: string,
+  ownerPersonId: string | null,
+  actorUserId: string,
+): Promise<SegmentModel> {
+  await ensureFirestoreOrm();
+  return assignSegmentOwnerInOrganization({ organizationId, projectId, segmentId, ownerPersonId, actorUserId });
+}
+
+/** Ticks a segment's work-list status (KAN-81). */
+export async function updateSegmentStatus(
+  organizationId: string,
+  projectId: string,
+  segmentId: string,
+  status: SegmentWorkListStatus,
+  actorUserId: string,
+): Promise<SegmentModel> {
+  await ensureFirestoreOrm();
+  return updateSegmentStatusInOrganization({ organizationId, projectId, segmentId, status, actorUserId });
 }
 
 interface CreateWinRuleInput {
