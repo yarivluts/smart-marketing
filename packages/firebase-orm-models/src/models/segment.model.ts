@@ -16,6 +16,19 @@ import type { SegmentFilterCondition, SegmentStatus } from '@growthos/shared';
 @Model({
   reference_path: 'organizations/:organization_id/projects/:project_id/segments',
   path_id: 'segment_id',
+  /**
+   * `@arbel/firebase-orm`'s default (`auto_time` unset -> `true`) makes
+   * every `save()` unconditionally overwrite `updated_at` with its own
+   * `Date.getTime()` epoch-ms number (`BaseModel.initAutoTime()`), silently
+   * discarding the ISO-string convention every service in this codebase
+   * assigns and every view/UI reads back — a real, previously-undetected
+   * bug this story's own `updateSegmentWorklist` surfaced (a worklist's
+   * "who touched this last" timestamp only means something if it's
+   * trustworthy). Disabling it here is scoped to `SegmentModel` alone —
+   * fixing the same latent issue for every other model in this codebase is
+   * a separate, larger cleanup, not part of this story.
+   */
+  auto_time: false,
 })
 export class SegmentModel extends BaseModel {
   @Field({ is_required: true })
