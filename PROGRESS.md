@@ -17,6 +17,70 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 14) — trigger-orchestration-run route coverage, closing out PR #201's original sweep (PR #223)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). This session's own **#220** (docs-only record of PR #218) merged clean
+    (`125ac5e`) as part of this run. A concurrent session's **PR #221** (`schema-defs/check-tracking-
+    alerts/route.ts` coverage — the last item on PR #201's list this session hadn't picked yet) also
+    merged during this run (`a924654`), confirmed via `git fetch` before this run opened its own PR —
+    no overlap with the candidate picked below.
+  - Picked the one remaining untested route from PR #201's original five-route list:
+    `ingest-health/trigger-orchestration-run/route.ts`. Unlike its ingest-health siblings this session
+    already fixed in PR #218 (and PR #212's `schema-defs/sync-marts`), this route's underlying service
+    (`orchestration.service.ts`'s `triggerOrchestrationRun`) already checks project existence via its
+    own `requireProjectInOrg` helper, called *before* the real dbt subprocess call — no bug found here,
+    genuinely coverage-only.
+  - **Fix (PR #223, branch `test/trigger-orchestration-run-route-coverage`):** new `route.test.ts` (5
+    cases, real Firestore/Auth emulator): 401, 404 non-membership, 403 for a viewer lacking
+    `ingest.write`, the wrong-project 404, and an end-to-end happy path that genuinely drives a real
+    `LocalDbtOrchestrationExecutor` run (the test project isn't the `dbt-transform` package's own
+    fixture project, so it honestly reports zero freshness rows rather than erroring — the same
+    documented behavior `local-dbt-executor.test.ts` already pins — still landing `status: 'succeeded'`).
+  - **A real test-hygiene bug in this PR's own first draft, caught before pushing**: the happy-path
+    test initially passed an explicit `30_000`ms per-test timeout to `it(...)`, which *overrode* this
+    suite's global `120_000`ms `testTimeout` (`vitest.config.ts`) rather than extending it. Standalone
+    the real dbt subprocess call took ~19s (fine under 30s), but under the full suite's parallel load
+    (200+ other test files/emulator contention) it pushed past 30s and the test timed out — caught by
+    running the *full* `apps/web` suite before opening the PR (not just the new file in isolation).
+    Fixed by removing the explicit override and relying on the same global timeout every sibling
+    dbt-subprocess test already uses; full suite reran clean at 1226/1226 (214 files) afterward.
+  - **Checks:** `pnpm turbo lint typecheck` (`@growthos/web`) clean, `pnpm build` (`@growthos/web`)
+    green, new test file 5/5 standalone and as part of the full suite.
+  - PR #223's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green on the
+    first run (confirmed via `subscribe_pr_activity` + a `send_later` self-check-in rather than
+    polling); `get_comments` empty, `mergeable_state: clean`. Merged 2026-08-22 (squash, `06d9c6b`).
+    Remote branch deletion for `test/trigger-orchestration-run-route-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local branch
+    deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #223 fully landed, `main` green. **Every route PR
+  #201's original risk-ranked `apps/web/app/api/` sweep flagged is now covered** — this closes out a
+  multi-session, multi-PR effort spanning #199/#201/#203/#205/#207/#209/#212/#213/#216/#218/#221/#223
+  (plus several duplicate-PR reconciliations along the way: #14/#18-era precedent, and this run's own
+  #211-vs-#212, #219-vs-#218).
+- **Blocked + why:** nothing.
+- **Next step:** the original PR #201 sweep list is exhausted. Options for a future run: (a) a fresh
+  Explore-agent sweep of `apps/web/app/api/` for any remaining zero-coverage route this multi-session
+  effort didn't originally surface (the sweep found real bugs on more than half the routes it touched
+  — PR #209's clear-template persistence bug, PR #212's and PR #218's wrong-project-404 gaps — so
+  another pass is plausibly still worth it); (b) sweep a different subtree entirely — `apps/api/`
+  (NestJS) or non-API `apps/web` components/pages haven't had this kind of systematic pass; (c)
+  reassess whether route-coverage-sweep work has reached diminishing returns for now and pivot to a
+  KAN-18/KAN-19 follow-up (see the standing waiting-on-human items below) or a forward-looking
+  `docs/plan/` story not yet mirrored into `TASKS.md`. Given today's very high concurrent-session
+  collision rate on this narrow, well-advertised candidate list (at least 4 duplicate-PR reconciliations
+  in one day), a future run picking (a) or (b) should check open PRs and recent `PROGRESS.md` entries
+  closely before committing to a specific route/subtree, and lean toward areas less likely to already
+  be claimed.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting — a long list has now accumulated across today's runs, including
+  `test/trigger-orchestration-run-route-coverage` and the superseded, unmerged
+  `test/schema-defs-sync-marts-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 13) — ingest-health pipeline DLQ/queue route coverage + a wrong-project 404 fix (PR #218)
 
 - **Last completed:**
