@@ -17,6 +17,84 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 5) — resource-attachment write-tier route coverage (PR #201)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#200** (docs-only, records PR #199's automation-actions
+    route coverage) from a concurrent session — left alone per the established convention; it merged
+    clean before this run's own PR, confirmed via `git fetch`.
+  - Followed PR #197's own "next step" lead: delegated a fresh Explore-agent sweep across
+    `apps/web/app/api/` **outside** the already-exhaustively-covered `automation/` subtree, looking
+    for zero-coverage routes or real bugs. It found 74 `route.ts` files in scope, 10 with zero test
+    coverage, and traced several security-sensitive already-tested routes (OAuth consent redirect,
+    session-replay URL scheme-checking, Stripe webhook signature verification, invite-accept
+    identity/email-verification gate) by hand without finding a live bug like PR #189's redirect
+    bypass.
+  - Picked its top-ranked candidate: **`resource-attachments/[attachmentId]/write-tier/route.ts`**
+    (POST, sets a credential connection's write tier — `read`/`optimize`/`manage`) — the highest-risk
+    zero-coverage route in scope, since this value is the actual security boundary
+    `automation.service.ts` checks before letting an automation mutate a live ad account
+    (`WRITE_TIER_RANK`).
+  - Traced the route and its service (`setResourceAttachmentWriteTier`,
+    `packages/firebase-orm-models/src/services/resource-library.service.ts`) by hand before writing
+    anything: auth (401), `resources.manage` permission (403), malformed JSON (400
+    `invalid_json`), non-string `tier` (400 `invalid_tier`), an unrecognized tier string (400
+    `invalid_tier`, isolating the enum check from the type check), attachment not found (404
+    `not_found`), a non-`credential` attachment — checked *before* the status check, so an
+    **approved template** attachment isolates it cleanly (400 `not_a_credential`), a `credential`
+    attachment still `pending` (409 `not_approved`, isolated from the kind check by using a
+    credential), and the happy path (200 + an audit-log entry with the real before/after tier and
+    the signed-in caller as actor). Every branch was already correctly implemented — **no
+    production code changed**, this is coverage only.
+  - **Fix (PR #201, branch `test/resource-attachment-write-tier-route-coverage`):** new
+    `route.test.ts` (9 cases, real Firestore/Auth emulator, mirroring the sibling
+    `[attachmentId]/route.test.ts`'s established convention) exercising every branch above.
+  - Independent self-review via a fresh-context subagent (given only the route, the service, and the
+    new test file) re-derived every expected value and branch by hand, confirmed `type: 'dashboard'`
+    is a valid `ResourceTemplateType`, checked for cross-test pollution under the shared Firestore
+    emulator (unique emails/org names per test, org IDs are server-generated not name-derived) — no
+    issues found, confirmed the route's own `InvalidWriteTierError` catch clause is unreachable
+    through the route today (the route's own `isConnectionWriteTier` guard already excludes every
+    value that would trigger it) but that exact service-level branch is independently covered by
+    `resource-library.emulator.test.ts`.
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. New test file 9/9 via the `firebase emulators:exec` wrapper, then `pnpm typecheck` and
+    `pnpm lint` clean. Full suite per package (per prior entries' documented memory-pressure
+    guidance): `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api`
+    140/140, `@growthos/firebase-orm-models` 1006/1006, `@growthos/web` unit 1106/1106 + e2e 22/23
+    outright (1 flaky, `schema-registry.spec.ts` — the same documented cold-dev-server-compile flake
+    class every recent run has hit, passed on Playwright's own retry, unrelated to this change since
+    it touches only one new test file) — all green, exit code 0.
+  - PR #201's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~25
+    minutes (via `subscribe_pr_activity` + `send_later` self-check-ins rather than polling); merged
+    2026-08-22 (squash, `7102671`). Remote branch deletion for
+    `test/resource-attachment-write-tier-route-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #201 fully landed, `main` green (also picked up
+  #200, a concurrent session's PROGRESS.md record for PR #199, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** the Explore-agent sweep's other 9 zero-coverage candidates, ranked by risk: (2)
+  `mcp-grants/[grantId]/route.ts` `DELETE` — the only mechanism to revoke a leaked MCP token; (3)
+  `automation/kill-switch/route.ts` — org-wide pause-all-automation HTTP layer (the underlying
+  service already has emulator tests, but the route's own `engaged`/`reason` validation and
+  permission gate don't); (4) `session-replay/route.ts` — the route's own wiring around the
+  well-tested `buildSessionReplayLink` XSS-scheme-check helper; (5) `schema-defs/sync-marts/route.ts`
+  — a bulk BigQuery-mart-regeneration action gated only by `schema.write`, untested. The remaining
+  five (`ingest-health/replay-failed-pipeline-messages`, `sweep-queued-pipeline-messages`,
+  `trigger-orchestration-run`, `quarantined-records/.../replay`,
+  `schema-defs/check-tracking-alerts`) are structurally identical thin wrappers around
+  already-permission-gated mutations, lower priority, same shape of gap. A future run should pick
+  the next of these, or do a fresh sweep of a different subtree (e.g. `apps/api/` or `apps/web`'s
+  non-API routes/components) if this list runs dry.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; Redis cost decision; prune merged feature branches the proxy blocks
+  scheduled runs from deleting, now including `test/resource-attachment-write-tier-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 4) — automation actions route (GET+POST) coverage (PR #199)
 
 - **Last completed:**
