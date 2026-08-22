@@ -17,6 +17,57 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 14) — schema-defs check-tracking-alerts route coverage (PR #221)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Picked the same next-step candidate PR #201's original sweep had flagged —
+    the ingest-health pipeline sweep/replay routes — independently traced the identical
+    `requireProjectInOrg` gap on `pipeline.service.ts`'s `sweepQueuedPipelineMessagesForProject`/
+    `replayFailedPipelineMessagesForProject`, fixed it the same way, and opened **PR #219**. A concurrent
+    session had picked the exact same two routes and merged the identical fix moments earlier as
+    **PR #218**; that session's own reconciliation closed #219 as superseded (see its entry immediately
+    below — #218's author fully documented the duplicate-PR story, including #219's extra cross-org
+    emulator-level tests, so it isn't repeated here). No further action was needed on #219 beyond local
+    branch cleanup (`git reset --hard origin/main`, local branch deleted; remote delete hit the usual
+    proxy 403).
+  - Moved to the one remaining untested candidate from PR #201's original five-route list:
+    `schema-defs/check-tracking-alerts/route.ts` (KAN-36's manual "check tracking alerts now" action).
+    Traced `checkTrackingAlertsForProject` (`tracking-alert.service.ts`) first — unlike the pipeline
+    routes, it already calls `requireProjectInOrg` correctly and the route already maps
+    `ProjectNotFoundError` to 404, so no bug here; this candidate is coverage-only.
+  - **Fix (PR #221, branch `test/check-tracking-alerts-route-coverage`):** new `route.test.ts` (6 cases,
+    real Firestore/Auth emulator): 401, 404 non-membership, 403 viewer-without-`schema.write`, 404 for a
+    wrong-org project id, and two happy paths (empty schema list; a registered event schema that's never
+    landed a record, asserting the `healthy` outcome). No production code changed.
+  - **Checks:** `pnpm turbo lint typecheck` (`@growthos/web`) green. New test file 6/6 via the `firebase
+    emulators:exec` wrapper. Full `@growthos/web` suite: 213/214 files green — the one failure
+    (`plugins/route.test.ts`'s SaaS-metric-pack-install test, a 60s timeout) reproduced as a flake:
+    reran that file alone and it passed clean in 35s with the same `RESOURCE_EXHAUSTED` emulator warning
+    this sweep has documented before, in a file this PR's diff never touches.
+  - PR #221's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green on the first
+    run (confirmed via `subscribe_pr_activity` rather than polling); no comments, base already current.
+    Merged 2026-08-22 (squash, `a924654`). Remote branch deletion for
+    `test/check-tracking-alerts-route-coverage` hit the same recurring proxy 403; local branch deleted
+    cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge; the fallback
+    `send_later` check-in for #221 was cancelled since the merge completed before it fired.
+- **In progress (exact stopping point):** none — #221 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** PR #201's original five-route list is now fully worked through (all five either fixed
+  a real bug or gained coverage). One candidate remains unstarted: `ingest-health/
+  trigger-orchestration-run/route.ts` — already correctly checks project existence (no bug expected),
+  just zero test coverage. Once that's done, do a fresh Explore-agent sweep of `apps/web/app/api/` for
+  the next zero-coverage subtree, or a different subtree entirely (`apps/api/`, non-API `apps/web`
+  components), or reassess whether the sweep has reached diminishing returns in favor of a
+  KAN-18/KAN-19 follow-up or a forward-looking `docs/plan/` story not yet in `TASKS.md`.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/check-tracking-alerts-route-coverage`,
+  `test/ingest-health-pipeline-routes-coverage`, and the superseded, unmerged
+  `test/pipeline-sweep-replay-route-coverage` / `test/schema-defs-sync-marts-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 13) — ingest-health pipeline DLQ/queue route coverage + a wrong-project 404 fix (PR #218)
 
 - **Last completed:**
