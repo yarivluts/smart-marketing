@@ -43,7 +43,11 @@ export async function setProjectSessionReplayUrlTemplate(
     throw new InvalidSessionReplayUrlTemplateError();
   }
 
-  project.session_replay_url_template = trimmed || undefined;
+  // Assigning `trimmed` (never `undefined`) rather than `trimmed || undefined`: the ORM's
+  // `getDocumentData()` omits any field whose in-memory value is `undefined` from the
+  // `updateDoc()` call entirely, so clearing the template that way would leave the old value
+  // stored in Firestore forever while the API response lied and said it was cleared.
+  project.session_replay_url_template = trimmed;
   project.setPathParams({ organization_id: params.organizationId });
   await project.save();
 
