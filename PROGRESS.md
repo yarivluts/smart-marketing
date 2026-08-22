@@ -17,6 +17,47 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 18) — win-rules/tv-pairing wrong-project-404 regression tests (PR #229)
+
+- **Last completed:**
+  - Session start: `TASKS.md` has no unblocked `todo` row (every KAN-17..78 story is `done`,
+    `needs-human`, `in-progress`-on-infra, or `blocked-by` KAN-43). No open PRs from concurrent
+    sessions (`list_pull_requests` empty). Picked up run 17's own flagged follow-up instead of a new
+    sweep: `win-rules/route.ts` GET and `tv-pairing/route.ts` GET both already call
+    `requireProjectInOrg` correctly (confirmed by reading `win-rule.service.ts`/`tv-pairing.service.ts`
+    directly, not just the route) and map `ProjectNotFoundError` to 404, but neither route's test file
+    pinned the "real org, nonexistent project id" case — only the "no membership at all" case. No
+    production code changed.
+  - **Fix (PR #229, branch `test/win-rules-tv-pairing-wrong-project-404`):** added one regression test
+    per route, matching the existing `goals/route.test.ts`/`boards/route.test.ts` template.
+  - **Checks:** fresh container this run — `pnpm install`, then `pnpm --filter @growthos/shared --filter
+    @growthos/firebase-orm-models build` (workspace packages must be built before `apps/web`'s vitest
+    can resolve `@growthos/firebase-orm-models` — hit and fixed this on the first run). New tests
+    21/21 (11 win-rules + 10 tv-pairing) against the Firestore/Auth emulator; `pnpm turbo lint
+    typecheck --filter=@growthos/web` clean; full `pnpm build` (8 packages) clean; `apps/web` full
+    vitest suite 216/216 files, 1246/1246 tests green; `packages/firebase-orm-models` full suite
+    990/1006 passed (16 skipped) with one failure — `saas-metric-pack.emulator.test.ts` hook-timeout,
+    the same pre-documented emulator-resource-contention flake runs 15/17 already hit (unrelated file,
+    nothing here touches it) — re-ran that file alone and it passed clean (19/19), confirming flake not
+    regression.
+  - Opened PR #229, subscribed to its activity. Ending this run's turn here to let CI confirm before
+    merge, per the babysit-PR convention (drive to green via the wake-driven flow, not by polling).
+- **In progress (exact stopping point):** PR #229 open, subscribed, awaiting CI (`lint · typecheck ·
+  test · build` + `terraform fmt · validate`). Will merge (squash) and delete the branch once green,
+  the same as every prior run in this file — no human action needed unless CI surfaces something real.
+- **Blocked + why:** nothing blocking; just waiting on CI to land.
+- **Next step:** once #229 merges, the short list from run 17 is exhausted. Pick from: a CI-stabilization
+  pass for the `saas-metric-pack.emulator.test.ts` flake now hit by three separate runs' PRs (15, 17,
+  18); a systematic pass over `apps/api/` (NestJS) or non-API `apps/web` components/pages, neither of
+  which has had this kind of check yet; or a KAN-18/KAN-19 follow-up (per-environment dataset split,
+  scheduled dbt orchestration against real BigQuery, terraform import/apply reconciliation). Check open
+  PRs and recent entries first given this repo's high concurrent-session collision rate.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting).
+
+---
+
 ## 2026-08-22 (later still, 16) — automation campaign-activations route coverage (PR #225)
 
 - **Last completed:**
