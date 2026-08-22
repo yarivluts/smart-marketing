@@ -25,12 +25,6 @@ async function createOrganization(page: Page, name: string): Promise<string> {
 
 test.describe('Record feed (KAN-81)', () => {
   test('an org owner reaches the record feed via nav and sees the no-schemas empty state for a fresh project', async ({ page }) => {
-    // Observed timing out waiting on the nav link under a loaded CI/sandbox runner (reproduced
-    // identically against the unmodified, already-merged billing-ops-feed.spec.ts run alongside it) —
-    // same "raise this test's own overall timeout to absorb runner slowness" fix `ingest-health.spec.ts`/
-    // `plugins.spec.ts`/`tv-pairing.spec.ts` already established for this exact failure class.
-    test.setTimeout(90_000);
-
     const email = uniqueEmail('record-feed-owner');
     await signUp(page, email);
     const orgId = await createOrganization(page, 'Record Feed E2E Org');
