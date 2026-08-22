@@ -75,6 +75,78 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 17) — wrong-org-404 audit finds 3 more real bugs (PR #227)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row. Two PRs were open from concurrent
+    sessions: **#224** (docs record of PR #223) and **#225** (`campaign-activations` route coverage,
+    KAN-72) — left alone per convention; both merged clean during this run (confirmed via
+    `list_pull_requests`), along with **#226** (docs record of #225, still open, not touched).
+  - Ran a fresh Explore-agent sweep of `apps/web/app/api/` for zero-coverage routes: found none — the
+    prior multi-session PR #201 sweep (documented in run 15 above) had genuinely exhausted the list,
+    every `route.ts` now has a sibling `route.test.ts`.
+  - Per run 15's own suggested next step, pivoted from "zero coverage" to "checked-and-tested": a
+    second agent audited every route under `apps/web/app/api/orgs/[orgId]/projects/[projectId]/**`
+    (61 files, ~35 backing service modules) for whether the org/project-ownership check
+    (`requireProjectInOrg` or equivalent) actually exists on each list-returning service function, not
+    just whether a test file exists. Found **3 real, previously-undetected instances** of the exact bug
+    class PR #212/#218 already fixed twice: `listAutomationTargetStatesForProject` and
+    `listAutomationActionsForProject` (`automation.service.ts`, backing `GET .../automation/targets`
+    and `GET .../automation/actions`) and `listAttachmentsForProject` (`resource-library.service.ts`,
+    backing `GET .../resource-attachments`) all queried Firestore scoped by `project_id` without first
+    confirming the project belongs to the claimed org — a wrong-org/nonexistent project id silently
+    returned `200` with an empty list instead of the `404` every sibling POST route on the same page
+    already returns. Two of the three routes had even self-documented the bug in an existing test
+    ("no project-existence check on the read path") — the sibling `apps/web` route.test.ts files
+    already pinned the *wrong* behavior as expected, a genuine regression-test gap the file-existence
+    sweep couldn't have caught.
+  - **Note on process:** this run's branch was initially created before an in-flight `git fetch`
+    resolved, forking from a stale point ~50 commits behind `origin/main` — caught immediately via
+    `git status` showing "diverged" and a suspiciously-missing test file the audit agent had just
+    confirmed existed. Recovered clean with `git stash` + `git reset --hard origin/main` before any
+    wrong-base work was pushed; a future run should `git fetch` and confirm the SHA *before* branching,
+    not interleave the two.
+  - **Fix (PR #227, branch `fix/project-ownership-check-gaps`):** added `requireProjectInOrg` to all
+    three service functions (each file already had the helper, used by sibling POST/write paths) and
+    mapped the resulting `ProjectNotFoundError` to 404 in each route's `GET` handler. Flipped the two
+    self-documenting tests to assert the correct 404; added `resource-attachments/route.test.ts`'s
+    first-ever `describe('GET ...')` block (401, 404 non-membership, 404 wrong-project — it previously
+    had zero GET coverage, only incidental exercise via a POST test's tail).
+  - **Checks:** `pnpm turbo lint typecheck build` (`@growthos/web`, `@growthos/firebase-orm-models`)
+    clean. Full suites via the Firestore/Auth emulator: `@growthos/firebase-orm-models` 1006/1006 (92
+    files), `@growthos/web` 1235/1235 (215 files, vitest only — Playwright e2e not run since no e2e
+    test touches these three routes, confirmed by grep). New/changed test cases 45/45 across the 3
+    touched `route.test.ts` files.
+  - PR #227's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green on the
+    first run (confirmed via `subscribe_pr_activity` + a `send_later` self-check-in rather than
+    polling); `get_comments` empty, `mergeable_state: clean`. Merged 2026-08-22 (squash, `110cbd2`).
+    Remote branch deletion for `fix/project-ownership-check-gaps` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local branch
+    deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+  - **This entry's own PR (#228) hit a merge conflict** against a concurrent session's #226 (the
+    campaign-activations doc-record entry above), both inserting at the same top-of-file point —
+    resolved by merging `main` in, renumbering this entry to run 17, and re-pushing. Its CI also hit
+    the well-documented `plugins/route.test.ts` SaaS-metric-pack-install 60s emulator-timeout flake
+    (unrelated to this docs-only diff); confirmed via one re-run (`rerun_failed_jobs`), which passed
+    clean.
+- **In progress (exact stopping point):** none — #227 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** the audit agent's report (see PR #227) also flagged 2 lower-priority coverage-only
+  gaps not yet acted on — `win-rules/route.ts` GET and `tv-pairing/route.ts` GET both already call
+  `requireProjectInOrg` correctly but have no regression test pinning the wrong-project-404 case; both
+  have a clean sibling template to copy from (`goals/route.test.ts`, `boards/route.test.ts`). Beyond
+  that short list, options are the same as run 15/16 left them: sweep `apps/api/` (NestJS) or non-API
+  `apps/web` components/pages, which haven't had this kind of systematic pass; a CI-stabilization pass
+  for the `plugins/route.test.ts` flake now hit by two consecutive runs' PRs; or pivot to a
+  KAN-18/KAN-19 follow-up or a forward-looking `docs/plan/` story not yet mirrored into `TASKS.md`.
+  Given the very high concurrent-session collision rate on this repo, check open PRs and recent
+  `PROGRESS.md` entries before committing to a specific route/subtree.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting — now also including `fix/project-ownership-check-gaps`).
+
+---
+
 ## 2026-08-22 (later still, 15) — trigger-orchestration-run route coverage, closing out PR #201's original sweep (PR #223)
 
 - **Last completed:**
