@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 — automation approve route coverage (PR #185)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#184** (docs-only, records PR #183's coverage) from a
+    concurrent session, different file (`PROGRESS.md`), left alone per the established convention —
+    it merged clean (squash, `7214a22`) before this run opened its own PR, confirmed via `git fetch`.
+  - Followed PR #183's own "Next step" note directly (no fresh sweep needed): the automation
+    execute route's sibling, `apps/web/app/api/orgs/[orgId]/projects/[projectId]/automation/
+    actions/[actionId]/approve/route.ts` — the endpoint transitioning an `awaiting_approval`
+    action to `approved`, gated on `automation.approve` rather than the `automation.execute` every
+    other automation route requires — had zero dedicated test coverage, same as execute had before
+    PR #183.
+  - Traced every branch by hand against `automation.service.ts`'s `approveAutomationAction` before
+    writing anything: status check (`awaiting_approval` only) → kill-switch check →
+    `assertSufficientWriteTierForAction` re-check → save. No production code changed; existing
+    behavior already correct on every case.
+  - **Fix (PR #185, branch `test/automation-approve-route-coverage`):** new `route.test.ts` (7
+    cases, real Firestore/Auth emulator, mirroring `execute/route.test.ts`'s established
+    convention): 401 unauthenticated; 403 for a `viewer` lacking `automation.approve`; 404 for an
+    unknown action id; 409 `invalid_state` on a double-approve; 409 `kill_switch_engaged`; 409
+    `insufficient_write_tier` (the interesting case — proposing directly against an under-tier
+    connection instead lands the action `blocked` at propose time, a different code path already
+    covered by the invalid_state-shaped test above it, so this test seeds the connection at the
+    `optimize` tier a budget change requires, lets the action land `awaiting_approval`, *then*
+    downgrades the connection before calling approve so `assertSufficientWriteTierForAction`'s own
+    re-check at approve time is what's actually exercised); and the 200 success path.
+  - Independent self-review via a fresh-context subagent (given only the diff + `route.ts` +
+    `automation.service.ts`) traced the write-tier-downgrade sequencing line-by-line against the
+    service and confirmed it's not a coincidentally-passing test — no bugs, no gaps found.
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first,
+    both green. New test file 7/7 via the `firebase emulators:exec` wrapper, then `pnpm typecheck`
+    and `pnpm lint` clean. Full suite per package (per prior entries' documented memory-pressure
+    guidance): `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api`
+    140/140, `@growthos/firebase-orm-models` 1006/1006, `@growthos/web` unit 1055/1055 + e2e 23/23
+    (`resource-library.spec.ts` hit the documented cold-dev-server-compile flake class once, passed
+    on Playwright's own retry — confirmed unrelated to this change by re-running it in isolation
+    twice, where it flaked-then-passed identically both times regardless of this PR's diff).
+  - PR #185's CI (`lint · typecheck · test · build`) went green (~23 minutes); merged 2026-08-22
+    (squash, `2f9f749`). Remote branch deletion for `test/automation-approve-route-coverage` hit
+    the same recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run
+    has hit; local branch deleted cleanly. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #185 fully landed, `main` green (also picked up
+  #184, the concurrent session's PROGRESS.md record for PR #183, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep. Concrete leads still
+  open from PR #183's own notes: the remaining automation-action sibling routes —
+  `reject/route.ts`, `rollback/route.ts`, `verify/route.ts`, and `guardrail-policy/route.ts` (its
+  own **route-level** input validation, distinct from and untested by PR #177's service-level
+  `setAutomationGuardrailPolicy` coverage) — are in the same zero-coverage state `approve/route.ts`
+  was in before this run; `reject/route.ts` is the most natural next pick (shares nearly all of
+  this run's setup helpers, simpler state machine than execute). Separately, `execute/route.ts`'s
+  own documented gap remains open: no test exercises its `InvalidAutomationActionError -> 400`
+  branch (only reachable via a `campaign_activation` action against a target with no
+  `campaign_resource_name`).
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; Redis cost decision; prune merged feature branches the proxy blocks
+  scheduled runs from deleting, now including `test/automation-approve-route-coverage`).
+
+---
+
 ## 2026-08-21 (later still, 13) — automation execute route coverage (PR #183)
 
 - **Last completed:**
