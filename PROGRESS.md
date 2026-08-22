@@ -17,6 +17,63 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 23) — record-feed PR #238 merged; real bug found behind the "CI flake" (correcting the prior entry)
+
+- **Last completed:**
+  - Continuation of the immediately-preceding entry below (`kan-81-record-feed`, PR #238). That
+    entry's own closing note guessed the local e2e failure was sandbox-only flakiness and "real CI ...
+    is expected to be unaffected" — **that guess was wrong**, and this entry corrects it.
+  - Real CI failed the same way: `record-feed.spec.ts` timed out 3/3 attempts waiting for
+    `getByRole('link', { name: 'Record feed' })` to ever appear. First response *mis*diagnosed it as
+    the same "loaded runner / cold dev-server compile" flake class `ingest-health.spec.ts`/
+    `plugins.spec.ts`/`tv-pairing.spec.ts` already document with a raised `test.setTimeout` — pushed
+    that fix (90s budget) and re-ran. **Still failed, at the identical "never found" point, even with
+    3x the time.** A flake that survives a 2x-longer timeout unchanged is not a timing flake.
+  - Root-caused it properly: `apps/web/app/[locale]/orgs/[orgId]/page.tsx` keeps a **second,
+    independent copy** of the project-scoped nav links (it renders through `OrgShell`, not the
+    `projects/[projectId]/layout.tsx` `AppShell` nav) — documented in that layout's own comment
+    ("`orgs/[orgId]/page.tsx` etc. render their own equivalent shell via `OrgShell`... a project page
+    needs its own copy of these too") but missed entirely when the `record-feed` link was added, since
+    it was only added to the layout's copy. `record-feed.spec.ts` reaches the record feed via the org
+    page (`page.goto('/en/orgs/{orgId}?project={projectId}')`, matching `billing-ops-feed.spec.ts`'s
+    own pattern), which never had the link — hence a link that truly never renders, no matter how long
+    a test waits for it. Confirmed no third copy exists (`grep -rl projectBillingOpsFeedLink apps/web`
+    → exactly these two files). Fixed by adding the same `canViewIngestHealth`-gated link to the org
+    page; reverted the speculative `test.setTimeout` since it wasn't the real cause. Verified locally
+    (`record-feed.spec.ts` passes clean, 2.0m) before re-pushing.
+  - CI went green on the real fix (`mergeable_state: "clean"`). **Duplicate-work collision #3:** by
+    the time CI finished, `main` had moved *again* — **PR #239** (a parallel session, AI-suggested
+    segments via a deterministic field-heuristic, same posture KAN-55 established) had merged. Checked
+    for overlap: #239 only touches segment-suggestion files, nothing in `pipeline.service.ts`/
+    billing-ops-feed/record-feed/the two nav-list copies — no conflict, GitHub's own `mergeable_state`
+    already confirmed clean. Merged **PR #238** (squash). Remote branch deletion hit the same
+    documented 403 (sandbox git-proxy restriction) every prior run's cleanup attempt has hit — left for
+    a human or a future run with real delete access.
+  - Updated `TASKS.md`'s KAN-81 row: slice 3 now cites the real PR number (#238, was a placeholder
+    "this PR"); added slice 4 (PR #239, AI-suggested segments) so "AI-suggested lists" drops out of
+    "Remaining" — only per-field filtering within a feed and the CRM-sync action plugin are left.
+  - **Lesson for future runs:** when a test fails identically after a timeout bump meant to fix it,
+    that is itself the signal the diagnosis was wrong — don't re-arm the same "probably a flake" check
+    and move on; grep for whether the thing under test has a second definition/registration site
+    somewhere else in the codebase (nav lists, permission tables, route registries) before concluding
+    "environment issue."
+- **In progress (exact stopping point):** none — KAN-81 slices 1-4 (PR #233, #236, #238, #239) are all
+  merged and `main` is green. `TASKS.md` reflects the true remaining scope.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** KAN-81 stays `in-progress` — per-field filtering within a record feed, or the
+  CRM-sync action plugin (needs a new outbound action-plugin executor interface, not a good fit for
+  KAN-71/72/73's ad-platform-specific `AutomationActionModel` pipeline), are the remaining slices; or
+  move to the next `todo` row (KAN-82..88) if KAN-81 is deliberately left mid-epic. The prior entry's
+  concern about **overlapping concurrent-session collisions on KAN-81** (four in one day now, across
+  three separate runs/sessions) still stands — worth a human decision on cadence or an explicit
+  per-story claim marker before a future run sinks time into this story again.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged/closed feature branches the proxy blocks scheduled runs
+  from deleting — `kan-81-segment-worklist` (closed, PR #235) and `kan-81-record-feed` (merged, PR
+  #238), both still present on the remote).
+
+---
+
 ## 2026-08-22 (later still, 22) — generic record feed, third KAN-81 slice, reconciled with a concurrent duplicate (PR #236 + this run)
 
 - **Last completed:**
