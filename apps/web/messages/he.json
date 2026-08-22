@@ -572,6 +572,7 @@
     "failureLine": "כשל: {message}",
     "refundReasonLine": "סיבה: {reason}",
     "landedAtLine": "נקלט ב-{landedAt}",
+    "clientIdLine": "מזהה {clientId}",
     "capNote": "מוצגים {count} אירועי החיוב האחרונים."
   },
   "CostGuardrails": {

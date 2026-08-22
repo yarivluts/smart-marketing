@@ -572,6 +572,7 @@
     "failureLine": "Failure: {message}",
     "refundReasonLine": "Reason: {reason}",
     "landedAtLine": "Landed {landedAt}",
+    "clientIdLine": "id {clientId}",
     "capNote": "Showing the {count} most recent billing events."
   },
   "CostGuardrails": {

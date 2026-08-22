@@ -297,7 +297,7 @@ export async function listRecentBillingEventsForProject(
     ),
   );
 
-  return (perSchemaResults as RawRecordModel[][])
+  return perSchemaResults
     .flat()
     .sort((a, b) => (a.landed_at < b.landed_at ? 1 : a.landed_at > b.landed_at ? -1 : 0))
     .slice(0, limit);

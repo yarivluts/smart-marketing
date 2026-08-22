@@ -84,7 +84,9 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
                 </span>
                 {entry.failureMessage ? <span className="text-destructive">{t('failureLine', { message: entry.failureMessage })}</span> : null}
                 {entry.refundReason ? <span className="text-muted-foreground">{t('refundReasonLine', { reason: entry.refundReason })}</span> : null}
-                <span className="text-xs text-muted-foreground">{t('landedAtLine', { landedAt: entry.landedAt })}</span>
+                <span className="text-xs text-muted-foreground">
+                  {`${t('landedAtLine', { landedAt: entry.landedAt })} · ${t('clientIdLine', { clientId: entry.clientId })}`}
+                </span>
               </li>
             ))}
           </ul>
