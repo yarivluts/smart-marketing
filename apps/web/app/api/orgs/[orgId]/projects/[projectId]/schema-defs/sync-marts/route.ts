@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { syncAllSchemaMartViewsForProject } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { listOrgProjects } from '@/lib/orgs/queries';
 import { requireOrgPermission } from '@/lib/orgs/access';
 
 interface RouteParams {
@@ -14,6 +15,12 @@ interface RouteParams {
  * evolve already sync their own schema's view; this is the backfill/repair
  * sweep for schemas registered before mart generation existed. Gated on
  * `schema.write`, same as every other action on the schema registry page.
+ *
+ * Validates `projectId` belongs to the org first (404 otherwise) — same
+ * convention this route's sibling GET/POST on `schema-defs/route.ts`
+ * documents: `listSchemaDefinitionsForProject` doesn't itself check the
+ * project exists, so a project id from a different org would otherwise
+ * silently return a 200 with an empty result.
  */
 export async function POST(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
@@ -23,6 +30,11 @@ export async function POST(_request: Request, { params }: RouteParams): Promise<
   }
 
   await ensureFirestoreOrm();
+  const projects = await listOrgProjects(orgId);
+  if (!projects.some((project) => project.id === projectId)) {
+    return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  }
+
   const result = await syncAllSchemaMartViewsForProject(orgId, projectId);
   return NextResponse.json(result);
 }
