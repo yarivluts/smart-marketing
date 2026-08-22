@@ -17,6 +17,80 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still) — automation rollback route coverage (PR #190)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#188** (docs-only, records PR #187's coverage) from a
+    concurrent session, different file (`PROGRESS.md`), left alone per the established convention —
+    it merged clean (`031c304`) before this run opened its own PR, confirmed via `git fetch`. A
+    second PR, **#189** (`fix(web): close backslash open-redirect bypass in resolveRedirectTarget`,
+    a real security fix from a concurrent session), also merged (`51df319`) during this run — unrelated
+    file, left alone, picked up on the final `git fetch` before writing this entry.
+  - Followed PR #185/#187's own "Next step" notes directly (no fresh sweep needed): of the remaining
+    automation-action sibling routes they flagged (`rollback/route.ts`, `verify/route.ts`,
+    `guardrail-policy/route.ts`'s own route-level validation), `rollback/route.ts` was the natural
+    next pick — structurally closest to `execute/route.ts` (already covered), sharing the same
+    executor-resolution plumbing.
+  - Traced every branch by hand against `automation.service.ts` (`rollbackAutomationAction`,
+    `rollbackActionByType`, `requireStatus`) and `automation-executor-resolver.service.ts`
+    (`resolveAutomationActionExecutorForTarget`) before writing anything: confirmed rollback, unlike
+    execute, has **no kill-switch check and no write-tier check** — the route doesn't import
+    `AutomationKillSwitchEngagedError` and the service never calls
+    `assertSufficientWriteTierForAction`. Confirmed the executor-resolution errors
+    (plugin-not-installed/credential-not-configured) are still reachable because
+    `resolveAutomationActionExecutorForTargetInOrganization` (in `apps/web/lib/orgs/mutations.ts`)
+    runs before the action's own status check, same ordering PR #183 documented for execute — so
+    those 409 tests correctly use an `approved` (not yet `executed`) action and still observe the
+    plugin/credential error, isolating them from the `invalid_state` branch.
+  - **Fix (PR #190, branch `test/automation-rollback-route-coverage`):** new `route.test.ts` (10
+    cases, real Firestore/Auth emulator, mirroring `execute/route.test.ts`'s established convention):
+    401 unauthenticated; 403 for a `viewer` lacking `automation.execute`; 404 for an unknown action
+    id; 409 `invalid_state` for an action not yet executed; 409
+    `google_ads_plugin_not_installed`/`meta_plugin_not_installed`; 409
+    `google_ads_credential_not_configured`/`meta_ads_credential_not_configured` (both asserting the
+    `reason` field); the 200 success path (rolls back an `executed` action, returns `rolled_back`);
+    and a dedicated test pinning the best-effort KMS resolution (a simulated/unlinked target still
+    rolls back successfully when the vault isn't configured at all). No production code changed —
+    existing behavior already correct on every case.
+  - Independent self-review via a fresh-context subagent (given only the diff + `route.ts` +
+    `automation.service.ts` + `automation-executor-resolver.service.ts` + `mutations.ts`) traced the
+    executor-resolution-before-status-check ordering line-by-line and confirmed the no-kill-switch/
+    no-write-tier claim against the actual service body — no bugs, no gaps found.
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. New test file 10/10 via the `firebase emulators:exec` wrapper, then `pnpm typecheck` and
+    `pnpm lint` clean. Full suite per package (per prior entries' documented memory-pressure
+    guidance): `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api`
+    140/140, `@growthos/firebase-orm-models` 1006/1006, `@growthos/web` unit + e2e all green (2 e2e
+    specs unrelated to this change — `boards.spec.ts`, `resource-library.spec.ts` — each hit the
+    documented cold-dev-server-compile flake class once, passed on Playwright's own retry; confirmed
+    unrelated since this PR touches only a new automation test file, nothing in either spec's path).
+  - PR #190's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green (~18
+    minutes); merged 2026-08-22 (squash, `35a7739`). Remote branch deletion hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch deleted cleanly. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #190 fully landed, `main` green (also picked up
+  #188 and #189, two concurrent sessions' merges, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep. Concrete leads still open:
+  `verify/route.ts` (has zero dedicated coverage — more branches than rollback: an extra request-body
+  validation step for `guardedMetricBefore`/`guardedMetricAfter`, plus the guardrail-regression
+  auto-rollback path) and `guardrail-policy/route.ts`'s own **route-level** input validation
+  (distinct from and untested by PR #177's service-level `setAutomationGuardrailPolicy` coverage) are
+  in the same zero-coverage state `rollback/route.ts` was in before this run. Separately,
+  `execute/route.ts`'s own documented gap remains open: no test exercises its
+  `InvalidAutomationActionError -> 400` branch (only reachable via a `campaign_activation` action
+  against a target with no `campaign_resource_name`) — `rollback/route.ts` has the identical gap for
+  its own `InvalidAutomationActionError` branch (line "this target has no campaign resource name to
+  roll back"), also untested here for the same reason (needs a materially different action-type
+  setup than the budget-change actions this PR's tests use).
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining
+  live-infra sub-items; Redis cost decision; prune merged feature branches the proxy blocks
+  scheduled runs from deleting, now including `test/automation-rollback-route-coverage`).
+
+---
+
 ## 2026-08-22 (later) — automation reject route coverage (PR #187)
 
 - **Last completed:**
