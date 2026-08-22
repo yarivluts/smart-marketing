@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still) — closed an open-redirect bypass in resolveRedirectTarget (PR #189)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two PRs were open, both docs-only "record PR #X in PROGRESS.md" entries
+    from concurrent sessions (**#179**, **#180**) — left alone per the established convention.
+  - Delegated a fresh Explore-agent sweep, explicitly told to find a real correctness bug over a
+    coverage gap if one existed and to justify why it wasn't already covered. It found one:
+    `apps/web/lib/auth/redirect-target.ts`'s `resolveRedirectTarget` — the security boundary
+    deciding where to send a user after sign-in/sign-up from the untrusted `?from=` query param
+    `middleware.ts` attaches — only rejected a *forward*-slash-prefixed protocol-relative URL
+    (`//evil.com`). It did not account for backslashes: browsers normalize a leading `\` to `/`
+    when resolving an href against an http(s) base (confirmed directly:
+    `new URL('/\\evil.com', 'http://example.com').href` → `http://evil.com/`), so
+    `?from=/\evil.com` passed the leading-slash check but resolved to the protocol-relative
+    `//evil.com` once handed to `router.push` in `email-password-form.tsx` — a real, exploitable
+    open-redirect bypass (crafted `?from=` login link -> off-site redirect post-auth), contradicting
+    the function's own doc comment guarantee. Confirmed via grep that the existing test file only
+    covered the forward-slash case, so the bypass was live and untested.
+  - **Fix (PR #189, branch `fix/redirect-target-backslash-bypass`):** added a
+    `!from.includes('\\')` check alongside the existing leading-slash checks, plus a doc-comment
+    note explaining the backslash-normalization vector. Added 3 regression tests: a leading
+    backslash, a backslash immediately followed by a slash, and a backslash later in an otherwise
+    same-app path. Kept the fix scoped to the one verified vector rather than also guarding
+    unverified normalization tricks (e.g. control characters) per CLAUDE.md's don't-speculate rule.
+  - **Checks:** `pnpm install` (fresh container, no prior `node_modules`) + `pnpm build` (all 7
+    packages green) first. Target file 9/9 via `npx vitest run lib/auth/redirect-target.test.ts`.
+    `pnpm lint` and `pnpm typecheck` clean across the monorepo. A full `npx vitest run` across
+    `apps/web` (unintentionally without the `firebase emulators:exec` wrapper — 201/1030
+    pre-existing failures, all emulator/vault-config-dependent routes needing that wrapper's env,
+    confirmed unrelated since `redirect-target.test.ts` wasn't among them) gave extra confidence
+    with no regression, but wasn't a substitute for CI's real emulator-backed run.
+  - Self-reviewed the diff before opening the PR: minimal, correct, tightly scoped, no findings.
+  - **CI hiccup:** the first CI attempt's `lint · typecheck · test · build` job sat `in_progress`
+    with its "Install Playwright browsers" step never completing — this run misjudged how long it
+    had been stuck (a scheduling/wall-clock mismatch between this session's own turn-timing and
+    GitHub's real timestamps) and cancelled + re-ran the job pre-emptively rather than waiting out
+    the normal ~20-25 minute CI duration this repo's runs regularly see. The re-run went green in
+    ~25 minutes, so the cancel was very likely unnecessary — worth a future run being more
+    conservative here and trusting `get_check_runs`' `started_at` against its own tool-call
+    timestamps rather than assuming a stall from step positioning alone.
+  - Merged 2026-08-22 (squash, `51df319`) once CI + `terraform fmt · validate` were both green.
+    Remote branch deletion for `fix/redirect-target-backslash-bypass` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #189 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep. Concrete leads left open
+  by a prior entry (PR #187, still unpicked as of this run): `rollback/route.ts` and
+  `verify/route.ts` (the two remaining automation-action sibling routes with zero coverage),
+  `guardrail-policy/route.ts`'s own route-level input validation, and `execute/route.ts`'s
+  documented `InvalidAutomationActionError -> 400` gap. Also worth a broader look: whether any other
+  user-input-driven redirect/URL-construction call site in `apps/web` has the same
+  backslash-normalization gap `resolveRedirectTarget` had (a quick grep for `router.push`/`redirect`
+  fed directly by a query param or stored field would find it fast) — this run fixed the one
+  instance the Explore sweep surfaced but did not do an exhaustive sweep for siblings.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `fix/redirect-target-backslash-bypass`).
+
+---
+
 ## 2026-08-22 (later) — automation reject route coverage (PR #187)
 
 - **Last completed:**
