@@ -17,6 +17,75 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 9) — session-replay route coverage + a real clear-template bug fix (PR #209)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#208** (a concurrent session's docs-only record of PR
+    #207) — left alone per the established convention; it merged clean (`226a92a`) before this run's
+    own PR, confirmed via `git fetch` after merging.
+  - Picked candidate (4) from PR #205/#207's own risk-ranked "next step" list: `orgs/[orgId]/projects/
+    [projectId]/session-replay/route.ts` (POST) — KAN-60's per-project admin config for the
+    session-replay/heatmap deep-link template a board's landing-page rows link out to. Zero test
+    coverage on the route.
+  - Traced every branch by hand before writing anything: `requireOrgPermission(orgId,
+    'project.manage')` (401/404 non-enumeration/403), `parseJsonBody`'s `invalid_json`, the route's own
+    non-string-`template` 400, and `setProjectSessionReplayUrlTemplate`'s own `ProjectNotFoundError`
+    (404, for a project id that exists but isn't in this org) and `InvalidSessionReplayUrlTemplateError`
+    (400, reusing the real `buildSessionReplayLink` scheme/well-formed-URL check against a throwaway
+    sample page rather than a second hand-rolled validator).
+  - **Found and fixed a real bug while writing the clear-template regression test:**
+    `setProjectSessionReplayUrlTemplate` cleared the field by assigning `project.session_replay_url_template
+    = trimmed || undefined`. `@arbel/firebase-orm`'s `getDocumentData()` (the payload handed to
+    `updateDoc()`) silently omits any field whose in-memory value is `undefined` — so the `updateDoc()`
+    call never touched that field at all, and the *previous* template stayed in Firestore forever. The
+    route still returned `200 { template: '' }`, lying about the clear having taken effect — once a
+    template was set, it could never actually be cleared again through this route. Fixed by assigning
+    the already-computed `trimmed` (an empty string, never `undefined`) instead — every existing reader
+    (`route.ts`'s own `?? ''`, the settings page, `buildSessionReplayLink`'s own `!trimmed` check)
+    already treats `''` and `undefined` identically, so this is a safe, behavior-only fix. This is the
+    same underlying ORM footgun PR #203 pinned (as out-of-scope) for `AutomationTargetStateModel
+    .updated_at` — that one was a cross-cutting reserved-field quirk affecting every model; this one is
+    a genuine, single-service correctness bug this story's own scope covers fixing.
+  - **Fix (PR #209, branch `test/session-replay-route-coverage`):** new `route.test.ts` (12 cases, real
+    Firestore/Auth emulator, mirroring the sibling `cost-guardrails/quota/route.test.ts` convention):
+    401/404/403/404-wrong-project, `invalid_json`, `invalid_template` for a non-string value / a
+    disallowed URL scheme (`javascript:` — the XSS guard) / a malformed URL, and the full set/clear
+    round trip (incl. whitespace-only and an omitted `template` field both clearing) with the cleared
+    value verified against a *fresh* Firestore read via `listOrgProjects`, not just the response body —
+    the regression test that would have caught the bug above.
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 8 packages) first, both
+    green. New test file 12/12 via the `firebase emulators:exec` wrapper (first run caught the bug: 1
+    failed/11 passed; green after the fix). `pnpm turbo lint typecheck` clean across all packages. Full
+    suite per package: `@growthos/web` 1186/1186 (208 files), `@growthos/firebase-orm-models` 1006/1006,
+    `@growthos/api` 140/140, `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171 — all green.
+  - PR #209's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green on the
+    first run (confirmed via `subscribe_pr_activity` + a `send_later` self-check-in rather than
+    polling), `mergeable_state: clean`, no review comments. Merged 2026-08-22 (squash, `efdee1e`).
+    Remote branch deletion for `test/session-replay-route-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local branch
+    deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #209 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** remaining candidates from PR #201/#205/#207's risk-ranked sweep: (5)
+  `schema-defs/sync-marts/route.ts` — a bulk BigQuery-mart-regeneration action gated only by
+  `schema.write`, untested. Also still open: PR #203's own flagged `automation/actions/campaign-drafts/
+  route.ts` (its `InvalidAutomationActionError` catch uniquely forwards `err.message` in the response
+  body, untested) and a pre-existing, untested edge case in `ensureAutomationTargetSeeded`'s
+  validate-before-lookup ordering. The remaining five thin-wrapper routes from PR #201's original sweep
+  (`ingest-health/replay-failed-pipeline-messages`, `sweep-queued-pipeline-messages`,
+  `trigger-orchestration-run`, `quarantined-records/.../replay`, `schema-defs/check-tracking-alerts`)
+  are lower priority, same shape of gap. A future run should pick the highest-priority open item, or do
+  a fresh sweep of a different subtree if this list runs dry — this session's own experience (a real bug
+  found on essentially every other route-coverage PR in this series) suggests the sweep keeps paying
+  for itself.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/session-replay-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 8) — automation kill-switch route coverage (PR #207)
 
 - **Last completed:**
