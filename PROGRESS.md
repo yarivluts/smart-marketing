@@ -153,6 +153,86 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still) — automation verify route coverage + Meta/InvalidAction error-mapping fix (PR #193)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two docs-only PRs were open from concurrent sessions — **#191** (records
+    PR #189) and **#192** (records PR #190) — different file, left alone per the established
+    convention; **#192** merged clean (`0b84b99`) partway through this run, confirmed via `git fetch`
+    before this run opened its own PR; **#191** was still open at merge time (also `PROGRESS.md`,
+    left for its own session to land).
+  - Followed PR #187's own "Next step" note directly: of the two remaining zero-coverage automation
+    sibling routes it named (`rollback/route.ts`, `verify/route.ts`), `rollback/route.ts` had already
+    been picked up and merged by a concurrent session as **PR #190** (confirmed via `git log`) before
+    this run started, so `verify/route.ts` — KAN-71's verify step — was the one unclaimed lead left.
+  - Traced `verify/route.ts` against `automation.service.ts`'s `verifyAutomationAction` and
+    `automation-executor-resolver.service.ts` by hand before writing anything, the same way prior
+    automation-route PRs did, and found a **real bug**: `apps/web/lib/orgs/mutations.ts`'s
+    `verifyAutomationAction` wrapper resolves the real-vs-simulated Google/Meta Ads executor
+    *unconditionally*, before the service even checks the action's status — identical to what
+    `execute`/`rollback` do — but `verify/route.ts` only caught
+    `GoogleAdsPluginNotInstalledError`/`GoogleAdsCredentialConfigError`, not their Meta-Ads mirrors
+    (`MetaPluginNotInstalledError`/`MetaAdsCredentialConfigError`, both real, exported, and already
+    handled by the sibling `rollback/route.ts`) nor `InvalidAutomationActionError` (thrown by the
+    service itself when a guarded metric overflows to a non-finite number — reachable via the
+    syntactically-valid-but-overflowing JSON number literal `1e400`, which `JSON.parse` turns into
+    `Infinity`, passing the route's own `typeof === 'number'` guard but failing the service's
+    `Number.isFinite` check). All three would have surfaced as an unhandled 500 instead of the
+    documented 409/400.
+  - **Fix (PR #193, branch `test/automation-verify-route-coverage`):** added the three missing
+    `catch` branches to `verify/route.ts`, verbatim-matching `rollback/route.ts`'s own mapping
+    (`meta_plugin_not_installed`/`meta_ads_credential_not_configured` → 409,
+    `invalid_action` → 400). New `route.test.ts` (15 cases, real Firestore/Auth emulator): 401
+    unauthenticated; 403 for a `viewer` lacking `automation.execute`; 404 unknown action; 409
+    `invalid_state`; 400 `invalid_guarded_metric` (wrong type); 400 `invalid_action` (the `1e400`
+    non-finite-overflow case, built as a raw request body since `JSON.stringify` itself collapses an
+    in-memory `Infinity` to `null` before it would ever reach the wire); 409 for both Google Ads and
+    Meta Ads plugin-not-installed/credential-not-configured branches; a dedicated test pinning that
+    verify has **no** kill-switch gate (engages the org kill switch, verifies anyway — same
+    documented-gap pattern PR #187 found for reject); the 200 success path with no guarded metric;
+    a guarded-metric regression under the default 20% threshold (stays `verified`, records the
+    pct); a guarded-metric regression past the threshold (auto-rolls back to `rolled_back` via the
+    service's own `rollbackAutomationAction` call, regression pct still reported); and the
+    best-effort-KMS no-vault-configured success path for an unlinked/simulated target.
+  - **Checks:** fresh container this run — `pnpm install` + `pnpm build` (all 7 packages) first, both
+    green. New test file 15/15 via the `firebase emulators:exec` wrapper, then `pnpm typecheck` and
+    `pnpm lint` clean. Full suite per package (per prior entries' documented memory-pressure
+    guidance): `@growthos/shared` 438/438, `@growthos/tracking-sdk` 21/21,
+    `@growthos/mcp-headless-example` 8/8, `@growthos/dbt-transform` 171/171, `@growthos/api`
+    140/140 (hit the documented `apps/api`-vs-`apps/web` emulator-port distinction the hard way: its
+    own `pnpm test` script wraps its own `firebase emulators:exec`, so it must not be run against a
+    manually-started emulator on the same ports — a manual one left running from debugging this
+    caused a spurious "port taken" failure, resolved by killing it and letting `pnpm test` manage its
+    own emulator lifecycle as designed), `@growthos/firebase-orm-models` 1006/1006, `@growthos/web`
+    unit + e2e (22/23 e2e passed outright, 1 flaky `resource-library.spec.ts` — the same documented
+    cold-dev-server-compile flake class every recent run has hit — passed on Playwright's own retry)
+    — all green, exit code 0.
+  - PR #193's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green in ~20
+    minutes (via `subscribe_pr_activity`); merged 2026-08-22 (squash, `de6b5dc`). Remote branch
+    deletion for `test/automation-verify-route-coverage` hit the same recurring
+    git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has hit; local
+    branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity after merge.
+- **In progress (exact stopping point):** none — #193 fully landed, `main` green (also picked up
+  #192, a concurrent session's PROGRESS.md record for PR #190, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** a future run should do a fresh unclaimed-follow-up sweep — every named automation
+  sibling route (`approve`/`reject`/`execute`/`rollback`/`verify`) now has dedicated coverage, closing
+  out that entire lead. Concrete leads still open: `guardrail-policy/route.ts`'s own **route-level**
+  input validation (distinct from and untested by PR #177's service-level
+  `setAutomationGuardrailPolicy` coverage — still zero `route.test.ts` for that route) and
+  `execute/route.ts`'s own documented gap (no test exercises its `InvalidAutomationActionError -> 400`
+  branch, only reachable via a `campaign_activation` action against a target with no
+  `campaign_resource_name`). Beyond that, the automation-actions route subtree is likely exhausted as
+  a coverage source — a fresh Explore-agent sweep across the rest of `apps/web/app/api/` (outside
+  `automation/`) for zero-coverage routes is the natural next move, same as PR #183's original sweep
+  found the automation subtree in the first place.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/automation-verify-route-coverage`).
+
+---
+
 ## 2026-08-22 (later) — automation reject route coverage (PR #187)
 
 - **Last completed:**
