@@ -17,6 +17,7 @@ import {
   registerSchemaDefinition,
   SegmentNotFoundError,
   setProjectCostQuota,
+  suggestSegments,
   updateSegmentStatus,
   WarehouseNotConfiguredError,
   WarehouseQueryFailedError,
@@ -695,5 +696,52 @@ describe('countSegmentMembers', () => {
       countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor }),
     ).rejects.toBeInstanceOf(SegmentNotFoundError);
     expect(executor.calls).toHaveLength(0);
+  });
+});
+
+describe('suggestSegments', () => {
+  it('proposes a suggestion from a real registered schema field, matching the pure heuristic', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Suggest Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+
+    const result = await suggestSegments({ organizationId: organization.id, projectId: project.id, schemaName: 'customer' });
+
+    // `customerFieldsV1` has no cancellation/trial-expiry/last-active/signup-timestamp field, only
+    // `mrr_usd` (a number field whose name contains the "mrr" keyword) — so exactly one archetype
+    // ("High-value customers") should fire.
+    expect(result.suggestions).toEqual([{ name: 'High-value customers', filters: [{ field: 'mrr_usd', op: '>=', value: 100 }], confidence: 0.85 }]);
+  });
+
+  it('returns no suggestions when nothing on the schema resembles a known archetype', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Suggest Empty Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'widget',
+      fields: [{ name: 'color', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    const result = await suggestSegments({ organizationId: organization.id, projectId: project.id, schemaName: 'widget' });
+
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it('rejects a schema name that is not registered (or not active) in this project', async () => {
+    const { organization, project } = await setupOrgWithProject('Segment Suggest Unregistered Org');
+
+    await expect(
+      suggestSegments({ organizationId: organization.id, projectId: project.id, schemaName: 'nonexistent' }),
+    ).rejects.toBeInstanceOf(InvalidSegmentError);
+  });
+
+  it('rejects a project that does not belong to this org', async () => {
+    const { organization } = await setupOrgWithProject('Segment Suggest Wrong Org');
+    const { project: otherProject } = await setupOrgWithProject('Segment Suggest Other Org');
+
+    await expect(
+      suggestSegments({ organizationId: organization.id, projectId: otherProject.id, schemaName: 'customer' }),
+    ).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 });

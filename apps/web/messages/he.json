@@ -889,7 +889,14 @@
       "in_progress": "בטיפול",
       "done": "הושלם"
     },
-    "workListUpdateError": "לא ניתן היה לעדכן את הפלח. נסה שוב."
+    "workListUpdateError": "לא ניתן היה לעדכן את הפלח. נסה שוב.",
+    "suggestSegmentsButton": "הצע פלחים",
+    "runSuggestSegments": "הצע",
+    "suggestSegmentsClose": "סגור",
+    "suggestSegmentsError": "לא ניתן היה לקבל הצעות. נסה שוב.",
+    "noSegmentSuggestions": "אין הצעות מהימנות עבור סכימת ישות זו כרגע.",
+    "segmentSuggestionSummary": "{name} (התאמה של {confidence}%)",
+    "useSuggestionButton": "השתמש בזה"
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

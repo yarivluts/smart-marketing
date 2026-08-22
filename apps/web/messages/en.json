@@ -889,7 +889,14 @@
       "in_progress": "In progress",
       "done": "Done"
     },
-    "workListUpdateError": "Could not update the segment. Please try again."
+    "workListUpdateError": "Could not update the segment. Please try again.",
+    "suggestSegmentsButton": "Suggest segments",
+    "runSuggestSegments": "Suggest",
+    "suggestSegmentsClose": "Close",
+    "suggestSegmentsError": "Couldn't get suggestions. Please try again.",
+    "noSegmentSuggestions": "No confident suggestions for this entity schema yet.",
+    "segmentSuggestionSummary": "{name} ({confidence}% match)",
+    "useSuggestionButton": "Use this"
   },
   "WinRules": {
     "metaTitle": "Win rules",

@@ -85,4 +85,42 @@ describe('CreateSegmentForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not create the segment. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('fills the name from an applied suggestion when the name field is still blank, and replaces the filter rows', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        suggestions: [{ name: 'High-value customers', filters: [{ field: 'mrr_usd', op: '>=', value: 100 }], confidence: 0.85 }],
+      }),
+    } as Response);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
+    await screen.findByText('High-value customers (85% match)');
+    fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
+
+    expect(screen.getByLabelText('Name')).toHaveValue('High-value customers');
+    expect(screen.getByLabelText('Field')).toHaveValue('mrr_usd');
+    expect(screen.getByLabelText('Value')).toHaveValue('100');
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+  });
+
+  it('never overwrites a name the user already typed when applying a suggestion', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        suggestions: [{ name: 'High-value customers', filters: [{ field: 'mrr_usd', op: '>=', value: 100 }], confidence: 0.85 }],
+      }),
+    } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'My own name' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
+    await screen.findByText('High-value customers (85% match)');
+    fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
+
+    expect(screen.getByLabelText('Name')).toHaveValue('My own name');
+  });
 });

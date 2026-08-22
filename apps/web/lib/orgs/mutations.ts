@@ -67,7 +67,9 @@ import {
   deleteSegment as deleteSegmentInOrganization,
   assignSegmentOwner as assignSegmentOwnerInOrganization,
   updateSegmentStatus as updateSegmentStatusInOrganization,
+  suggestSegments as suggestSegmentsInOrganization,
   type SegmentModel,
+  type SegmentSuggestion,
   createWinRule as createWinRuleInOrganization,
   updateWinRule as updateWinRuleInOrganization,
   deleteWinRule as deleteWinRuleInOrganization,
@@ -912,6 +914,18 @@ export async function updateSegmentStatus(
 ): Promise<SegmentModel> {
   await ensureFirestoreOrm();
   return updateSegmentStatusInOrganization({ organizationId, projectId, segmentId, status, actorUserId });
+}
+
+interface SuggestSegmentsInput {
+  organizationId: string;
+  projectId: string;
+  schemaName: string;
+}
+
+/** Proposes candidate segment definitions for one entity schema (KAN-81, plan `14 §Gap 9` "AI-suggested lists"). Nothing is saved — the admin UI merges a chosen suggestion into the create-segment form's own state, the same "user confirms" posture `suggestFieldMappingRules` (KAN-55) establishes. */
+export async function suggestSegments(input: SuggestSegmentsInput): Promise<{ suggestions: readonly SegmentSuggestion[] }> {
+  await ensureFirestoreOrm();
+  return suggestSegmentsInOrganization(input);
 }
 
 interface CreateWinRuleInput {
