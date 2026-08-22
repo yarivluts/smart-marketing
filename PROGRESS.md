@@ -17,6 +17,73 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 13) — ingest-health pipeline DLQ/queue route coverage + a wrong-project 404 fix (PR #218)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). Two PRs from this session's own earlier work in this run were open: **#211**
+    (superseded by a concurrent session's #212, closed) and **#215** (this session's own docs-only
+    record of PR #213) — #215 hit a merge conflict against a concurrent session's #214 (same PROGRESS.md
+    insertion point); resolved by merging `main` in, trimming duplicate narration, renumbering the
+    entry, and re-pushing, then merged clean (`63cec14`). A further concurrent session's PR #216
+    (quarantined-records replay route coverage) + its own docs record #217 also merged during this run,
+    confirmed via `git fetch` before this run opened its own PR — no overlap with the candidates picked
+    below.
+  - Picked two of PR #201's five originally-flagged thin-wrapper routes:
+    `ingest-health/replay-failed-pipeline-messages/route.ts` (KAN-34 DLQ replay) and
+    `ingest-health/sweep-queued-pipeline-messages/route.ts`, both zero coverage. Traced both against
+    `pipeline.service.ts` and their sibling `trigger-orchestration-run` route (same ingest-health page)
+    before writing anything, and **found a real bug**: `trigger-orchestration-run` already checks
+    project existence (`requireProjectInOrg` -> `ProjectNotFoundError` -> 404), but neither
+    `replayFailedPipelineMessagesForProject` nor `sweepQueuedPipelineMessagesForProject` did — a
+    wrong-org or nonexistent project id silently returned `200` with an empty `{delivered: 0, failed:
+    0}` instead of the `404` every sibling route on this resource returns. The exact same shape of gap
+    PR #212 found and fixed on `schema-defs/sync-marts` (a different, unrelated route/service pair) —
+    this is the third time this sweep has found this specific bug class (asymmetric project-existence
+    checking across sibling routes on the same admin page).
+  - **Fix (PR #218, branch `test/ingest-health-pipeline-routes-coverage`):** added a `requireProjectInOrg`
+    helper to `pipeline.service.ts` (mirroring `orchestration.service.ts`'s own copy verbatim) and called
+    it at the top of both functions, throwing the existing `ProjectNotFoundError`; wired the new error
+    through both routes exactly as `trigger-orchestration-run` already does. New `route.test.ts` for each
+    (6 cases apiece, real Firestore/Auth emulator): 401, 403 (viewer lacking `ingest.write`), the new
+    wrong-project 404 (the regression test), a zero-result happy path, and an end-to-end happy path
+    driving a message through real `queued`/`failed` status via the actual pipeline service functions in
+    test setup (the routes have no sink-injection point, so the delivered/failed outcome variety
+    `pipeline.emulator.test.ts` already exhaustively covers isn't re-tested at the route level — same
+    posture PR #212/#216 established for routes with no injection seam).
+  - **Checks:** all 28 pre-existing `pipeline.emulator.test.ts`/`audit-log.emulator.test.ts` tests
+    re-run and still pass unchanged against the new check (confirms no call site anywhere passes a
+    project id that doesn't actually belong to its org). `pnpm turbo lint typecheck` clean across all
+    packages. `pnpm build` (all 8 packages) green. New test files 12/12 (6+6) via the `firebase
+    emulators:exec` wrapper on the first run. Full suite: `@growthos/firebase-orm-models` 1006/1006,
+    `@growthos/web` 1214/1214 (212 files).
+  - PR #218's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green on the
+    first run (confirmed via `subscribe_pr_activity` + a `send_later` self-check-in rather than
+    polling); `get_comments` empty, base already current (no conflict this time). Merged 2026-08-22
+    (squash, `21ccd46`). Remote branch deletion for `test/ingest-health-pipeline-routes-coverage` hit
+    the same recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run has
+    hit; local branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity
+    after merge.
+- **In progress (exact stopping point):** none — #218 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** two candidates remain from PR #201's original five-route list: `ingest-health/
+  trigger-orchestration-run/route.ts` (already correctly checks project existence — no bug expected
+  there, but the route itself still has zero test coverage) and `schema-defs/check-tracking-alerts/
+  route.ts`. Given this sweep has now found a real, previously-undetected bug on essentially every
+  route it's touched that had a same-page sibling to compare against (PR #209's clear-template
+  persistence bug, PR #212's and this run's own wrong-project-404 gaps), a future run should keep
+  favoring routes with a comparable sibling to diff against — the asymmetry itself is the tell. Once
+  this short list runs dry, do a fresh Explore-agent sweep of `apps/web/app/api/` for the next
+  zero-coverage subtree, or a different subtree entirely (`apps/api/`, non-API `apps/web` components),
+  or reassess whether the sweep has reached diminishing returns in favor of a KAN-18/KAN-19 follow-up
+  or a forward-looking `docs/plan/` story not yet in `TASKS.md`.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/ingest-health-pipeline-routes-coverage` and the superseded, unmerged
+  `test/schema-defs-sync-marts-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 12) — quarantined-records replay route coverage (PR #216)
 
 - **Last completed:**
