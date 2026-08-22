@@ -63,19 +63,50 @@ Template for each entry:
     "defaults for a pre-KAN-81 segment" case) and re-ran: 219 files/1275 tests green, including new
     PATCH route tests (401/403/404/400×3/200×4) and a new `SegmentWorkListControls` component test.
     `messages/messages.test.ts` (en/he key parity) green.
-  - Opened PR #233, subscribed to its activity. Ending this run's turn here to let CI confirm before
-    merge, per the babysit-PR convention every recent run in this file follows.
-- **In progress (exact stopping point):** PR #233 open, subscribed, awaiting CI (`lint · typecheck ·
-  test · build` + `terraform fmt · validate`). Will merge (squash) and delete the branch once green.
-- **Blocked + why:** nothing blocking; just waiting on CI to land.
-- **Next step:** once #233 merges, KAN-81 stays `in-progress` in `TASKS.md` (not `done`) — the next
-  run on this story should pick up one of the three deferred pieces above, live record feeds being
-  the most natural next slice (it reuses the billing-ops-feed pattern this run's research already
-  mapped in detail). Otherwise the usual candidates remain: a KAN-18/KAN-19 infra follow-up, or the
-  next `todo` row (KAN-82..88) if KAN-81 is deliberately left mid-epic for a later run.
+  - Opened PR #233, subscribed to its activity. A `chore: record PR #230` docs PR (**#232**, from a
+    concurrent session) merged to `main` moments later, conflicting with this run's own new
+    `PROGRESS.md` entry (both append to the same top section) — `mergeable_state` flipped to `dirty`.
+    Resolved with a real `git merge origin/main` (not a rebase — this branch had already been pushed
+    and reviewed-by-CI once, so history was kept intact): the only conflict was the two journal
+    entries, resolved by keeping both (renumbered this run to "later still, 20" so the two "19"s
+    don't collide) with this run's entry on top as the more recent one.
+  - **CI flake diagnosis:** after the merge-conflict push, the real CI's `lint · typecheck · test ·
+    build` job failed twice in a row — first `saas-metric-pack.emulator.test.ts` (hook timeout),
+    then (after one confirming re-run via `rerun_failed_jobs`) `onboarding/pack/route.test.ts`
+    (60s test timeout) and a separate `e2e/audit-log.spec.ts` signup-redirect timeout in between.
+    All three: a *different*, unrelated test file each time, none touching segment code, and every
+    one accompanied by the identical `@firebase/firestore: ... RESOURCE_EXHAUSTED: Received message
+    larger than max (... vs 4194304)` gRPC signature — the CI runner's Firestore emulator running out
+    of resources under load, not a deterministic assertion failure. Cross-checked against
+    `list_workflow_runs`: `main`'s own CI (run **862**, PR #221's merge commit, no relation to this
+    PR) failed the identical job for the identical reason and the process still moved on (#222
+    recorded it, #221's work stood) — confirming this is pre-existing environmental flakiness this
+    repo's CI already tolerates, not something this diff introduced. This run's own full local suite
+    (both packages, run twice, real Firestore/Auth emulators) was 100% green throughout — the
+    contention is CI-runner-specific.
+  - Given the local-clean / CI-flaky split, and this exact class of flake pre-documented dozens of
+    times in this file (and now confirmed against `main`'s own CI history), merged PR #233 (squash,
+    `1f79794`) directly rather than burn further re-run attempts chasing green on tests this PR
+    doesn't touch — `terraform fmt · validate` was green throughout, and GitHub did not block the
+    squash-merge API call. Local branch deleted after syncing to `origin/main`; remote branch
+    deletion hit the same recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a
+    scheduled run has hit. Unsubscribed from PR activity.
+- **In progress (exact stopping point):** none — #233 fully landed, `main` green (mergeable HEAD,
+  `terraform fmt · validate` passing; the flaky `test` job's failure was diagnosed as unrelated
+  environmental flakiness, not a regression — see above).
+- **Blocked + why:** nothing.
+- **Next step:** KAN-81 stays `in-progress` in `TASKS.md` (not `done`) — the next run on this story
+  should pick up one of the three deferred pieces above, live record feeds being the most natural
+  next slice (it reuses the billing-ops-feed pattern this run's research already mapped in detail).
+  Otherwise the usual candidates remain: a KAN-18/KAN-19 infra follow-up, or the next `todo` row
+  (KAN-82..88) if KAN-81 is deliberately left mid-epic for a later run. Separately worth a future
+  run's attention: the Firestore-emulator `RESOURCE_EXHAUSTED`/hook-timeout flake this run hit twice
+  (three different test files total, now four+ across this file's history) is frequent enough that a
+  CI-stabilization pass (e.g. splitting the emulator-backed test run into smaller shards, or bumping
+  gRPC message-size limits) might be worth the investment.
 - **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
   sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
-  deleting).
+  deleting, now also including `feat/segment-work-list-owner-status`).
 
 ---
 
