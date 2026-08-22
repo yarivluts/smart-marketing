@@ -17,6 +17,75 @@ Template for each entry:
 
 ---
 
+## 2026-08-22 (later still, 11) — campaign-drafts route coverage (PR #213)
+
+- **Last completed:**
+  - Session start: `TASKS.md` still has no unblocked `todo` row (all done/needs-human/blocked-by
+    KAN-43/KAN-18/KAN-19). One PR was open: **#210** (this session's own docs-only record of PR #209)
+    — merged clean (`f9914aa`) as part of this run.
+  - Picked candidate (5) from PR #205/#207/#209's risk-ranked "next step" list:
+    `schema-defs/sync-marts/route.ts` — opened as **PR #211** (branch `test/schema-defs-sync-marts-
+    route-coverage`, 6 cases, `pnpm lint/typecheck/build/test` all green, `@growthos/web` 1192/1192).
+    A concurrent session independently picked the exact same candidate and opened **PR #212** while
+    #211's CI was still running, fixing a real wrong-project-404 isolation gap that #211 had only
+    pinned as expected behavior — see that session's own entry immediately below for the full story.
+    The other session closed #211 as superseded and merged #212; this session left it alone per the
+    "leave a concurrent session's own PR alone" convention, confirmed clean via a later `git fetch`.
+    Local/remote cleanup for the superseded `test/schema-defs-sync-marts-route-coverage` branch done
+    (remote delete hit the usual git-proxy 403, local deleted).
+  - Moved to the next candidate instead: PR #201/#203's own flagged item,
+    `automation/actions/campaign-drafts/route.ts` — its `InvalidAutomationActionError` catch uniquely
+    forwards `err.message` in the response body, untested. Traced `proposeCampaignDraftCreateAction`
+    (`automation.service.ts`) by hand: project-existence check, `validateCampaignDraft` (Google Ads RSA
+    shape rules, `InvalidCampaignDraftError` -> wrapped `InvalidAutomationActionError`), the
+    already-has-a-campaign guard (one `campaign_draft_create` per target lifetime), guardrail/kill-
+    switch/write-tier evaluation, and the `awaiting_approval`/`blocked` status split. Every branch was
+    already correctly implemented — **no production code changed**, this is coverage only.
+  - **Fix (PR #213, branch `test/campaign-drafts-route-coverage`):** new `route.test.ts` (10 cases,
+    real Firestore/Auth emulator, mirroring the sibling `automation/actions/route.test.ts` convention):
+    401/403, `invalid_json`, `target_id_required`, `draft_required` (missing/null/non-object), 404s for
+    a missing project and a missing target, `invalid_campaign_draft` with the validator's message
+    forwarded verbatim (an RSA headline-count violation — the exact behavior PR #201/#203 flagged as
+    unique and untested), the same error for a target that already has a campaign (propose -> approve
+    -> execute via the real service functions -> propose again), and the clean `awaiting_approval`
+    happy path.
+  - **Checks:** `pnpm turbo lint typecheck` (`@growthos/web`) green after one fixup (the shared
+    `campaignDraft()` test fixture needed an explicit `platform: 'google_ads'` literal and a
+    `GoogleAdsCampaignDraft` return type — the sibling `automation.emulator.test.ts` fixture this was
+    modeled on gets away without either because `**/*.test.ts` is excluded from that package's own
+    `tsc` run entirely, which `apps/web`'s config does not exclude). New test file 10/10 via the
+    `firebase emulators:exec` wrapper. `pnpm build` (`@growthos/web`) green. Full `apps/web` suite: one
+    run hit the documented Firestore-emulator `RESOURCE_EXHAUSTED` resource-pressure flake (unrelated
+    test), clean at 1196/1196 (209 files) on retry.
+  - PR #213's CI (`lint · typecheck · test · build` + `terraform fmt · validate`) went green on the
+    first run (confirmed via `subscribe_pr_activity` rather than polling); `get_comments` empty. Merged
+    2026-08-22 (squash, `8037eb2`). Remote branch deletion for `test/campaign-drafts-route-coverage`
+    hit the same recurring git-over-HTTPS-proxy HTTP 403 every prior merged branch from a scheduled run
+    has hit; local branch deleted cleanly after syncing to `origin/main`. Unsubscribed from PR activity
+    after merge.
+- **In progress (exact stopping point):** none — #213 fully landed, `main` green (also picked up #210
+  and, via the concurrent session, #212, along the way).
+- **Blocked + why:** nothing.
+- **Next step:** the remaining candidates from PR #201's original risk-ranked sweep are the five lower-
+  priority thin-wrapper routes it named: `ingest-health/replay-failed-pipeline-messages`,
+  `sweep-queued-pipeline-messages`, `trigger-orchestration-run`, `quarantined-records/.../replay`,
+  `schema-defs/check-tracking-alerts` — same shape of gap (route-level auth/permission + error-mapping
+  coverage over an already-tested service). Once that list runs dry, a future run should do a fresh
+  Explore-agent sweep of `apps/web/app/api/` for the next zero-coverage subtree, or consider whether
+  the coverage sweep itself has reached diminishing returns and a different kind of work (e.g. an
+  actual KAN-18/KAN-19 follow-up, or picking through `docs/plan/` for a forward-looking story not yet
+  in `TASKS.md`) is more valuable for the next several runs. This run's own experience is worth noting
+  for whoever picks that call: real, previously-undetected bugs turned up on 3 of this session's last 4
+  route-coverage PRs (#209's clear-template persistence bug, #212's wrong-project 404 gap found by a
+  concurrent session on the very route this session was also working, and #203/#207's documented
+  incidental findings) — the sweep is still finding genuine value, not just padding coverage numbers.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting, now including `test/campaign-drafts-route-coverage` and the superseded, unmerged
+  `test/schema-defs-sync-marts-route-coverage`).
+
+---
+
 ## 2026-08-22 (later still, 10) — schema-defs sync-marts route coverage + a wrong-project isolation fix (PR #212)
 
 - **Last completed:**
