@@ -91,6 +91,7 @@
     "projectIngestHealthLink": "Ingest health",
     "projectHooksLink": "Inbound hooks",
     "projectFieldMappingsLink": "Field mappings",
+    "projectBillingOpsFeedLink": "Billing ops feed",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
@@ -556,6 +557,22 @@
     "warehouseFreshnessEmpty": "The warehouse is connected but no records have landed for this project's production environment yet.",
     "warehouseFreshnessNotConfigured": "No warehouse is configured for this deployment yet — freshness will appear here once BigQuery is connected.",
     "warehouseFreshnessError": "Couldn't read warehouse freshness: {message}"
+  },
+  "BillingOpsFeed": {
+    "metaTitle": "Billing ops feed",
+    "title": "Billing ops feed for {projectName}",
+    "description": "Recent charges, failed payments, and refunds landed by the Stripe connector — the bridge from dashboards to daily billing ops.",
+    "empty": "No billing events landed for this project yet.",
+    "typeCharge": "Charge",
+    "typeFailedPayment": "Failed payment",
+    "typeRefund": "Refund",
+    "amountLine": "{amount} {currency}",
+    "amountUnknown": "Amount unknown",
+    "customerLine": "customer {customerId}",
+    "failureLine": "Failure: {message}",
+    "refundReasonLine": "Reason: {reason}",
+    "landedAtLine": "Landed {landedAt}",
+    "capNote": "Showing the {count} most recent billing events."
   },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",

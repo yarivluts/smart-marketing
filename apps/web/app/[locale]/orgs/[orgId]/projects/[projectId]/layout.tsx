@@ -150,6 +150,11 @@ export default async function ProjectLayout({
             label: t('projectFieldMappingsLink'),
             icon: 'GitBranch' as const,
           },
+          {
+            href: `${base}/billing-ops-feed`,
+            label: t('projectBillingOpsFeedLink'),
+            icon: 'Receipt' as const,
+          },
         ]
       : []),
   ];

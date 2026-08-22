@@ -91,6 +91,7 @@
     "projectIngestHealthLink": "תקינות הזרמת הנתונים",
     "projectHooksLink": "וֶבְּהוּקים נכנסים",
     "projectFieldMappingsLink": "מיפויי שדות",
+    "projectBillingOpsFeedLink": "פיד אירועי חיוב",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
@@ -556,6 +557,22 @@
     "warehouseFreshnessEmpty": "מחסן הנתונים מחובר אך טרם נחתו רשומות עבור סביבת הייצור של הפרויקט הזה.",
     "warehouseFreshnessNotConfigured": "טרם הוגדר מחסן נתונים לפריסה הזו — העדכניות תופיע כאן ברגע ש-BigQuery יחובר.",
     "warehouseFreshnessError": "לא ניתן היה לקרוא את עדכניות מחסן הנתונים: {message}"
+  },
+  "BillingOpsFeed": {
+    "metaTitle": "פיד אירועי חיוב",
+    "title": "פיד אירועי חיוב עבור {projectName}",
+    "description": "חיובים, תשלומים שנכשלו והחזרים אחרונים שנקלטו על ידי מחבר Stripe - הגשר בין לוחות המחוונים לתפעול החיוב היומיומי.",
+    "empty": "טרם נקלטו אירועי חיוב עבור פרויקט זה.",
+    "typeCharge": "חיוב",
+    "typeFailedPayment": "תשלום שנכשל",
+    "typeRefund": "החזר",
+    "amountLine": "{amount} {currency}",
+    "amountUnknown": "סכום לא ידוע",
+    "customerLine": "לקוח {customerId}",
+    "failureLine": "כשל: {message}",
+    "refundReasonLine": "סיבה: {reason}",
+    "landedAtLine": "נקלט ב-{landedAt}",
+    "capNote": "מוצגים {count} אירועי החיוב האחרונים."
   },
   "CostGuardrails": {
     "metaTitle": "בקרות עלות",

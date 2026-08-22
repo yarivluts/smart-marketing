@@ -14,6 +14,9 @@ import {
   listFailedPipelineMessagesForProject,
   listQueuedPipelineMessagesForProject,
   listRawRecordsForBatch,
+  listRecentBillingEventsForProject,
+  ProjectNotFoundError,
+  RawRecordModel,
   replayFailedPipelineMessagesForProject,
   sweepQueuedPipelineMessagesForProject,
   type BigQueryInsertClient,
@@ -501,5 +504,104 @@ describe('KAN-18 phase 3: DualWarehouseSink lands into both Firestore and BigQue
     const rawRecords = await listRawRecordsForBatch(organization.id, project.id, batchId);
     expect(rawRecords.map((r) => r.client_id)).toEqual(['evt-1']);
     expect(await listFailedPipelineMessagesForProject(organization.id, project.id)).toHaveLength(1);
+  });
+});
+
+/** Directly lands one raw record (bypassing the full ingest pipeline) at a caller-chosen `landedAt`/payload — same helper shape as `tracking-alert.emulator.test.ts`'s own copy, so ordering/payload can be controlled precisely. */
+async function landRawRecord(params: {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  schemaName: string;
+  landedAt: string;
+  payload?: Record<string, unknown>;
+}): Promise<RawRecordModel> {
+  const record = new RawRecordModel();
+  record.organization_id = params.organizationId;
+  record.project_id = params.projectId;
+  record.environment_id = params.environmentId;
+  record.partition_date = params.landedAt.slice(0, 10);
+  record.batch_id = unique('batch');
+  record.kind = 'event';
+  record.schema_name = params.schemaName;
+  record.client_id = unique('client');
+  record.payload = params.payload ?? {};
+  record.landed_at = params.landedAt;
+  record.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await record.save();
+  return record;
+}
+
+describe('listRecentBillingEventsForProject (KAN-80 billing-ops feed)', () => {
+  it('returns only the billing event schemas, newest first, folded across every environment', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Billing Ops Org');
+
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'stripe_charge',
+      landedAt: '2026-08-22T10:00:00.000Z',
+      payload: { charge_id: 'ch_1', amount: 5000, currency: 'usd', status: 'succeeded' },
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      schemaName: 'stripe_failed_payment',
+      landedAt: '2026-08-22T11:00:00.000Z',
+      payload: { charge_id: 'ch_2', amount: 1200, currency: 'usd', failure_message: 'Your card was declined.' },
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'stripe_refund',
+      landedAt: '2026-08-22T12:00:00.000Z',
+      payload: { refund_id: 're_1', charge_id: 'ch_1', amount: 5000, currency: 'usd', reason: 'requested_by_customer' },
+    });
+    // A non-billing event (e.g. a product-analytics event) must never show up in the feed.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'order_completed',
+      landedAt: '2026-08-22T13:00:00.000Z',
+      payload: { net: 42 },
+    });
+
+    const entries = await listRecentBillingEventsForProject(organization.id, project.id);
+
+    expect(entries.map((entry) => entry.schema_name)).toEqual(['stripe_refund', 'stripe_failed_payment', 'stripe_charge']);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id, devEnvironment.id, prodEnvironment.id]);
+  });
+
+  it('bounds each schema to `limit` and trims the merged, re-sorted result to `limit` overall', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Billing Ops Cap Org');
+
+    for (let i = 0; i < 5; i += 1) {
+      await landRawRecord({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: prodEnvironment.id,
+        schemaName: 'stripe_charge',
+        landedAt: `2026-08-22T10:0${i}:00.000Z`,
+        payload: { charge_id: `ch_${i}` },
+      });
+    }
+
+    const entries = await listRecentBillingEventsForProject(organization.id, project.id, 3);
+
+    expect(entries).toHaveLength(3);
+    // Newest-first, so the 3 kept are the 3 most recently landed, not the 3 earliest.
+    expect(entries[0].landed_at).toBe('2026-08-22T10:04:00.000Z');
+    expect(entries[2].landed_at).toBe('2026-08-22T10:02:00.000Z');
+  });
+
+  it('throws ProjectNotFoundError for a project id that does not belong to the given org', async () => {
+    const { organization: orgA } = await setupProject('Billing Ops Org A');
+    const { project: projectB } = await setupProject('Billing Ops Org B');
+
+    await expect(listRecentBillingEventsForProject(orgA.id, projectB.id)).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 });
