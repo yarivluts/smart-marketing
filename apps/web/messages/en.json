@@ -576,7 +576,14 @@
     "refundReasonLine": "Reason: {reason}",
     "landedAtLine": "Landed {landedAt}",
     "clientIdLine": "id {clientId}",
-    "capNote": "Showing the {count} most recent billing events."
+    "capNote": "Showing the {count} most recent billing events.",
+    "churnHeading": "Churned & at-risk subscriptions",
+    "churnEmpty": "No canceled or at-risk subscriptions landed for this project yet.",
+    "churnUnknownCustomer": "Unknown customer",
+    "mrrLine": "{amount} {currency} MRR",
+    "canceledAtLine": "Canceled {canceledAt}",
+    "cancelAtPeriodEndLine": "Scheduled to cancel at period end ({currentPeriodEnd})",
+    "churnCapNote": "Showing the {count} most recent churned or at-risk subscriptions."
   },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",
