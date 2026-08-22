@@ -1,4 +1,5 @@
 import 'server-only';
+import type { SegmentStatus } from '@growthos/shared';
 import {
   acceptInvite as acceptInviteForOrganization,
   type ApiKeyModel,
@@ -65,6 +66,7 @@ import {
   type GoalModel,
   createSegment as createSegmentInOrganization,
   deleteSegment as deleteSegmentInOrganization,
+  updateSegmentWorklist as updateSegmentWorklistInOrganization,
   type SegmentModel,
   createWinRule as createWinRuleInOrganization,
   updateWinRule as updateWinRuleInOrganization,
@@ -885,6 +887,21 @@ export async function createSegment(input: CreateSegmentInput): Promise<SegmentM
 export async function deleteSegment(organizationId: string, projectId: string, segmentId: string, deletedByUserId: string): Promise<void> {
   await ensureFirestoreOrm();
   return deleteSegmentInOrganization(organizationId, projectId, segmentId, deletedByUserId);
+}
+
+interface UpdateSegmentWorklistInput {
+  organizationId: string;
+  projectId: string;
+  segmentId: string;
+  updatedByUserId: string;
+  ownerPersonId?: string | null;
+  status?: SegmentStatus;
+}
+
+/** Assigns/clears a segment's worklist owner and/or ticks its status (KAN-81). */
+export async function updateSegmentWorklist(input: UpdateSegmentWorklistInput): Promise<SegmentModel> {
+  await ensureFirestoreOrm();
+  return updateSegmentWorklistInOrganization(input);
 }
 
 interface CreateWinRuleInput {

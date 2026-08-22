@@ -873,7 +873,17 @@
     "memberCountError": "ספירת חברים אינה זמינה",
     "deleteConfirm": "למחוק את הפלח הזה? לא ניתן לבטל פעולה זו.",
     "deleteButton": "מחק",
-    "deleteError": "לא ניתן היה למחוק את הפלח. נסה שוב."
+    "deleteError": "לא ניתן היה למחוק את הפלח. נסה שוב.",
+    "ownerLabel": "אחראי",
+    "unassignedOption": "לא משויך",
+    "statusLabel": "סטטוס",
+    "statusOption": {
+      "new": "חדש",
+      "in_progress": "בטיפול",
+      "done": "הושלם",
+      "dismissed": "נדחה"
+    },
+    "updateError": "לא ניתן היה לעדכן את הפלח. נסה שוב."
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

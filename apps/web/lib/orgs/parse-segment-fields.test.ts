@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
-import { parseCreateSegmentRequestBody } from './parse-segment-fields';
+import { parseCreateSegmentRequestBody, parseUpdateSegmentWorklistRequestBody } from './parse-segment-fields';
 
 function request(body?: unknown): NextRequest {
   return new NextRequest('https://growthos.test/x', {
@@ -62,5 +62,41 @@ describe('parseCreateSegmentRequestBody', () => {
 
   it('rejects a filter entry that is not an object', async () => {
     expect((await parseCreateSegmentRequestBody(request({ ...validBody, filters: ['not-a-filter'] }))).error?.status).toBe(400);
+  });
+});
+
+describe('parseUpdateSegmentWorklistRequestBody', () => {
+  it('accepts an owner-only update', async () => {
+    const parsed = await parseUpdateSegmentWorklistRequestBody(request({ ownerPersonId: 'person-1' }));
+    expect(parsed).toEqual({ ownerPersonId: 'person-1' });
+  });
+
+  it('accepts a status-only update', async () => {
+    const parsed = await parseUpdateSegmentWorklistRequestBody(request({ status: 'in_progress' }));
+    expect(parsed).toEqual({ status: 'in_progress' });
+  });
+
+  it('accepts null to clear the owner', async () => {
+    const parsed = await parseUpdateSegmentWorklistRequestBody(request({ ownerPersonId: null }));
+    expect(parsed).toEqual({ ownerPersonId: null });
+  });
+
+  it('accepts an empty body — nothing to change', async () => {
+    const parsed = await parseUpdateSegmentWorklistRequestBody(request({}));
+    expect(parsed).toEqual({});
+  });
+
+  it('rejects invalid JSON', async () => {
+    const badRequest = new NextRequest('https://growthos.test/x', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{not json' });
+    expect((await parseUpdateSegmentWorklistRequestBody(badRequest)).error?.status).toBe(400);
+  });
+
+  it('rejects a blank or non-string ownerPersonId', async () => {
+    expect((await parseUpdateSegmentWorklistRequestBody(request({ ownerPersonId: '  ' }))).error?.status).toBe(400);
+    expect((await parseUpdateSegmentWorklistRequestBody(request({ ownerPersonId: 42 }))).error?.status).toBe(400);
+  });
+
+  it('rejects an unknown status', async () => {
+    expect((await parseUpdateSegmentWorklistRequestBody(request({ status: 'archived' }))).error?.status).toBe(400);
   });
 });

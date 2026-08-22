@@ -1,7 +1,8 @@
-import { isSegmentFilterOperator, isValidSegmentFilterCondition, type SegmentFilterCondition } from '@growthos/shared';
+import { isSegmentFilterOperator, isValidSegmentFilterCondition, SEGMENT_STATUSES, type SegmentFilterCondition, type SegmentStatus } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import { SegmentModel } from '../models/segment.model';
 import type { SchemaFieldType } from '../models/schema-def.model';
+import { OrgPersonModel } from '../models/org-person.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { getActiveSchemaDefinition } from './schema-registry.service';
@@ -90,6 +91,10 @@ export async function createSegment(params: CreateSegmentParams): Promise<Segmen
   segment.filters = validFilters;
   segment.created_by = params.createdByUserId;
   segment.created_at = now;
+  segment.status = 'new';
+  segment.owner_person_id = null;
+  segment.updated_by = params.createdByUserId;
+  segment.updated_at = now;
   segment.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await segment.save();
 
@@ -149,6 +154,74 @@ export async function deleteSegment(organizationId: string, projectId: string, s
   } catch {
     // Best-effort — audit logging must never turn a successful delete into a failure for the caller.
   }
+}
+
+export interface UpdateSegmentWorklistParams {
+  organizationId: string;
+  projectId: string;
+  segmentId: string;
+  updatedByUserId: string;
+  /** Pass a person id to (re)assign the owner, `null` to clear it, or omit to leave the current owner unchanged. */
+  ownerPersonId?: string | null;
+  /** Omit to leave the current status unchanged. */
+  status?: SegmentStatus;
+}
+
+/**
+ * Assigns/clears a segment's worklist owner and/or ticks its status
+ * (KAN-81, E14.x, `docs/plan/14-gap-analysis.md` Gap 5: "any segment
+ * definition ... becomes a live list with owner assignment, status
+ * ticking") — the same partial-update, undefined-means-unchanged
+ * convention `updateBoardSettings` establishes for its own settings patch.
+ * Audit-logged as a single `segment.update` entry per call, like every
+ * other lifecycle change in this file.
+ */
+export async function updateSegmentWorklist(params: UpdateSegmentWorklistParams): Promise<SegmentModel> {
+  const segment = await loadSegment(params.organizationId, params.projectId, params.segmentId);
+
+  const reasons: string[] = [];
+  if (params.ownerPersonId !== undefined && params.ownerPersonId !== null) {
+    const owner = await OrgPersonModel.init(params.ownerPersonId, { organization_id: params.organizationId });
+    if (!owner || owner.organization_id !== params.organizationId) {
+      reasons.push(`Owner "${params.ownerPersonId}" does not exist in this organization.`);
+    }
+  }
+  if (params.status !== undefined && !SEGMENT_STATUSES.includes(params.status)) {
+    reasons.push(`Unknown status "${params.status}".`);
+  }
+  if (reasons.length > 0) {
+    throw new InvalidSegmentError(reasons);
+  }
+
+  const before = { ownerPersonId: segment.owner_person_id, status: segment.status };
+  if (params.ownerPersonId !== undefined) {
+    segment.owner_person_id = params.ownerPersonId;
+  }
+  if (params.status !== undefined) {
+    segment.status = params.status;
+  }
+  segment.updated_by = params.updatedByUserId;
+  segment.updated_at = new Date().toISOString();
+  await segment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.updatedByUserId,
+      action: 'segment.update',
+      targetType: 'segment',
+      targetId: segment.id,
+      summary: `Updated worklist for segment "${segment.name}"`,
+      before,
+      after: { ownerPersonId: segment.owner_person_id, status: segment.status },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful update into a failure for the caller.
+  }
+
+  return segment;
 }
 
 /** Same identifier-safety posture `packages/shared`'s metrics compiler applies to every compiled column reference (`assertSafeIdentifier`) — a segment's filter `field` is user-supplied and gets spliced directly into the JSON-subscript expression below, so only letters/digits/underscores are allowed through. */

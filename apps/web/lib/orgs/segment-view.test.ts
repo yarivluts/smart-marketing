@@ -8,6 +8,8 @@ function segment(overrides: Partial<SegmentModel> & Pick<SegmentModel, 'id'>): S
     schema_name: 'customer',
     filters: [{ field: 'plan', op: '=', value: 'pro' }],
     created_at: '2026-08-01T00:00:00.000Z',
+    status: 'new',
+    owner_person_id: null,
     ...overrides,
   } as SegmentModel;
 }
@@ -21,7 +23,15 @@ describe('toSegmentSummaryView', () => {
       schemaName: 'customer',
       filterCount: 1,
       createdAt: '2026-08-01T00:00:00.000Z',
+      status: 'new',
+      ownerPersonId: null,
     });
+  });
+
+  it('carries an assigned owner and non-default status through', () => {
+    const view = toSegmentSummaryView(segment({ id: 'segment-2', status: 'in_progress', owner_person_id: 'person-1' }));
+    expect(view.status).toBe('in_progress');
+    expect(view.ownerPersonId).toBe('person-1');
   });
 });
 

@@ -5,10 +5,11 @@ import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { countSegmentMembers, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
+import { countSegmentMembers, listOrgPeople, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
 import { buildSegmentMemberCountView, toSegmentSummaryView, type SegmentMemberCountView } from '@/lib/orgs/segment-view';
 import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
 import { DeleteSegmentButton } from '@/components/orgs/delete-segment-button';
+import { SegmentWorklistControls } from '@/components/orgs/segment-worklist-controls';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -52,11 +53,13 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
 
   // Only reached once `projectId` is confirmed to belong to this org — same
   // reasoning `goals/page.tsx`'s own comment gives for `listGoalsForProject`.
-  const [segments, schemaDefs] = await Promise.all([
+  const [segments, schemaDefs, people] = await Promise.all([
     listSegmentsForProject(orgId, projectId).then((rows) => rows.map(toSegmentSummaryView)),
     listSchemaDefinitionsForProject(orgId, projectId),
+    listOrgPeople(orgId),
   ]);
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
+  const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
   const t = await getTranslations('Segments');
 
   // Fanned out per segment via `Promise.all` — the same known, deliberately
@@ -106,6 +109,14 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
                           ? t('memberCountQuotaExceeded')
                           : t('memberCountError')}
                   </div>
+                  <SegmentWorklistControls
+                    orgId={orgId}
+                    projectId={projectId}
+                    segmentId={segment.id}
+                    status={segment.status}
+                    ownerPersonId={segment.ownerPersonId}
+                    people={peopleRows}
+                  />
                 </li>
               );
             })}

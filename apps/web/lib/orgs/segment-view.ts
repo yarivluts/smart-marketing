@@ -1,4 +1,5 @@
 import type { SegmentMemberCountOutcome, SegmentModel } from '@growthos/firebase-orm-models';
+import type { SegmentStatus } from '@growthos/shared';
 
 /** A segment's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface SegmentSummaryView {
@@ -7,6 +8,8 @@ export interface SegmentSummaryView {
   schemaName: string;
   filterCount: number;
   createdAt: string;
+  status: SegmentStatus;
+  ownerPersonId: string | null;
 }
 
 export function toSegmentSummaryView(segment: SegmentModel): SegmentSummaryView {
@@ -16,6 +19,8 @@ export function toSegmentSummaryView(segment: SegmentModel): SegmentSummaryView 
     schemaName: segment.schema_name,
     filterCount: segment.filters.length,
     createdAt: segment.created_at,
+    status: segment.status,
+    ownerPersonId: segment.owner_person_id,
   };
 }
 
