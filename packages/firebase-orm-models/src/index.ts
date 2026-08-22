@@ -56,6 +56,7 @@ export type {
   MappingRuleInput,
   MappingApplyResult,
   MappingSuggestion,
+  SegmentSuggestion,
   WinRuleFilter,
   WinRuleFilterOperator,
   GuardrailViolation,

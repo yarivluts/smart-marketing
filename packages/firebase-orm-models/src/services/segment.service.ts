@@ -1,4 +1,12 @@
-import { isSegmentFilterOperator, isSegmentWorkListStatus, isValidSegmentFilterCondition, type SegmentFilterCondition, type SegmentWorkListStatus } from '@growthos/shared';
+import {
+  isSegmentFilterOperator,
+  isSegmentWorkListStatus,
+  isValidSegmentFilterCondition,
+  suggestSegmentCandidates,
+  type SegmentFilterCondition,
+  type SegmentSuggestion,
+  type SegmentWorkListStatus,
+} from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import { SegmentModel } from '../models/segment.model';
 import { OrgPersonModel } from '../models/org-person.model';
@@ -113,6 +121,39 @@ export async function createSegment(params: CreateSegmentParams): Promise<Segmen
   }
 
   return segment;
+}
+
+export interface SuggestSegmentsParams {
+  organizationId: string;
+  projectId: string;
+  schemaName: string;
+}
+
+export interface SuggestSegmentsResult {
+  suggestions: readonly SegmentSuggestion[];
+}
+
+/**
+ * Proposes candidate segment definitions for one registered entity schema
+ * (KAN-81, E14.x, plan `14 §Gap 9` "AI-suggested lists") by running
+ * `@growthos/shared`'s deterministic `suggestSegmentCandidates` heuristic
+ * against the schema's own declared fields — the same "buildable-today
+ * stand-in for a real LLM call" posture `suggestFieldMappingRules` (KAN-55)
+ * already established for the mapping-suggestion feature. Nothing is
+ * persisted here; the caller still creates the segment through the existing
+ * `createSegment` confirm step, exactly like KAN-55's mapping suggestions
+ * merge into the existing rule editor rather than saving directly.
+ */
+export async function suggestSegments(params: SuggestSegmentsParams): Promise<SuggestSegmentsResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+
+  const schemaDef = await getActiveSchemaDefinition(params.organizationId, params.projectId, 'entity', params.schemaName);
+  if (!schemaDef) {
+    throw new InvalidSegmentError([`Entity schema "${params.schemaName}" is not registered (or not active) in this project.`]);
+  }
+
+  const fieldDefs = schemaDef.field_defs.map((field) => ({ name: field.name, type: field.type }));
+  return { suggestions: suggestSegmentCandidates(fieldDefs) };
 }
 
 /** Every segment in a project, newest-first — a saved definition has no inherent ordering the way a goal's deadline does. */

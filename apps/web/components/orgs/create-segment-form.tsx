@@ -6,6 +6,7 @@ import { SEGMENT_FILTER_OPERATORS, type SegmentFilterOperator } from '@growthos/
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SuggestSegmentsPanel } from './suggest-segments-panel';
 
 export interface CreateSegmentFormProps {
   orgId: string;
@@ -13,7 +14,7 @@ export interface CreateSegmentFormProps {
   entitySchemaNames: string[];
 }
 
-interface FilterRow {
+export interface FilterRow {
   field: string;
   op: SegmentFilterOperator;
   value: string;
@@ -46,6 +47,12 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames }: Creat
 
   function removeRow(index: number): void {
     setFilters((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
+  }
+
+  /** Applies an AI-suggested segment (KAN-81): replaces the filter rows outright (a suggestion is already a complete definition, not one row to merge) and fills in the name only if the user hasn't typed one yet — never overwrites something they already wrote. */
+  function applySuggestion(suggestion: { name: string; filters: FilterRow[] }): void {
+    setFilters(suggestion.filters.length > 0 ? suggestion.filters : [emptyRow()]);
+    setName((current) => (current.trim().length === 0 ? suggestion.name : current));
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -108,6 +115,8 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames }: Creat
           </select>
         </div>
       </div>
+
+      <SuggestSegmentsPanel orgId={orgId} projectId={projectId} schemaName={schemaName} onApplySuggestion={applySuggestion} />
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">{t('filtersLabel')}</span>

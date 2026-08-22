@@ -15,6 +15,7 @@ export * from './touchpoint-capture';
 export * from './mapping-engine';
 export * from './mapping-suggestion';
 export * from './funnel-suggestion';
+export * from './segment-suggestion';
 export * from './goals';
 export * from './win-rules';
 export * from './product-analytics';
