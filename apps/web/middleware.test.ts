@@ -53,6 +53,15 @@ describe('middleware', () => {
     expect(response.headers.get('location')).toBeNull();
   });
 
+  it('lets an unauthenticated visitor reach the token sign-in page (/login/token)', () => {
+    // The custom-token exchange route (TokenSignIn) — this IS a sign-in
+    // path, same posture as /login itself: it must stay reachable
+    // pre-session or a visitor with a valid token would never get in.
+    intlMiddlewareMock.mockReturnValue(NextResponse.next());
+    const response = middleware(requestFor('/en/login/token'));
+    expect(response.headers.get('location')).toBeNull();
+  });
+
   it('lets an unauthenticated visitor reach the public home page', () => {
     intlMiddlewareMock.mockReturnValue(NextResponse.next());
     const response = middleware(requestFor('/en'));

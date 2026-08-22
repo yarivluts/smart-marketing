@@ -36,7 +36,10 @@
     "genericError": "משהו השתבש. נסה שוב.",
     "invalidCredentialsError": "אימייל או סיסמה שגויים.",
     "emailInUseError": "כבר קיים חשבון עם כתובת אימייל זו.",
-    "weakPasswordError": "בחר סיסמה עם 6 תווים לפחות."
+    "weakPasswordError": "בחר סיסמה עם 6 תווים לפחות.",
+    "tokenSignInPending": "מתחבר...",
+    "invalidOrExpiredTokenError": "קישור ההתחברות הזה לא תקף או פג תוקף.",
+    "backToSignIn": "חזרה להתחברות"
   },
   "AccountStatus": {
     "signedInAs": "מחובר בתור {email}",
