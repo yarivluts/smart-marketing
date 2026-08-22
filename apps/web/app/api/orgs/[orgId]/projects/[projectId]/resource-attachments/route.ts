@@ -22,16 +22,23 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
     return error;
   }
 
-  const attachments = await listAttachmentsForProject(orgId, projectId);
-  return NextResponse.json({
-    attachments: attachments.map((attachment) => ({
-      id: attachment.id,
-      resourceKind: attachment.resource_kind,
-      resourceId: attachment.resource_id,
-      status: attachment.status,
-      scopeSelection: attachment.scope_selection ?? [],
-    })),
-  });
+  try {
+    const attachments = await listAttachmentsForProject(orgId, projectId);
+    return NextResponse.json({
+      attachments: attachments.map((attachment) => ({
+        id: attachment.id,
+        resourceKind: attachment.resource_kind,
+        resourceId: attachment.resource_id,
+        status: attachment.status,
+        scopeSelection: attachment.scope_selection ?? [],
+      })),
+    });
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    throw err;
+  }
 }
 
 /**

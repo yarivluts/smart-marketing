@@ -17,17 +17,24 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
     return error;
   }
 
-  const targets = await listAutomationTargetStatesForProject(orgId, projectId);
-  return NextResponse.json({
-    targets: targets.map((target) => ({
-      id: target.id,
-      targetType: target.target_type,
-      label: target.label,
-      dailyBudgetUsd: target.daily_budget_usd,
-      environmentId: target.environment_id,
-      updatedAt: target.updated_at,
-    })),
-  });
+  try {
+    const targets = await listAutomationTargetStatesForProject(orgId, projectId);
+    return NextResponse.json({
+      targets: targets.map((target) => ({
+        id: target.id,
+        targetType: target.target_type,
+        label: target.label,
+        dailyBudgetUsd: target.daily_budget_usd,
+        environmentId: target.environment_id,
+        updatedAt: target.updated_at,
+      })),
+    });
+  } catch (err) {
+    if (err instanceof ProjectNotFoundError) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    throw err;
+  }
 }
 
 /** Seeds (idempotent get-or-create) a new simulated target — the demo/test-data step a real KAN-72/73 connector would replace by discovering the org's actual live campaigns. */
