@@ -2,6 +2,8 @@ import {
   buildTouchpointEventPayload,
   buildTrackedEventPayload,
   CANCELLATION_REASON_SCHEMA_NAME,
+  classifyCompanyIndustry,
+  FIRMOGRAPHIC_SCHEMA_NAME,
   parseAcquisitionParams,
   SURVEY_RESPONSE_SCHEMA_NAME,
 } from '@growthos/shared';
@@ -39,6 +41,25 @@ export interface Tracker {
   submitNpsSurvey(score: number, comment?: string): Promise<void>;
   /** Sends a cancellation reason from a cancel flow or exit survey (KAN-84) — a thin `track()` wrapper over the `cancellation_reason` schema, same posture `submitNpsSurvey` takes over its own `track()` call. `reasonCode` should be one of `CANCELLATION_REASON_CODES` (`@growthos/shared`); `comment` is the customer's optional free text. */
   submitCancellationReason(reasonCode: string, comment?: string): Promise<void>;
+  /**
+   * Sends a self-reported company firmographic profile (KAN-87) — a thin
+   * `track()` wrapper over the `company_firmographic` schema. Computes
+   * `industry` client-side via `classifyCompanyIndustry` (`@growthos/shared`,
+   * this story's buildable-today AI-industry-classification stand-in)
+   * *before* sending, the same "compute before send, flatten on land"
+   * posture `submitOnboardingSurvey` (KAN-83) takes over its own
+   * `quality_score`, so the landed event already carries a real `industry`
+   * column with zero SQL-side classification logic needed downstream.
+   */
+  submitFirmographicProfile(profile: FirmographicProfileInput): Promise<void>;
+}
+
+/** The self-reported half of a KAN-87 firmographic profile — everything `submitFirmographicProfile` needs before it computes `industry` and sends the event. */
+export interface FirmographicProfileInput {
+  readonly companyName: string;
+  readonly companyDomain?: string;
+  readonly employeeCountRange: string;
+  readonly region: string;
 }
 
 function defaultNow(): string {
@@ -141,5 +162,19 @@ export function createTracker(options: TrackerOptions): Tracker {
     await track(CANCELLATION_REASON_SCHEMA_NAME, properties);
   }
 
-  return { page, track, identify, getAnonId, submitNpsSurvey, submitCancellationReason };
+  async function submitFirmographicProfile(profile: FirmographicProfileInput): Promise<void> {
+    const industry = classifyCompanyIndustry(profile.companyName, profile.companyDomain);
+    const properties: Record<string, unknown> = {
+      company_name: profile.companyName,
+      employee_count_range: profile.employeeCountRange,
+      region: profile.region,
+      industry,
+    };
+    if (profile.companyDomain !== undefined) {
+      properties.company_domain = profile.companyDomain;
+    }
+    await track(FIRMOGRAPHIC_SCHEMA_NAME, properties);
+  }
+
+  return { page, track, identify, getAnonId, submitNpsSurvey, submitCancellationReason, submitFirmographicProfile };
 }
