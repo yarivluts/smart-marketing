@@ -17,6 +17,104 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 3) — KAN-84 churn-reason capture delivered (PR #252), resolving a 3-way concurrent collision
+
+- **Last completed:**
+  - Picked **KAN-84** (E14.y Churn-reason capture, plan `14 §Gap 10`) per PROGRESS.md's own standing
+    recommendation. Checked `git branch -a`/`TASKS.md` before starting — at that point no
+    `kan-84-*`/`feat/kan-84-*` branch was visible from this session's own shallow fetch, so proceeded
+    (see "Blocked + why" below for how this still collided).
+  - Delivered a full KAN-84 slice on branch `kan-84-churn-reason-capture`, mirroring KAN-82's Feedback
+    & NPS pack shape end to end: a `cancellation_reason` event schema (`packages/shared/src/churn-reason`
+    — structured `reason_code` against a fixed `CANCELLATION_REASON_CODES` taxonomy + free-text
+    `comment`), `tracker.submitCancellationReason()` in `packages/tracking-sdk`, a
+    `clusterCancellationReasonComments` deterministic keyword-taxonomy digest (KAN-55/KAN-82's
+    established LLM-clustering stand-in posture), a new `fact_cancellation_reason` dbt core mart
+    joining each cancellation to the customer's current subscription plan (`dim_subscription`),
+    last-touch marketing channel (reusing `fact_attribution`'s own rows — a cancellation event is
+    itself just another non-touchpoint "conversion" candidate to that model), and signup cohort month
+    (a small duplicated `cohort_assignment` CTE, `fact_cohort_retention` only exposes aggregated
+    rows) — verified via a new isolated `proj_15` fixture + a hand-computed fixture-match singular
+    test (185/185 dbt tests green). A built-in "Churn Reasons" metric pack registers `cancellations_total`
+    with `[reason_code, plan_interval, channel_id, cohort_month]` dimensions, delivering the AC's
+    "breakdown joined to plan/channel/cohort" through the existing metrics-compiler dimension-breakdown
+    machinery (`getCancellationReasonDimensionBreakdownForProject`, degrading per-dimension the same
+    way `queryBoardTile`/KAN-60 degrades a tile when the warehouse isn't configured). Admin UI: a new
+    project-scoped Churn Reasons page (reason-code breakdown + free-text theme digest + plan/channel/
+    cohort sections, one-click pack install card until installed), gated on `ingest.write`, wired into
+    both nav copies (`AppShell`'s `layout.tsx` and `OrgShell`'s org `page.tsx`) from the start. en+he
+    translations added with full key parity (verified via a script, not just eyeballing).
+  - Full local verification before opening a PR: `pnpm lint`/`typecheck` clean across all 8 packages;
+    `pnpm test` green (`firebase-orm-models` 1102/1102 real-emulator tests, `shared` 474/474,
+    `tracking-sdk` 25/25, `apps/web`'s real Firestore+Auth-emulator vitest suite plus a real 27/27
+    Playwright e2e run — one caught-and-fixed bug along the way: a missing `grain` on the dimension-
+    breakdown query's `MetricQueryTimeRange` and the metrics compiler's always-on `bucket_date`
+    bucketing meant a dimension value's count could arrive split across more than one row, fixed by
+    summing per dimension value client-side rather than assuming one row per value); `pnpm build`
+    green (new `/[locale]/orgs/[orgId]/projects/[projectId]/churn-reasons` route builds cleanly).
+    Opened as **PR #252**.
+  - **Discovered mid-reconciliation (after opening #252) that this was a 3-way concurrent collision**,
+    not a 2-way one: a completely independent session had already opened **PR #250** for the identical
+    story at 03:28 UTC (`feat/kan-84-churn-reason-capture` — different branch name than this run's own,
+    which is exactly why this run's own `git push`/PR-open succeeded without a "reference already
+    exists" error the way a same-named-branch collision would surface). A *third* session had also
+    independently implemented KAN-84, discovered the collision with #250 at push time, and chose to
+    discard its own work in favor of #250 (documented in PROGRESS.md's own immediately-preceding entry,
+    merged as PR #251) — reasoning #250's own PR description claimed comprehensive green tests, with a
+    caveat flagged for a future run to confirm #250's CI actually went green, since it hadn't reported
+    at that time.
+  - **Reconciliation**: monitored #252's CI (subscribed via `subscribe_pr_activity`, plus scheduled
+    `send_later` check-ins as a fallback) — the first attempt failed, but only on unrelated Playwright
+    e2e specs (`feedback.spec.ts`, `hooks.spec.ts`, `resource-library.spec.ts`, `tv-pairing.spec.ts` —
+    none touch churn-reasons code), with a `"Server is approaching the used memory threshold,
+    restarting..."` warning and `RESOURCE_EXHAUSTED` Firestore-emulator errors right before the
+    failures — CI-runner resource exhaustion, the same flakiness class this repo's own PROGRESS.md
+    history documents repeatedly for e2e runs under load. Re-ran the failed job once (the flake-
+    confirmation playbook's own "re-run at most once" allowance); the re-run went fully green. Checked
+    PR #250's live state at the same time: still open, still `mergeable_state: dirty`, still zero CI
+    check runs — over 3 hours after opening, confirming the caveat PR #251's own entry had flagged.
+    With #252 holding the only actual verified-green CI of the three implementations, merged **#252**
+    (squash, matching this repo's own established merge convention) and closed **#250** with a comment
+    explaining the tiebreak (verified CI, not a design-quality judgment — #250's dimension-breakdown-
+    via-Boards approach is arguably cleaner than #252's own bespoke breakdown-table sections, noted
+    explicitly in the closing comment so a human skimming the closed PR doesn't read it as a quality
+    verdict).
+  - Remote branch deletion for `kan-84-churn-reason-capture` failed with the same HTTP 403 this
+    sandbox's git-over-HTTPS proxy has thrown for every prior run's delete attempt (creating/pushing
+    the branch itself worked fine — only the delete leg 403s) — left undeleted, same accepted posture
+    every prior entry documenting this takes.
+- **In progress (exact stopping point):** none — KAN-84 is fully delivered, merged, and TASKS.md
+  reflects it as `done`.
+- **Blocked + why:** nothing blocking the next code task. Worth flagging for whoever reads this: this
+  is now the **second** documented KAN-84 collision inside a few hours (three sessions total touched
+  this one story), on top of the KAN-20/KAN-32/KAN-81 collisions PROGRESS.md already documents for
+  other stories — a check-open-PRs-before-starting habit alone is provably insufficient when multiple
+  scheduled runs can start within minutes of each other and a shallow `git fetch` doesn't always see
+  a same-minute sibling's just-pushed branch. The standing recommendation (space out the scheduled
+  cadence, or add an explicit per-story claim marker to `TASKS.md` before a run starts a multi-file
+  story) applies with more force than ever.
+- **Next step:** pick the next unblocked `todo` in table order — **KAN-83** (Intent/quality scoring)
+  is still `blocked-by`-adjacent in spirit: KAN-82 itself remains `in-progress` (not `done`), but its
+  own stated dependency is narrower ("KAN-82's survey schema landing first for the onboarding-survey
+  half") and the `survey_response` schema has already landed (PR #246) — a future run should confirm
+  that's enough to unblock KAN-83's onboarding-survey half specifically, not assume the whole of
+  KAN-82 needs to finish first. **KAN-85** (Ergonomics: omnisearch, inline editing, column sort/show-
+  hide, `14` gap 15, ~6d) and **KAN-86** (Campaign ops: `roi_nd`/`collection_nd`, per-campaign targets,
+  prediction calibration, `14` gap 12, ~7d) are unblocked with no dependency either way. Check open
+  PRs/branches for whichever is picked before committing significant effort — the standing
+  recommendation above, now doubly warranted.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-84-churn-reason-capture` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403) and the still-outstanding `feat/kan-84-churn-reason-capture`
+    branch from the closed, unmerged PR #250.
+  - Consider whether the scheduled-run cadence needs adjusting — three separate sessions independently
+    starting KAN-84 within a few hours (following the same pattern already seen for KAN-20/KAN-32/
+    KAN-81) suggests the current cadence allows enough overlap that this will keep recurring on
+    whichever story a run's own PROGRESS.md-reading happens to recommend next.
+
+---
+
 ## 2026-08-23 (later still, 2) — KAN-84 collision: this run's own implementation discarded in favor of concurrent PR #250
 
 - **Last completed:**
