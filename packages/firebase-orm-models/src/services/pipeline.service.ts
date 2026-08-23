@@ -273,6 +273,12 @@ export const DEFAULT_BILLING_OPS_FEED_LIMIT = 100;
 /** Same load-bounding default as {@link DEFAULT_BILLING_OPS_FEED_LIMIT} — kept as its own named constant since a generic record feed (KAN-81) isn't billing-specific. */
 export const DEFAULT_RECORD_FEED_LIMIT = 100;
 
+/** One equality filter on a raw record's own `payload` field — the record-feed page's "filterable" half of Gap 5 (today only a schema picker exists). Exact match, compared as a string (see `stringifyPayloadFieldValue`). */
+export interface RecordFieldFilter {
+  fieldName: string;
+  value: string;
+}
+
 export interface ListRecentRecordsForSchemasParams {
   organizationId: string;
   projectId: string;
@@ -280,6 +286,29 @@ export interface ListRecentRecordsForSchemasParams {
   /** One or more registered schema names of the same `kind` to fold into one feed — e.g. every billing event schema, every churn-signal entity schema, or just the one schema a record-feed page's picker selected. */
   schemaNames: readonly string[];
   limit?: number;
+  /** Restricts the feed to records whose `payload[fieldName]` stringifies to exactly `value`. See `RECORD_FIELD_FILTER_CANDIDATE_WINDOW` for how this is applied. */
+  fieldFilter?: RecordFieldFilter;
+}
+
+/** Same "over-fetch a candidate window, then filter" posture as `CHURN_FEED_CANDIDATE_WINDOW` — Firestore has no native way to filter on an arbitrary `payload` field server-side without a dedicated per-field index, so a `fieldFilter` widens the per-schema fetch to this many candidates (newest first) before filtering, rather than filtering only within `limit`'s own narrow window. A project with more than this many records landed more recently than its oldest unscanned match would miss that match — the same known, documented limitation every other Firestore-backed feed in this file already carries. */
+const RECORD_FIELD_FILTER_CANDIDATE_WINDOW = 500;
+
+/** Same stringification convention `record-feed-view.ts`'s `stringifyPayloadValue` renders with, kept as its own copy here since filter-matching (server-side, never rendered) and PII-redacted display (client-facing) are different concerns that happen to share a shape. */
+function stringifyPayloadFieldValue(value: unknown): string {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
+function matchesFieldFilter(record: RawRecordModel, filter: RecordFieldFilter): boolean {
+  return stringifyPayloadFieldValue(record.payload[filter.fieldName]) === filter.value;
 }
 
 /**
@@ -287,17 +316,19 @@ export interface ListRecentRecordsForSchemasParams {
  * first, folded across every environment — same "whole project, one admin view" posture as
  * `listRecentIngestBatchesForProject`. One bounded query per schema name (Firestore has no native
  * "kind == X AND schema_name IN [...]" + orderBy composite this ORM exposes), merged and re-sorted
- * client-side, then trimmed to `limit` — so a burst in one schema can't silently starve the merged feed
- * of another's more recent records purely by fetch order. Each per-schema fetch needs a composite
- * Firestore index (`kind`, `schema_name`, `landed_at`) in a real (non-emulator) project, same documented
- * requirement every other `RawRecordModel` query in this file already carries. The general-purpose
- * building block behind `listRecentBillingEventsForProject` (KAN-80, a fixed Stripe schema set),
- * `listRecentChurnedSubscriptionsForProject` (KAN-81, a fixed entity schema set), and the KAN-81
- * record-feed page (a human-picked single schema).
+ * client-side, then (optionally field-filtered and) trimmed to `limit` — so a burst in one schema can't
+ * silently starve the merged feed of another's more recent records purely by fetch order. Each
+ * per-schema fetch needs a composite Firestore index (`kind`, `schema_name`, `landed_at`) in a real
+ * (non-emulator) project, same documented requirement every other `RawRecordModel` query in this file
+ * already carries. The general-purpose building block behind `listRecentBillingEventsForProject`
+ * (KAN-80, a fixed Stripe schema set), `listRecentChurnedSubscriptionsForProject` (KAN-81, a fixed
+ * entity schema set), and the KAN-81 record-feed page (a human-picked single schema, optionally
+ * field-filtered).
  */
 export async function listRecentRecordsForSchemas(params: ListRecentRecordsForSchemasParams): Promise<RawRecordModel[]> {
   await requireProjectInOrg(params.organizationId, params.projectId);
   const limit = params.limit ?? DEFAULT_RECORD_FEED_LIMIT;
+  const fetchLimit = params.fieldFilter ? Math.max(limit, RECORD_FIELD_FILTER_CANDIDATE_WINDOW) : limit;
 
   const perSchemaResults = await Promise.all(
     params.schemaNames.map((schemaName) =>
@@ -305,15 +336,18 @@ export async function listRecentRecordsForSchemas(params: ListRecentRecordsForSc
         .where('kind', '==', params.kind)
         .where('schema_name', '==', schemaName)
         .orderBy('landed_at', 'desc')
-        .limit(limit)
+        .limit(fetchLimit)
         .get(),
     ),
   );
 
-  return perSchemaResults
+  const merged = perSchemaResults
     .flat()
-    .sort((a, b) => (a.landed_at < b.landed_at ? 1 : a.landed_at > b.landed_at ? -1 : 0))
-    .slice(0, limit);
+    .sort((a, b) => (a.landed_at < b.landed_at ? 1 : a.landed_at > b.landed_at ? -1 : 0));
+
+  const filtered = params.fieldFilter ? merged.filter((record) => matchesFieldFilter(record, params.fieldFilter!)) : merged;
+
+  return filtered.slice(0, limit);
 }
 
 /**

@@ -596,7 +596,15 @@
     "fieldLine": "{name}: {value}",
     "landedAtLine": "נקלט ב-{landedAt}",
     "clientIdLine": "מזהה {clientId}",
-    "capNote": "מוצגות {count} הרשומות האחרונות."
+    "capNote": "מוצגות {count} הרשומות האחרונות.",
+    "filterFieldLabel": "סינון לפי שדה",
+    "filterFieldPlaceholder": "בחר שדה",
+    "filterValueLabel": "ערך",
+    "filterValuePlaceholder": "ערך מדויק",
+    "filterApply": "סנן",
+    "filterClear": "נקה סינון",
+    "filterActiveNote": "מסונן לרשומות שבהן {field} הוא {value}.",
+    "filterEmpty": "אין רשומות התואמות לסינון זה."
   },
   "CostGuardrails": {
     "metaTitle": "בקרות עלות",
