@@ -154,6 +154,36 @@ describe('createTracker', () => {
     expect(body.batch[0].properties.use_case).toBeUndefined();
   });
 
+  it('submitFirmographicProfile(): sends a company_firmographic event with a client-computed industry', async () => {
+    const storage = createInMemoryStorage();
+    const tracker = createTracker({ writeKey: 'gos_test_abc', ingestBaseUrl: 'https://api.example.com/v1/ingest', storage, fetchImpl });
+
+    await tracker.page();
+    await tracker.submitFirmographicProfile({ companyName: 'Acme Health Clinic', companyDomain: 'acme.io', employeeCountRange: '51-200', region: 'north_america' });
+
+    const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(body.batch[0].event).toBe('company_firmographic');
+    expect(body.batch[0].properties).toMatchObject({
+      company_name: 'Acme Health Clinic',
+      company_domain: 'acme.io',
+      employee_count_range: '51-200',
+      region: 'north_america',
+      industry: 'healthcare',
+    });
+  });
+
+  it('submitFirmographicProfile(): omits company_domain entirely when not provided, still classifying from the name alone', async () => {
+    const storage = createInMemoryStorage();
+    const tracker = createTracker({ writeKey: 'gos_test_abc', ingestBaseUrl: 'https://api.example.com/v1/ingest', storage, fetchImpl });
+
+    await tracker.page();
+    await tracker.submitFirmographicProfile({ companyName: 'Northwind Capital Bank', employeeCountRange: '1-10', region: 'europe' });
+
+    const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(body.batch[0].properties.company_domain).toBeUndefined();
+    expect(body.batch[0].properties.industry).toBe('finance_fintech');
+  });
+
   it('track(): fires the entry touchpoint itself when called before page() ever runs (regression: a caller that only ever calls track()/identify() must not lose the visitor\'s touchpoint)', async () => {
     navigateTo('https://shop.example.com/landing?gclid=first_call_gclid');
     const storage = createInMemoryStorage();

@@ -37,6 +37,11 @@ import {
   CAMPAIGN_OPS_PACK_MANIFEST_YAML,
   CAMPAIGN_OPS_PACK_PLUGIN_ID,
 } from '../plugin-runtime/campaign-ops-pack';
+import {
+  ensureFirmographicPackRegistered,
+  FIRMOGRAPHIC_PACK_MANIFEST_YAML,
+  FIRMOGRAPHIC_PACK_PLUGIN_ID,
+} from '../plugin-runtime/firmographic-pack';
 import { getLatestPluginManifestVersion, installPlugin, registerPluginManifest, type InstallPluginParams } from './plugin-registry.service';
 
 /**
@@ -118,6 +123,8 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
     await ensureQualityScorePackRegistered(params.organizationId, params.projectId, params.installedByUserId);
   } else if (install.plugin_id === CAMPAIGN_OPS_PACK_PLUGIN_ID) {
     await ensureCampaignOpsPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
+  } else if (install.plugin_id === FIRMOGRAPHIC_PACK_PLUGIN_ID) {
+    await ensureFirmographicPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
   }
 
   return install;
@@ -152,6 +159,7 @@ const BUILTIN_METRIC_PACKS: readonly BuiltinMetricPackCatalogEntry[] = [
   { pluginId: CHURN_REASON_PACK_PLUGIN_ID, manifestYaml: CHURN_REASON_PACK_MANIFEST_YAML },
   { pluginId: QUALITY_SCORE_PACK_PLUGIN_ID, manifestYaml: QUALITY_SCORE_PACK_MANIFEST_YAML },
   { pluginId: CAMPAIGN_OPS_PACK_PLUGIN_ID, manifestYaml: CAMPAIGN_OPS_PACK_MANIFEST_YAML },
+  { pluginId: FIRMOGRAPHIC_PACK_PLUGIN_ID, manifestYaml: FIRMOGRAPHIC_PACK_MANIFEST_YAML },
 ];
 
 /**

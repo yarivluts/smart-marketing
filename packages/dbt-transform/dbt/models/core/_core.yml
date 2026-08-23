@@ -480,3 +480,31 @@ models:
       - name: ts
         tests:
           - not_null
+
+  - name: fact_company_firmographic
+    description: >
+      Firmographic enrichment (KAN-87, plan `14 §Gap 11`): one row per landed
+      `company_firmographic` event, with its self-reported
+      `company_name`/`company_domain`/`employee_count_range`/`region` and its
+      client-computed `industry` (`classifyCompanyIndustry`,
+      `@growthos/shared`'s buildable-today AI-industry-classification
+      stand-in) pulled into real columns, joined to the customer's current
+      subscription MRR. Feeds the Firmographic Enrichment pack's
+      `firmographic_profiles_total` (count) and `firmographic_mrr_total`
+      (sum) metrics, broken down by industry/employee-count-range/region for
+      the "# vs $" composition dashboard the AC names.
+    columns:
+      - name: company_firmographic_key
+        description: Composite (project_id, environment_id, event_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: industry
+        tests:
+          - not_null
+      - name: ts
+        tests:
+          - not_null

@@ -4,6 +4,8 @@ import {
   CANCELLATION_REASON_SCHEMA_NAME,
   computeSignupQualityScore,
   ONBOARDING_SURVEY_SCHEMA_NAME,
+  classifyCompanyIndustry,
+  FIRMOGRAPHIC_SCHEMA_NAME,
   parseAcquisitionParams,
   SURVEY_RESPONSE_SCHEMA_NAME,
   type OnboardingSurveyAnswers,
@@ -59,6 +61,25 @@ export interface Tracker {
    * immediately for not trusting the client's arithmetic.
    */
   submitOnboardingSurvey(answers: OnboardingSurveyAnswers): Promise<void>;
+  /**
+   * Sends a self-reported company firmographic profile (KAN-87) — a thin
+   * `track()` wrapper over the `company_firmographic` schema. Computes
+   * `industry` client-side via `classifyCompanyIndustry` (`@growthos/shared`,
+   * this story's buildable-today AI-industry-classification stand-in)
+   * *before* sending, the same "compute before send, flatten on land"
+   * posture `submitOnboardingSurvey` (KAN-83) takes over its own
+   * `quality_score`, so the landed event already carries a real `industry`
+   * column with zero SQL-side classification logic needed downstream.
+   */
+  submitFirmographicProfile(profile: FirmographicProfileInput): Promise<void>;
+}
+
+/** The self-reported half of a KAN-87 firmographic profile — everything `submitFirmographicProfile` needs before it computes `industry` and sends the event. */
+export interface FirmographicProfileInput {
+  readonly companyName: string;
+  readonly companyDomain?: string;
+  readonly employeeCountRange: string;
+  readonly region: string;
 }
 
 function defaultNow(): string {
@@ -175,5 +196,28 @@ export function createTracker(options: TrackerOptions): Tracker {
     await track(ONBOARDING_SURVEY_SCHEMA_NAME, properties);
   }
 
-  return { page, track, identify, getAnonId, submitNpsSurvey, submitCancellationReason, submitOnboardingSurvey };
+  async function submitFirmographicProfile(profile: FirmographicProfileInput): Promise<void> {
+    const industry = classifyCompanyIndustry(profile.companyName, profile.companyDomain);
+    const properties: Record<string, unknown> = {
+      company_name: profile.companyName,
+      employee_count_range: profile.employeeCountRange,
+      region: profile.region,
+      industry,
+    };
+    if (profile.companyDomain !== undefined) {
+      properties.company_domain = profile.companyDomain;
+    }
+    await track(FIRMOGRAPHIC_SCHEMA_NAME, properties);
+  }
+
+  return {
+    page,
+    track,
+    identify,
+    getAnonId,
+    submitNpsSurvey,
+    submitCancellationReason,
+    submitOnboardingSurvey,
+    submitFirmographicProfile,
+  };
 }

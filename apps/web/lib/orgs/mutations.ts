@@ -25,6 +25,7 @@ import {
   type BoardModel,
   type BoardTile,
   checkTrackingAlertsForProject as checkTrackingAlertsForProjectInOrganization,
+  checkFirmographicCompositionAlertsForProject as checkFirmographicCompositionAlertsForProjectInOrganization,
   completeOnboarding as completeOnboardingInOrganization,
   confirmOnboardingFunnelSteps as confirmOnboardingFunnelStepsInOrganization,
   createBoard as createBoardInOrganization,
@@ -145,6 +146,7 @@ import {
   type TrackingAlertCheckResult,
   checkQualityMixAlertsForProject as checkQualityMixAlertsForProjectInOrganization,
   type QualityMixAlertCheckResult,
+  type FirmographicCompositionAlertCheckResult,
   claimTvPairing as claimTvPairingInOrganization,
   requestTvPairing as requestTvPairingInOrganization,
   revokeTvPairing as revokeTvPairingInOrganization,
@@ -694,6 +696,23 @@ interface CheckQualityMixAlertsInput {
 export async function checkQualityMixAlertsForProject(input: CheckQualityMixAlertsInput): Promise<QualityMixAlertCheckResult> {
   await ensureFirestoreOrm();
   return checkQualityMixAlertsForProjectInOrganization({
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    triggeredByUserId: input.triggeredByUserId,
+  });
+}
+
+interface CheckFirmographicCompositionAlertsInput {
+  organizationId: string;
+  projectId: string;
+  triggeredByUserId: string;
+}
+
+export async function checkFirmographicCompositionAlertsForProject(
+  input: CheckFirmographicCompositionAlertsInput,
+): Promise<FirmographicCompositionAlertCheckResult> {
+  await ensureFirestoreOrm();
+  return checkFirmographicCompositionAlertsForProjectInOrganization({
     organizationId: input.organizationId,
     projectId: input.projectId,
     triggeredByUserId: input.triggeredByUserId,

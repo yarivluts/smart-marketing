@@ -23,6 +23,7 @@ const PACK_LABEL_KEYS: Record<string, { title: string; description: string }> = 
   'com.growthos.churn-reason-pack': { title: 'builtinPackChurnReasonTitle', description: 'builtinPackChurnReasonDescription' },
   'com.growthos.quality-score-pack': { title: 'builtinPackQualityScoreTitle', description: 'builtinPackQualityScoreDescription' },
   'com.growthos.campaign-ops-pack': { title: 'builtinPackCampaignOpsTitle', description: 'builtinPackCampaignOpsDescription' },
+  'com.growthos.firmographic-enrichment-pack': { title: 'builtinPackFirmographicTitle', description: 'builtinPackFirmographicDescription' },
 };
 
 /**

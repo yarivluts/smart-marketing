@@ -9,6 +9,7 @@ import {
   ENGAGEMENT_PACK_MANIFEST_YAML,
   ENGAGEMENT_PACK_PLUGIN_ID,
   FEEDBACK_PACK_PLUGIN_ID,
+  FIRMOGRAPHIC_PACK_PLUGIN_ID,
   getLatestPluginManifestVersion,
   installBuiltinMetricPack,
   installPluginAndProvisionBuiltins,
@@ -192,6 +193,7 @@ describe('listBuiltinMetricPacks', () => {
       CHURN_REASON_PACK_PLUGIN_ID,
       QUALITY_SCORE_PACK_PLUGIN_ID,
       CAMPAIGN_OPS_PACK_PLUGIN_ID,
+      FIRMOGRAPHIC_PACK_PLUGIN_ID,
     ]);
   });
 });

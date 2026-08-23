@@ -1,6 +1,6 @@
 {{ config(enabled=(target.type == 'duckdb')) }}
 -- DuckDB-only (KAN-18): asserts exact hand-computed values against the
--- fixture seed's synthetic `proj_17` payback journey.
+-- fixture seed's synthetic `proj_18` payback journey.
 --
 -- `cust_p1` signs up 2026-07-01 and has four succeeded charges afterward, at
 -- +2 days ($100), +9 days ($50), +24 days ($30), +35 days ($20), plus a
@@ -22,7 +22,7 @@ with expected(customer_id, collected_revenue_7d, collected_revenue_14d, collecte
 actual as (
     select customer_id, collected_revenue_7d, collected_revenue_14d, collected_revenue_30d, collected_revenue_40d
     from {{ ref('fact_customer_payback') }}
-    where project_id = 'proj_17'
+    where project_id = 'proj_18'
 )
 select * from actual
 except
