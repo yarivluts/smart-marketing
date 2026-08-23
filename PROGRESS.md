@@ -17,6 +17,65 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 6) — KAN-85 PR #253 CI: 4 consecutive failures on the same spec, now escalating rather than retrying
+
+- **Last completed:** followed up on the prior entry's PR #253 (KAN-85 omnisearch) CI blocker. Since
+  that entry: the failed job was re-run **three more times** (once by this session after noticing
+  `main`'s own CI had just gone fully green on the identical suite at 08:42 UTC — meaningful new
+  evidence the runner wasn't permanently broken, justifying one more attempt; the other two runs were
+  triggered by something/someone else, most likely a human acting on the PushNotification this session
+  sent). **All three failed identically**: `e2e/schema-registry.spec.ts` (the same single spec every
+  time), always immediately preceded by `"Server is approaching the used memory threshold,
+  restarting..."`, always with the *specific* failing assertion differing run-to-run (confirms
+  resource-exhaustion timing, not a deterministic logic bug — a real bug would fail at the same line
+  every time). `e2e/resource-library.spec.ts` (the test immediately before it in file order) is also
+  consistently flaky-then-passes-on-retry in every one of these runs. This PR's own
+  `e2e/omnisearch.spec.ts` passed cleanly in all four attempts (27/27 non-schema-registry specs green
+  every time). This is now the **5th** documented occurrence of this exact signature in this file
+  (KAN-84's entry above describes the identical warning+error pattern) — no longer just "worth
+  flagging," this is a confirmed, reproducible capacity problem: the sequential Playwright suite (one
+  shared `next dev` server across all ~32 e2e specs) reliably exhausts that server's memory by roughly
+  spec #27-31 of 32, deterministically enough that it's now failed 4/4 attempts today on this exact PR
+  alone.
+- **In progress (exact stopping point):** stopped re-running. Per this session's own re-run policy
+  ("at most once... a second failure is real"), continuing to blindly retry a job that has now failed
+  identically 4 times in a row is not diagnosis, it's noise (and burns CI minutes) — the root cause is
+  understood, and no further re-run is going to fix a runner capacity limit. **PR #253 is still open,
+  still green on everything except this one unrelated spec, still not merged.**
+- **Blocked + why:** same as the prior entry — CLAUDE.md requires green CI before merge, and this
+  spec's failure is a CI-runner memory-capacity issue, not something a code change to this PR can fix
+  without unjustified scope creep (touching `e2e/schema-registry.spec.ts`, `playwright.config.ts`, or
+  `.github/workflows/ci.yml` is not KAN-85's job). This is no longer "an unlucky flake" — it's now a
+  standing, load-bearing gap in this repo's CI setup that will keep blocking *every* PR's merge some
+  fraction of the time until addressed at the infra level (more runner memory, or sharding the
+  Playwright suite across multiple jobs/workers so one long sequential run doesn't accumulate enough
+  memory to crash its own dev server).
+- **Next step:** a future run (or a human) should check PR #253's CI fresh rather than assuming
+  anything about timing-based luck — if it's green, merge (squash) + delete branch + record in
+  PROGRESS.md, following this run's own established "branch fresh off `origin/main`, commit, push
+  `<branch>:main`" pattern for the progress-note commit (this session's local `main` ref was
+  independently found to be stale/diverged from `origin/main` by 50 commits each way — likely a
+  container-lifetime artifact, not real divergence — so always fetch+compare before assuming local
+  `main` is trustworthy). If still red on the identical `schema-registry.spec.ts` signature, this
+  really is the moment to consider a small, separately-scoped follow-up story/PR that shards
+  `apps/web/e2e/*.spec.ts` into 2-3 parallel Playwright projects/CI jobs (or reduces `workers`/adds
+  periodic webServer restarts) — not squeezed into an unrelated feature PR. Once #253 is merged: pick
+  the next unblocked `todo` — **KAN-86** (Campaign ops) was picked up and merged by a concurrent session
+  while this one was stuck babysitting CI (PR #254, seen via `origin/main` during this entry's own
+  `git fetch`) — **KAN-83** (Intent/quality scoring) and **KAN-87**/**KAN-88** remain candidates; check
+  `git branch -a`/open PRs first, standing recommendation.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **PR #253's CI** — genuinely worth a human's attention now: 4/4 automated+manual attempts today
+    failed on the same spec. Either accept the current flakiness and keep retrying until lucky, or
+    prioritize the CI-sharding/runner-capacity fix above so this stops recurring for every PR.
+  - This session already sent one PushNotification about this PR being blocked; not sending a second
+    one for this same still-ongoing situation (no new actionable information beyond "it happened again,
+    3 more times") — the next genuinely new signal (green CI, or a decision to shard the e2e suite)
+    is worth surfacing when it happens.
+
+---
+
 ## 2026-08-23 (later still, 5) — KAN-86 Campaign ops: fixed-window payback + per-campaign spend targets (PR #254)
 
 - **Last completed:**
