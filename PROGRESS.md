@@ -17,6 +17,93 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (even later) — per-field record-feed filtering (PR #247) + a real envelope-shape bug found and fixed
+
+- **Last completed:**
+  - Session start: local `main` was stale again (same leftover-container-ref issue this file's own
+    history keeps documenting) — reset via `git branch -f main origin/main`. `TASKS.md`'s KAN-81 row
+    read `done` per the entry directly below (PR #244, CRM-sync) but its own Notes still flagged
+    "per-field filtering within a feed (Gap 5 says 'filterable' — today only a schema picker)" as
+    explicitly out of scope for that slice — picked that up as a small, well-scoped remaining gap.
+    Checked for concurrent work first (the standing recommendation from every KAN-81 collision this
+    file documents): one open PR (#244) turned out to already be CRM-sync, unrelated in scope; no
+    branch or PR named for record-feed filtering existed.
+  - **Delivered (PR #247, branch `feat/kan-81-record-feed-field-filter`):** the `/record-feed` page
+    gained an exact-match field/value filter, scoped to the selected schema's **non-PII fields only**
+    (the field picker never offers a PII field, so a filter value can never round-trip a PII value
+    through the page's own `?field=`/`?value=` query string — same defense-in-depth posture the page's
+    PII-redacted display already established). `listRecentRecordsForSchemas`
+    (`packages/firebase-orm-models`) gained an optional `fieldFilter`, over-fetching a bounded
+    500-record candidate window before filtering (`RECORD_FIELD_FILTER_CANDIDATE_WINDOW`) — same
+    "over-fetch then filter" posture the churn feed's own signal filter already established, since
+    Firestore has no native way to filter on an arbitrary declared field server-side.
+  - **A real, pre-existing bug found (and fixed) while building this:** a landed `RawRecordModel.payload`
+    is the *whole* ingest envelope as submitted — an event's own `event_id`/`event`/`ts` alongside its
+    `properties`, an entity's `id` alongside its `attributes` — not a flat map of the schema's declared
+    fields (`ingest.service.ts`'s own `checkRecordEnvelope` doc comment already said this explicitly).
+    `record-feed-view.ts`'s `toRecordFeedEntryView` was reading `payload[fieldName]` directly, so
+    **every declared field has been silently rendering blank** for any record landed through the real
+    ingest path since the record-feed page shipped (PR #238) — and the new filter could never match
+    anything either, since it hit the same wrong key. This was invisible to every existing test because
+    every emulator test for this feed family (billing-ops, churn, record-feed) used a synthetic
+    `landRawRecord` test helper that writes a flat payload directly to Firestore, bypassing
+    `ingestBatch`'s real envelope shape entirely — confirmed by grepping for the correct convention
+    already used and tested elsewhere (`ga4-plugin.emulator.test.ts`/`stripe-plugin.emulator.test.ts`/
+    `touchpoint-capture.emulator.test.ts` all assert against `payload.properties`/`payload.attributes`).
+    Only surfaced once this run's own new e2e filter test (`record-feed.spec.ts`, using the existing
+    `seedIngestFixture` helper that *does* go through the real `ingestBatch`) failed 3/3 times with the
+    filtered feed rendering zero matches. Fixed by reusing `checkRecordEnvelope` itself (the same
+    dispatch function `ingestBatch` validates against) in `record-feed-view.ts`, and a small duplicate
+    dispatcher (`declaredFieldsForRecord`) in `pipeline.service.ts` for the new filter's own matching
+    (duplicated rather than imported — `ingest.service.ts` already imports from `pipeline.service.ts`,
+    so importing back would cycle). Updated every affected test (`record-feed-view.test.ts`,
+    `pipeline.emulator.test.ts`'s 4 new filter cases) to use a real envelope-shaped payload instead of a
+    flat one.
+  - **Not fixed in this PR, flagged as a high-priority follow-up:** `apps/web/lib/orgs/billing-ops-view.ts`
+    (`toBillingOpsFeedEntryView`, KAN-80) and `packages/firebase-orm-models`'s `isChurnSignal`
+    (KAN-81 slice 2, PR #236) both read `payload[field]`/`payload.cancel_at_period_end`/
+    `payload.canceled_at` directly too, and are very likely carrying the exact same bug for any
+    record landed through the real Stripe plugin (KAN-49) — the billing-ops feed's amount/currency/
+    status/etc. columns would render blank, and the churn feed would never detect a real cancellation
+    (the `cancel_at_period_end`/`canceled_at` fields actually live under `payload.attributes` for a
+    `stripe_subscription` entity, not the payload top level). Left untouched deliberately — different,
+    already-merged features, out of scope for this PR's diff — but this is a real, evidenced,
+    high-value bug across two shipped features and deserves the very next run's attention before any
+    new KAN-82..88 work.
+  - **Checks:** `packages/firebase-orm-models` full suite 92 files/1032 tests green (real Firestore
+    emulator, after the fix). `apps/web` full unit suite 223 files/1297 tests green (real Firestore+Auth
+    emulators). `apps/web` e2e `record-feed.spec.ts` green (new filter scenario passed cleanly; the
+    pre-existing empty-state scenario flaked once on the documented cold-dev-server-compile class, then
+    passed on Playwright's own retry — not a regression). `pnpm turbo lint typecheck` clean for
+    `@growthos/shared`/`@growthos/firebase-orm-models`/`@growthos/web`. Full `pnpm build` clean across
+    all 7 packages.
+  - Opened PR #247, subscribed to its activity. Real CI (`lint · typecheck · test · build` +
+    `terraform fmt · validate`) came back green in ~33 minutes, `mergeable_state: clean` — squash-merged
+    (`251fcc1`). Local branch deleted; remote branch deletion not attempted (the recurring
+    git-over-HTTPS-proxy 403 every prior scheduled-run merge has hit — a human can prune it whenever
+    convenient, along with every other merged/closed branch this file's history has already flagged).
+  - Updated `TASKS.md`'s KAN-81 row: added slice 6 (PR #247) closing Gap 5's "filterable" requirement —
+    KAN-81 now has no remaining scope at all.
+- **In progress (exact stopping point):** none — #247 fully landed, `main` green (`251fcc1`). KAN-81 is
+  fully done, including the "filterable" gap the CRM-sync entry below left open.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** strongly recommend the next run prioritize the **billing-ops-view.ts / isChurnSignal
+  payload-reading bug** flagged above over starting new KAN-82..88 work — it's a real, evidenced
+  correctness bug in two already-shipped, human-facing admin surfaces (billing ops feed, churn feed),
+  not speculative. A fix would mirror this PR's own: reuse `checkRecordEnvelope`'s `fieldsToValidate`
+  (or `pipeline.service.ts`'s new `declaredFieldsForRecord`) instead of reading `payload[field]`
+  directly, then re-verify against a `seedIngestFixture`-style real-envelope test rather than the
+  flat-payload `landRawRecord` helper alone. Otherwise: KAN-82..88 (all `todo`, no blockers, ~4-8d each
+  per the gap doc) — KAN-84 (churn-reason capture) is flagged High-severity/cheap with no dependency on
+  the others; KAN-82/83 have a real ordering dependency (KAN-83 needs KAN-82's survey schema).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: prune merged/closed feature branches the proxy blocks scheduled runs from deleting — this
+    run's own `feat/kan-81-record-feed-field-filter` (merged, PR #247), plus every prior one this file's
+    history already lists.
+
+---
+
 ## 2026-08-23 (later) — CRM-sync action plugin, closing out KAN-81 (PR #244)
 
 - **Last completed:**
