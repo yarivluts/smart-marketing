@@ -15,7 +15,7 @@ import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { getActiveSchemaDefinition } from './schema-registry.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
-import { escapeLikePattern } from './mcp-tools.service';
+import { escapeLikePattern, parseJsonColumn } from './mcp-tools.service';
 import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor } from '../warehouse/query-executor';
 
@@ -358,18 +358,20 @@ export type SegmentMemberCountOutcome =
  * `queryBoardTile`/`queryGoalProgress` do, so an unconfigured/rejecting
  * warehouse degrades the badge instead of crashing the segments page.
  */
-export async function countSegmentMembers(params: CountSegmentMembersParams): Promise<SegmentMemberCountOutcome> {
-  const segment = await loadSegment(params.organizationId, params.projectId, params.segmentId);
-  const schemaDef = await getActiveSchemaDefinition(params.organizationId, params.projectId, 'entity', segment.schema_name);
+/** The `WHERE`-clause fragments + bound parameters common to every warehouse read scoped to one segment's own schema+filters (`countSegmentMembers` and `listSegmentMembers` alike) — factored out once a second caller needed the exact same compilation `countSegmentMembers` already did. */
+async function buildSegmentMemberWhereClause(
+  organizationId: string,
+  projectId: string,
+  segment: SegmentModel,
+  environmentId: string | undefined,
+): Promise<{ filters: string[]; queryParams: Record<string, string> }> {
+  const schemaDef = await getActiveSchemaDefinition(organizationId, projectId, 'entity', segment.schema_name);
   const fieldTypeByName = new Map((schemaDef?.field_defs ?? []).map((field) => [field.name, field.type]));
-
-  const executor = params.executor ?? defaultWarehouseQueryExecutor;
-  const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
 
   const filters = ['organization_id = @organizationId', 'project_id = @projectId', 'schema_name = @schemaName'];
   const queryParams: Record<string, string> = {
-    organizationId: params.organizationId,
-    projectId: params.projectId,
+    organizationId,
+    projectId,
     schemaName: segment.schema_name,
   };
   if (environmentId !== undefined) {
@@ -380,12 +382,92 @@ export async function countSegmentMembers(params: CountSegmentMembersParams): Pr
     filters.push(emitSegmentFilterClause(condition, `filter_${index}`, fieldTypeByName.get(condition.field), queryParams));
   });
 
+  return { filters, queryParams };
+}
+
+export async function countSegmentMembers(params: CountSegmentMembersParams): Promise<SegmentMemberCountOutcome> {
+  const segment = await loadSegment(params.organizationId, params.projectId, params.segmentId);
+  const executor = params.executor ?? defaultWarehouseQueryExecutor;
+  const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
+  const { filters, queryParams } = await buildSegmentMemberWhereClause(params.organizationId, params.projectId, segment, environmentId);
+
   const sql = `SELECT COUNT(*) AS member_count FROM entities WHERE ${filters.join(' AND ')}`;
   try {
     const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'count_segment_members' }, () =>
       executor.execute({ sql, params: queryParams }),
     );
     return { ok: true, count: Number(rows[0]?.member_count ?? 0) };
+  } catch (error) {
+    if (error instanceof WarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured', message: error.message };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    if (error instanceof WarehouseQueryFailedError) {
+      return { ok: false, reason: 'query_error', message: error.message };
+    }
+    throw error;
+  }
+}
+
+/** One matching entity row `listSegmentMembers` hands back — the same shape `CustomerSearchResult` (`mcp-tools.service.ts`) already establishes for a warehouse-backed entity projection, so a caller (e.g. `syncSegmentToCrm`) gets a stable, JSON-serializable record without needing to know this ran hand-written SQL. */
+export interface SegmentMemberRow {
+  entityId: string;
+  properties: unknown;
+  lastSeenAt: string;
+}
+
+/** Bounds how many of a segment's matching rows one `listSegmentMembers` call ever fetches — the same "buildable-today, bounded" posture every other Firestore/warehouse "list this project's X" read in this codebase already carries (see `searchProjectCustomers`'s own `MAX_CUSTOMER_SEARCH_LIMIT`), until a real paginated export exists. */
+export const MAX_SEGMENT_MEMBER_LIST_LIMIT = 1000;
+const DEFAULT_SEGMENT_MEMBER_LIST_LIMIT = 500;
+
+export interface ListSegmentMembersParams {
+  organizationId: string;
+  projectId: string;
+  segmentId: string;
+  /** Same semantics as `CountSegmentMembersParams.environmentId`. */
+  environmentId?: string;
+  /** Defaults to {@link DEFAULT_SEGMENT_MEMBER_LIST_LIMIT}, clamped to {@link MAX_SEGMENT_MEMBER_LIST_LIMIT}. */
+  limit?: number;
+  executor?: WarehouseQueryExecutor;
+}
+
+/** Mirrors `SegmentMemberCountOutcome`'s exact ok/degraded-reason split — a caller that lists members to push somewhere (e.g. `syncSegmentToCrm`) hits the same expected-not-buggy failure modes a member-count badge does, so it degrades the same honest way rather than throwing a generic error. */
+export type SegmentMemberListOutcome =
+  | { ok: true; members: SegmentMemberRow[] }
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
+
+/**
+ * Lists the actual `entities` rows (not just a count) currently matching a
+ * saved segment's own schema + ANDed filter conditions (KAN-81, plan `14
+ * §Gap 5`: "export/sync to CRM") — `countSegmentMembers`'s row-returning
+ * sibling, sharing its exact filter-compilation via
+ * `buildSegmentMemberWhereClause`. Bounded to `limit` (never unbounded — see
+ * `MAX_SEGMENT_MEMBER_LIST_LIMIT`'s own doc comment), newest-`last_seen_at`
+ * first so a bounded call favors the freshest rows over an arbitrary
+ * warehouse-native order.
+ */
+export async function listSegmentMembers(params: ListSegmentMembersParams): Promise<SegmentMemberListOutcome> {
+  const segment = await loadSegment(params.organizationId, params.projectId, params.segmentId);
+  const executor = params.executor ?? defaultWarehouseQueryExecutor;
+  const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
+  const { filters, queryParams } = await buildSegmentMemberWhereClause(params.organizationId, params.projectId, segment, environmentId);
+  const limit = Math.max(1, Math.min(params.limit ?? DEFAULT_SEGMENT_MEMBER_LIST_LIMIT, MAX_SEGMENT_MEMBER_LIST_LIMIT));
+
+  const sql = `SELECT entity_id, properties, last_seen_at FROM entities WHERE ${filters.join(' AND ')} ORDER BY last_seen_at DESC LIMIT ${limit}`;
+  try {
+    const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'list_segment_members' }, () =>
+      executor.execute({ sql, params: queryParams }),
+    );
+    return {
+      ok: true,
+      members: rows.map((row) => ({
+        entityId: String(row.entity_id ?? ''),
+        properties: parseJsonColumn(row.properties),
+        lastSeenAt: String(row.last_seen_at ?? ''),
+      })),
+    };
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { ok: false, reason: 'warehouse_not_configured', message: error.message };

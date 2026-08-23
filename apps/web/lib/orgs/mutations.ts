@@ -68,8 +68,10 @@ import {
   assignSegmentOwner as assignSegmentOwnerInOrganization,
   updateSegmentStatus as updateSegmentStatusInOrganization,
   suggestSegments as suggestSegmentsInOrganization,
+  syncSegmentToCrm as syncSegmentToCrmInOrganization,
   type SegmentModel,
   type SegmentSuggestion,
+  type PluginSinkRunModel,
   createWinRule as createWinRuleInOrganization,
   updateWinRule as updateWinRuleInOrganization,
   deleteWinRule as deleteWinRuleInOrganization,
@@ -777,6 +779,25 @@ interface RunSourcePluginInstallInput {
 export async function runSourcePluginInstall(input: RunSourcePluginInstallInput): Promise<PluginSourceRunModel> {
   await ensureFirestoreOrm();
   return runSourcePluginInstallInOrganization(input);
+}
+
+interface SyncSegmentToCrmInput {
+  organizationId: string;
+  projectId: string;
+  segmentId: string;
+  installId: string;
+  triggeredByUserId: string;
+  kms: KmsProvider;
+}
+
+/**
+ * Pushes one saved segment's own currently-matching entity rows out to a
+ * configured action-type plugin install "right now" (KAN-81, plan `14 §Gap
+ * 5`: "export/sync to CRM") — the outbound mirror of `runSourcePluginInstall`.
+ */
+export async function syncSegmentToCrm(input: SyncSegmentToCrmInput): Promise<PluginSinkRunModel> {
+  await ensureFirestoreOrm();
+  return syncSegmentToCrmInOrganization(input);
 }
 
 interface ProcessStripeWebhookEventInput {
