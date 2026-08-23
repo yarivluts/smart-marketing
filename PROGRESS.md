@@ -17,6 +17,96 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still) — Feedback & NPS pack, a buildable-today KAN-82 slice (PR #246)
+
+- **Last completed:**
+  - Picked **KAN-82** (E15.x Feedback & NPS, plan `14 §Gap 1`) — the next `todo` row in table order once
+    KAN-81 stopped being the natural pick (a `survey_response` schema + in-app SDK + NPS metric pack +
+    theme digest, same "split into a buildable-today slice" posture KAN-18/KAN-27/KAN-81 established for
+    a large multi-part story).
+  - Delivered: a `survey_response` event schema (`packages/shared/src/survey`, registered via
+    `ensureSurveyResponseSchemaRegistered` — same "seed on demand" posture KAN-57's touchpoint schema
+    established) + an in-app survey SDK helper (`tracker.submitNpsSurvey(score, comment?)` in
+    `packages/tracking-sdk`, a thin `track()` wrapper mirroring `identify()`'s own shape). A new dbt core
+    mart `fact_survey_response.sql` flattens the event's JSON `score`/`survey_type` into real columns
+    (mirrors `fact_funnel_event`'s own `step` column — confirmed via research that the metrics compiler
+    only ever emits bare column references against a mart's own flat columns, never generic JSON
+    extraction, so a metric can't filter/aggregate a JSON payload field directly), covered by a new
+    `proj_14` dbt fixture + two tests (score-range, fixture-match) — `dbt build` 178/178 green. A new
+    built-in "Feedback & NPS" metric pack (`plugin-runtime/feedback-pack`), installed the same one-click
+    way as the SaaS/Engagement/Landing-Page packs via the existing generic `installBuiltinMetricPack`
+    route/`InstallBuiltinPackSection` component (zero new install plumbing needed), registers
+    `nps_respondents`/`nps_promoters`/`nps_detractors` (aggregation) + `nps_score` (formula:
+    `(promoters - detractors) / respondents * 100`). Goal type: no code change needed —
+    `GoalModel.metric_name` is already a free string validated against the active metric catalog, so
+    `nps_score` works as a goal target as soon as the pack is installed (confirmed by reading
+    `goal.service.ts`'s own validation). AI theme clustering: a deterministic keyword-taxonomy heuristic
+    (`clusterFeedbackThemes`), same buildable-today stand-in posture KAN-55's `suggestFieldMappingRules`
+    established, clusters landed comments into a small fixed theme set (pricing/support/bugs/
+    performance/missing_features/onboarding/usability) for a "top complaint this month" digest. Admin UI:
+    a new project-scoped Feedback page (score + daily trend sparkline + theme digest), gated on
+    `ingest.write` (same posture as billing-ops-feed/record-feed), showing the pack's one-click install
+    card until installed — added to **both** nav copies (`AppShell`'s `layout.tsx` and `OrgShell`'s org
+    `page.tsx`) from the start, after re-reading the immediately-preceding entries' own postmortem about
+    a real bug from missing one of the two copies.
+  - **Self-review (via `/code-review`) found and fixed three real issues before merging:** (1) the
+    `comment` field was flagged PII, but the theme digest's whole point is showing that text — un-flagged
+    it to match `billing-ops-view.ts`'s own free-text-field convention (Stripe's `failureMessage`/
+    `refundReason`, neither PII-flagged) instead of the record-feed page's PII-redaction one, which would
+    have silently redacted every example quote; (2) `nps_respondents` counted rows with a malformed/
+    missing score (which the dbt mart's own `growthos_try_cast` tolerates), diluting the warehouse-
+    computed `nps_score` relative to the admin page's own Firestore-side computation (which already
+    excludes unparseable scores) — added a `score >= 0` filter, which excludes a null score via SQL's own
+    null-comparison semantics since the compiler has no "is not null" operator; (3) the Feedback page was
+    fetching the same bounded `survey_response` record set twice (once per function) — added a
+    `precomputedRecords` pass-through (same convention `getEventVolumeOverviewForProject`, KAN-36,
+    established) so it fetches once. All three had regression tests added/updated.
+  - **Two concurrent-session collisions handled cleanly, no wasted work:** opened as PR #246 against a
+    now-stale `main` after a prior run's docs PR (#243, this run's own earlier follow-up for the KAN-81
+    AI-suggested-lists reconciliation) merged; then again after a second parallel run merged the
+    CRM-sync action plugin (PR #244/#245, closing out KAN-81) while this PR's own CI was running. Both
+    resolved by merging `main` into the branch — the conflicts were only in `TASKS.md`'s own adjacent
+    rows (KAN-81/KAN-82), never in source files — re-verified full green (build/lint/typecheck across
+    the whole monorepo, `dbt build` 178/178, `firebase-orm-models` 100/100 files, `apps/web` 224/224
+    unit files + 26/26 e2e) after each merge before re-pushing.
+  - Checks: `packages/dbt-transform` `pnpm test` (`dbt build`) 178/178; `packages/firebase-orm-models`
+    `pnpm test` (Firestore emulator) 100/100 files, 1085/1085 tests (grew from 95/1048 after merging in
+    the concurrent CRM-sync plugin's own tests); `packages/shared`/`packages/tracking-sdk` unit tests
+    green; `apps/web` `pnpm test` 224/224 unit files (1299 tests) + 26/26 Playwright e2e (including a new
+    `feedback.spec.ts`: nav → install → empty state); root `pnpm build && pnpm lint && pnpm typecheck`
+    all green. CI (`terraform fmt · validate` + `lint · typecheck · test · build`) green on the final
+    head before merging (squash).
+  - Merged PR #246. Remote branch deletion hit the same documented 403 (sandbox git-proxy restriction)
+    every prior run's cleanup attempt has hit — left for a human or a future run with real delete access
+    (`kan-82-feedback-nps`).
+  - Noticed while updating `TASKS.md`'s KAN-81 row for the CRM-sync merge conflict that a *third*
+    concurrent commit (`251fcc1`, direct-to-main, no PR number visible from this session) had already
+    delivered per-field filtering on the record feed — the one piece KAN-81's own "done" entry still
+    listed as out of scope. Updated that row's own "Remaining" note to reflect it's no longer remaining
+    (see this same PROGRESS.md entry's own TASKS.md diff) rather than leaving a stale gap noted in a
+    story already marked `done`.
+- **In progress (exact stopping point):** none — KAN-82's buildable-today slice is fully delivered,
+  tested, self-reviewed, and merged. `main` is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** KAN-82 stays `in-progress` — remaining pieces are a real Delighted/Typeform third-party
+  survey connector (needs a human-provisioned account/API key, same posture Stripe/GA4 established; the
+  in-app SDK path already covers ingestion without one) and NPS-by-segment/plan/channel breakdown
+  dimensions (no such dimension columns exist on `fact_survey_response` yet — would need a schema
+  addition + dbt mart change, a bigger follow-up than this run's own scope). Otherwise the next
+  unblocked `todo` in table order is **KAN-83** (E16.x Intent/quality scoring) — note its own dependency
+  on "KAN-82's survey schema" refers to a distinct onboarding-survey construct this run's post-signup
+  `survey_response` schema does *not* satisfy — or **KAN-84** (churn-reason capture, ~4d, rated cheap/
+  high-value per the gap doc) if KAN-83's onboarding-survey prerequisite is judged too large to start
+  fresh. The **four-plus concurrent-session collisions on adjacent KAN-8x stories in one day** (this
+  run's own two, on top of KAN-81's own well-documented four from earlier the same day) continues to
+  repeat — worth a human decision on scheduled-run cadence or an explicit per-story claim marker, as
+  every preceding entry touching this same backlog section has now independently recommended.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged/closed feature branches the proxy blocks scheduled runs
+  from deleting — `kan-82-feedback-nps` (merged, PR #246) joins the existing list).
+
+---
+
 ## 2026-08-23 (later) — CRM-sync action plugin, closing out KAN-81 (PR #244)
 
 - **Last completed:**
