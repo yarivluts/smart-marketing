@@ -17,6 +17,76 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 9) — CI-capacity root-cause fix: shard apps/web's e2e run (PR #259), instead of picking a new KAN story
+
+- **Last completed:**
+  - Started this run by reading PROGRESS.md + TASKS.md per usual, then checking `git branch -a` /
+    open PRs before picking work — the standing recommendation every recent entry has repeated.
+    Found **three** PRs already open and mid-CI simultaneously: #253 (KAN-85, blocked 5 attempts),
+    #255 (KAN-83, hit the identical failure independently), and a brand-new #257 (KAN-87,
+    firmographic enrichment, opened by another concurrent session just before this run started).
+    `mcp__github__actions_list` confirmed all three had CI `in_progress` at the same moment — live,
+    first-hand confirmation of exactly the "several scheduled sessions' CI runs contending for
+    shared capacity at once" diagnosis the prior 3 entries built up.
+  - Given that, judged that starting a *fourth* fresh feature PR (KAN-88, the only genuinely
+    unclaimed `todo`, and one that per its own TASKS.md note needs scoping-down work first) would
+    add to the exact contention already blocking three other PRs, not make progress. Instead acted
+    on the standing recommendation those entries had graduated to "actionable": fix the CI capacity
+    problem at its root.
+  - Root-caused it precisely (the prior entries suspected but hadn't pinned the actual source):
+    `"Server is approaching the used memory threshold, restarting..."` is the **Firestore/Auth Java
+    emulator's own log line**, not `next dev`. `apps/web/package.json`'s `test` script ran
+    `vitest run` (hundreds of tests, many hitting the Firestore emulator) immediately followed by
+    the **entire** ~19-file e2e suite (`playwright test`, single worker, single long-lived
+    `next dev` webServer) through **one single `firebase emulators:exec` invocation** — so the
+    emulator JVM (and the dev server's module cache) accumulated state across the whole run with no
+    reset point until something crossed a memory ceiling and got killed/restarted mid-test. That
+    explains why the *specific* failing spec varied run to run (schema-registry.spec.ts four times,
+    then an unrelated firebase-orm-models emulator test the fifth time, then KAN-83's PR hitting its
+    own e2e suite independently) — it's whichever test happens to be running when the shared process
+    finally tips over, not a bug in any of those tests.
+  - Fixed on branch `ci-e2e-sharding`: split `apps/web`'s `test` script into four independent
+    `firebase emulators:exec` sessions instead of one — `test:unit:emulator` (vitest, its own fresh
+    emulator) then three sequential `test:e2e:sharded` invocations (`playwright test --shard=1/3`,
+    `2/3`, `3/3`), each getting its own fresh emulator *and* its own fresh `next dev` webServer
+    (already `reuseExistingServer: false`, so this was free). No changes to `ci.yml`,
+    `playwright.config.ts`, or any spec file — purely how `apps/web`'s own test script sequences its
+    existing commands, so it applies identically whether run in CI or locally.
+  - Verified thoroughly before opening a PR, specifically because this class of failure only ever
+    showed up under CI's resource conditions and a shallow "looks right" review wouldn't be enough:
+    ran `pnpm install` (this container had no `node_modules` yet), `pnpm build` (7/7 green),
+    `pnpm lint` (6/6 green), `pnpm typecheck` (10/10 green), then the full `apps/web` test command
+    standalone (230/230 unit files, all three e2e shards green — a handful of the same
+    already-documented flaky-then-passes-on-retry specs, zero hard failures, and critically **zero**
+    occurrences of the memory-threshold-restart message anywhere in the run), and finally the whole
+    monorepo's `pnpm test` via turbo (11/11 tasks green, 37m: `firebase-orm-models` 105/105,
+    `apps/api` 17/17 suites, `apps/web` 230/230 + all e2e shards, same clean result).
+  - Opened **PR #259** against `main` and subscribed this session to its activity (CI, reviews) so a
+    future wake can react to its result without a human having to check back manually.
+- **In progress (exact stopping point):** PR #259 is open, fully self-verified green locally, not
+  yet merged — CI on the PR itself is the real end-to-end confirmation this was waiting on when this
+  entry was written (deliberately not re-running PR #253/#255/#257 myself while three other CI jobs
+  were already mid-flight, to avoid adding a fourth concurrent job on top of the exact problem this
+  PR exists to fix).
+- **Blocked + why:** nothing blocking merge once CI reports back — subscribed via
+  `subscribe_pr_activity`, will act on the CI result (merge if green; diagnose further if red) rather
+  than needing a human to poll it.
+- **Next step:** once PR #259 merges, this should make PR #253/#255/#257's *own* future CI attempts
+  (and every PR after them) meaningfully less likely to hit this failure class — worth a fresh run
+  checking whether any of those three need a re-run/merge once #259 lands. After that, resume the
+  normal backlog pick: **KAN-88** (Rep-attributed collections ledger) is the only unclaimed `todo`
+  left in TASKS.md, and per its own note likely needs scoping-down (no people/team-member layer
+  exists yet) the same way KAN-86 was split — check `git branch -a`/open PRs again first, standing
+  recommendation, especially since KAN-83/85/87 may still be open when the next run starts.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - PR #259's CI result — will self-resolve via the PR-activity subscription; a human doesn't need to
+    check unless it's still open after a while.
+  - PR #253 (5 CI attempts) / #255 (KAN-83) — unchanged from prior entries, not touched by this run;
+    should get easier to land once #259's fix is in `main`.
+
+---
+
 ## 2026-08-23 (later still, 8) — KAN-87 Firmographic enrichment delivered and merged (PR #257)
 
 - **Last completed:**
