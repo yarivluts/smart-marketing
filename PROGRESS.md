@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 8) — KAN-87 Firmographic enrichment delivered and merged (PR #257)
+
+- **Last completed:**
+  - Picked **KAN-87** (E19.x Firmographic enrichment, `docs/plan/14-gap-analysis.md` Gap 11, ~6d full
+    scope). Checked `git branch -a` and open PRs first — KAN-83 (#255) and KAN-85 (#253) were both
+    already claimed by concurrent sessions at pick time, KAN-88 carries a soft "needs a people layer
+    that doesn't exist yet" dependency note, so KAN-87 was the cleanest genuinely-unblocked next `todo`
+    in table order with no existing branch/PR. Split into a buildable-today slice, same posture this
+    backlog uses throughout.
+  - Delivered on branch `kan-87-firmographic-enrichment`, mirroring KAN-82/83/84's established shape
+    end to end: `packages/shared/src/firmographic-enrichment` (a fixed `INDUSTRY_CATEGORIES` taxonomy +
+    `EMPLOYEE_COUNT_RANGES`/`FIRMOGRAPHIC_REGIONS`, a `company_firmographic` event schema,
+    `classifyCompanyIndustry` — a deterministic keyword/domain-TLD heuristic, this story's
+    buildable-today stand-in for a real AI/LLM industry-classification call, same posture
+    `clusterFeedbackThemes`/`clusterCancellationReasonComments` established — and `evaluateCompositionShift`,
+    generalizing KAN-83's `evaluateQualityMixShift` fire/resolve hysteresis rule from "a channel's
+    average score dropped" to "a category's share of the total moved," bidirectionally: a share
+    *increasing* past the threshold is just as real a composition shift as one shrinking). A new
+    `fact_company_firmographic` dbt core mart flattens the event and left-joins each profile to the
+    customer's current subscription MRR (`dim_subscription`, same "current = most-recently-started"
+    ranking `fact_cancellation_reason`'s own `current_subscription` CTE established) — the "$" half of
+    the AC's "composition dashboards (# vs $)". `packages/firebase-orm-models` gained
+    `firmographic.service.ts` (`ensureFirmographicSchemaRegistered`/`getFirmographicIndustryBreakdownForProject`
+    — bounded Firestore-side, no warehouse needed — /`getFirmographicCompositionDimensionBreakdownForProject`
+    — a two-metric warehouse query returning both `firmographic_profiles_total`/`firmographic_mrr_total`
+    per dimension, mirroring `getSignupQualityScoreDimensionBreakdownForProject`'s own two-metric shape
+    — /`checkFirmographicCompositionAlertsForProject`, a "check now" comparing each industry's 14-day
+    current-window share against its own baseline window, firing/updating/resolving a
+    `FirmographicCompositionAlertModel` episode per industry, mirroring `checkQualityMixAlertsForProject`'s
+    own window-query + fold + evaluate + audit shape almost exactly). The built-in "Firmographic
+    Enrichment" pack registers both metrics (`count`/`sum`) sharing the same
+    `industry`/`employee_count_range`/`region` dimensions. `packages/tracking-sdk` gained
+    `tracker.submitFirmographicProfile(profile)` (computes `industry` client-side before sending, same
+    "compute before send, flatten on land" posture `submitOnboardingSurvey`/KAN-83 established for its
+    own `quality_score`). Admin UI: a new project-scoped Firmographics page (industry breakdown, # vs $
+    composition-by-dimension sections, active composition-shift alerts + a Check-now button), gated on
+    `ingest.write` (the established convention for this class of read surface), wired into both nav
+    copies from the start, en/he translations with full key parity.
+  - Found and fixed a real, pre-existing bug while verifying: `metric-pack-dispatch.emulator.test.ts`'s
+    `listBuiltinMetricPacks` test asserted the *exact* list of built-in pack plugin ids — adding the new
+    pack broke it (a real, deterministic assertion failure, not a flake); updated the expected list to
+    include `FIRMOGRAPHIC_PACK_PLUGIN_ID`.
+  - Full local verification before opening a PR: `pnpm lint && pnpm typecheck` clean across all 8
+    packages; `packages/shared` 512/512, `packages/tracking-sdk` 27/27, `packages/dbt-transform` `dbt
+    build` 200/200 (new `fact_company_firmographic` mart + a new isolated `proj_17` fixture covering
+    both the with-subscription and without-subscription cases), `packages/firebase-orm-models`'s full
+    real-Firestore-emulator suite 107 files / 1138 tests green (new `firmographic.service.ts` +
+    `firmographic-pack` emulator tests, including a window-aware fake-executor-backed fire/resolve
+    composition-shift-alert test mirroring KAN-83's own `WindowAwareWarehouseQueryExecutor` technique),
+    `apps/web`'s full suite 233 files / 1351 tests green (new page/view/route/button tests, plus
+    `messages/messages.test.ts` confirming en/he key parity). Root `pnpm build` (7 packages) green.
+    Opened as **PR #257**, subscribed to its activity.
+  - **CI**: the `lint · typecheck · test · build` job took ~31 minutes (longer than this repo's more
+    typical ~10-25 min, but within the range other recent PRs have shown under concurrent-session CI
+    load — see the KAN-85/PR #253 entries above for the standing CI-capacity concern) and came back
+    fully green on the first attempt, no re-run needed. `terraform fmt · validate` green too. Merged
+    (squash) via PR #257. Remote branch deletion failed with the same HTTP 403 this sandbox's
+    git-over-HTTPS proxy has thrown for every prior run's delete attempt — left undeleted, same accepted
+    posture every prior entry documenting this takes.
+- **In progress (exact stopping point):** none — KAN-87's buildable-today slice is fully delivered,
+  tested, merged, and `TASKS.md` reflects it as `done`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** pick the next unblocked `todo` — check `git branch -a`/open PRs first (standing
+  recommendation, now doubly warranted given how much concurrent-session activity this backlog is
+  seeing). **KAN-88** (Rep-attributed collections ledger) is the last sprint-item `todo` in table order
+  but carries a soft dependency note ("rides on a people/team-member layer that doesn't exist yet") —
+  worth confirming whether `OrgPersonModel` (KAN-27's people registry, already used as `owner_person_id`
+  by KAN-81's segment-as-worklist slice) is enough groundwork to build a first buildable-today slice
+  against, or whether that really needs new groundwork first. Deferred within KAN-87 itself: a real
+  third-party enrichment connector (Clearbit-style) — needs a human-provisioned API key (KAN-43/KAN-18-style
+  posture) — worth a KAN-87-follow-on slice once a connector account exists.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Nothing new from this run specifically.
+
+---
+
 ## 2026-08-23 (later still, 7) — KAN-85 PR #253 CI: a 5th failure, this time a different test — confirms this is broader CI-capacity contention, not one flaky spec
 
 - **Last completed:** re-ran PR #253's failed job once more at 10:04 UTC after checking concurrent CI
