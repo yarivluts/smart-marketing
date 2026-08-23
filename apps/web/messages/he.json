@@ -105,7 +105,8 @@
     "projectGoalsLink": "יעדים",
     "projectSegmentsLink": "פלחים",
     "projectTvLink": "טלוויזיית חדר מלחמה",
-    "projectSessionReplayLink": "הקלטות סשן"
+    "projectSessionReplayLink": "הקלטות סשן",
+    "projectCampaignOpsLink": "תפעול קמפיינים"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -663,6 +664,28 @@
     "themeBugs": "באגים ואמינות",
     "themeNotUsing": "חוסר שימוש"
   },
+  "CampaignOps": {
+    "metaTitle": "תפעול קמפיינים",
+    "title": "תפעול קמפיינים עבור {projectName}",
+    "description": "החזר השקעה בחלון זמן קבוע ויעדי הוצאה לכל קמפיין.",
+    "paybackHeading": "החזר השקעה בחלון זמן קבוע",
+    "paybackUnavailable": "אין עדיין נתוני החזר השקעה — חברו מחסן נתונים כדי לראות זאת.",
+    "paybackWindowLabel": "גבייה תוך {days} ימים",
+    "spendTargetsHeading": "יעדי הוצאה לקמפיין",
+    "spendTargetsDescription": "הוצאה בפועל ב-{days} הימים האחרונים לעומת יעד התקציב השמור של כל קמפיין.",
+    "spendTargetsUnavailable": "אין עדיין נתוני הוצאה — חברו מחסן נתונים כדי לראות זאת.",
+    "spendTargetsEmpty": "טרם נקלטה הוצאת קמפיינים עבור הפרויקט הזה.",
+    "columnCampaign": "קמפיין",
+    "columnActualSpend": "הוצאה בפועל",
+    "columnTarget": "יעד",
+    "columnStatus": "סטטוס",
+    "statusOverTarget": "מעל היעד",
+    "statusOnTarget": "בתוך היעד",
+    "statusNoTarget": "לא הוגדר יעד",
+    "targetUpdateError": "עדכון היעד נכשל. נסו שוב.",
+    "targetInputLabel": "יעד הוצאה עבור {campaignId}",
+    "targetInputPlaceholder": "ללא יעד"
+  },
   "CostGuardrails": {
     "metaTitle": "בקרות עלות",
     "title": "בקרות עלות עבור {projectName}",
@@ -781,7 +804,9 @@
     "builtinPackFeedbackTitle": "משוב ו-NPS",
     "builtinPackFeedbackDescription": "ציון NPS, פילוח תומכים/ניטרליים/מסתייגים, ומגמה.",
     "builtinPackChurnReasonTitle": "סיבות נטישה",
-    "builtinPackChurnReasonDescription": "סיבות ביטול מובנות וחופשיות, מפולחות לפי תוכנית, ערוץ וקוהורט."
+    "builtinPackChurnReasonDescription": "סיבות ביטול מובנות וחופשיות, מפולחות לפי תוכנית, ערוץ וקוהורט.",
+    "builtinPackCampaignOpsTitle": "תפעול קמפיינים",
+    "builtinPackCampaignOpsDescription": "החזר השקעה בחלון זמן קבוע (גביית הכנסות ל-7/14/30/40 יום) עבור לקוחות לפי מועד הרכישה."
   },
   "Boards": {
     "metaTitle": "לוחות מחוונים",

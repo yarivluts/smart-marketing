@@ -401,6 +401,33 @@ models:
         tests:
           - not_null
 
+  - name: fact_customer_payback
+    description: >
+      Fixed-window payback (KAN-86, plan `14 §Gap 12`): one row per customer,
+      with revenue collected within 7/14/30/40 days of that customer's own
+      acquisition (first customer-side event). Feeds the Campaign Ops pack's
+      `collection_7d`/`collection_14d`/`collection_30d`/`collection_40d`
+      metrics — project-level cohort payback, not per-campaign yet (see the
+      model's own doc comment for why).
+    columns:
+      - name: customer_payback_key
+        description: Composite (project_id, environment_id, customer_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: acquired_at
+        tests:
+          - not_null
+      - name: collected_revenue_7d
+        tests:
+          - not_null
+      - name: collected_revenue_40d
+        tests:
+          - not_null
+
   - name: fact_cancellation_reason
     description: >
       Churn-reason capture (KAN-84, plan `14 §Gap 10`): one row per landed
