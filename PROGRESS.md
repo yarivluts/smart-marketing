@@ -17,6 +17,42 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 11) — rebased stuck PR #255 (KAN-83) onto main to pick up the #259 CI-sharding fix; left #253/#260 to concurrent sessions already handling them
+
+- **Last completed:**
+  - Read PROGRESS.md + TASKS.md, then checked `git branch -a`/open PRs before picking work (standing
+    recommendation). Found the exact situation the prior two entries anticipated: PR #259 (CI-sharding
+    fix) had merged to `main`, and three PRs were open needing a rebase onto it — #260 (chore recording
+    #259's own merge), #255 (KAN-83), #253 (KAN-85) — all three already showing fresh CI `in_progress`.
+  - Checked each PR's last commit timestamp against #259's merge time (12:11:45 UTC) to tell which
+    CI runs actually included the fix vs. were stale re-runs of pre-fix code: #253's head (`cda887d`,
+    merged at ~12:1x) already had it — another concurrent session had just rebased it seconds before I
+    checked, so I backed off rather than duplicate that push. #255's head (`2e73329`, merged
+    11:18:58 UTC) predated the fix — its `in_progress` run (started 12:05:41) was going to test stale
+    code and likely fail the same way again.
+  - Merged `origin/main` into `feat/kan-83-intent-quality-scoring` (clean, no conflicts — only
+    `PROGRESS.md`/`apps/web/package.json` differed, both purely additive), verified locally
+    (`pnpm build`, `pnpm lint`, `pnpm typecheck` all green — didn't re-run the full emulator+e2e suite
+    locally since no application code changed, only the merge; CI is the real gate here), and pushed
+    (`2e73329..e878c5e`). Subscribed this session to PR activity on #253, #255, and #260 so their CI
+    results wake this session directly instead of needing a future run to poll.
+- **In progress (exact stopping point):** all three PRs (#253, #255, #260) now have CI running against
+  code that includes the #259 sharding fix. Waiting on those results (arriving as PR-activity wake
+  events) before merging any of them — none had reported back yet when this entry was written.
+- **Blocked + why:** nothing blocking except waiting on GitHub Actions to finish; no action needed from
+  a human unless one of the three fails again for a reason unrelated to the now-fixed capacity issue.
+- **Next step:** on each PR's CI-complete wake event: if green, do the independent-review pass this
+  repo's convention calls for (these are two other sessions' diffs) and merge; if red, diagnose whether
+  it's a genuine regression vs. leftover capacity contention (three CI jobs still running concurrently
+  even with the fix) before deciding to re-run vs. dig in. Once all three are resolved, resume the
+  normal backlog pick — **KAN-88** is the only unclaimed `todo`, and per its own note needs a
+  scoping-down pass first (no people/team-member layer exists yet, same as KAN-86's split).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Nothing new — the three open PRs should self-resolve via their activity subscriptions.
+
+---
+
 ## 2026-08-23 (later still, 9) — CI-capacity root-cause fix: shard apps/web's e2e run (PR #259), instead of picking a new KAN story
 
 - **Last completed:**
