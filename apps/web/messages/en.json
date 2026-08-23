@@ -596,7 +596,15 @@
     "fieldLine": "{name}: {value}",
     "landedAtLine": "Landed {landedAt}",
     "clientIdLine": "id {clientId}",
-    "capNote": "Showing the {count} most recent records."
+    "capNote": "Showing the {count} most recent records.",
+    "filterFieldLabel": "Filter by field",
+    "filterFieldPlaceholder": "Choose a field",
+    "filterValueLabel": "Value",
+    "filterValuePlaceholder": "Exact value",
+    "filterApply": "Filter",
+    "filterClear": "Clear filter",
+    "filterActiveNote": "Filtered to records where {field} is {value}.",
+    "filterEmpty": "No records match this filter."
   },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",

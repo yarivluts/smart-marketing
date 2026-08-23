@@ -1,4 +1,4 @@
-import type { RawRecordModel, SchemaFieldDef } from '@growthos/firebase-orm-models';
+import { checkRecordEnvelope, type RawRecordModel, type SchemaFieldDef } from '@growthos/firebase-orm-models';
 
 /** A redaction placeholder standing in for any `is_pii` field's value — never sent to the client at all, unlike `billing-ops-view.ts`'s Stripe-specific fields (none of which are declared PII). */
 const REDACTED_VALUE = '••••••';
@@ -40,7 +40,15 @@ export interface RecordFeedEntryView {
 }
 
 export function toRecordFeedEntryView(record: RawRecordModel, fieldDefs: readonly SchemaFieldDef[]): RecordFeedEntryView {
-  const payload = record.payload;
+  // A landed `RawRecordModel.payload` is the *whole* ingest envelope as submitted (an event's own
+  // `event_id`/`event`/`ts` alongside its `properties`, an entity's `id` alongside its `attributes`,
+  // a measure's `measure`/`ts`/`value` alongside its `dimensions`) — not a flat map of the schema's
+  // declared fields. Reusing `checkRecordEnvelope` (the same dispatch `ingestBatch` itself validates
+  // against) rather than reading `payload[fieldDef.name]` directly avoids re-introducing the bug this
+  // fix corrects: every declared field silently rendering blank for any record landed through the real
+  // ingest path (only caught once a real end-to-end record — not a hand-built flat-payload test
+  // fixture — was rendered through this view).
+  const { fieldsToValidate } = checkRecordEnvelope(record.kind, record.payload);
   return {
     id: record.id,
     environmentId: record.environment_id,
@@ -48,7 +56,7 @@ export function toRecordFeedEntryView(record: RawRecordModel, fieldDefs: readonl
     landedAt: record.landed_at,
     fields: fieldDefs.map((fieldDef) => ({
       name: fieldDef.name,
-      value: fieldDef.is_pii ? REDACTED_VALUE : stringifyPayloadValue(payload[fieldDef.name]),
+      value: fieldDef.is_pii ? REDACTED_VALUE : stringifyPayloadValue(fieldsToValidate[fieldDef.name]),
       isPii: fieldDef.is_pii,
     })),
   };

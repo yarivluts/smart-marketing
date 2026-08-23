@@ -694,6 +694,134 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       listRecentRecordsForSchemas({ organizationId: orgA.id, projectId: projectB.id, kind: 'event', schemaNames: ['signup_completed'] }),
     ).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
+
+  it('filters by an exact field-value match on the record\'s declared fields (its envelope\'s `properties`, not the raw payload top level)', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Record Feed Filter Org');
+
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T10:00:00.000Z',
+      payload: { event_id: 'evt-1', event: 'signup_completed', ts: '2026-08-22T10:00:00.000Z', properties: { plan: 'pro' } },
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T11:00:00.000Z',
+      payload: { event_id: 'evt-2', event: 'signup_completed', ts: '2026-08-22T11:00:00.000Z', properties: { plan: 'free' } },
+    });
+
+    const entries = await listRecentRecordsForSchemas({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      schemaNames: ['signup_completed'],
+      fieldFilter: { fieldName: 'plan', value: 'pro' },
+    });
+
+    expect(entries.map((entry) => (entry.payload.properties as Record<string, unknown>).plan)).toEqual(['pro']);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id]);
+  });
+
+  it('returns an empty array when no record matches the field filter', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Record Feed Filter Miss Org');
+
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T10:00:00.000Z',
+      payload: { event_id: 'evt-1', event: 'signup_completed', ts: '2026-08-22T10:00:00.000Z', properties: { plan: 'pro' } },
+    });
+
+    const entries = await listRecentRecordsForSchemas({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      schemaNames: ['signup_completed'],
+      fieldFilter: { fieldName: 'plan', value: 'enterprise' },
+    });
+
+    expect(entries).toEqual([]);
+  });
+
+  it('applies the field filter before trimming to `limit`, so a matching older record is not starved out by a narrow limit', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Record Feed Filter Limit Org');
+
+    // The oldest record is the only one matching the filter; two newer, non-matching records would
+    // otherwise fill up a naive `limit: 1` fetch before filtering ever ran.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T09:00:00.000Z',
+      payload: { event_id: 'evt-1', event: 'signup_completed', ts: '2026-08-22T09:00:00.000Z', properties: { plan: 'pro' } },
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T10:00:00.000Z',
+      payload: { event_id: 'evt-2', event: 'signup_completed', ts: '2026-08-22T10:00:00.000Z', properties: { plan: 'free' } },
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'signup_completed',
+      landedAt: '2026-08-22T11:00:00.000Z',
+      payload: { event_id: 'evt-3', event: 'signup_completed', ts: '2026-08-22T11:00:00.000Z', properties: { plan: 'free' } },
+    });
+
+    const entries = await listRecentRecordsForSchemas({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      schemaNames: ['signup_completed'],
+      limit: 1,
+      fieldFilter: { fieldName: 'plan', value: 'pro' },
+    });
+
+    expect(entries.map((entry) => entry.landed_at)).toEqual(['2026-08-22T09:00:00.000Z']);
+  });
+
+  it('matches non-string field values by their stringified form', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Record Feed Filter Type Org');
+
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'order_completed',
+      landedAt: '2026-08-22T10:00:00.000Z',
+      payload: { event_id: 'evt-1', event: 'order_completed', ts: '2026-08-22T10:00:00.000Z', properties: { net: 42, refunded: false } },
+    });
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'order_completed',
+      landedAt: '2026-08-22T11:00:00.000Z',
+      payload: { event_id: 'evt-2', event: 'order_completed', ts: '2026-08-22T11:00:00.000Z', properties: { net: 99, refunded: true } },
+    });
+
+    const entries = await listRecentRecordsForSchemas({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      schemaNames: ['order_completed'],
+      fieldFilter: { fieldName: 'net', value: '42' },
+    });
+
+    expect(entries.map((entry) => (entry.payload.properties as Record<string, unknown>).net)).toEqual([42]);
+  });
 });
 
 describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {

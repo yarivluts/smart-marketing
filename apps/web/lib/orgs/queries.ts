@@ -58,6 +58,7 @@ import {
   listRecentChurnedSubscriptionsForProject as listRecentChurnedSubscriptionsForProjectInOrganization,
   listRecentRecordsForSchemas as listRecentRecordsForSchemasInOrganization,
   type RawRecordModel,
+  type RecordFieldFilter,
   type SchemaDefKind,
   listSourcePluginRunsForInstall as listSourcePluginRunsForInstallInOrganization,
   listQueryCostLogEntriesForProject as listQueryCostLogEntriesForProjectInOrganization,
@@ -260,15 +261,16 @@ export async function listRecentBillingEventsForProject(
   return listRecentBillingEventsForProjectInOrganization(organizationId, projectId, limit);
 }
 
-/** The generic, single-schema record feed (KAN-81) — a project-scoped view of any registered schema's recently landed records. */
+/** The generic, single-schema record feed (KAN-81) — a project-scoped view of any registered schema's recently landed records, optionally restricted to records matching one field's exact value. */
 export async function listRecentRecordsForSchema(
   organizationId: string,
   projectId: string,
   kind: SchemaDefKind,
   schemaName: string,
+  fieldFilter?: RecordFieldFilter,
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
-  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName] });
+  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName], fieldFilter });
 }
 
 export async function listRecentChurnedSubscriptionsForProject(
