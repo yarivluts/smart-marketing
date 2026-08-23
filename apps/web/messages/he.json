@@ -96,6 +96,7 @@
     "projectFieldMappingsLink": "מיפויי שדות",
     "projectBillingOpsFeedLink": "פיד אירועי חיוב",
     "projectRecordFeedLink": "פיד רשומות",
+    "projectFeedbackLink": "משוב",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
@@ -606,6 +607,28 @@
     "filterActiveNote": "מסונן לרשומות שבהן {field} הוא {value}.",
     "filterEmpty": "אין רשומות התואמות לסינון זה."
   },
+  "Feedback": {
+    "metaTitle": "משוב ו-NPS",
+    "title": "משוב ו-NPS עבור {projectName}",
+    "description": "ציון NPS, מגמה, ונושאי המשוב המובילים החודש.",
+    "setupIntro": "התקינו את חבילת המשוב ו-NPS כדי להתחיל לאסוף סקרי NPS ולנקד אותם.",
+    "npsHeading": "ציון NPS",
+    "npsEmpty": "טרם נקלטו תגובות NPS עבור הפרויקט הזה.",
+    "npsBreakdownLine": "{promoters} תומכים, {passives} ניטרליים, {detractors} מסתייגים ({total} תגובות)",
+    "trendSparklineLabel": "מגמת NPS יומית",
+    "trendPointEmpty": "אין תגובות",
+    "themeDigestHeading": "נושאי המשוב המובילים החודש",
+    "themeDigestEmpty": "טרם נקלטו תגובות משוב בטווח הזה.",
+    "themeCommentCount": "{count, plural, one {תגובה #} other {# תגובות}}",
+    "themeExampleComment": "“{comment}”",
+    "themePricing": "תמחור",
+    "themeSupport": "תמיכה",
+    "themeBugs": "באגים ואמינות",
+    "themePerformance": "ביצועים",
+    "themeMissingFeatures": "פיצ'רים חסרים",
+    "themeOnboarding": "הצטרפות",
+    "themeUsability": "שימושיות"
+  },
   "CostGuardrails": {
     "metaTitle": "בקרות עלות",
     "title": "בקרות עלות עבור {projectName}",
@@ -720,7 +743,9 @@
     "builtinPackEngagementTitle": "חבילת מעורבות",
     "builtinPackEngagementDescription": "DAU/WAU/MAU, יחס דביקות, והיסטוגרמות פעילות.",
     "builtinPackLandingPageTitle": "ביצועי דפי נחיתה",
-    "builtinPackLandingPageDescription": "מבקרים ואחוז המרה לכל דף נחיתה x קמפיין x ערוץ."
+    "builtinPackLandingPageDescription": "מבקרים ואחוז המרה לכל דף נחיתה x קמפיין x ערוץ.",
+    "builtinPackFeedbackTitle": "משוב ו-NPS",
+    "builtinPackFeedbackDescription": "ציון NPS, פילוח תומכים/ניטרליים/מסתייגים, ומגמה."
   },
   "Boards": {
     "metaTitle": "לוחות מחוונים",

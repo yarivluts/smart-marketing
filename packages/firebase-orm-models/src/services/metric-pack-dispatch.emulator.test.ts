@@ -6,6 +6,7 @@ import {
   ensureUserForFirebaseSession,
   ENGAGEMENT_PACK_MANIFEST_YAML,
   ENGAGEMENT_PACK_PLUGIN_ID,
+  FEEDBACK_PACK_PLUGIN_ID,
   getLatestPluginManifestVersion,
   installBuiltinMetricPack,
   installPluginAndProvisionBuiltins,
@@ -180,7 +181,12 @@ describe('installPluginAndProvisionBuiltins', () => {
 describe('listBuiltinMetricPacks', () => {
   it('lists every built-in pack this codebase ships, keyed by plugin id only (no display text, per CLAUDE.md)', () => {
     const pluginIds = listBuiltinMetricPacks().map((pack) => pack.pluginId);
-    expect(pluginIds).toEqual([SAAS_METRIC_PACK_PLUGIN_ID, ENGAGEMENT_PACK_PLUGIN_ID, LANDING_PAGE_PACK_PLUGIN_ID]);
+    expect(pluginIds).toEqual([
+      SAAS_METRIC_PACK_PLUGIN_ID,
+      ENGAGEMENT_PACK_PLUGIN_ID,
+      LANDING_PAGE_PACK_PLUGIN_ID,
+      FEEDBACK_PACK_PLUGIN_ID,
+    ]);
   });
 });
 
