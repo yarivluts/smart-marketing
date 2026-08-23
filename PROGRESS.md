@@ -17,6 +17,92 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 4) — KAN-85 global omnisearch delivered, PR #253 open and blocked only by a pre-existing unrelated CI flake
+
+- **Last completed:**
+  - Picked **KAN-85** (E17.x Ergonomics, `docs/plan/14-gap-analysis.md` Gap 15, ~6d full scope) per
+    the prior entry's recommendation — checked `git branch -a` and open PRs first (none existed for
+    KAN-83/85/86/87/88), avoiding the KAN-20/32/81/84 collision pattern. Split into a buildable-today
+    slice, same posture this backlog uses throughout: **global omnisearch (Cmd/Ctrl-K)** only. Inline
+    target/value editing and column sort/show-hide persistence (the other two AC bullets) are
+    explicitly deferred to a follow-on story/run.
+  - Delivered on branch `kan-85-omnisearch`: `packages/shared/src/omnisearch` (pure `OmniSearchItem`
+    type + a deterministic `searchOmniSearchItems` label/description-matching ranking heuristic — same
+    "stand-in" posture as `segment-suggestion`/`churn-reason`'s clustering), `apps/web/lib/orgs/
+    omnisearch.ts` (`buildOmniSearchIndexForProject`, gathering a project's boards/active metric defs/
+    segments/automation campaign targets, one Firestore list call per type gated on that type's own
+    permission), a new `GET /api/orgs/[orgId]/projects/[projectId]/omnisearch` route that — unlike
+    most project-admin GET routes — degrades per result type instead of blanket-denying (any active
+    org member can call it; each type included only if the caller holds the exact permission its own
+    destination page already gates on), and `OmniSearchTrigger` (`apps/web/components/orgs/
+    omni-search.tsx`): a hand-rolled Cmd/Ctrl-K palette (no `cmdk`/dialog library existed in this repo
+    yet, so this is a plain modal + `document.addEventListener('keydown', ...)`, matching `AppShell`'s
+    own existing hand-rolled-modal style) that lazy-fetches the project index on first open and ranks
+    entirely client-side as the user types. Wired into `AppShell` via a new optional `omniSearch` slot
+    (rendered alongside `switchers` in both the sidebar and mobile menu) and `ProjectLayout` only —
+    project-scoped, so `OrgShell`'s org-only pages don't get it. en/he translations added with full key
+    parity.
+  - Self-review before opening the PR found and fixed two real issues: (1) a route-isolation-guard
+    filesystem-scan test (KAN-26) failed because the new route hand-rolled its own session/membership
+    check instead of calling `requireOrgMembership` — refactored to call it for the gate (+ a second,
+    `cache()`-deduped `resolveOrgSessionContext` call to get the raw bindings the per-type `can()`
+    checks need, since `requireOrgMembership` itself only returns the `UserModel`); (2) a real
+    staleness bug — React reconciles a client component by tree position, not prop equality, so if
+    `OmniSearchTrigger` ever stayed mounted across a client-side project switch (same instance, new
+    `orgId`/`projectId` props), its cached index would keep serving the *previous* project's results;
+    fixed with an effect that discards the cached index on an `orgId`/`projectId` change, plus a
+    regression test that fails without the fix.
+  - Full local verification before opening the PR: `pnpm lint && pnpm typecheck && pnpm test &&
+    pnpm build` all green across all 8 packages (`packages/shared` 486/486, `apps/web` 1344/1344 incl.
+    the new emulator-backed route tests, `firebase-orm-models` 1102/1102, full Playwright e2e — 27
+    passed, 2 flaky-then-passed-on-retry, the documented CI-runner-memory-exhaustion flake class this
+    file already tracks). Opened as **PR #253**, subscribed to its activity.
+  - **CI**: the `lint · typecheck · test · build` job failed on the first run —
+    `e2e/schema-registry.spec.ts` (a pre-existing spec this PR doesn't touch — no schema-registry code
+    changed) timed out after all 3 attempts, each with a *different* transient symptom (element not
+    found, then a signup-flow URL mismatch, then a second element-not-found), with `"Server is
+    approaching the used memory threshold, restarting..."` and Firestore `RESOURCE_EXHAUSTED` errors
+    logged immediately before each failure — the exact same flake signature this file's KAN-84 entry
+    (and others before it) already documents for this repo's e2e suite under CI-runner load. This
+    PR's own `e2e/omnisearch.spec.ts` passed cleanly both times. Re-ran the failed job once (the
+    flake-confirmation playbook's "at most once in total" allowance) — the re-run reproduced the exact
+    same pattern (same spec, three different transient symptoms across its 3 attempts, same memory-
+    threshold warning immediately before), settling it as a genuine pre-existing infra flake rather
+    than something to keep retrying. Per the playbook, a second re-run is not permitted and widening
+    this PR to "fix" an unrelated flaky spec would violate CLAUDE.md's own "keep PRs scoped to one
+    task" rule, so **PR #253 is left open, subscribed, and unmerged** — CLAUDE.md requires green CI
+    before merge, and this run has exhausted its own re-run allowance.
+- **In progress (exact stopping point):** none on the omnisearch code itself — KAN-85's global-search
+  slice is fully implemented, tested, and PR'd. What's left is purely operational: getting PR #253's
+  CI to a green run (a human re-running the failed job in the GitHub UI, or a later scheduled run of
+  this routine judging a fresh re-run attempt warranted, would both unblock it — nothing in the code
+  needs to change).
+- **Blocked + why:** PR #253 (KAN-85 omnisearch) is ready to merge but CI is red on an unrelated,
+  pre-existing e2e flake (`schema-registry.spec.ts`, CI-runner memory exhaustion) that this run's one
+  allowed re-run already confirmed isn't caused by this diff. Not merged per CLAUDE.md's "all checks
+  green before merge" rule.
+- **Next step:** a future run should first check PR #253's live CI state (`pull_request_read` /
+  `get_check_runs`) before doing anything else — it may already be green if a human or a later CI
+  attempt cleared it. If still red on the same `schema-registry.spec.ts` signature, that run can use
+  its own fresh re-run allowance (this run's own allowance was already spent). Once green, merge
+  (squash) and delete the branch. Only after that: pick the next unblocked `todo` — **KAN-86**
+  (Campaign ops, ~7d) is unblocked with no dependency; **KAN-83** (Intent/quality scoring) still needs
+  someone to confirm whether KAN-82's already-landed `survey_response` schema (PR #246) is enough to
+  unblock its onboarding-survey half specifically, per the standing note carried forward from the
+  KAN-84 entry. The two other KAN-85 AC bullets (inline target/value editing in tables, column sort/
+  show-hide persistence) remain unbuilt — worth a KAN-85-follow-on slice once picked up again.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **PR #253's CI** — either manually re-run the failed `lint · typecheck · test · build` job (GitHub
+    Actions UI or `gh run rerun --failed`), or just let a later scheduled run of this routine retry it.
+  - This is now at least the third distinct e2e spec (after the flakiness class' prior occurrences)
+    to trip on the same "CI-runner memory exhaustion" signature — the standing recommendation to
+    either raise the CI runner's resource allocation or split the Playwright suite into smaller
+    parallel shards (so one heavy suite doesn't exhaust one runner's memory) applies with more force
+    each time this recurs.
+
+---
+
 ## 2026-08-23 (later still, 3) — KAN-84 churn-reason capture delivered (PR #252), resolving a 3-way concurrent collision
 
 - **Last completed:**
