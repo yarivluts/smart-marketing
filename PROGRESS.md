@@ -17,6 +17,109 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 5) — KAN-86 Campaign ops: fixed-window payback + per-campaign spend targets (PR #254)
+
+- **Last completed:**
+  - Read PROGRESS.md's own standing recommendation and checked for collisions before starting: PR
+    #253 (KAN-85 omnisearch, open) already claimed KAN-85; no open PR/branch existed for **KAN-86**
+    (E18.x Campaign ops, plan `14 §Gap 12`) or its sibling `todo` rows (KAN-87/88), so picked KAN-86.
+  - Researched the codebase's own conventions first (a subagent pass plus direct reads):
+    `fact_attribution`/`ad_spend`'s own doc comments already document that `campaign_id`/`channel_id`
+    are bare strings with no `dim_campaign` surrogate key, `fact_revenue_event` carries no
+    `campaign_id` at all, and the metrics compiler (`packages/shared/src/metrics-compiler`) has no
+    join graph and no formula-level dimension breakdown — confirmed a true **per-campaign**
+    `roi_nd`/`collection_nd` is not buildable today without both a real ad-spend connector
+    (KAN-50/51, blocked by KAN-43) and a compiler feature. Split KAN-86 into a buildable-today slice,
+    same posture KAN-80/81/82/84/85 established, and documented every deferred piece in-code and in
+    `TASKS.md`.
+  - Delivered on branch `kan-86-campaign-ops`, merged as **PR #254**:
+    - **`collection_Nd` fixed-window payback** (project-level, not per-campaign — see above): a new
+      `fact_customer_payback` dbt core mart (one row per customer; revenue collected within
+      7/14/30/40 days of that customer's own acquisition, reusing the exact
+      `min(occurred_at)`-over-non-touchpoint-events convention `fact_cohort_retention`/
+      `fact_cancellation_reason` already established; joins only `type='charge'` rows from
+      `fact_revenue_event`, deliberately excluding the synthetic `first_charge` duplicate row a
+      customer's first payment also produces, to avoid double-counting) — verified via a new isolated
+      `proj_16` fixture + a hand-computed fixture-match singular test (193/193 dbt tests green). A new
+      built-in **Campaign Ops** metric pack (`plugin-runtime/campaign-ops-pack`, installed the same
+      one-click way as every other built-in pack) registers `collection_7d`/`collection_14d`/
+      `collection_30d`/`collection_40d`. `roi_nd` formulas deliberately not shipped: they'd need to
+      divide by the SaaS pack's own `ad_spend` metric, but the compiler only lets a formula reference
+      an already-*active* metric at registration time, and there's no inter-pack "install this pack
+      first" dependency the install flow (`installPluginAndProvisionBuiltins`) models yet — documented
+      in the pack's own doc comment, along with the fact a human can already compose
+      `collection_40d / ad_spend` today via the existing custom-metric evolve flow once both packs are
+      installed, no code change needed.
+    - **Per-campaign spend budget targets**: a new `CampaignTargetModel` (upserted by a sha256-hashed
+      Firestore doc id derived from the raw `campaign_id` string — the same third-party-string-safety
+      reasoning `ingest.service.ts`'s dedup keys use, since a `campaign_id` from ad-spend data can
+      contain characters a Firestore doc id rejects) + `campaign-target.service.ts`
+      (`setCampaignTargetBudget`/`deleteCampaignTargetBudget`/`listCampaignTargetsForProject`/
+      `getCampaignSpendBreakdownForProject`, the last mirroring
+      `getCancellationReasonDimensionBreakdownForProject`'s own catch-and-classify degrade posture),
+      surfaced as an inline-editable admin table (commit-on-blur — the gap doc's own "x-editable"
+      pattern; an emptied cell DELETEs the target rather than PATCHing budget `0`, since those mean
+      different things) showing actual `ad_spend`-by-`campaign_id` (the one metric this codebase
+      carries that dimension on today) vs. each campaign's saved target, driving red/green.
+    - New project-scoped **Campaign Ops** admin page (`orgs/:orgId/projects/:projectId/campaign-ops`),
+      gated on `dashboards.write` (the same permission Goals/Segments use), wired into **both** nav
+      copies (`ProjectLayout`'s `layout.tsx` and `OrgShell`'s org `page.tsx`) from the start, having
+      re-read the immediately-preceding entries' own postmortems about a real bug from missing one of
+      the two copies. Added a `TrendingUp` icon to `AppShell`'s string-keyed icon registry (a bare
+      lucide component can't cross the server/client boundary — see that file's own doc comment on
+      why icons are passed as string keys, not elements). en/he translations added with full key
+      parity (verified via the existing key-parity test).
+  - Self-review before merge (own pass, not a separate tool run) found and fixed one real issue:
+    `spendTargetsDescription`'s trailing-window day count was hard-coded as a literal `30` in the page
+    component rather than importing the real `CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS` constant from
+    `campaign-target.service.ts` — would have silently drifted from the real window if that constant
+    ever changed. Fixed to import and reference the constant directly.
+  - Full local verification before opening the PR: `packages/dbt-transform` `pnpm test` 193/193;
+    `packages/firebase-orm-models` full Firestore-emulator suite green (new: `campaign-ops-pack`
+    manifest + registration/idempotency/isolation tests, `campaign-target.emulator.test.ts` incl. a
+    fake-executor-driven spend-breakdown-merge test covering over/on/no-target statuses and a
+    zero-spend-but-targeted campaign still appearing); `apps/web` full unit suite (230 files / 1338
+    tests) + a new real Playwright e2e (`campaign-ops.spec.ts`: nav → page → spend section degrades
+    with no warehouse configured → install the payback pack → payback section degrades too) all green;
+    root `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green across the whole monorepo.
+  - Opened PR #254. First CI attempt failed on a single unrelated pre-existing test
+    (`plugins/route.test.ts`'s SaaS-metric-pack end-to-end install test, which that file's own comment
+    already flags as tight against its 60s timeout — "twenty-two metric registrations + three board
+    creates/tile-saves in one request") under the same `RESOURCE_EXHAUSTED`-class CI-runner-under-load
+    flakiness this repo's history documents repeatedly; confirmed it doesn't touch any file this PR
+    changes. Re-ran the failed job once (the flake-confirmation playbook's own "at most once, to
+    confirm" allowance) — went fully green. Merged (squash) as **PR #254**. Remote branch deletion for
+    `kan-86-campaign-ops` failed with the same HTTP 403 this sandbox's git-over-HTTPS proxy has thrown
+    for every prior run's delete attempt — left undeleted, same accepted posture every prior entry
+    documenting this takes.
+  - `TASKS.md`'s KAN-86 row updated to `in-progress` (not `done` — see deferred items below) with a
+    Notes cell mirroring this entry's own summary.
+- **In progress (exact stopping point):** none for the delivered slice — it's fully merged, tested,
+  and documented. KAN-86 itself remains `in-progress`: genuinely open follow-on work below.
+- **Blocked + why:** the three deferred pieces are each blocked on something real, not just
+  unattempted: (1) `roi_nd` formulas need either a compiler feature (formula referencing a metric from
+  a different, not-necessarily-installed pack) or a human manually adding one via the existing
+  custom-metric evolve flow once both packs are installed — no code blocker, just not pre-built; (2) a
+  genuine **per-campaign** `roi_nd`/`collection_nd` needs both a real ad-spend connector (KAN-50/51,
+  blocked by KAN-43's still-outstanding human application) and a metrics-compiler join feature; (3)
+  predicted-vs-actual calibration views have literally nothing to calibrate against yet — no AI score
+  exists anywhere in this codebase (KAN-83, intent/quality scoring, is still `todo`, though a
+  concurrent session opened PR #255 for it around the same time this run was finishing up — worth a
+  future run checking whether KAN-83 lands, which would make calibration views newly buildable).
+- **Next step:** pick the next unblocked `todo` in table order — **KAN-87** (Firmographic enrichment,
+  `14` gap 11, ~6d) is the next candidate with no dependency; **KAN-88** (Rep-attributed collections
+  ledger) explicitly notes it likely needs a people/team-member layer (Gap 6) that doesn't exist yet,
+  so probably needs scoping-down the same way this run scoped KAN-86. Check open PRs/branches for
+  whichever is picked before committing significant effort — the standing recommendation from every
+  prior collision entry, now with a concurrent KAN-83 PR (#255) also freshly in flight as a fresh
+  example of why.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-86-campaign-ops` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403, same as every prior run's attempt).
+
+---
+
 ## 2026-08-23 (later still, 4) — KAN-85 global omnisearch delivered, PR #253 open and blocked only by a pre-existing unrelated CI flake
 
 - **Last completed:**
