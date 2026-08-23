@@ -17,6 +17,59 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 7) — KAN-85 PR #253 CI: a 5th failure, this time a different test — confirms this is broader CI-capacity contention, not one flaky spec
+
+- **Last completed:** re-ran PR #253's failed job once more at 10:04 UTC after checking concurrent CI
+  load first (`mcp__github__actions_list` `list_workflow_runs` with `status: in_progress` showed only
+  2 runs — down from several earlier, a concrete signal load had eased, not a timer-based guess). It
+  failed again at 10:14 UTC, but **on a different test this time**: not
+  `e2e/schema-registry.spec.ts` at all, but `packages/firebase-orm-models`'s own
+  `src/services/product-analytics.emulator.test.ts` (KAN-70, unrelated to omnisearch) — one test timed
+  out at the vitest-configured 120s limit after throwing `ProjectNotFoundError` from
+  `onboarding.service.ts`'s `requireProjectInOrg`, with a real Firestore-emulator write apparently not
+  visible yet to a read moments later. 1101/1102 other tests in that package still passed. Concurrent
+  CI investigation revealed why: another independent scheduled session was simultaneously running its
+  own KAN-83 PR (#255) through **3 separate CI attempts**, hitting the *exact same*
+  `RESOURCE_EXHAUSTED`/memory-restart signature on its own e2e suite at the same time (visible via
+  `list_triggers`' own check-in history for that session) — today's actual root cause is **several
+  scheduled sessions' CI runs contending for shared runner capacity at once**, not any one flaky test.
+  Whichever slow, emulator-or-webServer-heavy test happens to be running when the shared resource
+  crunch hits is the one that fails — schema-registry.spec.ts five times running so far purely because
+  it's positioned late in the sequential e2e run (spec ~29 of 32) where accumulated memory pressure
+  peaks; this time a slow firebase-orm-models emulator test caught it instead.
+- **In progress (exact stopping point):** stopped re-running again — a 2nd distinct symptom in one
+  session doesn't change the diagnosis, it reinforces it. **PR #253 remains open, unmerged, all of
+  its own code/tests verified green** (only ever the environment's shared test infra failing, never
+  anything in the omnisearch diff itself, across all 5 attempts).
+- **Blocked + why:** unchanged from the prior entries — CLAUDE.md requires green CI before merge.
+  Reiterating with sharper evidence: this is not a per-spec bug to silence, it's aggregate CI capacity
+  being oversubscribed by concurrent scheduled-session runs. The standing recommendation graduates from
+  "worth flagging" to **actionable**: either (a) reduce how many scheduled GrowthOS sessions can have
+  CI running at once (the "GrowthOS autonomous build" trigger fires hourly at :18 and, per its own
+  `job_config`, spawns a brand-new session each time rather than resuming one — nothing currently caps
+  how many of those can be mid-PR/mid-CI simultaneously), or (b) give the CI runner more memory/give the
+  Playwright job more headroom (sharding `apps/web/e2e/*.spec.ts` across parallel jobs, or restarting
+  the shared `next dev` webServer partway through the suite instead of running all ~32 specs against
+  one long-lived process).
+- **Next step:** same as the prior entry's — check PR #253 fresh, don't assume; if green, merge +
+  record. If red again, check concurrent `in_progress` CI runs before deciding whether to retry (a
+  concrete signal, not a timer) — this entry's own successful use of that heuristic (2 concurrent runs
+  → retry was reasonable, even though it still hit a *different* piece of shared-infra contention) is
+  the model to repeat. If this keeps recurring across multiple future runs, the infra-level fix above
+  stops being optional.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **PR #253's CI** — 5 attempts today, all failed on shared-infra contention, never on this PR's own
+    diff. A human's options: keep waiting/retrying opportunistically, merge with an admin override once
+    confident (all real checks this PR owns are green), or prioritize the CI-capacity fix above (which
+    would unblock every PR affected today, not just this one — KAN-83's PR #255 hit the identical
+    problem independently).
+  - Not sending a second PushNotification for this specific update (same open question as before, just
+    more evidence) — already sent one; the next one will be either "it's merged" or a clearer ask if
+    this keeps recurring across several more hours.
+
+---
+
 ## 2026-08-23 (later still, 6) — KAN-85 PR #253 CI: 4 consecutive failures on the same spec, now escalating rather than retrying
 
 - **Last completed:** followed up on the prior entry's PR #253 (KAN-85 omnisearch) CI blocker. Since
