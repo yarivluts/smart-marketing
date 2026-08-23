@@ -17,6 +17,86 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 — AI-suggested lists: triple concurrent duplicate, reconciled (PR #239 kept, PR #242 closed, this run's own copy discarded)
+
+- **Last completed:**
+  - Session start: local `main` was stale again (same leftover-container-ref issue this file's own
+    history keeps documenting) — reset via `git branch -f main origin/main` to `cb217ab` (PR #236, the
+    churn feed). Read PROGRESS.md's own "next step" from the entry above: KAN-81 stayed `in-progress`,
+    with "AI-suggested lists" flagged as following KAN-55's established "deterministic heuristic
+    stand-in for a real LLM call" posture. Picked it, since the CRM-sync action plugin (the other
+    remaining slice) needs a first-of-its-kind executor interface — a bigger design task better
+    started fresh.
+  - Researched KAN-55's proposer pattern (`suggestFieldMappingRules`) and KAN-68's
+    (`proposeFunnelSteps`), `SegmentModel`/`segment.service.ts`'s filter shape, and what fields are
+    actually available on registered entity schemas (no fixed "customer" shape — entirely
+    project-defined via the Schema Registry). Designed and **fully implemented** a
+    `packages/shared/src/segment-suggestion` module (`suggestSegments`: a role-based field-name/type
+    matcher against four templates — `cancelling_soon`/`high_value`/`inactive_paying`/`renewing_soon`
+    — with an identifier-safety guard so a suggestion can never propose a field name `createSegment`
+    would reject), a `proposeSegmentSuggestions` service wrapper, a `GET .../segments/suggest` route,
+    and a `SuggestSegmentsPanel` embedded in `CreateSegmentForm` (seeds name/schema/filters for the
+    user to review and submit — never auto-saves). Full local verification: `packages/shared` unit
+    tests (8 cases), a `firebase-orm-models` emulator suite (33/33 including 3 new
+    `proposeSegmentSuggestions` cases), `apps/web` component/route tests, en/he i18n parity, `pnpm
+    build` clean across all 7 packages, `pnpm turbo lint typecheck` clean. Committed to a local branch
+    `feat/kan-81-ai-suggested-lists`.
+  - **Triple concurrent duplicate, discovered at push time:** `git push` failed (this session has no
+    raw git push access at all here — every attempt returns a 403 from the proxy, not just branch
+    deletion as prior entries documented; the GitHub MCP tools are the only write path). Investigating
+    via `mcp__github` tools surfaced the full picture:
+    1. **PR #239** ("AI-suggested segments", branch `feat/kan-81-ai-suggested-segments`) — a *second*
+       concurrent session had independently built the same feature and merged it into `main` at
+       `3a1c571` **before** this run finished. Different shape (`suggestSegmentCandidates`, a richer
+       archetype library — recently churned/high-value/trial-expiring/inactive/new-signups — POST
+       route, prefill-name-only-if-blank UI), same AC, same "user confirms" posture.
+    2. **PR #242** ("AI-suggested high-value lists for segments") — a *third* concurrent session had
+       independently built the same feature *again*, on a branch named `feat/kan-81-ai-suggested-lists`
+       — the exact same branch name this run had independently chosen — and pushed it as an **open**
+       PR based on `main` *after* #239 had already merged, yet reimplementing the identical
+       `packages/shared/src/segment-suggestion` module from scratch (boolean-fields-only heuristic, 4
+       fixed categories, a "Create list" one-click panel bypassing the review-form step). `git
+       ls-remote`/`create_branch` both confirmed the collision — this run's own local commit was never
+       actually pushed anywhere.
+  - **Reconciled:** left a comment on PR #242 explaining the collision and closed it (state: `closed`,
+    no code merged) — merging it on top of already-merged #239 would have left two parallel,
+    conflicting `segment-suggestion` implementations rather than one. Flagged two ideas from #242 worth
+    a future follow-up against #239's now-merged module if anyone picks it up: its
+    dedup-against-already-saved-segments filter, and its boolean-only-fields scoping rationale.
+    Discarded this run's own local implementation entirely (`git branch -D
+    feat/kan-81-ai-suggested-lists`, nothing pushed) — a third parallel copy would have been strictly
+    worse than either #239 or a clean revert, and #239 already satisfies the AC. Fast-forwarded local
+    `main` to `origin/main` (`cb9a641`), which now carries both #239 (AI-suggested lists) and **#238**
+    ("generic record feed for any registered event schema" — the live-record-feeds slice, merged
+    moments after #239, also not yet reconciled into this file until now).
+  - Updated `TASKS.md`'s KAN-81 row: all four buildable-today AC pieces (segment work-lists, churn
+    feed, live record feeds, AI-suggested lists) are now `done`; only the CRM-sync action plugin
+    remains open for this story.
+- **In progress (exact stopping point):** none — reconciliation is complete, `main` is green
+  (inherited from #238/#239's own pre-merge CI, not independently re-verified full-suite by this run
+  given nothing of this run's own code is being merged), PR #242 closed, no dangling branches from this
+  run (the local one was deleted, nothing was ever pushed).
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** KAN-81's only remaining slice is the **CRM-sync action plugin** — needs a new,
+  first-of-its-kind outbound action-plugin executor interface (confirmed across three separate runs'
+  research now that KAN-71/72/73's `AutomationActionModel` pipeline is ad-platform-specific and a poor
+  fit to extend). Sizeable enough to deserve a dedicated run rather than being squeezed in after a
+  reconciliation pass. Otherwise: KAN-82..88 (~4-8d each per the gap doc, all `todo`, no blockers).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **Four-way concurrent-session collision on one story in one day** (this run's own AI-suggested-
+    lists duplicate, on top of the record-feed run's own two collisions documented in the entry below)
+    is no longer a one-off — it has now happened on every single KAN-81 slice attempted since it was
+    picked up. Repeating the same recommendation those entries already made, more strongly: either
+    space out the scheduled cadence, or add an explicit per-story claim marker to `TASKS.md` before a
+    run sinks time into a large multi-slice story like KAN-81 (or KAN-88's likely successor epics).
+    This run's own implementation was fully working and tested but 100% wasted effort purely from the
+    collision — a cheap claim-marker check at pickup time would have caught it before any code was
+    written.
+  - Optional: PR #242's branch (`feat/kan-81-ai-suggested-lists`) is closed but not deleted — same
+    recurring git-over-HTTPS-proxy 403 every prior scheduled run has hit trying to delete a branch; a
+    human with direct repo access can delete it whenever convenient.
+
 ## 2026-08-22 (later still, 22) — generic record feed, third KAN-81 slice, reconciled with a concurrent duplicate (PR #236 + this run)
 
 - **Last completed:**
