@@ -695,7 +695,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
     ).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 
-  it('filters by an exact field-value match on the payload', async () => {
+  it('filters by an exact field-value match on the record\'s declared fields (its envelope\'s `properties`, not the raw payload top level)', async () => {
     const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Record Feed Filter Org');
 
     await landRawRecord({
@@ -704,7 +704,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       environmentId: prodEnvironment.id,
       schemaName: 'signup_completed',
       landedAt: '2026-08-22T10:00:00.000Z',
-      payload: { plan: 'pro' },
+      payload: { event_id: 'evt-1', event: 'signup_completed', ts: '2026-08-22T10:00:00.000Z', properties: { plan: 'pro' } },
     });
     await landRawRecord({
       organizationId: organization.id,
@@ -712,7 +712,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       environmentId: devEnvironment.id,
       schemaName: 'signup_completed',
       landedAt: '2026-08-22T11:00:00.000Z',
-      payload: { plan: 'free' },
+      payload: { event_id: 'evt-2', event: 'signup_completed', ts: '2026-08-22T11:00:00.000Z', properties: { plan: 'free' } },
     });
 
     const entries = await listRecentRecordsForSchemas({
@@ -723,7 +723,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       fieldFilter: { fieldName: 'plan', value: 'pro' },
     });
 
-    expect(entries.map((entry) => entry.payload.plan)).toEqual(['pro']);
+    expect(entries.map((entry) => (entry.payload.properties as Record<string, unknown>).plan)).toEqual(['pro']);
     expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id]);
   });
 
@@ -736,7 +736,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       environmentId: prodEnvironment.id,
       schemaName: 'signup_completed',
       landedAt: '2026-08-22T10:00:00.000Z',
-      payload: { plan: 'pro' },
+      payload: { event_id: 'evt-1', event: 'signup_completed', ts: '2026-08-22T10:00:00.000Z', properties: { plan: 'pro' } },
     });
 
     const entries = await listRecentRecordsForSchemas({
@@ -761,7 +761,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       environmentId: prodEnvironment.id,
       schemaName: 'signup_completed',
       landedAt: '2026-08-22T09:00:00.000Z',
-      payload: { plan: 'pro' },
+      payload: { event_id: 'evt-1', event: 'signup_completed', ts: '2026-08-22T09:00:00.000Z', properties: { plan: 'pro' } },
     });
     await landRawRecord({
       organizationId: organization.id,
@@ -769,7 +769,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       environmentId: prodEnvironment.id,
       schemaName: 'signup_completed',
       landedAt: '2026-08-22T10:00:00.000Z',
-      payload: { plan: 'free' },
+      payload: { event_id: 'evt-2', event: 'signup_completed', ts: '2026-08-22T10:00:00.000Z', properties: { plan: 'free' } },
     });
     await landRawRecord({
       organizationId: organization.id,
@@ -777,7 +777,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       environmentId: prodEnvironment.id,
       schemaName: 'signup_completed',
       landedAt: '2026-08-22T11:00:00.000Z',
-      payload: { plan: 'free' },
+      payload: { event_id: 'evt-3', event: 'signup_completed', ts: '2026-08-22T11:00:00.000Z', properties: { plan: 'free' } },
     });
 
     const entries = await listRecentRecordsForSchemas({
@@ -792,7 +792,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
     expect(entries.map((entry) => entry.landed_at)).toEqual(['2026-08-22T09:00:00.000Z']);
   });
 
-  it('matches non-string payload values by their stringified form', async () => {
+  it('matches non-string field values by their stringified form', async () => {
     const { organization, project, prodEnvironment } = await setupProject('Record Feed Filter Type Org');
 
     await landRawRecord({
@@ -801,7 +801,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       environmentId: prodEnvironment.id,
       schemaName: 'order_completed',
       landedAt: '2026-08-22T10:00:00.000Z',
-      payload: { net: 42, refunded: false },
+      payload: { event_id: 'evt-1', event: 'order_completed', ts: '2026-08-22T10:00:00.000Z', properties: { net: 42, refunded: false } },
     });
     await landRawRecord({
       organizationId: organization.id,
@@ -809,7 +809,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       environmentId: prodEnvironment.id,
       schemaName: 'order_completed',
       landedAt: '2026-08-22T11:00:00.000Z',
-      payload: { net: 99, refunded: true },
+      payload: { event_id: 'evt-2', event: 'order_completed', ts: '2026-08-22T11:00:00.000Z', properties: { net: 99, refunded: true } },
     });
 
     const entries = await listRecentRecordsForSchemas({
@@ -820,7 +820,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       fieldFilter: { fieldName: 'net', value: '42' },
     });
 
-    expect(entries.map((entry) => entry.payload.net)).toEqual([42]);
+    expect(entries.map((entry) => (entry.payload.properties as Record<string, unknown>).net)).toEqual([42]);
   });
 });
 

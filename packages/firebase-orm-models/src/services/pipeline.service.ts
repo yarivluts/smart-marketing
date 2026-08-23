@@ -273,7 +273,7 @@ export const DEFAULT_BILLING_OPS_FEED_LIMIT = 100;
 /** Same load-bounding default as {@link DEFAULT_BILLING_OPS_FEED_LIMIT} — kept as its own named constant since a generic record feed (KAN-81) isn't billing-specific. */
 export const DEFAULT_RECORD_FEED_LIMIT = 100;
 
-/** One equality filter on a raw record's own `payload` field — the record-feed page's "filterable" half of Gap 5 (today only a schema picker exists). Exact match, compared as a string (see `stringifyPayloadFieldValue`). */
+/** One equality filter on a raw record's own declared field (its schema's `field_defs` entry, not a raw envelope key — see `declaredFieldsForRecord`) — the record-feed page's "filterable" half of Gap 5 (today only a schema picker exists). Exact match, compared as a string (see `stringifyPayloadFieldValue`). */
 export interface RecordFieldFilter {
   fieldName: string;
   value: string;
@@ -286,7 +286,7 @@ export interface ListRecentRecordsForSchemasParams {
   /** One or more registered schema names of the same `kind` to fold into one feed — e.g. every billing event schema, every churn-signal entity schema, or just the one schema a record-feed page's picker selected. */
   schemaNames: readonly string[];
   limit?: number;
-  /** Restricts the feed to records whose `payload[fieldName]` stringifies to exactly `value`. See `RECORD_FIELD_FILTER_CANDIDATE_WINDOW` for how this is applied. */
+  /** Restricts the feed to records whose declared `fieldName` value stringifies to exactly `value`. See `RECORD_FIELD_FILTER_CANDIDATE_WINDOW` for how this is applied. */
   fieldFilter?: RecordFieldFilter;
 }
 
@@ -307,8 +307,23 @@ function stringifyPayloadFieldValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/**
+ * The declared-fields sub-object within a raw record's own envelope, keyed by `kind` — a landed
+ * `RawRecordModel.payload` is the *whole* envelope as submitted (an event's own `event_id`/`event`/
+ * `ts` alongside its `properties`, an entity's `id` alongside its `attributes`, a measure's `measure`/
+ * `ts`/`value` alongside its `dimensions`), not a flat map of the schema's declared fields — same
+ * dispatch `ingest.service.ts`'s `checkRecordEnvelope` uses for validation. Duplicated here (not
+ * imported) since `ingest.service.ts` already imports from this file — importing back would create a
+ * cycle.
+ */
+function declaredFieldsForRecord(record: RawRecordModel): Record<string, unknown> {
+  const key = record.kind === 'entity' ? 'attributes' : record.kind === 'measure' ? 'dimensions' : 'properties';
+  const value = record.payload[key];
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
 function matchesFieldFilter(record: RawRecordModel, filter: RecordFieldFilter): boolean {
-  return stringifyPayloadFieldValue(record.payload[filter.fieldName]) === filter.value;
+  return stringifyPayloadFieldValue(declaredFieldsForRecord(record)[filter.fieldName]) === filter.value;
 }
 
 /**
