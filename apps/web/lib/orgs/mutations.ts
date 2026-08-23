@@ -25,6 +25,7 @@ import {
   type BoardModel,
   type BoardTile,
   checkTrackingAlertsForProject as checkTrackingAlertsForProjectInOrganization,
+  checkFirmographicCompositionAlertsForProject as checkFirmographicCompositionAlertsForProjectInOrganization,
   completeOnboarding as completeOnboardingInOrganization,
   confirmOnboardingFunnelSteps as confirmOnboardingFunnelStepsInOrganization,
   createBoard as createBoardInOrganization,
@@ -143,6 +144,7 @@ import {
   setResourceAttachmentWriteTier as setResourceAttachmentWriteTierInOrganization,
   type SharedCredentialModel,
   type TrackingAlertCheckResult,
+  type FirmographicCompositionAlertCheckResult,
   claimTvPairing as claimTvPairingInOrganization,
   requestTvPairing as requestTvPairingInOrganization,
   revokeTvPairing as revokeTvPairingInOrganization,
@@ -676,6 +678,23 @@ interface CheckTrackingAlertsInput {
 export async function checkTrackingAlertsForProject(input: CheckTrackingAlertsInput): Promise<TrackingAlertCheckResult> {
   await ensureFirestoreOrm();
   return checkTrackingAlertsForProjectInOrganization({
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    triggeredByUserId: input.triggeredByUserId,
+  });
+}
+
+interface CheckFirmographicCompositionAlertsInput {
+  organizationId: string;
+  projectId: string;
+  triggeredByUserId: string;
+}
+
+export async function checkFirmographicCompositionAlertsForProject(
+  input: CheckFirmographicCompositionAlertsInput,
+): Promise<FirmographicCompositionAlertCheckResult> {
+  await ensureFirestoreOrm();
+  return checkFirmographicCompositionAlertsForProjectInOrganization({
     organizationId: input.organizationId,
     projectId: input.projectId,
     triggeredByUserId: input.triggeredByUserId,
