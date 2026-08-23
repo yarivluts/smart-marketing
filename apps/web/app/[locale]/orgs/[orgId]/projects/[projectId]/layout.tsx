@@ -160,6 +160,11 @@ export default async function ProjectLayout({
             label: t('projectRecordFeedLink'),
             icon: 'Rows3' as const,
           },
+          {
+            href: `${base}/feedback`,
+            label: t('projectFeedbackLink'),
+            icon: 'MessageSquare' as const,
+          },
         ]
       : []),
   ];

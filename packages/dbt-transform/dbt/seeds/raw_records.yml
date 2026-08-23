@@ -32,7 +32,12 @@ seeds:
       reactivate; `sub_1303`: new -> past_due -> reactivate, covering the
       "reactivation from a non-canceled status" branch a canceled-only
       fixture wouldn't exercise) plus four charges (two customers, one
-      failed charge) — isolated the same way.
+      failed charge) — isolated the same way. `proj_14`'s rows are a
+      synthetic NPS survey-response journey (KAN-82: `fact_survey_response`)
+      — six landed responses (promoters: 10, 9, 9; passive: 8; detractor: 4;
+      plus one malformed response with no `score` field, exercising
+      `growthos_try_cast`'s null-on-failure tolerance) — isolated the same
+      way.
     columns:
       - name: organization_id
         tests:

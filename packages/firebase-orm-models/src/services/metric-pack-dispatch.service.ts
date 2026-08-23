@@ -17,6 +17,11 @@ import {
   LANDING_PAGE_PACK_MANIFEST_YAML,
   LANDING_PAGE_PACK_PLUGIN_ID,
 } from '../plugin-runtime/landing-page-pack';
+import {
+  ensureFeedbackPackRegistered,
+  FEEDBACK_PACK_MANIFEST_YAML,
+  FEEDBACK_PACK_PLUGIN_ID,
+} from '../plugin-runtime/feedback-pack';
 import { getLatestPluginManifestVersion, installPlugin, registerPluginManifest, type InstallPluginParams } from './plugin-registry.service';
 
 /**
@@ -90,6 +95,8 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
   } else if (install.plugin_id === LANDING_PAGE_PACK_PLUGIN_ID) {
     await ensureLandingPagePackRegistered(params.organizationId, params.projectId, params.installedByUserId);
     await ensureLandingPagePackDefaultBoardsSeeded(params.organizationId, params.projectId, params.installedByUserId);
+  } else if (install.plugin_id === FEEDBACK_PACK_PLUGIN_ID) {
+    await ensureFeedbackPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
   }
 
   return install;
@@ -120,6 +127,7 @@ const BUILTIN_METRIC_PACKS: readonly BuiltinMetricPackCatalogEntry[] = [
   { pluginId: SAAS_METRIC_PACK_PLUGIN_ID, manifestYaml: SAAS_METRIC_PACK_MANIFEST_YAML },
   { pluginId: ENGAGEMENT_PACK_PLUGIN_ID, manifestYaml: ENGAGEMENT_PACK_MANIFEST_YAML },
   { pluginId: LANDING_PAGE_PACK_PLUGIN_ID, manifestYaml: LANDING_PAGE_PACK_MANIFEST_YAML },
+  { pluginId: FEEDBACK_PACK_PLUGIN_ID, manifestYaml: FEEDBACK_PACK_MANIFEST_YAML },
 ];
 
 /**
