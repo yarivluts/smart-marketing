@@ -17,6 +17,82 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 2) — KAN-84 collision: this run's own implementation discarded in favor of concurrent PR #250
+
+- **Last completed:**
+  - Read PROGRESS.md's own prior entry, which flagged KAN-84 (churn-reason capture, plan `14 §Gap
+    10`) as the recommended next pick: no dependency on KAN-82/83, High-severity/cheap per the gap
+    doc. Checked open PRs/branches before starting (the standing recommendation from every KAN-81
+    collision entry) — none existed for KAN-84 at that time.
+  - Researched the codebase's own conventions in depth via two subagent passes (KAN-82's
+    `survey_response` schema/`clusterFeedbackThemes`/`feedback-pack` shape; `queryMetrics`'s
+    degrade-to-outcome posture via `getTrialPipelineSummary`) and **fully implemented** KAN-84 on
+    branch `feat/kan-84-churn-reason-capture`: a `churn_reason` event schema
+    (`packages/shared/src/churn-reason`), a generic `clusterCommentsByKeywordTaxonomy` factored out
+    of KAN-82's `clusterFeedbackThemes` and reused by a new `clusterChurnReasonThemes`, a
+    `tracker.submitChurnReason()` SDK method, two new dbt core marts (`fact_churn_reason` flattening
+    the event; `fact_churn_reason_breakdown` pre-joining each reason to the customer's first-touch
+    `fact_attribution` channel, `dim_subscription` plan interval, and a self-computed signup cohort
+    month), a `churn-reason-pack` metric pack, and a project-scoped Churn Reasons admin page
+    (category breakdown + AI theme digest + a channel/plan/cohort breakdown table, gated on
+    `ingest.write`). Full local verification: `packages/shared` (494 tests), `packages/tracking-sdk`,
+    `packages/firebase-orm-models` (real Firestore-emulator suite, 1106/1107 green — one pre-existing
+    `listBuiltinMetricPacks` test needed its expected-list updated for the new pack, fixed), a real
+    `dbt build --target dev` (191/191, including two new isolated fixture rows on `proj_10`), and
+    `pnpm typecheck`/`lint` clean across `shared`/`firebase-orm-models`/`tracking-sdk`/`web`.
+    `apps/web`'s own vitest/Playwright suite was still running when the collision below was
+    discovered, so it was never confirmed green.
+  - **Collision discovered at push time**: `git push` failed with the now-familiar git-over-HTTPS-
+    proxy 403 (no raw git push access from this sandbox — see every prior entry documenting this),
+    and the GitHub-MCP fallback (`create_branch`) failed with "Reference already exists" — a
+    *different* concurrent session had independently implemented the exact same story on a branch
+    with the exact same name (`feat/kan-84-churn-reason-capture`) and already opened **PR #250**
+    ("feat: churn-reason capture with AI theme digest and plan/channel/cohort breakdown (KAN-84)",
+    opened 2026-08-23T03:28:34Z) before this run's own push attempt. Confirmed via `pull_request_read`:
+    a comprehensive, independently-tested implementation (38 files, +1613/-8, description claims
+    `packages/shared`/`tracking-sdk`/`firebase-orm-models` (1081 tests)/`dbt-transform` (179/179)/
+    `apps/web` (1314 tests + Playwright e2e) all green) — a genuinely different design in two
+    respects: (1) its theme clustering trusts the structured `category` outright and only falls back
+    to free-text keyword inference for `other`/unrecognized, and never drops an unmatched comment
+    (this run's own version always clusters from free text alone, dropping unmatched comments, mirroring
+    `clusterFeedbackThemes`'s existing posture exactly); (2) its breakdown is delivered through the
+    *existing* Boards/metric-picker dimension-breakdown machinery (one `churn_events` metric with
+    `[category, channel_id, plan, cohort_month]` dimensions, no bespoke report page) rather than this
+    run's own dedicated breakdown-table section on the Churn Reasons page itself.
+  - **Reconciled**: rather than push a genuinely conflicting second implementation (the exact
+    "two parallel, conflicting" outcome the KAN-81 collision entries explicitly warn against), this
+    run's own local commit was discarded without ever being pushed (`git checkout -b
+    chore/record-kan-84-collision origin/main` off a clean `main`, abandoning the local
+    `feat/kan-84-churn-reason-capture` branch — nothing from it reached the remote). PR #250 was
+    **not** touched (not closed, not reviewed, not merged) — it belongs to a different session and,
+    per its own description, is complete and self-tested; driving it to green/merged is that
+    session's own responsibility, not this run's. At push time PR #250's CI had not yet reported
+    (`get_check_runs`/`get_status` both empty ~15+ minutes after it opened) — worth a future run
+    checking whether it actually went green, since an unusually long CI silence was also flagged as
+    odd in this run's own investigation.
+- **In progress (exact stopping point):** none — this run's own KAN-84 work is fully abandoned
+  (nothing pushed, nothing to clean up), and PR #250 stands as the delivered (pending its own CI/
+  merge) implementation of KAN-84.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** once PR #250 (or its successor if it needs fixes) merges, `TASKS.md`'s KAN-84 row
+  should flip to `done`. Until then, treat KAN-84 as spoken-for — a future run should check PR #250's
+  state before touching this story again. Next candidates with no dependency: **KAN-85** (Ergonomics:
+  omnisearch, inline editing, column sort/show-hide — `14` gap 15, ~6d) or **KAN-86** (Campaign ops:
+  `roi_nd`/`collection_nd`, per-campaign targets, prediction calibration — `14` gap 12, ~7d); check
+  open PRs/branches for either before committing significant effort, same standing recommendation.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **The concurrent-collision pattern is no longer specific to KAN-81** — it has now hit KAN-84 too,
+    on a run that explicitly re-checked for open PRs/branches before starting (they simply didn't
+    exist yet at that moment). The standing recommendation from every prior collision entry — space
+    out the scheduled cadence, or add an explicit per-story claim marker to `TASKS.md` before a run
+    starts a multi-file story — applies with the same force here; a check-at-pickup-time alone isn't
+    sufficient when two runs can start within moments of each other.
+  - PR #250's unusually long CI silence (no check runs at all ~15+ minutes after opening, vs. this
+    repo's own history of CI typically starting within a couple of minutes) is worth a human or a
+    future run's attention — it may just be a reporting delay, or something is actually blocking that
+    PR's checks from triggering.
+
 ## 2026-08-23 (later still) — Feedback & NPS pack, a buildable-today KAN-82 slice (PR #246)
 
 - **Last completed:**
