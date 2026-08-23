@@ -934,7 +934,14 @@
     "suggestSegmentsError": "לא ניתן היה לקבל הצעות. נסה שוב.",
     "noSegmentSuggestions": "אין הצעות מהימנות עבור סכימת ישות זו כרגע.",
     "segmentSuggestionSummary": "{name} (התאמה של {confidence}%)",
-    "useSuggestionButton": "השתמש בזה"
+    "useSuggestionButton": "השתמש בזה",
+    "crmSyncNoInstalls": "התקן תוסף סנכרון CRM (בעמוד התוספים) כדי לייצא רשימה זו.",
+    "crmSyncInstallLabel": "יעד סנכרון CRM",
+    "crmSyncButton": "סנכרן ל-CRM",
+    "crmSyncError": "לא ניתן היה לסנכרן את הפלח. נסה שוב.",
+    "crmSyncLastRunSucceeded": "סונכרנו לאחרונה {count, plural, one {רשומה #} other {# רשומות}}",
+    "crmSyncLastRunFailed": "הסנכרון האחרון נכשל",
+    "crmSyncLastRunRunning": "סנכרון בתהליך…"
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

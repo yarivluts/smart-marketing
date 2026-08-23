@@ -4,6 +4,7 @@ export * from './executor';
 export * from './toy-counter-executor';
 export * from './stripe';
 export * from './ga4';
+export * from './crm-webhook';
 export * from './saas-metric-pack';
 export * from './engagement-pack';
 export * from './google-ads';

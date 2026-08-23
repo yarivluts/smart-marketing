@@ -53,6 +53,8 @@ import {
   listBuiltinMetricPacks,
   listOnboardingMetricPacks,
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
+  listActionPluginInstallsForProject as listActionPluginInstallsForProjectInOrganization,
+  listCrmSyncRunsForSegment as listCrmSyncRunsForSegmentInOrganization,
   listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
@@ -93,6 +95,7 @@ import {
   type OrgPersonModel,
   type PipelineMessageModel,
   type PluginInstallModel,
+  type PluginSinkRunModel,
   type PluginManifestModel,
   type PluginSourceRunModel,
   type ProjectCostQuota,
@@ -437,6 +440,18 @@ export async function listSourcePluginRunsForInstall(
 ): Promise<PluginSourceRunModel[]> {
   await ensureFirestoreOrm();
   return listSourcePluginRunsForInstallInOrganization(organizationId, projectId, installId, limit);
+}
+
+/** Every currently-installed, `action`-type plugin install in a project (KAN-81) — the pick-list the Segments page's "Sync to CRM" control offers. */
+export async function listActionPluginInstallsForProject(organizationId: string, projectId: string): Promise<PluginInstallModel[]> {
+  await ensureFirestoreOrm();
+  return listActionPluginInstallsForProjectInOrganization(organizationId, projectId);
+}
+
+/** One segment's CRM-sync run history, newest-first (KAN-81). */
+export async function listCrmSyncRunsForSegment(organizationId: string, projectId: string, segmentId: string, limit?: number): Promise<PluginSinkRunModel[]> {
+  await ensureFirestoreOrm();
+  return listCrmSyncRunsForSegmentInOrganization(organizationId, projectId, segmentId, limit);
 }
 
 export async function listBoardsForProject(organizationId: string, projectId: string): Promise<BoardModel[]> {
