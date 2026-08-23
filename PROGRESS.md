@@ -17,6 +17,101 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later) — CRM-sync action plugin, closing out KAN-81 (PR #244)
+
+- **Last completed:**
+  - Session start: picked up KAN-81 where PR #242's own reconciliation left off — opened a duplicate
+    "AI-suggested lists" PR against a stale `main`, discovered a concurrent session had already merged
+    the same feature as PR #239 (plus PR #238's record-feed generalization), and correctly closed the
+    duplicate (see the entry directly below — that reconciliation was this run's own doing, discovered
+    right after opening it). With `main` synced (`cb9a641`, PR #238/#239 both in), re-checked
+    `TASKS.md`'s KAN-81 row: three of its four Gap-5/9 pieces were done, one genuinely remained —
+    **CRM-sync action plugin** ("saved segments ... export/sync to CRM (action plugin)").
+  - Researched the shape via a subagent first: the KAN-71/72/73 `AutomationActionModel` guardrail
+    pipeline is entirely ad-spend-shaped (budget %, spend ceiling, protected campaign ids) and a poor
+    fit to extend, confirming `TASKS.md`'s own note; `PLUGIN_TYPES` already includes `'action'`
+    (`packages/shared/src/plugin-manifest/types.ts`) with an `endpoints.action` field, so the manifest
+    vocabulary already anticipated an outbound plugin — only the KAN-47 runtime itself
+    (`SourcePluginExecutor`) was inbound-only; and `countSegmentMembers` only returns a `COUNT`, no
+    path existed to fetch actual matching row/entity ids for a segment.
+  - **Delivered (PR #244, branch `feat/kan-81-crm-sync-action-plugin`):** the outbound mirror of
+    KAN-47's inbound source-plugin runtime, end to end:
+    - `plugin-runtime/executor.ts` gained `SinkPluginExecutor` (`push()`) +
+      `SinkPluginPushParams`/`Result`/`SinkPluginExecutionError` — the exact outbound mirror of
+      `SourcePluginExecutor`, no cursor (a push is always handed an already-resolved batch).
+    - `plugin-runtime/crm-webhook/`: a built-in generic authenticated-webhook connector (`type: action`
+      manifest, `CrmWebhookHttpApiClient` — real `fetch` POST + bearer auth,
+      `CrmWebhookSinkPluginExecutor`) — no real CRM-specific OAuth exists to build against yet, so this
+      follows the same "buildable-today stand-in for a real provider" posture
+      `STRIPE_PLUGIN_MANIFEST_YAML` established for its own inbound connector. Reuses the *existing*
+      `generic` `SharedCredentialModel` provider for its secret (`{webhookUrl, bearerToken}` JSON blob,
+      same "bundle everything into one secret" posture `parseStripeCredentialSecret` established) — no
+      new credential provider, vault field, or admin UI needed.
+    - `segment.service.ts` gained `listSegmentMembers` — `countSegmentMembers`'s row-returning sibling
+      (`SELECT entity_id, properties, last_seen_at`, the exact pattern `searchProjectCustomers`
+      established), sharing its filter-compilation via a new `buildSegmentMemberWhereClause` helper;
+      bounded to 500 rows by default (`MAX_SEGMENT_MEMBER_LIST_LIMIT` 1000).
+    - New `crm-sync.service.ts`: `syncSegmentToCrm` (resolves the install's credential + the segment's
+      live member list *before* any run record is written — a genuinely invalid segment/install throws
+      straight through, 404-not-403; a *degraded* member list or a push failure is recorded on the run
+      instead, mirroring `triggerSourcePluginRun`'s own "the record is the result" posture), with
+      retry/backoff and a new `PluginSinkRunModel` (Firestore run history, mirrors
+      `PluginSourceRunModel`); plus `listCrmSyncRunsForSegment` and `listActionPluginInstallsForProject`
+      (no "list action installs" query existed yet).
+    - Admin UI: a "Sync to CRM" control on the Segments page (`SegmentCrmSyncControls`) — picks any
+      installed `action`-type plugin in the project, triggers a sync, shows the last run's outcome. New
+      `POST .../segments/[segmentId]/sync` route, gated on `dashboards.write` (this feature's own
+      existing permission, same reuse posture every other segment mutation route already establishes).
+  - **A real bug caught during this run's own test-writing, before any push:** the first cut of
+    `syncSegmentToCrm` resolved the segment's member list *inside* the same `try` block a push failure
+    was caught by, after the run record already existed — meaning a bad `segmentId` would have been
+    silently swallowed into a "failed" run rather than throwing `SegmentNotFoundError` straight through
+    (breaking the 404-not-403 isolation posture every other lookup in this codebase follows). Caught
+    while designing the emulator tests, not by a failing test — restructured so credential resolution
+    and the member-list fetch both happen *before* the run record is created, with the ordering (bad
+    credential checked before a degraded member list) documented directly in the function's own doc
+    comment.
+  - **Checks:** `packages/firebase-orm-models`: 17 new unit tests for the crm-webhook connector (no
+    network — manifest/credential-secret/api-client/executor), 5 new `listSegmentMembers` emulator
+    tests, 15 new `crm-sync.emulator.test.ts` tests (credential resolution success/4 failure modes,
+    sync success/retry/exhausted-failure/degraded-member-list, audit log, 404/409/400 error paths, run
+    history, action-install listing) — full suite 97 files/1065 tests green (real Firestore emulator).
+    `apps/web`: new `segment-crm-sync-controls.test.tsx` (6 tests) + `sync/route.test.ts` (9 tests) —
+    full suite green (vitest + Playwright e2e, run twice for stability; each run's handful of
+    flaky/failed e2e cases landed in unrelated specs — `billing-ops-feed`/`orgs`/`resource-library`/
+    `schema-registry`/`hooks`/`plugins`/`tv-pairing` — none touching segments/CRM-sync, all passed on
+    an isolated rerun with less resource contention — the same pre-existing sandbox-contention
+    flakiness this file's history repeatedly documents, not a regression). `pnpm turbo lint typecheck
+    build` clean across `@growthos/shared`/`@growthos/firebase-orm-models`/`@growthos/web`; full `pnpm
+    build` clean across all 7 packages.
+  - **Process note:** the first commit for this slice was accidentally made directly on local `main`
+    (a genuine slip, not a deliberate branch-skip) — caught immediately before any push via `git log`/
+    `git status`; fixed by creating the feature branch from that commit, hard-resetting local `main`
+    back to `origin/main`, and continuing normally. No `main` history was ever affected (the commit was
+    never pushed to `origin/main`), but flagging it here as a reminder to double-check `git branch
+    --show-current` before the first commit of a task, especially after a `git reset --hard` mid-run.
+  - Opened PR #244, subscribed to its activity, scheduled a 30-minute self-check-in. Real CI (`lint ·
+    typecheck · test · build` + `terraform fmt · validate`) came back green in ~28 minutes,
+    `mergeable_state: clean` — squash-merged (`49509ee`) on the scheduled check-in, no flakiness this
+    round. Local branch deleted; remote branch deletion not attempted this run (the recurring
+    git-over-HTTPS-proxy 403 every prior scheduled-run merge has hit — a human can prune it).
+- **In progress (exact stopping point):** none — #244 fully landed, `main` green (`49509ee`). **KAN-81
+  is now `done`** — all four Gap-5/9 pieces delivered (work-list owner/status, live record feeds,
+  AI-suggested lists, CRM-sync action plugin).
+- **Blocked + why:** nothing.
+- **Next step:** no unblocked `todo` remains in KAN-17..81 (KAN-43/KAN-18/KAN-19 stay `needs-human`/
+  infra-gated). The next candidates are KAN-82..88 (`todo`, no blockers, ~4-8d each per the gap doc) —
+  KAN-84 (churn-reason capture) is flagged High-severity/cheap in the gap doc and has no dependency on
+  the others; KAN-82/83 have a real ordering dependency (KAN-83 needs KAN-82's survey schema). Given
+  how many concurrent sessions raced on KAN-81 tonight (five PRs — #233/#236/#238/#239/#244 — plus two
+  closed duplicates, #237/#240/#241 docs-only follow-ups), a future run picking up KAN-82..88 should
+  re-check open PRs/branches first before committing significant effort, the same check this run itself
+  did before starting CRM-sync.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting — now also including `feat/kan-81-crm-sync-action-plugin` and the several other KAN-81
+  branches accumulated tonight).
+
 ## 2026-08-23 — AI-suggested lists: triple concurrent duplicate, reconciled (PR #239 kept, PR #242 closed, this run's own copy discarded)
 
 - **Last completed:**
