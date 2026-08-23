@@ -37,7 +37,13 @@ seeds:
       — six landed responses (promoters: 10, 9, 9; passive: 8; detractor: 4;
       plus one malformed response with no `score` field, exercising
       `growthos_try_cast`'s null-on-failure tolerance) — isolated the same
-      way.
+      way. `proj_15`'s rows are a synthetic churn-reason journey (KAN-84:
+      `fact_cancellation_reason`) — one customer with a captured touchpoint,
+      a signup, and an active subscription before cancelling (exercising the
+      plan/channel/cohort joins all landing on real values), and a second
+      customer who cancels with no subscription or touchpoint ever landed
+      (exercising the left joins' null-on-missing-dimension tolerance) —
+      isolated the same way.
     columns:
       - name: organization_id
         tests:

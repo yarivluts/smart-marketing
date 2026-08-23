@@ -6,6 +6,12 @@ import {
   getActiveAutomationGuardrailPolicy as getActiveAutomationGuardrailPolicyInOrganization,
   getAutomationKillSwitchStatus as getAutomationKillSwitchStatusInOrganization,
   getBoard as getBoardInOrganization,
+  getCancellationReasonCodeBreakdownForProject as getCancellationReasonCodeBreakdownForProjectInOrganization,
+  getCancellationReasonDimensionBreakdownForProject as getCancellationReasonDimensionBreakdownForProjectInOrganization,
+  getCancellationReasonThemeDigestForProject as getCancellationReasonThemeDigestForProjectInOrganization,
+  listCancellationReasonRecordsForProject as listCancellationReasonRecordsForProjectInOrganization,
+  type CancellationReasonBreakdownDimension,
+  type CancellationReasonDimensionBreakdownOutcome,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -126,7 +132,7 @@ import {
   type WinEventModel,
   type WinRuleModel,
 } from '@growthos/firebase-orm-models';
-import type { FeedbackThemeCluster, FunnelStepSuggestion, Result } from '@growthos/shared';
+import type { CancellationReasonCodeCount, CancellationReasonThemeCluster, FeedbackThemeCluster, FunnelStepSuggestion, Result } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 export async function listOrgMembers(organizationId: string): Promise<OrgMemberSummary[]> {
@@ -381,6 +387,43 @@ export async function listSurveyResponseRecordsForProject(
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
   return listSurveyResponseRecordsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+/** The bounded, landed `cancellation_reason` raw records `getCancellationReasonCodeBreakdownForProject`/`getCancellationReasonThemeDigestForProject` each read — fetch once via this and pass the result to both via `precomputedRecords`, same posture `listSurveyResponseRecordsForProject` establishes. */
+export async function listCancellationReasonRecordsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listCancellationReasonRecordsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function getCancellationReasonCodeBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+): Promise<CancellationReasonCodeCount[]> {
+  await ensureFirestoreOrm();
+  return getCancellationReasonCodeBreakdownForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getCancellationReasonThemeDigestForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
+): Promise<CancellationReasonThemeCluster[]> {
+  await ensureFirestoreOrm();
+  return getCancellationReasonThemeDigestForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getCancellationReasonDimensionBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  dimension: CancellationReasonBreakdownDimension,
+): Promise<CancellationReasonDimensionBreakdownOutcome> {
+  await ensureFirestoreOrm();
+  return getCancellationReasonDimensionBreakdownForProjectInOrganization(organizationId, projectId, dimension);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {

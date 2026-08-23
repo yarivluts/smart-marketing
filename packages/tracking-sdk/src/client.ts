@@ -1,6 +1,7 @@
 import {
   buildTouchpointEventPayload,
   buildTrackedEventPayload,
+  CANCELLATION_REASON_SCHEMA_NAME,
   parseAcquisitionParams,
   SURVEY_RESPONSE_SCHEMA_NAME,
 } from '@growthos/shared';
@@ -36,6 +37,8 @@ export interface Tracker {
   getAnonId(): string | null;
   /** Sends an NPS survey response (KAN-82's in-app survey SDK) — a thin `track()` wrapper over the `survey_response` schema, same posture `identify()` takes over its own `track()` call. `score` is 0-10; `comment` is the respondent's optional free text. */
   submitNpsSurvey(score: number, comment?: string): Promise<void>;
+  /** Sends a cancellation reason from a cancel flow or exit survey (KAN-84) — a thin `track()` wrapper over the `cancellation_reason` schema, same posture `submitNpsSurvey` takes over its own `track()` call. `reasonCode` should be one of `CANCELLATION_REASON_CODES` (`@growthos/shared`); `comment` is the customer's optional free text. */
+  submitCancellationReason(reasonCode: string, comment?: string): Promise<void>;
 }
 
 function defaultNow(): string {
@@ -130,5 +133,13 @@ export function createTracker(options: TrackerOptions): Tracker {
     await track(SURVEY_RESPONSE_SCHEMA_NAME, properties);
   }
 
-  return { page, track, identify, getAnonId, submitNpsSurvey };
+  async function submitCancellationReason(reasonCode: string, comment?: string): Promise<void> {
+    const properties: Record<string, unknown> = { reason_code: reasonCode };
+    if (comment !== undefined) {
+      properties.comment = comment;
+    }
+    await track(CANCELLATION_REASON_SCHEMA_NAME, properties);
+  }
+
+  return { page, track, identify, getAnonId, submitNpsSurvey, submitCancellationReason };
 }

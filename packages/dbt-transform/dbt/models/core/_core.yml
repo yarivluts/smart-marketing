@@ -400,3 +400,28 @@ models:
       - name: ts
         tests:
           - not_null
+
+  - name: fact_cancellation_reason
+    description: >
+      Churn-reason capture (KAN-84, plan `14 §Gap 10`): one row per landed
+      `cancellation_reason` event, with the payload's structured `reason_code`
+      + free-text `comment` pulled into real columns and joined to the
+      customer's current subscription plan, last-touch marketing channel,
+      and signup cohort month. Feeds the Churn Reason pack's
+      `cancellations_total` metric, broken down by any of those three
+      dimensions plus `reason_code` itself.
+    columns:
+      - name: cancellation_reason_key
+        description: Composite (project_id, environment_id, event_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: reason_code
+        tests:
+          - not_null
+      - name: ts
+        tests:
+          - not_null

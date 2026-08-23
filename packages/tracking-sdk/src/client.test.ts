@@ -100,6 +100,30 @@ describe('createTracker', () => {
     expect(body.batch[0].properties.comment).toBeUndefined();
   });
 
+  it('submitCancellationReason(): sends a cancellation_reason event carrying the reason code and comment', async () => {
+    const storage = createInMemoryStorage();
+    const tracker = createTracker({ writeKey: 'gos_test_abc', ingestBaseUrl: 'https://api.example.com/v1/ingest', storage, fetchImpl });
+
+    await tracker.page();
+    await tracker.submitCancellationReason('too_expensive', 'Not worth it for our team size');
+
+    const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(body.batch[0].event).toBe('cancellation_reason');
+    expect(body.batch[0].properties).toMatchObject({ reason_code: 'too_expensive', comment: 'Not worth it for our team size' });
+  });
+
+  it('submitCancellationReason(): omits comment entirely when not provided', async () => {
+    const storage = createInMemoryStorage();
+    const tracker = createTracker({ writeKey: 'gos_test_abc', ingestBaseUrl: 'https://api.example.com/v1/ingest', storage, fetchImpl });
+
+    await tracker.page();
+    await tracker.submitCancellationReason('other');
+
+    const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(body.batch[0].properties).toMatchObject({ reason_code: 'other' });
+    expect(body.batch[0].properties.comment).toBeUndefined();
+  });
+
   it('track(): fires the entry touchpoint itself when called before page() ever runs (regression: a caller that only ever calls track()/identify() must not lose the visitor\'s touchpoint)', async () => {
     navigateTo('https://shop.example.com/landing?gclid=first_call_gclid');
     const storage = createInMemoryStorage();

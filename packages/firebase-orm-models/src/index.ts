@@ -154,6 +154,8 @@ export * from './orchestration';
 export * from './plugin-runtime';
 export * from './plugin-runtime/landing-page-pack';
 export * from './plugin-runtime/feedback-pack';
+export * from './plugin-runtime/churn-reason-pack';
+export * from './services/churn-reason.service';
 export * from './services/automation-guardrail.service';
 export * from './services/automation-kill-switch.service';
 export * from './services/automation.service';
