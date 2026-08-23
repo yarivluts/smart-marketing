@@ -27,6 +27,11 @@ import {
   CHURN_REASON_PACK_MANIFEST_YAML,
   CHURN_REASON_PACK_PLUGIN_ID,
 } from '../plugin-runtime/churn-reason-pack';
+import {
+  ensureQualityScorePackRegistered,
+  QUALITY_SCORE_PACK_MANIFEST_YAML,
+  QUALITY_SCORE_PACK_PLUGIN_ID,
+} from '../plugin-runtime/quality-score-pack';
 import { getLatestPluginManifestVersion, installPlugin, registerPluginManifest, type InstallPluginParams } from './plugin-registry.service';
 
 /**
@@ -104,6 +109,8 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
     await ensureFeedbackPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
   } else if (install.plugin_id === CHURN_REASON_PACK_PLUGIN_ID) {
     await ensureChurnReasonPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
+  } else if (install.plugin_id === QUALITY_SCORE_PACK_PLUGIN_ID) {
+    await ensureQualityScorePackRegistered(params.organizationId, params.projectId, params.installedByUserId);
   }
 
   return install;
@@ -136,6 +143,7 @@ const BUILTIN_METRIC_PACKS: readonly BuiltinMetricPackCatalogEntry[] = [
   { pluginId: LANDING_PAGE_PACK_PLUGIN_ID, manifestYaml: LANDING_PAGE_PACK_MANIFEST_YAML },
   { pluginId: FEEDBACK_PACK_PLUGIN_ID, manifestYaml: FEEDBACK_PACK_MANIFEST_YAML },
   { pluginId: CHURN_REASON_PACK_PLUGIN_ID, manifestYaml: CHURN_REASON_PACK_MANIFEST_YAML },
+  { pluginId: QUALITY_SCORE_PACK_PLUGIN_ID, manifestYaml: QUALITY_SCORE_PACK_MANIFEST_YAML },
 ];
 
 /**

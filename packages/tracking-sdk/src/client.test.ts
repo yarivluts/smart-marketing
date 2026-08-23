@@ -124,6 +124,36 @@ describe('createTracker', () => {
     expect(body.batch[0].properties.comment).toBeUndefined();
   });
 
+  it('submitOnboardingSurvey(): sends an onboarding_survey event carrying the raw answers plus a computed quality_score', async () => {
+    const storage = createInMemoryStorage();
+    const tracker = createTracker({ writeKey: 'gos_test_abc', ingestBaseUrl: 'https://api.example.com/v1/ingest', storage, fetchImpl });
+
+    await tracker.page();
+    await tracker.submitOnboardingSurvey({ companySize: '51-200', budgetRange: '10k_50k', urgency: 'this_quarter', useCase: 'replacing spreadsheets' });
+
+    const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(body.batch[0].event).toBe('onboarding_survey');
+    expect(body.batch[0].properties).toMatchObject({
+      company_size: '51-200',
+      budget_range: '10k_50k',
+      urgency: 'this_quarter',
+      use_case: 'replacing spreadsheets',
+      quality_score: 71,
+    });
+  });
+
+  it('submitOnboardingSurvey(): omits use_case entirely when not provided', async () => {
+    const storage = createInMemoryStorage();
+    const tracker = createTracker({ writeKey: 'gos_test_abc', ingestBaseUrl: 'https://api.example.com/v1/ingest', storage, fetchImpl });
+
+    await tracker.page();
+    await tracker.submitOnboardingSurvey({ companySize: '1-10', budgetRange: 'no_budget', urgency: 'exploring' });
+
+    const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(body.batch[0].properties).toMatchObject({ company_size: '1-10', budget_range: 'no_budget', urgency: 'exploring', quality_score: 12 });
+    expect(body.batch[0].properties.use_case).toBeUndefined();
+  });
+
   it('track(): fires the entry touchpoint itself when called before page() ever runs (regression: a caller that only ever calls track()/identify() must not lose the visitor\'s touchpoint)', async () => {
     navigateTo('https://shop.example.com/landing?gclid=first_call_gclid');
     const storage = createInMemoryStorage();

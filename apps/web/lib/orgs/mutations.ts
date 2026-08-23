@@ -140,6 +140,8 @@ import {
   setResourceAttachmentWriteTier as setResourceAttachmentWriteTierInOrganization,
   type SharedCredentialModel,
   type TrackingAlertCheckResult,
+  checkQualityMixAlertsForProject as checkQualityMixAlertsForProjectInOrganization,
+  type QualityMixAlertCheckResult,
   claimTvPairing as claimTvPairingInOrganization,
   requestTvPairing as requestTvPairingInOrganization,
   revokeTvPairing as revokeTvPairingInOrganization,
@@ -673,6 +675,22 @@ interface CheckTrackingAlertsInput {
 export async function checkTrackingAlertsForProject(input: CheckTrackingAlertsInput): Promise<TrackingAlertCheckResult> {
   await ensureFirestoreOrm();
   return checkTrackingAlertsForProjectInOrganization({
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    triggeredByUserId: input.triggeredByUserId,
+  });
+}
+
+interface CheckQualityMixAlertsInput {
+  organizationId: string;
+  projectId: string;
+  triggeredByUserId: string;
+}
+
+/** KAN-83's "check now" mix-shift alert action (same buildable-today posture as `checkTrackingAlertsForProject`, KAN-36) — see `checkQualityMixAlertsForProject`'s own doc comment in `@growthos/firebase-orm-models`. */
+export async function checkQualityMixAlertsForProject(input: CheckQualityMixAlertsInput): Promise<QualityMixAlertCheckResult> {
+  await ensureFirestoreOrm();
+  return checkQualityMixAlertsForProjectInOrganization({
     organizationId: input.organizationId,
     projectId: input.projectId,
     triggeredByUserId: input.triggeredByUserId,
