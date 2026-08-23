@@ -171,6 +171,14 @@ export default async function OrgDetailPage({
                       {t('projectFeedbackLink')}
                     </Link>
                   ) : null}
+                  {canViewIngestHealth ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/churn-reasons`}
+                    >
+                      {t('projectChurnReasonsLink')}
+                    </Link>
+                  ) : null}
                   {canManageProjects ? (
                     <Link
                       className="text-sm underline"

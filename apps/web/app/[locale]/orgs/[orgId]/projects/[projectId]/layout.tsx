@@ -165,6 +165,11 @@ export default async function ProjectLayout({
             label: t('projectFeedbackLink'),
             icon: 'MessageSquare' as const,
           },
+          {
+            href: `${base}/churn-reasons`,
+            label: t('projectChurnReasonsLink'),
+            icon: 'UserX' as const,
+          },
         ]
       : []),
   ];

@@ -23,3 +23,4 @@ export * from './automation-guardrails';
 export * from './segments';
 export * from './session-replay/link';
 export * from './survey';
+export * from './churn-reason';
