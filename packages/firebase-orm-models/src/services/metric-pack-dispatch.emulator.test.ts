@@ -4,6 +4,7 @@ import {
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  CAMPAIGN_OPS_PACK_PLUGIN_ID,
   CHURN_REASON_PACK_PLUGIN_ID,
   ENGAGEMENT_PACK_MANIFEST_YAML,
   ENGAGEMENT_PACK_PLUGIN_ID,
@@ -188,6 +189,7 @@ describe('listBuiltinMetricPacks', () => {
       LANDING_PAGE_PACK_PLUGIN_ID,
       FEEDBACK_PACK_PLUGIN_ID,
       CHURN_REASON_PACK_PLUGIN_ID,
+      CAMPAIGN_OPS_PACK_PLUGIN_ID,
     ]);
   });
 });
