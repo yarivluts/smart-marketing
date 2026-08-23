@@ -61,14 +61,17 @@ describe('ensureFeedbackPackRegistered — schema + metric definitions', () => {
     expect(defs.every((def) => def.version === 1 && def.status === 'active')).toBe(true);
   });
 
-  it('registers nps_respondents: count(fact_survey_response where survey_type=nps)', async () => {
+  it('registers nps_respondents: count(fact_survey_response where survey_type=nps and score>=0)', async () => {
     const metric = await activeMetric('nps_respondents');
     expect(metric?.definition_kind).toBe('aggregation');
     expect(metric?.aggregation).toEqual({
       function: 'count',
       table: 'fact_survey_response',
       timeColumn: 'ts',
-      filters: [{ field: 'survey_type', operator: '=', value: 'nps' }],
+      filters: [
+        { field: 'survey_type', operator: '=', value: 'nps' },
+        { field: 'score', operator: '>=', value: '0' },
+      ],
     });
   });
 

@@ -11,6 +11,7 @@ import {
   getNpsOverviewForProject,
   listOrgProjects,
   listPluginInstallsForProject,
+  listSurveyResponseRecordsForProject,
 } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { feedbackThemeLabelKey } from '@/lib/orgs/feedback-view';
@@ -76,9 +77,10 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
     );
   }
 
+  const surveyResponseRecords = await listSurveyResponseRecordsForProject(orgId, projectId);
   const [overview, themeDigest] = await Promise.all([
-    getNpsOverviewForProject(orgId, projectId),
-    getFeedbackThemeDigestForProject(orgId, projectId),
+    getNpsOverviewForProject(orgId, projectId, { precomputedRecords: surveyResponseRecords }),
+    getFeedbackThemeDigestForProject(orgId, projectId, { precomputedRecords: surveyResponseRecords }),
   ]);
 
   return (

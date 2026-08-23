@@ -152,6 +152,27 @@ export interface NpsOverview {
 }
 
 /**
+ * The bounded, landed `survey_response` raw records both `getNpsOverviewForProject` and
+ * `getFeedbackThemeDigestForProject` read — exported so a caller needing both (the Feedback admin
+ * page) can fetch once and pass the result to each via `precomputedRecords`, same `precomputedSchemaDefs`
+ * pass-through convention `getEventVolumeOverviewForProject` (KAN-36) established, instead of paying for
+ * the same bounded Firestore read twice.
+ */
+export async function listSurveyResponseRecordsForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = DEFAULT_NPS_OVERVIEW_RECORD_LIMIT,
+): Promise<RawRecordModel[]> {
+  return listRecentRecordsForSchemas({
+    organizationId,
+    projectId,
+    kind: SURVEY_RESPONSE_SCHEMA_KIND,
+    schemaNames: [SURVEY_RESPONSE_SCHEMA_NAME],
+    limit,
+  });
+}
+
+/**
  * A project's NPS score, promoter/passive/detractor breakdown, and a daily
  * trend over the trailing window — computed fresh from bounded, landed
  * `survey_response` raw records, folded across every environment (same
@@ -162,20 +183,14 @@ export interface NpsOverview {
 export async function getNpsOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; now?: number; windowDays?: number },
+  options?: { limit?: number; now?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
 ): Promise<NpsOverview> {
   await requireProjectInOrg(organizationId, projectId);
   const limit = options?.limit ?? DEFAULT_NPS_OVERVIEW_RECORD_LIMIT;
   const windowDays = options?.windowDays ?? DEFAULT_NPS_OVERVIEW_WINDOW_DAYS;
   const now = options?.now ?? Date.now();
 
-  const records = await listRecentRecordsForSchemas({
-    organizationId,
-    projectId,
-    kind: SURVEY_RESPONSE_SCHEMA_KIND,
-    schemaNames: [SURVEY_RESPONSE_SCHEMA_NAME],
-    limit,
-  });
+  const records = options?.precomputedRecords ?? (await listSurveyResponseRecordsForProject(organizationId, projectId, limit));
   const responses = records.map(parseNpsResponse).filter((r): r is ParsedSurveyResponse => r !== null);
 
   const overall = computeNpsBreakdown(responses.map((r) => r.score));
@@ -206,7 +221,7 @@ export async function getNpsOverviewForProject(
 export async function getFeedbackThemeDigestForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; now?: number; windowDays?: number },
+  options?: { limit?: number; now?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
 ): Promise<FeedbackThemeCluster[]> {
   await requireProjectInOrg(organizationId, projectId);
   const limit = options?.limit ?? DEFAULT_NPS_OVERVIEW_RECORD_LIMIT;
@@ -214,13 +229,7 @@ export async function getFeedbackThemeDigestForProject(
   const now = options?.now ?? Date.now();
   const windowStartMs = startOfUtcDayMs(now) - (windowDays - 1) * 24 * 60 * 60 * 1000;
 
-  const records = await listRecentRecordsForSchemas({
-    organizationId,
-    projectId,
-    kind: SURVEY_RESPONSE_SCHEMA_KIND,
-    schemaNames: [SURVEY_RESPONSE_SCHEMA_NAME],
-    limit,
-  });
+  const records = options?.precomputedRecords ?? (await listSurveyResponseRecordsForProject(organizationId, projectId, limit));
   const comments = records
     .map(parseNpsResponse)
     .filter((r): r is ParsedSurveyResponse => r !== null && r.comment !== null && Date.parse(r.landedAt) >= windowStartMs)

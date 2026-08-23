@@ -17,7 +17,18 @@ import type { MetricDefinitionInput } from '../../services/metric-registry.servi
  * than once over time (this pack tracks response volume/score, not
  * per-customer sentiment). `nps_score` is a formula composed from the
  * other three so it always reflects the exact same underlying row set a
- * human inspecting the other three metrics would see.
+ * human inspecting the other three metrics would see. `nps_respondents`
+ * carries a `score >= 0` filter — not because a real score is ever
+ * negative, but because the compiler has no "is not null" filter operator
+ * (`MetricFilterOperator`), and SQL's own null-comparison semantics (`NULL
+ * >= 0` evaluates to unknown, which a `WHERE` clause drops) make this the
+ * one available way to exclude a malformed/missing score from the
+ * denominator. Without it, a response `fact_survey_response.sql`'s
+ * `growthos_try_cast` tolerates (null score) would count as a respondent
+ * without being classifiable as promoter/passive/detractor, diluting
+ * `nps_score` relative to `getNpsOverviewForProject`'s own Firestore-side
+ * computation, which already excludes unparseable scores before computing
+ * its breakdown.
  */
 export interface FeedbackPackMetricDefinition {
   name: string;
@@ -34,7 +45,10 @@ const NPS_RESPONDENTS: FeedbackPackMetricDefinition = {
       function: 'count',
       table: 'fact_survey_response',
       timeColumn: 'ts',
-      filters: [{ field: 'survey_type', operator: '=', value: 'nps' }],
+      filters: [
+        { field: 'survey_type', operator: '=', value: 'nps' },
+        { field: 'score', operator: '>=', value: '0' },
+      ],
     },
   },
 };

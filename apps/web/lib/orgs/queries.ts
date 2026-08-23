@@ -10,6 +10,7 @@ import {
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
   getNpsOverviewForProject as getNpsOverviewForProjectInOrganization,
+  listSurveyResponseRecordsForProject as listSurveyResponseRecordsForProjectInOrganization,
   type NpsOverview,
   getOnboardingState as getOnboardingStateInOrganization,
   getProjectCostQuota as getProjectCostQuotaInOrganization,
@@ -352,7 +353,7 @@ export async function getEventVolumeOverviewForProject(
 export async function getNpsOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; windowDays?: number },
+  options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
 ): Promise<NpsOverview> {
   await ensureFirestoreOrm();
   return getNpsOverviewForProjectInOrganization(organizationId, projectId, options);
@@ -361,10 +362,20 @@ export async function getNpsOverviewForProject(
 export async function getFeedbackThemeDigestForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; windowDays?: number },
+  options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
 ): Promise<FeedbackThemeCluster[]> {
   await ensureFirestoreOrm();
   return getFeedbackThemeDigestForProjectInOrganization(organizationId, projectId, options);
+}
+
+/** The bounded, landed `survey_response` raw records `getNpsOverviewForProject`/`getFeedbackThemeDigestForProject` each read — fetch once via this and pass the result to both via `precomputedRecords` (the Feedback page's own posture) rather than paying for the same bounded read twice. */
+export async function listSurveyResponseRecordsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listSurveyResponseRecordsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
