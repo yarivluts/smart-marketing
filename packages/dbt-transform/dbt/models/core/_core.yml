@@ -378,3 +378,34 @@ models:
       - name: conversions
         tests:
           - not_null
+
+  - name: fact_churn_reason
+    description: >
+      Churn-reason fact (plan `14 §Gap 10`, KAN-84): one row per landed
+      `churn_reason` event, carrying the structured `category` and free-text
+      `reason_text` straight off the event's own properties, joined to the
+      customer's first-touch `channel_id`/`campaign_id` (`fact_attribution`),
+      current subscription `plan` (`dim_subscription.plan_interval`), and
+      `cohort_month` (the customer's own first-event month, same convention
+      `fact_cohort_retention` uses) — the "breakdown joined to plan/channel/
+      cohort" report, surfaced through the Churn Reasons pack's
+      `churn_events` metric and its declared breakdown dimensions. See the
+      model's own doc comment for the full join rules.
+    columns:
+      - name: churn_reason_key
+        description: Composite (organization_id, project_id, environment_id, event_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: category
+        tests:
+          - not_null
+      - name: channel_id
+        tests:
+          - not_null
+      - name: ts
+        tests:
+          - not_null

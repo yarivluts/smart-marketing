@@ -1,4 +1,9 @@
-import { buildTouchpointEventPayload, buildTrackedEventPayload, parseAcquisitionParams } from '@growthos/shared';
+import {
+  buildTouchpointEventPayload,
+  buildTrackedEventPayload,
+  CHURN_REASON_SCHEMA_NAME,
+  parseAcquisitionParams,
+} from '@growthos/shared';
 import {
   ANON_ID_STORAGE_KEY,
   CUSTOMER_ID_STORAGE_KEY,
@@ -29,6 +34,8 @@ export interface Tracker {
   identify(customerId: string, traits?: Record<string, unknown>): Promise<void>;
   /** The visitor's persisted anon id, or `null` if `page()`/`track()`/`identify()` has never run yet. */
   getAnonId(): string | null;
+  /** Sends a churn-reason capture (KAN-84's cancel-flow/exit-survey SDK) — a thin `track()` wrapper over the `churn_reason` schema, same posture `submitNpsSurvey` takes over its own `track()` call. `category` should be one of `CHURN_REASON_CATEGORIES`; `reasonText` is the respondent's optional free text. */
+  submitChurnReason(category: string, reasonText?: string): Promise<void>;
 }
 
 function defaultNow(): string {
@@ -115,5 +122,13 @@ export function createTracker(options: TrackerOptions): Tracker {
     return readStoredId(storage, ANON_ID_STORAGE_KEY);
   }
 
-  return { page, track, identify, getAnonId };
+  async function submitChurnReason(category: string, reasonText?: string): Promise<void> {
+    const properties: Record<string, unknown> = { category };
+    if (reasonText !== undefined) {
+      properties.reason_text = reasonText;
+    }
+    await track(CHURN_REASON_SCHEMA_NAME, properties);
+  }
+
+  return { page, track, identify, getAnonId, submitChurnReason };
 }

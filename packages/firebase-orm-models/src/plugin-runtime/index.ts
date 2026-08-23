@@ -7,5 +7,6 @@ export * from './ga4';
 export * from './crm-webhook';
 export * from './saas-metric-pack';
 export * from './engagement-pack';
+export * from './churn-reason-pack';
 export * from './google-ads';
 export * from './meta-ads';

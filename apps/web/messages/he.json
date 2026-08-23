@@ -96,6 +96,7 @@
     "projectFieldMappingsLink": "מיפויי שדות",
     "projectBillingOpsFeedLink": "פיד אירועי חיוב",
     "projectRecordFeedLink": "פיד רשומות",
+    "projectChurnReasonsLink": "סיבות נטישה",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
@@ -598,6 +599,27 @@
     "clientIdLine": "מזהה {clientId}",
     "capNote": "מוצגות {count} הרשומות האחרונות."
   },
+  "ChurnReasons": {
+    "metaTitle": "סיבות נטישה",
+    "title": "סיבות נטישה עבור {projectName}",
+    "description": "פילוח לפי קטגוריה מובנית והנושאים המובילים החודש.",
+    "setupIntro": "התקן את חבילת סיבות הנטישה כדי להתחיל ללכוד סיבות ביטול.",
+    "categoryHeading": "סיבות לפי קטגוריה",
+    "categoryEmpty": "טרם נקלטו סיבות נטישה עבור פרויקט זה.",
+    "categoryCount": "{count, plural, one {סיבה #} other {# סיבות}}",
+    "themeDigestHeading": "מדיה נושאית חיה",
+    "themeDigestEmpty": "טרם נקלטו סיבות נטישה עבור פרויקט זה.",
+    "themeReasonCount": "{count, plural, one {סיבה #} other {# סיבות}}",
+    "themeExampleReason": "“{reason}”",
+    "categoryTooExpensive": "יקר מדי",
+    "categoryMissingFeatures": "חסרים פיצ'רים",
+    "categorySwitchedCompetitor": "עבר למתחרה",
+    "categoryPoorSupport": "תמיכה לקויה",
+    "categoryTooComplex": "מורכב מדי",
+    "categoryLowUsage": "שימוש נמוך",
+    "categoryNoLongerNeeded": "לא נחוץ יותר",
+    "categoryOther": "אחר"
+  },
   "CostGuardrails": {
     "metaTitle": "בקרות עלות",
     "title": "בקרות עלות עבור {projectName}",
@@ -712,7 +734,9 @@
     "builtinPackEngagementTitle": "חבילת מעורבות",
     "builtinPackEngagementDescription": "DAU/WAU/MAU, יחס דביקות, והיסטוגרמות פעילות.",
     "builtinPackLandingPageTitle": "ביצועי דפי נחיתה",
-    "builtinPackLandingPageDescription": "מבקרים ואחוז המרה לכל דף נחיתה x קמפיין x ערוץ."
+    "builtinPackLandingPageDescription": "מבקרים ואחוז המרה לכל דף נחיתה x קמפיין x ערוץ.",
+    "builtinPackChurnReasonsTitle": "סיבות נטישה",
+    "builtinPackChurnReasonsDescription": "לכידת סיבות ביטול עם מדיה נושאית מבוססת בינה מלאכותית."
   },
   "Boards": {
     "metaTitle": "לוחות מחוונים",

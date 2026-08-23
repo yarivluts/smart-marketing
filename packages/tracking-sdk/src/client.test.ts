@@ -76,6 +76,30 @@ describe('createTracker', () => {
     expect(purchaseBody.batch[0].properties.amount).toBe(99);
   });
 
+  it('submitChurnReason(): sends a churn_reason event carrying the category and reason text', async () => {
+    const storage = createInMemoryStorage();
+    const tracker = createTracker({ writeKey: 'gos_test_abc', ingestBaseUrl: 'https://api.example.com/v1/ingest', storage, fetchImpl });
+
+    await tracker.page();
+    await tracker.submitChurnReason('too_expensive', 'the plan got too pricey');
+
+    const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(body.batch[0].event).toBe('churn_reason');
+    expect(body.batch[0].properties).toMatchObject({ category: 'too_expensive', reason_text: 'the plan got too pricey' });
+  });
+
+  it('submitChurnReason(): omits reason_text entirely when not provided', async () => {
+    const storage = createInMemoryStorage();
+    const tracker = createTracker({ writeKey: 'gos_test_abc', ingestBaseUrl: 'https://api.example.com/v1/ingest', storage, fetchImpl });
+
+    await tracker.page();
+    await tracker.submitChurnReason('low_usage');
+
+    const body = JSON.parse(fetchImpl.mock.calls[1][1].body);
+    expect(body.batch[0].properties).toMatchObject({ category: 'low_usage' });
+    expect(body.batch[0].properties.reason_text).toBeUndefined();
+  });
+
   it('track(): fires the entry touchpoint itself when called before page() ever runs (regression: a caller that only ever calls track()/identify() must not lose the visitor\'s touchpoint)', async () => {
     navigateTo('https://shop.example.com/landing?gclid=first_call_gclid');
     const storage = createInMemoryStorage();

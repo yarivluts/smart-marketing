@@ -165,3 +165,4 @@ export * from './services/warehouse-freshness.service';
 export * from './services/schema-mart.service';
 export * from './warehouse/schema-mart';
 export * from './services/segment.service';
+export * from './services/churn-reason.service';

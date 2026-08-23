@@ -19,6 +19,7 @@ const PACK_LABEL_KEYS: Record<string, { title: string; description: string }> = 
   'com.growthos.saas-marketing-metrics': { title: 'builtinPackSaasTitle', description: 'builtinPackSaasDescription' },
   'com.growthos.engagement-pack': { title: 'builtinPackEngagementTitle', description: 'builtinPackEngagementDescription' },
   'com.growthos.landing-page-pack': { title: 'builtinPackLandingPageTitle', description: 'builtinPackLandingPageDescription' },
+  'com.growthos.churn-reason-pack': { title: 'builtinPackChurnReasonsTitle', description: 'builtinPackChurnReasonsDescription' },
 };
 
 /**

@@ -4,6 +4,7 @@ import {
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  CHURN_REASON_PACK_PLUGIN_ID,
   ENGAGEMENT_PACK_MANIFEST_YAML,
   ENGAGEMENT_PACK_PLUGIN_ID,
   getLatestPluginManifestVersion,
@@ -180,7 +181,7 @@ describe('installPluginAndProvisionBuiltins', () => {
 describe('listBuiltinMetricPacks', () => {
   it('lists every built-in pack this codebase ships, keyed by plugin id only (no display text, per CLAUDE.md)', () => {
     const pluginIds = listBuiltinMetricPacks().map((pack) => pack.pluginId);
-    expect(pluginIds).toEqual([SAAS_METRIC_PACK_PLUGIN_ID, ENGAGEMENT_PACK_PLUGIN_ID, LANDING_PAGE_PACK_PLUGIN_ID]);
+    expect(pluginIds).toEqual([SAAS_METRIC_PACK_PLUGIN_ID, ENGAGEMENT_PACK_PLUGIN_ID, LANDING_PAGE_PACK_PLUGIN_ID, CHURN_REASON_PACK_PLUGIN_ID]);
   });
 });
 
@@ -245,6 +246,23 @@ describe('installBuiltinMetricPack', () => {
     expect(defs.map((def) => def.name).sort()).toEqual(['lp_conversion_rate', 'lp_conversions', 'lp_visitors']);
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards.map((board) => board.name)).toEqual(['Landing page performance']);
+  });
+
+  it('installs the Churn Reasons pack one-click, seeding its schema and metric (no default boards, same posture as Engagement)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Builtin Churn Reasons Org');
+
+    const install = await installBuiltinMetricPack({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: CHURN_REASON_PACK_PLUGIN_ID,
+      installedByUserId: owner.id,
+    });
+
+    expect(install.status).toBe('installed');
+    const defs = await listMetricDefinitionsForProject(organization.id, project.id);
+    expect(defs.map((def) => def.name)).toEqual(['churn_events']);
+    const boards = await listBoardsForProject(organization.id, project.id);
+    expect(boards).toHaveLength(0);
   });
 
   it('rejects an unknown plugin id rather than silently no-op-ing', async () => {

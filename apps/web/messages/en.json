@@ -96,6 +96,7 @@
     "projectFieldMappingsLink": "Field mappings",
     "projectBillingOpsFeedLink": "Billing ops feed",
     "projectRecordFeedLink": "Record feed",
+    "projectChurnReasonsLink": "Churn reasons",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
@@ -598,6 +599,27 @@
     "clientIdLine": "id {clientId}",
     "capNote": "Showing the {count} most recent records."
   },
+  "ChurnReasons": {
+    "metaTitle": "Churn reasons",
+    "title": "Churn reasons for {projectName}",
+    "description": "Structured category breakdown and this month's top churn themes.",
+    "setupIntro": "Install the Churn Reasons pack to start capturing cancellation reasons.",
+    "categoryHeading": "Reasons by category",
+    "categoryEmpty": "No churn reasons landed for this project yet.",
+    "categoryCount": "{count, plural, one {# reason} other {# reasons}}",
+    "themeDigestHeading": "Live theme digest",
+    "themeDigestEmpty": "No churn reasons landed for this project yet.",
+    "themeReasonCount": "{count, plural, one {# reason} other {# reasons}}",
+    "themeExampleReason": "“{reason}”",
+    "categoryTooExpensive": "Too expensive",
+    "categoryMissingFeatures": "Missing features",
+    "categorySwitchedCompetitor": "Switched to a competitor",
+    "categoryPoorSupport": "Poor support",
+    "categoryTooComplex": "Too complex",
+    "categoryLowUsage": "Low usage",
+    "categoryNoLongerNeeded": "No longer needed",
+    "categoryOther": "Other"
+  },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",
     "title": "Cost guardrails for {projectName}",
@@ -712,7 +734,9 @@
     "builtinPackEngagementTitle": "Engagement Pack",
     "builtinPackEngagementDescription": "DAU/WAU/MAU, stickiness, and activity histograms.",
     "builtinPackLandingPageTitle": "Landing Page Performance",
-    "builtinPackLandingPageDescription": "Visitors and conversion rate per landing page x campaign x channel."
+    "builtinPackLandingPageDescription": "Visitors and conversion rate per landing page x campaign x channel.",
+    "builtinPackChurnReasonsTitle": "Churn Reasons",
+    "builtinPackChurnReasonsDescription": "Cancellation-reason capture with an AI-clustered theme digest."
   },
   "Boards": {
     "metaTitle": "Boards",

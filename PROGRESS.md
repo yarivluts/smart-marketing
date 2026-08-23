@@ -17,6 +17,102 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still) — Churn-reason capture (KAN-84)
+
+- **Last completed:**
+  - Session start: `main` at `b8ed71b` (KAN-81 fully done, per the entry below). Checked for
+    concurrent-session collisions before picking anything (the repeated lesson from every KAN-81
+    slice): two other sessions' PRs were already open — **#246** (`kan-82-feedback-nps`, a full
+    Feedback & NPS pack for KAN-82) and **#247** (`feat/kan-81-record-feed-field-filter`, per-field
+    filtering on the record feed). Neither touches KAN-82..88 candidates other than KAN-82 itself, so
+    picked **KAN-84** (churn-reason capture) instead of duplicating KAN-82 — explicitly flagged in the
+    prior entry as "no dependency on the others" and high-severity/cheap per the gap doc. Left #246/
+    #247 alone (not created by this session, no explicit request to drive them) rather than reviewing/
+    merging someone else's in-flight PR.
+  - Researched the shape via existing precedent before writing anything: KAN-82's (still-unmerged)
+    Feedback & NPS pack is the closest analogue — `survey_response` schema + `submitNpsSurvey` +
+    `clusterFeedbackThemes` + a Feedback admin page — read its branch for the established pattern
+    (schema-registration idiom, Firestore-side overview/digest reads via `listRecentRecordsForSchemas`,
+    metric-pack dispatch wiring, nav-link-in-both-copies lesson) without depending on any of its
+    unmerged code. Also read `fact_attribution`/`dim_subscription`/`fact_cohort_retention`/
+    `fact_revenue_event` to work out how "breakdown joined to plan/channel/cohort" should actually be
+    delivered.
+  - **Delivered (branch `feat/kan-84-churn-reason-capture`):**
+    - `packages/shared/src/churn-reason`: `CHURN_REASON_CATEGORIES` (8-value fixed taxonomy incl.
+      `other`), the `churn_reason` event schema field spec (`category` + free-text `reason_text`, not
+      PII — same `comment`/KAN-82 precedent), and `clusterChurnReasons`/`resolveChurnReasonTheme` — a
+      deterministic keyword-taxonomy stand-in for a real LLM clustering call (KAN-55's established
+      posture) that trusts a recognized structured `category` outright and only infers a theme from
+      free text for `other`/unrecognized ones. Unlike `clusterFeedbackThemes` (which drops an
+      unmatched comment from its digest), this **never drops an entry** — a churn breakdown needs every
+      landed reason accounted for, so a no-keyword-match reason still lands under `other`.
+    - `packages/tracking-sdk`: `tracker.submitChurnReason(category, reasonText?)`, a thin `track()`
+      wrapper mirroring `submitNpsSurvey`'s own shape, for a cancel flow/exit survey to call.
+    - `packages/firebase-orm-models`: `churn-reason.service.ts` (`ensureChurnReasonSchemaRegistered` +
+      `getChurnReasonCategoryBreakdownForProject`/`getChurnReasonThemeDigestForProject`, both reading
+      bounded landed records via the existing `listRecentRecordsForSchemas` and correctly extracting
+      declared fields from `payload.properties` — not `payload[fieldName]` directly, the exact bug
+      class PR #247 (open, unmerged) is fixing elsewhere in the record-feed; this service was written
+      fresh against the correct pattern from the start). New built-in **Churn Reasons metric pack**
+      (`plugin-runtime/churn-reason-pack`, mirrors the SaaS/Engagement/Feedback packs' install-time
+      dispatch wiring exactly) registering one `churn_events` count metric against a new dbt mart.
+    - `packages/dbt-transform`: new core mart `fact_churn_reason.sql` — one row per landed
+      `churn_reason` event, joined to the customer's first-touch `channel_id`/`campaign_id` (reusing
+      `fact_attribution`'s existing rows — a churn_reason event is itself just another non-touchpoint
+      "conversion" candidate to that model, no new touchpoint-linkage logic needed), current
+      subscription `plan` (`dim_subscription.plan_interval`, the same "plan" vocabulary
+      `fact_revenue_event.plan` already established), and `cohort_month` (the same per-customer
+      first-event-month assignment `fact_cohort_retention` computes). The `churn_events` metric
+      declares `[category, channel_id, plan, cohort_month]` as breakdown dimensions — the gap doc's
+      "breakdown joined to plan/channel/cohort" report is delivered through the *existing*
+      metric-picker/dimension-breakdown Boards machinery (KAN-60), not a bespoke report page, the same
+      "reuse what's already generic" posture every prior metric pack takes. New isolated fixture
+      (`proj_20`: a `tiktok`-channel touchpoint, a `signup` event declaring `anon_id` so
+      `bridge_identity` resolves it to the customer, a subscription, one `churn_reason` event) plus a
+      hand-computed fixture-match test — verified for real via `dbt build --target dev` (179/179 green,
+      including this new mart/test), not just `dbt parse`.
+    - Admin UI: a project-scoped Churn Reasons page (`/churn-reasons`) — category breakdown + AI theme
+      digest, one-click pack install card before then — gated on `ingest.write`, added to **both** nav
+      copies (`AppShell`'s `layout.tsx` and `OrgShell`'s `orgs/[orgId]/page.tsx`) from the start, per
+      the KAN-81/82 postmortems' repeated lesson about a second, independent nav-list copy being easy
+      to miss.
+  - **Checks, all run for real (not assumed):** `packages/shared` unit tests (9 new taxonomy cases) +
+    `pnpm build`/`typecheck`/`lint` clean. `packages/tracking-sdk` unit tests (2 new
+    `submitChurnReason` cases) + build/typecheck/lint clean. `packages/firebase-orm-models`: real
+    Firestore-emulator suite, 100 files / 1081 tests green, including 8 new `churn-reason.service`
+    cases, 5 new `churn-reason-pack` cases, 2 new manifest cases, and `metric-pack-dispatch`'s own
+    `listBuiltinMetricPacks`/`installBuiltinMetricPack` tests extended for the new pack; build/
+    typecheck/lint clean. `packages/dbt-transform`: real `dbt build --target dev`, 179/179 green.
+    `apps/web`: real Firestore+Auth-emulator unit suite, 226 files / 1314 tests green (incl. 2 new
+    `churn-reason-view` cases); real Playwright e2e run (26 tests, real browser, real dev server) — the
+    new `churn-reasons.spec.ts` passed clean; 2 unrelated pre-existing specs (`metric-defs.spec.ts`,
+    `resource-library.spec.ts` — neither touches schema/pack/tracking-sdk/nav code this PR changed)
+    flaked on their first attempt and passed on Playwright's own built-in retry, the same
+    sandbox-contention flakiness this file's history repeatedly documents, not a regression. Root
+    `pnpm build`/`lint`/`typecheck` all green across all 8 packages (7 build targets + eslint-config).
+  - Self-review before opening the PR: re-read every new/changed file end to end. No correctness bugs
+    found; the one thing double-checked carefully was the `latest_subscription` CTE's window-function
+    `ORDER BY started_at desc nulls last, subscription_id asc` referencing `subscription_id`, a column
+    not in that same subquery's own `SELECT` list — confirmed this is valid SQL (the window function's
+    `ORDER BY` sees every column of the subquery's `FROM` source, not just its projected columns), and
+    the real `dbt build` run already exercises it successfully.
+- **In progress (exact stopping point):** none — PR opened, self-reviewed, and merged this run (see
+  below for the exact merge outcome once done).
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** KAN-85 (ergonomics: omnisearch, inline editing, column persistence), KAN-86 (campaign
+  ops: `roi_nd`/`collection_nd`), KAN-87 (firmographic enrichment), KAN-88 (rep-attributed collections
+  ledger, blocked-by an unfiled people/team-member layer) all remain `todo`, no blockers among
+  themselves. KAN-83 (intent/quality scoring) now has its real dependency satisfied in the sense that
+  KAN-82 exists as an open PR (#246, not yet merged) — a future run should check whether #246 landed
+  before starting KAN-83, since KAN-83 explicitly depends on KAN-82's survey schema.
+- **Waiting on human:** standing only (KAN-43 long-lead approvals; KAN-18/KAN-19 remaining live-infra
+  sub-items; Redis cost decision; prune merged feature branches the proxy blocks scheduled runs from
+  deleting). Also: PR #246 (KAN-82) and PR #247 (KAN-81 record-feed field filter) were both open and
+  untouched by this run when picked up — worth a human check on their status if they're still open
+  next time a run looks at KAN-82/KAN-81 follow-ups.
+
+---
+
 ## 2026-08-23 (later) — CRM-sync action plugin, closing out KAN-81 (PR #244)
 
 - **Last completed:**

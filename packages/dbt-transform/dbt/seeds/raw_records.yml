@@ -32,7 +32,12 @@ seeds:
       reactivate; `sub_1303`: new -> past_due -> reactivate, covering the
       "reactivation from a non-canceled status" branch a canceled-only
       fixture wouldn't exercise) plus four charges (two customers, one
-      failed charge) — isolated the same way.
+      failed charge) — isolated the same way. `proj_20`'s rows are a
+      synthetic churn-reason journey (KAN-84's `fact_churn_reason`: a
+      `tiktok`-channel touchpoint, a `signup` event declaring `anon_id` so
+      `bridge_identity` resolves it to the customer, a subscription, and a
+      `churn_reason` event) — isolated the same way, exercising the
+      channel/plan/cohort join all at once against one hand-computable row.
     columns:
       - name: organization_id
         tests:

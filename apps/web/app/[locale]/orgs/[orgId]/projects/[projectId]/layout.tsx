@@ -160,6 +160,11 @@ export default async function ProjectLayout({
             label: t('projectRecordFeedLink'),
             icon: 'Rows3' as const,
           },
+          {
+            href: `${base}/churn-reasons`,
+            label: t('projectChurnReasonsLink'),
+            icon: 'UserMinus' as const,
+          },
         ]
       : []),
   ];

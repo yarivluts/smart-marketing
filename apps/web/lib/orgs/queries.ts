@@ -6,6 +6,10 @@ import {
   getActiveAutomationGuardrailPolicy as getActiveAutomationGuardrailPolicyInOrganization,
   getAutomationKillSwitchStatus as getAutomationKillSwitchStatusInOrganization,
   getBoard as getBoardInOrganization,
+  getChurnReasonCategoryBreakdownForProject as getChurnReasonCategoryBreakdownForProjectInOrganization,
+  getChurnReasonThemeDigestForProject as getChurnReasonThemeDigestForProjectInOrganization,
+  listChurnReasonRecordsForProject as listChurnReasonRecordsForProjectInOrganization,
+  type ChurnReasonOverview,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getGoal as getGoalInOrganization,
   getOnboardingState as getOnboardingStateInOrganization,
@@ -121,7 +125,7 @@ import {
   type WinEventModel,
   type WinRuleModel,
 } from '@growthos/firebase-orm-models';
-import type { FunnelStepSuggestion, Result } from '@growthos/shared';
+import type { ChurnReasonThemeCluster, FunnelStepSuggestion, Result } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 export async function listOrgMembers(organizationId: string): Promise<OrgMemberSummary[]> {
@@ -347,6 +351,34 @@ export async function getEventVolumeOverviewForProject(
 ): Promise<EventVolumeOverviewEntry[]> {
   await ensureFirestoreOrm();
   return getEventVolumeOverviewForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getChurnReasonCategoryBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+): Promise<ChurnReasonOverview> {
+  await ensureFirestoreOrm();
+  return getChurnReasonCategoryBreakdownForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getChurnReasonThemeDigestForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+): Promise<ChurnReasonThemeCluster[]> {
+  await ensureFirestoreOrm();
+  return getChurnReasonThemeDigestForProjectInOrganization(organizationId, projectId, options);
+}
+
+/** The bounded, landed `churn_reason` raw records both `getChurnReasonCategoryBreakdownForProject`/`getChurnReasonThemeDigestForProject` each read — fetch once via this and pass the result to both via `precomputedRecords`, same pass-through convention `listSurveyResponseRecordsForProject` (KAN-82) established. */
+export async function listChurnReasonRecordsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listChurnReasonRecordsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
