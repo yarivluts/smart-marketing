@@ -5,11 +5,21 @@ import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { countSegmentMembers, listOrgPeople, listOrgProjects, listSchemaDefinitionsForProject, listSegmentsForProject } from '@/lib/orgs/queries';
+import {
+  countSegmentMembers,
+  listActionPluginInstallsForProject,
+  listCrmSyncRunsForSegment,
+  listOrgPeople,
+  listOrgProjects,
+  listSchemaDefinitionsForProject,
+  listSegmentsForProject,
+} from '@/lib/orgs/queries';
 import { buildSegmentMemberCountView, toSegmentSummaryView, type SegmentMemberCountView } from '@/lib/orgs/segment-view';
+import { toActionPluginInstallOptionView, toCrmSyncRunView, type CrmSyncRunView } from '@/lib/orgs/crm-sync-view';
 import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
 import { DeleteSegmentButton } from '@/components/orgs/delete-segment-button';
 import { SegmentWorkListControls } from '@/components/orgs/segment-work-list-controls';
+import { SegmentCrmSyncControls } from '@/components/orgs/segment-crm-sync-controls';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -54,10 +64,11 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
 
   // Only reached once `projectId` is confirmed to belong to this org — same
   // reasoning `goals/page.tsx`'s own comment gives for `listGoalsForProject`.
-  const [segments, schemaDefs, people] = await Promise.all([
+  const [segments, schemaDefs, people, actionInstalls] = await Promise.all([
     listSegmentsForProject(orgId, projectId).then((rows) => rows.map(toSegmentSummaryView)),
     listSchemaDefinitionsForProject(orgId, projectId),
     listOrgPeople(orgId),
+    listActionPluginInstallsForProject(orgId, projectId).then((rows) => rows.map(toActionPluginInstallOptionView)),
   ]);
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const t = await getTranslations('Segments');
@@ -71,6 +82,14 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
       segments.map(async (segment): Promise<[string, SegmentMemberCountView]> => [
         segment.id,
         buildSegmentMemberCountView(await countSegmentMembers(orgId, projectId, segment.id)),
+      ]),
+    ),
+  );
+  const latestCrmSyncRuns = new Map<string, CrmSyncRunView | null>(
+    await Promise.all(
+      segments.map(async (segment): Promise<[string, CrmSyncRunView | null]> => [
+        segment.id,
+        (await listCrmSyncRunsForSegment(orgId, projectId, segment.id, 1)).map(toCrmSyncRunView)[0] ?? null,
       ]),
     ),
   );
@@ -116,6 +135,13 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
                     ownerPersonId={segment.ownerPersonId}
                     status={segment.status}
                     people={people.map((person) => ({ id: person.id, name: person.name }))}
+                  />
+                  <SegmentCrmSyncControls
+                    orgId={orgId}
+                    projectId={projectId}
+                    segmentId={segment.id}
+                    actionInstalls={actionInstalls}
+                    latestRun={latestCrmSyncRuns.get(segment.id) ?? null}
                   />
                 </li>
               );

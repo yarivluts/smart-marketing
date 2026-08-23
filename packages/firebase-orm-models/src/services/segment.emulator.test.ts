@@ -12,6 +12,7 @@ import {
   InvalidSegmentError,
   listAuditLogEntriesForOrg,
   listQueryCostLogEntriesForProject,
+  listSegmentMembers,
   listSegmentsForProject,
   ProjectNotFoundError,
   registerSchemaDefinition,
@@ -694,6 +695,117 @@ describe('countSegmentMembers', () => {
 
     await expect(
       countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor }),
+    ).rejects.toBeInstanceOf(SegmentNotFoundError);
+    expect(executor.calls).toHaveLength(0);
+  });
+});
+
+describe('listSegmentMembers', () => {
+  it('builds a parameterized row-select scoped to the segment’s schema and org/project, mapping rows to SegmentMemberRow', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Members Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Paying pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([
+      { entity_id: 'cust_1', properties: JSON.stringify({ plan: 'pro' }), last_seen_at: '2026-08-20T00:00:00.000Z' },
+      { entity_id: 'cust_2', properties: JSON.stringify({ plan: 'pro' }), last_seen_at: '2026-08-21T00:00:00.000Z' },
+    ]);
+
+    const outcome = await listSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(outcome).toEqual({
+      ok: true,
+      members: [
+        { entityId: 'cust_1', properties: { plan: 'pro' }, lastSeenAt: '2026-08-20T00:00:00.000Z' },
+        { entityId: 'cust_2', properties: { plan: 'pro' }, lastSeenAt: '2026-08-21T00:00:00.000Z' },
+      ],
+    });
+    expect(executor.calls).toHaveLength(1);
+    const { sql, params } = executor.calls[0];
+    expect(sql).toContain('SELECT entity_id, properties, last_seen_at FROM entities');
+    expect(sql).toContain("LAX_STRING(properties['plan']) = @filter_0");
+    expect(params.filter_0).toBe('pro');
+    expect(sql).toContain('ORDER BY last_seen_at DESC LIMIT 500');
+  });
+
+  it('clamps a requested limit to MAX_SEGMENT_MEMBER_LIST_LIMIT', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Members Limit Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await listSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, limit: 999_999, executor });
+
+    expect(executor.calls[0].sql).toContain('LIMIT 1000');
+  });
+
+  it('degrades to a "warehouse_not_configured" outcome instead of throwing, mirroring countSegmentMembers', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Members Not Configured Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor: WarehouseQueryExecutor = {
+      execute: () => Promise.reject(new WarehouseNotConfiguredError()),
+    };
+
+    const outcome = await listSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+    expect(outcome).toEqual({ ok: false, reason: 'warehouse_not_configured', message: expect.any(String) });
+  });
+
+  it('degrades to a "query_error" outcome when the warehouse rejects the query', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Members Query Error Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor: WarehouseQueryExecutor = {
+      execute: () => Promise.reject(new WarehouseQueryFailedError('table not found')),
+    };
+
+    const outcome = await listSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+    expect(outcome).toEqual({ ok: false, reason: 'query_error', message: 'table not found' });
+  });
+
+  it('throws SegmentNotFoundError for a segment that does not belong to this org+project', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Members Missing Org');
+    const { organization: otherOrg, project: otherProject } = await setupOrgWithProject('Segment Members Missing Other Org');
+    await registerCustomerSchema(otherOrg.id, otherProject.id, owner.id);
+    const segment = await createSegment({
+      organizationId: otherOrg.id,
+      projectId: otherProject.id,
+      name: 'Elsewhere',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await expect(
+      listSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor }),
     ).rejects.toBeInstanceOf(SegmentNotFoundError);
     expect(executor.calls).toHaveLength(0);
   });

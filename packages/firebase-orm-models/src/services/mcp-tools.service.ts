@@ -39,8 +39,8 @@ function clampLimit(requested: number | undefined, fallback: number, max: number
   return Math.min(Math.max(value, 1), max);
 }
 
-/** BigQuery's JSON columns come back over the client library as a JSON-encoded string, not a parsed object — the same shape this adapter's hand-written SQL selects `properties` as. Falls back to the raw string if it somehow isn't valid JSON (never actually opaque data loss: the caller still gets *something* usable) rather than throwing on a row that otherwise matched the search. */
-function parseJsonColumn(raw: string | number | null): unknown {
+/** BigQuery's JSON columns come back over the client library as a JSON-encoded string, not a parsed object — the same shape this adapter's hand-written SQL selects `properties` as. Falls back to the raw string if it somehow isn't valid JSON (never actually opaque data loss: the caller still gets *something* usable) rather than throwing on a row that otherwise matched the search. Exported for `segment.service.ts`'s `listSegmentMembers`, which selects the same `properties` column and needs the exact same JSON-string handling. */
+export function parseJsonColumn(raw: string | number | null): unknown {
   if (typeof raw !== 'string') {
     return raw;
   }
