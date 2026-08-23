@@ -401,6 +401,33 @@ models:
         tests:
           - not_null
 
+  - name: fact_customer_payback
+    description: >
+      Fixed-window payback (KAN-86, plan `14 §Gap 12`): one row per customer,
+      with revenue collected within 7/14/30/40 days of that customer's own
+      acquisition (first customer-side event). Feeds the Campaign Ops pack's
+      `collection_7d`/`collection_14d`/`collection_30d`/`collection_40d`
+      metrics — project-level cohort payback, not per-campaign yet (see the
+      model's own doc comment for why).
+    columns:
+      - name: customer_payback_key
+        description: Composite (project_id, environment_id, customer_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: acquired_at
+        tests:
+          - not_null
+      - name: collected_revenue_7d
+        tests:
+          - not_null
+      - name: collected_revenue_40d
+        tests:
+          - not_null
+
   - name: fact_cancellation_reason
     description: >
       Churn-reason capture (KAN-84, plan `14 §Gap 10`): one row per landed
@@ -420,6 +447,34 @@ models:
         tests:
           - not_null
       - name: reason_code
+        tests:
+          - not_null
+      - name: ts
+        tests:
+          - not_null
+
+  - name: fact_company_firmographic
+    description: >
+      Firmographic enrichment (KAN-87, plan `14 §Gap 11`): one row per landed
+      `company_firmographic` event, with its self-reported
+      `company_name`/`company_domain`/`employee_count_range`/`region` and its
+      client-computed `industry` (`classifyCompanyIndustry`,
+      `@growthos/shared`'s buildable-today AI-industry-classification
+      stand-in) pulled into real columns, joined to the customer's current
+      subscription MRR. Feeds the Firmographic Enrichment pack's
+      `firmographic_profiles_total` (count) and `firmographic_mrr_total`
+      (sum) metrics, broken down by industry/employee-count-range/region for
+      the "# vs $" composition dashboard the AC names.
+    columns:
+      - name: company_firmographic_key
+        description: Composite (project_id, environment_id, event_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: industry
         tests:
           - not_null
       - name: ts

@@ -179,6 +179,14 @@ export default async function OrgDetailPage({
                       {t('projectChurnReasonsLink')}
                     </Link>
                   ) : null}
+                  {canViewIngestHealth ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/firmographics`}
+                    >
+                      {t('projectFirmographicsLink')}
+                    </Link>
+                  ) : null}
                   {canManageProjects ? (
                     <Link
                       className="text-sm underline"
@@ -233,6 +241,14 @@ export default async function OrgDetailPage({
                       href={`/orgs/${orgId}/projects/${currentProjectId}/tv`}
                     >
                       {t('projectTvLink')}
+                    </Link>
+                  ) : null}
+                  {canManageBoards ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/campaign-ops`}
+                    >
+                      {t('projectCampaignOpsLink')}
                     </Link>
                   ) : null}
                 </div>

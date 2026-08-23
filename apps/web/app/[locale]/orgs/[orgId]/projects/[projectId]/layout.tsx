@@ -115,6 +115,7 @@ export default async function ProjectLayout({
           { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: 'Users' as const },
           { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },
           { href: `${base}/tv`, label: t('projectTvLink'), icon: 'Tv' as const },
+          { href: `${base}/campaign-ops`, label: t('projectCampaignOpsLink'), icon: 'TrendingUp' as const },
         ]
       : []),
   ];
@@ -170,6 +171,11 @@ export default async function ProjectLayout({
             href: `${base}/churn-reasons`,
             label: t('projectChurnReasonsLink'),
             icon: 'UserX' as const,
+          },
+          {
+            href: `${base}/firmographics`,
+            label: t('projectFirmographicsLink'),
+            icon: 'Building2' as const,
           },
         ]
       : []),

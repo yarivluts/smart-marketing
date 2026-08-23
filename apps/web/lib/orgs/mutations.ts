@@ -25,6 +25,7 @@ import {
   type BoardModel,
   type BoardTile,
   checkTrackingAlertsForProject as checkTrackingAlertsForProjectInOrganization,
+  checkFirmographicCompositionAlertsForProject as checkFirmographicCompositionAlertsForProjectInOrganization,
   completeOnboarding as completeOnboardingInOrganization,
   confirmOnboardingFunnelSteps as confirmOnboardingFunnelStepsInOrganization,
   createBoard as createBoardInOrganization,
@@ -63,6 +64,9 @@ import {
   createGoal as createGoalInOrganization,
   deleteGoal as deleteGoalInOrganization,
   type GoalModel,
+  setCampaignTargetBudget as setCampaignTargetBudgetInOrganization,
+  deleteCampaignTargetBudget as deleteCampaignTargetBudgetInOrganization,
+  type CampaignTargetModel,
   createSegment as createSegmentInOrganization,
   deleteSegment as deleteSegmentInOrganization,
   assignSegmentOwner as assignSegmentOwnerInOrganization,
@@ -140,6 +144,7 @@ import {
   setResourceAttachmentWriteTier as setResourceAttachmentWriteTierInOrganization,
   type SharedCredentialModel,
   type TrackingAlertCheckResult,
+  type FirmographicCompositionAlertCheckResult,
   claimTvPairing as claimTvPairingInOrganization,
   requestTvPairing as requestTvPairingInOrganization,
   revokeTvPairing as revokeTvPairingInOrganization,
@@ -679,6 +684,23 @@ export async function checkTrackingAlertsForProject(input: CheckTrackingAlertsIn
   });
 }
 
+interface CheckFirmographicCompositionAlertsInput {
+  organizationId: string;
+  projectId: string;
+  triggeredByUserId: string;
+}
+
+export async function checkFirmographicCompositionAlertsForProject(
+  input: CheckFirmographicCompositionAlertsInput,
+): Promise<FirmographicCompositionAlertCheckResult> {
+  await ensureFirestoreOrm();
+  return checkFirmographicCompositionAlertsForProjectInOrganization({
+    organizationId: input.organizationId,
+    projectId: input.projectId,
+    triggeredByUserId: input.triggeredByUserId,
+  });
+}
+
 interface EnsureTouchpointSchemaRegisteredInput {
   organizationId: string;
   projectId: string;
@@ -935,6 +957,24 @@ export async function updateSegmentStatus(
 ): Promise<SegmentModel> {
   await ensureFirestoreOrm();
   return updateSegmentStatusInOrganization({ organizationId, projectId, segmentId, status, actorUserId });
+}
+
+/** Creates or overwrites a campaign's spend budget target, upserted by campaign id (KAN-86). */
+export async function setCampaignTargetBudget(
+  organizationId: string,
+  projectId: string,
+  campaignId: string,
+  monthlyBudget: number,
+  updatedByUserId: string,
+): Promise<CampaignTargetModel> {
+  await ensureFirestoreOrm();
+  return setCampaignTargetBudgetInOrganization({ organizationId, projectId, campaignId, monthlyBudget, updatedByUserId });
+}
+
+/** Removes a campaign's spend target (KAN-86) — reverts to "no target", a no-op if none was set. */
+export async function deleteCampaignTargetBudget(organizationId: string, projectId: string, campaignId: string): Promise<void> {
+  await ensureFirestoreOrm();
+  return deleteCampaignTargetBudgetInOrganization(organizationId, projectId, campaignId);
 }
 
 interface SuggestSegmentsInput {

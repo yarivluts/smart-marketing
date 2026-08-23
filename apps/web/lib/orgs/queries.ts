@@ -12,6 +12,19 @@ import {
   listCancellationReasonRecordsForProject as listCancellationReasonRecordsForProjectInOrganization,
   type CancellationReasonBreakdownDimension,
   type CancellationReasonDimensionBreakdownOutcome,
+  getFirmographicIndustryBreakdownForProject as getFirmographicIndustryBreakdownForProjectInOrganization,
+  getFirmographicCompositionDimensionBreakdownForProject as getFirmographicCompositionDimensionBreakdownForProjectInOrganization,
+  listFirmographicRecordsForProject as listFirmographicRecordsForProjectInOrganization,
+  listFirmographicCompositionAlertsForProject as listFirmographicCompositionAlertsForProjectInOrganization,
+  type FirmographicBreakdownDimension,
+  type FirmographicQueryOutcome,
+  type FirmographicCompositionAlertModel,
+  getCampaignSpendBreakdownForProject as getCampaignSpendBreakdownForProjectInOrganization,
+  getPaybackOverviewForProject as getPaybackOverviewForProjectInOrganization,
+  listCampaignTargetsForProject as listCampaignTargetsForProjectInOrganization,
+  type CampaignSpendBreakdownOutcome,
+  type CampaignTargetModel,
+  type PaybackOverviewOutcome,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -132,7 +145,7 @@ import {
   type WinEventModel,
   type WinRuleModel,
 } from '@growthos/firebase-orm-models';
-import type { CancellationReasonCodeCount, CancellationReasonThemeCluster, FeedbackThemeCluster, FunnelStepSuggestion, Result } from '@growthos/shared';
+import type { CancellationReasonCodeCount, CancellationReasonThemeCluster, FeedbackThemeCluster, FirmographicIndustryCount, FunnelStepSuggestion, Result } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 export async function listOrgMembers(organizationId: string): Promise<OrgMemberSummary[]> {
@@ -424,6 +437,50 @@ export async function getCancellationReasonDimensionBreakdownForProject(
 ): Promise<CancellationReasonDimensionBreakdownOutcome> {
   await ensureFirestoreOrm();
   return getCancellationReasonDimensionBreakdownForProjectInOrganization(organizationId, projectId, dimension);
+}
+
+/** The bounded, landed `company_firmographic` raw records `getFirmographicIndustryBreakdownForProject` reads — fetch once via this and pass the result via `precomputedRecords`, same posture `listCancellationReasonRecordsForProject` establishes. */
+export async function listFirmographicRecordsForProject(organizationId: string, projectId: string, limit?: number): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listFirmographicRecordsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function getFirmographicIndustryBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+): Promise<FirmographicIndustryCount[]> {
+  await ensureFirestoreOrm();
+  return getFirmographicIndustryBreakdownForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getFirmographicCompositionDimensionBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  dimension: FirmographicBreakdownDimension,
+): Promise<FirmographicQueryOutcome> {
+  await ensureFirestoreOrm();
+  return getFirmographicCompositionDimensionBreakdownForProjectInOrganization(organizationId, projectId, dimension);
+}
+
+export async function listFirmographicCompositionAlertsForProject(organizationId: string, projectId: string): Promise<FirmographicCompositionAlertModel[]> {
+  await ensureFirestoreOrm();
+  return listFirmographicCompositionAlertsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getCampaignSpendBreakdownForProject(organizationId: string, projectId: string): Promise<CampaignSpendBreakdownOutcome> {
+  await ensureFirestoreOrm();
+  return getCampaignSpendBreakdownForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listCampaignTargetsForProject(organizationId: string, projectId: string): Promise<CampaignTargetModel[]> {
+  await ensureFirestoreOrm();
+  return listCampaignTargetsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getPaybackOverviewForProject(organizationId: string, projectId: string): Promise<PaybackOverviewOutcome> {
+  await ensureFirestoreOrm();
+  return getPaybackOverviewForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {

@@ -25,3 +25,4 @@ export * from './session-replay/link';
 export * from './survey';
 export * from './churn-reason';
 export * from './omnisearch';
+export * from './firmographic-enrichment';

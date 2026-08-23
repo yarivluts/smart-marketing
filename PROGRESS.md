@@ -17,6 +17,384 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 8) — KAN-87 Firmographic enrichment delivered and merged (PR #257)
+
+- **Last completed:**
+  - Picked **KAN-87** (E19.x Firmographic enrichment, `docs/plan/14-gap-analysis.md` Gap 11, ~6d full
+    scope). Checked `git branch -a` and open PRs first — KAN-83 (#255) and KAN-85 (#253) were both
+    already claimed by concurrent sessions at pick time, KAN-88 carries a soft "needs a people layer
+    that doesn't exist yet" dependency note, so KAN-87 was the cleanest genuinely-unblocked next `todo`
+    in table order with no existing branch/PR. Split into a buildable-today slice, same posture this
+    backlog uses throughout.
+  - Delivered on branch `kan-87-firmographic-enrichment`, mirroring KAN-82/83/84's established shape
+    end to end: `packages/shared/src/firmographic-enrichment` (a fixed `INDUSTRY_CATEGORIES` taxonomy +
+    `EMPLOYEE_COUNT_RANGES`/`FIRMOGRAPHIC_REGIONS`, a `company_firmographic` event schema,
+    `classifyCompanyIndustry` — a deterministic keyword/domain-TLD heuristic, this story's
+    buildable-today stand-in for a real AI/LLM industry-classification call, same posture
+    `clusterFeedbackThemes`/`clusterCancellationReasonComments` established — and `evaluateCompositionShift`,
+    generalizing KAN-83's `evaluateQualityMixShift` fire/resolve hysteresis rule from "a channel's
+    average score dropped" to "a category's share of the total moved," bidirectionally: a share
+    *increasing* past the threshold is just as real a composition shift as one shrinking). A new
+    `fact_company_firmographic` dbt core mart flattens the event and left-joins each profile to the
+    customer's current subscription MRR (`dim_subscription`, same "current = most-recently-started"
+    ranking `fact_cancellation_reason`'s own `current_subscription` CTE established) — the "$" half of
+    the AC's "composition dashboards (# vs $)". `packages/firebase-orm-models` gained
+    `firmographic.service.ts` (`ensureFirmographicSchemaRegistered`/`getFirmographicIndustryBreakdownForProject`
+    — bounded Firestore-side, no warehouse needed — /`getFirmographicCompositionDimensionBreakdownForProject`
+    — a two-metric warehouse query returning both `firmographic_profiles_total`/`firmographic_mrr_total`
+    per dimension, mirroring `getSignupQualityScoreDimensionBreakdownForProject`'s own two-metric shape
+    — /`checkFirmographicCompositionAlertsForProject`, a "check now" comparing each industry's 14-day
+    current-window share against its own baseline window, firing/updating/resolving a
+    `FirmographicCompositionAlertModel` episode per industry, mirroring `checkQualityMixAlertsForProject`'s
+    own window-query + fold + evaluate + audit shape almost exactly). The built-in "Firmographic
+    Enrichment" pack registers both metrics (`count`/`sum`) sharing the same
+    `industry`/`employee_count_range`/`region` dimensions. `packages/tracking-sdk` gained
+    `tracker.submitFirmographicProfile(profile)` (computes `industry` client-side before sending, same
+    "compute before send, flatten on land" posture `submitOnboardingSurvey`/KAN-83 established for its
+    own `quality_score`). Admin UI: a new project-scoped Firmographics page (industry breakdown, # vs $
+    composition-by-dimension sections, active composition-shift alerts + a Check-now button), gated on
+    `ingest.write` (the established convention for this class of read surface), wired into both nav
+    copies from the start, en/he translations with full key parity.
+  - Found and fixed a real, pre-existing bug while verifying: `metric-pack-dispatch.emulator.test.ts`'s
+    `listBuiltinMetricPacks` test asserted the *exact* list of built-in pack plugin ids — adding the new
+    pack broke it (a real, deterministic assertion failure, not a flake); updated the expected list to
+    include `FIRMOGRAPHIC_PACK_PLUGIN_ID`.
+  - Full local verification before opening a PR: `pnpm lint && pnpm typecheck` clean across all 8
+    packages; `packages/shared` 512/512, `packages/tracking-sdk` 27/27, `packages/dbt-transform` `dbt
+    build` 200/200 (new `fact_company_firmographic` mart + a new isolated `proj_17` fixture covering
+    both the with-subscription and without-subscription cases), `packages/firebase-orm-models`'s full
+    real-Firestore-emulator suite 107 files / 1138 tests green (new `firmographic.service.ts` +
+    `firmographic-pack` emulator tests, including a window-aware fake-executor-backed fire/resolve
+    composition-shift-alert test mirroring KAN-83's own `WindowAwareWarehouseQueryExecutor` technique),
+    `apps/web`'s full suite 233 files / 1351 tests green (new page/view/route/button tests, plus
+    `messages/messages.test.ts` confirming en/he key parity). Root `pnpm build` (7 packages) green.
+    Opened as **PR #257**, subscribed to its activity.
+  - **CI**: the `lint · typecheck · test · build` job took ~31 minutes (longer than this repo's more
+    typical ~10-25 min, but within the range other recent PRs have shown under concurrent-session CI
+    load — see the KAN-85/PR #253 entries above for the standing CI-capacity concern) and came back
+    fully green on the first attempt, no re-run needed. `terraform fmt · validate` green too. Merged
+    (squash) via PR #257. Remote branch deletion failed with the same HTTP 403 this sandbox's
+    git-over-HTTPS proxy has thrown for every prior run's delete attempt — left undeleted, same accepted
+    posture every prior entry documenting this takes.
+- **In progress (exact stopping point):** none — KAN-87's buildable-today slice is fully delivered,
+  tested, merged, and `TASKS.md` reflects it as `done`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** pick the next unblocked `todo` — check `git branch -a`/open PRs first (standing
+  recommendation, now doubly warranted given how much concurrent-session activity this backlog is
+  seeing). **KAN-88** (Rep-attributed collections ledger) is the last sprint-item `todo` in table order
+  but carries a soft dependency note ("rides on a people/team-member layer that doesn't exist yet") —
+  worth confirming whether `OrgPersonModel` (KAN-27's people registry, already used as `owner_person_id`
+  by KAN-81's segment-as-worklist slice) is enough groundwork to build a first buildable-today slice
+  against, or whether that really needs new groundwork first. Deferred within KAN-87 itself: a real
+  third-party enrichment connector (Clearbit-style) — needs a human-provisioned API key (KAN-43/KAN-18-style
+  posture) — worth a KAN-87-follow-on slice once a connector account exists.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Nothing new from this run specifically.
+
+---
+
+## 2026-08-23 (later still, 7) — KAN-85 PR #253 CI: a 5th failure, this time a different test — confirms this is broader CI-capacity contention, not one flaky spec
+
+- **Last completed:** re-ran PR #253's failed job once more at 10:04 UTC after checking concurrent CI
+  load first (`mcp__github__actions_list` `list_workflow_runs` with `status: in_progress` showed only
+  2 runs — down from several earlier, a concrete signal load had eased, not a timer-based guess). It
+  failed again at 10:14 UTC, but **on a different test this time**: not
+  `e2e/schema-registry.spec.ts` at all, but `packages/firebase-orm-models`'s own
+  `src/services/product-analytics.emulator.test.ts` (KAN-70, unrelated to omnisearch) — one test timed
+  out at the vitest-configured 120s limit after throwing `ProjectNotFoundError` from
+  `onboarding.service.ts`'s `requireProjectInOrg`, with a real Firestore-emulator write apparently not
+  visible yet to a read moments later. 1101/1102 other tests in that package still passed. Concurrent
+  CI investigation revealed why: another independent scheduled session was simultaneously running its
+  own KAN-83 PR (#255) through **3 separate CI attempts**, hitting the *exact same*
+  `RESOURCE_EXHAUSTED`/memory-restart signature on its own e2e suite at the same time (visible via
+  `list_triggers`' own check-in history for that session) — today's actual root cause is **several
+  scheduled sessions' CI runs contending for shared runner capacity at once**, not any one flaky test.
+  Whichever slow, emulator-or-webServer-heavy test happens to be running when the shared resource
+  crunch hits is the one that fails — schema-registry.spec.ts five times running so far purely because
+  it's positioned late in the sequential e2e run (spec ~29 of 32) where accumulated memory pressure
+  peaks; this time a slow firebase-orm-models emulator test caught it instead.
+- **In progress (exact stopping point):** stopped re-running again — a 2nd distinct symptom in one
+  session doesn't change the diagnosis, it reinforces it. **PR #253 remains open, unmerged, all of
+  its own code/tests verified green** (only ever the environment's shared test infra failing, never
+  anything in the omnisearch diff itself, across all 5 attempts).
+- **Blocked + why:** unchanged from the prior entries — CLAUDE.md requires green CI before merge.
+  Reiterating with sharper evidence: this is not a per-spec bug to silence, it's aggregate CI capacity
+  being oversubscribed by concurrent scheduled-session runs. The standing recommendation graduates from
+  "worth flagging" to **actionable**: either (a) reduce how many scheduled GrowthOS sessions can have
+  CI running at once (the "GrowthOS autonomous build" trigger fires hourly at :18 and, per its own
+  `job_config`, spawns a brand-new session each time rather than resuming one — nothing currently caps
+  how many of those can be mid-PR/mid-CI simultaneously), or (b) give the CI runner more memory/give the
+  Playwright job more headroom (sharding `apps/web/e2e/*.spec.ts` across parallel jobs, or restarting
+  the shared `next dev` webServer partway through the suite instead of running all ~32 specs against
+  one long-lived process).
+- **Next step:** same as the prior entry's — check PR #253 fresh, don't assume; if green, merge +
+  record. If red again, check concurrent `in_progress` CI runs before deciding whether to retry (a
+  concrete signal, not a timer) — this entry's own successful use of that heuristic (2 concurrent runs
+  → retry was reasonable, even though it still hit a *different* piece of shared-infra contention) is
+  the model to repeat. If this keeps recurring across multiple future runs, the infra-level fix above
+  stops being optional.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **PR #253's CI** — 5 attempts today, all failed on shared-infra contention, never on this PR's own
+    diff. A human's options: keep waiting/retrying opportunistically, merge with an admin override once
+    confident (all real checks this PR owns are green), or prioritize the CI-capacity fix above (which
+    would unblock every PR affected today, not just this one — KAN-83's PR #255 hit the identical
+    problem independently).
+  - Not sending a second PushNotification for this specific update (same open question as before, just
+    more evidence) — already sent one; the next one will be either "it's merged" or a clearer ask if
+    this keeps recurring across several more hours.
+
+---
+
+## 2026-08-23 (later still, 6) — KAN-85 PR #253 CI: 4 consecutive failures on the same spec, now escalating rather than retrying
+
+- **Last completed:** followed up on the prior entry's PR #253 (KAN-85 omnisearch) CI blocker. Since
+  that entry: the failed job was re-run **three more times** (once by this session after noticing
+  `main`'s own CI had just gone fully green on the identical suite at 08:42 UTC — meaningful new
+  evidence the runner wasn't permanently broken, justifying one more attempt; the other two runs were
+  triggered by something/someone else, most likely a human acting on the PushNotification this session
+  sent). **All three failed identically**: `e2e/schema-registry.spec.ts` (the same single spec every
+  time), always immediately preceded by `"Server is approaching the used memory threshold,
+  restarting..."`, always with the *specific* failing assertion differing run-to-run (confirms
+  resource-exhaustion timing, not a deterministic logic bug — a real bug would fail at the same line
+  every time). `e2e/resource-library.spec.ts` (the test immediately before it in file order) is also
+  consistently flaky-then-passes-on-retry in every one of these runs. This PR's own
+  `e2e/omnisearch.spec.ts` passed cleanly in all four attempts (27/27 non-schema-registry specs green
+  every time). This is now the **5th** documented occurrence of this exact signature in this file
+  (KAN-84's entry above describes the identical warning+error pattern) — no longer just "worth
+  flagging," this is a confirmed, reproducible capacity problem: the sequential Playwright suite (one
+  shared `next dev` server across all ~32 e2e specs) reliably exhausts that server's memory by roughly
+  spec #27-31 of 32, deterministically enough that it's now failed 4/4 attempts today on this exact PR
+  alone.
+- **In progress (exact stopping point):** stopped re-running. Per this session's own re-run policy
+  ("at most once... a second failure is real"), continuing to blindly retry a job that has now failed
+  identically 4 times in a row is not diagnosis, it's noise (and burns CI minutes) — the root cause is
+  understood, and no further re-run is going to fix a runner capacity limit. **PR #253 is still open,
+  still green on everything except this one unrelated spec, still not merged.**
+- **Blocked + why:** same as the prior entry — CLAUDE.md requires green CI before merge, and this
+  spec's failure is a CI-runner memory-capacity issue, not something a code change to this PR can fix
+  without unjustified scope creep (touching `e2e/schema-registry.spec.ts`, `playwright.config.ts`, or
+  `.github/workflows/ci.yml` is not KAN-85's job). This is no longer "an unlucky flake" — it's now a
+  standing, load-bearing gap in this repo's CI setup that will keep blocking *every* PR's merge some
+  fraction of the time until addressed at the infra level (more runner memory, or sharding the
+  Playwright suite across multiple jobs/workers so one long sequential run doesn't accumulate enough
+  memory to crash its own dev server).
+- **Next step:** a future run (or a human) should check PR #253's CI fresh rather than assuming
+  anything about timing-based luck — if it's green, merge (squash) + delete branch + record in
+  PROGRESS.md, following this run's own established "branch fresh off `origin/main`, commit, push
+  `<branch>:main`" pattern for the progress-note commit (this session's local `main` ref was
+  independently found to be stale/diverged from `origin/main` by 50 commits each way — likely a
+  container-lifetime artifact, not real divergence — so always fetch+compare before assuming local
+  `main` is trustworthy). If still red on the identical `schema-registry.spec.ts` signature, this
+  really is the moment to consider a small, separately-scoped follow-up story/PR that shards
+  `apps/web/e2e/*.spec.ts` into 2-3 parallel Playwright projects/CI jobs (or reduces `workers`/adds
+  periodic webServer restarts) — not squeezed into an unrelated feature PR. Once #253 is merged: pick
+  the next unblocked `todo` — **KAN-86** (Campaign ops) was picked up and merged by a concurrent session
+  while this one was stuck babysitting CI (PR #254, seen via `origin/main` during this entry's own
+  `git fetch`) — **KAN-83** (Intent/quality scoring) and **KAN-87**/**KAN-88** remain candidates; check
+  `git branch -a`/open PRs first, standing recommendation.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **PR #253's CI** — genuinely worth a human's attention now: 4/4 automated+manual attempts today
+    failed on the same spec. Either accept the current flakiness and keep retrying until lucky, or
+    prioritize the CI-sharding/runner-capacity fix above so this stops recurring for every PR.
+  - This session already sent one PushNotification about this PR being blocked; not sending a second
+    one for this same still-ongoing situation (no new actionable information beyond "it happened again,
+    3 more times") — the next genuinely new signal (green CI, or a decision to shard the e2e suite)
+    is worth surfacing when it happens.
+
+---
+
+## 2026-08-23 (later still, 5) — KAN-86 Campaign ops: fixed-window payback + per-campaign spend targets (PR #254)
+
+- **Last completed:**
+  - Read PROGRESS.md's own standing recommendation and checked for collisions before starting: PR
+    #253 (KAN-85 omnisearch, open) already claimed KAN-85; no open PR/branch existed for **KAN-86**
+    (E18.x Campaign ops, plan `14 §Gap 12`) or its sibling `todo` rows (KAN-87/88), so picked KAN-86.
+  - Researched the codebase's own conventions first (a subagent pass plus direct reads):
+    `fact_attribution`/`ad_spend`'s own doc comments already document that `campaign_id`/`channel_id`
+    are bare strings with no `dim_campaign` surrogate key, `fact_revenue_event` carries no
+    `campaign_id` at all, and the metrics compiler (`packages/shared/src/metrics-compiler`) has no
+    join graph and no formula-level dimension breakdown — confirmed a true **per-campaign**
+    `roi_nd`/`collection_nd` is not buildable today without both a real ad-spend connector
+    (KAN-50/51, blocked by KAN-43) and a compiler feature. Split KAN-86 into a buildable-today slice,
+    same posture KAN-80/81/82/84/85 established, and documented every deferred piece in-code and in
+    `TASKS.md`.
+  - Delivered on branch `kan-86-campaign-ops`, merged as **PR #254**:
+    - **`collection_Nd` fixed-window payback** (project-level, not per-campaign — see above): a new
+      `fact_customer_payback` dbt core mart (one row per customer; revenue collected within
+      7/14/30/40 days of that customer's own acquisition, reusing the exact
+      `min(occurred_at)`-over-non-touchpoint-events convention `fact_cohort_retention`/
+      `fact_cancellation_reason` already established; joins only `type='charge'` rows from
+      `fact_revenue_event`, deliberately excluding the synthetic `first_charge` duplicate row a
+      customer's first payment also produces, to avoid double-counting) — verified via a new isolated
+      `proj_16` fixture + a hand-computed fixture-match singular test (193/193 dbt tests green). A new
+      built-in **Campaign Ops** metric pack (`plugin-runtime/campaign-ops-pack`, installed the same
+      one-click way as every other built-in pack) registers `collection_7d`/`collection_14d`/
+      `collection_30d`/`collection_40d`. `roi_nd` formulas deliberately not shipped: they'd need to
+      divide by the SaaS pack's own `ad_spend` metric, but the compiler only lets a formula reference
+      an already-*active* metric at registration time, and there's no inter-pack "install this pack
+      first" dependency the install flow (`installPluginAndProvisionBuiltins`) models yet — documented
+      in the pack's own doc comment, along with the fact a human can already compose
+      `collection_40d / ad_spend` today via the existing custom-metric evolve flow once both packs are
+      installed, no code change needed.
+    - **Per-campaign spend budget targets**: a new `CampaignTargetModel` (upserted by a sha256-hashed
+      Firestore doc id derived from the raw `campaign_id` string — the same third-party-string-safety
+      reasoning `ingest.service.ts`'s dedup keys use, since a `campaign_id` from ad-spend data can
+      contain characters a Firestore doc id rejects) + `campaign-target.service.ts`
+      (`setCampaignTargetBudget`/`deleteCampaignTargetBudget`/`listCampaignTargetsForProject`/
+      `getCampaignSpendBreakdownForProject`, the last mirroring
+      `getCancellationReasonDimensionBreakdownForProject`'s own catch-and-classify degrade posture),
+      surfaced as an inline-editable admin table (commit-on-blur — the gap doc's own "x-editable"
+      pattern; an emptied cell DELETEs the target rather than PATCHing budget `0`, since those mean
+      different things) showing actual `ad_spend`-by-`campaign_id` (the one metric this codebase
+      carries that dimension on today) vs. each campaign's saved target, driving red/green.
+    - New project-scoped **Campaign Ops** admin page (`orgs/:orgId/projects/:projectId/campaign-ops`),
+      gated on `dashboards.write` (the same permission Goals/Segments use), wired into **both** nav
+      copies (`ProjectLayout`'s `layout.tsx` and `OrgShell`'s org `page.tsx`) from the start, having
+      re-read the immediately-preceding entries' own postmortems about a real bug from missing one of
+      the two copies. Added a `TrendingUp` icon to `AppShell`'s string-keyed icon registry (a bare
+      lucide component can't cross the server/client boundary — see that file's own doc comment on
+      why icons are passed as string keys, not elements). en/he translations added with full key
+      parity (verified via the existing key-parity test).
+  - Self-review before merge (own pass, not a separate tool run) found and fixed one real issue:
+    `spendTargetsDescription`'s trailing-window day count was hard-coded as a literal `30` in the page
+    component rather than importing the real `CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS` constant from
+    `campaign-target.service.ts` — would have silently drifted from the real window if that constant
+    ever changed. Fixed to import and reference the constant directly.
+  - Full local verification before opening the PR: `packages/dbt-transform` `pnpm test` 193/193;
+    `packages/firebase-orm-models` full Firestore-emulator suite green (new: `campaign-ops-pack`
+    manifest + registration/idempotency/isolation tests, `campaign-target.emulator.test.ts` incl. a
+    fake-executor-driven spend-breakdown-merge test covering over/on/no-target statuses and a
+    zero-spend-but-targeted campaign still appearing); `apps/web` full unit suite (230 files / 1338
+    tests) + a new real Playwright e2e (`campaign-ops.spec.ts`: nav → page → spend section degrades
+    with no warehouse configured → install the payback pack → payback section degrades too) all green;
+    root `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green across the whole monorepo.
+  - Opened PR #254. First CI attempt failed on a single unrelated pre-existing test
+    (`plugins/route.test.ts`'s SaaS-metric-pack end-to-end install test, which that file's own comment
+    already flags as tight against its 60s timeout — "twenty-two metric registrations + three board
+    creates/tile-saves in one request") under the same `RESOURCE_EXHAUSTED`-class CI-runner-under-load
+    flakiness this repo's history documents repeatedly; confirmed it doesn't touch any file this PR
+    changes. Re-ran the failed job once (the flake-confirmation playbook's own "at most once, to
+    confirm" allowance) — went fully green. Merged (squash) as **PR #254**. Remote branch deletion for
+    `kan-86-campaign-ops` failed with the same HTTP 403 this sandbox's git-over-HTTPS proxy has thrown
+    for every prior run's delete attempt — left undeleted, same accepted posture every prior entry
+    documenting this takes.
+  - `TASKS.md`'s KAN-86 row updated to `in-progress` (not `done` — see deferred items below) with a
+    Notes cell mirroring this entry's own summary.
+- **In progress (exact stopping point):** none for the delivered slice — it's fully merged, tested,
+  and documented. KAN-86 itself remains `in-progress`: genuinely open follow-on work below.
+- **Blocked + why:** the three deferred pieces are each blocked on something real, not just
+  unattempted: (1) `roi_nd` formulas need either a compiler feature (formula referencing a metric from
+  a different, not-necessarily-installed pack) or a human manually adding one via the existing
+  custom-metric evolve flow once both packs are installed — no code blocker, just not pre-built; (2) a
+  genuine **per-campaign** `roi_nd`/`collection_nd` needs both a real ad-spend connector (KAN-50/51,
+  blocked by KAN-43's still-outstanding human application) and a metrics-compiler join feature; (3)
+  predicted-vs-actual calibration views have literally nothing to calibrate against yet — no AI score
+  exists anywhere in this codebase (KAN-83, intent/quality scoring, is still `todo`, though a
+  concurrent session opened PR #255 for it around the same time this run was finishing up — worth a
+  future run checking whether KAN-83 lands, which would make calibration views newly buildable).
+- **Next step:** pick the next unblocked `todo` in table order — **KAN-87** (Firmographic enrichment,
+  `14` gap 11, ~6d) is the next candidate with no dependency; **KAN-88** (Rep-attributed collections
+  ledger) explicitly notes it likely needs a people/team-member layer (Gap 6) that doesn't exist yet,
+  so probably needs scoping-down the same way this run scoped KAN-86. Check open PRs/branches for
+  whichever is picked before committing significant effort — the standing recommendation from every
+  prior collision entry, now with a concurrent KAN-83 PR (#255) also freshly in flight as a fresh
+  example of why.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-86-campaign-ops` branch on GitHub (this sandbox's git remote
+    rejected the delete with a 403, same as every prior run's attempt).
+
+---
+
+## 2026-08-23 (later still, 4) — KAN-85 global omnisearch delivered, PR #253 open and blocked only by a pre-existing unrelated CI flake
+
+- **Last completed:**
+  - Picked **KAN-85** (E17.x Ergonomics, `docs/plan/14-gap-analysis.md` Gap 15, ~6d full scope) per
+    the prior entry's recommendation — checked `git branch -a` and open PRs first (none existed for
+    KAN-83/85/86/87/88), avoiding the KAN-20/32/81/84 collision pattern. Split into a buildable-today
+    slice, same posture this backlog uses throughout: **global omnisearch (Cmd/Ctrl-K)** only. Inline
+    target/value editing and column sort/show-hide persistence (the other two AC bullets) are
+    explicitly deferred to a follow-on story/run.
+  - Delivered on branch `kan-85-omnisearch`: `packages/shared/src/omnisearch` (pure `OmniSearchItem`
+    type + a deterministic `searchOmniSearchItems` label/description-matching ranking heuristic — same
+    "stand-in" posture as `segment-suggestion`/`churn-reason`'s clustering), `apps/web/lib/orgs/
+    omnisearch.ts` (`buildOmniSearchIndexForProject`, gathering a project's boards/active metric defs/
+    segments/automation campaign targets, one Firestore list call per type gated on that type's own
+    permission), a new `GET /api/orgs/[orgId]/projects/[projectId]/omnisearch` route that — unlike
+    most project-admin GET routes — degrades per result type instead of blanket-denying (any active
+    org member can call it; each type included only if the caller holds the exact permission its own
+    destination page already gates on), and `OmniSearchTrigger` (`apps/web/components/orgs/
+    omni-search.tsx`): a hand-rolled Cmd/Ctrl-K palette (no `cmdk`/dialog library existed in this repo
+    yet, so this is a plain modal + `document.addEventListener('keydown', ...)`, matching `AppShell`'s
+    own existing hand-rolled-modal style) that lazy-fetches the project index on first open and ranks
+    entirely client-side as the user types. Wired into `AppShell` via a new optional `omniSearch` slot
+    (rendered alongside `switchers` in both the sidebar and mobile menu) and `ProjectLayout` only —
+    project-scoped, so `OrgShell`'s org-only pages don't get it. en/he translations added with full key
+    parity.
+  - Self-review before opening the PR found and fixed two real issues: (1) a route-isolation-guard
+    filesystem-scan test (KAN-26) failed because the new route hand-rolled its own session/membership
+    check instead of calling `requireOrgMembership` — refactored to call it for the gate (+ a second,
+    `cache()`-deduped `resolveOrgSessionContext` call to get the raw bindings the per-type `can()`
+    checks need, since `requireOrgMembership` itself only returns the `UserModel`); (2) a real
+    staleness bug — React reconciles a client component by tree position, not prop equality, so if
+    `OmniSearchTrigger` ever stayed mounted across a client-side project switch (same instance, new
+    `orgId`/`projectId` props), its cached index would keep serving the *previous* project's results;
+    fixed with an effect that discards the cached index on an `orgId`/`projectId` change, plus a
+    regression test that fails without the fix.
+  - Full local verification before opening the PR: `pnpm lint && pnpm typecheck && pnpm test &&
+    pnpm build` all green across all 8 packages (`packages/shared` 486/486, `apps/web` 1344/1344 incl.
+    the new emulator-backed route tests, `firebase-orm-models` 1102/1102, full Playwright e2e — 27
+    passed, 2 flaky-then-passed-on-retry, the documented CI-runner-memory-exhaustion flake class this
+    file already tracks). Opened as **PR #253**, subscribed to its activity.
+  - **CI**: the `lint · typecheck · test · build` job failed on the first run —
+    `e2e/schema-registry.spec.ts` (a pre-existing spec this PR doesn't touch — no schema-registry code
+    changed) timed out after all 3 attempts, each with a *different* transient symptom (element not
+    found, then a signup-flow URL mismatch, then a second element-not-found), with `"Server is
+    approaching the used memory threshold, restarting..."` and Firestore `RESOURCE_EXHAUSTED` errors
+    logged immediately before each failure — the exact same flake signature this file's KAN-84 entry
+    (and others before it) already documents for this repo's e2e suite under CI-runner load. This
+    PR's own `e2e/omnisearch.spec.ts` passed cleanly both times. Re-ran the failed job once (the
+    flake-confirmation playbook's "at most once in total" allowance) — the re-run reproduced the exact
+    same pattern (same spec, three different transient symptoms across its 3 attempts, same memory-
+    threshold warning immediately before), settling it as a genuine pre-existing infra flake rather
+    than something to keep retrying. Per the playbook, a second re-run is not permitted and widening
+    this PR to "fix" an unrelated flaky spec would violate CLAUDE.md's own "keep PRs scoped to one
+    task" rule, so **PR #253 is left open, subscribed, and unmerged** — CLAUDE.md requires green CI
+    before merge, and this run has exhausted its own re-run allowance.
+- **In progress (exact stopping point):** none on the omnisearch code itself — KAN-85's global-search
+  slice is fully implemented, tested, and PR'd. What's left is purely operational: getting PR #253's
+  CI to a green run (a human re-running the failed job in the GitHub UI, or a later scheduled run of
+  this routine judging a fresh re-run attempt warranted, would both unblock it — nothing in the code
+  needs to change).
+- **Blocked + why:** PR #253 (KAN-85 omnisearch) is ready to merge but CI is red on an unrelated,
+  pre-existing e2e flake (`schema-registry.spec.ts`, CI-runner memory exhaustion) that this run's one
+  allowed re-run already confirmed isn't caused by this diff. Not merged per CLAUDE.md's "all checks
+  green before merge" rule.
+- **Next step:** a future run should first check PR #253's live CI state (`pull_request_read` /
+  `get_check_runs`) before doing anything else — it may already be green if a human or a later CI
+  attempt cleared it. If still red on the same `schema-registry.spec.ts` signature, that run can use
+  its own fresh re-run allowance (this run's own allowance was already spent). Once green, merge
+  (squash) and delete the branch. Only after that: pick the next unblocked `todo` — **KAN-86**
+  (Campaign ops, ~7d) is unblocked with no dependency; **KAN-83** (Intent/quality scoring) still needs
+  someone to confirm whether KAN-82's already-landed `survey_response` schema (PR #246) is enough to
+  unblock its onboarding-survey half specifically, per the standing note carried forward from the
+  KAN-84 entry. The two other KAN-85 AC bullets (inline target/value editing in tables, column sort/
+  show-hide persistence) remain unbuilt — worth a KAN-85-follow-on slice once picked up again.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **PR #253's CI** — either manually re-run the failed `lint · typecheck · test · build` job (GitHub
+    Actions UI or `gh run rerun --failed`), or just let a later scheduled run of this routine retry it.
+  - This is now at least the third distinct e2e spec (after the flakiness class' prior occurrences)
+    to trip on the same "CI-runner memory exhaustion" signature — the standing recommendation to
+    either raise the CI runner's resource allocation or split the Playwright suite into smaller
+    parallel shards (so one heavy suite doesn't exhaust one runner's memory) applies with more force
+    each time this recurs.
+
+---
+
 ## 2026-08-23 (later still, 3) — KAN-84 churn-reason capture delivered (PR #252), resolving a 3-way concurrent collision
 
 - **Last completed:**
