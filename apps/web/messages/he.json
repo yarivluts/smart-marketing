@@ -23,6 +23,16 @@
     "openMenu": "פתיחת תפריט",
     "closeMenu": "סגירת תפריט"
   },
+  "OmniSearch": {
+    "trigger": "חיפוש...",
+    "shortcutHint": "⌘K",
+    "dialogLabel": "חיפוש לוחות, מדדים, פלחים וקמפיינים",
+    "inputPlaceholder": "חיפוש לוחות, מדדים, פלחים, קמפיינים...",
+    "emptyPrompt": "התחילו להקליד כדי לחפש בפרויקט זה.",
+    "loading": "טוען...",
+    "noResults": "אין תוצאות עבור \"{query}\".",
+    "resultType": "{type, select, board {לוח} metric {מדד} segment {פלח} campaign {קמפיין} other {תוצאה}}"
+  },
   "Auth": {
     "emailLabel": "אימייל",
     "passwordLabel": "סיסמה",

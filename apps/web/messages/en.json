@@ -23,6 +23,16 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu"
   },
+  "OmniSearch": {
+    "trigger": "Search...",
+    "shortcutHint": "⌘K",
+    "dialogLabel": "Search boards, metrics, segments, and campaigns",
+    "inputPlaceholder": "Search boards, metrics, segments, campaigns...",
+    "emptyPrompt": "Start typing to search this project.",
+    "loading": "Loading...",
+    "noResults": "No results for \"{query}\".",
+    "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} other {Result}}"
+  },
   "Auth": {
     "emailLabel": "Email",
     "passwordLabel": "Password",

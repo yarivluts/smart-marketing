@@ -88,6 +88,8 @@ export interface AppShellNavSection {
 export interface AppShellProps {
   /** Org switcher / project switcher / env badge — rendered above the nav sections in the sidebar and mobile menu. */
   switchers?: ReactNode;
+  /** KAN-85 global omnisearch trigger — rendered below `switchers`, above the nav sections, in the sidebar and mobile menu. Project-scoped, so only `ProjectLayout` passes it; `OrgShell` (org-only pages) omits it. */
+  omniSearch?: ReactNode;
   sections: AppShellNavSection[];
   /** Up to ~5 of the most-used items, for the mobile bottom tab bar (an Intercom/native-app-style shortcut row, not a full nav replacement — the same items are also in `sections`). */
   mobileTabItems: AppShellNavItem[];
@@ -164,7 +166,7 @@ function NavSections({
  * `app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx`, so individual
  * pages stay focused on their own content.
  */
-export function AppShell({ switchers, sections, mobileTabItems, children }: AppShellProps): React.ReactElement {
+export function AppShell({ switchers, omniSearch, sections, mobileTabItems, children }: AppShellProps): React.ReactElement {
   const t = useTranslations('AppShell');
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -176,6 +178,7 @@ export function AppShell({ switchers, sections, mobileTabItems, children }: AppS
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-border bg-background/80 p-4 backdrop-blur md:flex">
         {switchers ? <div className="flex flex-col gap-3">{switchers}</div> : null}
+        {omniSearch}
         <NavSections sections={sections} activeHref={activeHref} />
       </aside>
 
@@ -197,6 +200,7 @@ export function AppShell({ switchers, sections, mobileTabItems, children }: AppS
       {mobileMenuOpen ? (
         <div className="fixed inset-x-0 top-[57px] z-10 flex max-h-[calc(100vh-57px)] flex-col gap-4 overflow-y-auto border-b border-border bg-background p-4 shadow-soft-lg md:hidden">
           {switchers ? <div className="flex flex-col gap-3">{switchers}</div> : null}
+          {omniSearch}
           <NavSections sections={sections} activeHref={activeHref} onNavigate={() => setMobileMenuOpen(false)} />
         </div>
       ) : null}
