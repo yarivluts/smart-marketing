@@ -1,4 +1,9 @@
-import { buildTouchpointEventPayload, buildTrackedEventPayload, parseAcquisitionParams } from '@growthos/shared';
+import {
+  buildTouchpointEventPayload,
+  buildTrackedEventPayload,
+  parseAcquisitionParams,
+  SURVEY_RESPONSE_SCHEMA_NAME,
+} from '@growthos/shared';
 import {
   ANON_ID_STORAGE_KEY,
   CUSTOMER_ID_STORAGE_KEY,
@@ -29,6 +34,8 @@ export interface Tracker {
   identify(customerId: string, traits?: Record<string, unknown>): Promise<void>;
   /** The visitor's persisted anon id, or `null` if `page()`/`track()`/`identify()` has never run yet. */
   getAnonId(): string | null;
+  /** Sends an NPS survey response (KAN-82's in-app survey SDK) — a thin `track()` wrapper over the `survey_response` schema, same posture `identify()` takes over its own `track()` call. `score` is 0-10; `comment` is the respondent's optional free text. */
+  submitNpsSurvey(score: number, comment?: string): Promise<void>;
 }
 
 function defaultNow(): string {
@@ -115,5 +122,13 @@ export function createTracker(options: TrackerOptions): Tracker {
     return readStoredId(storage, ANON_ID_STORAGE_KEY);
   }
 
-  return { page, track, identify, getAnonId };
+  async function submitNpsSurvey(score: number, comment?: string): Promise<void> {
+    const properties: Record<string, unknown> = { survey_type: 'nps', score };
+    if (comment !== undefined) {
+      properties.comment = comment;
+    }
+    await track(SURVEY_RESPONSE_SCHEMA_NAME, properties);
+  }
+
+  return { page, track, identify, getAnonId, submitNpsSurvey };
 }

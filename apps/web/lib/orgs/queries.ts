@@ -7,7 +7,10 @@ import {
   getAutomationKillSwitchStatus as getAutomationKillSwitchStatusInOrganization,
   getBoard as getBoardInOrganization,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
+  getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
+  getNpsOverviewForProject as getNpsOverviewForProjectInOrganization,
+  type NpsOverview,
   getOnboardingState as getOnboardingStateInOrganization,
   getProjectCostQuota as getProjectCostQuotaInOrganization,
   getTrialPipelineSummary as getTrialPipelineSummaryInOrganization,
@@ -118,7 +121,7 @@ import {
   type WinEventModel,
   type WinRuleModel,
 } from '@growthos/firebase-orm-models';
-import type { FunnelStepSuggestion, Result } from '@growthos/shared';
+import type { FeedbackThemeCluster, FunnelStepSuggestion, Result } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 export async function listOrgMembers(organizationId: string): Promise<OrgMemberSummary[]> {
@@ -344,6 +347,24 @@ export async function getEventVolumeOverviewForProject(
 ): Promise<EventVolumeOverviewEntry[]> {
   await ensureFirestoreOrm();
   return getEventVolumeOverviewForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getNpsOverviewForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; windowDays?: number },
+): Promise<NpsOverview> {
+  await ensureFirestoreOrm();
+  return getNpsOverviewForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getFeedbackThemeDigestForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; windowDays?: number },
+): Promise<FeedbackThemeCluster[]> {
+  await ensureFirestoreOrm();
+  return getFeedbackThemeDigestForProjectInOrganization(organizationId, projectId, options);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {

@@ -14,6 +14,7 @@ const PACKS = [
   { pluginId: 'com.growthos.saas-marketing-metrics' },
   { pluginId: 'com.growthos.engagement-pack' },
   { pluginId: 'com.growthos.landing-page-pack' },
+  { pluginId: 'com.growthos.feedback-pack' },
 ];
 
 function renderSection(packs = PACKS): void {
@@ -35,6 +36,7 @@ describe('InstallBuiltinPackSection', () => {
     expect(screen.getByText('SaaS & Marketing Metrics')).toBeInTheDocument();
     expect(screen.getByText('Engagement Pack')).toBeInTheDocument();
     expect(screen.getByText('Landing Page Performance')).toBeInTheDocument();
+    expect(screen.getByText('Feedback & NPS')).toBeInTheDocument();
     expect(screen.getByText(/Ad spend, signups, CAC/)).toBeInTheDocument();
   });
 

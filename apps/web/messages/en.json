@@ -96,6 +96,7 @@
     "projectFieldMappingsLink": "Field mappings",
     "projectBillingOpsFeedLink": "Billing ops feed",
     "projectRecordFeedLink": "Record feed",
+    "projectFeedbackLink": "Feedback",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
@@ -598,6 +599,28 @@
     "clientIdLine": "id {clientId}",
     "capNote": "Showing the {count} most recent records."
   },
+  "Feedback": {
+    "metaTitle": "Feedback & NPS",
+    "title": "Feedback & NPS for {projectName}",
+    "description": "NPS score, trend, and this month's top feedback themes.",
+    "setupIntro": "Install the Feedback & NPS pack to start collecting NPS surveys and scoring them.",
+    "npsHeading": "NPS score",
+    "npsEmpty": "No NPS responses landed for this project yet.",
+    "npsBreakdownLine": "{promoters} promoters, {passives} passives, {detractors} detractors ({total} responses)",
+    "trendSparklineLabel": "Daily NPS trend",
+    "trendPointEmpty": "no responses",
+    "themeDigestHeading": "Top feedback themes this month",
+    "themeDigestEmpty": "No feedback comments landed in this window yet.",
+    "themeCommentCount": "{count, plural, one {# comment} other {# comments}}",
+    "themeExampleComment": "“{comment}”",
+    "themePricing": "Pricing",
+    "themeSupport": "Support",
+    "themeBugs": "Bugs & reliability",
+    "themePerformance": "Performance",
+    "themeMissingFeatures": "Missing features",
+    "themeOnboarding": "Onboarding",
+    "themeUsability": "Usability"
+  },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",
     "title": "Cost guardrails for {projectName}",
@@ -712,7 +735,9 @@
     "builtinPackEngagementTitle": "Engagement Pack",
     "builtinPackEngagementDescription": "DAU/WAU/MAU, stickiness, and activity histograms.",
     "builtinPackLandingPageTitle": "Landing Page Performance",
-    "builtinPackLandingPageDescription": "Visitors and conversion rate per landing page x campaign x channel."
+    "builtinPackLandingPageDescription": "Visitors and conversion rate per landing page x campaign x channel.",
+    "builtinPackFeedbackTitle": "Feedback & NPS",
+    "builtinPackFeedbackDescription": "NPS score, promoter/passive/detractor breakdown, and trend."
   },
   "Boards": {
     "metaTitle": "Boards",

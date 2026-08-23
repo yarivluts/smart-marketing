@@ -378,3 +378,25 @@ models:
       - name: conversions
         tests:
           - not_null
+
+  - name: fact_survey_response
+    description: >
+      Flattened survey-response fact (KAN-82, plan `14 §Gap 1`): one row per
+      landed `survey_response` event, with the payload's `score`/
+      `survey_type` pulled out into real columns so the metrics compiler
+      (which only ever emits bare column references, never generic JSON
+      extraction) can filter/aggregate NPS promoter/detractor counts. Feeds
+      the Feedback pack's `nps_respondents`/`nps_promoters`/
+      `nps_detractors`/`nps_score` metrics.
+    columns:
+      - name: survey_response_key
+        description: Composite (project_id, environment_id, event_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: survey_type
+        tests:
+          - not_null
+      - name: ts
+        tests:
+          - not_null
