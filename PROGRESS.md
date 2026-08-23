@@ -17,6 +17,64 @@ Template for each entry:
 
 ---
 
+## 2026-08-23 (later still, 3) — KAN-84 collision, concluded: this run's own PR #250 closed as superseded by #252; TASKS.md gap fixed
+
+- **Last completed:**
+  - This run independently picked **KAN-84** (churn-reason capture) at the same point in the backlog
+    the entry below also picked it from, checked for open PRs/branches first (none existed yet), fully
+    implemented it (`churn_reason` schema, `submitChurnReason` SDK method, `clusterChurnReasons` theme
+    taxonomy that trusts a structured category outright and infers from free text only for
+    `other`/unrecognized, a `fact_churn_reason` dbt mart joining to `fact_attribution`'s channel/
+    `dim_subscription`'s plan/a self-computed cohort month, a Churn Reasons metric pack delivering the
+    plan/channel/cohort breakdown through the existing Boards dimension-breakdown machinery rather
+    than a bespoke report page, and a Churn Reasons admin page wired into both nav copies), verified
+    everything for real (`packages/shared`/`tracking-sdk`/`firebase-orm-models` all green incl. a real
+    Firestore-emulator suite — 1081 tests, real `dbt build --target dev` 179/179, `apps/web`'s real
+    Firestore+Auth-emulator unit suite — 1314 tests — plus a real Playwright e2e run of the full
+    26-test suite, root `pnpm build`/`lint`/`typecheck` clean across every package), and opened **PR
+    #250**. Subscribed to its activity and scheduled a check-in, per the standing PR-driving rules.
+  - **On check-in, found PR #250 had already been closed** by a different session/PR's own action: a
+    comment on #250 explained that this story collided **three ways** — this run's own PR #250, a
+    third session that discarded its own implementation entirely before ever pushing (documented in
+    the entry directly below this one, itself landed as PR #251 — a docs-only chore, not a competing
+    code PR), and **PR #252**, a fourth implementation whose CI actually triggered and went green (on
+    a re-run, after an unrelated Playwright flake). #250's own CI mysteriously never triggered at all
+    in the ~3 hours it was open (`get_check_runs` returned zero the one time this run checked, and the
+    closing comment confirms it stayed that way) — the tiebreak was explicitly "the one with verified
+    passing CI," not a design judgment; the closing comment itself calls out that #250's
+    dimension-breakdown-via-Boards approach was arguably cleaner than #252's bespoke breakdown
+    sections. Confirmed via `pull_request_read`: `state: closed`, `merged: false`, one comment
+    explaining the reasoning, `updated_at`/`closed_at` both `2026-08-23T06:17:04Z`.
+  - Per the harness's own instruction on a closed PR ("do not reopen or open a new PR for the same
+    change unless explicitly asked"), did **not** attempt to resurrect #250 or re-litigate the
+    tiebreak — #252 is merged into `main` (`2e1b6ea`) and is the delivered implementation of KAN-84
+    now. Synced local `main` to `origin/main`, deleted the now-superseded local
+    `feat/kan-84-churn-reason-capture` branch (nothing else to clean up — it was never left in any
+    other state).
+  - **Found and fixed a real gap**: PR #252 itself never updated `TASKS.md`'s KAN-84 row, which still
+    read `todo` on `main` despite the story being fully delivered and merged. Flipped it to `done`,
+    crediting PR #252 and summarizing the three-way collision for anyone reading `TASKS.md` cold.
+- **In progress (exact stopping point):** none — this entry plus the `TASKS.md` fix are this run's
+  entire remaining contribution; opening this as its own small PR next.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** KAN-85 (ergonomics: omnisearch, inline editing, column persistence), KAN-86 (campaign
+  ops), KAN-87 (firmographic enrichment), and KAN-88 (rep-attributed collections, blocked-by an
+  unfiled people/team-member layer) remain `todo`. Given KAN-84 alone drew **four** independent
+  concurrent implementations today, a future run picking up KAN-85..87 should treat the "check open
+  PRs/branches before starting" step as necessary but **not sufficient** — a check moments before two
+  other sessions also start is exactly what happened here twice in one day (KAN-81 earlier, KAN-84
+  now). The standing recommendation from every collision entry to date — space out the scheduled
+  cadence, or add an explicit per-story claim marker to `TASKS.md` before a run sinks real effort into
+  a story — is now backed by enough repeated evidence that a human decision on it would meaningfully
+  cut wasted work.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Same cadence/claim-marker recommendation as above, now repeated for a third distinct story
+    (KAN-20, KAN-32-ish reconciliations, KAN-81, and now KAN-84) — worth an explicit decision rather
+    than another entry restating it.
+  - Optional: this run's own closed PR #250 and its branch `feat/kan-84-churn-reason-capture` are
+    fully cleaned up remote-side already (closed, not merged) — nothing further needed there.
+
 ## 2026-08-23 (later still, 2) — KAN-84 collision: this run's own implementation discarded in favor of concurrent PR #250
 
 - **Last completed:**
