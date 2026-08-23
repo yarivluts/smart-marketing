@@ -22,6 +22,12 @@ import {
   type SignupQualityScoreQueryOutcome,
   type SignupQualityScoreAdjustedMetricsOutcome,
   type QualityMixAlertModel,
+  getCampaignSpendBreakdownForProject as getCampaignSpendBreakdownForProjectInOrganization,
+  getPaybackOverviewForProject as getPaybackOverviewForProjectInOrganization,
+  listCampaignTargetsForProject as listCampaignTargetsForProjectInOrganization,
+  type CampaignSpendBreakdownOutcome,
+  type CampaignTargetModel,
+  type PaybackOverviewOutcome,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -487,6 +493,21 @@ export async function listActiveQualityMixAlertsForProject(organizationId: strin
 export async function listQualityMixAlertsForProject(organizationId: string, projectId: string): Promise<QualityMixAlertModel[]> {
   await ensureFirestoreOrm();
   return listQualityMixAlertsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getCampaignSpendBreakdownForProject(organizationId: string, projectId: string): Promise<CampaignSpendBreakdownOutcome> {
+  await ensureFirestoreOrm();
+  return getCampaignSpendBreakdownForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listCampaignTargetsForProject(organizationId: string, projectId: string): Promise<CampaignTargetModel[]> {
+  await ensureFirestoreOrm();
+  return listCampaignTargetsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getPaybackOverviewForProject(organizationId: string, projectId: string): Promise<PaybackOverviewOutcome> {
+  await ensureFirestoreOrm();
+  return getPaybackOverviewForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {

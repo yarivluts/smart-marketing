@@ -63,6 +63,9 @@ import {
   createGoal as createGoalInOrganization,
   deleteGoal as deleteGoalInOrganization,
   type GoalModel,
+  setCampaignTargetBudget as setCampaignTargetBudgetInOrganization,
+  deleteCampaignTargetBudget as deleteCampaignTargetBudgetInOrganization,
+  type CampaignTargetModel,
   createSegment as createSegmentInOrganization,
   deleteSegment as deleteSegmentInOrganization,
   assignSegmentOwner as assignSegmentOwnerInOrganization,
@@ -953,6 +956,24 @@ export async function updateSegmentStatus(
 ): Promise<SegmentModel> {
   await ensureFirestoreOrm();
   return updateSegmentStatusInOrganization({ organizationId, projectId, segmentId, status, actorUserId });
+}
+
+/** Creates or overwrites a campaign's spend budget target, upserted by campaign id (KAN-86). */
+export async function setCampaignTargetBudget(
+  organizationId: string,
+  projectId: string,
+  campaignId: string,
+  monthlyBudget: number,
+  updatedByUserId: string,
+): Promise<CampaignTargetModel> {
+  await ensureFirestoreOrm();
+  return setCampaignTargetBudgetInOrganization({ organizationId, projectId, campaignId, monthlyBudget, updatedByUserId });
+}
+
+/** Removes a campaign's spend target (KAN-86) — reverts to "no target", a no-op if none was set. */
+export async function deleteCampaignTargetBudget(organizationId: string, projectId: string, campaignId: string): Promise<void> {
+  await ensureFirestoreOrm();
+  return deleteCampaignTargetBudgetInOrganization(organizationId, projectId, campaignId);
 }
 
 interface SuggestSegmentsInput {

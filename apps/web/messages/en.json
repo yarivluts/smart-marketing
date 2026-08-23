@@ -106,7 +106,8 @@
     "projectGoalsLink": "Goals",
     "projectSegmentsLink": "Segments",
     "projectTvLink": "War-room TV",
-    "projectSessionReplayLink": "Session replay"
+    "projectSessionReplayLink": "Session replay",
+    "projectCampaignOpsLink": "Campaign ops"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -696,6 +697,28 @@
     "dimensionValueUnknown": "Unknown",
     "dimensionAverageScore": "Avg {average} ({count, plural, one {# signup} other {# signups}})"
   },
+  "CampaignOps": {
+    "metaTitle": "Campaign ops",
+    "title": "Campaign ops for {projectName}",
+    "description": "Fixed-window payback and per-campaign spend targets.",
+    "paybackHeading": "Fixed-window payback",
+    "paybackUnavailable": "No payback data available yet — connect a data warehouse to see this.",
+    "paybackWindowLabel": "{days}-day collection",
+    "spendTargetsHeading": "Campaign spend targets",
+    "spendTargetsDescription": "Actual spend over the trailing {days} days vs. each campaign's saved budget target.",
+    "spendTargetsUnavailable": "No spend data available yet — connect a data warehouse to see this.",
+    "spendTargetsEmpty": "No campaign spend landed for this project yet.",
+    "columnCampaign": "Campaign",
+    "columnActualSpend": "Actual spend",
+    "columnTarget": "Target",
+    "columnStatus": "Status",
+    "statusOverTarget": "Over target",
+    "statusOnTarget": "On target",
+    "statusNoTarget": "No target set",
+    "targetUpdateError": "Couldn't update the target. Please try again.",
+    "targetInputLabel": "Spend target for {campaignId}",
+    "targetInputPlaceholder": "No target"
+  },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",
     "title": "Cost guardrails for {projectName}",
@@ -816,7 +839,9 @@
     "builtinPackChurnReasonTitle": "Churn Reasons",
     "builtinPackChurnReasonDescription": "Structured + free-text cancellation reasons, broken down by plan, channel, and cohort.",
     "builtinPackQualityScoreTitle": "Intent & Quality Scoring",
-    "builtinPackQualityScoreDescription": "At-signup quality score, quality-adjusted CAC/CPS, and channel mix-shift alerts."
+    "builtinPackQualityScoreDescription": "At-signup quality score, quality-adjusted CAC/CPS, and channel mix-shift alerts.",
+    "builtinPackCampaignOpsTitle": "Campaign Ops",
+    "builtinPackCampaignOpsDescription": "Fixed-window payback (7/14/30/40-day revenue collection) for customers as they're acquired."
   },
   "Boards": {
     "metaTitle": "Boards",
