@@ -17,6 +17,60 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 (yet later still) — KAN-82 closed out: NPS-by-plan/channel/cohort breakdown dimensions (PR #274)
+
+- **Last completed:**
+  - Started this run by re-syncing: this sandbox's local clone was stale (origin `main` had been
+    force-updated past it), and local `main` itself had diverged 50/50 commits from `origin/main` —
+    both resolved with a `git fetch` + `git reset --hard origin/main` (safe: clean working tree, no
+    local-only commits at risk). Checked `git branch -a` + open PRs before picking work, per this
+    backlog's own now-standard collision-avoidance posture (see the prior two entries).
+  - Found **PR #273** already open (another concurrent session's own KAN-85 docs-reconciliation PR —
+    left untouched, not mine) and an unclaimed remote branch, **`kan-82-nps-dimension-breakdown`**,
+    with a complete, well-tested commit (author `Claude`, a different session) implementing exactly
+    KAN-82's own documented remaining gap — NPS-by-plan/channel/cohort breakdown dimensions — but with
+    no PR opened for it yet.
+  - Rebased that branch onto current `main` (merge, not conflict — only i18n message files needed
+    auto-merging), then independently verified the whole thing from scratch rather than trusting the
+    commit message: `pnpm install && pnpm lint && pnpm typecheck && pnpm build` green monorepo-wide;
+    `packages/shared` (541 tests), `packages/firebase-orm-models` (112 files / 1208 tests, real
+    Firestore emulator), `packages/dbt-transform` (221 dbt tests incl. the new
+    `assert_fact_survey_response_dimension_breakdown_fixture_matches_expected`) all green; read the
+    actual diff end to end (dbt join set, metric-dimension wiring, the `getNpsDimensionBreakdownForProject`
+    error-classification, the `toNpsDimensionBreakdownRows` view-mapper, i18n keys) — well-precedented,
+    reuses `fact_cancellation_reason`'s (KAN-84) exact join pattern and `computeNpsBreakdown`'s rounding
+    rule via a new factored-out `computeNpsScoreFromCounts` helper, no correctness issues found.
+  - Pushed the branch and went to open a PR — found **PR #274** had just been opened moments earlier by
+    the same originating session, with the identical head commit SHA my own push produced (both of us
+    had merged `main` into the branch and landed on the same tree). No duplicate PR created; subscribed
+    to #274's activity instead and drove it to green: `apps/web`'s own emulator-backed unit suite (run
+    separately, 570s+) came back 246/247 files passing, with one `onboarding/pack/route.test.ts` timeout
+    under 7-way-parallel emulator load — confirmed a flake (unrelated file, passes clean in isolation:
+    6/6 in 88s) rather than treated as a real failure. CI's `lint · typecheck · test · build` job took
+    ~35 minutes total (mostly the `Test` step) but came back green with no intervention needed; merged
+    (squash) once `mergeable_state` was `clean`.
+  - Branch deletion 403'd from this sandbox's git remote — the same standing, accepted restriction every
+    prior entry in this file has hit.
+  - Updated `TASKS.md`: KAN-82's row flips from `in-progress` to `done` (the only remaining documented
+    gap — a real third-party survey connector — needs a human-provisioned API key, the same deferred-but-
+    not-blocking posture KAN-49/KAN-52/KAN-83/KAN-87 already established for their own third-party
+    connectors).
+- **In progress (exact stopping point):** none — PR #274 is merged, `TASKS.md` + this entry are the
+  clean stopping point. This entry itself still needs a PR (docs-only changes go through a PR too, per
+  this repo's own established convention — see the many `chore: record ... in PROGRESS.md/TASKS.md`
+  branches in `git branch -a`).
+- **Blocked + why:** nothing blocking.
+- **Next step:** pick the next unblocked task per `TASKS.md` — check `git branch -a`/open PRs first, this
+  backlog collides on itself fast with no unclaimed `todo` row left (same observation the last several
+  entries have all made). `KAN-18`/`KAN-19`/`KAN-86` are the other `in-progress` rows with their own
+  documented remaining gaps if a future run wants a different area; `KAN-82`'s gap is now fully closed.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **KAN-82**'s real third-party survey connector (Delighted/Typeform-style, needs a human-provisioned
+    API key) — documented, not blocking `done` status, same posture as the other third-party connectors.
+
+---
+
 ## 2026-08-24 (even later) — KAN-85 fully delivered: inline goal target-value editing, the last Gap-15 AC bullet (PR #272)
 
 - **Last completed:**
