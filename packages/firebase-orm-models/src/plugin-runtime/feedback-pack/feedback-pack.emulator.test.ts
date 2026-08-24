@@ -73,6 +73,7 @@ describe('ensureFeedbackPackRegistered — schema + metric definitions', () => {
         { field: 'score', operator: '>=', value: '0' },
       ],
     });
+    expect(metric?.dimensions).toEqual(['plan_interval', 'channel_id', 'cohort_month']);
   });
 
   it('registers nps_promoters: count(fact_survey_response where survey_type=nps and score>=9)', async () => {
@@ -87,6 +88,7 @@ describe('ensureFeedbackPackRegistered — schema + metric definitions', () => {
         { field: 'score', operator: '>=', value: '9' },
       ],
     });
+    expect(metric?.dimensions).toEqual(['plan_interval', 'channel_id', 'cohort_month']);
   });
 
   it('registers nps_detractors: count(fact_survey_response where survey_type=nps and score<=6)', async () => {
@@ -101,12 +103,14 @@ describe('ensureFeedbackPackRegistered — schema + metric definitions', () => {
         { field: 'score', operator: '<=', value: '6' },
       ],
     });
+    expect(metric?.dimensions).toEqual(['plan_interval', 'channel_id', 'cohort_month']);
   });
 
   it('registers nps_score: (nps_promoters - nps_detractors) / nps_respondents * 100', async () => {
     const metric = await activeMetric('nps_score');
     expect(metric?.definition_kind).toBe('formula');
     expect(metric?.formula).toBe('(nps_promoters - nps_detractors) / nps_respondents * 100');
+    expect(metric?.dimensions).toEqual([]);
   });
 });
 

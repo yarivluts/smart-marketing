@@ -385,9 +385,11 @@ models:
       landed `survey_response` event, with the payload's `score`/
       `survey_type` pulled out into real columns so the metrics compiler
       (which only ever emits bare column references, never generic JSON
-      extraction) can filter/aggregate NPS promoter/detractor counts. Feeds
-      the Feedback pack's `nps_respondents`/`nps_promoters`/
-      `nps_detractors`/`nps_score` metrics.
+      extraction) can filter/aggregate NPS promoter/detractor counts, and
+      joined to the customer's current subscription plan, last-touch
+      marketing channel, and signup cohort month. Feeds the Feedback pack's
+      `nps_respondents`/`nps_promoters`/`nps_detractors`/`nps_score` metrics,
+      broken down by any of `plan_interval`/`channel_id`/`cohort_month`.
     columns:
       - name: survey_response_key
         description: Composite (project_id, environment_id, event_id) uniqueness key.

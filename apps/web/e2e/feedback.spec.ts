@@ -45,5 +45,12 @@ test.describe('Feedback & NPS (KAN-82)', () => {
     await page.getByRole('button', { name: 'Install' }).click();
     await expect(page.getByText('No NPS responses landed for this project yet.')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('No feedback comments landed in this window yet.')).toBeVisible();
+
+    // Plan/channel/cohort breakdown (KAN-82 follow-up): no BigQuery warehouse is wired up in this
+    // test env, so every dimension section degrades to its own "connect a data warehouse" empty state.
+    await expect(page.getByRole('heading', { name: 'By plan' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'By channel' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'By signup cohort' })).toBeVisible();
+    await expect(page.getByText('No plan breakdown available yet — connect a data warehouse to see this.')).toBeVisible();
   });
 });

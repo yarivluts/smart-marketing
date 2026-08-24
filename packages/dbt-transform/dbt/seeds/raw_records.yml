@@ -43,7 +43,16 @@ seeds:
       plan/channel/cohort joins all landing on real values), and a second
       customer who cancels with no subscription or touchpoint ever landed
       (exercising the left joins' null-on-missing-dimension tolerance) —
-      isolated the same way.
+      isolated the same way. `proj_19`'s rows are a second, dimension-focused
+      NPS journey (KAN-82 follow-up: `fact_survey_response`'s
+      `plan_interval`/`channel_id`/`cohort_month` breakdown columns) — one
+      customer with a captured touchpoint, a signup, and an active annual
+      subscription before responding (exercising the plan/channel/cohort
+      joins all landing on real values), and a second customer who responds
+      with no subscription or touchpoint ever landed (exercising the left
+      joins' null-on-missing-dimension tolerance, same posture `proj_15`
+      established) — isolated from `proj_14`'s own exact-category-count-
+      asserting fixture test.
     columns:
       - name: organization_id
         tests:
