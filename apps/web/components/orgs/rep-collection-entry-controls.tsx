@@ -30,6 +30,17 @@ export function RepCollectionEntryControls({ orgId, projectId, entryId, orgPerso
   const t = useTranslations('RepCollections');
   const router = useRouter();
   const [amountValue, setAmountValue] = useState(String(amount));
+  // Resyncs the local draft when the server-rendered `amount` prop changes
+  // (a `router.refresh()` from *any* row's action re-renders every row) —
+  // without this, editing one entry's amount, then blurring this row's
+  // still-stale input, would PATCH the old value right back over a
+  // concurrent edit. The "adjust state during render" pattern React's own
+  // docs recommend for resyncing local state to a changed prop.
+  const [lastSyncedAmount, setLastSyncedAmount] = useState(amount);
+  if (amount !== lastSyncedAmount) {
+    setLastSyncedAmount(amount);
+    setAmountValue(String(amount));
+  }
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

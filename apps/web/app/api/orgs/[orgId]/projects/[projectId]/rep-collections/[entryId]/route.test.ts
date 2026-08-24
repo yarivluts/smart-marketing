@@ -84,6 +84,20 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/rep-collections/[entryId
     expect(response.status).toBe(401);
   });
 
+  it("rejects a member whose role doesn't hold dashboards.write (viewer)", async () => {
+    const { owner, organization, project, entry } = await setupOrgProjectEntry('Rep Collection Delete Viewer Org');
+    const viewerEmail = uniqueEmail('rep-collection-delete-viewer');
+    const invitation = await inviteMemberToOrganization({ organizationId: organization.id, email: viewerEmail, role: 'viewer', invitedByUserId: owner.id });
+    const viewerSession = await sessionFor(unique('uid'), viewerEmail);
+    const viewerUser = await ensureUserForFirebaseSession({ firebaseUid: viewerSession.uid, email: viewerEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: viewerUser.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(viewerSession);
+    const { request, params } = deleteRequest(organization.id, project.id, entry.id);
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(403);
+  });
+
   it('returns 404 for an entry id that does not exist', async () => {
     const { ownerSession, organization, project } = await setupOrgProjectEntry('Rep Collection Delete Missing Org');
     getServerSessionMock.mockResolvedValue(ownerSession);

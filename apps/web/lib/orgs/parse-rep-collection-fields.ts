@@ -57,13 +57,13 @@ export async function parseCreateRepCollectionEntryRequestBody(request: NextRequ
     if (typeof body.orgPersonId !== 'string' || body.orgPersonId.trim().length === 0) {
       return invalid('invalid_org_person_id');
     }
-    orgPersonId = body.orgPersonId;
+    orgPersonId = body.orgPersonId.trim();
   }
 
   return {
     orgPersonId,
     company: body.company,
-    collectionType: body.collectionType,
+    collectionType: body.collectionType.trim(),
     planFrom: typeof body.planFrom === 'string' ? body.planFrom : undefined,
     planTo: typeof body.planTo === 'string' ? body.planTo : undefined,
     amount: body.amount,
@@ -106,7 +106,7 @@ export async function parseUpdateRepCollectionEntryRequestBody(request: NextRequ
     if (body.orgPersonId !== null && (typeof body.orgPersonId !== 'string' || body.orgPersonId.trim().length === 0)) {
       return invalid('invalid_org_person_id');
     }
-    result.orgPersonId = body.orgPersonId as string | null;
+    result.orgPersonId = body.orgPersonId === null ? null : (body.orgPersonId as string).trim();
   }
 
   if (hasAmount) {

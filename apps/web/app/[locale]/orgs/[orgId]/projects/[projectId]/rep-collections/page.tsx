@@ -1,10 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { aggregateRepCollectionLeaderboard } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { getRepCollectionLeaderboardForProject, listBillingCollectionSignalsForProject, listOrgPeople, listOrgProjects, listRepCollectionEntriesForProject } from '@/lib/orgs/queries';
+import { listBillingCollectionSignalsForProject, listOrgPeople, listOrgProjects, listRepCollectionEntriesForProject } from '@/lib/orgs/queries';
 import { repCollectionTypeLabelKey, toRepCollectionBillingSignalRow, toRepCollectionEntryRow, toRepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
 import { CreateRepCollectionEntryForm } from '@/components/orgs/create-rep-collection-entry-form';
 import { RepCollectionEntryControls } from '@/components/orgs/rep-collection-entry-controls';
@@ -49,17 +50,16 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [entries, people, weekLeaderboard, monthLeaderboard, billingSignals] = await Promise.all([
-    listRepCollectionEntriesForProject(orgId, projectId).then((rows) => rows.map(toRepCollectionEntryRow)),
-    listOrgPeople(orgId),
-    getRepCollectionLeaderboardForProject(orgId, projectId, 'week'),
-    getRepCollectionLeaderboardForProject(orgId, projectId, 'month'),
-    listBillingCollectionSignalsForProject(orgId, projectId).then((rows) => rows.map(toRepCollectionBillingSignalRow)),
-  ]);
+  // Fetched once and reused for both leaderboard periods (via the pure
+  // `aggregateRepCollectionLeaderboard`) and the billing-signal linked-id
+  // check, rather than four independent full-ledger reads per page load.
+  const [rawEntries, people] = await Promise.all([listRepCollectionEntriesForProject(orgId, projectId), listOrgPeople(orgId)]);
+  const billingSignals = (await listBillingCollectionSignalsForProject(orgId, projectId, rawEntries)).map(toRepCollectionBillingSignalRow);
+  const entries = rawEntries.map(toRepCollectionEntryRow);
   const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
   const peopleById = new Map(peopleRows.map((person) => [person.id, person.name]));
-  const weekView = toRepCollectionLeaderboardView(weekLeaderboard, peopleById);
-  const monthView = toRepCollectionLeaderboardView(monthLeaderboard, peopleById);
+  const weekView = toRepCollectionLeaderboardView(aggregateRepCollectionLeaderboard(rawEntries, 'week'), peopleById);
+  const monthView = toRepCollectionLeaderboardView(aggregateRepCollectionLeaderboard(rawEntries, 'month'), peopleById);
   const t = await getTranslations('RepCollections');
 
   return (
@@ -124,6 +124,7 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
                   <th className="py-2 pe-3 font-medium">{t('columnType')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnPlan')}</th>
                   <th className="py-2 pe-3 font-medium">{t('columnWhen')}</th>
+                  <th className="py-2 pe-3 font-medium">{t('columnNote')}</th>
                   <th className="py-2 font-medium">{t('columnRepAndAmount')}</th>
                 </tr>
               </thead>
@@ -133,9 +134,16 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
                     <td className="py-2 pe-3 font-medium">{entry.company}</td>
                     <td className="py-2 pe-3">{t(repCollectionTypeLabelKey(entry.collectionType))}</td>
                     <td className="py-2 pe-3 text-xs text-muted-foreground">
-                      {entry.planFrom && entry.planTo ? t('planSummary', { from: entry.planFrom, to: entry.planTo }) : ''}
+                      {entry.planFrom && entry.planTo
+                        ? t('planSummary', { from: entry.planFrom, to: entry.planTo })
+                        : entry.planFrom
+                          ? t('planFromOnly', { from: entry.planFrom })
+                          : entry.planTo
+                            ? t('planToOnly', { to: entry.planTo })
+                            : ''}
                     </td>
                     <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.occurredAt}</td>
+                    <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.note ?? ''}</td>
                     <td className="py-2">
                       <RepCollectionEntryControls orgId={orgId} projectId={projectId} entryId={entry.id} orgPersonId={entry.orgPersonId} amount={entry.amount} people={peopleRows} />
                     </td>

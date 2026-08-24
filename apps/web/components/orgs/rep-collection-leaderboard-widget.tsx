@@ -25,7 +25,7 @@ function formatAmount(value: number): string {
 export function RepCollectionLeaderboardWidget({ view }: RepCollectionLeaderboardWidgetProps): React.ReactElement {
   const t = useTranslations('RepCollectionLeaderboard');
 
-  if (view.rows.length === 0) {
+  if (view.rows.length === 0 && view.unattributedCount === 0) {
     return (
       <section className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
         <h2 className="text-lg font-semibold">{t('heading')}</h2>
@@ -37,14 +37,19 @@ export function RepCollectionLeaderboardWidget({ view }: RepCollectionLeaderboar
   return (
     <section className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
       <h2 className="text-lg font-semibold">{t('heading')}</h2>
-      <ol className="flex flex-col gap-1.5">
-        {view.rows.slice(0, 5).map((row, index) => (
-          <li key={row.orgPersonId} className="flex items-baseline justify-between gap-4 text-sm">
-            <span className="font-medium">{t('rank', { rank: index + 1, name: row.name })}</span>
-            <span className="tabular-nums text-muted-foreground">{t('rowSummary', { amount: formatAmount(row.totalAmount), count: row.entryCount })}</span>
-          </li>
-        ))}
-      </ol>
+      {view.rows.length > 0 ? (
+        <ol className="flex flex-col gap-1.5">
+          {view.rows.slice(0, 5).map((row, index) => (
+            <li key={row.orgPersonId} className="flex items-baseline justify-between gap-4 text-sm">
+              <span className="font-medium">{t('rank', { rank: index + 1, name: row.name })}</span>
+              <span className="tabular-nums text-muted-foreground">{t('rowSummary', { amount: formatAmount(row.totalAmount), count: row.entryCount })}</span>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+      {view.unattributedCount > 0 ? (
+        <p className="text-xs text-muted-foreground">{t('unattributed', { amount: formatAmount(view.unattributedTotal), count: view.unattributedCount })}</p>
+      ) : null}
     </section>
   );
 }

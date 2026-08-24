@@ -1352,8 +1352,11 @@
     "columnType": "סוג",
     "columnPlan": "תוכנית",
     "columnWhen": "מתי",
+    "columnNote": "הערה",
     "columnRepAndAmount": "נציג / סכום",
     "planSummary": "{from} ← {to}",
+    "planFromOnly": "מ-{from}",
+    "planToOnly": "ל-{to}",
     "createHeading": "רישום גבייה",
     "companyLabel": "חברה",
     "companyPlaceholder": "לדוגמה: אקמי בע״מ",
@@ -1387,6 +1390,7 @@
     "heading": "מובילי הגבייה השבוע",
     "empty": "עדיין אין גבייה משויכת השבוע.",
     "rank": "{rank}. {name}",
-    "rowSummary": "{amount} ({count, plural, one {רשומה אחת} other {# רשומות}})"
+    "rowSummary": "{amount} ({count, plural, one {רשומה אחת} other {# רשומות}})",
+    "unattributed": "בנוסף {amount} שטרם שויכו ({count, plural, one {רשומה אחת} other {# רשומות}})"
   }
 }

@@ -681,10 +681,14 @@ export async function getRepCollectionLeaderboardForProject(
   return getRepCollectionLeaderboardForProjectInOrganization({ organizationId, projectId, period });
 }
 
-/** KAN-88's "auto from billing" suggestions — recently landed, not-yet-attributed Stripe charges a human can confirm onto the ledger. */
-export async function listBillingCollectionSignalsForProject(organizationId: string, projectId: string): Promise<RepCollectionBillingSignal[]> {
+/** KAN-88's "auto from billing" suggestions — recently landed, not-yet-attributed Stripe charges a human can confirm onto the ledger. Pass `existingEntries` (a ledger already fetched for the same page render) to skip this call's own ledger read. */
+export async function listBillingCollectionSignalsForProject(
+  organizationId: string,
+  projectId: string,
+  existingEntries?: readonly RepCollectionEntryModel[],
+): Promise<RepCollectionBillingSignal[]> {
   await ensureFirestoreOrm();
-  return listBillingCollectionSignalsForProjectInOrganization(organizationId, projectId);
+  return listBillingCollectionSignalsForProjectInOrganization(organizationId, projectId, { existingEntries });
 }
 
 /** One segment's live member count (or a typed, renderable "why not" outcome — see `SegmentMemberCountOutcome`'s own doc comment) for the Segments page's own member-count badge. */

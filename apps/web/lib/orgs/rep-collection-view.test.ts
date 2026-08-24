@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { RepCollectionEntryModel, RepCollectionLeaderboardResult } from '@growthos/firebase-orm-models';
-import { repCollectionTypeLabelKey, toRepCollectionEntryRow, toRepCollectionLeaderboardView } from './rep-collection-view';
+import type { RepCollectionBillingSignal, RepCollectionEntryModel, RepCollectionLeaderboardResult } from '@growthos/firebase-orm-models';
+import { repCollectionTypeLabelKey, toRepCollectionBillingSignalRow, toRepCollectionEntryRow, toRepCollectionLeaderboardView } from './rep-collection-view';
 
 function entry(overrides: Partial<RepCollectionEntryModel> = {}): RepCollectionEntryModel {
   return {
@@ -90,5 +90,12 @@ describe('toRepCollectionLeaderboardView', () => {
 
     const view = toRepCollectionLeaderboardView(result, new Map());
     expect(view.rows[0]).toEqual({ orgPersonId: 'person-gone', name: 'person-gone', totalAmount: 500, entryCount: 1 });
+  });
+});
+
+describe('toRepCollectionBillingSignalRow', () => {
+  it('passes every field through unchanged', () => {
+    const signal: RepCollectionBillingSignal = { rawRecordId: 'raw-1', amount: 42, currency: 'usd', customerId: 'cus_1', occurredAt: '2026-08-24T10:00:00.000Z' };
+    expect(toRepCollectionBillingSignalRow(signal)).toEqual(signal);
   });
 });

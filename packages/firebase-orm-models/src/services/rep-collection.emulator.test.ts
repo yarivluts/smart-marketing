@@ -46,13 +46,16 @@ async function setupOrgWithProject(orgName: string) {
   return { owner, organization, project, environmentId: devEnvironment.id };
 }
 
-/** Lands one `stripe_charge` raw record with a real event envelope shape (`{event, event_id, ts, properties}`) — reading `payload.amount` directly (rather than `payload.properties.amount`) is a known, documented mistake elsewhere in this codebase (see `listBillingCollectionSignalsForProject`'s own doc comment), so this helper deliberately mirrors the correct shape `churn-reason.emulator.test.ts`/`feedback.emulator.test.ts` already establish, not `pipeline.emulator.test.ts`'s flat (incorrect) fixture. */
+/** Lands one `stripe_charge` raw record with a real event envelope shape (`{event, event_id, ts, properties}`) — reading `payload.amount` directly (rather than `payload.properties.amount`) is a known, documented mistake elsewhere in this codebase (see `listBillingCollectionSignalsForProject`'s own doc comment), so this helper deliberately mirrors the correct shape `churn-reason.emulator.test.ts`/`feedback.emulator.test.ts` already establish, not `pipeline.emulator.test.ts`'s flat (incorrect) fixture. `amount`/`amountRefunded` are Stripe's own smallest-currency-unit convention (cents), matching what a real Stripe charge event carries. */
 async function landStripeCharge(params: {
   organizationId: string;
   projectId: string;
   environmentId: string;
   landedAt: string;
+  /** The event envelope's own `ts` — defaults to `landedAt`; set separately to test that `listBillingCollectionSignalsForProject` prefers this over `landed_at`. */
+  ts?: string;
   amount?: number;
+  amountRefunded?: number;
   currency?: string;
   status?: string;
   refunded?: boolean;
@@ -73,12 +76,35 @@ async function landStripeCharge(params: {
     currency: params.currency ?? 'usd',
     status: params.status ?? 'succeeded',
     refunded: params.refunded ?? false,
-    amount_refunded: 0,
+    amount_refunded: params.amountRefunded ?? 0,
   };
   if (params.customerId !== undefined) {
     properties.customer_id = params.customerId;
   }
-  record.payload = { event: 'stripe_charge', event_id: unique('event'), ts: params.landedAt, properties };
+  record.payload = { event: 'stripe_charge', event_id: unique('event'), ts: params.ts ?? params.landedAt, properties };
+  record.landed_at = params.landedAt;
+  record.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await record.save();
+  return record;
+}
+
+/** Lands one `stripe_failed_payment` event — used to prove `listBillingCollectionSignalsForProject` no longer starves on a burst of non-charge billing events sharing `listRecentBillingEventsForProject`'s merged window (the fixed schema-starvation bug this service's own doc comment documents). */
+async function landStripeFailedPayment(params: { organizationId: string; projectId: string; environmentId: string; landedAt: string }): Promise<RawRecordModel> {
+  const record = new RawRecordModel();
+  record.organization_id = params.organizationId;
+  record.project_id = params.projectId;
+  record.environment_id = params.environmentId;
+  record.partition_date = params.landedAt.slice(0, 10);
+  record.batch_id = unique('batch');
+  record.kind = 'event';
+  record.schema_name = 'stripe_failed_payment';
+  record.client_id = unique('client');
+  record.payload = {
+    event: 'stripe_failed_payment',
+    event_id: unique('event'),
+    ts: params.landedAt,
+    properties: { charge_id: unique('ch'), amount: 1000, currency: 'usd', failure_code: 'card_declined' },
+  };
   record.landed_at = params.landedAt;
   record.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
   await record.save();
@@ -163,6 +189,39 @@ describe('createRepCollectionEntry', () => {
         createdByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(InvalidRepCollectionEntryError);
+  });
+
+  it('rejects a `Date.parse`-able but non-ISO occurredAt (e.g. "08/24/2026") since it would sort/filter nowhere sensible', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Rep Collection Non-ISO Date Org');
+
+    await expect(
+      createRepCollectionEntry({
+        organizationId: organization.id,
+        projectId: project.id,
+        orgPersonId: null,
+        company: 'Acme Inc',
+        collectionType: 'upgrade',
+        amount: 100,
+        occurredAt: '08/24/2026',
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidRepCollectionEntryError);
+  });
+
+  it('accepts a full ISO datetime occurredAt', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Rep Collection ISO Datetime Org');
+
+    const entry = await createRepCollectionEntry({
+      organizationId: organization.id,
+      projectId: project.id,
+      orgPersonId: null,
+      company: 'Acme Inc',
+      collectionType: 'upgrade',
+      amount: 100,
+      occurredAt: '2026-08-24T15:30:00.000Z',
+      createdByUserId: owner.id,
+    });
+    expect(entry.occurred_at).toBe('2026-08-24T15:30:00.000Z');
   });
 
   it('rejects an orgPersonId that does not belong to the organization', async () => {
@@ -291,6 +350,30 @@ describe('updateRepCollectionEntry', () => {
       updateRepCollectionEntry({ organizationId: organization.id, projectId: project.id, entryId: 'does-not-exist', amount: 10, actorUserId: owner.id }),
     ).rejects.toBeInstanceOf(RepCollectionEntryNotFoundError);
   });
+
+  it('cannot be used by a different org to mutate an entry by guessing its id (KAN-26 non-enumeration)', async () => {
+    const { owner: ownerA, organization: orgA, project: projectA } = await setupOrgWithProject('Rep Collection Isolation Org A');
+    const entry = await createRepCollectionEntry({
+      organizationId: orgA.id,
+      projectId: projectA.id,
+      orgPersonId: null,
+      company: 'Acme Inc',
+      collectionType: 'upgrade',
+      amount: 100,
+      occurredAt: '2026-08-24',
+      createdByUserId: ownerA.id,
+    });
+    const ownerB = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('org-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Rep Collection Isolation Org B', ownerUserId: ownerB.id });
+    const { project: projectB } = await createProject({ organizationId: orgB.id, name: 'Other Website' });
+
+    await expect(
+      updateRepCollectionEntry({ organizationId: orgB.id, projectId: projectB.id, entryId: entry.id, amount: 999, actorUserId: ownerB.id }),
+    ).rejects.toBeInstanceOf(RepCollectionEntryNotFoundError);
+
+    const stillOriginal = await listRepCollectionEntriesForProject(orgA.id, projectA.id);
+    expect(stillOriginal.find((row) => row.id === entry.id)?.amount).toBe(100);
+  });
 });
 
 describe('deleteRepCollectionEntry', () => {
@@ -312,6 +395,28 @@ describe('deleteRepCollectionEntry', () => {
     await expect(
       updateRepCollectionEntry({ organizationId: organization.id, projectId: project.id, entryId: entry.id, amount: 10, actorUserId: owner.id }),
     ).rejects.toBeInstanceOf(RepCollectionEntryNotFoundError);
+  });
+
+  it('cannot be used by a different org to delete an entry by guessing its id (KAN-26 non-enumeration)', async () => {
+    const { owner: ownerA, organization: orgA, project: projectA } = await setupOrgWithProject('Rep Collection Delete Isolation Org A');
+    const entry = await createRepCollectionEntry({
+      organizationId: orgA.id,
+      projectId: projectA.id,
+      orgPersonId: null,
+      company: 'Acme Inc',
+      collectionType: 'upgrade',
+      amount: 100,
+      occurredAt: '2026-08-24',
+      createdByUserId: ownerA.id,
+    });
+    const ownerB = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('org-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Rep Collection Delete Isolation Org B', ownerUserId: ownerB.id });
+    const { project: projectB } = await createProject({ organizationId: orgB.id, name: 'Other Website' });
+
+    await expect(deleteRepCollectionEntry(orgB.id, projectB.id, entry.id, ownerB.id)).rejects.toBeInstanceOf(RepCollectionEntryNotFoundError);
+
+    const stillThere = await listRepCollectionEntriesForProject(orgA.id, projectA.id);
+    expect(stillThere.find((row) => row.id === entry.id)).toBeDefined();
   });
 });
 
@@ -462,7 +567,10 @@ describe('listBillingCollectionSignalsForProject', () => {
     expect(signals).toHaveLength(1);
     expect(signals[0]).toEqual({
       rawRecordId: goodCharge.id,
-      amount: 4200,
+      // Converted from Stripe's minor-unit cents (4200) to decimal (42) —
+      // matching how a manually-typed ledger amount is entered, see
+      // `stripeMinorUnitsToDecimal`'s own doc comment.
+      amount: 42,
       currency: 'usd',
       customerId: 'cus_1',
       occurredAt: '2026-08-24T10:00:00.000Z',
@@ -483,5 +591,77 @@ describe('listBillingCollectionSignalsForProject', () => {
 
     const signalsAfterLinking = await listBillingCollectionSignalsForProject(organization.id, project.id);
     expect(signalsAfterLinking).toHaveLength(0);
+  });
+
+  it('excludes a partially refunded charge even though `refunded` itself is still false', async () => {
+    const { organization, project, environmentId } = await setupOrgWithProject('Rep Collection Partial Refund Org');
+    await landStripeCharge({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId,
+      landedAt: '2026-08-24T10:00:00.000Z',
+      amount: 5000,
+      amountRefunded: 1500,
+      refunded: false,
+    });
+
+    const signals = await listBillingCollectionSignalsForProject(organization.id, project.id);
+    expect(signals).toHaveLength(0);
+  });
+
+  it("prefers the charge's own envelope ts over landed_at (a backfilled charge lands today but happened earlier)", async () => {
+    const { organization, project, environmentId } = await setupOrgWithProject('Rep Collection Backfill Ts Org');
+    await landStripeCharge({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId,
+      landedAt: '2026-08-24T10:00:00.000Z',
+      ts: '2026-07-01T09:00:00.000Z',
+      amount: 1000,
+    });
+
+    const signals = await listBillingCollectionSignalsForProject(organization.id, project.id);
+    expect(signals).toHaveLength(1);
+    expect(signals[0].occurredAt).toBe('2026-07-01T09:00:00.000Z');
+  });
+
+  it('still surfaces a charge candidate even when many stripe_failed_payment events share the same billing-events window (the fixed schema-starvation bug)', async () => {
+    const { organization, project, environmentId } = await setupOrgWithProject('Rep Collection Signal Starvation Org');
+    for (let i = 0; i < 10; i += 1) {
+      await landStripeFailedPayment({ organizationId: organization.id, projectId: project.id, environmentId, landedAt: `2026-08-24T10:0${i}:00.000Z` });
+    }
+    const charge = await landStripeCharge({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId,
+      landedAt: '2026-08-24T09:00:00.000Z',
+      amount: 2000,
+    });
+
+    const signals = await listBillingCollectionSignalsForProject(organization.id, project.id);
+    expect(signals.map((signal) => signal.rawRecordId)).toContain(charge.id);
+  });
+
+  it('reuses an already-fetched ledger via existingEntries instead of re-fetching it', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Rep Collection Existing Entries Org');
+    const charge = await landStripeCharge({ organizationId: organization.id, projectId: project.id, environmentId, landedAt: '2026-08-24T10:00:00.000Z', amount: 1000 });
+    const linkedEntry = await createRepCollectionEntry({
+      organizationId: organization.id,
+      projectId: project.id,
+      orgPersonId: null,
+      company: 'cus_x',
+      collectionType: 'upgrade',
+      amount: 10,
+      occurredAt: '2026-08-24',
+      sourceRawRecordId: charge.id,
+      createdByUserId: owner.id,
+    });
+
+    // A stale `existingEntries` snapshot taken before the link would wrongly re-suggest the charge —
+    // confirming the fresh entries list passed in is actually the one consulted.
+    const staleEntries = await listRepCollectionEntriesForProject(organization.id, project.id);
+    expect(staleEntries.map((entry) => entry.id)).toContain(linkedEntry.id);
+    const signals = await listBillingCollectionSignalsForProject(organization.id, project.id, { existingEntries: staleEntries });
+    expect(signals).toHaveLength(0);
   });
 });

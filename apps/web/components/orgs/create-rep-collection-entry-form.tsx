@@ -21,8 +21,6 @@ export interface CreateRepCollectionEntryFormProps {
    * `sourceRawRecordId` so the same charge is never suggested again.
    */
   signal?: { rawRecordId: string; amount: number; occurredAt: string; customerId: string };
-  /** Called after a successful submit — lets a signal-confirmation form (rendered per-row in a list) hide itself instead of staying mounted with stale props. */
-  onSubmitted?: () => void;
 }
 
 const UNASSIGNED_VALUE = '';
@@ -34,7 +32,7 @@ const UNASSIGNED_VALUE = '';
  * confirmed signal disappears from "Suggested from billing" the same way a
  * synced segment's CRM-run list refreshes elsewhere in this app).
  */
-export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal, onSubmitted }: CreateRepCollectionEntryFormProps): React.ReactElement {
+export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal }: CreateRepCollectionEntryFormProps): React.ReactElement {
   const t = useTranslations('RepCollections');
   const router = useRouter();
   const [orgPersonId, setOrgPersonId] = useState(UNASSIGNED_VALUE);
@@ -76,13 +74,16 @@ export function CreateRepCollectionEntryForm({ orgId, projectId, people, signal,
       }
       setOrgPersonId(UNASSIGNED_VALUE);
       setCompany(signal?.customerId ?? '');
+      setCollectionType('upgrade');
       setPlanFrom('');
       setPlanTo('');
       setAmount(signal ? String(signal.amount) : '');
       setOccurredAt(signal?.occurredAt.slice(0, 10) ?? '');
       setNote('');
+      // A signal-confirmation form's row disappears from the parent's list on
+      // this refresh (the page re-fetches `listBillingCollectionSignalsForProject`,
+      // which now excludes the just-linked charge) — no separate unmount signal needed.
       router.refresh();
-      onSubmitted?.();
     } finally {
       setSubmitting(false);
     }

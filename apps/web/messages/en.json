@@ -1352,8 +1352,11 @@
     "columnType": "How",
     "columnPlan": "Plan",
     "columnWhen": "When",
+    "columnNote": "Note",
     "columnRepAndAmount": "Rep / Collection",
     "planSummary": "{from} → {to}",
+    "planFromOnly": "From {from}",
+    "planToOnly": "To {to}",
     "createHeading": "Log a collection",
     "companyLabel": "Company",
     "companyPlaceholder": "e.g. Acme Inc",
@@ -1387,6 +1390,7 @@
     "heading": "Top collections this week",
     "empty": "No attributed collections yet this week.",
     "rank": "{rank}. {name}",
-    "rowSummary": "{amount} ({count, plural, one {# entry} other {# entries}})"
+    "rowSummary": "{amount} ({count, plural, one {# entry} other {# entries}})",
+    "unattributed": "Plus {amount} not yet attributed ({count, plural, one {# entry} other {# entries}})"
   }
 }
