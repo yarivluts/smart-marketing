@@ -22,10 +22,14 @@
 -- most granular "plan" label available from Stripe's minimal API shape this
 -- connector reads (see `mapSubscriptionToEntityRecord`'s own doc comment).
 -- `status`/`amount` are only ever populated for `charge`/`first_charge`
--- rows — a movement has no per-dollar "outcome status", and `collected_
--- revenue` (`status = 'succeeded'`) naturally excludes a null-status
--- movement row rather than needing its own type filter; likewise `plan`/
--- `mrr_delta` are only ever populated for movement rows.
+-- rows — a movement has no per-dollar "outcome status", so a `status`
+-- filter alone excludes movement rows; it does NOT exclude `first_charge`
+-- rows, since those carry the same `status`/`amount` as their originating
+-- `charge` row. `collected_revenue` (`packages/firebase-orm-models`'s SaaS
+-- metric pack) filters on `type = 'charge'` as well, same as
+-- `fact_customer_payback.sql`'s identical filter, to avoid double-counting
+-- a customer's first payment. `plan`/`mrr_delta` are only ever populated
+-- for movement rows.
 
 with charge_events as (
     select

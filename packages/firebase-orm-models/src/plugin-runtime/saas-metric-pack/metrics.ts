@@ -197,6 +197,14 @@ const CHURNED_MRR: SaasMetricPackDefinition = {
   },
 };
 
+/**
+ * Filters on `type = 'charge'` as well as `status = 'succeeded'`. Without the
+ * `type` filter this double-counts a customer's very first payment: a
+ * succeeded charge event lands both a `charge` row and a synthetic
+ * `first_charge` row for the same dollar amount (see `fact_revenue_event`'s
+ * own doc comment, and `fact_customer_payback.sql`'s identical filter for the
+ * same reason), and `status = 'succeeded'` alone matches both.
+ */
 const COLLECTED_REVENUE: SaasMetricPackDefinition = {
   name: 'collected_revenue',
   featured: true,
@@ -208,7 +216,10 @@ const COLLECTED_REVENUE: SaasMetricPackDefinition = {
       table: 'fact_revenue_event',
       column: 'amount',
       timeColumn: 'ts',
-      filters: [{ field: 'status', operator: '=', value: 'succeeded' }],
+      filters: [
+        { field: 'type', operator: '=', value: 'charge' },
+        { field: 'status', operator: '=', value: 'succeeded' },
+      ],
     },
   },
 };
