@@ -186,6 +186,11 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/plugins', () => {
       const boards = await listBoardsForProject(organization.id, project.id);
       expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
     },
-    60_000, // twenty-two metric registrations + three board creates/tile-saves in one request — see saas-metric-pack.emulator.test.ts's own timeout note
+    // Twenty-two metric registrations + three board creates/tile-saves in one request, each a
+    // sequential emulator round-trip — under CI load this genuinely races a 60s cap (it timed out
+    // on #263's run and reproduces locally in isolation). Match the suite-wide 120s `testTimeout`
+    // (vitest.config.ts) that every other slow emulator test already inherits, rather than keeping
+    // a tighter per-test override than the suite it runs in.
+    120_000,
   );
 });
