@@ -17,6 +17,76 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 (later still) — Cleared the leftover PR queue, delivered KAN-85's column sort/show-hide slice (PR #269)
+
+- **Last completed:**
+  - Started this run finding `TASKS.md` at zero remaining `todo` rows (per the prior entry's own
+    finding) and two PRs still open from concurrent sessions: **PR #265** (`collected_revenue`
+    double-counting fix, CI already green) and **PR #266** (the KAN-88 3-way-collision docs chore,
+    CI still pending). Verified #265's diff directly (matches `fact_customer_payback.sql`'s existing
+    `type = 'charge'` filter precedent) and merged it. Waited out #266's CI via a scheduled check-in;
+    it came back green and I was about to merge it when I found **a concurrent session had already
+    merged it first** — left it alone, no action needed.
+  - With the formalized backlog fully claimed, picked the next buildable slice off KAN-85's own
+    documented remaining scope: **column sort/show-hide persistence** for board table tiles (Gap 15).
+    Surveyed the existing table-tile view-mapper (`board-tile-view.tsx`) via a subagent first — key
+    finding: `BoardTile`'s schema (`packages/firebase-orm-models`) is a strictly-validated fixed shape
+    with no open per-tile config bag, and the only existing `localStorage` precedent in this app
+    (`tv-app.tsx`'s device-token persistence) is a first for a per-user *display* preference, not
+    reuse of an established pattern — so this was a genuine, considered design decision (client-only
+    `localStorage` keyed by tile id, not a `BoardTile` schema change) rather than following existing
+    convention.
+  - Implemented: sortable column headers (numeric-aware compare, `null` sorts last, matching
+    `buildHeatmapView`'s "not yet observable" treatment of a missing cell) and a show/hide "Columns"
+    menu, both persisted per tile id in `localStorage` with the same guarded
+    `typeof window`/try-catch shape `tv-app.tsx` established. A defensive fallback (never hide every
+    column — an all-hidden table would look identical to the tile's own "no data" empty state) is the
+    one piece of behavior beyond the literal AC wording, added because the naive implementation would
+    have produced a confusing false-empty state.
+  - Added 9 new tests (`board-tile-view.test.tsx`) covering sort toggle/switch, hide-column,
+    hide-all-columns safety net, cross-remount persistence, per-tile-id isolation (one tile's prefs
+    must not leak into another's), and a corrupt-`localStorage`-value fallback; fixed one pre-existing
+    test that started failing once headers became interactive (`getByText('bucket_date')` matched both
+    the new "Columns" menu's checkbox label and the sort button — same text, two elements — switched
+    to `getByRole('button', { name: 'Sort by bucket_date' })`). Added 3 new `Boards`-namespace i18n
+    keys to both `en.json`/`he.json`.
+  - `pnpm build && pnpm lint && pnpm typecheck` green across the whole monorepo; the changed file's own
+    33 tests plus every other consumer/adjacent suite (`board-grid-editor.test.tsx`,
+    `tv-rotation-screen.test.tsx`, `messages/messages.test.ts`) green. The full `apps/web` unit suite
+    (100+ files, most needing the Firestore/Auth emulator) didn't finish inside this sandbox's command
+    timeout — left to the CI job, which does run it.
+  - Opened **PR #269**. Its first CI run failed on `e2e/intent-quality.spec.ts` (KAN-83, a feature this
+    diff never touches) with the exact, long-documented `RESOURCE_EXHAUSTED: Received message larger
+    than max` gRPC/Firestore-emulator flake (see KAN-22's original PROGRESS.md entry and PR #259's own
+    sharding fix). Re-ran the failed job once per the drive-to-green rules rather than re-diagnosing a
+    flake in a file this PR doesn't own — came back green on the retry, confirming it wasn't a real
+    regression. Merged (squash). Branch deletion 403'd from this sandbox's git remote, same standing,
+    accepted restriction every prior entry has hit.
+  - Noticed **PR #267** (another concurrent session's own KAN-88/PR-265 recording chore, opened before
+    #266 merged) is now `mergeable_state: dirty` against current `main` — left it alone; it's not this
+    run's PR to resolve, and the session that owns it is better positioned to rebase or close it as
+    redundant with #266.
+  - Updated `TASKS.md`: KAN-85's row now credits PR #269, with a corrected note that KAN-86's
+    campaign-target inline editing is a narrower precedent, not the same AC bullet — the one remaining
+    KAN-85 gap is still just inline target/value editing in *report* tables.
+- **In progress (exact stopping point):** none — PR #269 is merged, `TASKS.md`/this entry are the
+  clean stopping point.
+- **Blocked + why:** nothing blocking.
+- **Next step:** KAN-85's own remaining bullet — inline target/value editing in report tables — is the
+  most directly obvious next buildable slice (same "pick the next documented gap off an in-progress
+  row" posture this run and the prior one both used). KAN-18/19/82/86 are the other `in-progress` rows
+  with their own documented remaining gaps if a future run wants a different area. Worth checking
+  `git branch -a`/open PRs first, per the prior entry's own observation — this backlog collides on
+  itself fast now that there's no unclaimed `todo` row to fall back on.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - PR #267 (see above) — another concurrent session's own PR, now conflicted; needs that session (or
+    a human) to rebase or close it, not a mechanical fix this entry should make unilaterally.
+  - Branch deletion on GitHub still 403s from this sandbox — same accepted posture as every prior
+    entry.
+
+---
+
 ## 2026-08-24 (later) — KAN-88 delivered via a 3-way collision: merged PR #264, closed PR #263 as superseded, discarded a third local implementation before push
 
 - **Last completed:**
