@@ -5,10 +5,12 @@
 # once a human provisions it, rather than modeling it speculatively here.
 locals {
   cloud_run_services = {
-    web-dev  = { app = "web", environment = "dev" }
-    web-prod = { app = "web", environment = "prod" }
-    api-dev  = { app = "api", environment = "dev" }
-    api-prod = { app = "api", environment = "prod" }
+    web-dev     = { app = "web", environment = "dev" }
+    web-preprod = { app = "web", environment = "preprod" }
+    web-prod    = { app = "web", environment = "prod" }
+    api-dev     = { app = "api", environment = "dev" }
+    api-preprod = { app = "api", environment = "preprod" }
+    api-prod    = { app = "api", environment = "prod" }
   }
 }
 
