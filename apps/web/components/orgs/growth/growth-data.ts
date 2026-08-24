@@ -11,7 +11,27 @@ import type {
   GrowthKpiSummary,
 } from './types';
 
-export function getGrowthKpis(range: GrowthDateRange, channel: GrowthChannelFilter): GrowthKpiSummary {
+export function getGrowthKpis(
+  range: GrowthDateRange,
+  channel: GrowthChannelFilter,
+  isLiveMode = false,
+  hasLiveTraffic = false,
+): GrowthKpiSummary {
+  if (isLiveMode && !hasLiveTraffic) {
+    return {
+      totalSpend: 0,
+      totalRevenue: 0,
+      blendedRoas: 0,
+      totalConversions: 0,
+      blendedCac: 0,
+      netProfit: 0,
+      spendDeltaPct: 0,
+      revenueDeltaPct: 0,
+      conversionsDeltaPct: 0,
+      cacDeltaPct: 0,
+    };
+  }
+
   const multiplier = range === '7d' ? 0.25 : range === '90d' ? 3.0 : 1.0;
   const channelFactor = channel === 'google_ads' ? 0.52 : channel === 'meta_ads' ? 0.38 : channel === 'tiktok' ? 0.1 : 1.0;
 
@@ -36,7 +56,15 @@ export function getGrowthKpis(range: GrowthDateRange, channel: GrowthChannelFilt
   };
 }
 
-export function getChannelPerformances(range: GrowthDateRange): ChannelPerformance[] {
+export function getChannelPerformances(
+  range: GrowthDateRange,
+  isLiveMode = false,
+  hasLiveTraffic = false,
+): ChannelPerformance[] {
+  if (isLiveMode && !hasLiveTraffic) {
+    return [];
+  }
+
   const mult = range === '7d' ? 0.25 : range === '90d' ? 3.0 : 1.0;
   return [
     {
@@ -73,11 +101,22 @@ export function getChannelPerformances(range: GrowthDateRange): ChannelPerforman
   ];
 }
 
-export function getCampaignLeaderboard(channel: GrowthChannelFilter): CampaignLeaderboardItem[] {
+export function getCampaignLeaderboard(
+  channel: GrowthChannelFilter,
+  projectName = '',
+  isLiveMode = false,
+  hasLiveTraffic = false,
+): CampaignLeaderboardItem[] {
+  if (isLiveMode && !hasLiveTraffic) {
+    return [];
+  }
+
+  const prefix = projectName ? `${projectName} - ` : '';
+
   const all: CampaignLeaderboardItem[] = [
     {
       id: 'cmp-1',
-      name: 'Search - High Intent Brand & Solution',
+      name: `${prefix}Google Search B2B High Intent`,
       channel: 'google_ads',
       status: 'active',
       spend: 5200,
@@ -90,7 +129,7 @@ export function getCampaignLeaderboard(channel: GrowthChannelFilter): CampaignLe
     },
     {
       id: 'cmp-2',
-      name: 'Meta - Retargeting Cart Abandoners (7d)',
+      name: `${prefix}Meta Retargeting Trial Abandoners (7d)`,
       channel: 'meta_ads',
       status: 'active',
       spend: 3400,
@@ -98,54 +137,42 @@ export function getCampaignLeaderboard(channel: GrowthChannelFilter): CampaignLe
       cpa: 50.0,
       revenue: 16200,
       roas: 4.76,
-      recommendationKey: 'recScaleLookalike',
+      recommendationKey: 'recTopRetargeting',
     },
     {
       id: 'cmp-3',
-      name: 'Performance Max - Top Products',
+      name: `${prefix}Google Performance Max Document Workflow`,
       channel: 'google_ads',
       status: 'active',
-      spend: 4800,
-      conversions: 72,
-      cpa: 66.67,
+      spend: 4100,
+      conversions: 71,
+      cpa: 57.74,
       revenue: 18400,
-      roas: 3.83,
-      recommendationKey: 'recProfitableMaintain',
+      roas: 4.49,
+      recommendationKey: 'recProfitableStable',
     },
     {
       id: 'cmp-4',
-      name: 'Meta - Prospecting Lookalike 1% Buyers',
+      name: `${prefix}Meta Video Lookalike 1% Decision Makers`,
       channel: 'meta_ads',
       status: 'active',
-      spend: 4100,
-      conversions: 54,
-      cpa: 75.93,
-      revenue: 12900,
-      roas: 3.15,
-      recommendationKey: 'recRefreshCreative',
-    },
-    {
-      id: 'cmp-5',
-      name: 'TikTok - UGC Video Hook Testing',
-      channel: 'tiktok',
-      status: 'learning',
-      spend: 2600,
-      conversions: 48,
-      cpa: 54.17,
-      revenue: 8120,
-      roas: 3.12,
+      spend: 3800,
+      conversions: 52,
+      cpa: 73.07,
+      revenue: 11200,
+      roas: 2.95,
       recommendationKey: 'recScaleWinnerHook',
     },
     {
-      id: 'cmp-6',
-      name: 'Search - Generic Competitor Conquesting',
+      id: 'cmp-5',
+      name: `${prefix}Google Search Generic Keywords`,
       channel: 'google_ads',
       status: 'active',
-      spend: 2800,
-      conversions: 22,
-      cpa: 127.27,
-      revenue: 4200,
-      roas: 1.5,
+      spend: 3500,
+      conversions: 28,
+      cpa: 125.0,
+      revenue: 6200,
+      roas: 1.77,
       recommendationKey: 'recOptimizeNegativeKeywords',
     },
   ];
@@ -154,16 +181,43 @@ export function getCampaignLeaderboard(channel: GrowthChannelFilter): CampaignLe
   return all.filter((c) => c.channel === channel);
 }
 
-export function getCreativePerformances(channel: GrowthChannelFilter): CreativePerformanceItem[] {
+export function getCreativePerformances(
+  channel: GrowthChannelFilter,
+  projectName = '',
+  isLiveMode = false,
+  hasLiveTraffic = false,
+): CreativePerformanceItem[] {
+  if (isLiveMode && !hasLiveTraffic) {
+    return [];
+  }
+
+  const isEasySign = projectName.toLowerCase().includes('easysign') || projectName.toLowerCase().includes('sign');
+
+  const headline1 = isEasySign
+    ? 'Sign contracts and documents from anywhere in 30 seconds'
+    : 'Stop Wasting 40% of Ad Spend - Autonomous Marketing ROI Engine';
+
+  const headline2 = isEasySign
+    ? 'Replace paper, scanning and couriers with secure digital signatures'
+    : 'Transform Ad Clicks Into Paying Customers - Live Growth OS';
+
+  const headline3 = isEasySign
+    ? 'EasySign B2B Enterprise: Legally binding electronic signature platform'
+    : 'Full-Funnel ROAS Attribution - See Exactly Which Campaign Wins';
+
+  const headline4 = isEasySign
+    ? 'Start Free 14-Day Trial - Unlimited documents and team templates'
+    : 'Instant AI Growth Recommendations - Automated Budget Scaling';
+
   const all: CreativePerformanceItem[] = [
     {
       id: 'cr-1',
-      headline: 'Stop Wasting 40% of Ad Spend — Automated Growth OS',
+      headline: headline1,
       format: 'video',
       channel: 'meta_ads',
-      impressions: 48500,
-      clicks: 1940,
-      ctrPct: 4.0,
+      impressions: 48000,
+      clicks: 1930,
+      ctrPct: 4.02,
       conversions: 62,
       revenue: 15500,
       roas: 5.34,
@@ -172,42 +226,42 @@ export function getCreativePerformances(channel: GrowthChannelFilter): CreativeP
     },
     {
       id: 'cr-2',
-      headline: 'The #1 Marketing Growth Engine for Fast-Moving Brands',
+      headline: headline2,
       format: 'search_text',
       channel: 'google_ads',
-      impressions: 32400,
-      clicks: 2268,
-      ctrPct: 7.0,
+      impressions: 24500,
+      clicks: 1675,
+      ctrPct: 6.84,
       conversions: 78,
-      revenue: 20280,
-      roas: 4.95,
-      cpa: 52.56,
+      revenue: 19800,
+      roas: 5.21,
+      cpa: 48.71,
     },
     {
       id: 'cr-3',
-      headline: 'Before vs After GrowthOS: 3.4x Revenue in 60 Days',
+      headline: headline3,
       format: 'carousel',
       channel: 'meta_ads',
-      impressions: 39100,
-      clicks: 1446,
-      ctrPct: 3.7,
-      conversions: 44,
-      revenue: 10560,
-      roas: 3.84,
-      cpa: 62.5,
+      impressions: 32000,
+      clicks: 1008,
+      ctrPct: 3.15,
+      conversions: 34,
+      revenue: 7200,
+      roas: 3.43,
+      cpa: 61.76,
     },
     {
       id: 'cr-4',
-      headline: 'Real Founder Unboxing & First-Look Dashboard',
-      format: 'video',
-      channel: 'tiktok',
-      impressions: 54000,
-      clicks: 2700,
-      ctrPct: 5.0,
-      conversions: 48,
-      revenue: 8120,
-      roas: 3.12,
-      cpa: 54.17,
+      headline: headline4,
+      format: 'image',
+      channel: 'google_ads',
+      impressions: 18200,
+      clicks: 336,
+      ctrPct: 1.85,
+      conversions: 18,
+      revenue: 3800,
+      roas: 2.71,
+      cpa: 77.77,
     },
   ];
 
@@ -215,71 +269,146 @@ export function getCreativePerformances(channel: GrowthChannelFilter): CreativeP
   return all.filter((c) => c.channel === channel);
 }
 
-export function getAudienceSegments(): AudienceSegmentItem[] {
+export function getAudienceSegments(isLiveMode = false, hasLiveTraffic = false): AudienceSegmentItem[] {
+  if (isLiveMode && !hasLiveTraffic) {
+    return [];
+  }
+
   return [
     {
       id: 'seg-1',
       nameKey: 'segmentLookalikeBuyers',
       type: 'lookalike',
       visitors: 4200,
-      conversions: 142,
-      conversionRatePct: 3.38,
-      revenue: 35500,
-      roas: 4.62,
+      conversions: 168,
+      conversionRatePct: 4.0,
+      revenue: 41200,
+      roas: 4.85,
     },
     {
       id: 'seg-2',
       nameKey: 'segmentCartAbandoners',
       type: 'retargeting',
-      visitors: 1850,
-      conversions: 118,
-      conversionRatePct: 6.38,
-      revenue: 28320,
-      roas: 5.45,
+      visitors: 1100,
+      conversions: 70,
+      conversionRatePct: 6.36,
+      revenue: 22400,
+      roas: 5.1,
     },
     {
       id: 'seg-3',
       nameKey: 'segmentHighIntentSearch',
       type: 'search_intent',
-      visitors: 3100,
-      conversions: 98,
-      conversionRatePct: 3.16,
-      revenue: 21560,
+      visitors: 3800,
+      conversions: 124,
+      conversionRatePct: 3.26,
+      revenue: 24800,
       roas: 4.12,
     },
     {
       id: 'seg-4',
       nameKey: 'segmentBroadInterest',
       type: 'interest',
-      visitors: 5800,
-      conversions: 54,
-      conversionRatePct: 0.93,
-      revenue: 10040,
-      roas: 2.15,
+      visitors: 3700,
+      conversions: 50,
+      conversionRatePct: 1.35,
+      revenue: 7020,
+      roas: 1.95,
     },
   ];
 }
 
-export function getDeviceBreakdown(): DeviceBreakdownItem[] {
+export function getDeviceBreakdown(isLiveMode = false, hasLiveTraffic = false): DeviceBreakdownItem[] {
+  if (isLiveMode && !hasLiveTraffic) {
+    return [];
+  }
+
   return [
-    { device: 'mobile', trafficSharePct: 68, conversionRatePct: 3.1, revenue: 59160 },
-    { device: 'desktop', trafficSharePct: 28, conversionRatePct: 4.4, revenue: 33400 },
-    { device: 'tablet', trafficSharePct: 4, conversionRatePct: 1.8, revenue: 2860 },
+    {
+      device: 'mobile',
+      trafficSharePct: 68,
+      conversionRatePct: 2.82,
+      revenue: 56800,
+    },
+    {
+      device: 'desktop',
+      trafficSharePct: 28,
+      conversionRatePct: 4.12,
+      revenue: 34900,
+    },
+    {
+      device: 'tablet',
+      trafficSharePct: 4,
+      conversionRatePct: 3.52,
+      revenue: 3720,
+    },
   ];
 }
 
-export function getFunnelSteps(range: GrowthDateRange): FunnelStepItem[] {
+export function getFunnelSteps(
+  range: GrowthDateRange,
+  isLiveMode = false,
+  hasLiveTraffic = false,
+): FunnelStepItem[] {
+  if (isLiveMode && !hasLiveTraffic) {
+    return [
+      { key: 'impressions', titleKey: 'funnelImpressions', count: 0 },
+      { key: 'clicks', titleKey: 'funnelClicks', count: 0, conversionFromPrevPct: 0, dropoffPct: 0 },
+      { key: 'visitors', titleKey: 'funnelVisitors', count: 0, conversionFromPrevPct: 0, dropoffPct: 0 },
+      { key: 'leads', titleKey: 'funnelLeads', count: 0, conversionFromPrevPct: 0, dropoffPct: 0 },
+      { key: 'customers', titleKey: 'funnelCustomers', count: 0, conversionFromPrevPct: 0, dropoffPct: 0 },
+    ];
+  }
+
   const mult = range === '7d' ? 0.25 : range === '90d' ? 3.0 : 1.0;
+  const impressions = Math.round(240000 * mult);
+  const clicks = Math.round(14200 * mult);
+  const visitors = Math.round(12800 * mult);
+  const leads = Math.round(1640 * mult);
+  const customers = Math.round(412 * mult);
+
   return [
-    { key: 'impressions', titleKey: 'funnelImpressions', count: Math.round(240000 * mult) },
-    { key: 'clicks', titleKey: 'funnelClicks', count: Math.round(14200 * mult), conversionFromPrevPct: 5.92, dropoffPct: 94.08 },
-    { key: 'visitors', titleKey: 'funnelVisitors', count: Math.round(12800 * mult), conversionFromPrevPct: 90.14, dropoffPct: 9.86 },
-    { key: 'leads', titleKey: 'funnelLeads', count: Math.round(1640 * mult), conversionFromPrevPct: 12.81, dropoffPct: 87.19 },
-    { key: 'customers', titleKey: 'funnelCustomers', count: Math.round(412 * mult), conversionFromPrevPct: 25.12, dropoffPct: 74.88 },
+    {
+      key: 'impressions',
+      titleKey: 'funnelImpressions',
+      count: impressions,
+    },
+    {
+      key: 'clicks',
+      titleKey: 'funnelClicks',
+      count: clicks,
+      conversionFromPrevPct: (clicks / impressions) * 100,
+      dropoffPct: (1 - clicks / impressions) * 100,
+    },
+    {
+      key: 'visitors',
+      titleKey: 'funnelVisitors',
+      count: visitors,
+      conversionFromPrevPct: (visitors / clicks) * 100,
+      dropoffPct: (1 - visitors / clicks) * 100,
+    },
+    {
+      key: 'leads',
+      titleKey: 'funnelLeads',
+      count: leads,
+      conversionFromPrevPct: (leads / visitors) * 100,
+      dropoffPct: (1 - leads / visitors) * 100,
+    },
+    {
+      key: 'customers',
+      titleKey: 'funnelCustomers',
+      count: customers,
+      conversionFromPrevPct: (customers / leads) * 100,
+      dropoffPct: (1 - customers / leads) * 100,
+    },
   ];
 }
 
-export function getActionableInsights(): ActionableInsightItem[] {
+export function getActionableInsights(isLiveMode = false, hasLiveTraffic = false): ActionableInsightItem[] {
+  if (isLiveMode && !hasLiveTraffic) {
+    return [];
+  }
+
   return [
     {
       id: 'ins-1',

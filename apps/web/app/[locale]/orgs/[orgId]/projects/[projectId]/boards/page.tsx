@@ -5,7 +5,12 @@ import { Link } from '@/i18n/navigation';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listBoardsForProject, listOrgProjects } from '@/lib/orgs/queries';
+import {
+  listActiveAttachmentsForProject,
+  listBoardsForProject,
+  listOrgProjects,
+  listPluginInstallsForProject,
+} from '@/lib/orgs/queries';
 import { toBoardSummaryView } from '@/lib/orgs/board-view';
 import { CreateBoardForm } from '@/components/orgs/create-board-form';
 import { GrowthDashboard } from '@/components/orgs/growth-dashboard';
@@ -50,14 +55,40 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
     notFound();
   }
 
-  const boards = await listBoardsForProject(orgId, projectId);
+  const [boards, attachments, pluginInstalls] = await Promise.all([
+    listBoardsForProject(orgId, projectId),
+    listActiveAttachmentsForProject(orgId, projectId),
+    listPluginInstallsForProject(orgId, projectId),
+  ]);
+
   const boardViews = boards.map(toBoardSummaryView);
   const t = await getTranslations('Boards');
+
+  const hasGoogleAds = pluginInstalls.some((p) => p.plugin_id.includes('google')) || attachments.some((a) => a.resource_id.includes('google'));
+  const hasMetaAds = pluginInstalls.some((p) => p.plugin_id.includes('meta') || p.plugin_id.includes('facebook')) || attachments.some((a) => a.resource_id.includes('meta') || a.resource_id.includes('facebook'));
+  const hasWebPixel = pluginInstalls.some((p) => p.plugin_id.includes('easysign') || p.plugin_id.includes('landing-page') || p.plugin_id.includes('pixel') || p.plugin_id.includes('source'));
+
+  const pluginPackNames = pluginInstalls
+    .map((p) => {
+      if (p.plugin_id.includes('landing-page')) return 'Landing Page Pack';
+      if (p.plugin_id.includes('saas')) return 'SaaS Metric Pack';
+      if (p.plugin_id.includes('ecommerce')) return 'E-Commerce Pack';
+      return p.plugin_id.split('.').pop() ?? p.plugin_id;
+    })
+    .filter(Boolean);
 
   return (
     <main className="container mx-auto flex max-w-6xl flex-col gap-10 py-10 px-4 sm:px-6">
       {/* 1. Predefined Growth & Marketing Intelligence Dashboard */}
-      <GrowthDashboard orgId={orgId} projectId={projectId} projectName={project.name} />
+      <GrowthDashboard
+        orgId={orgId}
+        projectId={projectId}
+        projectName={project.name}
+        hasGoogleAds={hasGoogleAds}
+        hasMetaAds={hasMetaAds}
+        hasWebPixel={hasWebPixel}
+        pluginPackNames={pluginPackNames}
+      />
 
       {/* 2. Custom Boards & Tile Management Section */}
       <section className="flex flex-col gap-6 rounded-3xl border border-border bg-card p-6 shadow-sm">
