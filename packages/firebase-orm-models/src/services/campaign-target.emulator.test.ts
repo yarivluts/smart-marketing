@@ -10,6 +10,7 @@ import {
   ensureSaasMetricPackSchemasRegistered,
   getCampaignSpendBreakdownForProject,
   getPaybackOverviewForProject,
+  getQualityCalibrationBreakdownForProject,
   InMemoryMetricQueryResultCache,
   InvalidCampaignTargetError,
   listCampaignTargetsForProject,
@@ -204,6 +205,45 @@ describe('getPaybackOverviewForProject', () => {
       { windowDays: 14, collectedRevenue: 170 },
       { windowDays: 30, collectedRevenue: 200 },
       { windowDays: 40, collectedRevenue: 220 },
+    ]);
+  });
+});
+
+describe('getQualityCalibrationBreakdownForProject', () => {
+  it('degrades to a "warehouse not configured" outcome when no BigQuery project is wired up (buildable-today default)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Calibration Unconfigured Org');
+    await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
+
+    const outcome = await getQualityCalibrationBreakdownForProject(organization.id, project.id);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('warehouse_not_configured');
+  });
+
+  it('degrades to a "query error" outcome when the pack is not installed yet', async () => {
+    const { organization, project } = await setupOrgWithProject('Calibration Unregistered Org');
+    const outcome = await getQualityCalibrationBreakdownForProject(organization.id, project.id);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('query_error');
+  });
+
+  it('folds rows into a fixed low/medium/high row set, dividing once at the end (never re-averaging a per-bucket ratio)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Calibration Merge Org');
+    await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
+
+    const rows: WarehouseRow[] = [
+      { bucket_date: '2026-01-01', quality_tier: 'high', quality_calibration_signups: 8, quality_calibration_paying_signups: 6, quality_calibration_collected_revenue_40d: 4000 },
+      { bucket_date: '2026-02-01', quality_tier: 'high', quality_calibration_signups: 2, quality_calibration_paying_signups: 2, quality_calibration_collected_revenue_40d: 2000 },
+      { bucket_date: '2026-01-01', quality_tier: 'low', quality_calibration_signups: 10, quality_calibration_paying_signups: 0, quality_calibration_collected_revenue_40d: 0 },
+    ];
+    const executor = new FakeWarehouseQueryExecutor(rows);
+
+    const outcome = await getQualityCalibrationBreakdownForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    expect(outcome.tiers).toEqual([
+      { qualityTier: 'low', signups: 10, payingSignups: 0, payingRate: 0, collectedRevenue40d: 0, avgCollectedRevenue40d: 0 },
+      { qualityTier: 'medium', signups: 0, payingSignups: 0, payingRate: null, collectedRevenue40d: 0, avgCollectedRevenue40d: null },
+      { qualityTier: 'high', signups: 10, payingSignups: 8, payingRate: 0.8, collectedRevenue40d: 6000, avgCollectedRevenue40d: 600 },
     ]);
   });
 });
