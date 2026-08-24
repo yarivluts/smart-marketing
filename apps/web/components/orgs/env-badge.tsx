@@ -11,6 +11,7 @@ export interface EnvBadgeProps {
 
 const ENV_ACTIVE_CLASS: Record<Environment, string> = {
   dev: 'bg-slate-500 text-white',
+  preprod: 'bg-purple-600 text-white',
   staging: 'bg-amber-500 text-white',
   prod: 'bg-red-600 text-white',
 };
