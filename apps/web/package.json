@@ -5,9 +5,9 @@
   "scripts": {
     "build": "next build",
     "dev": "next dev -p 3000",
-    "start": "next start -p 3000",
     "test": "firebase emulators:exec --project demo-growthos-test --only auth,firestore \"vitest run && playwright test\"",
-    "test:unit": "vitest run",
+    "test:unit": "vitest run components",
+    "test:integration": "firebase emulators:exec --project demo-growthos-test --only auth,firestore \"vitest run app/api lib/orgs/isolation.test.ts\"",
     "test:e2e": "playwright test",
     "lint": "eslint \"app/**/*.{ts,tsx}\" \"components/**/*.{ts,tsx}\" \"lib/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
