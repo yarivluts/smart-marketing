@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 (later) — KAN-88 delivered via a 3-way collision: merged PR #264, closed PR #263 as superseded, discarded a third local implementation before push
+
+- **Last completed:**
+  - Started this run finding PR #259 (CI-sharding fix) already merged and PR #253 (KAN-85)/#255
+    (KAN-83)/#260 (a progress-record chore) all needing a rebase onto it — exactly the state the prior
+    entry anticipated. Rebased #255 myself (another session had already rebased #253 seconds before I
+    checked); backed off duplicating work already in flight. Opened PR #261 to record that. Waited out
+    CI via scheduled self check-ins rather than polling; merged #260, then (once its CI came back green
+    on the rebased head) #253 got merged by a concurrent session, #255 needed a second rebase (main had
+    moved again) which I did, and #261 itself needed a rebase for the same reason — all landed clean.
+  - Picked **KAN-88** (Rep-attributed collections ledger, the only unclaimed `todo` left) next. Checked
+    `OrgPersonModel` (KAN-27) first per the standing "verify the people-layer note is still accurate"
+    recommendation — confirmed it's exactly the `dim_team_member` registry Gap 6 calls for, so no new
+    groundwork was needed. Built a full slice: `RepCollectionEntryModel` + `rep-collection.service.ts`
+    (record/update/list + a 7d/30d/all-time leaderboard), admin UI, route + emulator tests, all green
+    locally (`pnpm build`/`lint`/`typecheck` + the full `pnpm test` — 11/11 tasks). Merged `origin/main`
+    into the branch along the way (PROGRESS.md/TASKS.md conflicts, both resolved keeping chronological
+    entries) and re-verified green.
+  - **Before pushing**, fetched the remote branch to check for updates and discovered two other
+    sessions had independently built and already opened full PRs for the identical story under two
+    near-identical branch names: **PR #263** (`feat/kan-88-rep-collections-ledger` —
+    `CustomerOwnerModel`+`CollectionActivityModel`+a warehouse-derived metric pack) and **PR #264**
+    (`kan-88-rep-collections-ledger` — a `RepCollectionEntryModel` design very close to my own, plus
+    Stripe-charge auto-suggestion and a war-room widget). A genuine 3-way collision, the same pattern
+    KAN-20/32/60/65-70/76/81/84 established. **Discarded my own local branch without pushing** — the
+    established "third implementation, discarded before push" precedent (KAN-84's PROGRESS.md entry
+    describes the identical situation) — rather than adding a fourth competing PR.
+  - Read both PRs' full descriptions and diffs (not just titles) before deciding: #263 explicitly
+    deferred all three of Gap 13's AC bullets its own description enumerates (no time-windowed
+    leaderboard — lifetime totals only; no war-room integration; no CRM/billing auto-suggest — its
+    `assignCustomerOwner` ties revenue to `fact_revenue_event` via a persistent customer→rep mapping,
+    which needs the warehouse to show any numbers at all). #264 delivered all three: ISO-week/calendar-
+    month leaderboard windows, `listBillingCollectionSignalsForProject` (un-linked, successful,
+    non-refunded Stripe charges surfaced as candidates a human confirms), and a "Top collections this
+    week" widget on the win-rules/war-room page. Watched #264's own session self-review and fix 10 real
+    issues (a Stripe-cents-vs-decimal unit mismatch that would have corrupted the leaderboard, a
+    suggestion-starvation bug, a stale-prop bug in the inline amount input, a missing translation key
+    caught by its own test run, and more) before its CI went green — genuinely careful work.
+  - Waited for both PRs' CI (scheduled check-ins, not polling) — both came back green and
+    `mergeable_state: clean` on current `main`. **Merged PR #264** (squash). **Closed PR #263** with a
+    comment explaining the decision and explicitly crediting its one genuinely valuable, separable
+    finding: `collected_revenue`'s existing aggregation (SaaS pack, KAN-59, already shipped) filters
+    `fact_revenue_event` on `status='succeeded'` only, with no `type` filter — `fact_revenue_event.sql`
+    emits a synthetic `type='first_charge'` row alongside every customer's first real `type='charge'`
+    row (documented in that model's own doc comment), so `collected_revenue` double-counts every
+    customer's first payment today, in production, on an already-shipped board figure. Verified this
+    directly by reading both files myself rather than trusting the closed PR's claim — confirmed real.
+    Filed it as a follow-up note on KAN-59's own `TASKS.md` row (not fixed here — a drive-by fix would
+    silently restate a shipped number, which the closed PR's own author judged deserves its own PR, a
+    call I agreed with) rather than letting it disappear with the closed PR.
+  - Updated `TASKS.md`: **KAN-85**, **KAN-83** confirmed `done` (already flipped by a concurrent
+    session's PR #262 while this run's own PR queue was draining); **KAN-88** flipped to `done` with
+    full delivered-scope notes and the collision's resolution documented; KAN-59's row gained the
+    `collected_revenue` bug note; a stale cross-reference on KAN-86's row ("KAN-83 is `todo`") fixed to
+    reflect KAN-83 now being done. **After this, `TASKS.md` has zero remaining `todo` rows** — every
+    story is `done`, `in-progress` (with real partial scope delivered, remaining gaps documented in
+    each row), `blocked-by` (KAN-50/51 on KAN-43), or `needs-human` (KAN-43 itself). The formalized
+    backlog this file mirrors is fully claimed.
+- **In progress (exact stopping point):** opened a small chore PR recording this TASKS.md update; once
+  it merges, this is a clean stopping point.
+- **Blocked + why:** nothing blocking.
+- **Next step:** with `TASKS.md` carrying no `todo` rows, a future run's "pick the next unblocked task"
+  step needs to look at the `in-progress` rows' own documented remaining gaps instead of a fresh pick —
+  worth reading through KAN-18/19/82/85/86 (the five `in-progress` rows) and picking whichever
+  undelivered AC bullet is now buildable-today, the same "split into a slice" posture this backlog has
+  used throughout. KAN-59's `collected_revenue` double-counting bug (documented above) is also a real,
+  scoped, ready-to-pick fix if nothing else stands out. Given how fast this backlog collides on itself
+  now that unclaimed `todo` rows are gone, checking `git branch -a`/open PRs first matters more than
+  ever — a genuinely idle backlog looks identical to one where three other sessions just haven't pushed
+  yet.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Branch deletion on GitHub still 403s from this sandbox (every branch this run touched left
+    undeleted on the remote) — same accepted posture as every prior entry.
+
+---
+
 ## 2026-08-24 — Landed both PR #253 (KAN-85) and PR #255 (KAN-83), stuck since before the #259 CI-sharding fix
 
 - **Last completed:**
