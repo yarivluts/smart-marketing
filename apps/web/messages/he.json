@@ -1384,6 +1384,7 @@
     "updateError": "עדכון הרשומה נכשל. נסו שוב.",
     "deleteConfirm": "למחוק את רשומת היומן? לא ניתן לבטל פעולה זו.",
     "deleteButton": "מחיקה",
+    "deleteError": "מחיקת הרשומה נכשלה. נסו שוב.",
     "amountInputLabel": "סכום"
   },
   "RepCollectionLeaderboard": {

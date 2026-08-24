@@ -1384,6 +1384,7 @@
     "updateError": "Could not update this entry. Please try again.",
     "deleteConfirm": "Delete this ledger entry? This cannot be undone.",
     "deleteButton": "Delete",
+    "deleteError": "Could not delete this entry. Please try again.",
     "amountInputLabel": "Amount"
   },
   "RepCollectionLeaderboard": {
