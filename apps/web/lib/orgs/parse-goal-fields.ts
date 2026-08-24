@@ -93,3 +93,63 @@ export async function parseCreateGoalRequestBody(request: NextRequest): Promise<
     ownerPersonId: body.ownerPersonId,
   };
 }
+
+export interface ParsedUpdateGoalFields {
+  targetValue?: number;
+  rangeMin?: number;
+  rangeMax?: number;
+}
+
+export type ParsedUpdateGoalRequest = (ParsedUpdateGoalFields & { error?: undefined }) | { error: NextResponse };
+
+interface RawUpdateGoalBody {
+  targetValue?: unknown;
+  rangeMin?: unknown;
+  rangeMax?: unknown;
+}
+
+/**
+ * Field-*shape* validation only (`no_fields_to_update` if the request
+ * touches none of the three, `number` where a number was sent at all) —
+ * direction-specific business rules (a "range" goal has no single target
+ * value, `rangeMin < rangeMax`, etc.) live in `updateGoal`
+ * (`goal.service.ts`), the same split `parseUpdateRepCollectionEntryRequestBody`
+ * documents for its own sibling.
+ */
+export async function parseUpdateGoalRequestBody(request: NextRequest): Promise<ParsedUpdateGoalRequest> {
+  const parsed = await parseJsonBody<RawUpdateGoalBody>(request);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+  const body = parsed.body;
+
+  const hasTargetValue = Object.prototype.hasOwnProperty.call(body, 'targetValue');
+  const hasRangeMin = Object.prototype.hasOwnProperty.call(body, 'rangeMin');
+  const hasRangeMax = Object.prototype.hasOwnProperty.call(body, 'rangeMax');
+  if (!hasTargetValue && !hasRangeMin && !hasRangeMax) {
+    return invalid('no_fields_to_update');
+  }
+
+  const result: ParsedUpdateGoalFields = {};
+
+  if (hasTargetValue) {
+    if (typeof body.targetValue !== 'number' || !Number.isFinite(body.targetValue)) {
+      return invalid('invalid_target_value');
+    }
+    result.targetValue = body.targetValue;
+  }
+  if (hasRangeMin) {
+    if (typeof body.rangeMin !== 'number' || !Number.isFinite(body.rangeMin)) {
+      return invalid('invalid_range_min');
+    }
+    result.rangeMin = body.rangeMin;
+  }
+  if (hasRangeMax) {
+    if (typeof body.rangeMax !== 'number' || !Number.isFinite(body.rangeMax)) {
+      return invalid('invalid_range_max');
+    }
+    result.rangeMax = body.rangeMax;
+  }
+
+  return result;
+}

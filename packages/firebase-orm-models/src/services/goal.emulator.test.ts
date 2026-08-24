@@ -18,6 +18,7 @@ import {
   queryGoalProgress,
   registerMetricDefinition,
   setProjectCostQuota,
+  updateGoal,
   type WarehouseQueryExecutor,
   type WarehouseRow,
 } from '../index';
@@ -361,6 +362,155 @@ describe('deleteGoal', () => {
     });
 
     await expect(deleteGoal(organization.id, project.id, goal.id, owner.id)).rejects.toBeInstanceOf(GoalNotFoundError);
+  });
+});
+
+describe('updateGoal', () => {
+  it('updates a maximize goal’s target value and audits before/after', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Update Target Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Q3 signups',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      goalId: goal.id,
+      targetValue: 1500,
+      updatedByUserId: owner.id,
+    });
+
+    expect(updated.target_value).toBe(1500);
+    expect(updated.updated_by).toBe(owner.id);
+
+    const reloaded = await getGoal(organization.id, project.id, goal.id);
+    expect(reloaded?.target_value).toBe(1500);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.target_id === goal.id && candidate.action === 'goal.update');
+    expect(entry).toBeDefined();
+  });
+
+  it('updates a range goal’s rangeMin/rangeMax together', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Update Range Org');
+    await registerCostPerSignup(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Healthy CAC band',
+      metricName: 'cost_per_signup',
+      direction: 'range',
+      rangeMin: 20,
+      rangeMax: 40,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      goalId: goal.id,
+      rangeMin: 25,
+      rangeMax: 45,
+      updatedByUserId: owner.id,
+    });
+
+    expect(updated.range_min).toBe(25);
+    expect(updated.range_max).toBe(45);
+  });
+
+  it('rejects setting targetValue on a range goal', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Update Wrong Direction Org');
+    await registerCostPerSignup(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Healthy CAC band',
+      metricName: 'cost_per_signup',
+      direction: 'range',
+      rangeMin: 20,
+      rangeMax: 40,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      updateGoal({ organizationId: organization.id, projectId: project.id, goalId: goal.id, targetValue: 999, updatedByUserId: owner.id }),
+    ).rejects.toBeInstanceOf(InvalidGoalError);
+  });
+
+  it('rejects setting rangeMin/rangeMax on a maximize goal', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Update Wrong Direction 2 Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Q3 signups',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      updateGoal({ organizationId: organization.id, projectId: project.id, goalId: goal.id, rangeMin: 10, rangeMax: 20, updatedByUserId: owner.id }),
+    ).rejects.toBeInstanceOf(InvalidGoalError);
+  });
+
+  it('rejects a range update where rangeMin >= rangeMax', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Update Bad Range Org');
+    await registerCostPerSignup(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Healthy CAC band',
+      metricName: 'cost_per_signup',
+      direction: 'range',
+      rangeMin: 20,
+      rangeMax: 40,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      updateGoal({ organizationId: organization.id, projectId: project.id, goalId: goal.id, rangeMin: 50, rangeMax: 30, updatedByUserId: owner.id }),
+    ).rejects.toBeInstanceOf(InvalidGoalError);
+  });
+
+  it('throws GoalNotFoundError for a goal that does not belong to this org+project', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Update Missing Org');
+    await expect(
+      updateGoal({ organizationId: organization.id, projectId: project.id, goalId: 'does-not-exist', targetValue: 100, updatedByUserId: owner.id }),
+    ).rejects.toBeInstanceOf(GoalNotFoundError);
   });
 });
 

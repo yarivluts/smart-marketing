@@ -212,6 +212,90 @@ export async function createGoal(params: CreateGoalParams): Promise<GoalModel> {
   return goal;
 }
 
+export interface UpdateGoalParams {
+  organizationId: string;
+  projectId: string;
+  goalId: string;
+  /** Only meaningful for a `maximize`/`minimize` goal — rejected if the goal's own `direction` is `range`. */
+  targetValue?: number;
+  /** Only meaningful for a `range` goal — rejected if the goal's own `direction` is `maximize`/`minimize`. */
+  rangeMin?: number;
+  rangeMax?: number;
+  updatedByUserId: string;
+}
+
+/**
+ * Updates a goal's own target (KAN-85, plan `14 §Gap 15`'s "inline editing...
+ * of targets/values directly in report tables") — the PATCH commit path the
+ * goals table's inline target cell fires on blur. A goal is in-place
+ * editable (unlike `SchemaDefModel`/`MetricDefModel`'s immutable
+ * new-version-supersedes-old registries) since it has no dependents that
+ * pin to a specific target value the way a metric formula pins to a
+ * specific field shape. Mirrors `updateRepCollectionEntry`'s before/after
+ * audit-log shape.
+ */
+export async function updateGoal(params: UpdateGoalParams): Promise<GoalModel> {
+  const goal = await loadGoal(params.organizationId, params.projectId, params.goalId);
+
+  const reasons: string[] = [];
+  if (goal.direction === 'range') {
+    if (params.targetValue !== undefined) {
+      reasons.push('A "range" goal has no single target value — update rangeMin/rangeMax instead.');
+    }
+  } else if (params.rangeMin !== undefined || params.rangeMax !== undefined) {
+    reasons.push(`A "${goal.direction}" goal has no range — update targetValue instead.`);
+  }
+  if (reasons.length > 0) {
+    throw new InvalidGoalError(reasons);
+  }
+
+  const nextTargetValue = params.targetValue !== undefined ? params.targetValue : goal.target_value;
+  const nextRangeMin = params.rangeMin !== undefined ? params.rangeMin : goal.range_min;
+  const nextRangeMax = params.rangeMax !== undefined ? params.rangeMax : goal.range_max;
+
+  if (goal.direction === 'maximize' || goal.direction === 'minimize') {
+    if (nextTargetValue === null || !Number.isFinite(nextTargetValue)) {
+      reasons.push(`A "${goal.direction}" goal requires a finite target value.`);
+    }
+  } else {
+    if (nextRangeMin === null || !Number.isFinite(nextRangeMin) || nextRangeMax === null || !Number.isFinite(nextRangeMax)) {
+      reasons.push('A "range" goal requires finite rangeMin and rangeMax values.');
+    } else if (nextRangeMin >= nextRangeMax) {
+      reasons.push('A "range" goal requires rangeMin to be less than rangeMax.');
+    }
+  }
+  if (reasons.length > 0) {
+    throw new InvalidGoalError(reasons);
+  }
+
+  const before = { target_value: goal.target_value, range_min: goal.range_min, range_max: goal.range_max };
+  goal.target_value = nextTargetValue;
+  goal.range_min = nextRangeMin;
+  goal.range_max = nextRangeMax;
+  goal.updated_by = params.updatedByUserId;
+  goal.updated_at = new Date().toISOString();
+  await goal.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.updatedByUserId,
+      action: 'goal.update',
+      targetType: 'goal',
+      targetId: goal.id,
+      summary: `Updated goal "${goal.name}" target`,
+      before,
+      after: { target_value: goal.target_value, range_min: goal.range_min, range_max: goal.range_max },
+    });
+  } catch {
+    // Best-effort — see the comment in createGoal above.
+  }
+
+  return goal;
+}
+
 /** Every goal in a project, deadline-sorted (soonest-first) — unlike `listBoardsForProject`'s alphabetical sort, a goal's most useful default ordering is "what's due soonest", since that's what a human checking in on goals cares about first. */
 export async function listGoalsForProject(organizationId: string, projectId: string): Promise<GoalModel[]> {
   await requireProjectInOrg(organizationId, projectId);

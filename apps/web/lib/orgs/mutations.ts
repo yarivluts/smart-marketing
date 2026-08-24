@@ -62,6 +62,7 @@ import {
   type OnboardingSourceConnectionMethod,
   type OnboardingStateModel,
   createGoal as createGoalInOrganization,
+  updateGoal as updateGoalInOrganization,
   deleteGoal as deleteGoalInOrganization,
   type GoalModel,
   setCampaignTargetBudget as setCampaignTargetBudgetInOrganization,
@@ -925,6 +926,18 @@ interface CreateGoalInput {
 export async function createGoal(input: CreateGoalInput): Promise<GoalModel> {
   await ensureFirestoreOrm();
   return createGoalInOrganization(input);
+}
+
+/** Updates a goal's own target value (or range) — the PATCH commit path the goals table's inline target cell fires on blur. */
+export async function updateGoal(
+  organizationId: string,
+  projectId: string,
+  goalId: string,
+  fields: { targetValue?: number; rangeMin?: number; rangeMax?: number },
+  updatedByUserId: string,
+): Promise<GoalModel> {
+  await ensureFirestoreOrm();
+  return updateGoalInOrganization({ organizationId, projectId, goalId, ...fields, updatedByUserId });
 }
 
 export async function deleteGoal(
