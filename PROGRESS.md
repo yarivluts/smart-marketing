@@ -87,6 +87,81 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 (later still, 2) — KAN-86 slice 2: predicted-vs-actual quality calibration (PR #271)
+
+- **Last completed:**
+  - Read PROGRESS.md + TASKS.md, then checked `git branch -a`/open PRs before picking work (standing
+    recommendation). Local `main` turned out to be a stale container-cached ref, 50 commits behind
+    `origin/main` with nothing of its own to lose — reset it to `origin/main` rather than merging.
+    Found two open PRs from other concurrent sessions (#269 KAN-85 table column sort/visibility, #267
+    a progress-recording chore) both still mid-CI; **TASKS.md had zero remaining `todo` rows** (the
+    prior entry's own finding), so per its own recommendation looked at the `in-progress` rows'
+    documented remaining gaps instead of a fresh pick. **KAN-86**'s row named its own last undelivered
+    AC bullet — "predicted-vs-actual calibration views" — with no open PR or branch already targeting
+    it (checked `git branch -a` for anything calibration/quality-shaped first).
+  - Read `fact_signup_quality_score.sql` (KAN-83's predicted quality score) and `fact_customer_payback.sql`
+    (KAN-86's own actual-revenue mart) — both already grain on `customer_id`, making a join
+    straightforward. Built a new `fact_quality_calibration` dbt core mart joining the two, bucketing
+    `quality_score` into `low`/`medium`/`high` via `signupQualityScoreTier`'s exact thresholds
+    (duplicated in SQL by necessity, pinned by a fixture test). Added 5 new Campaign Ops pack metrics
+    (`quality_calibration_signups`/`quality_calibration_paying_signups`/
+    `quality_calibration_collected_revenue_40d` + two phase-2 ratio formulas,
+    `quality_calibration_paying_rate`/`quality_calibration_avg_collected_revenue_40d`), a new
+    `getQualityCalibrationBreakdownForProject` service function (folds the three aggregations per tier,
+    divides once at the end — same posture `getSignupQualityScoreDimensionBreakdownForProject`
+    documents), and a new table on the Campaign Ops admin page (tier / signups / paying rate / avg
+    40-day revenue), gated on the same pack-install check the existing payback section already uses.
+    en/he translations added, reusing `signupQualityScoreTierLabelKey` from the Intent & Quality page
+    rather than duplicating the tier-label mapping.
+  - **Self-review (via the `/code-review` skill, medium effort) caught a real bug before this ever
+    reached CI**: the calibration mart originally joined at `fact_signup_quality_score`'s own
+    event-grain (a customer can legitimately retake the onboarding survey, per that model's own doc
+    comment) straight onto `fact_customer_payback`'s customer-level revenue totals — so a customer with
+    two scored events had their `collected_revenue_40d` summed twice, silently inflating
+    `quality_calibration_avg_collected_revenue_40d`. The review also caught a second, related issue:
+    the derived unique key used `ts` instead of a stable per-customer key, so two same-timestamp events
+    would have collided on it. Fixed both by deduping to the customer's single latest-scored event via
+    the same `row_number() over (... order by ts desc)` convention `entities.sql` already establishes
+    for "current = latest-landed row." Added a `cust_qs3` fixture (two survey events at different
+    scores, one $150 charge) to both the KAN-83 and this story's own fixture tests, proving the fix:
+    the latest tier wins (high, not the earlier low) and revenue is counted exactly once (150, not
+    300) — a regression fixture that genuinely fails against the pre-fix model.
+  - Verified thoroughly before opening the PR: `packages/dbt-transform` `dbt build` green (220/220,
+    including the new fixture cases); `packages/firebase-orm-models`'s full real-emulator suite green
+    (112 files / 1197 tests, including new coverage for the pack's 5 metrics and the new service
+    function's degraded-outcome + multi-bucket-fold cases); `apps/web`'s full suite green (246 files /
+    1457 unit tests + all 3 e2e shards, including the pre-existing `campaign-ops.spec.ts` flow — two
+    unrelated tests in other spec files were "flaky" (failed once, passed on Playwright's built-in
+    retry) but nothing failed outright); `pnpm lint && pnpm typecheck && pnpm build` green across the
+    whole monorepo.
+  - Opened **PR #271**, subscribed to its activity, waited for real CI (not a local re-run) via
+    scheduled check-ins rather than polling. Both checks (`lint · typecheck · test · build`,
+    `terraform fmt · validate`) came back green on the first attempt, `mergeable_state: clean` — merged
+    (squash). Remote branch deletion for `kan-86-quality-calibration` failed with the same HTTP 403
+    this sandbox's git-over-HTTPS proxy has thrown for every prior run's delete attempt — left
+    undeleted, same accepted posture every prior entry documents.
+  - Updated `TASKS.md`: **KAN-86**'s row gained a "Slice 2 (PR #271, done)" note crediting the
+    calibration-view delivery and the double-counting bug fix, closing that AC bullet; the row stays
+    `in-progress` since `roi_nd`/true per-campaign `collection_nd` remain blocked on KAN-50/51/KAN-43
+    and a metrics-compiler join feature, unchanged from before.
+- **In progress (exact stopping point):** none — PR #271 is fully merged, `main` is green, `TASKS.md`
+  reflects the delivered scope.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` still has zero unclaimed `todo` rows. The remaining `in-progress` rows are
+  now **KAN-18** (BigQuery orchestration/dataset-split follow-ups, all needing real infra),
+  **KAN-19** (preview/staging deploy, needs infra), **KAN-82** (Feedback & NPS — a real third-party
+  survey connector needs human-provisioned credentials, and NPS-by-segment/plan/channel breakdown
+  dimensions don't exist on `fact_survey_response` yet — the latter is buildable-today), and **KAN-86**
+  itself (still blocked-on-infra for `roi_nd`). Of these, **KAN-82**'s breakdown-dimensions gap looks
+  like the next genuinely buildable-today slice — check `git branch -a`/open PRs first as always, given
+  how often this backlog collides on itself now that unclaimed `todo` rows are gone.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-86-quality-calibration` branch on GitHub (this sandbox's
+    git-over-HTTPS proxy rejected the delete with a 403, same as every prior run).
+
+---
+
 ## 2026-08-24 (later still) — Fixed collected_revenue double-counting first_charge rows (PR #265); KAN-88 resolved itself via two concurrent sessions
 
 - **Last completed:**

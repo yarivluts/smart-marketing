@@ -31,10 +31,12 @@ import {
   type FirmographicCompositionAlertModel,
   getCampaignSpendBreakdownForProject as getCampaignSpendBreakdownForProjectInOrganization,
   getPaybackOverviewForProject as getPaybackOverviewForProjectInOrganization,
+  getQualityCalibrationBreakdownForProject as getQualityCalibrationBreakdownForProjectInOrganization,
   listCampaignTargetsForProject as listCampaignTargetsForProjectInOrganization,
   type CampaignSpendBreakdownOutcome,
   type CampaignTargetModel,
   type PaybackOverviewOutcome,
+  type QualityCalibrationBreakdownOutcome,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -552,6 +554,11 @@ export async function listCampaignTargetsForProject(organizationId: string, proj
 export async function getPaybackOverviewForProject(organizationId: string, projectId: string): Promise<PaybackOverviewOutcome> {
   await ensureFirestoreOrm();
   return getPaybackOverviewForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getQualityCalibrationBreakdownForProject(organizationId: string, projectId: string): Promise<QualityCalibrationBreakdownOutcome> {
+  await ensureFirestoreOrm();
+  return getQualityCalibrationBreakdownForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {

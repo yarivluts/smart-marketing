@@ -48,9 +48,9 @@ describe('ensureCampaignOpsPackRegistered — metric definitions', () => {
     return getActiveMetricDefinition(organizationId, projectId, name);
   }
 
-  it('registers all four metrics as active v1', async () => {
+  it('registers all nine metrics as active v1', async () => {
     const defs = await listMetricDefinitionsForProject(organizationId, projectId);
-    expect(defs).toHaveLength(4);
+    expect(defs).toHaveLength(9);
     expect(defs.every((def) => def.version === 1 && def.status === 'active')).toBe(true);
   });
 
@@ -70,6 +70,51 @@ describe('ensureCampaignOpsPackRegistered — metric definitions', () => {
       filters: [],
     });
   });
+
+  it('registers quality_calibration_signups: count_distinct(fact_quality_calibration.customer_id) by quality_tier', async () => {
+    const metric = await activeMetric('quality_calibration_signups');
+    expect(metric?.definition_kind).toBe('aggregation');
+    expect(metric?.dimensions).toEqual(['quality_tier']);
+    expect(metric?.aggregation).toEqual({
+      function: 'count_distinct',
+      table: 'fact_quality_calibration',
+      column: 'customer_id',
+      timeColumn: 'ts',
+      filters: [],
+    });
+  });
+
+  it('registers quality_calibration_paying_signups: filtered to is_paying_customer=true', async () => {
+    const metric = await activeMetric('quality_calibration_paying_signups');
+    expect(metric?.aggregation).toEqual({
+      function: 'count_distinct',
+      table: 'fact_quality_calibration',
+      column: 'customer_id',
+      timeColumn: 'ts',
+      filters: [{ field: 'is_paying_customer', operator: '=', value: 'true' }],
+    });
+  });
+
+  it('registers quality_calibration_collected_revenue_40d: sum(fact_quality_calibration.collected_revenue_40d)', async () => {
+    const metric = await activeMetric('quality_calibration_collected_revenue_40d');
+    expect(metric?.aggregation).toEqual({
+      function: 'sum',
+      table: 'fact_quality_calibration',
+      column: 'collected_revenue_40d',
+      timeColumn: 'ts',
+      filters: [],
+    });
+  });
+
+  it.each([
+    ['quality_calibration_paying_rate', 'quality_calibration_paying_signups / quality_calibration_signups'],
+    ['quality_calibration_avg_collected_revenue_40d', 'quality_calibration_collected_revenue_40d / quality_calibration_signups'],
+  ])('registers %s as a formula over the phase-1 calibration aggregations', async (name, formula) => {
+    const metric = await activeMetric(name);
+    expect(metric?.definition_kind).toBe('formula');
+    expect(metric?.formula).toBe(formula);
+    expect(metric?.dimensions).toEqual(['quality_tier']);
+  });
 });
 
 describe('ensureCampaignOpsPackRegistered — idempotency and isolation', () => {
@@ -87,7 +132,7 @@ describe('ensureCampaignOpsPackRegistered — idempotency and isolation', () => 
     const result = await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
 
     expect(result.alreadyRegistered).toEqual(['collection_7d']);
-    expect(result.registered).toHaveLength(3);
+    expect(result.registered).toHaveLength(8);
     expect(result.registered).not.toContain('collection_7d');
   });
 
@@ -97,10 +142,10 @@ describe('ensureCampaignOpsPackRegistered — idempotency and isolation', () => 
 
     const second = await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
     expect(second.registered).toEqual([]);
-    expect(second.alreadyRegistered).toHaveLength(4);
+    expect(second.alreadyRegistered).toHaveLength(9);
 
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
-    expect(defs).toHaveLength(4);
+    expect(defs).toHaveLength(9);
     expect(defs.every((def) => def.version === 1)).toBe(true);
   });
 

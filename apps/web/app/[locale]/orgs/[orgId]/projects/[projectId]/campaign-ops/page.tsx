@@ -5,9 +5,17 @@ import { CAMPAIGN_OPS_PACK_PLUGIN_ID, CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS } from
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { builtinMetricPacks, getCampaignSpendBreakdownForProject, getPaybackOverviewForProject, listOrgProjects, listPluginInstallsForProject } from '@/lib/orgs/queries';
+import {
+  builtinMetricPacks,
+  getCampaignSpendBreakdownForProject,
+  getPaybackOverviewForProject,
+  getQualityCalibrationBreakdownForProject,
+  listOrgProjects,
+  listPluginInstallsForProject,
+} from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { campaignSpendStatusLabelKey } from '@/lib/orgs/campaign-ops-view';
+import { signupQualityScoreTierLabelKey } from '@/lib/orgs/quality-score-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 import { CampaignTargetInput } from '@/components/orgs/campaign-target-input';
 
@@ -23,13 +31,17 @@ export async function generateMetadata({ params }: PageProps) {
 
 /**
  * Campaign ops (KAN-86, E18.x, plan `14 §Gap 12`): a fixed-window payback
- * overview (`collection_Nd`, the Campaign Ops pack) and a per-campaign spend
- * budget table with inline-editable targets driving red/green
- * (`ad_spend`-by-`campaign_id`, no pack install required — `ad_spend` is the
- * SaaS pack's own metric). The two sections are independent: a project can
- * have spend targets with the Campaign Ops pack never installed, and vice
- * versa. Gated on `dashboards.write`, the same permission Goals/Segments use
- * for a project-scoped editable-target admin surface.
+ * overview, a predicted-vs-actual quality calibration table (both
+ * `collection_Nd`/`quality_calibration_*`, the Campaign Ops pack — the AC's
+ * own "predicted-vs-actual calibration views" bullet, this page's last
+ * previously-undelivered piece), and a per-campaign spend budget table with
+ * inline-editable targets driving red/green (`ad_spend`-by-`campaign_id`, no
+ * pack install required — `ad_spend` is the SaaS pack's own metric). Spend
+ * targets are independent of the other two: a project can have spend targets
+ * with the Campaign Ops pack never installed, and vice versa; payback and
+ * calibration share one pack-install gate since both read marts that pack
+ * registers. Gated on `dashboards.write`, the same permission Goals/Segments
+ * use for a project-scoped editable-target admin surface.
  */
 export default async function CampaignOpsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -55,9 +67,10 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
   const installViews = installs.map(toPluginInstallView);
   const paybackPackInstalled = hasActiveInstall(installViews, CAMPAIGN_OPS_PACK_PLUGIN_ID);
 
-  const [paybackOutcome, spendOutcome] = await Promise.all([
+  const [paybackOutcome, spendOutcome, calibrationOutcome] = await Promise.all([
     paybackPackInstalled ? getPaybackOverviewForProject(orgId, projectId) : Promise.resolve(null),
     getCampaignSpendBreakdownForProject(orgId, projectId),
+    paybackPackInstalled ? getQualityCalibrationBreakdownForProject(orgId, projectId) : Promise.resolve(null),
   ]);
 
   const t = await getTranslations('CampaignOps');
@@ -84,6 +97,37 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
           </ul>
         )}
       </section>
+
+      {paybackPackInstalled && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">{t('calibrationHeading')}</h2>
+          <p className="text-xs text-muted-foreground">{t('calibrationDescription')}</p>
+          {!calibrationOutcome || !calibrationOutcome.ok ? (
+            <p className="text-muted-foreground">{t('calibrationUnavailable')}</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-input text-left text-xs text-muted-foreground">
+                  <th className="py-2 pe-3 font-medium">{t('columnQualityTier')}</th>
+                  <th className="py-2 pe-3 font-medium">{t('columnSignups')}</th>
+                  <th className="py-2 pe-3 font-medium">{t('columnPayingRate')}</th>
+                  <th className="py-2 font-medium">{t('columnAvgRevenue40d')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {calibrationOutcome.tiers.map((tier) => (
+                  <tr key={tier.qualityTier} className="border-b border-input last:border-0">
+                    <td className="py-2 pe-3 font-medium">{t(signupQualityScoreTierLabelKey(tier.qualityTier))}</td>
+                    <td className="py-2 pe-3 tabular-nums">{tier.signups.toLocaleString(locale)}</td>
+                    <td className="py-2 pe-3 tabular-nums">{tier.payingRate === null ? t('calibrationNoData') : `${(tier.payingRate * 100).toFixed(1)}%`}</td>
+                    <td className="py-2 tabular-nums">{tier.avgCollectedRevenue40d === null ? t('calibrationNoData') : tier.avgCollectedRevenue40d.toLocaleString(locale, { maximumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{t('spendTargetsHeading')}</h2>
