@@ -17,6 +17,91 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 (later) — KAN-88 rep-attributed collections ledger (the last unclaimed `todo`), plus merged the KAN-83/85 bookkeeping PR #262
+
+- **Last completed:**
+  - Read PROGRESS.md + TASKS.md, then checked `git branch -a`/open PRs before picking work (standing
+    recommendation). Two things came out of that: local `main` was 50 commits behind and had an
+    *unrelated history* to `origin/main` (a stale clone artifact — reset the local ref to
+    `origin/main`, working tree was clean, nothing lost); and **PR #262** was already open from a
+    concurrent session doing exactly the bookkeeping I'd independently spotted as needed (KAN-83 and
+    KAN-85 had merged to `main` but `TASKS.md` still said `todo`). Rather than duplicate it, I
+    subscribed to it, verified its diff against the actual merge commits, and merged it once CI came
+    back green — so `TASKS.md` now records both stories correctly.
+  - Picked **KAN-88** (E20.x, plan `14 §Gap 13`), the only remaining unclaimed `todo`. Its own
+    TASKS.md note said it "rides on a people/team-member layer (Gap 6) that doesn't exist yet" and
+    likely needed that groundwork first — **that turned out to be wrong**, and checking it was the
+    first real step: KAN-27's `OrgPersonModel` *is* that layer (an org people registry whose members
+    need never sign in), and KAN-64 goals + KAN-81 segments already use it as an owner reference. So
+    the story was buildable today with no new groundwork, and I built all three of its AC bullets:
+    - **Activity ledger:** `CollectionActivityModel` (append-only; call/email/note/payment_followup/
+      payment_collected + optional note) with `recordCollectionActivity`/
+      `listCollectionActivityForProject`.
+    - **Rep-attributed collections:** `CustomerOwnerModel` (one owner per project+customer, keyed by
+      a content-hashed doc id per `CampaignTargetModel`'s documented convention) with
+      `assignCustomerOwner`/`unassignCustomerOwner`, audit-logged like every sibling in-place config
+      change in this codebase.
+    - **Leaderboard:** `getRepCollectionsLeaderboardForProject` rolls a new
+      `collected_revenue_by_customer` metric up per owning rep, bucketing unowned customers into an
+      explicit "unassigned" row rather than dropping them, and degrades through the established
+      outcome union (`warehouse_not_configured`/`quota_exceeded`/`not_yet_backed`/`query_error`)
+      instead of throwing.
+    - A built-in **"Rep Collections" metric pack** (one-click install, same shape as Campaign Ops),
+      and a project-scoped **Rep collections admin page** (leaderboard, customer-ownership table with
+      an inline owner picker, an assign-by-customer-id form, and the activity ledger + log form),
+      gated on `dashboards.write`, wired into both nav copies with en/he translations.
+  - **Ran an independent adversarial review of my own diff before opening the PR, which found four
+    real bugs — all fixed, each with a regression test:**
+    1. **Double-counted revenue (the serious one).** `collected_revenue_by_customer` filtered only
+       `status = 'succeeded'`. But `fact_revenue_event` emits a *synthetic* `first_charge` row
+       alongside each customer's first succeeded `charge` for the same amount — so every customer's
+       first payment counted twice, and unevenly across reps (the inflation scales with each rep's
+       new-customer count), which corrupts the leaderboard **ranking**, not just its magnitudes.
+       `fact_customer_payback.sql` documents this exact trap for the same table; I'd missed it. Fixed
+       by also filtering `type = 'charge'`, with a named regression test pinning that filter.
+    2. **The owner-assignment UI was unreachable.** The ownership section was gated on a *successful*
+       warehouse query, so with no BigQuery provisioned (today's default until KAN-18 — the very
+       state this repo's own tests assert) a human could never assign an owner at all, and
+       `listCustomerOwnersForProject` was plumbed into the web layer but never called. That breaks
+       CLAUDE.md's "everything user-manageable gets an admin surface" rule. Fixed: the section now
+       falls back to the saved assignments alone and gained an assign-by-customer-id form, so the
+       feature works before the warehouse exists; the e2e spec now exercises that path.
+    3. **Whitespace in a customer id split one customer into two rows** — writes trimmed, reads and
+       warehouse bucketing didn't, so a padded warehouse `customer_id` hashed to a different doc id
+       than its saved assignment (one row holding the revenue but unassignable, one holding the owner
+       but showing nothing collected). Fixed with a single `normalizeCustomerId` every path now goes
+       through — write, lookup, list filter, and warehouse bucketing.
+    4. **A Firestore composite index was missing.** The activity-ledger query passed in the emulator
+       (which auto-creates indexes) but would fail against real Firestore. Dropped a redundant
+       `project_id` filter (the collection path already scopes it) so the unfiltered listing needs
+       only a single-field index, and declared the `customer_id`+`occurred_at` composite in the root
+       `firestore.indexes.json`. I'd caught this one myself before the review.
+    Also added the missing `DELETE` 403/404 authorization tests the review flagged, and coverage for
+    the numeric-coercion and `limit` branches.
+  - Verified locally end to end: `pnpm lint`, `pnpm typecheck`, `pnpm build` (7/7) all green;
+    23 new backend tests (emulator-backed) pass; `apps/web` 810 tests across 149 files pass;
+    the new e2e spec passes **first-attempt, no retry** (it needed its own raised `test.setTimeout`,
+    the same convention `boards`/`omnisearch`/`onboarding` already use, because it spans more
+    first-hit route compiles than the default 45s whole-test budget covers).
+- **In progress (exact stopping point):** KAN-88's PR is opened and self-verified; CI on it is the
+  real gate. `TASKS.md` marks KAN-88 `in-progress` (delivered slice documented) rather than `done`,
+  per the buildable-today-slice convention this backlog uses.
+- **Blocked + why:** nothing blocking.
+- **Next step:** merge KAN-88's PR once CI is green. After that there are **no unclaimed `todo`s
+  left** in `TASKS.md` — the remaining open scope is the `in-progress` stories' documented deferrals
+  (KAN-82's real survey connector, KAN-85's inline table editing + column sort/show-hide persistence,
+  KAN-86's `roi_nd`, KAN-88's per-rep targets/time-windowed leaderboard), most of which need either a
+  human-provisioned third-party account or KAN-18/KAN-43. Worth a human's steer on priority.
+  One concrete, self-contained follow-up found this run: **the SaaS pack's own `collected_revenue`
+  metric has the same first-charge double-counting bug** described above (it omits the `type` filter).
+  I deliberately did not change it here — it would silently restate an already-shipped board figure,
+  which deserves its own PR and a human's awareness.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - A steer on whether to fix `collected_revenue`'s double-count (restates existing board numbers).
+
+---
+
 ## 2026-08-24 — Landed both PR #253 (KAN-85) and PR #255 (KAN-83), stuck since before the #259 CI-sharding fix
 
 - **Last completed:**

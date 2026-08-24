@@ -67,6 +67,11 @@ import {
   setCampaignTargetBudget as setCampaignTargetBudgetInOrganization,
   deleteCampaignTargetBudget as deleteCampaignTargetBudgetInOrganization,
   type CampaignTargetModel,
+  assignCustomerOwner as assignCustomerOwnerInOrganization,
+  unassignCustomerOwner as unassignCustomerOwnerInOrganization,
+  recordCollectionActivity as recordCollectionActivityInOrganization,
+  type CustomerOwnerModel,
+  type CollectionActivityModel,
   createSegment as createSegmentInOrganization,
   deleteSegment as deleteSegmentInOrganization,
   assignSegmentOwner as assignSegmentOwnerInOrganization,
@@ -153,7 +158,7 @@ import {
   type RequestTvPairingResult,
   type TvPairingModel,
 } from '@growthos/firebase-orm-models';
-import type { SegmentWorkListStatus } from '@growthos/shared';
+import type { SegmentWorkListStatus, CollectionActivityType } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 interface CreateOrganizationInput {
@@ -993,6 +998,38 @@ export async function setCampaignTargetBudget(
 export async function deleteCampaignTargetBudget(organizationId: string, projectId: string, campaignId: string): Promise<void> {
   await ensureFirestoreOrm();
   return deleteCampaignTargetBudgetInOrganization(organizationId, projectId, campaignId);
+}
+
+/** Assigns (or reassigns) a customer's collections owner, upserted by customer id (KAN-88). */
+export async function assignCustomerOwner(
+  organizationId: string,
+  projectId: string,
+  customerId: string,
+  ownerPersonId: string,
+  actorUserId: string,
+): Promise<CustomerOwnerModel> {
+  await ensureFirestoreOrm();
+  return assignCustomerOwnerInOrganization({ organizationId, projectId, customerId, ownerPersonId, actorUserId });
+}
+
+/** Clears a customer's collections owner (KAN-88) — reverts to "unassigned", a no-op if none was set. */
+export async function unassignCustomerOwner(organizationId: string, projectId: string, customerId: string, actorUserId: string): Promise<void> {
+  await ensureFirestoreOrm();
+  return unassignCustomerOwnerInOrganization(organizationId, projectId, customerId, actorUserId);
+}
+
+/** Appends one entry to a customer's collections activity ledger (KAN-88). */
+export async function recordCollectionActivity(
+  organizationId: string,
+  projectId: string,
+  customerId: string,
+  personId: string,
+  activityType: CollectionActivityType,
+  note: string | undefined,
+  actorUserId: string,
+): Promise<CollectionActivityModel> {
+  await ensureFirestoreOrm();
+  return recordCollectionActivityInOrganization({ organizationId, projectId, customerId, personId, activityType, note, actorUserId });
 }
 
 interface SuggestSegmentsInput {

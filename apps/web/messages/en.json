@@ -118,7 +118,8 @@
     "projectSegmentsLink": "Segments",
     "projectTvLink": "War-room TV",
     "projectSessionReplayLink": "Session replay",
-    "projectCampaignOpsLink": "Campaign ops"
+    "projectCampaignOpsLink": "Campaign ops",
+    "projectRepCollectionsLink": "Rep collections"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -763,6 +764,42 @@
     "targetInputLabel": "Spend target for {campaignId}",
     "targetInputPlaceholder": "No target"
   },
+  "RepCollections": {
+    "metaTitle": "Rep collections",
+    "title": "Rep collections for {projectName}",
+    "description": "Who collected what, which rep owns each customer, and the activity log behind it.",
+    "leaderboardHeading": "Collections leaderboard",
+    "leaderboardUnavailable": "No collections data available yet — connect a data warehouse to see this.",
+    "leaderboardEmpty": "No collected revenue landed for this project yet.",
+    "customersHeading": "Customer ownership",
+    "customersEmpty": "No customers with collected revenue or a saved owner yet.",
+    "collectedRevenueUnavailable": "Not available yet",
+    "assignOwnerButton": "Assign owner",
+    "noPeopleForOwnerAssignment": "Add people to this organization's resource library before assigning customer owners.",
+    "columnRep": "Rep",
+    "columnCollectedRevenue": "Collected revenue",
+    "columnCustomerCount": "Customers",
+    "columnCustomer": "Customer",
+    "columnOwner": "Owner",
+    "unassignedOption": "Unassigned",
+    "ownerSelectLabel": "Collections owner for {customerId}",
+    "ownerUpdateError": "Couldn't update the owner. Please try again.",
+    "activityHeading": "Activity ledger",
+    "activityEmpty": "No collections activity logged for this project yet.",
+    "activityCustomerIdLabel": "Customer",
+    "activityCustomerIdPlaceholder": "cus_...",
+    "activityPersonLabel": "Rep",
+    "activityTypeLabel": "Activity",
+    "activityNoteLabel": "Note",
+    "activityLogButton": "Log activity",
+    "activityLogError": "Couldn't log the activity. Please try again.",
+    "noPeopleForActivityLog": "Add people to this organization's resource library before logging collections activity.",
+    "activityTypeCall": "Call",
+    "activityTypeEmail": "Email",
+    "activityTypeNote": "Note",
+    "activityTypePaymentFollowup": "Payment follow-up",
+    "activityTypePaymentCollected": "Payment collected"
+  },
   "CostGuardrails": {
     "metaTitle": "Cost guardrails",
     "title": "Cost guardrails for {projectName}",
@@ -887,7 +924,9 @@
     "builtinPackFirmographicTitle": "Firmographic Enrichment",
     "builtinPackFirmographicDescription": "AI-classified company industry, size, and region, with # vs $ composition dashboards and composition-shift alerts.",
     "builtinPackCampaignOpsTitle": "Campaign Ops",
-    "builtinPackCampaignOpsDescription": "Fixed-window payback (7/14/30/40-day revenue collection) for customers as they're acquired."
+    "builtinPackCampaignOpsDescription": "Fixed-window payback (7/14/30/40-day revenue collection) for customers as they're acquired.",
+    "builtinPackRepCollectionsTitle": "Rep Collections",
+    "builtinPackRepCollectionsDescription": "Collected revenue broken down per customer, so collections can be attributed to the rep who owns each account."
   },
   "Boards": {
     "metaTitle": "Boards",

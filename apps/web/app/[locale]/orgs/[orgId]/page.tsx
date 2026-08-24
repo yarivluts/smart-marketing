@@ -259,6 +259,14 @@ export default async function OrgDetailPage({
                       {t('projectCampaignOpsLink')}
                     </Link>
                   ) : null}
+                  {canManageBoards ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/rep-collections`}
+                    >
+                      {t('projectRepCollectionsLink')}
+                    </Link>
+                  ) : null}
                 </div>
               ) : null}
             </>

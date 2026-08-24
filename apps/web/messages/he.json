@@ -118,7 +118,8 @@
     "projectSegmentsLink": "פלחים",
     "projectTvLink": "טלוויזיית חדר מלחמה",
     "projectSessionReplayLink": "הקלטות סשן",
-    "projectCampaignOpsLink": "תפעול קמפיינים"
+    "projectCampaignOpsLink": "תפעול קמפיינים",
+    "projectRepCollectionsLink": "גבייה לפי נציג"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -763,6 +764,42 @@
     "targetInputLabel": "יעד הוצאה עבור {campaignId}",
     "targetInputPlaceholder": "ללא יעד"
   },
+  "RepCollections": {
+    "metaTitle": "גבייה לפי נציג",
+    "title": "גבייה לפי נציג עבור {projectName}",
+    "description": "מי גבה כמה, איזה נציג אחראי על כל לקוח, ויומן הפעילות שמאחורי זה.",
+    "leaderboardHeading": "טבלת מובילי הגבייה",
+    "leaderboardUnavailable": "אין עדיין נתוני גבייה — חברו מחסן נתונים כדי לראות זאת.",
+    "leaderboardEmpty": "טרם נקלטה הכנסה שנגבתה עבור הפרויקט הזה.",
+    "customersHeading": "אחריות על לקוחות",
+    "customersEmpty": "אין עדיין לקוחות עם הכנסה שנגבתה או עם אחראי שמור.",
+    "collectedRevenueUnavailable": "לא זמין עדיין",
+    "assignOwnerButton": "שיוך אחראי",
+    "noPeopleForOwnerAssignment": "הוסיפו אנשים לספריית המשאבים של הארגון לפני שיוך אחראים ללקוחות.",
+    "columnRep": "נציג",
+    "columnCollectedRevenue": "הכנסה שנגבתה",
+    "columnCustomerCount": "לקוחות",
+    "columnCustomer": "לקוח",
+    "columnOwner": "אחראי",
+    "unassignedOption": "ללא אחראי",
+    "ownerSelectLabel": "אחראי גבייה עבור {customerId}",
+    "ownerUpdateError": "עדכון האחראי נכשל. נסו שוב.",
+    "activityHeading": "יומן פעילות",
+    "activityEmpty": "טרם תועדה פעילות גבייה עבור הפרויקט הזה.",
+    "activityCustomerIdLabel": "לקוח",
+    "activityCustomerIdPlaceholder": "cus_...",
+    "activityPersonLabel": "נציג",
+    "activityTypeLabel": "פעילות",
+    "activityNoteLabel": "הערה",
+    "activityLogButton": "תיעוד פעילות",
+    "activityLogError": "תיעוד הפעילות נכשל. נסו שוב.",
+    "noPeopleForActivityLog": "הוסיפו אנשים לספריית המשאבים של הארגון לפני תיעוד פעילות גבייה.",
+    "activityTypeCall": "שיחה",
+    "activityTypeEmail": "אימייל",
+    "activityTypeNote": "הערה",
+    "activityTypePaymentFollowup": "מעקב תשלום",
+    "activityTypePaymentCollected": "תשלום נגבה"
+  },
   "CostGuardrails": {
     "metaTitle": "בקרות עלות",
     "title": "בקרות עלות עבור {projectName}",
@@ -887,7 +924,9 @@
     "builtinPackFirmographicTitle": "העשרת נתונים פירמוגרפיים",
     "builtinPackFirmographicDescription": "סיווג ענף, גודל חברה ואזור באמצעות בינה מלאכותית, עם לוחות מחוונים להרכב לקוחות (# מול $) והתראות על שינוי בהרכב.",
     "builtinPackCampaignOpsTitle": "תפעול קמפיינים",
-    "builtinPackCampaignOpsDescription": "החזר השקעה בחלון זמן קבוע (גביית הכנסות ל-7/14/30/40 יום) עבור לקוחות לפי מועד הרכישה."
+    "builtinPackCampaignOpsDescription": "החזר השקעה בחלון זמן קבוע (גביית הכנסות ל-7/14/30/40 יום) עבור לקוחות לפי מועד הרכישה.",
+    "builtinPackRepCollectionsTitle": "גבייה לפי נציג",
+    "builtinPackRepCollectionsDescription": "פילוח ההכנסה שנגבתה לפי לקוח, כדי לשייך גבייה לנציג האחראי על כל חשבון."
   },
   "Boards": {
     "metaTitle": "לוחות מחוונים",

@@ -35,6 +35,13 @@ import {
   type CampaignSpendBreakdownOutcome,
   type CampaignTargetModel,
   type PaybackOverviewOutcome,
+  getRepCollectionsLeaderboardForProject as getRepCollectionsLeaderboardForProjectInOrganization,
+  listCustomerOwnersForProject as listCustomerOwnersForProjectInOrganization,
+  listCollectionActivityForProject as listCollectionActivityForProjectInOrganization,
+  type CustomerOwnerModel,
+  type CollectionActivityModel,
+  type ListCollectionActivityOptions,
+  type RepCollectionsLeaderboardOutcome,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -545,6 +552,25 @@ export async function listCampaignTargetsForProject(organizationId: string, proj
 export async function getPaybackOverviewForProject(organizationId: string, projectId: string): Promise<PaybackOverviewOutcome> {
   await ensureFirestoreOrm();
   return getPaybackOverviewForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getRepCollectionsLeaderboardForProject(organizationId: string, projectId: string): Promise<RepCollectionsLeaderboardOutcome> {
+  await ensureFirestoreOrm();
+  return getRepCollectionsLeaderboardForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listCustomerOwnersForProject(organizationId: string, projectId: string): Promise<CustomerOwnerModel[]> {
+  await ensureFirestoreOrm();
+  return listCustomerOwnersForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listCollectionActivityForProject(
+  organizationId: string,
+  projectId: string,
+  options?: ListCollectionActivityOptions,
+): Promise<CollectionActivityModel[]> {
+  await ensureFirestoreOrm();
+  return listCollectionActivityForProjectInOrganization(organizationId, projectId, options);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {

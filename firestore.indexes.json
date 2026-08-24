@@ -26,6 +26,14 @@
       ]
     },
     {
+      "collectionGroup": "collection_activities",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "customer_id", "order": "ASCENDING" },
+        { "fieldPath": "occurred_at", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "plugin_source_runs",
       "queryScope": "COLLECTION",
       "fields": [
