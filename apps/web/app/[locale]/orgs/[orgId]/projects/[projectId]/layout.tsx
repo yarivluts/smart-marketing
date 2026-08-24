@@ -56,8 +56,6 @@ export default async function ProjectLayout({
 
   const principal = { type: 'user' as const, id: user.id };
   const canManageKeys = can(bindings, principal, 'keys.manage', { orgId });
-  const canManageSchemas = can(bindings, principal, 'schema.write', { orgId });
-  const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId });
   const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
@@ -103,68 +101,54 @@ export default async function ProjectLayout({
       : []),
   ];
 
-  const insightsItems: AppShellNavItem[] = [
-    // `dashboards.read` gates Boards on its own (a `viewer` should see this) — Goals/Segments/
-    // Win rules/War-room TV still gate on the write permission only, unchanged: only Boards was
-    // asked to become viewer-visible (session-B dogfooding QA, 2026-08-18), not the whole section.
+  const intelligenceItems: AppShellNavItem[] = [
     ...(canViewBoards ? [{ href: `${base}/boards`, label: t('projectBoardsLink'), icon: 'LayoutGrid' as const }] : []),
     ...(canManageBoards
       ? [
           { href: `${base}/goals`, label: t('projectGoalsLink'), icon: 'Target' as const },
           { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: 'Users' as const },
-          { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },
-          { href: `${base}/tv`, label: t('projectTvLink'), icon: 'Tv' as const },
         ]
       : []),
   ];
 
-  const dataItems: AppShellNavItem[] = [
-    ...(canManageSchemas
+  const growthEngineItems: AppShellNavItem[] = [
+    ...(canRunAutomation
+      ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: 'Bot' as const }]
+      : []),
+    ...(canManageBoards
+      ? [
+          { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },
+          { href: `${base}/tv`, label: t('projectTvLink'), icon: 'Tv' as const },
+        ]
+      : []),
+    ...(canManageProjects
       ? [
           {
-            href: `${base}/schema-defs`,
-            label: t('projectSchemaRegistryLink'),
-            icon: 'Database' as const,
+            href: `${base}/session-replay`,
+            label: t('projectSessionReplayLink'),
+            icon: 'Video' as const,
           },
         ]
       : []),
-    ...(canManageMetrics
-      ? [
-          {
-            href: `${base}/metric-defs`,
-            label: t('projectMetricRegistryLink'),
-            icon: 'BarChart3' as const,
-          },
-        ]
+  ];
+
+  const channelItems: AppShellNavItem[] = [
+    ...(canManagePlugins
+      ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: 'Plug' as const }]
       : []),
     ...(canViewIngestHealth
       ? [
-          {
-            href: `${base}/ingest-health`,
-            label: t('projectIngestHealthLink'),
-            icon: 'Activity' as const,
-          },
-          { href: `${base}/hooks`, label: t('projectHooksLink'), icon: 'Webhook' as const },
-          {
-            href: `${base}/field-mappings`,
-            label: t('projectFieldMappingsLink'),
-            icon: 'GitBranch' as const,
-          },
           {
             href: `${base}/billing-ops-feed`,
             label: t('projectBillingOpsFeedLink'),
             icon: 'Receipt' as const,
           },
+          {
+            href: `${base}/ingest-health`,
+            label: t('projectIngestHealthLink'),
+            icon: 'Activity' as const,
+          },
         ]
-      : []),
-  ];
-
-  const automationItems: AppShellNavItem[] = [
-    ...(canManagePlugins
-      ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: 'Puzzle' as const }]
-      : []),
-    ...(canRunAutomation
-      ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: 'Bot' as const }]
       : []),
   ];
 
@@ -180,26 +164,22 @@ export default async function ProjectLayout({
             label: t('projectCostGuardrailsLink'),
             icon: 'Gauge' as const,
           },
-          {
-            href: `${base}/session-replay`,
-            label: t('projectSessionReplayLink'),
-            icon: 'Video' as const,
-          },
         ]
       : []),
   ];
 
   const sections: AppShellNavSection[] = [
     { items: orgItems },
-    { items: insightsItems },
-    { heading: tShell('dataSection'), items: dataItems },
-    { heading: tShell('automationSection'), items: automationItems },
+    { heading: tShell('intelligenceSection'), items: intelligenceItems },
+    { heading: tShell('growthEngineSection'), items: growthEngineItems },
+    { heading: tShell('channelsSection'), items: channelItems },
     { heading: tShell('settingsSection'), items: settingsItems },
   ].filter((section) => section.items.length > 0);
 
   const mobileTabItems = [
-    ...insightsItems.slice(0, 3),
-    ...automationItems.slice(0, 1),
+    ...intelligenceItems.slice(0, 2),
+    ...growthEngineItems.slice(0, 1),
+    ...channelItems.slice(0, 1),
     ...settingsItems.slice(0, 1),
   ].slice(0, 5);
 
