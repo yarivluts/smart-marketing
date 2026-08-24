@@ -17,6 +17,60 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 — Landed both PR #253 (KAN-85) and PR #255 (KAN-83), stuck since before the #259 CI-sharding fix
+
+- **Last completed:**
+  - Read PROGRESS.md + TASKS.md, then checked `git branch -a`/open PRs before picking new work
+    (standing recommendation). Found PR #253 (KAN-85 omnisearch) and PR #255 (KAN-83 intent/quality
+    scoring) both still open with `lint · typecheck · test · build` **and** `terraform fmt · validate`
+    green, `mergeable_state: clean` — exactly the state the prior entry (2026-08-23, later still 11)
+    expected once #259's CI-sharding fix had time to prove out. Neither needed a re-run; both were
+    ready to merge as-is.
+  - Merged **PR #253** (squash) first, no conflicts.
+  - Re-checked **PR #255** post-merge: `main` had moved (#253's own new files), so #255 flipped to
+    `mergeable_state: dirty`. Checked out its branch locally, merged `origin/main` in: one real
+    conflict in `packages/shared/src/index.ts` (both PRs added a new `export * from './...'` line at
+    the same spot) — trivially additive, kept both (`onboarding-survey` + `omnisearch`). Everything
+    else (`layout.tsx`, `app-shell.tsx`, `messages/en.json`, `messages/he.json`, `PROGRESS.md`)
+    auto-merged cleanly; spot-checked each by hand (both features' nav entries/slots coexist, JSON
+    still parses, translation key parity intact) rather than trusting the auto-merge blindly.
+  - Ran `pnpm build && pnpm lint && pnpm typecheck` locally (all green across all 8 packages) before
+    pushing the merge commit, then let real CI on the pushed commit be the actual test gate (same
+    posture the #259-merge entry established) rather than waiting out a full local emulator+e2e run.
+    Pushed, subscribed to PR activity, and CI came back green (`lint · typecheck · test · build` in
+    ~35 min, `terraform fmt · validate` green) with `mergeable_state: clean` — merged (squash).
+  - Found **PR #261** ("record KAN-83/85/260 CI-sharding-fix rebase status in PROGRESS.md", a
+    documentation-only PR from an earlier concurrent session covering the mid-flight state before
+    either #253 or #255 had actually landed) had already been merged by the time this run got to it
+    (`merged_at` 14:10:28Z, ahead of this run's own actions) — its content is now historical record
+    only, superseded by this entry for the actual outcome. Left a comment noting the supersession for
+    anyone reading the PR later; no further action needed since it was already merged, not left open.
+  - Updated `TASKS.md`: **KAN-85** and **KAN-83** both flipped to `done` with their delivered-scope
+    notes (KAN-85: omnisearch only, inline table editing + column sort/show-hide persistence deferred
+    to a follow-on per the PR's own description; KAN-83: as described in PR #255's body — onboarding
+    survey schema, quality score, quality-adjusted CAC/CPS, mix-shift alerts, connector/dimension
+    breakdowns deferred).
+- **In progress (exact stopping point):** none — both PRs are fully merged, `main` is green, `TASKS.md`
+  reflects both as `done`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** pick the next unblocked `todo`. **KAN-85**'s own PR left two AC bullets undelivered
+  (inline target/value editing in tables, column sort/show-hide persistence) — worth a follow-on slice
+  under the same KAN-85 story rather than treating it as fully closed scope-wise, though `TASKS.md`
+  marks it `done` per this repo's "buildable-today slice" convention (same posture KAN-80/81/etc. use).
+  Otherwise **KAN-88** (Rep-attributed collections ledger) is the only unclaimed `todo` left in
+  `TASKS.md`, and per its own note likely needs scoping-down first (no people/team-member layer exists
+  yet — check whether `OrgPersonModel` from KAN-27/KAN-81 is enough to build a first slice against, or
+  whether real groundwork is needed). Check `git branch -a`/open PRs first as always, given how much
+  concurrent-session activity this backlog sees.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-85-omnisearch` / `feat/kan-83-intent-quality-scoring` /
+    `chore/record-kan83-rebase-progress` branches on GitHub (this sandbox's git-over-HTTPS proxy has
+    rejected every prior run's remote branch-delete attempt with an HTTP 403 — not re-attempted here,
+    same accepted posture every prior entry takes).
+
+---
+
 ## 2026-08-23 (later still, 11) — rebased stuck PR #255 (KAN-83) onto main to pick up the #259 CI-sharding fix; left #253/#260 to concurrent sessions already handling them
 
 - **Last completed:**
