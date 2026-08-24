@@ -51,6 +51,46 @@ Template for each entry:
   - **KAN-43**/**KAN-18** — standing, unchanged.
   - Nothing new — the three open PRs should self-resolve via their activity subscriptions.
 
+**Update (same run, later):** #260 came back green and merged cleanly (docs-only, no risk). #253
+(KAN-85) also came back green on its rebased head and merged (by a concurrent session — this run
+never got to press merge itself, having gone off to spawn an independent-review subagent that hit a
+weekly usage cap; #253's own diff had already been reviewed inline in its PR description by its
+author, and the merge succeeded on green CI, so no further action needed here). That merge left this
+run's own #261 (recording the above) and #255 both showing `mergeable_state: dirty` against the new
+`main` — rebasing both now.
+
+---
+
+## 2026-08-23 (later still, 10) — PR #259 (CI-capacity fix) merged; real CI confirmed the fix works
+
+- **Last completed:**
+  - PR #259 came back **green on the first real CI attempt** (`lint · typecheck · test · build` in
+    ~32 minutes, `terraform fmt · validate` green too) — the actual end-to-end confirmation the prior
+    entry was waiting on. No re-run needed, unlike every recent PR before it. Merged (squash) into
+    `main`. Remote branch deletion for `ci-e2e-sharding` failed with the same HTTP 403 this sandbox's
+    git-over-HTTPS proxy has thrown for every prior run's delete attempt — left undeleted, same
+    accepted posture every prior entry documenting this takes.
+  - Along the way, `main` had moved (PR #257/KAN-87 merged mid-run) — merged `origin/main` into the
+    branch, resolved a `PROGRESS.md` conflict (both entries kept, chronologically ordered), re-ran
+    `pnpm build && pnpm lint && pnpm typecheck` locally clean before pushing the merge commit, then
+    let the real CI run (rather than the local run, which was still mid-flight) be the actual gate —
+    it passed.
+- **In progress (exact stopping point):** none — this is a clean, fully merged stopping point.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** pick the next unblocked `todo` — **KAN-88** is the only unclaimed one, and per its
+  own note likely needs scoping-down first (no people/team-member layer exists yet). Check
+  `git branch -a`/open PRs first as always; PR #253 (KAN-85, 5 CI attempts) and PR #255 (KAN-83) are
+  still open from before this fix landed — a future run (or re-running their CI now that `main`
+  carries the sharding fix, once they rebase onto it) should confirm whether they land cleanly now.
+  Neither PR belongs to this run (opened by other sessions), so left untouched per the "only drive
+  PRs you opened or were asked to watch" posture — flagging for whichever run/human picks them up
+  next.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `ci-e2e-sharding` branch on GitHub (403 from this sandbox).
+  - Worth a human's glance: PR #253/#255 predate this fix — merging `main` into them (or just
+    re-running their CI) should confirm whether the recurring failure is actually gone now.
+
 ---
 
 ## 2026-08-23 (later still, 9) — CI-capacity root-cause fix: shard apps/web's e2e run (PR #259), instead of picking a new KAN story
