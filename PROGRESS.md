@@ -17,6 +17,72 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 (later) — Fixed collected_revenue double-counting first_charge rows (PR #265); KAN-88 resolved itself via two concurrent sessions
+
+- **Last completed:**
+  - Session start: local `main` was a stale cached ref, 50 commits behind `origin/main` with no
+    common ancestor found by `git merge-base` — the remote had clearly been rewritten/force-pushed
+    since this container's clone. Reset local `main` to `origin/main` (`git checkout -B main
+    origin/main`) rather than trying to reconcile unrelated histories; this is a local-ref fix only,
+    nothing was force-pushed by this run.
+  - Read `PROGRESS.md`/`TASKS.md` on the now-current `main`: every story was `done` except the
+    standing blockers (KAN-18/19 `in-progress`, KAN-43 `needs-human`, KAN-50/51 `blocked-by`) and
+    **KAN-88**, the one remaining `todo`. Checked open PRs first per standing convention and found
+    **two** independent concurrent sessions had *already* opened competing full implementations of
+    KAN-88 minutes apart — **PR #263** (`feat/kan-88-rep-collections-ledger`) and **PR #264**
+    (`kan-88-rep-collections-ledger`) — both still mid-CI from their own sessions. Left both alone
+    rather than start a third implementation or intervene prematurely; they went on to resolve
+    themselves during this run (**PR #264 merged**, **PR #263 closed as superseded by its own
+    author/session**) with no action needed from this run.
+  - Instead picked a genuine, real, unclaimed bug **PR #263's own review notes had explicitly
+    flagged and deliberately left unfixed**: the SaaS metric pack's `collected_revenue` aggregation
+    (`saas-metric-pack/metrics.ts`) filtered `fact_revenue_event` on `status = 'succeeded'` only.
+    `fact_revenue_event` lands a synthetic `first_charge` row alongside every customer's first
+    succeeded `charge` row for the same dollar amount (its own doc comment explains why) — so a
+    `status`-only filter double-counts every customer's very first payment, unevenly across
+    cohorts/time windows. `fact_customer_payback.sql` already documented and applied the correct
+    fix (`type = 'charge'`, not `first_charge`) for the identical trap; verified by reading both
+    models directly rather than trusting either PR's framing secondhand.
+  - **Fix (PR #265, branch `fix/collected-revenue-double-counts-first-charge`):** added
+    `{ field: 'type', operator: '=', value: 'charge' }` to `COLLECTED_REVENUE`'s filters (mirrors
+    `TOTAL_CHARGES`'s existing shape) with a doc comment explaining the trap; corrected
+    `fact_revenue_event.sql`'s own doc comment, which incorrectly claimed the `status` filter alone
+    was sufficient (it doesn't mention `first_charge` at all); updated the
+    `saas-metric-pack.emulator.test.ts` registration-shape assertion for the new filter shape.
+    Grepped `apps/web` for any numeric board-fixture/e2e test asserting a specific `collected_revenue`
+    value — none exists today, so no other test needed updating.
+  - **Checks:** `pnpm install` (fresh container), `pnpm build` (whole monorepo, backgrounded past the
+    2-minute inline timeout, completed clean), `pnpm lint`/`pnpm typecheck` green across every
+    package, `packages/firebase-orm-models` full suite green (1164/1164, Firestore emulator),
+    `packages/dbt-transform` `dbt build` green (209/209 — this PR only changes a SQL comment, no
+    model logic). Real CI on the pushed PR came back green (`lint · typecheck · test · build`) with
+    `mergeable_state: clean`; merged (squash) into `main`.
+  - Remote branch deletion for `fix/collected-revenue-double-counts-first-charge` hit the same
+    recurring HTTP 403 from this sandbox's git-over-HTTPS proxy every prior run has documented — not
+    a GitHub permissions issue; branch merged and dead but not deleted, same accepted posture.
+  - Updated `TASKS.md`: **KAN-88** flipped to `done`, crediting PR #264 (the implementation that
+    merged) and noting PR #263 as the superseded concurrent duplicate.
+- **In progress (exact stopping point):** none — PR #265 fully merged, `TASKS.md` reflects KAN-88 as
+  `done`, `main` is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` now has **no remaining unblocked `todo`** — every story KAN-17..KAN-88 is
+  `done` except the standing KAN-18/19/43/50/51 blockers. A future run should do a fresh sweep (own
+  reading, not assumed from this entry) for genuine small follow-ups the way this run and its
+  predecessors have (e.g. #148's bounded-LRU-map fix, #142's cost-quota wiring, this run's
+  double-counting fix) — PR #263's own body and PR #264's "deliberately deferred" section are two
+  concrete starting points (e.g. PR #264 deferred `/tv` rotation integration for rep collections;
+  worth checking whether that's small enough for a follow-on slice). Always check `git branch -a`/
+  open PRs first — this backlog sees heavy concurrent-session activity, and note that local `main`
+  can silently go stale across container restarts (as it had at this run's start) — verify
+  `git merge-base main origin/main` resolves before trusting a local checkout.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `fix/collected-revenue-double-counts-first-charge` /
+    `feat/kan-88-rep-collections-ledger` / `kan-88-rep-collections-ledger` branches on GitHub (the
+    git-over-HTTPS proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-24 — Landed both PR #253 (KAN-85) and PR #255 (KAN-83), stuck since before the #259 CI-sharding fix
 
 - **Last completed:**
