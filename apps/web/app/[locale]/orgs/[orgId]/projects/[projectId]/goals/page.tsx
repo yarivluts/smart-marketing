@@ -8,6 +8,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listGoalsForProject, listMetricsCatalogForProject, listOrgPeople, listOrgProjects } from '@/lib/orgs/queries';
 import { toGoalSummaryView } from '@/lib/orgs/goal-view';
 import { CreateGoalForm } from '@/components/orgs/create-goal-form';
+import { GoalTargetInput } from '@/components/orgs/goal-target-input';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -21,10 +22,12 @@ export async function generateMetadata({ params }: PageProps) {
 
 /**
  * A project's goals (KAN-64, E12.1, plan `04 §6`): every goal created in
- * this project, deadline-sorted, plus a form to create a new one. Gated on
- * `dashboards.write` for the whole page — the same "whole feature, not just
- * mutation, is admin-only" posture every other project admin surface in
- * this codebase (including `boards/page.tsx`, which this page mirrors) uses.
+ * this project, deadline-sorted, as a table with an inline-editable target
+ * column (KAN-85, plan `14 §Gap 15`), plus a form to create a new one.
+ * Gated on `dashboards.write` for the whole page — the same "whole feature,
+ * not just mutation, is admin-only" posture every other project admin
+ * surface in this codebase (including `boards/page.tsx`, which this page
+ * mirrors) uses.
  */
 export default async function GoalsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -56,6 +59,7 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
   ]);
   const goalViews = goals.map(toGoalSummaryView);
   const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
+  const personNameById = new Map(peopleRows.map((person) => [person.id, person.name]));
   const t = await getTranslations('Goals');
 
   return (
@@ -67,16 +71,43 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
         {goalViews.length === 0 ? (
           <p className="text-muted-foreground">{t('noGoals')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {goalViews.map((goal) => (
-              <li key={goal.id} className="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm">
-                <Link className="font-medium underline" href={`/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`}>
-                  {goal.name}
-                </Link>
-                <span className="text-xs text-muted-foreground">{t('deadlineListLabel', { deadline: goal.deadline })}</span>
-              </li>
-            ))}
-          </ul>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-input text-left text-xs text-muted-foreground">
+                <th className="py-2 pe-3 font-medium">{t('columnName')}</th>
+                <th className="py-2 pe-3 font-medium">{t('columnMetric')}</th>
+                <th className="py-2 pe-3 font-medium">{t('columnTarget')}</th>
+                <th className="py-2 pe-3 font-medium">{t('columnDeadline')}</th>
+                <th className="py-2 font-medium">{t('columnOwner')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {goalViews.map((goal) => (
+                <tr key={goal.id} className="border-b border-input last:border-0">
+                  <td className="py-2 pe-3 font-medium">
+                    <Link className="underline" href={`/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`}>
+                      {goal.name}
+                    </Link>
+                  </td>
+                  <td className="py-2 pe-3">{goal.metricName}</td>
+                  <td className="py-2 pe-3">
+                    <GoalTargetInput
+                      orgId={orgId}
+                      projectId={projectId}
+                      goalId={goal.id}
+                      goalName={goal.name}
+                      direction={goal.direction}
+                      targetValue={goal.targetValue}
+                      rangeMin={goal.rangeMin}
+                      rangeMax={goal.rangeMax}
+                    />
+                  </td>
+                  <td className="py-2 pe-3">{goal.deadline}</td>
+                  <td className="py-2">{personNameById.get(goal.ownerPersonId) ?? goal.ownerPersonId}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         )}
       </section>
 

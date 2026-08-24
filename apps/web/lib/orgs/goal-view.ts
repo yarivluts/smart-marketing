@@ -7,6 +7,12 @@ export interface GoalSummaryView {
   name: string;
   metricName: string;
   direction: GoalModel['direction'];
+  /** `null` unless `direction` is `maximize`/`minimize` — see `GoalModel.target_value`'s own doc comment. */
+  targetValue: number | null;
+  /** `null` unless `direction === 'range'` — see `GoalModel.range_min`'s own doc comment. */
+  rangeMin: number | null;
+  /** `null` unless `direction === 'range'` — see `GoalModel.range_max`'s own doc comment. */
+  rangeMax: number | null;
   deadline: string;
   ownerPersonId: string;
 }
@@ -17,6 +23,9 @@ export function toGoalSummaryView(goal: GoalModel): GoalSummaryView {
     name: goal.name,
     metricName: goal.metric_name,
     direction: goal.direction,
+    targetValue: goal.target_value,
+    rangeMin: goal.range_min,
+    rangeMax: goal.range_max,
     deadline: goal.deadline,
     ownerPersonId: goal.owner_person_id,
   };
