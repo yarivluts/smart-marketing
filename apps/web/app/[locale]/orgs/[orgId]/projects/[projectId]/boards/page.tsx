@@ -8,6 +8,7 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listBoardsForProject, listOrgProjects } from '@/lib/orgs/queries';
 import { toBoardSummaryView } from '@/lib/orgs/board-view';
 import { CreateBoardForm } from '@/components/orgs/create-board-form';
+import { GrowthDashboard } from '@/components/orgs/growth-dashboard';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -20,13 +21,10 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's dashboard boards (KAN-60, plan `13 §E11.2`, `10 §2.2`): every
- * board created in this project, plus (for `dashboards.write` holders only) a
- * form to create a new (empty) one — tiles are added from the board's own
- * grid editor. Gated on `dashboards.read` for the page itself (`viewer`
- * included — KAN-60 follow-up, session-B dogfooding QA 2026-08-18: a viewer
- * couldn't see board data at all, only write-capable roles could reach this
- * page); the create form is separately gated on `dashboards.write` below.
+ * A project's marketing growth dashboard & custom boards (KAN-60):
+ * Primary view renders the predefined Growth Intelligence dashboard answering
+ * core marketing questions (ROI, top campaign, top creative, audience segmentation,
+ * funnel leak points, actionable insights), plus custom boards management below.
  */
 export default async function BoardsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -52,44 +50,48 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
     notFound();
   }
 
-  // Only reached once `projectId` is confirmed to belong to this org —
-  // `listBoardsForProject` itself throws `ProjectNotFoundError` for a
-  // project id that doesn't (unlike most list queries in this codebase,
-  // which just return an empty result for one), and this page has no error
-  // boundary to turn that into the 404 `notFound()` above already gives a
-  // bad project id via the same non-enumeration posture KAN-26 established.
   const boards = await listBoardsForProject(orgId, projectId);
   const boardViews = boards.map(toBoardSummaryView);
   const t = await getTranslations('Boards');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-10 py-10 px-4 sm:px-6">
+      {/* 1. Predefined Growth & Marketing Intelligence Dashboard */}
+      <GrowthDashboard orgId={orgId} projectId={projectId} projectName={project.name} />
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('boardsHeading')}</h2>
+      {/* 2. Custom Boards & Tile Management Section */}
+      <section className="flex flex-col gap-6 rounded-3xl border border-border bg-card p-6 shadow-sm">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-xl font-bold tracking-tight text-foreground">{t('boardsHeading')}</h2>
+          <p className="text-xs text-muted-foreground">{t('customBoardsSubtitle')}</p>
+        </div>
+
         {boardViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('noBoards')}</p>
+          <p className="text-xs text-muted-foreground">{t('noBoards')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {boardViews.map((board) => (
-              <li key={board.id} className="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm">
-                <Link className="font-medium underline" href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}>
-                  {board.name}
-                </Link>
-                <span className="text-xs text-muted-foreground">{t('tileCountLabel', { count: board.tileCount })}</span>
-              </li>
+              <Link
+                key={board.id}
+                href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}
+                className="flex items-center justify-between rounded-2xl border border-border/80 bg-background p-4 text-xs font-semibold hover:border-primary/50 transition-colors shadow-xs"
+              >
+                <span className="font-bold text-foreground truncate">{board.name}</span>
+                <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {t('tileCountLabel', { count: board.tileCount })}
+                </span>
+              </Link>
             ))}
-          </ul>
+          </div>
         )}
-      </section>
 
-      {canManageBoards ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
-          <CreateBoardForm orgId={orgId} projectId={projectId} />
-        </section>
-      ) : null}
+        {canManageBoards ? (
+          <div className="mt-4 border-t border-border/60 pt-6">
+            <h3 className="text-sm font-bold text-foreground mb-3">{t('createHeading')}</h3>
+            <CreateBoardForm orgId={orgId} projectId={projectId} />
+          </div>
+        ) : null}
+      </section>
     </main>
   );
 }
