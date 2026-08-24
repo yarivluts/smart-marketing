@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyNpsScore, computeNpsBreakdown } from './nps';
+import { classifyNpsScore, computeNpsBreakdown, computeNpsScoreFromCounts } from './nps';
 
 describe('classifyNpsScore', () => {
   it('classifies 9 and 10 as promoter', () => {
@@ -53,5 +53,21 @@ describe('computeNpsBreakdown', () => {
 
   it('returns a score of 100 when every response is a promoter', () => {
     expect(computeNpsBreakdown([9, 10]).npsScore).toBe(100);
+  });
+});
+
+describe('computeNpsScoreFromCounts', () => {
+  it('returns null when there are no respondents', () => {
+    expect(computeNpsScoreFromCounts(0, 0, 0)).toBeNull();
+  });
+
+  it('matches computeNpsBreakdown for the same underlying scores', () => {
+    // promoters: 10, 9, 9 (3); passive: 8 (1); detractor: 4 (1) -> (3-1)/5*100 = 40
+    expect(computeNpsScoreFromCounts(3, 1, 5)).toBe(computeNpsBreakdown([10, 9, 9, 8, 4]).npsScore);
+  });
+
+  it('rounds to one decimal place', () => {
+    // (1-2)/3*100 = -33.333... -> -33.3
+    expect(computeNpsScoreFromCounts(1, 2, 3)).toBe(-33.3);
   });
 });

@@ -3,9 +3,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   createOrganizationWithOwner,
   createProject,
+  ensureFeedbackPackRegistered,
   ensureSurveyResponseSchemaRegistered,
   ensureUserForFirebaseSession,
   getFeedbackThemeDigestForProject,
+  getNpsDimensionBreakdownForProject,
   getNpsOverviewForProject,
   ProjectNotFoundError,
   RawRecordModel,
@@ -209,5 +211,26 @@ describe('getFeedbackThemeDigestForProject', () => {
 
     const digest = await getFeedbackThemeDigestForProject(organization.id, project.id, { now, windowDays: 30 });
     expect(digest).toEqual([]);
+  });
+});
+
+describe('getNpsDimensionBreakdownForProject', () => {
+  it('degrades to a "warehouse not configured" outcome when no BigQuery project is wired up (buildable-today default)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('NPS Dimension Breakdown Org');
+    await ensureFeedbackPackRegistered(organization.id, project.id, owner.id);
+
+    const outcome = await getNpsDimensionBreakdownForProject(organization.id, project.id, 'plan_interval');
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('warehouse_not_configured');
+  });
+
+  it('degrades to a "query error" outcome when nps_respondents is not registered yet', async () => {
+    const { organization, project } = await setupOrgWithProject('NPS Dimension Breakdown Unregistered Org');
+
+    const outcome = await getNpsDimensionBreakdownForProject(organization.id, project.id, 'channel_id');
+
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('query_error');
   });
 });

@@ -1,6 +1,7 @@
 import {
   clusterFeedbackThemes,
   computeNpsBreakdown,
+  MetricCompilerError,
   SURVEY_RESPONSE_SCHEMA_FIELDS,
   SURVEY_RESPONSE_SCHEMA_KIND,
   SURVEY_RESPONSE_SCHEMA_NAME,
@@ -13,6 +14,10 @@ import type { SchemaDefModel } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { DuplicateSchemaDefinitionError, getActiveSchemaDefinition, registerSchemaDefinition } from './schema-registry.service';
 import { listRecentRecordsForSchemas } from './pipeline.service';
+import { MetricNotRegisteredError, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
+import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
+import { queryMetrics } from './metrics-query.service';
+import { WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseRow } from '../warehouse/query-executor';
 
 /** This story's own NPS metric pack/digest only reads `survey_type: 'nps'` responses — a future CSAT survey lands under the same schema with a different value, and gets its own digest rather than being folded into this one. */
 const NPS_SURVEY_TYPE = 'nps';
@@ -236,4 +241,69 @@ export async function getFeedbackThemeDigestForProject(
     .map((r) => r.comment as string);
 
   return clusterFeedbackThemes(comments);
+}
+
+/** Every dimension the Feedback pack's `nps_respondents`/`nps_promoters`/`nps_detractors` (`feedback-pack/metrics.ts`) declare — the plan/channel/cohort breakdown axes the AC names. */
+export type NpsBreakdownDimension = 'plan_interval' | 'channel_id' | 'cohort_month';
+
+export type NpsDimensionBreakdownOutcome =
+  | { ok: true; rows: WarehouseRow[] }
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
+
+/**
+ * The warehouse-backed half of the AC — "NPS by segment/plan/channel" — one
+ * `GROUP BY <dimension>` query against the `fact_survey_response` dbt mart
+ * (which itself performs the plan/channel/cohort joins, see that model's own
+ * doc comment), reusing the existing metrics/dimension-breakdown machinery
+ * exactly the way a board tile would. Requests the three underlying
+ * aggregation metrics directly rather than the `nps_score` formula metric
+ * itself: the compiler rejects breaking down a metric by a dimension it
+ * doesn't itself declare (`compiler.ts`'s own per-requested-metric check),
+ * and `nps_score` declares no `dimensions` of its own (a formula can't be
+ * broken down directly — see that metric's own doc comment) — so the caller
+ * derives the per-dimension-value score from the three raw counts instead
+ * (`toNpsDimensionBreakdownRows`, `apps/web`'s own view-mapper), the same
+ * way it already derives `nps_score` from `NpsBreakdown`'s promoter/
+ * detractor/total counts. Never throws for an expected, per-query-
+ * recoverable outcome — mirrors `getCancellationReasonDimensionBreakdownForProject`'s
+ * (KAN-84) own catch-and-classify posture.
+ */
+export async function getNpsDimensionBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  dimension: NpsBreakdownDimension,
+): Promise<NpsDimensionBreakdownOutcome> {
+  try {
+    const result = await queryMetrics({
+      organizationId,
+      projectId,
+      request: {
+        metrics: ['nps_respondents', 'nps_promoters', 'nps_detractors'],
+        dimensions: [dimension],
+        // A lifetime breakdown, not a windowed one — same reasoning
+        // `getCancellationReasonDimensionBreakdownForProject` documents.
+        time: { start: '1970-01-01', end: '2999-12-31', grain: 'year' },
+      },
+    });
+    return { ok: true, rows: result.series };
+  } catch (error) {
+    if (error instanceof WarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured', message: error.message };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    if (error instanceof MetricTargetsUnbuiltWarehouseTableError) {
+      return { ok: false, reason: 'not_yet_backed', message: error.message };
+    }
+    if (
+      error instanceof MetricCompilerError ||
+      error instanceof ProjectNotFoundError ||
+      error instanceof MetricNotRegisteredError ||
+      error instanceof WarehouseQueryFailedError
+    ) {
+      return { ok: false, reason: 'query_error', message: error.message };
+    }
+    throw error;
+  }
 }

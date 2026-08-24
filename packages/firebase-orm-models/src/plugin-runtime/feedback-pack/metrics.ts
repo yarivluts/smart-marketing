@@ -29,6 +29,17 @@ import type { MetricDefinitionInput } from '../../services/metric-registry.servi
  * `nps_score` relative to `getNpsOverviewForProject`'s own Firestore-side
  * computation, which already excludes unparseable scores before computing
  * its breakdown.
+ *
+ * `dimensions: ['plan_interval', 'channel_id', 'cohort_month']` on all
+ * three aggregations (KAN-82 follow-up, plan `14 §Gap 1`'s "NPS metric pack
+ * ... by segment/plan/channel") mirrors the Churn Reason pack's
+ * `cancellations_total` breakdown-axis precedent exactly — every dimension
+ * here must exactly match a real column on `fact_survey_response` (see that
+ * mart's own doc comment for the plan/channel/cohort join set). `nps_score`
+ * itself carries no `dimensions`: a formula metric can't be broken down by
+ * the compiler directly (see `getNpsDimensionBreakdownForProject`, which
+ * derives the per-dimension-value score from the three aggregations' own
+ * breakdown rows instead).
  */
 export interface FeedbackPackMetricDefinition {
   name: string;
@@ -36,9 +47,11 @@ export interface FeedbackPackMetricDefinition {
   definition: MetricDefinitionInput;
 }
 
+const NPS_BREAKDOWN_DIMENSIONS = ['plan_interval', 'channel_id', 'cohort_month'] as const;
+
 const NPS_RESPONDENTS: FeedbackPackMetricDefinition = {
   name: 'nps_respondents',
-  dimensions: [],
+  dimensions: NPS_BREAKDOWN_DIMENSIONS,
   definition: {
     kind: 'aggregation',
     aggregation: {
@@ -55,7 +68,7 @@ const NPS_RESPONDENTS: FeedbackPackMetricDefinition = {
 
 const NPS_PROMOTERS: FeedbackPackMetricDefinition = {
   name: 'nps_promoters',
-  dimensions: [],
+  dimensions: NPS_BREAKDOWN_DIMENSIONS,
   definition: {
     kind: 'aggregation',
     aggregation: {
@@ -72,7 +85,7 @@ const NPS_PROMOTERS: FeedbackPackMetricDefinition = {
 
 const NPS_DETRACTORS: FeedbackPackMetricDefinition = {
   name: 'nps_detractors',
-  dimensions: [],
+  dimensions: NPS_BREAKDOWN_DIMENSIONS,
   definition: {
     kind: 'aggregation',
     aggregation: {

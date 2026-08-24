@@ -41,8 +41,11 @@ import {
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
   getNpsOverviewForProject as getNpsOverviewForProjectInOrganization,
+  getNpsDimensionBreakdownForProject as getNpsDimensionBreakdownForProjectInOrganization,
   listSurveyResponseRecordsForProject as listSurveyResponseRecordsForProjectInOrganization,
   type NpsOverview,
+  type NpsBreakdownDimension,
+  type NpsDimensionBreakdownOutcome,
   getOnboardingState as getOnboardingStateInOrganization,
   getProjectCostQuota as getProjectCostQuotaInOrganization,
   getTrialPipelineSummary as getTrialPipelineSummaryInOrganization,
@@ -417,6 +420,15 @@ export async function getFeedbackThemeDigestForProject(
 ): Promise<FeedbackThemeCluster[]> {
   await ensureFirestoreOrm();
   return getFeedbackThemeDigestForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getNpsDimensionBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  dimension: NpsBreakdownDimension,
+): Promise<NpsDimensionBreakdownOutcome> {
+  await ensureFirestoreOrm();
+  return getNpsDimensionBreakdownForProjectInOrganization(organizationId, projectId, dimension);
 }
 
 /** The bounded, landed `survey_response` raw records `getNpsOverviewForProject`/`getFeedbackThemeDigestForProject` each read — fetch once via this and pass the result to both via `precomputedRecords` (the Feedback page's own posture) rather than paying for the same bounded read twice. */

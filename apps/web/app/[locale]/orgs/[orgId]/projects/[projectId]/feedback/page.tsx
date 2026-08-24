@@ -1,20 +1,21 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
-import { FEEDBACK_PACK_PLUGIN_ID } from '@growthos/firebase-orm-models';
+import { FEEDBACK_PACK_PLUGIN_ID, type NpsBreakdownDimension } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   builtinMetricPacks,
   getFeedbackThemeDigestForProject,
+  getNpsDimensionBreakdownForProject,
   getNpsOverviewForProject,
   listOrgProjects,
   listPluginInstallsForProject,
   listSurveyResponseRecordsForProject,
 } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
-import { feedbackThemeLabelKey } from '@/lib/orgs/feedback-view';
+import { feedbackThemeLabelKey, toNpsDimensionBreakdownRows } from '@/lib/orgs/feedback-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 
 type PageProps = Readonly<{
@@ -27,6 +28,12 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
+const DIMENSIONS: readonly { key: NpsBreakdownDimension; headingKey: string; emptyKey: string }[] = [
+  { key: 'plan_interval', headingKey: 'byPlanHeading', emptyKey: 'byPlanEmpty' },
+  { key: 'channel_id', headingKey: 'byChannelHeading', emptyKey: 'byChannelEmpty' },
+  { key: 'cohort_month', headingKey: 'byCohortHeading', emptyKey: 'byCohortEmpty' },
+];
+
 /**
  * A project's NPS score, trend, and "top complaint this month" theme digest
  * (KAN-82, plan `14 §Gap 1`). Gated on `ingest.write`, same "whole feature,
@@ -38,7 +45,12 @@ export async function generateMetadata({ params }: PageProps) {
  * offers rather than an empty dashboard — reusing `InstallBuiltinPackSection`
  * exactly, no separate install UI. Theme clustering is a deterministic
  * keyword heuristic (`clusterFeedbackThemes`), a buildable-today stand-in
- * for a real LLM call, same posture KAN-55 established.
+ * for a real LLM call, same posture KAN-55 established. The plan/channel/
+ * cohort breakdown (KAN-82 follow-up) is the one section that reads the
+ * warehouse-backed `fact_survey_response` mart via the metrics compiler,
+ * degrading per-dimension (not blanking the whole page) the same way the
+ * Churn Reasons page's own breakdown section does (`ChurnReasonsPage`,
+ * KAN-84).
  */
 export default async function FeedbackPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -78,9 +90,10 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
   }
 
   const surveyResponseRecords = await listSurveyResponseRecordsForProject(orgId, projectId);
-  const [overview, themeDigest] = await Promise.all([
+  const [overview, themeDigest, dimensionOutcomes] = await Promise.all([
     getNpsOverviewForProject(orgId, projectId, { precomputedRecords: surveyResponseRecords }),
     getFeedbackThemeDigestForProject(orgId, projectId, { precomputedRecords: surveyResponseRecords }),
+    Promise.all(DIMENSIONS.map((dimension) => getNpsDimensionBreakdownForProject(orgId, projectId, dimension.key))),
   ]);
 
   return (
@@ -139,6 +152,31 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
           </ul>
         )}
       </section>
+
+      {DIMENSIONS.map((dimension, index) => {
+        const outcome = dimensionOutcomes[index];
+        return (
+          <section key={dimension.key} className="flex flex-col gap-3">
+            <h2 className="text-xl font-semibold tracking-tight">{t(dimension.headingKey)}</h2>
+            {!outcome.ok ? (
+              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
+            ) : outcome.rows.length === 0 ? (
+              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {toNpsDimensionBreakdownRows(outcome.rows, dimension.key).map((row) => (
+                  <li key={row.value} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
+                    <span>{row.value || t('dimensionValueUnknown')}</span>
+                    <span className="text-muted-foreground">
+                      {row.npsScore === null ? t('dimensionScoreUnavailable') : t('dimensionScoreLine', { score: row.npsScore, respondents: row.respondents })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
     </main>
   );
 }
