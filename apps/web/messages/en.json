@@ -1220,6 +1220,7 @@
     "noFrames": "This TV has no boards or goals to show yet.",
     "loadingBoard": "Loading board…",
     "goalsFrameHeading": "Goals",
+    "leaderboardFrameHeading": "Collections leaderboard",
     "winOverlayHeading": "New win!"
   },
   "Automation": {
