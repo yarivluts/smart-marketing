@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { MetricCompilerError } from '@growthos/shared';
+import { MetricCompilerError, SIGNUP_QUALITY_SCORE_TIERS, type SignupQualityScoreTier } from '@growthos/shared';
 import { CampaignTargetModel } from '../models/campaign-target.model';
 import { ProjectModel } from '../models/project.model';
 import { ProjectNotFoundError } from './resource-library.service';
@@ -288,11 +288,11 @@ export async function getPaybackOverviewForProject(
   }
 }
 
-/** Fixed display order for the calibration breakdown — same "fixed catalog, not whatever the warehouse happens to return" posture {@link COLLECTION_WINDOW_DAYS} establishes; a tier with zero scored signups still gets a row (all zeros), not a gap. */
-export const QUALITY_CALIBRATION_TIERS: readonly ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
+/** Fixed display order for the calibration breakdown, reusing `signupQualityScoreTier`'s own tier vocabulary (`@growthos/shared`) — same "fixed catalog, not whatever the warehouse happens to return" posture {@link COLLECTION_WINDOW_DAYS} establishes; a tier with zero scored signups still gets a row (all zeros), not a gap. */
+export const QUALITY_CALIBRATION_TIERS: readonly SignupQualityScoreTier[] = SIGNUP_QUALITY_SCORE_TIERS;
 
 export interface QualityCalibrationTierRow {
-  qualityTier: 'low' | 'medium' | 'high';
+  qualityTier: SignupQualityScoreTier;
   signups: number;
   payingSignups: number;
   /** `null` when `signups` is 0 — an undefined ratio, not a misleading `0`. */
