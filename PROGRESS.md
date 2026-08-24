@@ -17,6 +17,77 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 (even later) — KAN-85 fully delivered: inline goal target-value editing, the last Gap-15 AC bullet (PR #272)
+
+- **Last completed:**
+  - Session start: local `main` was stale (detached HEAD, behind `origin/main`) — reset to
+    `origin/main` (`git checkout -B main origin/main`), same local-ref-only fix prior runs have
+    documented. Read `PROGRESS.md`/`TASKS.md`: every story was `done` or a standing blocker
+    (KAN-18/19 `in-progress`, KAN-43 `needs-human`, KAN-50/51 `blocked-by`) except **KAN-85**, whose
+    row hadn't yet been updated for PR #269 (column sort/show-hide) at read time — found and left
+    alone an already-open, unrelated concurrent housekeeping PR (**PR #270**) fixing exactly that
+    gap, rather than duplicating it (it later merged on its own, ahead of this run's own PR).
+  - Confirmed the one real remaining KAN-85 (Gap 15) AC bullet — "inline editing... of targets/
+    values directly in report tables" — was still unbuilt: goals had no update path at all (only
+    create/delete), and the goals list was a plain `<ul>`, not a table.
+  - **Delivered (PR #272, branch `kan-85-inline-goal-target-editing`):**
+    - `packages/firebase-orm-models/src/services/goal.service.ts`: new `updateGoal` — direction-
+      aware (`range` goals reject `targetValue`, `maximize`/`minimize` goals reject `rangeMin`/
+      `rangeMax`, `rangeMin < rangeMax` enforced), before/after audit-logged as `goal.update`,
+      mirroring `updateRepCollectionEntry`'s shape. Goals are in-place editable (unlike the
+      schema/metric registries' immutable-new-version convention) since nothing pins to a specific
+      target value the way a metric formula pins to a field shape.
+    - New `PATCH /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]` route +
+      `parseUpdateGoalRequestBody` (added to the existing `parse-goal-fields.ts`, which already had
+      `parseCreateGoalRequestBody`) + an `updateGoal` wrapper in `lib/orgs/mutations.ts`.
+    - `GoalSummaryView`/`toGoalSummaryView` extended with `targetValue`/`rangeMin`/`rangeMax` (the
+      GET route's own redundant duplicate copy of those fields was removed).
+    - New `GoalTargetInput` component mirrors `CampaignTargetInput`'s (KAN-86) commit-on-blur
+      pattern: a single numeric input for `maximize`/`minimize`, or a rangeMin/rangeMax pair for
+      `range`. Unlike a campaign spend target, a goal's target is required, so an empty/invalid
+      value reverts rather than clearing anything.
+    - The goals list page is now a table (name/metric/target/deadline/owner columns) instead of a
+      plain `<ul>`, with the inline-editable Target column.
+    - New translation keys in both `en.json`/`he.json`; the now-unused `deadlineListLabel` key was
+      removed from both, keeping en/he key parity.
+  - **Self-review** (`/code-review`, medium effort) caught two real bugs, both fixed before
+    opening the PR:
+    - The two range inputs each committed independently on blur, validating the just-edited field
+      against the sibling's still-stale value — moving a band up (e.g. 20-40 → 45-50) would
+      spuriously fail and revert when tabbing from min to max. Fixed by tracking both inputs via
+      refs and skipping the commit when focus is moving to the sibling input, so only the blur that
+      actually leaves the pair commits (with a regression test).
+    - `patch()`'s `fetch` call had no `catch`, so a network failure (offline/DNS) would throw an
+      unhandled rejection instead of showing the inline error and reverting the field (also fixed
+      with a regression test).
+  - **Checks:** `pnpm lint && pnpm typecheck && pnpm build` green; full `pnpm test` green across the
+    whole monorepo (1198/1198 `firebase-orm-models`, 1486/1486 `apps/web` unit, 538/538 `shared`,
+    plus e2e — one known-flaky `resource-library.spec.ts` case passed on its automatic retry, same
+    class of Firestore-emulator flake this repo's history already documents, unrelated to this
+    change). CI on the pushed PR hit that same flake class on its first run (`RESOURCE_EXHAUSTED` in
+    an unrelated `saas-metric-pack/default-boards.emulator.test.ts` test, a file this diff never
+    touches) — re-ran the failed job once per the drive-to-green playbook; green on the re-run.
+    Verified the PR merged cleanly against `main` (which had advanced twice more, unrelated KAN-86/
+    housekeeping commits, both auto-merging with no real conflicts) before merging. Squash-merged
+    into `main`. Remote branch deletion for `kan-85-inline-goal-target-editing` hit the same
+    recurring HTTP 403 from this sandbox's git-over-HTTPS proxy every prior run has documented (also
+    tried via the GitHub API — no delete-branch tool exposed either) — branch merged and dead but
+    not deleted, same accepted posture.
+  - Updated `TASKS.md`: **KAN-85** flipped to `done`.
+- **In progress (exact stopping point):** none — PR #272 fully merged, `TASKS.md` reflects KAN-85 as
+  `done`, `main` is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` now has **no remaining unblocked `todo`/`in-progress`** story except the
+  standing KAN-18/19/43/50/51 blockers. A future run should do a fresh sweep (own reading, not
+  assumed from this entry) for genuine small follow-ups the way this and prior runs have — check
+  `git branch -a`/open PRs first, this backlog sees heavy concurrent-session activity, and verify
+  `git merge-base main origin/main` resolves before trusting a local checkout (it didn't at this
+  run's start).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-85-inline-goal-target-editing` branch on GitHub (the
+    git-over-HTTPS proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
 ## 2026-08-24 (later still) — Cleared the leftover PR queue, delivered KAN-85's column sort/show-hide slice (PR #269)
 
 - **Last completed:**
