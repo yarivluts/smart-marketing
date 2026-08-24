@@ -1,5 +1,6 @@
 import type { TileRenderView } from '@/lib/orgs/board-view';
 import type { GoalThermometerView } from '@/lib/orgs/goal-view';
+import type { RepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
 import type { BoardTileRow } from '@/components/orgs/board-types';
 
 // Client-safe request/response shapes for `app/api/tv-pairing/*` — plain
@@ -50,6 +51,8 @@ export interface TvRotationManifest {
   projectId: string;
   boards: TvRotationBoardSummary[];
   goals: TvRotationGoal[];
+  /** This week's rep-attributed collections leaderboard (KAN-88's own "war-room integration" AC bullet, previously delivered only as a headline widget on the win-rules page — see `rep-collection-leaderboard-widget.tsx`'s doc comment). `RepCollectionLeaderboardView` is already the plain, serializable shape that widget renders, so the rotation manifest reuses it directly rather than inventing a parallel type. */
+  repCollectionLeaderboard: RepCollectionLeaderboardView;
 }
 
 export interface TvBoardFrame {

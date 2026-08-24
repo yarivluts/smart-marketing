@@ -39,6 +39,14 @@ const BOARD_FRAME_B: TvBoardFrame = {
   ],
 };
 
+const EMPTY_LEADERBOARD: TvRotationManifest['repCollectionLeaderboard'] = {
+  periodStart: '2026-01-05',
+  periodEnd: '2026-01-11',
+  rows: [],
+  unattributedTotal: 0,
+  unattributedCount: 0,
+};
+
 function manifestWith(overrides: Partial<TvRotationManifest>): TvRotationManifest {
   return {
     label: 'Office lobby',
@@ -48,6 +56,7 @@ function manifestWith(overrides: Partial<TvRotationManifest>): TvRotationManifes
     projectId: 'project-1',
     boards: [{ id: 'board-1', name: 'Marketing' }],
     goals: [],
+    repCollectionLeaderboard: EMPTY_LEADERBOARD,
     ...overrides,
   };
 }
@@ -162,8 +171,32 @@ describe('TvRotationScreen (KAN-67)', () => {
     expect(screen.getByText('Q4 signups')).toBeInTheDocument();
   });
 
-  it('shows the empty state when there are no boards and no goals', () => {
+  it('shows the empty state when there are no boards, goals, or leaderboard rows', () => {
     renderScreen(manifestWith({ boards: [], goals: [] }));
+    expect(screen.getByText('This TV has no boards or goals to show yet.')).toBeInTheDocument();
+  });
+
+  it('renders a leaderboard frame when the rep-collections leaderboard has rows', () => {
+    renderScreen(
+      manifestWith({
+        boards: [],
+        goals: [],
+        repCollectionLeaderboard: {
+          periodStart: '2026-01-05',
+          periodEnd: '2026-01-11',
+          rows: [{ orgPersonId: 'person-1', name: 'Dana', totalAmount: 500, entryCount: 2 }],
+          unattributedTotal: 0,
+          unattributedCount: 0,
+        },
+      }),
+    );
+
+    expect(screen.getByText('Collections leaderboard')).toBeInTheDocument();
+    expect(screen.getByText('1. Dana')).toBeInTheDocument();
+  });
+
+  it('omits the leaderboard frame entirely when it has no rows and no unattributed total', () => {
+    renderScreen(manifestWith({ boards: [], goals: [], repCollectionLeaderboard: EMPTY_LEADERBOARD }));
     expect(screen.getByText('This TV has no boards or goals to show yet.')).toBeInTheDocument();
   });
 });
