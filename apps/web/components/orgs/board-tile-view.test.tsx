@@ -1,10 +1,14 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { BoardTileView } from './board-tile-view';
 import type { BoardTileRow } from './board-types';
 import messages from '../../messages/en.json';
 import type { TileRenderView } from '@/lib/orgs/board-view';
+
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 function tile(overrides: Partial<BoardTileRow> = {}): BoardTileRow {
   return {
@@ -131,7 +135,7 @@ describe('BoardTileView', () => {
       { kind: 'table', columns: ['bucket_date', 'ad_spend'], rows: [{ bucket_date: '2026-01-01', ad_spend: 100 }], isEmpty: false, freshness: null },
       { type: 'table' },
     );
-    expect(screen.getByText('bucket_date')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by bucket_date' })).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
   });
 
@@ -231,6 +235,101 @@ describe('BoardTileView', () => {
       renderTile({ kind: 'unavailable', reason: 'query_error', message: 'boom' });
       expect(screen.queryByText(/Data as of/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('BoardTileView table column sort/show-hide (KAN-85)', () => {
+  const MULTI_ROW_VIEW: TileRenderView = {
+    kind: 'table',
+    isEmpty: false,
+    columns: ['campaign_id', 'ad_spend'],
+    rows: [
+      { campaign_id: 'summer_search', ad_spend: 300 },
+      { campaign_id: 'winter_social', ad_spend: 100 },
+      { campaign_id: 'spring_display', ad_spend: 200 },
+    ],
+    freshness: null,
+  } as unknown as TileRenderView;
+
+  /**
+   * The rendered `ad_spend` cell of every body row, in DOM order — locates
+   * the column by its current header position rather than a hard-coded
+   * index, since a show/hide test can leave `ad_spend` as the only (index 0)
+   * visible column instead of the fixture's original second position.
+   */
+  function renderedAdSpendOrder(): string[] {
+    const adSpendIndex = screen.getAllByRole('columnheader').findIndex((cell) => cell.textContent?.includes('ad_spend'));
+    return screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelectorAll('td')[adSpendIndex]?.textContent ?? '');
+  }
+
+  it('sorts rows ascending on first header click, descending on a second click of the same column', () => {
+    renderTile(MULTI_ROW_VIEW, { id: 'sort-tile', type: 'table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by ad_spend' }));
+    expect(renderedAdSpendOrder()).toEqual(['100', '200', '300']);
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by ad_spend' }));
+    expect(renderedAdSpendOrder()).toEqual(['300', '200', '100']);
+  });
+
+  it('resets to ascending when switching the sort to a different column', () => {
+    renderTile(MULTI_ROW_VIEW, { id: 'switch-sort-tile', type: 'table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by ad_spend' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by ad_spend' })); // now descending
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by campaign_id' }));
+    expect(renderedAdSpendOrder()).toEqual(['200', '300', '100']); // spring_display, summer_search, winter_social
+  });
+
+  it('hides a column via the columns menu without dropping any rows', () => {
+    renderTile(MULTI_ROW_VIEW, { id: 'hide-tile', type: 'table' });
+    expect(screen.getByRole('button', { name: 'Sort by campaign_id' })).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('Show campaign_id'));
+    expect(screen.queryByRole('button', { name: 'Sort by campaign_id' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(4); // header + 3 body rows still present
+  });
+
+  it('never hides every column — the safety net keeps them all visible once none would remain', () => {
+    renderTile(MULTI_ROW_VIEW, { id: 'hide-all-tile', type: 'table' });
+    fireEvent.click(screen.getByLabelText('Show campaign_id'));
+    fireEvent.click(screen.getByLabelText('Show ad_spend'));
+    expect(screen.getByRole('button', { name: 'Sort by campaign_id' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sort by ad_spend' })).toBeInTheDocument();
+  });
+
+  it('persists sort and hidden-column choices per tile id across a remount', () => {
+    const { unmount } = renderTile(MULTI_ROW_VIEW, { id: 'persist-tile', type: 'table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by ad_spend' }));
+    fireEvent.click(screen.getByLabelText('Show campaign_id'));
+    unmount();
+
+    renderTile(MULTI_ROW_VIEW, { id: 'persist-tile', type: 'table' });
+    expect(screen.queryByRole('button', { name: 'Sort by campaign_id' })).not.toBeInTheDocument();
+    expect(renderedAdSpendOrder()).toEqual(['100', '200', '300']);
+  });
+
+  it('does not carry one tile’s preferences over to a different tile id', () => {
+    const { unmount } = renderTile(MULTI_ROW_VIEW, { id: 'tile-a', type: 'table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by ad_spend' }));
+    unmount();
+
+    renderTile(MULTI_ROW_VIEW, { id: 'tile-b', type: 'table' });
+    expect(renderedAdSpendOrder()).toEqual(['300', '100', '200']);
+  });
+
+  it('falls back to unsorted, all-columns-visible defaults when localStorage holds a corrupt value', () => {
+    window.localStorage.setItem('growthos-board-tile-corrupt-tile-table-prefs', '{not json');
+    renderTile(MULTI_ROW_VIEW, { id: 'corrupt-tile', type: 'table' });
+    expect(renderedAdSpendOrder()).toEqual(['300', '100', '200']);
+    expect(screen.getByRole('button', { name: 'Sort by campaign_id' })).toBeInTheDocument();
+  });
+
+  it('does not render a columns menu for a single-column table', () => {
+    renderTile(
+      { kind: 'table', columns: ['ad_spend'], rows: [{ ad_spend: 100 }], isEmpty: false, freshness: null },
+      { id: 'single-column-tile', type: 'table' },
+    );
+    expect(screen.queryByText('Columns')).not.toBeInTheDocument();
   });
 });
 

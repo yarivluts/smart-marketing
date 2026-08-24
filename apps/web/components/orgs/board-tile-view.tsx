@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { buildSessionReplayLink } from '@growthos/shared';
 import type { TileFreshness, TileRenderView, TimeSeries } from '@/lib/orgs/board-view';
@@ -211,59 +212,209 @@ function BarChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_se
   );
 }
 
+interface TableColumnPrefs {
+  sortColumn: string | null;
+  sortDirection: 'asc' | 'desc';
+  hiddenColumns: string[];
+}
+
+const DEFAULT_TABLE_COLUMN_PREFS: TableColumnPrefs = { sortColumn: null, sortDirection: 'asc', hiddenColumns: [] };
+
+function tableColumnPrefsStorageKey(tileId: string): string {
+  return `growthos-board-tile-${tileId}-table-prefs`;
+}
+
+/**
+ * KAN-85's "column sort/show-hide persistence" (Gap 15) — per-tile, client-
+ * only (no server round-trip; `BoardTile`'s schema is a strictly-validated
+ * fixed shape, see `board.service.ts`'s `validateTiles`, not an open config
+ * bag worth extending for a per-viewer display preference). Same
+ * `typeof window` guard + try/catch-swallow shape as `tv-app.tsx`'s device-
+ * token persistence, the only other `localStorage` use in this app — a
+ * private-browsing quota error, or a stale/corrupt value from an older
+ * shape, must fall back to the unsorted, all-columns-visible default rather
+ * than breaking the tile.
+ */
+function readTableColumnPrefs(tileId: string): TableColumnPrefs {
+  if (typeof window === 'undefined') {
+    return DEFAULT_TABLE_COLUMN_PREFS;
+  }
+  try {
+    const raw = window.localStorage.getItem(tableColumnPrefsStorageKey(tileId));
+    if (!raw) {
+      return DEFAULT_TABLE_COLUMN_PREFS;
+    }
+    const parsed = JSON.parse(raw) as Partial<TableColumnPrefs>;
+    return {
+      sortColumn: typeof parsed.sortColumn === 'string' ? parsed.sortColumn : null,
+      sortDirection: parsed.sortDirection === 'desc' ? 'desc' : 'asc',
+      hiddenColumns: Array.isArray(parsed.hiddenColumns)
+        ? parsed.hiddenColumns.filter((column): column is string => typeof column === 'string')
+        : [],
+    };
+  } catch {
+    return DEFAULT_TABLE_COLUMN_PREFS;
+  }
+}
+
+function writeTableColumnPrefs(tileId: string, prefs: TableColumnPrefs): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    window.localStorage.setItem(tableColumnPrefsStorageKey(tileId), JSON.stringify(prefs));
+  } catch {
+    // best-effort — a private-browsing quota error must not break the tile
+  }
+}
+
+/**
+ * Ascending compare over a table cell's raw value. `WarehouseRow` values are
+ * already typed `string | number | null` (unlike `sortLabels`'s numeric-
+ * string dimension labels), so a genuine `number` short-circuits straight to
+ * numeric compare; a missing/`null` value always sorts last regardless of
+ * direction — the same "not yet observable" treatment `buildHeatmapView`
+ * gives a missing cohort cell, rather than collapsing into a misleading `0`
+ * or an arbitrary string-compare position.
+ */
+function compareColumnValues(a: string | number | null, b: string | number | null): number {
+  if (a === null || b === null) {
+    return a === b ? 0 : a === null ? 1 : -1;
+  }
+  if (typeof a === 'number' && typeof b === 'number') {
+    return a - b;
+  }
+  return String(a).localeCompare(String(b));
+}
+
 function TableView({
   view,
+  tileId,
   sessionReplayUrlTemplate,
 }: {
   view: Extract<TileRenderView, { kind: 'table' }>;
+  tileId: string;
   sessionReplayUrlTemplate?: string;
 }): React.ReactElement {
   const t = useTranslations('Boards');
+  const [prefs, setPrefs] = useState<TableColumnPrefs>(() => readTableColumnPrefs(tileId));
+
+  useEffect(() => {
+    writeTableColumnPrefs(tileId, prefs);
+  }, [tileId, prefs]);
+
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('tableEmpty')}</p>;
   }
+
+  const visibleColumns = view.columns.filter((column) => !prefs.hiddenColumns.includes(column));
+  // Hiding every column would render a blank table indistinguishable from "no data" — always keep at least one.
+  const columns = visibleColumns.length > 0 ? visibleColumns : view.columns;
+
+  const sortColumn = prefs.sortColumn;
+  const rows =
+    sortColumn !== null && view.columns.includes(sortColumn)
+      ? [...view.rows].sort((a, b) => {
+          const compared = compareColumnValues(a[sortColumn] ?? null, b[sortColumn] ?? null);
+          return prefs.sortDirection === 'desc' ? -compared : compared;
+        })
+      : view.rows;
+
+  function toggleSort(column: string): void {
+    setPrefs((current) => ({
+      ...current,
+      sortColumn: column,
+      sortDirection: current.sortColumn === column && current.sortDirection === 'asc' ? 'desc' : 'asc',
+    }));
+  }
+
+  function toggleColumnVisibility(column: string): void {
+    setPrefs((current) => ({
+      ...current,
+      hiddenColumns: current.hiddenColumns.includes(column)
+        ? current.hiddenColumns.filter((hidden) => hidden !== column)
+        : [...current.hiddenColumns, column],
+    }));
+  }
+
   return (
-    <div className="max-h-48 overflow-auto">
-      <table className="w-full text-left text-xs">
-        <thead>
-          <tr>
+    <div className="flex h-full flex-col gap-1">
+      {view.columns.length > 1 ? (
+        <details className="self-end text-xs">
+          <summary className="cursor-pointer select-none text-muted-foreground">{t('columnsMenuLabel')}</summary>
+          <div className="absolute z-10 mt-1 flex flex-col gap-1 rounded-md border border-input bg-card p-2 shadow-md">
             {view.columns.map((column) => (
-              <th key={column} className="border-b border-input px-2 py-1 font-medium">
+              <label key={column} className="flex items-center gap-1.5 whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={!prefs.hiddenColumns.includes(column)}
+                  onChange={() => toggleColumnVisibility(column)}
+                  aria-label={t('showColumnLabel', { column })}
+                />
                 {column}
-              </th>
+              </label>
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {view.rows.map((row, index) => (
-            <tr key={index}>
-              {view.columns.map((column) => {
-                const value = row[column] ?? '';
-                const replayLink = LANDING_PAGE_COLUMNS.has(column)
-                  ? buildSessionReplayLink(sessionReplayUrlTemplate, String(value))
-                  : null;
+          </div>
+        </details>
+      ) : null}
+      <div className="max-h-48 overflow-auto">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr>
+              {columns.map((column) => {
+                const isSorted = sortColumn === column;
                 return (
-                  <td key={column} className="border-b border-input px-2 py-1 tabular-nums">
-                    {replayLink ? (
-                      <a
-                        href={replayLink}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={t('sessionReplayLinkTitle')}
-                        className="underline underline-offset-2 hover:text-primary"
-                      >
-                        {value}
-                      </a>
-                    ) : (
-                      value
-                    )}
-                  </td>
+                  <th
+                    key={column}
+                    scope="col"
+                    aria-sort={isSorted ? (prefs.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    className="border-b border-input px-2 py-1 font-medium"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(column)}
+                      className="flex items-center gap-1 hover:text-primary"
+                      aria-label={t('sortColumnLabel', { column })}
+                    >
+                      {column}
+                      {isSorted ? <span aria-hidden="true">{prefs.sortDirection === 'asc' ? '▲' : '▼'}</span> : null}
+                    </button>
+                  </th>
                 );
               })}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={index}>
+                {columns.map((column) => {
+                  const value = row[column] ?? '';
+                  const replayLink = LANDING_PAGE_COLUMNS.has(column)
+                    ? buildSessionReplayLink(sessionReplayUrlTemplate, String(value))
+                    : null;
+                  return (
+                    <td key={column} className="border-b border-input px-2 py-1 tabular-nums">
+                      {replayLink ? (
+                        <a
+                          href={replayLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={t('sessionReplayLinkTitle')}
+                          className="underline underline-offset-2 hover:text-primary"
+                        >
+                          {value}
+                        </a>
+                      ) : (
+                        value
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -374,7 +525,7 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
       case 'time_series':
         return view.chart === 'line' ? <LineChartView view={view} /> : <BarChartView view={view} />;
       case 'table':
-        return <TableView view={view} sessionReplayUrlTemplate={sessionReplayUrlTemplate} />;
+        return <TableView view={view} tileId={tile.id} sessionReplayUrlTemplate={sessionReplayUrlTemplate} />;
       case 'funnel':
         return <FunnelView view={view} />;
       case 'heatmap':
