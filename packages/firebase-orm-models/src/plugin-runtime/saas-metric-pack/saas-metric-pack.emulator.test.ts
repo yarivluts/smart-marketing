@@ -142,7 +142,7 @@ describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
     expect(metric?.formula).toBe('attributed_gross_profit / ad_spend');
   });
 
-  it('registers collected_revenue: sum(fact_revenue_event.amount where status=succeeded)', async () => {
+  it('registers collected_revenue: sum(fact_revenue_event.amount where type=charge and status=succeeded)', async () => {
     const metric = await activeMetric('collected_revenue');
     expect(metric?.definition_kind).toBe('aggregation');
     expect(metric?.aggregation).toEqual({
@@ -150,7 +150,10 @@ describe('ensureSaasMetricPackRegistered — per-metric definitions', () => {
       table: 'fact_revenue_event',
       column: 'amount',
       timeColumn: 'ts',
-      filters: [{ field: 'status', operator: '=', value: 'succeeded' }],
+      filters: [
+        { field: 'type', operator: '=', value: 'charge' },
+        { field: 'status', operator: '=', value: 'succeeded' },
+      ],
     });
   });
 
