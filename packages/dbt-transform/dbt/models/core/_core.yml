@@ -508,3 +508,40 @@ models:
       - name: ts
         tests:
           - not_null
+
+  - name: fact_quality_calibration
+    description: >
+      Predicted-vs-actual calibration (KAN-86, plan `14 §Gap 12`): one row
+      per scored `onboarding_survey` event (KAN-83's `fact_signup_quality_score`),
+      joined to that customer's fixed-window payback (`fact_customer_payback`)
+      and bucketed into a `quality_tier` (low/medium/high, reusing
+      `signupQualityScoreTier`'s exact 0-100 thresholds). Feeds the Campaign
+      Ops pack's `quality_calibration_signups`/`quality_calibration_paying`/
+      `quality_calibration_collected_revenue_40d` metrics, broken down by
+      `quality_tier` for the "does a high-scored signup actually pay more"
+      calibration view.
+    columns:
+      - name: quality_calibration_key
+        description: Composite (project_id, environment_id, customer_id, ts) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: customer_id
+        tests:
+          - not_null
+      - name: quality_tier
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['low', 'medium', 'high']
+      - name: is_paying_customer
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['true', 'false']
+      - name: collected_revenue_40d
+        tests:
+          - not_null
+      - name: ts
+        tests:
+          - not_null

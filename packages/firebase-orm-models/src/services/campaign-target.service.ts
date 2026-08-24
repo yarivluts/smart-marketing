@@ -287,3 +287,113 @@ export async function getPaybackOverviewForProject(
     throw error;
   }
 }
+
+/** Fixed display order for the calibration breakdown — same "fixed catalog, not whatever the warehouse happens to return" posture {@link COLLECTION_WINDOW_DAYS} establishes; a tier with zero scored signups still gets a row (all zeros), not a gap. */
+export const QUALITY_CALIBRATION_TIERS: readonly ('low' | 'medium' | 'high')[] = ['low', 'medium', 'high'];
+
+export interface QualityCalibrationTierRow {
+  qualityTier: 'low' | 'medium' | 'high';
+  signups: number;
+  payingSignups: number;
+  /** `null` when `signups` is 0 — an undefined ratio, not a misleading `0`. */
+  payingRate: number | null;
+  collectedRevenue40d: number;
+  /** `null` when `signups` is 0, same reasoning as {@link payingRate}. */
+  avgCollectedRevenue40d: number | null;
+}
+
+export type QualityCalibrationBreakdownOutcome =
+  | { ok: true; tiers: QualityCalibrationTierRow[] }
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
+
+interface QualityCalibrationTierTotals {
+  signups: number;
+  payingSignups: number;
+  collectedRevenue40d: number;
+}
+
+/** Folds the three calibration aggregations' series into per-tier totals — sums (never averages) across any repeated `bucket_date` rows, same safety reasoning `sumByCampaign`/`sumMetricRows` above already establish for this file's other breakdowns. */
+function foldCalibrationTierTotals(rows: readonly WarehouseRow[]): Map<string, QualityCalibrationTierTotals> {
+  const totals = new Map<string, QualityCalibrationTierTotals>();
+  for (const row of rows) {
+    const qualityTier = String(row.quality_tier ?? '');
+    if (qualityTier.length === 0) continue;
+    const existing = totals.get(qualityTier) ?? { signups: 0, payingSignups: 0, collectedRevenue40d: 0 };
+    const rawSignups = row.quality_calibration_signups ?? null;
+    const rawPaying = row.quality_calibration_paying_signups ?? null;
+    const rawRevenue = row.quality_calibration_collected_revenue_40d ?? null;
+    totals.set(qualityTier, {
+      signups: existing.signups + (rawSignups === null ? 0 : Number(rawSignups) || 0),
+      payingSignups: existing.payingSignups + (rawPaying === null ? 0 : Number(rawPaying) || 0),
+      collectedRevenue40d: existing.collectedRevenue40d + (rawRevenue === null ? 0 : Number(rawRevenue) || 0),
+    });
+  }
+  return totals;
+}
+
+/**
+ * The predicted-vs-actual calibration view (KAN-86's own remaining AC
+ * bullet, plan `14 §Gap 12`): every {@link QUALITY_CALIBRATION_TIERS} tier's
+ * scored-signup count, paying-conversion rate, and average 40-day collected
+ * revenue, all sourced from one query against the three phase-1 calibration
+ * aggregations (`campaign-ops-pack/metrics.ts`) rather than the two
+ * formula-kind metrics directly — same "sum/count first, divide once at the
+ * end" reasoning `getSignupQualityScoreDimensionBreakdownForProject`'s own
+ * doc comment gives (a formula-kind metric's ratio can't be safely
+ * re-averaged across more than one `bucket_date` row). A lifetime breakdown,
+ * not a windowed one, same reasoning `getPaybackOverviewForProject`'s own
+ * query gives.
+ */
+export async function getQualityCalibrationBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+): Promise<QualityCalibrationBreakdownOutcome> {
+  try {
+    const result = await queryMetrics({
+      organizationId,
+      projectId,
+      request: {
+        metrics: ['quality_calibration_signups', 'quality_calibration_paying_signups', 'quality_calibration_collected_revenue_40d'],
+        dimensions: ['quality_tier'],
+        time: { start: '1970-01-01', end: '2999-12-31', grain: 'year' },
+      },
+      ...(options?.executor ? { executor: options.executor } : {}),
+      ...(options?.cache ? { cache: options.cache } : {}),
+    });
+
+    const totalsByTier = foldCalibrationTierTotals(result.series);
+    const tiers: QualityCalibrationTierRow[] = QUALITY_CALIBRATION_TIERS.map((qualityTier) => {
+      const totals = totalsByTier.get(qualityTier) ?? { signups: 0, payingSignups: 0, collectedRevenue40d: 0 };
+      return {
+        qualityTier,
+        signups: totals.signups,
+        payingSignups: totals.payingSignups,
+        payingRate: totals.signups > 0 ? totals.payingSignups / totals.signups : null,
+        collectedRevenue40d: totals.collectedRevenue40d,
+        avgCollectedRevenue40d: totals.signups > 0 ? totals.collectedRevenue40d / totals.signups : null,
+      };
+    });
+
+    return { ok: true, tiers };
+  } catch (error) {
+    if (error instanceof WarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured', message: error.message };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    if (error instanceof MetricTargetsUnbuiltWarehouseTableError) {
+      return { ok: false, reason: 'not_yet_backed', message: error.message };
+    }
+    if (
+      error instanceof MetricCompilerError ||
+      error instanceof ProjectNotFoundError ||
+      error instanceof MetricNotRegisteredError ||
+      error instanceof WarehouseQueryFailedError
+    ) {
+      return { ok: false, reason: 'query_error', message: error.message };
+    }
+    throw error;
+  }
+}
