@@ -10,7 +10,7 @@ import {
   registerMetricDefinition,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
-import { DELETE, GET } from './route';
+import { DELETE, GET, PATCH } from './route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -93,6 +93,22 @@ function deleteRequest(
   };
 }
 
+function patchRequest(
+  orgId: string,
+  projectId: string,
+  goalId: string,
+  body: unknown,
+): { request: NextRequest; params: Promise<{ orgId: string; projectId: string; goalId: string }> } {
+  return {
+    request: new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/goals/${goalId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+    params: Promise.resolve({ orgId, projectId, goalId }),
+  };
+}
+
 describe('GET /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]', () => {
   it('rejects an unauthenticated caller', async () => {
     getServerSessionMock.mockResolvedValue(null);
@@ -146,5 +162,56 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]', () => {
 
     const second = deleteRequest(organization.id, project.id, goal.id);
     expect((await DELETE(second.request, { params: second.params })).status).toBe(404);
+  });
+});
+
+describe('PATCH /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]', () => {
+  it('rejects an unauthenticated caller', async () => {
+    getServerSessionMock.mockResolvedValue(null);
+    const { request, params } = patchRequest('org-1', 'project-1', 'goal-1', { targetValue: 100 });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 404 for a goal id that does not exist', async () => {
+    const { ownerSession, organization, project } = await setupOrgProjectGoal('Goal Patch Missing Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, 'does-not-exist', { targetValue: 100 });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(404);
+  });
+
+  it('rejects a malformed body (no fields to update)', async () => {
+    const { ownerSession, organization, project, goal } = await setupOrgProjectGoal('Goal Patch Empty Body Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, goal.id, {});
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects an invalid update (targetValue on a range goal) with the service’s reasons', async () => {
+    const { ownerSession, organization, project, goal } = await setupOrgProjectGoal('Goal Patch Invalid Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    // `goal` is a maximize goal (see setupOrgProjectGoal) — sending rangeMin/rangeMax is the mismatch here.
+    const { request, params } = patchRequest(organization.id, project.id, goal.id, { rangeMin: 10, rangeMax: 20 });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string; reasons: string[] };
+    expect(body.error).toBe('invalid_goal');
+    expect(body.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('updates the target value and returns the updated goal summary', async () => {
+    const { ownerSession, organization, project, goal } = await setupOrgProjectGoal('Goal Patch Happy Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, goal.id, { targetValue: 1500 });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { goal: { targetValue: number | null } };
+    expect(body.goal.targetValue).toBe(1500);
+
+    const getResult = await GET(getRequest(organization.id, project.id, goal.id).request, { params: getRequest(organization.id, project.id, goal.id).params });
+    const getBody = (await getResult.json()) as { goal: { targetValue: number | null } };
+    expect(getBody.goal.targetValue).toBe(1500);
   });
 });

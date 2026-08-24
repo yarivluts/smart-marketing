@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
-import { parseCreateGoalRequestBody } from './parse-goal-fields';
+import { parseCreateGoalRequestBody, parseUpdateGoalRequestBody } from './parse-goal-fields';
 
-function request(body?: unknown): NextRequest {
+function request(body?: unknown, method = 'POST'): NextRequest {
   return new NextRequest('https://growthos.test/x', {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -89,6 +89,45 @@ describe('parseCreateGoalRequestBody', () => {
 
   it('does not itself reject a direction/rhythm value outside the known enum — that is the service layer’s job', async () => {
     const parsed = await parseCreateGoalRequestBody(request({ ...validMaximizeGoal, direction: 'not_a_real_direction' }));
+    expect(parsed.error).toBeUndefined();
+  });
+});
+
+describe('parseUpdateGoalRequestBody', () => {
+  it('accepts a targetValue-only update', async () => {
+    const parsed = await parseUpdateGoalRequestBody(request({ targetValue: 1500 }, 'PATCH'));
+    expect(parsed).toEqual({ targetValue: 1500 });
+  });
+
+  it('accepts a rangeMin/rangeMax update', async () => {
+    const parsed = await parseUpdateGoalRequestBody(request({ rangeMin: 10, rangeMax: 30 }, 'PATCH'));
+    expect(parsed).toEqual({ rangeMin: 10, rangeMax: 30 });
+  });
+
+  it('omits fields the request never sent, rather than including them as undefined', async () => {
+    const parsed = await parseUpdateGoalRequestBody(request({ targetValue: 1500 }, 'PATCH'));
+    expect(parsed.error).toBeUndefined();
+    expect('rangeMin' in parsed).toBe(false);
+    expect('rangeMax' in parsed).toBe(false);
+  });
+
+  it('rejects invalid JSON', async () => {
+    const badRequest = new NextRequest('https://growthos.test/x', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{not json' });
+    expect((await parseUpdateGoalRequestBody(badRequest)).error?.status).toBe(400);
+  });
+
+  it('rejects a request that touches none of targetValue/rangeMin/rangeMax', async () => {
+    expect((await parseUpdateGoalRequestBody(request({}, 'PATCH'))).error?.status).toBe(400);
+  });
+
+  it('rejects a non-numeric targetValue/rangeMin/rangeMax when sent', async () => {
+    expect((await parseUpdateGoalRequestBody(request({ targetValue: 'lots' }, 'PATCH'))).error?.status).toBe(400);
+    expect((await parseUpdateGoalRequestBody(request({ rangeMin: 'low' }, 'PATCH'))).error?.status).toBe(400);
+    expect((await parseUpdateGoalRequestBody(request({ rangeMax: 'high' }, 'PATCH'))).error?.status).toBe(400);
+  });
+
+  it('does not itself reject rangeMin >= rangeMax or a direction mismatch — that is the service layer’s job', async () => {
+    const parsed = await parseUpdateGoalRequestBody(request({ rangeMin: 40, rangeMax: 20 }, 'PATCH'));
     expect(parsed.error).toBeUndefined();
   });
 });
