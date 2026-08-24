@@ -110,6 +110,7 @@
     "projectChurnReasonsLink": "סיבות נטישה",
     "projectIntentQualityLink": "כוונה ואיכות",
     "projectFirmographicsLink": "נתונים פירמוגרפיים",
+    "projectExperimentsLink": "ניסויים",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
@@ -751,6 +752,25 @@
     "industryNonprofit": "מלכ״ר",
     "industryOther": "אחר"
   },
+  "Experiments": {
+    "metaTitle": "ניסויים",
+    "title": "ניסויים עבור {projectName}",
+    "description": "תוצאות ניסויי A/B לפי וריאנט, כולל חשיפות, המרות ומובהקות סטטיסטית מול הביקורת.",
+    "setupIntro": "התקינו את חבילת הניסויים כדי להתחיל לעקוב אחר חשיפות והמרות בניסויי ה-A/B שלכם.",
+    "resultsUnavailable": "אין עדיין תוצאות זמינות - חברו מחסן נתונים כדי לראות זאת.",
+    "resultsEmpty": "טרם נקלטו נתוני ניסויים עבור הפרויקט הזה.",
+    "columnVariant": "וריאנט",
+    "columnExposures": "חשיפות",
+    "columnConversions": "המרות",
+    "columnConversionRate": "שיעור המרה",
+    "columnUplift": "שיפור מול הביקורת",
+    "columnResult": "תוצאה",
+    "noData": "אין נתונים",
+    "badgeControl": "ביקורת",
+    "badgeSignificant": "מובהק",
+    "badgeNotSignificant": "לא מובהק",
+    "badgeInsufficientData": "נתונים לא מספיקים"
+  },
   "CampaignOps": {
     "metaTitle": "תפעול קמפיינים",
     "title": "תפעול קמפיינים עבור {projectName}",
@@ -907,6 +927,8 @@
     "builtinPackQualityScoreDescription": "ציון איכות בעת ההרשמה, עלות רכישה/הרשמה מותאמת איכות, והתראות שינוי תמהיל לפי ערוץ.",
     "builtinPackFirmographicTitle": "העשרת נתונים פירמוגרפיים",
     "builtinPackFirmographicDescription": "סיווג ענף, גודל חברה ואזור באמצעות בינה מלאכותית, עם לוחות מחוונים להרכב לקוחות (# מול $) והתראות על שינוי בהרכב.",
+    "builtinPackExperimentTitle": "ניסויים",
+    "builtinPackExperimentDescription": "חשיפות והמרות בניסויי A/B לפי וריאנט, כולל בדיקת מובהקות סטטיסטית מול קבוצת ביקורת.",
     "builtinPackCampaignOpsTitle": "תפעול קמפיינים",
     "builtinPackCampaignOpsDescription": "החזר השקעה בחלון זמן קבוע (גביית הכנסות ל-7/14/30/40 יום) עבור לקוחות לפי מועד הרכישה."
   },

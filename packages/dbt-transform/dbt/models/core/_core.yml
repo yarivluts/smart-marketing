@@ -549,3 +549,32 @@ models:
       - name: ts
         tests:
           - not_null
+
+  - name: fact_experiment_event
+    description: >
+      Experimentation & A/B (KAN-89, plan `14 §Gap 3`): one row per landed
+      `experiment_exposure`/`experiment_conversion` event, with the
+      payload's `experiment_key`/`variant_key` pulled into real columns.
+      Feeds the Experiment pack's `experiment_exposures`/
+      `experiment_conversions` metrics (each filtering this mart's own
+      `event_type` column), broken down by `experiment_key`/`variant_key`.
+    columns:
+      - name: experiment_event_key
+        description: Composite (project_id, environment_id, event_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: event_type
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['experiment_exposure', 'experiment_conversion']
+      - name: experiment_key
+        tests:
+          - not_null
+      - name: variant_key
+        tests:
+          - not_null
+      - name: ts
+        tests:
+          - not_null

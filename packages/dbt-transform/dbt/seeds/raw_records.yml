@@ -52,7 +52,13 @@ seeds:
       with no subscription or touchpoint ever landed (exercising the left
       joins' null-on-missing-dimension tolerance, same posture `proj_15`
       established) — isolated from `proj_14`'s own exact-category-count-
-      asserting fixture test.
+      asserting fixture test. `proj_20`'s rows are a synthetic A/B
+      experiment journey (KAN-89: `fact_experiment_event`) — one
+      `lp_headline_v2` experiment with two `control` visitors (one who
+      converts, one who doesn't) and two `treatment` visitors (both
+      convert) — exercising the mart's exposure/conversion flattening
+      with a hand-computable, deliberately asymmetric expected count per
+      (event_type, variant_key) — isolated the same way.
     columns:
       - name: organization_id
         tests:

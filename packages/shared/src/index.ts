@@ -24,6 +24,7 @@ export * from './segments';
 export * from './session-replay/link';
 export * from './survey';
 export * from './churn-reason';
+export * from './experiments';
 export * from './onboarding-survey';
 export * from './omnisearch';
 export * from './firmographic-enrichment';
