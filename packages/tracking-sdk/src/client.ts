@@ -2,10 +2,13 @@ import {
   buildTouchpointEventPayload,
   buildTrackedEventPayload,
   CANCELLATION_REASON_SCHEMA_NAME,
+  computeSignupQualityScore,
+  ONBOARDING_SURVEY_SCHEMA_NAME,
   classifyCompanyIndustry,
   FIRMOGRAPHIC_SCHEMA_NAME,
   parseAcquisitionParams,
   SURVEY_RESPONSE_SCHEMA_NAME,
+  type OnboardingSurveyAnswers,
 } from '@growthos/shared';
 import {
   ANON_ID_STORAGE_KEY,
@@ -41,6 +44,23 @@ export interface Tracker {
   submitNpsSurvey(score: number, comment?: string): Promise<void>;
   /** Sends a cancellation reason from a cancel flow or exit survey (KAN-84) — a thin `track()` wrapper over the `cancellation_reason` schema, same posture `submitNpsSurvey` takes over its own `track()` call. `reasonCode` should be one of `CANCELLATION_REASON_CODES` (`@growthos/shared`); `comment` is the customer's optional free text. */
   submitCancellationReason(reasonCode: string, comment?: string): Promise<void>;
+  /**
+   * Sends an onboarding-survey response from a signup flow (KAN-83, plan `14
+   * §Gap 4`) — a thin `track()` wrapper over the `onboarding_survey` schema,
+   * same posture `submitNpsSurvey`/`submitCancellationReason` take over their
+   * own `track()` call. Unlike those two, this computes
+   * `computeSignupQualityScore(answers)` itself and lands the resulting
+   * `quality_score` alongside the raw answers, *before* sending — so the
+   * landed event is already flat/scored and the `fact_signup_quality_score`
+   * dbt mart needs no SQL-side scoring logic to flatten it into a real
+   * column (same "compute before send" posture that field's own doc comment
+   * documents). This is this codebase's one "AI" score computed client-side
+   * rather than server-side/warehouse-side — a deliberate simplification: a
+   * production version might move this to a server-side scoring call once a
+   * real model exists, trading the client's ability to see its own score
+   * immediately for not trusting the client's arithmetic.
+   */
+  submitOnboardingSurvey(answers: OnboardingSurveyAnswers): Promise<void>;
   /**
    * Sends a self-reported company firmographic profile (KAN-87) — a thin
    * `track()` wrapper over the `company_firmographic` schema. Computes
@@ -162,6 +182,20 @@ export function createTracker(options: TrackerOptions): Tracker {
     await track(CANCELLATION_REASON_SCHEMA_NAME, properties);
   }
 
+  async function submitOnboardingSurvey(answers: OnboardingSurveyAnswers): Promise<void> {
+    const { score } = computeSignupQualityScore(answers);
+    const properties: Record<string, unknown> = {
+      company_size: answers.companySize,
+      budget_range: answers.budgetRange,
+      urgency: answers.urgency,
+      quality_score: score,
+    };
+    if (answers.useCase !== undefined) {
+      properties.use_case = answers.useCase;
+    }
+    await track(ONBOARDING_SURVEY_SCHEMA_NAME, properties);
+  }
+
   async function submitFirmographicProfile(profile: FirmographicProfileInput): Promise<void> {
     const industry = classifyCompanyIndustry(profile.companyName, profile.companyDomain);
     const properties: Record<string, unknown> = {
@@ -176,5 +210,14 @@ export function createTracker(options: TrackerOptions): Tracker {
     await track(FIRMOGRAPHIC_SCHEMA_NAME, properties);
   }
 
-  return { page, track, identify, getAnonId, submitNpsSurvey, submitCancellationReason, submitFirmographicProfile };
+  return {
+    page,
+    track,
+    identify,
+    getAnonId,
+    submitNpsSurvey,
+    submitCancellationReason,
+    submitOnboardingSurvey,
+    submitFirmographicProfile,
+  };
 }

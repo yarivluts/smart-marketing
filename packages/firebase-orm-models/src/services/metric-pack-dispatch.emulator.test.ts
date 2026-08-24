@@ -18,6 +18,7 @@ import {
   listBuiltinMetricPacks,
   listMetricDefinitionsForProject,
   PluginScopeConsentMismatchError,
+  QUALITY_SCORE_PACK_PLUGIN_ID,
   registerPluginManifest,
   SAAS_METRIC_PACK_MANIFEST_YAML,
   SAAS_METRIC_PACK_PLUGIN_ID,
@@ -190,6 +191,7 @@ describe('listBuiltinMetricPacks', () => {
       LANDING_PAGE_PACK_PLUGIN_ID,
       FEEDBACK_PACK_PLUGIN_ID,
       CHURN_REASON_PACK_PLUGIN_ID,
+      QUALITY_SCORE_PACK_PLUGIN_ID,
       CAMPAIGN_OPS_PACK_PLUGIN_ID,
       FIRMOGRAPHIC_PACK_PLUGIN_ID,
     ]);

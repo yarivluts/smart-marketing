@@ -173,6 +173,11 @@ export default async function ProjectLayout({
             icon: 'UserX' as const,
           },
           {
+            href: `${base}/intent-quality`,
+            label: t('projectIntentQualityLink'),
+            icon: 'Gauge' as const,
+          },
+          {
             href: `${base}/firmographics`,
             label: t('projectFirmographicsLink'),
             icon: 'Building2' as const,

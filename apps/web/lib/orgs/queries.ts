@@ -12,6 +12,16 @@ import {
   listCancellationReasonRecordsForProject as listCancellationReasonRecordsForProjectInOrganization,
   type CancellationReasonBreakdownDimension,
   type CancellationReasonDimensionBreakdownOutcome,
+  getSignupQualityScoreOverviewForProject as getSignupQualityScoreOverviewForProjectInOrganization,
+  getSignupQualityScoreDimensionBreakdownForProject as getSignupQualityScoreDimensionBreakdownForProjectInOrganization,
+  getSignupQualityScoreAdjustedMetricsForProject as getSignupQualityScoreAdjustedMetricsForProjectInOrganization,
+  listOnboardingSurveyRecordsForProject as listOnboardingSurveyRecordsForProjectInOrganization,
+  listActiveQualityMixAlertsForProject as listActiveQualityMixAlertsForProjectInOrganization,
+  listQualityMixAlertsForProject as listQualityMixAlertsForProjectInOrganization,
+  type SignupQualityScoreBreakdownDimension,
+  type SignupQualityScoreQueryOutcome,
+  type SignupQualityScoreAdjustedMetricsOutcome,
+  type QualityMixAlertModel,
   getFirmographicIndustryBreakdownForProject as getFirmographicIndustryBreakdownForProjectInOrganization,
   getFirmographicCompositionDimensionBreakdownForProject as getFirmographicCompositionDimensionBreakdownForProjectInOrganization,
   listFirmographicRecordsForProject as listFirmographicRecordsForProjectInOrganization,
@@ -145,7 +155,15 @@ import {
   type WinEventModel,
   type WinRuleModel,
 } from '@growthos/firebase-orm-models';
-import type { CancellationReasonCodeCount, CancellationReasonThemeCluster, FeedbackThemeCluster, FirmographicIndustryCount, FunnelStepSuggestion, Result } from '@growthos/shared';
+import type {
+  CancellationReasonCodeCount,
+  CancellationReasonThemeCluster,
+  FeedbackThemeCluster,
+  FirmographicIndustryCount,
+  FunnelStepSuggestion,
+  Result,
+  SignupQualityScoreDistribution,
+} from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 
 export async function listOrgMembers(organizationId: string): Promise<OrgMemberSummary[]> {
@@ -437,6 +455,52 @@ export async function getCancellationReasonDimensionBreakdownForProject(
 ): Promise<CancellationReasonDimensionBreakdownOutcome> {
   await ensureFirestoreOrm();
   return getCancellationReasonDimensionBreakdownForProjectInOrganization(organizationId, projectId, dimension);
+}
+
+/** The bounded, landed `onboarding_survey` raw records `getSignupQualityScoreOverviewForProject` reads — fetch once via this and pass the result via `precomputedRecords` for a page needing more than one read, same posture `listCancellationReasonRecordsForProject` establishes. */
+export async function listOnboardingSurveyRecordsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listOnboardingSurveyRecordsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function getSignupQualityScoreOverviewForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number; precomputedRecords?: RawRecordModel[] },
+): Promise<SignupQualityScoreDistribution> {
+  await ensureFirestoreOrm();
+  return getSignupQualityScoreOverviewForProjectInOrganization(organizationId, projectId, options);
+}
+
+export async function getSignupQualityScoreDimensionBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  dimension: SignupQualityScoreBreakdownDimension,
+): Promise<SignupQualityScoreQueryOutcome> {
+  await ensureFirestoreOrm();
+  return getSignupQualityScoreDimensionBreakdownForProjectInOrganization(organizationId, projectId, dimension);
+}
+
+export async function getSignupQualityScoreAdjustedMetricsForProject(
+  organizationId: string,
+  projectId: string,
+): Promise<SignupQualityScoreAdjustedMetricsOutcome> {
+  await ensureFirestoreOrm();
+  return getSignupQualityScoreAdjustedMetricsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listActiveQualityMixAlertsForProject(organizationId: string, projectId: string): Promise<QualityMixAlertModel[]> {
+  await ensureFirestoreOrm();
+  return listActiveQualityMixAlertsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listQualityMixAlertsForProject(organizationId: string, projectId: string): Promise<QualityMixAlertModel[]> {
+  await ensureFirestoreOrm();
+  return listQualityMixAlertsForProjectInOrganization(organizationId, projectId);
 }
 
 /** The bounded, landed `company_firmographic` raw records `getFirmographicIndustryBreakdownForProject` reads — fetch once via this and pass the result via `precomputedRecords`, same posture `listCancellationReasonRecordsForProject` establishes. */
