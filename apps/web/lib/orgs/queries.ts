@@ -101,6 +101,13 @@ import {
   listSchemaDefinitionsForProject as listSchemaDefinitionsForProjectInOrganization,
   listSegmentsForProject as listSegmentsForProjectInOrganization,
   listSharedCredentials as listSharedCredentialsInOrganization,
+  listRepCollectionEntriesForProject as listRepCollectionEntriesForProjectInOrganization,
+  getRepCollectionLeaderboardForProject as getRepCollectionLeaderboardForProjectInOrganization,
+  listBillingCollectionSignalsForProject as listBillingCollectionSignalsForProjectInOrganization,
+  type RepCollectionEntryModel,
+  type RepCollectionLeaderboardPeriod,
+  type RepCollectionLeaderboardResult,
+  type RepCollectionBillingSignal,
   MembershipModel,
   OrganizationModel,
   proposeOnboardingFunnelSteps as proposeOnboardingFunnelStepsInOrganization,
@@ -656,6 +663,28 @@ export async function listGoalsForProject(organizationId: string, projectId: str
 export async function listSegmentsForProject(organizationId: string, projectId: string): Promise<SegmentModel[]> {
   await ensureFirestoreOrm();
   return listSegmentsForProjectInOrganization(organizationId, projectId);
+}
+
+/** A project's rep-attributed collections ledger (KAN-88), newest-`occurred_at`-first. */
+export async function listRepCollectionEntriesForProject(organizationId: string, projectId: string): Promise<RepCollectionEntryModel[]> {
+  await ensureFirestoreOrm();
+  return listRepCollectionEntriesForProjectInOrganization(organizationId, projectId);
+}
+
+/** KAN-88's weekly/monthly per-rep leaderboard, aggregated from the ledger. */
+export async function getRepCollectionLeaderboardForProject(
+  organizationId: string,
+  projectId: string,
+  period: RepCollectionLeaderboardPeriod,
+): Promise<RepCollectionLeaderboardResult> {
+  await ensureFirestoreOrm();
+  return getRepCollectionLeaderboardForProjectInOrganization({ organizationId, projectId, period });
+}
+
+/** KAN-88's "auto from billing" suggestions — recently landed, not-yet-attributed Stripe charges a human can confirm onto the ledger. */
+export async function listBillingCollectionSignalsForProject(organizationId: string, projectId: string): Promise<RepCollectionBillingSignal[]> {
+  await ensureFirestoreOrm();
+  return listBillingCollectionSignalsForProjectInOrganization(organizationId, projectId);
 }
 
 /** One segment's live member count (or a typed, renderable "why not" outcome — see `SegmentMemberCountOutcome`'s own doc comment) for the Segments page's own member-count badge. */

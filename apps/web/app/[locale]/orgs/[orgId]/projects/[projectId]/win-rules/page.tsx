@@ -5,19 +5,23 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
+  getRepCollectionLeaderboardForProject,
   getTrialPipelineSummary,
   listActiveEventSchemaNames,
+  listOrgPeople,
   listOrgProjects,
   listRecentWinEventsForProject,
   listWinRulesForProject,
 } from '@/lib/orgs/queries';
 import { toWinEventFeedItem, toWinRuleSummaryView } from '@/lib/orgs/win-rule-view';
 import { toTrialPipelineWidgetView } from '@/lib/orgs/trial-pipeline-view';
+import { toRepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
 import { CreateWinRuleForm } from '@/components/orgs/create-win-rule-form';
 import { WinRuleList } from '@/components/orgs/win-rule-list';
 import { LiveWinFeed } from '@/components/orgs/live-win-feed';
 import { WinEventHistoryList } from '@/components/orgs/win-event-history-list';
 import { TrialPipelineWidget } from '@/components/orgs/trial-pipeline-widget';
+import { RepCollectionLeaderboardWidget } from '@/components/orgs/rep-collection-leaderboard-widget';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -57,15 +61,21 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
     notFound();
   }
 
-  const [winRules, eventSchemaNames, trialPipelineOutcome, recentWinEvents] = await Promise.all([
+  const [winRules, eventSchemaNames, trialPipelineOutcome, recentWinEvents, repCollectionLeaderboard, people] = await Promise.all([
     listWinRulesForProject(orgId, projectId),
     listActiveEventSchemaNames(orgId, projectId),
     getTrialPipelineSummary(orgId, projectId),
     listRecentWinEventsForProject(orgId, projectId),
+    getRepCollectionLeaderboardForProject(orgId, projectId, 'week'),
+    listOrgPeople(orgId),
   ]);
   const winRuleViews = winRules.map(toWinRuleSummaryView);
   const trialPipelineView = toTrialPipelineWidgetView(trialPipelineOutcome);
   const winEventHistoryViews = recentWinEvents.map(toWinEventFeedItem);
+  const repCollectionLeaderboardView = toRepCollectionLeaderboardView(
+    repCollectionLeaderboard,
+    new Map(people.map((person) => [person.id, person.name])),
+  );
   const t = await getTranslations('WinRules');
 
   return (
@@ -73,6 +83,7 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
 
       <TrialPipelineWidget view={trialPipelineView} />
+      <RepCollectionLeaderboardWidget view={repCollectionLeaderboardView} />
 
       {/* Persisted history (KAN-65 follow-up, session-B dogfooding QA 2026-08-18): the live feed
         below is a broadcast-only view that shows nothing once the tab wasn't open when a win fired

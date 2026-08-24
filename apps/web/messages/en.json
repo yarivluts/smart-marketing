@@ -118,7 +118,8 @@
     "projectSegmentsLink": "Segments",
     "projectTvLink": "War-room TV",
     "projectSessionReplayLink": "Session replay",
-    "projectCampaignOpsLink": "Campaign ops"
+    "projectCampaignOpsLink": "Campaign ops",
+    "projectRepCollectionsLink": "Rep collections"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -1329,5 +1330,63 @@
     "save": "Save",
     "saved": "Saved.",
     "saveError": "Could not save the template. Check that it is an http(s) URL."
+  },
+  "RepCollections": {
+    "metaTitle": "Rep collections",
+    "title": "Rep collections for {projectName}",
+    "description": "Attribute upgrades, saves, and expansions to the team member who drove them.",
+    "leaderboardHeading": {
+      "week": "This week",
+      "month": "This month"
+    },
+    "leaderboardEmpty": "No attributed collections yet.",
+    "leaderboardRank": "{rank}. {name}",
+    "leaderboardRowSummary": "{amount} ({count, plural, one {# entry} other {# entries}})",
+    "leaderboardUnattributed": "Plus {amount} not yet attributed to a rep ({count, plural, one {# entry} other {# entries}})",
+    "signalsHeading": "Suggested from billing",
+    "noSignals": "No unattributed billing charges to suggest right now.",
+    "signalSummary": "Customer {customerId}: {amount} {currency}",
+    "ledgerHeading": "Ledger",
+    "noEntries": "No collections logged yet.",
+    "columnCompany": "Company",
+    "columnType": "How",
+    "columnPlan": "Plan",
+    "columnWhen": "When",
+    "columnRepAndAmount": "Rep / Collection",
+    "planSummary": "{from} → {to}",
+    "createHeading": "Log a collection",
+    "companyLabel": "Company",
+    "companyPlaceholder": "e.g. Acme Inc",
+    "repLabel": "Rep",
+    "unassignedOption": "Unassigned",
+    "typeLabel": "How",
+    "collectionType": {
+      "upgrade": "Upgrade",
+      "expansion": "Expansion",
+      "save": "Save",
+      "renewal": "Renewal",
+      "other": "Other"
+    },
+    "planFromLabel": "Plan from",
+    "planFromPlaceholder": "e.g. Starter",
+    "planToLabel": "Plan to",
+    "planToPlaceholder": "e.g. Pro",
+    "amountLabel": "Amount",
+    "occurredAtLabel": "When",
+    "noteLabel": "Note",
+    "notePlaceholder": "Optional context",
+    "createError": "Could not log this collection. Please try again.",
+    "createButton": "Log collection",
+    "attributeButton": "Add to ledger",
+    "updateError": "Could not update this entry. Please try again.",
+    "deleteConfirm": "Delete this ledger entry? This cannot be undone.",
+    "deleteButton": "Delete",
+    "amountInputLabel": "Amount"
+  },
+  "RepCollectionLeaderboard": {
+    "heading": "Top collections this week",
+    "empty": "No attributed collections yet this week.",
+    "rank": "{rank}. {name}",
+    "rowSummary": "{amount} ({count, plural, one {# entry} other {# entries}})"
   }
 }

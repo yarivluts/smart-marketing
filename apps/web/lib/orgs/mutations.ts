@@ -75,6 +75,10 @@ import {
   syncSegmentToCrm as syncSegmentToCrmInOrganization,
   type SegmentModel,
   type SegmentSuggestion,
+  createRepCollectionEntry as createRepCollectionEntryInOrganization,
+  updateRepCollectionEntry as updateRepCollectionEntryInOrganization,
+  deleteRepCollectionEntry as deleteRepCollectionEntryInOrganization,
+  type RepCollectionEntryModel,
   type PluginSinkRunModel,
   createWinRule as createWinRuleInOrganization,
   updateWinRule as updateWinRuleInOrganization,
@@ -975,6 +979,45 @@ export async function updateSegmentStatus(
 ): Promise<SegmentModel> {
   await ensureFirestoreOrm();
   return updateSegmentStatusInOrganization({ organizationId, projectId, segmentId, status, actorUserId });
+}
+
+interface CreateRepCollectionEntryInput {
+  organizationId: string;
+  projectId: string;
+  orgPersonId: string | null;
+  company: string;
+  collectionType: string;
+  planFrom?: string | null;
+  planTo?: string | null;
+  amount: number;
+  occurredAt: string;
+  note?: string | null;
+  sourceRawRecordId?: string | null;
+  createdByUserId: string;
+}
+
+/** Logs one entry to the rep-attributed collections ledger (KAN-88). */
+export async function createRepCollectionEntry(input: CreateRepCollectionEntryInput): Promise<RepCollectionEntryModel> {
+  await ensureFirestoreOrm();
+  return createRepCollectionEntryInOrganization(input);
+}
+
+/** Reassigns the rep and/or corrects the amount on an existing ledger entry (KAN-88) — the inline-edit commit path. */
+export async function updateRepCollectionEntry(
+  organizationId: string,
+  projectId: string,
+  entryId: string,
+  fields: { orgPersonId?: string | null; amount?: number },
+  actorUserId: string,
+): Promise<RepCollectionEntryModel> {
+  await ensureFirestoreOrm();
+  return updateRepCollectionEntryInOrganization({ organizationId, projectId, entryId, ...fields, actorUserId });
+}
+
+/** Deletes a ledger entry outright (KAN-88). */
+export async function deleteRepCollectionEntry(organizationId: string, projectId: string, entryId: string, actorUserId: string): Promise<void> {
+  await ensureFirestoreOrm();
+  return deleteRepCollectionEntryInOrganization(organizationId, projectId, entryId, actorUserId);
 }
 
 /** Creates or overwrites a campaign's spend budget target, upserted by campaign id (KAN-86). */

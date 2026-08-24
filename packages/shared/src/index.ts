@@ -27,3 +27,4 @@ export * from './churn-reason';
 export * from './onboarding-survey';
 export * from './omnisearch';
 export * from './firmographic-enrichment';
+export * from './rep-collections';
