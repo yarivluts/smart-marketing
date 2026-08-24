@@ -1,5 +1,10 @@
 import { DuplicateMetricDefinitionError, registerMetricDefinition } from '../../services/metric-registry.service';
-import { CAMPAIGN_OPS_PACK_METRICS, type CampaignOpsPackMetricDefinition } from './metrics';
+import {
+  CAMPAIGN_OPS_PACK_CALIBRATION_AGGREGATION_METRICS,
+  CAMPAIGN_OPS_PACK_CALIBRATION_FORMULA_METRICS,
+  CAMPAIGN_OPS_PACK_METRICS,
+  type CampaignOpsPackMetricDefinition,
+} from './metrics';
 
 export * from './manifest';
 export * from './metrics';
@@ -35,10 +40,27 @@ async function registerOne(
   }
 }
 
+async function registerPhase(
+  organizationId: string,
+  projectId: string,
+  createdByUserId: string,
+  metrics: readonly CampaignOpsPackMetricDefinition[],
+): Promise<{ registered: string[]; alreadyRegistered: string[] }> {
+  const outcomes = await Promise.all(metrics.map((metric) => registerOne(organizationId, projectId, createdByUserId, metric)));
+  const registered: string[] = [];
+  const alreadyRegistered: string[] = [];
+  metrics.forEach((metric, index) => {
+    (outcomes[index] === 'registered' ? registered : alreadyRegistered).push(metric.name);
+  });
+  return { registered, alreadyRegistered };
+}
+
 /**
- * Idempotently registers the KAN-86 Campaign Ops pack's four
- * `collection_Nd` metrics (all aggregation-kind, no schema to self-provision
- * first — see `manifest.ts`'s own doc comment).
+ * Idempotently registers the KAN-86 Campaign Ops pack's `collection_Nd`
+ * metrics (all aggregation-kind, no schema to self-provision first — see
+ * `manifest.ts`'s own doc comment), then the predicted-vs-actual calibration
+ * metrics across two ordered phases (see `metrics.ts`'s own doc comment for
+ * why the phase-2 formulas need their phase-1 references already active).
  */
 export async function ensureCampaignOpsPackRegistered(
   organizationId: string,
@@ -48,12 +70,17 @@ export async function ensureCampaignOpsPackRegistered(
   const registered: string[] = [];
   const alreadyRegistered: string[] = [];
 
-  const outcomes = await Promise.all(
-    CAMPAIGN_OPS_PACK_METRICS.map((metric) => registerOne(organizationId, projectId, createdByUserId, metric)),
-  );
-  CAMPAIGN_OPS_PACK_METRICS.forEach((metric, index) => {
-    (outcomes[index] === 'registered' ? registered : alreadyRegistered).push(metric.name);
-  });
+  const collection = await registerPhase(organizationId, projectId, createdByUserId, CAMPAIGN_OPS_PACK_METRICS);
+  registered.push(...collection.registered);
+  alreadyRegistered.push(...collection.alreadyRegistered);
+
+  const calibrationPhase1 = await registerPhase(organizationId, projectId, createdByUserId, CAMPAIGN_OPS_PACK_CALIBRATION_AGGREGATION_METRICS);
+  registered.push(...calibrationPhase1.registered);
+  alreadyRegistered.push(...calibrationPhase1.alreadyRegistered);
+
+  const calibrationPhase2 = await registerPhase(organizationId, projectId, createdByUserId, CAMPAIGN_OPS_PACK_CALIBRATION_FORMULA_METRICS);
+  registered.push(...calibrationPhase2.registered);
+  alreadyRegistered.push(...calibrationPhase2.alreadyRegistered);
 
   return { registered, alreadyRegistered };
 }
