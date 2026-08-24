@@ -9,6 +9,9 @@ import {
   RefreshCw,
   Sparkles,
   Radio,
+  Layers,
+  Repeat,
+  ShoppingBag,
 } from 'lucide-react';
 import { KpiRibbon } from './growth/kpi-ribbon';
 import { ChannelRoiCard } from './growth/channel-roi-card';
@@ -17,6 +20,8 @@ import { CreativePerformanceCard } from './growth/creative-performance-card';
 import { AudienceSegmentationCard } from './growth/audience-segmentation-card';
 import { FunnelConversionCard } from './growth/funnel-conversion-card';
 import { ActionableInsightsCard } from './growth/actionable-insights-card';
+import { SubscriptionMetricsCard } from './growth/subscription-metrics-card';
+import { EcommerceMetricsCard } from './growth/ecommerce-metrics-card';
 import { TrackingSnippetModal } from './growth/tracking-snippet-modal';
 import { LiveSourceStatusBar } from './growth/live-source-status-bar';
 import { DemoModeBanner } from './growth/demo-mode-banner';
@@ -28,10 +33,16 @@ import {
   getChannelPerformances,
   getCreativePerformances,
   getDeviceBreakdown,
+  getEcommerceGrowthMetrics,
   getFunnelSteps,
   getGrowthKpis,
+  getSubscriptionGrowthMetrics,
 } from './growth/growth-data';
-import type { GrowthChannelFilter, GrowthDateRange } from './growth/types';
+import type {
+  GrowthBusinessModel,
+  GrowthChannelFilter,
+  GrowthDateRange,
+} from './growth/types';
 
 export interface GrowthDashboardProps {
   orgId: string;
@@ -59,6 +70,7 @@ export function GrowthDashboard({
   const [isDemoMode, setIsDemoMode] = useState<boolean>(!hasConnectedSources);
   const [dateRange, setDateRange] = useState<GrowthDateRange>('30d');
   const [channelFilter, setChannelFilter] = useState<GrowthChannelFilter>('all');
+  const [businessModel, setBusinessModel] = useState<GrowthBusinessModel>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -90,6 +102,14 @@ export function GrowthDashboard({
     () => getFunnelSteps(dateRange, !isDemoMode, hasConnectedSources),
     [dateRange, isDemoMode, hasConnectedSources],
   );
+  const subscriptionMetrics = useMemo(
+    () => getSubscriptionGrowthMetrics(dateRange, !isDemoMode, hasConnectedSources),
+    [dateRange, isDemoMode, hasConnectedSources],
+  );
+  const ecommerceMetrics = useMemo(
+    () => getEcommerceGrowthMetrics(dateRange, !isDemoMode, hasConnectedSources),
+    [dateRange, isDemoMode, hasConnectedSources],
+  );
   const actionableInsights = useMemo(
     () => getActionableInsights(!isDemoMode, hasConnectedSources),
     [isDemoMode, hasConnectedSources],
@@ -105,6 +125,12 @@ export function GrowthDashboard({
     { id: '30d', labelKey: 'dateRange30d' },
     { id: 'this_month', labelKey: 'dateRangeThisMonth' },
     { id: '90d', labelKey: 'dateRange90d' },
+  ];
+
+  const businessModelOptions: { id: GrowthBusinessModel; labelKey: string; icon: typeof Layers }[] = [
+    { id: 'all', labelKey: 'modelAll', icon: Layers },
+    { id: 'subscriptions', labelKey: 'modelSubscriptions', icon: Repeat },
+    { id: 'ecommerce', labelKey: 'modelEcommerce', icon: ShoppingBag },
   ];
 
   const channelOptions: { id: GrowthChannelFilter; labelKey: string }[] = [
@@ -210,47 +236,84 @@ export function GrowthDashboard({
         />
       ) : (
         <>
-          {/* Channel Pills Filter */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-              <Filter className="h-3.5 w-3.5" />
-              <span>{`${t('filterByChannel')}:`}</span>
-            </span>
-            {channelOptions.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setChannelFilter(c.id)}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
-                  channelFilter === c.id
-                    ? 'bg-foreground text-background shadow-xs'
-                    : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                {t(c.labelKey)}
-              </button>
-            ))}
+          {/* Business Model Selector Tabs */}
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card/60 p-3 shadow-2xs">
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <span className="text-xs font-semibold text-muted-foreground ml-1 mr-2">
+                {t('filterByBusinessModel')}{':'}
+              </span>
+              {businessModelOptions.map((opt) => {
+                const IconComponent = opt.icon;
+                const isActive = businessModel === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setBusinessModel(opt.id)}
+                    className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all ${
+                      isActive
+                        ? 'bg-primary text-primary-foreground shadow-xs'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    }`}
+                  >
+                    <IconComponent className="h-3.5 w-3.5" />
+                    <span>{t(opt.labelKey as Parameters<typeof t>[0])}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Channel Pills Filter */}
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <span className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                <Filter className="h-3.5 w-3.5" />
+                <span>{`${t('filterByChannel')}:`}</span>
+              </span>
+              {channelOptions.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setChannelFilter(c.id)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
+                    channelFilter === c.id
+                      ? 'bg-foreground text-background shadow-xs'
+                      : 'bg-muted/70 text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  {t(c.labelKey)}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* 3. High Level Executive KPI Ribbon */}
           <KpiRibbon kpis={kpis} />
 
-          {/* 4. Cross-Channel ROI & Spend Distribution */}
+          {/* 4. Dedicated Business Model Intelligence Cards */}
+          {(businessModel === 'all' || businessModel === 'subscriptions') && (
+            <SubscriptionMetricsCard metrics={subscriptionMetrics} isDemo={isDemoMode} />
+          )}
+
+          {(businessModel === 'all' || businessModel === 'ecommerce') && (
+            <EcommerceMetricsCard metrics={ecommerceMetrics} isDemo={isDemoMode} />
+          )}
+
+          {/* 5. Cross-Channel ROI & Spend Distribution */}
           <ChannelRoiCard channels={channels} />
 
-          {/* 5. Cross-Platform Campaign Leaderboard (Google, Meta, TikTok) */}
+          {/* 6. Cross-Platform Campaign Leaderboard (Google, Meta, TikTok) */}
           <CampaignLeaderboard campaigns={campaigns} />
 
-          {/* 6. Winning Ads & Creative Showcase */}
+          {/* 7. Winning Ads & Creative Showcase */}
           <CreativePerformanceCard creatives={creatives} />
 
-          {/* 7. Audience & Device Breakdown */}
+          {/* 8. Audience & Device Breakdown */}
           <AudienceSegmentationCard segments={audienceSegments} devices={deviceBreakdown} />
 
-          {/* 8. End-to-End Funnel & Leak Points */}
+          {/* 9. End-to-End Funnel & Leak Points */}
           <FunnelConversionCard steps={funnelSteps} />
 
-          {/* 9. Actionable Executive AI Growth Recommendations */}
+          {/* 10. Actionable Executive AI Growth Recommendations */}
           <ActionableInsightsCard insights={actionableInsights} />
         </>
       )}

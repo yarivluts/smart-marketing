@@ -42,35 +42,75 @@ describe('GrowthDashboard', () => {
     expect(screen.getByText('Attributed Revenue')).toBeInTheDocument();
     expect(screen.getByText('Blended ROAS')).toBeInTheDocument();
 
-    // 4. Question 1: Cross-Channel ROI
+    // 4. Dedicated Subscription Metrics Card
+    expect(
+      screen.getByRole('heading', { name: 'What is our recurring subscription health (MRR, Churn, LTV)?' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Monthly Recurring Revenue (MRR)')).toBeInTheDocument();
+    expect(screen.getByText('Active Subscription Plans Breakdown')).toBeInTheDocument();
+
+    // 5. Dedicated E-Commerce Metrics Card
+    expect(
+      screen.getByRole('heading', { name: 'What are our one-time purchasing & e-commerce trends?' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Average Order Value (AOV)')).toBeInTheDocument();
+    expect(screen.getByText('Top Converting Products & Packages')).toBeInTheDocument();
+
+    // 6. Question 1: Cross-Channel ROI
     expect(
       screen.getByRole('heading', { name: 'What is our ROI & return across ad channels?' }),
     ).toBeInTheDocument();
 
-    // 5. Question 2: Campaign Leaderboard
+    // 7. Question 2: Campaign Leaderboard
     expect(
       screen.getByRole('heading', { name: 'What is our best-performing campaign cross-platform?' }),
     ).toBeInTheDocument();
 
-    // 6. Question 3: Winning Creatives & Ads
+    // 8. Question 3: Winning Creatives & Ads
     expect(
       screen.getByRole('heading', { name: 'What are our top-performing creative ads & copy?' }),
     ).toBeInTheDocument();
 
-    // 7. Question 4: Audience Segmentation
+    // 9. Question 4: Audience Segmentation
     expect(
       screen.getByRole('heading', { name: 'Where are our conversions coming from? Audience Segmentation' }),
     ).toBeInTheDocument();
 
-    // 8. Question 5: Funnel Analysis & Bottlenecks
+    // 10. Question 5: Funnel Analysis & Bottlenecks
     expect(
       screen.getByRole('heading', { name: 'Where are the conversion bottlenecks? Full Funnel Analysis' }),
     ).toBeInTheDocument();
 
-    // 9. Question 6: Actionable Insights & AI Recommendations
+    // 11. Question 6: Actionable Insights & AI Recommendations
     expect(
       screen.getByRole('heading', { name: 'Actionable Growth & ROI Insights' }),
     ).toBeInTheDocument();
+  });
+
+  it('allows toggling between Business Model tabs', () => {
+    renderDashboard();
+
+    // Select Monthly Subscriptions tab
+    const subTab = screen.getByRole('button', { name: /Monthly Subscriptions/i });
+    fireEvent.click(subTab);
+    expect(subTab).toHaveClass('bg-primary');
+    expect(
+      screen.getByRole('heading', { name: 'What is our recurring subscription health (MRR, Churn, LTV)?' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'What are our one-time purchasing & e-commerce trends?' }),
+    ).not.toBeInTheDocument();
+
+    // Select E-Commerce tab
+    const ecomTab = screen.getByRole('button', { name: /One-Time Purchases/i });
+    fireEvent.click(ecomTab);
+    expect(ecomTab).toHaveClass('bg-primary');
+    expect(
+      screen.getByRole('heading', { name: 'What are our one-time purchasing & e-commerce trends?' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'What is our recurring subscription health (MRR, Churn, LTV)?' }),
+    ).not.toBeInTheDocument();
   });
 
   it('allows toggling between Demo Preview and Live Data mode', () => {

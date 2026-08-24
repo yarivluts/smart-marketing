@@ -1,18 +1,14 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
-import { Link } from '@/i18n/navigation';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   listActiveAttachmentsForProject,
-  listBoardsForProject,
   listOrgProjects,
   listPluginInstallsForProject,
 } from '@/lib/orgs/queries';
-import { toBoardSummaryView } from '@/lib/orgs/board-view';
-import { CreateBoardForm } from '@/components/orgs/create-board-form';
 import { GrowthDashboard } from '@/components/orgs/growth-dashboard';
 
 type PageProps = Readonly<{
@@ -26,10 +22,11 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's marketing growth dashboard & custom boards (KAN-60):
- * Primary view renders the predefined Growth Intelligence dashboard answering
- * core marketing questions (ROI, top campaign, top creative, audience segmentation,
- * funnel leak points, actionable insights), plus custom boards management below.
+ * A project's predefined marketing growth dashboard:
+ * Delivers 100% out-of-the-box, question-led intelligence across all digital
+ * marketing channels with zero manual setup. Includes dedicated zones for
+ * recurring subscriptions (SaaS MRR, Churn, LTV, Trial-to-Paid) and one-time
+ * e-commerce orders (GMV, AOV, Cart Abandonment, Repeat Buyers).
  */
 export default async function BoardsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -47,7 +44,6 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
   if (!membership || !canViewBoards) {
     notFound();
   }
-  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
 
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -55,14 +51,10 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
     notFound();
   }
 
-  const [boards, attachments, pluginInstalls] = await Promise.all([
-    listBoardsForProject(orgId, projectId),
+  const [attachments, pluginInstalls] = await Promise.all([
     listActiveAttachmentsForProject(orgId, projectId),
     listPluginInstallsForProject(orgId, projectId),
   ]);
-
-  const boardViews = boards.map(toBoardSummaryView);
-  const t = await getTranslations('Boards');
 
   const hasGoogleAds = pluginInstalls.some((p) => p.plugin_id.includes('google')) || attachments.some((a) => a.resource_id.includes('google'));
   const hasMetaAds = pluginInstalls.some((p) => p.plugin_id.includes('meta') || p.plugin_id.includes('facebook')) || attachments.some((a) => a.resource_id.includes('meta') || a.resource_id.includes('facebook'));
@@ -79,7 +71,6 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
 
   return (
     <main className="container mx-auto flex max-w-6xl flex-col gap-10 py-10 px-4 sm:px-6">
-      {/* 1. Predefined Growth & Marketing Intelligence Dashboard */}
       <GrowthDashboard
         orgId={orgId}
         projectId={projectId}
@@ -89,40 +80,6 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
         hasWebPixel={hasWebPixel}
         pluginPackNames={pluginPackNames}
       />
-
-      {/* 2. Custom Boards & Tile Management Section */}
-      <section className="flex flex-col gap-6 rounded-3xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold tracking-tight text-foreground">{t('boardsHeading')}</h2>
-          <p className="text-xs text-muted-foreground">{t('customBoardsSubtitle')}</p>
-        </div>
-
-        {boardViews.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t('noBoards')}</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {boardViews.map((board) => (
-              <Link
-                key={board.id}
-                href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}
-                className="flex items-center justify-between rounded-2xl border border-border/80 bg-background p-4 text-xs font-semibold hover:border-primary/50 transition-colors shadow-xs"
-              >
-                <span className="font-bold text-foreground truncate">{board.name}</span>
-                <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  {t('tileCountLabel', { count: board.tileCount })}
-                </span>
-              </Link>
-            ))}
-          </div>
-        )}
-
-        {canManageBoards ? (
-          <div className="mt-4 border-t border-border/60 pt-6">
-            <h3 className="text-sm font-bold text-foreground mb-3">{t('createHeading')}</h3>
-            <CreateBoardForm orgId={orgId} projectId={projectId} />
-          </div>
-        ) : null}
-      </section>
     </main>
   );
 }

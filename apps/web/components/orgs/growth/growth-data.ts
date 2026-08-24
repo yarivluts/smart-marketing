@@ -5,10 +5,12 @@ import type {
   ChannelPerformance,
   CreativePerformanceItem,
   DeviceBreakdownItem,
+  EcommerceGrowthMetrics,
   FunnelStepItem,
   GrowthChannelFilter,
   GrowthDateRange,
   GrowthKpiSummary,
+  SubscriptionGrowthMetrics,
 } from './types';
 
 export function getGrowthKpis(
@@ -447,4 +449,118 @@ export function getActionableInsights(isLiveMode = false, hasLiveTraffic = false
       actionKey: 'insightAudienceAction',
     },
   ];
+}
+
+export function getSubscriptionGrowthMetrics(
+  range: GrowthDateRange,
+  isLiveMode = false,
+  hasLiveTraffic = false,
+): SubscriptionGrowthMetrics {
+  if (isLiveMode && !hasLiveTraffic) {
+    return {
+      mrr: 0,
+      arr: 0,
+      mrrGrowthRatePct: 0,
+      activeSubscribers: 0,
+      trialToPaidConversionPct: 0,
+      monthlyChurnRatePct: 0,
+      ltv: 0,
+      ltvToCacRatio: 0,
+      cacPaybackMonths: 0,
+      tiers: [],
+    };
+  }
+
+  const multiplier = range === '7d' ? 0.25 : range === '90d' ? 3.0 : 1.0;
+  const mrr = Math.round(68400 * multiplier);
+  const arr = mrr * 12;
+
+  return {
+    mrr,
+    arr,
+    mrrGrowthRatePct: 18.4,
+    activeSubscribers: Math.round(540 * (range === '90d' ? 1.4 : 1.0)),
+    trialToPaidConversionPct: 14.8,
+    monthlyChurnRatePct: 2.1,
+    ltv: 1840,
+    ltvToCacRatio: 5.2,
+    cacPaybackMonths: 2.4,
+    tiers: [
+      {
+        nameKey: 'tierStarter',
+        subscribers: 280,
+        mrrSharePct: 35,
+        arpu: 89,
+      },
+      {
+        nameKey: 'tierPro',
+        subscribers: 195,
+        mrrSharePct: 45,
+        arpu: 159,
+      },
+      {
+        nameKey: 'tierEnterprise',
+        subscribers: 65,
+        mrrSharePct: 20,
+        arpu: 390,
+      },
+    ],
+  };
+}
+
+export function getEcommerceGrowthMetrics(
+  range: GrowthDateRange,
+  isLiveMode = false,
+  hasLiveTraffic = false,
+): EcommerceGrowthMetrics {
+  if (isLiveMode && !hasLiveTraffic) {
+    return {
+      grossMerchandiseValue: 0,
+      averageOrderValue: 0,
+      aovDeltaPct: 0,
+      totalOrders: 0,
+      cartAbandonmentRatePct: 0,
+      cartRecoveryRevenue: 0,
+      repeatPurchaseRatePct: 0,
+      topSellingProducts: [],
+    };
+  }
+
+  const multiplier = range === '7d' ? 0.25 : range === '90d' ? 3.0 : 1.0;
+  const totalOrders = Math.round(336 * multiplier);
+  const averageOrderValue = 284;
+  const grossMerchandiseValue = Math.round(totalOrders * averageOrderValue);
+
+  return {
+    grossMerchandiseValue,
+    averageOrderValue,
+    aovDeltaPct: 14.2,
+    totalOrders,
+    cartAbandonmentRatePct: 68.4,
+    cartRecoveryRevenue: Math.round(18400 * multiplier),
+    repeatPurchaseRatePct: 34.8,
+    topSellingProducts: [
+      {
+        id: 'sku-1',
+        nameKey: 'productBundleStarter',
+        unitsSold: Math.round(145 * multiplier),
+        revenue: Math.round(36250 * multiplier),
+        conversionRatePct: 4.8,
+      },
+      {
+        id: 'sku-2',
+        nameKey: 'productAnnualPass',
+        unitsSold: Math.round(82 * multiplier),
+        revenue: Math.round(41000 * multiplier),
+        conversionRatePct: 3.2,
+      },
+      {
+        id: 'sku-3',
+        nameKey: 'productTeamExpansion',
+        unitsSold: Math.round(48 * multiplier),
+        revenue: Math.round(23520 * multiplier),
+        conversionRatePct: 6.4,
+      },
+    ],
+  };
 }
