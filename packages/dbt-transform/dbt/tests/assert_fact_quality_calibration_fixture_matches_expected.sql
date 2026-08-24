@@ -16,10 +16,18 @@
 -- `cust_qs2`: quality_score=12 -> quality_tier='low'; no charge at all, so
 -- collected_revenue_40d=0 (the left join still produces a row, coalesced to
 -- 0 rather than null) and is_paying_customer='false'.
+--
+-- `cust_qs3`: submits the onboarding survey twice -- quality_score=12 on
+-- 2026-11-01, then 100 on 2026-11-05 -- proving the dedup keeps only the
+-- LATEST scored event (quality_tier='high', not 'low') and its $150
+-- succeeded charge (5 days after acquisition, its first survey event) is
+-- counted exactly once, not once per scored event: collected_revenue_40d
+-- must be 150, not 300.
 with expected(customer_id, quality_score, quality_tier, is_paying_customer, collected_revenue_40d) as (
     values
         ('cust_qs1', 97.0, 'high', 'true', 200.0),
-        ('cust_qs2', 12.0, 'low', 'false', 0.0)
+        ('cust_qs2', 12.0, 'low', 'false', 0.0),
+        ('cust_qs3', 100.0, 'high', 'true', 150.0)
 ),
 actual as (
     select customer_id, quality_score, quality_tier, is_paying_customer, collected_revenue_40d
