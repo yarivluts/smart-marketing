@@ -80,4 +80,30 @@ describe('AppShell', () => {
     const tabBarLinks = screen.getAllByRole('link', { name: 'Boards' });
     expect(tabBarLinks.length).toBeGreaterThanOrEqual(2);
   });
+
+  it('renders an optional omniSearch node alongside switchers, in both the sidebar and mobile menu', () => {
+    mockUsePathname.mockReturnValue('/orgs/org-1');
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AppShell
+          switchers={<span>switcher</span>}
+          omniSearch={<span>omni-search-widget</span>}
+          sections={[{ heading: 'Nav', items: [homeItem] }]}
+          mobileTabItems={[homeItem]}
+        >
+          <p>page content</p>
+        </AppShell>
+      </NextIntlClientProvider>,
+    );
+
+    // Sidebar copy always present; opening the mobile menu adds a second copy.
+    expect(screen.getAllByText('omni-search-widget')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    expect(screen.getAllByText('omni-search-widget')).toHaveLength(2);
+  });
+
+  it('omits omniSearch entirely when not given (org-level pages via OrgShell)', () => {
+    renderShell('/orgs/org-1');
+    expect(screen.queryByText('omni-search-widget')).not.toBeInTheDocument();
+  });
 });
