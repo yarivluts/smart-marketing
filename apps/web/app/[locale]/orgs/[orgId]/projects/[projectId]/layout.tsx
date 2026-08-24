@@ -6,6 +6,7 @@ import {
   type AppShellNavItem,
   type AppShellNavSection,
 } from '@/components/orgs/app-shell';
+import { OmniSearchTrigger } from '@/components/orgs/omni-search';
 import { ProjectSwitcher } from '@/components/orgs/project-switcher';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
@@ -242,6 +243,7 @@ export default async function ProjectLayout({
           />
         </>
       }
+      omniSearch={<OmniSearchTrigger orgId={orgId} projectId={projectId} />}
       sections={sections}
       mobileTabItems={mobileTabItems}
     >
