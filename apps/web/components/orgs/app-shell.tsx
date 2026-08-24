@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 import {
   Activity,
+  Award,
   BarChart3,
   Bot,
   Building2,
@@ -49,6 +50,7 @@ import { cn } from '@/lib/utils';
  */
 const ICONS = {
   Activity,
+  Award,
   BarChart3,
   Bot,
   Building2,

@@ -118,7 +118,8 @@
     "projectSegmentsLink": "פלחים",
     "projectTvLink": "טלוויזיית חדר מלחמה",
     "projectSessionReplayLink": "הקלטות סשן",
-    "projectCampaignOpsLink": "תפעול קמפיינים"
+    "projectCampaignOpsLink": "תפעול קמפיינים",
+    "projectRepCollectionsLink": "גבייה לפי נציג"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -1329,5 +1330,68 @@
     "save": "שמירה",
     "saved": "נשמר.",
     "saveError": "שמירת התבנית נכשלה. ודאו שזו כתובת http(s) תקינה."
+  },
+  "RepCollections": {
+    "metaTitle": "גבייה לפי נציג",
+    "title": "גבייה לפי נציג עבור {projectName}",
+    "description": "שייכו שדרוגים, שימורים והרחבות לנציג שהוביל אותם.",
+    "leaderboardHeading": {
+      "week": "השבוע",
+      "month": "החודש"
+    },
+    "leaderboardEmpty": "עדיין אין גבייה משויכת.",
+    "leaderboardRank": "{rank}. {name}",
+    "leaderboardRowSummary": "{amount} ({count, plural, one {רשומה אחת} other {# רשומות}})",
+    "leaderboardUnattributed": "בנוסף {amount} שטרם שויכו לנציג ({count, plural, one {רשומה אחת} other {# רשומות}})",
+    "signalsHeading": "הצעות מחיוב",
+    "noSignals": "אין כרגע חיובים לא משויכים להצעה.",
+    "signalSummary": "לקוח {customerId}: {amount} {currency}",
+    "ledgerHeading": "יומן",
+    "noEntries": "עדיין לא נרשמה גבייה.",
+    "columnCompany": "חברה",
+    "columnType": "סוג",
+    "columnPlan": "תוכנית",
+    "columnWhen": "מתי",
+    "columnNote": "הערה",
+    "columnRepAndAmount": "נציג / סכום",
+    "planSummary": "{from} ← {to}",
+    "planFromOnly": "מ-{from}",
+    "planToOnly": "ל-{to}",
+    "createHeading": "רישום גבייה",
+    "companyLabel": "חברה",
+    "companyPlaceholder": "לדוגמה: אקמי בע״מ",
+    "repLabel": "נציג",
+    "unassignedOption": "לא משויך",
+    "typeLabel": "סוג",
+    "collectionType": {
+      "upgrade": "שדרוג",
+      "expansion": "הרחבה",
+      "save": "שימור",
+      "renewal": "חידוש",
+      "other": "אחר"
+    },
+    "planFromLabel": "מתוכנית",
+    "planFromPlaceholder": "לדוגמה: בסיסי",
+    "planToLabel": "לתוכנית",
+    "planToPlaceholder": "לדוגמה: מתקדם",
+    "amountLabel": "סכום",
+    "occurredAtLabel": "מתי",
+    "noteLabel": "הערה",
+    "notePlaceholder": "הקשר נוסף (לא חובה)",
+    "createError": "רישום הגבייה נכשל. נסו שוב.",
+    "createButton": "רישום גבייה",
+    "attributeButton": "הוספה ליומן",
+    "updateError": "עדכון הרשומה נכשל. נסו שוב.",
+    "deleteConfirm": "למחוק את רשומת היומן? לא ניתן לבטל פעולה זו.",
+    "deleteButton": "מחיקה",
+    "deleteError": "מחיקת הרשומה נכשלה. נסו שוב.",
+    "amountInputLabel": "סכום"
+  },
+  "RepCollectionLeaderboard": {
+    "heading": "מובילי הגבייה השבוע",
+    "empty": "עדיין אין גבייה משויכת השבוע.",
+    "rank": "{rank}. {name}",
+    "rowSummary": "{amount} ({count, plural, one {רשומה אחת} other {# רשומות}})",
+    "unattributed": "בנוסף {amount} שטרם שויכו ({count, plural, one {רשומה אחת} other {# רשומות}})"
   }
 }
