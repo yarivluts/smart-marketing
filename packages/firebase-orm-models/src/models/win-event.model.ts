@@ -66,4 +66,10 @@ export class WinEventModel extends BaseModel {
   /** When this win event itself was created — the field the live-feed poll cursors on. */
   @Field({ is_required: true })
   public created_at!: string;
+
+  @Field()
+  public _demo_title?: string;
+
+  @Field()
+  public _demo_amount?: string;
 }

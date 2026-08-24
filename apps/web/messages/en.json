@@ -1404,7 +1404,10 @@
     "pacingScalingVelocity": "Budget deployed efficiently",
     "pacingCacRoomToScale": "Healthy margin for top-of-funnel reach",
     "pacingNeedsAttentionCac": "Apply negative keywords to reduce cost",
-    "daysLeft": "days left"
+    "daysLeft": "days left",
+    "emptyStateHeading": "Goal tracking for {projectName}",
+    "emptyStateDesc": "Connect a Google Ads or Meta Ads account to start tracking real ROAS, revenue, and conversion goals automatically.",
+    "emptyStateCta": "Go to Ad Channels to connect"
   },
   "MarketingAudiences": {
     "pageHeading": "Smart Audiences & Cohorts ({projectName})",
@@ -1437,7 +1440,10 @@
     "audTopConvertersName": "🌟 Top 10% Converters (Lookalike Seed)",
     "audTopConvertersDesc": "Highest propensity customer segment ranked by fastest checkout velocity and highest order value.",
     "badgeLookalikeSeed": "Seed Audience for Meta/Google Lookalike",
-    "recTopConverters": "Directly synced as root seed list to generate 1% Lookalikes across Meta Advantage+ & Google PMax."
+    "recTopConverters": "Directly synced as root seed list to generate 1% Lookalikes across Meta Advantage+ & Google PMax.",
+    "emptyStateHeading": "Smart audiences for {projectName}",
+    "emptyStateDesc": "Audience cohorts are calculated automatically once your website pixel or store connector is active and events start flowing in.",
+    "emptyStateCta": "Connect your website pixel or store"
   },
   "MarketingAutomation": {
     "pageHeading": "Autonomous Marketing Copilot ({projectName})",
@@ -1480,7 +1486,10 @@
     "actionFatiguePauseImpact": "Prevented ₪650 in wasted spend",
     "actionBidBoostTitle": "Boosted Top-Converting Keyword Bid",
     "actionBidBoostDesc": "Increased target CPA by 10% during peak 19:00-22:00 conversion window.",
-    "actionBidBoostImpact": "+18% conversion volume"
+    "actionBidBoostImpact": "+18% conversion volume",
+    "emptyStateHeading": "Marketing Copilot for {projectName}",
+    "emptyStateDesc": "The AI copilot activates automatically after you connect your first Google Ads or Meta Ads account and it starts receiving conversion data.",
+    "emptyStateCta": "Connect an ad channel to activate"
   },
   "MarketingWinRules": {
     "pageHeading": "Marketing Win Triggers & Live War Room ({projectName})",
@@ -1512,7 +1521,10 @@
     "eventEnterpriseSigned": "Enterprise License Closed!",
     "eventHighTicketOrder": "VIP High-Ticket Order!",
     "eventRoasMilestoneBroken": "5.4x ROAS Milestone Hit!",
-    "eventProPlanSubscribed": "New Pro SaaS Subscriber!"
+    "eventProPlanSubscribed": "New Pro SaaS Subscriber!",
+    "emptyStateHeading": "Live win feed for {projectName}",
+    "emptyStateDesc": "Win events appear here automatically when orders, subscriptions, and conversions are tracked through your connected channels.",
+    "emptyStateCta": "Connect channels to activate the live feed"
   },
   "MarketingChannels": {
     "pageHeading": "Marketing Channels & Connectors ({projectName})",

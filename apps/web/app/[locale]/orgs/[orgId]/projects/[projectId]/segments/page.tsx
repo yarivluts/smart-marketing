@@ -4,7 +4,7 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects } from '@/lib/orgs/queries';
+import { listOrgProjects, listSegmentsForProject } from '@/lib/orgs/queries';
 import { MarketingAudiencesDashboard } from '@/components/orgs/segments/marketing-audiences-dashboard';
 
 type PageProps = Readonly<{
@@ -19,9 +19,8 @@ export async function generateMetadata({ params }: PageProps) {
 
 /**
  * A project's smart marketing audiences & cohorts:
- * Delivers 5 predefined smart digital marketing audiences ready for 1-click sync
- * with Google Ads and Meta Ads (High-Intent Cart Abandoners, VIP Repeat Buyers,
- * Expiring Trials, Dormant Churn Reactivation, Top 10% Converters for Lookalike).
+ * Delivers smart digital marketing audiences ready for 1-click sync
+ * with Google Ads and Meta Ads. Zero manual setup.
  */
 export default async function SegmentsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -44,9 +43,22 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
     notFound();
   }
 
+  const rawSegments = await listSegmentsForProject(orgId, projectId);
+  const segments = rawSegments.map((s) => ({
+    id: s.id,
+    name: s.name,
+    schemaName: s.schema_name,
+    size: s._demo_size ?? 0,
+    matchQuality: s._demo_match_quality ?? 90,
+    channels: s._demo_channels ? s._demo_channels.split(',').map((c: string) => c.trim()) : ['google', 'meta'],
+    tactic: s._demo_tactic ?? '',
+    createdAt: s.created_at,
+  }));
+
   return (
     <main className="container mx-auto flex max-w-6xl flex-col gap-10 py-10 px-4 sm:px-6">
-      <MarketingAudiencesDashboard projectName={project.name} />
+      <MarketingAudiencesDashboard projectName={project.name} audiences={segments} />
     </main>
   );
 }
+

@@ -83,4 +83,16 @@ export class GoalModel extends BaseModel {
 
   @Field({ is_required: true })
   public updated_at!: string;
+
+  @Field()
+  public _demo_current_value?: number;
+
+  @Field()
+  public _demo_progress_pct?: number;
+
+  @Field()
+  public _demo_pacing_note?: string;
+
+  @Field()
+  public _demo_status?: string;
 }

@@ -26,27 +26,48 @@ export interface MarketingConnector {
   descKey: string;
 }
 
+export interface SerializedPluginInstall {
+  id: string;
+  pluginId: string;
+  status: string;
+  name: string;
+  eventsToday: number;
+  matchQuality: number;
+}
+
 export function MarketingChannelsHub({
   orgId,
   projectId,
   projectName,
+  installs = [],
 }: {
   orgId: string;
   projectId: string;
   projectName: string;
+  installs?: SerializedPluginInstall[];
 }) {
   const t = useTranslations('MarketingChannels');
-
   const [copiedSnippet, setCopiedSnippet] = useState<boolean>(false);
+
+  const googleInstall = installs.find((i) => i.pluginId.toLowerCase().includes('google'));
+  const metaInstall = installs.find((i) => i.pluginId.toLowerCase().includes('meta'));
+  const tiktokInstall = installs.find((i) => i.pluginId.toLowerCase().includes('tiktok'));
+  const stripeInstall = installs.find((i) => i.pluginId.toLowerCase().includes('stripe'));
+  const storeInstall = installs.find((i) =>
+    i.pluginId.toLowerCase().includes('woocommerce') ||
+    i.pluginId.toLowerCase().includes('shopify') ||
+    i.pluginId.toLowerCase().includes('store'),
+  );
+
   const connectors: MarketingConnector[] = [
     {
       id: 'conn-google',
       name: 'Google Ads',
       category: 'ad_platform',
-      status: 'connected',
-      accountName: 'EasySign Search & PMax (ID: 412-882-9011)',
-      eventVolumeToday: 1420,
-      matchQualityScore: '9.2 / 10',
+      status: googleInstall ? (googleInstall.status === 'installed' || googleInstall.status === 'connected' ? 'connected' : 'ready') : 'ready',
+      accountName: googleInstall ? `${projectName} Google Ads` : undefined,
+      eventVolumeToday: googleInstall?.eventsToday ?? 0,
+      matchQualityScore: googleInstall?.matchQuality ? `${(googleInstall.matchQuality / 10).toFixed(1)} / 10` : undefined,
       badgeKey: 'badgeEnhancedConversions',
       descKey: 'descGoogleAds',
     },
@@ -54,10 +75,10 @@ export function MarketingChannelsHub({
       id: 'conn-meta',
       name: 'Meta Ads (Facebook & Instagram)',
       category: 'ad_platform',
-      status: 'connected',
-      accountName: 'EasySign Meta Pixel & CAPI (ID: 98124018)',
-      eventVolumeToday: 2180,
-      matchQualityScore: '8.9 / 10',
+      status: metaInstall ? (metaInstall.status === 'installed' || metaInstall.status === 'connected' ? 'connected' : 'ready') : 'ready',
+      accountName: metaInstall ? `${projectName} Meta Pixel & CAPI` : undefined,
+      eventVolumeToday: metaInstall?.eventsToday ?? 0,
+      matchQualityScore: metaInstall?.matchQuality ? `${(metaInstall.matchQuality / 10).toFixed(1)} / 10` : undefined,
       badgeKey: 'badgeConversionsApi',
       descKey: 'descMetaAds',
     },
@@ -65,8 +86,10 @@ export function MarketingChannelsHub({
       id: 'conn-tiktok',
       name: 'TikTok Ads',
       category: 'ad_platform',
-      status: 'ready',
-      eventVolumeToday: 0,
+      status: tiktokInstall ? (tiktokInstall.status === 'installed' || tiktokInstall.status === 'connected' ? 'connected' : 'ready') : 'ready',
+      accountName: tiktokInstall ? `${projectName} TikTok Ads` : undefined,
+      eventVolumeToday: tiktokInstall?.eventsToday ?? 0,
+      matchQualityScore: tiktokInstall?.matchQuality ? `${(tiktokInstall.matchQuality / 10).toFixed(1)} / 10` : undefined,
       badgeKey: 'badgeEventsApi',
       descKey: 'descTikTokAds',
     },
@@ -74,23 +97,26 @@ export function MarketingChannelsHub({
       id: 'conn-stripe',
       name: 'Stripe / Credit Card Ingest',
       category: 'payments',
-      status: 'connected',
-      accountName: 'EasySign Production Ingest',
-      eventVolumeToday: 384,
+      status: stripeInstall ? (stripeInstall.status === 'installed' || stripeInstall.status === 'connected' ? 'connected' : 'ready') : 'ready',
+      accountName: stripeInstall ? `${projectName} Stripe Webhook` : undefined,
+      eventVolumeToday: stripeInstall?.eventsToday ?? 0,
+      matchQualityScore: stripeInstall?.matchQuality ? `${(stripeInstall.matchQuality / 10).toFixed(1)} / 10` : undefined,
       badgeKey: 'badgeRealtimeBilling',
       descKey: 'descStripe',
     },
     {
       id: 'conn-ecommerce',
-      name: 'Shopify / WooCommerce / EasySign Store',
+      name: 'Shopify / WooCommerce Store',
       category: 'ecommerce',
-      status: 'connected',
-      accountName: 'EasySign Checkout Engine',
-      eventVolumeToday: 912,
+      status: storeInstall ? (storeInstall.status === 'installed' || storeInstall.status === 'connected' ? 'connected' : 'ready') : 'ready',
+      accountName: storeInstall ? `${projectName} Store Hook` : undefined,
+      eventVolumeToday: storeInstall?.eventsToday ?? 0,
+      matchQualityScore: storeInstall?.matchQuality ? `${(storeInstall.matchQuality / 10).toFixed(1)} / 10` : undefined,
       badgeKey: 'badgeAutoCartCapture',
       descKey: 'descEcommerceStore',
     },
   ];
+
 
   const trackingSnippetCode = `<script>
   !function(w,d,s,g,r){w[g]=w[g]||function(){(w[g].q=w[g].q||[]).push(arguments)};

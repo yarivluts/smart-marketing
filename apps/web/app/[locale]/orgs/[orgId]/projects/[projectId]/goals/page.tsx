@@ -4,7 +4,7 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects } from '@/lib/orgs/queries';
+import { listOrgProjects, listGoalsForProject } from '@/lib/orgs/queries';
 import { MarketingGoalsDashboard } from '@/components/orgs/goals/marketing-goals-dashboard';
 
 type PageProps = Readonly<{
@@ -44,9 +44,25 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
     notFound();
   }
 
+  const rawGoals = await listGoalsForProject(orgId, projectId);
+  const goals = rawGoals.map((g) => ({
+    id: g.id,
+    name: g.name,
+    metricName: g.metric_name,
+    direction: g.direction,
+    targetValue: g.target_value,
+    startDate: g.start_date,
+    deadline: g.deadline,
+    rhythm: g.rhythm,
+    currentValue: g._demo_current_value ?? null,
+    progressPct: g._demo_progress_pct ?? null,
+    pacingNote: g._demo_pacing_note ?? null,
+    status: g._demo_status ?? 'on_track',
+  }));
+
   return (
     <main className="container mx-auto flex max-w-6xl flex-col gap-10 py-10 px-4 sm:px-6">
-      <MarketingGoalsDashboard projectName={project.name} />
+      <MarketingGoalsDashboard projectName={project.name} goals={goals} />
     </main>
   );
 }

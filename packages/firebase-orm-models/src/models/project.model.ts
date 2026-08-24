@@ -31,4 +31,14 @@ export class ProjectModel extends BaseModel {
    */
   @Field()
   public session_replay_url_template?: string;
+
+  /**
+   * When true, this project is the GrowthOS demo / showcase project.
+   * All marketing intelligence pages show rich pre-seeded mock data so
+   * users can explore the product without connecting a real ad account.
+   * Real (non-demo) projects show only authentic data pulled from live
+   * integrations or show empty-state prompts until data is connected.
+   */
+  @Field()
+  public is_demo?: boolean;
 }

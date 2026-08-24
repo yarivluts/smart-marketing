@@ -132,4 +132,7 @@ export class AutomationActionModel extends BaseModel {
   /** Absent for an automatic guardrail-regression rollback — there was no human actor. */
   @Field({ is_required: false })
   public rolled_back_by_user_id?: string;
+
+  @Field()
+  public _demo_impact?: string;
 }

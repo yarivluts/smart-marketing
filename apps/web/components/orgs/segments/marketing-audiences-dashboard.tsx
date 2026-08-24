@@ -15,88 +15,40 @@ import {
   Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MarketingEmptyState } from '@/components/orgs/marketing-empty-state';
 
-export interface PredefinedMarketingAudience {
+export interface SerializedSegment {
   id: string;
-  nameKey: string;
-  descKey: string;
-  badgeKey: string;
-  iconType: 'abandon' | 'vip' | 'expiring' | 'churn' | 'lookalike';
+  name: string;
+  schemaName: string;
   size: number;
-  matchRatePct: number;
-  syncedChannels: ('google' | 'meta' | 'tiktok')[];
-  aiRecommendationKey: string;
-  lastUpdated: string;
+  matchQuality: number;
+  channels: string[];
+  tactic?: string;
+  createdAt: string;
 }
 
-export function MarketingAudiencesDashboard({ projectName }: { projectName: string }) {
+export function MarketingAudiencesDashboard({
+  projectName,
+  audiences = [],
+}: {
+  projectName: string;
+  audiences?: SerializedSegment[];
+}) {
   const t = useTranslations('MarketingAudiences');
-
-  const audiences: PredefinedMarketingAudience[] = [
-    {
-      id: 'aud-cart-abandoners',
-      nameKey: 'audCartAbandonersName',
-      descKey: 'audCartAbandonersDesc',
-      badgeKey: 'badgeHighIntent',
-      iconType: 'abandon',
-      size: 1420,
-      matchRatePct: 88.4,
-      syncedChannels: ['meta', 'google'],
-      aiRecommendationKey: 'recCartAbandoners',
-      lastUpdated: '10m ago',
-    },
-    {
-      id: 'aud-vip-buyers',
-      nameKey: 'audVipBuyersName',
-      descKey: 'audVipBuyersDesc',
-      badgeKey: 'badgeHighLtv',
-      iconType: 'vip',
-      size: 840,
-      matchRatePct: 94.1,
-      syncedChannels: ['meta', 'google', 'tiktok'],
-      aiRecommendationKey: 'recVipBuyers',
-      lastUpdated: '1h ago',
-    },
-    {
-      id: 'aud-expiring-trials',
-      nameKey: 'audExpiringTrialsName',
-      descKey: 'audExpiringTrialsDesc',
-      badgeKey: 'badgeTrialUrgency',
-      iconType: 'expiring',
-      size: 310,
-      matchRatePct: 91.0,
-      syncedChannels: ['meta', 'google'],
-      aiRecommendationKey: 'recExpiringTrials',
-      lastUpdated: '25m ago',
-    },
-    {
-      id: 'aud-dormant-churn',
-      nameKey: 'audDormantChurnName',
-      descKey: 'audDormantChurnDesc',
-      badgeKey: 'badgeWinback',
-      iconType: 'churn',
-      size: 2150,
-      matchRatePct: 82.6,
-      syncedChannels: ['meta', 'google'],
-      aiRecommendationKey: 'recDormantChurn',
-      lastUpdated: '2h ago',
-    },
-    {
-      id: 'aud-top-converters',
-      nameKey: 'audTopConvertersName',
-      descKey: 'audTopConvertersDesc',
-      badgeKey: 'badgeLookalikeSeed',
-      iconType: 'lookalike',
-      size: 620,
-      matchRatePct: 96.2,
-      syncedChannels: ['meta', 'google', 'tiktok'],
-      aiRecommendationKey: 'recTopConverters',
-      lastUpdated: '15m ago',
-    },
-  ];
-
   const [syncingId, setSyncingId] = useState<string | null>(null);
   const [syncedIds, setSyncedIds] = useState<Set<string>>(new Set());
+
+  if (audiences.length === 0) {
+    return (
+      <MarketingEmptyState
+        Icon={Users}
+        heading={t('emptyStateHeading', { projectName })}
+        description={t('emptyStateDesc')}
+        ctaLabel={t('emptyStateCta')}
+      />
+    );
+  }
 
   const handleSyncAll = (audId: string) => {
     setSyncingId(audId);
@@ -106,19 +58,21 @@ export function MarketingAudiencesDashboard({ projectName }: { projectName: stri
     }, 800);
   };
 
-  const getIcon = (type: PredefinedMarketingAudience['iconType']) => {
-    switch (type) {
-      case 'abandon':
-        return <Flame className="h-5 w-5 text-rose-500" />;
-      case 'vip':
-        return <Crown className="h-5 w-5 text-amber-500" />;
-      case 'expiring':
-        return <Clock className="h-5 w-5 text-indigo-500" />;
-      case 'churn':
-        return <RotateCcw className="h-5 w-5 text-purple-500" />;
-      case 'lookalike':
-        return <Star className="h-5 w-5 text-emerald-500" />;
+  const getIcon = (name: string) => {
+    const lower = name.toLowerCase();
+    if (lower.includes('abandon') || lower.includes('cart')) {
+      return <Flame className="h-5 w-5 text-rose-500" />;
     }
+    if (lower.includes('vip') || lower.includes('buyer') || lower.includes('ltv')) {
+      return <Crown className="h-5 w-5 text-amber-500" />;
+    }
+    if (lower.includes('trial') || lower.includes('expir')) {
+      return <Clock className="h-5 w-5 text-indigo-500" />;
+    }
+    if (lower.includes('churn') || lower.includes('dormant') || lower.includes('winback')) {
+      return <RotateCcw className="h-5 w-5 text-purple-500" />;
+    }
+    return <Star className="h-5 w-5 text-emerald-500" />;
   };
 
   return (
@@ -151,6 +105,7 @@ export function MarketingAudiencesDashboard({ projectName }: { projectName: stri
         {audiences.map((aud) => {
           const isSyncing = syncingId === aud.id;
           const isJustSynced = syncedIds.has(aud.id);
+          const channels = aud.channels.length > 0 ? aud.channels : ['google', 'meta'];
 
           return (
             <div
@@ -162,14 +117,14 @@ export function MarketingAudiencesDashboard({ projectName }: { projectName: stri
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-muted">
-                      {getIcon(aud.iconType)}
+                      {getIcon(aud.name)}
                     </div>
                     <div>
                       <h3 className="text-base font-bold text-foreground">
-                        {t(aud.nameKey as Parameters<typeof t>[0])}
+                        {aud.name}
                       </h3>
                       <span className="text-[11px] font-semibold text-primary">
-                        {t(aud.badgeKey as Parameters<typeof t>[0])}
+                        {aud.schemaName}
                       </span>
                     </div>
                   </div>
@@ -182,10 +137,6 @@ export function MarketingAudiencesDashboard({ projectName }: { projectName: stri
                     <span className="text-[10px] text-muted-foreground">{t('usersCountLabel')}</span>
                   </div>
                 </div>
-
-                <p className="text-xs text-muted-foreground">
-                  {t(aud.descKey as Parameters<typeof t>[0])}
-                </p>
               </div>
 
               {/* Match Quality & Channels */}
@@ -193,14 +144,14 @@ export function MarketingAudiencesDashboard({ projectName }: { projectName: stri
                 <div className="flex items-center gap-1.5 font-semibold text-muted-foreground">
                   <span>{t('matchQualityLabel')}{':'}</span>
                   <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                    {aud.matchRatePct}{'%'}
+                    {aud.matchQuality}{'%'}
                   </span>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] text-muted-foreground">{t('autoSyncTo')}{':'}</span>
                   <div className="flex items-center gap-1">
-                    {aud.syncedChannels.map((ch) => (
+                    {channels.map((ch) => (
                       <span
                         key={ch}
                         className="rounded-lg bg-muted px-2 py-0.5 text-[10px] font-bold uppercase text-foreground"
@@ -213,21 +164,23 @@ export function MarketingAudiencesDashboard({ projectName }: { projectName: stri
               </div>
 
               {/* AI Recommendation Box */}
-              <div className="flex items-start gap-2 rounded-2xl border border-primary/20 bg-primary/5 p-3 text-xs">
-                <Sparkles className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-bold text-foreground">{t('aiTacticalPlay')}</span>
-                  <span className="text-muted-foreground leading-relaxed">
-                    {t(aud.aiRecommendationKey as Parameters<typeof t>[0])}
-                  </span>
+              {aud.tactic && (
+                <div className="flex items-start gap-2 rounded-2xl border border-primary/20 bg-primary/5 p-3 text-xs">
+                  <Sparkles className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="font-bold text-foreground">{t('aiTacticalPlay')}</span>
+                    <span className="text-muted-foreground leading-relaxed">
+                      {aud.tactic}
+                    </span>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Footer / 1-Click Sync Button */}
               <div className="flex items-center justify-between border-t border-border/70 pt-3">
                 <span className="text-[11px] text-muted-foreground">
                   {t('lastRefreshedLabel')}{': '}
-                  {aud.lastUpdated}
+                  {new Date(aud.createdAt).toLocaleDateString()}
                 </span>
 
                 <Button
@@ -262,3 +215,4 @@ export function MarketingAudiencesDashboard({ projectName }: { projectName: stri
     </div>
   );
 }
+

@@ -37,4 +37,16 @@ export class SegmentModel extends BaseModel {
 
   @Field({ is_required: true })
   public created_at!: string;
+
+  @Field()
+  public _demo_size?: number;
+
+  @Field()
+  public _demo_match_quality?: number;
+
+  @Field()
+  public _demo_channels?: string;
+
+  @Field()
+  public _demo_tactic?: string;
 }

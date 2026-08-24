@@ -12,119 +12,52 @@ import {
 import { Button } from '@/components/ui/button';
 import { Link } from '@/i18n/navigation';
 
-export interface PredefinedWinRule {
+export interface SerializedWinRule {
   id: string;
-  titleKey: string;
-  descKey: string;
-  triggerConditionKey: string;
-  celebrationStyleKey: string;
-  enabled: boolean;
-  timesFiredToday: number;
+  name: string;
+  schemaName: string;
+  winType: string;
+  active: boolean;
+  label?: string;
+  firedToday?: number;
 }
 
-export interface LiveWinEventItem {
+export interface SerializedWinEvent {
   id: string;
-  headlineKey: string;
-  customerName: string;
+  winRuleName: string;
+  winType: string;
+  title: string;
   amount: string;
-  channel: 'google' | 'meta' | 'direct' | 'tiktok';
-  timestamp: string;
-  celebrationEmoji: string;
+  occurredAt: string;
 }
 
 export function MarketingWinRulesDashboard({
   orgId,
   projectId,
   projectName,
+  rules: initialRules = [],
+  events = [],
 }: {
   orgId: string;
   projectId: string;
   projectName: string;
+  rules?: SerializedWinRule[];
+  events?: SerializedWinEvent[];
 }) {
   const t = useTranslations('MarketingWinRules');
-
-  const [rules, setRules] = useState<PredefinedWinRule[]>([
-    {
-      id: 'rule-enterprise-saas',
-      titleKey: 'ruleEnterpriseTitle',
-      descKey: 'ruleEnterpriseDesc',
-      triggerConditionKey: 'condEnterprise',
-      celebrationStyleKey: 'styleGoldCelebration',
-      enabled: true,
-      timesFiredToday: 2,
-    },
-    {
-      id: 'rule-highticket-order',
-      titleKey: 'ruleHighTicketTitle',
-      descKey: 'ruleHighTicketDesc',
-      triggerConditionKey: 'condHighTicket',
-      celebrationStyleKey: 'styleConfettiSound',
-      enabled: true,
-      timesFiredToday: 6,
-    },
-    {
-      id: 'rule-roas-milestone',
-      titleKey: 'ruleRoasMilestoneTitle',
-      descKey: 'ruleRoasMilestoneDesc',
-      triggerConditionKey: 'condRoasMilestone',
-      celebrationStyleKey: 'styleChannelBanner',
-      enabled: true,
-      timesFiredToday: 1,
-    },
-    {
-      id: 'rule-daily-conversions',
-      titleKey: 'ruleDailyConversionsTitle',
-      descKey: 'ruleDailyConversionsDesc',
-      triggerConditionKey: 'condDailyConversions',
-      celebrationStyleKey: 'styleTeamWarRoom',
-      enabled: true,
-      timesFiredToday: 0,
-    },
-  ]);
-
-  const liveWins: LiveWinEventItem[] = [
-    {
-      id: 'win-1',
-      headlineKey: 'eventEnterpriseSigned',
-      customerName: 'AeroTech Systems Ltd',
-      amount: '₪3,600 / yr',
-      channel: 'google',
-      timestamp: '4m ago',
-      celebrationEmoji: '🎉',
-    },
-    {
-      id: 'win-2',
-      headlineKey: 'eventHighTicketOrder',
-      customerName: 'Danielle Shavit',
-      amount: '₪640.00',
-      channel: 'meta',
-      timestamp: '22m ago',
-      celebrationEmoji: '🛍️',
-    },
-    {
-      id: 'win-3',
-      headlineKey: 'eventRoasMilestoneBroken',
-      customerName: 'High-Intent Search Campaign #1',
-      amount: '5.42x ROAS',
-      channel: 'google',
-      timestamp: '1h ago',
-      celebrationEmoji: '🔥',
-    },
-    {
-      id: 'win-4',
-      headlineKey: 'eventProPlanSubscribed',
-      customerName: 'Nimrod Cohen',
-      amount: '₪249 / mo',
-      channel: 'direct',
-      timestamp: '2h ago',
-      celebrationEmoji: '⚡',
-    },
-  ];
+  const [rules, setRules] = useState<SerializedWinRule[]>(initialRules);
 
   const handleToggleRule = (id: string) => {
     setRules((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, enabled: !r.enabled } : r)),
+      prev.map((r) => (r.id === id ? { ...r, active: !r.active } : r)),
     );
+  };
+
+  const getCelebrationEmoji = (winType: string) => {
+    if (winType.includes('enterprise') || winType.includes('deal')) return '🎉';
+    if (winType.includes('ticket') || winType.includes('order')) return '🛍️';
+    if (winType.includes('roas') || winType.includes('milestone')) return '🔥';
+    return '⚡';
   };
 
   return (
@@ -167,33 +100,41 @@ export function MarketingWinRulesDashboard({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {liveWins.map((win) => (
-            <div
-              key={win.id}
-              className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-background p-4 shadow-xs"
-            >
-              <div className="flex items-start justify-between">
-                <span className="text-2xl">{win.celebrationEmoji}</span>
-                <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold uppercase text-foreground">
-                  {win.channel}
-                </span>
+        {events.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+            <p>{t('emptyStateDesc')}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {events.map((win) => (
+              <div
+                key={win.id}
+                className="flex flex-col justify-between gap-3 rounded-2xl border border-border bg-background p-4 shadow-xs"
+              >
+                <div className="flex items-start justify-between">
+                  <span className="text-2xl">{getCelebrationEmoji(win.winType)}</span>
+                  <span className="rounded-md bg-muted px-2 py-0.5 text-[10px] font-bold uppercase text-foreground">
+                    {win.winType}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs font-bold text-foreground">
+                    {win.title}
+                  </span>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {win.winRuleName}
+                  </span>
+                  {win.amount && (
+                    <span className="text-base font-black text-primary mt-1">{win.amount}</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-muted-foreground border-t border-border/60 pt-2">
+                  {new Date(win.occurredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </div>
               </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xs font-bold text-foreground">
-                  {t(win.headlineKey as Parameters<typeof t>[0])}
-                </span>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {win.customerName}
-                </span>
-                <span className="text-base font-black text-primary mt-1">{win.amount}</span>
-              </div>
-              <div className="text-[10px] text-muted-foreground border-t border-border/60 pt-2">
-                {win.timestamp}
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Predefined Win Trigger Rules */}
@@ -210,44 +151,51 @@ export function MarketingWinRulesDashboard({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {rules.map((rule) => (
-            <div
-              key={rule.id}
-              className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-background p-5 shadow-xs"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-bold text-foreground">
-                    {t(rule.titleKey as Parameters<typeof t>[0])}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {t(rule.descKey as Parameters<typeof t>[0])}
-                  </span>
+        {rules.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center text-xs text-muted-foreground">
+            <p>{t('emptyStateDesc')}</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {rules.map((rule) => (
+              <div
+                key={rule.id}
+                className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-background p-5 shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-bold text-foreground">
+                      {rule.name}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {rule.schemaName}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant={rule.active ? 'default' : 'outline'}
+                    onClick={() => handleToggleRule(rule.id)}
+                    className="rounded-xl text-xs font-bold shrink-0"
+                  >
+                    {rule.active ? t('ruleActive') : t('ruleDisabled')}
+                  </Button>
                 </div>
-                <Button
-                  size="sm"
-                  variant={rule.enabled ? 'default' : 'outline'}
-                  onClick={() => handleToggleRule(rule.id)}
-                  className="rounded-xl text-xs font-bold shrink-0"
-                >
-                  {rule.enabled ? t('ruleActive') : t('ruleDisabled')}
-                </Button>
-              </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-xs">
-                <div className="flex items-center gap-1.5 font-semibold text-primary">
-                  <Volume2 className="h-3.5 w-3.5" />
-                  <span>{t(rule.celebrationStyleKey as Parameters<typeof t>[0])}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold text-primary">
+                    <Volume2 className="h-3.5 w-3.5" />
+                    <span>{rule.label || rule.winType}</span>
+                  </div>
+                  <span className="font-bold text-muted-foreground">
+                    {t('firedTodayCount', { count: rule.firedToday ?? 0 })}
+                  </span>
                 </div>
-                <span className="font-bold text-muted-foreground">
-                  {t('firedTodayCount', { count: rule.timesFiredToday })}
-                </span>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
+

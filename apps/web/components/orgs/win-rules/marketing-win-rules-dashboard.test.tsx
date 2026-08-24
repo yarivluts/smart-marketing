@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { MarketingWinRulesDashboard } from './marketing-win-rules-dashboard';
+import {
+  MarketingWinRulesDashboard,
+  type SerializedWinRule,
+  type SerializedWinEvent,
+} from './marketing-win-rules-dashboard';
 import messages from '../../../messages/en.json';
 
 vi.mock('@/i18n/navigation', () => ({
@@ -12,6 +16,29 @@ vi.mock('@/i18n/navigation', () => ({
   ),
 }));
 
+const mockRules: SerializedWinRule[] = [
+  {
+    id: 'wr-enterprise-deal',
+    name: 'Enterprise Annual License Closed',
+    schemaName: 'purchase',
+    winType: 'enterprise_deal',
+    active: true,
+    label: 'Enterprise License',
+    firedToday: 2,
+  },
+];
+
+const mockEvents: SerializedWinEvent[] = [
+  {
+    id: 'we-001',
+    winRuleName: 'Enterprise Annual License Closed',
+    winType: 'enterprise_deal',
+    title: 'EasySign — Enterprise License Closed!',
+    amount: '₪12,400',
+    occurredAt: '2026-08-24T09:47:00Z',
+  },
+];
+
 describe('MarketingWinRulesDashboard', () => {
   it('renders marketing win triggers and live celebration stream', () => {
     render(
@@ -20,6 +47,8 @@ describe('MarketingWinRulesDashboard', () => {
           orgId="JGTxet9aGXV6xUPWYidR"
           projectId="LYierelkF0eKnLmIrS9u"
           projectName="EasySign Growth"
+          rules={mockRules}
+          events={mockEvents}
         />
       </NextIntlClientProvider>,
     );
@@ -36,14 +65,11 @@ describe('MarketingWinRulesDashboard', () => {
 
     // Live stream
     expect(screen.getByText('Live Marketing Wins Stream')).toBeInTheDocument();
-    expect(screen.getByText('Enterprise License Closed!')).toBeInTheDocument();
-    expect(screen.getByText('VIP High-Ticket Order!')).toBeInTheDocument();
+    expect(screen.getByText('EasySign — Enterprise License Closed!')).toBeInTheDocument();
+    expect(screen.getByText('₪12,400')).toBeInTheDocument();
 
     // Predefined triggers
-    expect(
-      screen.getByText('💼 Enterprise Contract / Annual SaaS License'),
-    ).toBeInTheDocument();
-    expect(screen.getByText('🛍️ High-Ticket E-Commerce Order')).toBeInTheDocument();
+    expect(screen.getAllByText('Enterprise Annual License Closed').length).toBeGreaterThan(0);
   });
 
   it('allows toggling win trigger rules', () => {
@@ -53,13 +79,14 @@ describe('MarketingWinRulesDashboard', () => {
           orgId="JGTxet9aGXV6xUPWYidR"
           projectId="LYierelkF0eKnLmIrS9u"
           projectName="EasySign Growth"
+          rules={mockRules}
+          events={mockEvents}
         />
       </NextIntlClientProvider>,
     );
 
     const activeButtons = screen.getAllByRole('button', { name: 'Active' });
-    expect(activeButtons.length).toBeGreaterThan(0);
-    fireEvent.click(activeButtons[0]);
+    fireEvent.click(activeButtons[0]!);
     expect(screen.getByRole('button', { name: 'Disabled' })).toBeInTheDocument();
   });
 });

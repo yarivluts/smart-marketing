@@ -80,4 +80,16 @@ export class PluginInstallModel extends BaseModel {
 
   @Field()
   public source_last_synced_at?: string;
+
+  @Field()
+  public _demo_name?: string;
+
+  @Field()
+  public _demo_status?: string;
+
+  @Field()
+  public _demo_events_today?: number;
+
+  @Field()
+  public _demo_match_quality?: number;
 }

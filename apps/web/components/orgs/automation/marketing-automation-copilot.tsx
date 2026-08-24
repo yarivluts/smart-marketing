@@ -18,17 +18,22 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-export interface AutomatedOptimizationAction {
+export interface SerializedAutomationAction {
   id: string;
-  titleKey: string;
-  descKey: string;
-  channel: 'google' | 'meta' | 'tiktok';
-  impactKey: string;
-  timestamp: string;
-  status: 'executed' | 'pending';
+  actionType: string;
+  targetLabel: string;
+  status: string;
+  impact: string;
+  proposedAt: string;
 }
 
-export function MarketingAutomationCopilot({ projectName }: { projectName: string }) {
+export function MarketingAutomationCopilot({
+  projectName,
+  actions = [],
+}: {
+  projectName: string;
+  actions?: SerializedAutomationAction[];
+}) {
   const t = useTranslations('MarketingAutomation');
 
   const [copilotActive, setCopilotActive] = useState<boolean>(true);
@@ -37,35 +42,6 @@ export function MarketingAutomationCopilot({ projectName }: { projectName: strin
   const [launchingId, setLaunchingId] = useState<string | null>(null);
   const [launchedIds, setLaunchedIds] = useState<Set<string>>(new Set());
 
-  const recentActions: AutomatedOptimizationAction[] = [
-    {
-      id: 'act-1',
-      titleKey: 'actionBudgetShiftTitle',
-      descKey: 'actionBudgetShiftDesc',
-      channel: 'meta',
-      impactKey: 'actionBudgetShiftImpact',
-      timestamp: '12m ago',
-      status: 'executed',
-    },
-    {
-      id: 'act-2',
-      titleKey: 'actionFatiguePauseTitle',
-      descKey: 'actionFatiguePauseDesc',
-      channel: 'meta',
-      impactKey: 'actionFatiguePauseImpact',
-      timestamp: '45m ago',
-      status: 'executed',
-    },
-    {
-      id: 'act-3',
-      titleKey: 'actionBidBoostTitle',
-      descKey: 'actionBidBoostDesc',
-      channel: 'google',
-      impactKey: 'actionBidBoostImpact',
-      timestamp: '2h ago',
-      status: 'executed',
-    },
-  ];
 
   const handleLaunchCampaign = (id: string) => {
     setLaunchingId(id);
@@ -335,32 +311,35 @@ export function MarketingAutomationCopilot({ projectName }: { projectName: strin
           </div>
 
           <div className="flex flex-col gap-2.5">
-            {recentActions.map((act) => (
-              <div
-                key={act.id}
-                className="flex items-start justify-between gap-3 rounded-2xl border border-border/80 bg-background/60 p-3.5 text-xs"
-              >
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-foreground">
-                      {t(act.titleKey as Parameters<typeof t>[0])}
-                    </span>
-                    <span className="rounded-md bg-muted px-1.5 py-0.2 text-[10px] font-bold uppercase text-foreground">
-                      {act.channel}
+            {actions.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                <p>{'No autonomous actions executed yet. Copilot is actively monitoring connected ad accounts.'}</p>
+              </div>
+            ) : (
+              actions.map((act) => (
+                <div
+                  key={act.id}
+                  className="flex items-start justify-between gap-3 rounded-2xl border border-border/80 bg-background/60 p-3.5 text-xs"
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-foreground">
+                        {act.targetLabel}
+                      </span>
+                      <span className="rounded-md bg-muted px-1.5 py-0.2 text-[10px] font-bold uppercase text-foreground">
+                        {act.actionType}
+                      </span>
+                    </div>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
+                      {act.impact}
                     </span>
                   </div>
-                  <span className="text-muted-foreground">
-                    {t(act.descKey as Parameters<typeof t>[0])}
-                  </span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400 mt-1">
-                    {t(act.impactKey as Parameters<typeof t>[0])}
+                  <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">
+                    {new Date(act.proposedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                <span className="text-[10px] text-muted-foreground shrink-0 mt-0.5">
-                  {act.timestamp}
-                </span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

@@ -4,7 +4,11 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects } from '@/lib/orgs/queries';
+import {
+  listOrgProjects,
+  listWinRulesForProject,
+  listRecentWinEventsForProject,
+} from '@/lib/orgs/queries';
 import { MarketingWinRulesDashboard } from '@/components/orgs/win-rules/marketing-win-rules-dashboard';
 
 type PageProps = Readonly<{
@@ -43,9 +47,38 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
     notFound();
   }
 
+  const rawRules = await listWinRulesForProject(orgId, projectId);
+  const rawEvents = await listRecentWinEventsForProject(orgId, projectId);
+
+  const rules = rawRules.map((r) => ({
+    id: r.id,
+    name: r.name,
+    schemaName: r.schema_name,
+    winType: r.win_type,
+    active: r.active,
+    label: r._demo_label ?? r.name,
+    firedToday: r._demo_fired_today ?? 0,
+  }));
+
+  const events = rawEvents.map((e) => ({
+    id: e.id,
+    winRuleName: e.win_rule_name,
+    winType: e.win_type,
+    title: e._demo_title ?? (typeof e.payload?.title === 'string' ? e.payload.title : `${e.win_rule_name} Fired`),
+    amount: e._demo_amount ?? (typeof e.payload?.amount === 'string' ? e.payload.amount : ''),
+    occurredAt: e.occurred_at,
+  }));
+
   return (
     <main className="container mx-auto flex max-w-6xl flex-col gap-10 py-10 px-4 sm:px-6">
-      <MarketingWinRulesDashboard orgId={orgId} projectId={projectId} projectName={project.name} />
+      <MarketingWinRulesDashboard
+        orgId={orgId}
+        projectId={projectId}
+        projectName={project.name}
+        rules={rules}
+        events={events}
+      />
     </main>
   );
 }
+

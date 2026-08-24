@@ -4,7 +4,7 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects } from '@/lib/orgs/queries';
+import { listOrgProjects, listAutomationActionsForProject } from '@/lib/orgs/queries';
 import { MarketingAutomationCopilot } from '@/components/orgs/automation/marketing-automation-copilot';
 
 type PageProps = Readonly<{
@@ -47,9 +47,20 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
     notFound();
   }
 
+  const rawActions = await listAutomationActionsForProject(orgId, projectId);
+  const actions = rawActions.map((a) => ({
+    id: a.id,
+    actionType: a.action_type,
+    targetLabel: a.target_label,
+    status: a.status,
+    impact: a._demo_impact ?? (a.status === 'executed' ? 'Optimization executed' : 'Pending review'),
+    proposedAt: a.proposed_at,
+  }));
+
   return (
     <main className="container mx-auto flex max-w-6xl flex-col gap-10 py-10 px-4 sm:px-6">
-      <MarketingAutomationCopilot projectName={project.name} />
+      <MarketingAutomationCopilot projectName={project.name} actions={actions} />
     </main>
   );
 }
+

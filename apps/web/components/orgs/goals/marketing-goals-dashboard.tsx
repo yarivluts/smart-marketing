@@ -14,217 +14,81 @@ import {
   ShieldCheck,
   Compass,
 } from 'lucide-react';
+import { MarketingEmptyState } from '@/components/orgs/marketing-empty-state';
 
 export type GrowthGoalPreset = 'scale' | 'profit' | 'lead_gen';
 
-export interface PredefinedMarketingGoal {
+export interface SerializedGoal {
   id: string;
-  titleKey: string;
-  subtitleKey: string;
-  category: 'roas' | 'revenue' | 'cac' | 'trial_cvr' | 'cart_recovery';
-  targetValue: string;
-  currentValue: string;
-  progressPct: number;
-  status: 'on_track' | 'ahead' | 'needs_attention';
-  pacingNoteKey: string;
-  deadlineDaysLeft: number;
+  name: string;
+  metricName: string;
+  direction: string;
+  targetValue: number | null;
+  startDate: string;
+  deadline: string;
+  rhythm: string;
+  currentValue?: number | null;
+  progressPct?: number | null;
+  pacingNote?: string | null;
+  status?: string;
 }
 
-export function MarketingGoalsDashboard({ projectName }: { projectName: string }) {
+export function MarketingGoalsDashboard({
+  projectName,
+  goals = [],
+}: {
+  projectName: string;
+  goals?: SerializedGoal[];
+}) {
   const t = useTranslations('MarketingGoals');
-
   const [activePreset, setActivePreset] = useState<GrowthGoalPreset>('profit');
 
-  const goalsByPreset: Record<GrowthGoalPreset, PredefinedMarketingGoal[]> = {
-    profit: [
-      {
-        id: 'goal-roas',
-        titleKey: 'goalRoasTitle',
-        subtitleKey: 'goalRoasSubtitle',
-        category: 'roas',
-        targetValue: '4.00x',
-        currentValue: '3.84x',
-        progressPct: 96,
-        status: 'ahead',
-        pacingNoteKey: 'pacingAheadNote',
-        deadlineDaysLeft: 14,
-      },
-      {
-        id: 'goal-revenue',
-        titleKey: 'goalRevenueTitle',
-        subtitleKey: 'goalRevenueSubtitle',
-        category: 'revenue',
-        targetValue: '₪100,000',
-        currentValue: '₪95,420',
-        progressPct: 95,
-        status: 'on_track',
-        pacingNoteKey: 'pacingOnTrackRevenue',
-        deadlineDaysLeft: 7,
-      },
-      {
-        id: 'goal-cac',
-        titleKey: 'goalCacTitle',
-        subtitleKey: 'goalCacSubtitle',
-        category: 'cac',
-        targetValue: '< ₪60.00',
-        currentValue: '₪60.31',
-        progressPct: 99,
-        status: 'on_track',
-        pacingNoteKey: 'pacingOptimalCac',
-        deadlineDaysLeft: 21,
-      },
-      {
-        id: 'goal-trial-cvr',
-        titleKey: 'goalTrialCvrTitle',
-        subtitleKey: 'goalTrialCvrSubtitle',
-        category: 'trial_cvr',
-        targetValue: '15.0%',
-        currentValue: '14.8%',
-        progressPct: 98,
-        status: 'ahead',
-        pacingNoteKey: 'pacingHighTrialNote',
-        deadlineDaysLeft: 30,
-      },
-      {
-        id: 'goal-cart-recovery',
-        titleKey: 'goalCartRecoveryTitle',
-        subtitleKey: 'goalCartRecoverySubtitle',
-        category: 'cart_recovery',
-        targetValue: '25.0%',
-        currentValue: '26.4%',
-        progressPct: 105,
-        status: 'ahead',
-        pacingNoteKey: 'pacingExceedingCartRecovery',
-        deadlineDaysLeft: 18,
-      },
-    ],
-    scale: [
-      {
-        id: 'goal-roas',
-        titleKey: 'goalRoasTitle',
-        subtitleKey: 'goalRoasSubtitle',
-        category: 'roas',
-        targetValue: '3.20x',
-        currentValue: '3.84x',
-        progressPct: 120,
-        status: 'ahead',
-        pacingNoteKey: 'pacingAggressiveScale',
-        deadlineDaysLeft: 14,
-      },
-      {
-        id: 'goal-revenue',
-        titleKey: 'goalRevenueTitle',
-        subtitleKey: 'goalRevenueSubtitle',
-        category: 'revenue',
-        targetValue: '₪180,000',
-        currentValue: '₪95,420',
-        progressPct: 53,
-        status: 'on_track',
-        pacingNoteKey: 'pacingScalingVelocity',
-        deadlineDaysLeft: 25,
-      },
-      {
-        id: 'goal-cac',
-        titleKey: 'goalCacTitle',
-        subtitleKey: 'goalCacSubtitle',
-        category: 'cac',
-        targetValue: '< ₪85.00',
-        currentValue: '₪60.31',
-        progressPct: 100,
-        status: 'ahead',
-        pacingNoteKey: 'pacingCacRoomToScale',
-        deadlineDaysLeft: 25,
-      },
-      {
-        id: 'goal-trial-cvr',
-        titleKey: 'goalTrialCvrTitle',
-        subtitleKey: 'goalTrialCvrSubtitle',
-        category: 'trial_cvr',
-        targetValue: '12.0%',
-        currentValue: '14.8%',
-        progressPct: 123,
-        status: 'ahead',
-        pacingNoteKey: 'pacingHighTrialNote',
-        deadlineDaysLeft: 30,
-      },
-      {
-        id: 'goal-cart-recovery',
-        titleKey: 'goalCartRecoveryTitle',
-        subtitleKey: 'goalCartRecoverySubtitle',
-        category: 'cart_recovery',
-        targetValue: '20.0%',
-        currentValue: '26.4%',
-        progressPct: 132,
-        status: 'ahead',
-        pacingNoteKey: 'pacingExceedingCartRecovery',
-        deadlineDaysLeft: 18,
-      },
-    ],
-    lead_gen: [
-      {
-        id: 'goal-roas',
-        titleKey: 'goalRoasTitle',
-        subtitleKey: 'goalRoasSubtitle',
-        category: 'roas',
-        targetValue: '2.50x',
-        currentValue: '3.84x',
-        progressPct: 153,
-        status: 'ahead',
-        pacingNoteKey: 'pacingAheadNote',
-        deadlineDaysLeft: 14,
-      },
-      {
-        id: 'goal-revenue',
-        titleKey: 'goalRevenueTitle',
-        subtitleKey: 'goalRevenueSubtitle',
-        category: 'revenue',
-        targetValue: '₪80,000',
-        currentValue: '₪95,420',
-        progressPct: 119,
-        status: 'ahead',
-        pacingNoteKey: 'pacingOnTrackRevenue',
-        deadlineDaysLeft: 10,
-      },
-      {
-        id: 'goal-cac',
-        titleKey: 'goalCacTitle',
-        subtitleKey: 'goalCacSubtitle',
-        category: 'cac',
-        targetValue: '< ₪45.00',
-        currentValue: '₪60.31',
-        progressPct: 75,
-        status: 'needs_attention',
-        pacingNoteKey: 'pacingNeedsAttentionCac',
-        deadlineDaysLeft: 15,
-      },
-      {
-        id: 'goal-trial-cvr',
-        titleKey: 'goalTrialCvrTitle',
-        subtitleKey: 'goalTrialCvrSubtitle',
-        category: 'trial_cvr',
-        targetValue: '18.0%',
-        currentValue: '14.8%',
-        progressPct: 82,
-        status: 'on_track',
-        pacingNoteKey: 'pacingHighTrialNote',
-        deadlineDaysLeft: 20,
-      },
-      {
-        id: 'goal-cart-recovery',
-        titleKey: 'goalCartRecoveryTitle',
-        subtitleKey: 'goalCartRecoverySubtitle',
-        category: 'cart_recovery',
-        targetValue: '30.0%',
-        currentValue: '26.4%',
-        progressPct: 88,
-        status: 'on_track',
-        pacingNoteKey: 'pacingExceedingCartRecovery',
-        deadlineDaysLeft: 18,
-      },
-    ],
+  if (goals.length === 0) {
+    return (
+      <MarketingEmptyState
+        Icon={Target}
+        heading={t('emptyStateHeading', { projectName })}
+        description={t('emptyStateDesc')}
+        ctaLabel={t('emptyStateCta')}
+      />
+    );
+  }
+
+  // Calculate days left to deadline
+  const getDaysLeft = (deadlineStr: string) => {
+    const deadline = new Date(deadlineStr);
+    const today = new Date();
+    const diffTime = deadline.getTime() - today.getTime();
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return Math.max(days, 0);
   };
 
-  const activeGoals = goalsByPreset[activePreset];
+  const formatTarget = (metricName: string, value: number | null, direction: string) => {
+    if (value === null) return '-';
+    const prefix = direction === 'at_most' ? '< ' : '';
+    if (metricName.includes('roas')) return `${prefix}${value.toFixed(2)}x`;
+    if (metricName.includes('revenue') || metricName.includes('recovery')) {
+      return `${prefix}₪${value.toLocaleString()}`;
+    }
+    if (metricName.includes('cac')) return `${prefix}₪${value.toFixed(2)}`;
+    if (metricName.includes('cvr') || metricName.includes('rate')) {
+      return `${prefix}${value.toFixed(1)}%`;
+    }
+    return `${prefix}${value.toLocaleString()}`;
+  };
+
+  const formatCurrent = (metricName: string, value: number | null | undefined) => {
+    if (value === null || value === undefined) return '-';
+    if (metricName.includes('roas')) return `${value.toFixed(2)}x`;
+    if (metricName.includes('revenue') || metricName.includes('recovery')) {
+      return `₪${value.toLocaleString()}`;
+    }
+    if (metricName.includes('cac')) return `₪${value.toFixed(2)}`;
+    if (metricName.includes('cvr') || metricName.includes('rate')) {
+      return `${value.toFixed(1)}%`;
+    }
+    return `${value.toLocaleString()}`;
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -300,9 +164,12 @@ export function MarketingGoalsDashboard({ projectName }: { projectName: string }
 
       {/* Predefined Marketing Goals Grid */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-        {activeGoals.map((goal) => {
-          const isAhead = goal.status === 'ahead';
-          const isNeedsAttention = goal.status === 'needs_attention';
+        {goals.map((goal) => {
+          const progressPct = goal.progressPct ?? 0;
+          const status = goal.status ?? (progressPct >= 100 ? 'ahead' : progressPct >= 70 ? 'on_track' : 'needs_attention');
+          const isAhead = status === 'ahead';
+          const isNeedsAttention = status === 'needs_attention';
+          const daysLeft = getDaysLeft(goal.deadline);
 
           return (
             <div
@@ -313,7 +180,7 @@ export function MarketingGoalsDashboard({ projectName }: { projectName: string }
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-bold text-foreground">
-                    {t(goal.titleKey as Parameters<typeof t>[0])}
+                    {goal.name}
                   </span>
                   <div
                     className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
@@ -331,11 +198,11 @@ export function MarketingGoalsDashboard({ projectName }: { projectName: string }
                     ) : (
                       <TrendingUp className="h-3 w-3" />
                     )}
-                    <span>{t(`status_${goal.status}` as Parameters<typeof t>[0])}</span>
+                    <span>{t(`status_${status}` as Parameters<typeof t>[0])}</span>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {t(goal.subtitleKey as Parameters<typeof t>[0])}
+                  {goal.metricName}
                 </p>
               </div>
 
@@ -346,13 +213,17 @@ export function MarketingGoalsDashboard({ projectName }: { projectName: string }
                     <span className="text-[11px] font-medium text-muted-foreground">
                       {t('currentValueLabel')}
                     </span>
-                    <span className="text-2xl font-black text-foreground">{goal.currentValue}</span>
+                    <span className="text-2xl font-black text-foreground">
+                      {formatCurrent(goal.metricName, goal.currentValue)}
+                    </span>
                   </div>
                   <div className="flex flex-col items-end">
                     <span className="text-[11px] font-medium text-muted-foreground">
                       {t('targetValueLabel')}
                     </span>
-                    <span className="text-base font-bold text-primary">{goal.targetValue}</span>
+                    <span className="text-base font-bold text-primary">
+                      {formatTarget(goal.metricName, goal.targetValue, goal.direction)}
+                    </span>
                   </div>
                 </div>
 
@@ -360,7 +231,7 @@ export function MarketingGoalsDashboard({ projectName }: { projectName: string }
                 <div className="flex flex-col gap-1">
                   <div className="flex justify-between text-[11px] font-semibold text-muted-foreground">
                     <span>{t('completionPacing')}</span>
-                    <span className="font-bold text-foreground">{goal.progressPct}{'%'}</span>
+                    <span className="font-bold text-foreground">{progressPct}{'%'}</span>
                   </div>
                   <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
                     <div
@@ -371,7 +242,7 @@ export function MarketingGoalsDashboard({ projectName }: { projectName: string }
                           ? 'bg-rose-500'
                           : 'bg-primary'
                       }`}
-                      style={{ width: `${Math.min(goal.progressPct, 100)}%` }}
+                      style={{ width: `${Math.min(progressPct, 100)}%` }}
                     />
                   </div>
                 </div>
@@ -381,11 +252,11 @@ export function MarketingGoalsDashboard({ projectName }: { projectName: string }
               <div className="flex items-center justify-between border-t border-border/70 pt-3 text-[11px]">
                 <span className="flex items-center gap-1 font-semibold text-muted-foreground">
                   <Zap className="h-3 w-3 text-amber-500" />
-                  <span>{t(goal.pacingNoteKey as Parameters<typeof t>[0])}</span>
+                  <span>{goal.pacingNote || t('pacingOnTrackRevenue')}</span>
                 </span>
                 <span className="flex items-center gap-1 text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  <span>{goal.deadlineDaysLeft} {t('daysLeft')}</span>
+                  <span>{daysLeft} {t('daysLeft')}</span>
                 </span>
               </div>
             </div>
@@ -395,3 +266,4 @@ export function MarketingGoalsDashboard({ projectName }: { projectName: string }
     </div>
   );
 }
+

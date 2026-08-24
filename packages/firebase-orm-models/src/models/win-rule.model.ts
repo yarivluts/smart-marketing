@@ -60,4 +60,10 @@ export class WinRuleModel extends BaseModel {
 
   @Field({ is_required: true })
   public updated_at!: string;
+
+  @Field()
+  public _demo_label?: string;
+
+  @Field()
+  public _demo_fired_today?: number;
 }

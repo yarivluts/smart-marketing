@@ -4,7 +4,7 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects } from '@/lib/orgs/queries';
+import { listOrgProjects, listPluginInstallsForProject } from '@/lib/orgs/queries';
 import { MarketingChannelsHub } from '@/components/orgs/plugins/marketing-channels-hub';
 
 type PageProps = Readonly<{
@@ -43,9 +43,25 @@ export default async function PluginsPage({ params }: PageProps): Promise<React.
     notFound();
   }
 
+  const rawInstalls = await listPluginInstallsForProject(orgId, projectId);
+  const installs = rawInstalls.map((i) => ({
+    id: i.id,
+    pluginId: i.plugin_id,
+    status: i.status,
+    name: i._demo_name ?? i.plugin_id,
+    eventsToday: i._demo_events_today ?? 0,
+    matchQuality: i._demo_match_quality ?? 0,
+  }));
+
   return (
     <main className="container mx-auto flex max-w-6xl flex-col gap-10 py-10 px-4 sm:px-6">
-      <MarketingChannelsHub orgId={orgId} projectId={projectId} projectName={project.name} />
+      <MarketingChannelsHub
+        orgId={orgId}
+        projectId={projectId}
+        projectName={project.name}
+        installs={installs}
+      />
     </main>
   );
 }
+
