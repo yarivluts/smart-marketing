@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { GoalThermometer } from '@/components/orgs/goal-thermometer';
 import { BoardTileView } from '@/components/orgs/board-tile-view';
+import { RepCollectionLeaderboardWidget } from '@/components/orgs/rep-collection-leaderboard-widget';
 import { WarRoomWinOverlay } from '@/components/tv/war-room-win-overlay';
 import { fetchTvBoardFrame, type TvBoardFrame, type TvRotationManifest } from '@/lib/tv/tv-client';
 
@@ -12,21 +13,33 @@ export interface TvRotationScreenProps {
   manifest: TvRotationManifest;
 }
 
-type RotationFrame = { kind: 'board'; boardId: string; name: string } | { kind: 'goals' };
+type RotationFrame = { kind: 'board'; boardId: string; name: string } | { kind: 'goals' } | { kind: 'leaderboard' };
+
+/** A leaderboard frame is only worth a rotation slot once there's something to show — the same "no rows, no unattributed total" empty check `RepCollectionLeaderboardWidget` itself uses to decide whether to render its own empty state. */
+function hasLeaderboardData(manifest: TvRotationManifest): boolean {
+  return manifest.repCollectionLeaderboard.rows.length > 0 || manifest.repCollectionLeaderboard.unattributedCount > 0;
+}
 
 function buildFrames(manifest: TvRotationManifest): RotationFrame[] {
   const boardFrames: RotationFrame[] = manifest.boards.map((board) => ({ kind: 'board', boardId: board.id, name: board.name }));
-  return manifest.goals.length > 0 ? [...boardFrames, { kind: 'goals' }] : boardFrames;
+  const withGoals = manifest.goals.length > 0 ? [...boardFrames, { kind: 'goals' as const }] : boardFrames;
+  return hasLeaderboardData(manifest) ? [...withGoals, { kind: 'leaderboard' as const }] : withGoals;
 }
 
 /**
  * The war-room's own fullscreen rotation (KAN-67 AC: "fullscreen board
  * rotation"): cycles through every paired board plus one goals-thermometer
- * frame, `manifest.rotationSeconds` apart, huge dark-theme typography (plan
- * `10 §2.3`). A board's tile data is fetched on demand the moment its frame
- * becomes current (not all up front) — the same "don't pay for every
- * board's query before it's even shown" reasoning `rotation/route.ts`'s own
- * doc comment gives for keeping tile data out of the manifest fetch itself.
+ * frame and one rep-collections leaderboard frame (KAN-88's "war-room
+ * integration" AC bullet, reusing `RepCollectionLeaderboardWidget` — the same
+ * component already shown as a headline widget on the win-rules page — rather
+ * than a parallel TV-only rendering), `manifest.rotationSeconds` apart, huge
+ * dark-theme typography (plan `10 §2.3`). A board's tile data is fetched on
+ * demand the moment its frame becomes current (not all up front) — the same
+ * "don't pay for every board's query before it's even shown" reasoning
+ * `rotation/route.ts`'s own doc comment gives for keeping tile data out of
+ * the manifest fetch itself. The goals and leaderboard frames, by contrast,
+ * ride along in the manifest fetch itself — both are already small, single
+ * queries the rotation route computes once per poll, unlike a board's tiles.
  *
  * The rotation timer runs even when there's only one frame (a TV paired to a
  * single board with no goals — a common, not edge-case, configuration): it
@@ -104,7 +117,11 @@ export function TvRotationScreen({ deviceToken, manifest }: TvRotationScreenProp
       <header className="flex items-center justify-between">
         <h1 className="text-4xl font-bold tracking-tight">{manifest.label}</h1>
         <span className="text-lg text-muted-foreground">
-          {currentFrame.kind === 'board' ? currentFrame.name : t('goalsFrameHeading')}
+          {currentFrame.kind === 'board'
+            ? currentFrame.name
+            : currentFrame.kind === 'goals'
+              ? t('goalsFrameHeading')
+              : t('leaderboardFrameHeading')}
         </span>
       </header>
 
@@ -116,6 +133,12 @@ export function TvRotationScreen({ deviceToken, manifest }: TvRotationScreenProp
               <GoalThermometer view={goal.thermometer} />
             </section>
           ))}
+        </div>
+      ) : currentFrame.kind === 'leaderboard' ? (
+        <div className="flex flex-1 items-start">
+          <div className="w-full max-w-2xl text-xl [&_h2]:text-3xl [&_li]:text-xl [&_p]:text-lg">
+            <RepCollectionLeaderboardWidget view={manifest.repCollectionLeaderboard} />
+          </div>
         </div>
       ) : (
         <div className="grid flex-1 grid-cols-2 gap-8">

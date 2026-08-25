@@ -102,6 +102,7 @@ describe('TvApp', () => {
             projectId: 'project-1',
             boards: [],
             goals: [],
+            repCollectionLeaderboard: { periodStart: '2026-07-06', periodEnd: '2026-07-12', rows: [], unattributedTotal: 0, unattributedCount: 0 },
           });
         }
         throw new Error(`unexpected fetch: ${url}`);
@@ -154,6 +155,7 @@ describe('TvApp', () => {
             projectId: 'project-1',
             boards: [],
             goals: [],
+            repCollectionLeaderboard: { periodStart: '2026-07-06', periodEnd: '2026-07-12', rows: [], unattributedTotal: 0, unattributedCount: 0 },
           });
         }
         throw new Error(`unexpected fetch: ${url}`);

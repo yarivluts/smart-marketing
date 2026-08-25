@@ -1,21 +1,24 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireTvViewer } from '@/lib/orgs/tv-viewer-auth';
-import { getBoard, listGoalsForProject, queryGoalProgress } from '@/lib/orgs/queries';
+import { getBoard, getRepCollectionLeaderboardForProject, listGoalsForProject, listOrgPeople, queryGoalProgress } from '@/lib/orgs/queries';
 import { buildGoalThermometerView, toGoalSummaryView } from '@/lib/orgs/goal-view';
+import { toRepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
 
 /**
  * The rotation "frame manifest" (KAN-67): every board this TV rotates
  * through (by name — tile data itself is fetched per-frame from `board/
  * route.ts` so a rotation with many boards doesn't pay for every board's
- * query up front) plus every project goal's current thermometer, so the TV
- * can build its full rotation sequence (boards, then a goals frame) client-
- * side. Deliberately not streamed/pushed — the TV refetches this
- * periodically on its own (see `tv-app.tsx`'s own comment on the refresh
- * interval), the same "poll, don't hold a connection open" posture the win
- * feed's `EventSource` reconnect cycle already accepts for its own transport
- * (see `win-feed-stream.ts`'s doc comment) — a goal's progress or a board's
- * name changing mid-rotation only needs to show up eventually, not within
- * the sub-5s budget the win feed itself is held to.
+ * query up front) plus every project goal's current thermometer and this
+ * week's rep-collections leaderboard (KAN-88's own "war-room integration" AC
+ * bullet), so the TV can build its full rotation sequence (boards, then a
+ * goals frame, then a leaderboard frame) client-side. Deliberately not
+ * streamed/pushed — the TV refetches this periodically on its own (see
+ * `tv-app.tsx`'s own comment on the refresh interval), the same "poll, don't
+ * hold a connection open" posture the win feed's `EventSource` reconnect
+ * cycle already accepts for its own transport (see `win-feed-stream.ts`'s doc
+ * comment) — a goal's progress, a board's name, or the leaderboard totals
+ * changing mid-rotation only needs to show up eventually, not within the
+ * sub-5s budget the win feed itself is held to.
  */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { pairing, organizationId, projectId, error } = await requireTvViewer(request);
@@ -25,9 +28,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const boardIds = pairing.board_ids ?? [];
 
-  const [boardResults, goals] = await Promise.all([
+  const [boardResults, goals, repCollectionLeaderboard, people] = await Promise.all([
     Promise.all(boardIds.map((boardId) => getBoard(organizationId, projectId, boardId))),
     listGoalsForProject(organizationId, projectId),
+    getRepCollectionLeaderboardForProject(organizationId, projectId, 'week'),
+    listOrgPeople(organizationId),
   ]);
 
   const boards = boardResults
@@ -41,6 +46,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     }),
   );
 
+  const repCollectionLeaderboardView = toRepCollectionLeaderboardView(
+    repCollectionLeaderboard,
+    new Map(people.map((person) => [person.id, person.name])),
+  );
+
   return NextResponse.json({
     label: pairing.label ?? '',
     rotationSeconds: pairing.rotation_seconds ?? 30,
@@ -49,5 +59,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     projectId,
     boards,
     goals: goalFrames,
+    repCollectionLeaderboard: repCollectionLeaderboardView,
   });
 }

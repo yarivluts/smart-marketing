@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-08-24 (yet even later) — KAN-88's deferred /tv rotation integration delivered: rep-collections leaderboard frame (PR #276)
+
+- **Last completed:**
+  - Session start: local `main` was a detached-HEAD stale ref — reset to `origin/main`
+    (`git checkout -B main origin/main`), the same recurring local-ref fix every prior entry
+    documents. Read `PROGRESS.md`/`TASKS.md`: confirmed (again) that every story is `done` except
+    the standing blockers (KAN-18/19 `in-progress` on real infra, KAN-43 `needs-human`, KAN-50/51
+    `blocked-by` KAN-43) and KAN-82 (its last buildable bullet — NPS breakdown dimensions — had
+    just been delivered via PR #274, with a bookkeeping PR #275 already open from a concurrent
+    session to record it; left that alone rather than duplicating it).
+  - With no unclaimed `todo`/`in-progress` row left to pick, did the "fresh sweep" prior entries
+    have repeatedly recommended: grepped `TASKS.md` for `deferred`/`not yet` notes across `done`
+    rows, cross-checked each candidate against `git branch -a`/open PRs. Landed on a real,
+    concrete, previously-flagged-twice-but-never-picked-up gap: **KAN-88**'s own
+    `rep-collection-leaderboard-widget.tsx` doc comment explicitly deferred the war-room `/tv`
+    fullscreen-rotation integration as "a much larger, separately-scoped" piece of work — the
+    win-rules page's own leaderboard widget never made it onto the TV. Verified nobody else had
+    already built this (no branch/PR named anything leaderboard/tv/rotation-shaped).
+  - **Delivered (PR #276, branch `kan-88-tv-rotation-rep-leaderboard`):** `GET /api/tv-pairing/
+    rotation` (`rotation/route.ts`) now also fetches `getRepCollectionLeaderboardForProject(...,
+    'week')` + `listOrgPeople`, joined via the existing `toRepCollectionLeaderboardView` (the exact
+    same join the win-rules page already does — no new query logic needed). `TvRotationManifest`
+    (`tv-client.ts`) gained a `repCollectionLeaderboard` field reusing `RepCollectionLeaderboardView`
+    directly rather than inventing a parallel type. `TvRotationScreen` rotates through a new
+    `leaderboard` frame, reusing `RepCollectionLeaderboardWidget` as-is (no parallel TV-only
+    rendering) — omitted from the rotation entirely when there's nothing attributed or unattributed
+    to show yet, mirroring the widget's own empty-state check (same "don't show an empty frame"
+    posture the goals frame already established). New `TvMode.leaderboardFrameHeading` translation
+    key in both `en.json`/`he.json` — deliberately worded differently from the widget's own internal
+    "Top collections this week" heading (`RepCollectionLeaderboard.heading`) to avoid a duplicate-
+    text collision in the rendered frame (caught during test-writing, not left as a real bug).
+  - Updated `tv-app.test.tsx`'s two existing rotation-manifest fixtures (missing the new field
+    caused an immediate crash — `hasLeaderboardData` reading `.rows` off `undefined`) and added
+    fresh coverage: `rotation/route.test.ts` (a real `createRepCollectionEntry` lands in the
+    manifest response), `tv-rotation-screen.test.tsx` (renders the leaderboard frame when it has
+    data; omits it entirely when empty, including the pre-existing "no boards or goals" empty-state
+    case still passing).
+  - **Self-reviewed** via the `/code-review` skill (medium effort) before opening the PR — no
+    findings; the review specifically checked the frame-cycling/retry logic, i18n key parity, and
+    whether the added `listOrgPeople` read was reused correctly rather than duplicated.
+  - **Checks:** `pnpm install` (fresh container), `pnpm build` (whole monorepo, ~5 min), `pnpm lint`
+    and `pnpm --filter @growthos/web typecheck` green. Targeted emulator test runs green before
+    pushing (`rotation/route.test.ts`, `tv-rotation-screen.test.tsx`, `tv-client.test.ts`,
+    `rep-collection-view.test.ts`, `messages.test.ts`, then the whole `apps/web`/`components/tv`+
+    `app/api/tv-pairing` slice, 59/59). A full `pnpm test` run separately hit 4 unrelated failures/
+    timeouts in `packages/firebase-orm-models`'s `metric-pack-dispatch.emulator.test.ts` and
+    `campaign-ops-pack.emulator.test.ts` — neither file touched by this diff, and preceded in the
+    log by the same `RESOURCE_EXHAUSTED: Received message larger than max` gRPC/Firestore-emulator
+    flake this repo's history has documented repeatedly (KAN-22's original entry, PR #259's sharding
+    fix, KAN-85's own entry) — turbo had aborted the pipeline before `apps/web`'s own test task even
+    ran. Ran `apps/web`'s full unit suite directly instead (bypassing the aborted pipeline): 247/247
+    test files green. Opened PR #276, subscribed to its activity, waited via two scheduled
+    check-ins (~26 min for CI to report at all, then green) rather than polling — both checks
+    (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green,
+    `mergeable_state: clean`. Merged (squash). Remote branch deletion for
+    `kan-88-tv-rotation-rep-leaderboard` hit the same recurring HTTP 403 from this sandbox's
+    git-over-HTTPS proxy every prior run has documented — left undeleted, same accepted posture.
+  - Updated `TASKS.md`: **KAN-88**'s row gained a "Follow-up delivered (2026-08-24)" note crediting
+    PR #276 and closing the war-room-integration gap its own widget doc comment had flagged.
+- **In progress (exact stopping point):** none — PR #276 fully merged, `TASKS.md` reflects the
+  delivered scope, `main` is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` still has no remaining unblocked `todo`/`in-progress` row beyond the
+  standing KAN-18/19/43/50/51 blockers and KAN-86 (blocked-on-infra for `roi_nd`). A future run
+  should repeat this run's own "fresh sweep" approach — grep `TASKS.md` for `deferred`/`not yet`
+  notes on `done` rows, cross-check against `git branch -a`/open PRs, and look for a genuinely
+  unclaimed, concretely-scoped gap the way this run found KAN-88's TV integration and prior runs
+  found the `collected_revenue` double-count and the bounded-LRU-map fixes. Always verify
+  `git merge-base main origin/main` resolves before trusting a local checkout — this container's
+  local `main` was stale again at this run's start, same recurring issue every recent entry notes.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-88-tv-rotation-rep-leaderboard` branch on GitHub (the
+    git-over-HTTPS proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-24 (yet later still) — KAN-82 closed out: NPS-by-plan/channel/cohort breakdown dimensions (PR #274)
 
 - **Last completed:**

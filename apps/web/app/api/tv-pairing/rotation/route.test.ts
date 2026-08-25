@@ -7,6 +7,7 @@ import {
   createOrganizationWithOwner,
   createOrgPerson,
   createProject,
+  createRepCollectionEntry,
   ensureUserForFirebaseSession,
   registerMetricDefinition,
   requestTvPairing,
@@ -56,6 +57,16 @@ async function setupClaimedPairing(orgName: string) {
     ownerPersonId: person.id,
     createdByUserId: owner.id,
   });
+  await createRepCollectionEntry({
+    organizationId: organization.id,
+    projectId: project.id,
+    orgPersonId: person.id,
+    company: 'Acme Co',
+    collectionType: 'upgrade',
+    amount: 500,
+    occurredAt: new Date().toISOString(),
+    createdByUserId: owner.id,
+  });
 
   const { deviceToken, code } = await requestTvPairing();
   const pairing = await claimTvPairing({
@@ -91,7 +102,7 @@ describe('GET /api/tv-pairing/rotation', () => {
     expect(response.status).toBe(401);
   });
 
-  it('returns the board list and goal thermometers for a claimed pairing', async () => {
+  it('returns the board list, goal thermometers, and rep-collections leaderboard for a claimed pairing', async () => {
     const { deviceToken, board, goal } = await setupClaimedPairing('TV Rotation Org');
     const response = await GET(rotationRequest(deviceToken));
     expect(response.status).toBe(200);
@@ -101,11 +112,14 @@ describe('GET /api/tv-pairing/rotation', () => {
       reducedMotion: boolean;
       boards: Array<{ id: string; name: string }>;
       goals: Array<{ id: string; name: string }>;
+      repCollectionLeaderboard: { rows: Array<{ orgPersonId: string; name: string; totalAmount: number; entryCount: number }> };
     };
     expect(body.label).toBe('Rotation Test TV');
     expect(body.rotationSeconds).toBe(20);
     expect(body.boards).toEqual([{ id: board.id, name: 'Marketing' }]);
     expect(body.goals).toHaveLength(1);
     expect(body.goals[0].id).toBe(goal.id);
+    expect(body.repCollectionLeaderboard.rows).toHaveLength(1);
+    expect(body.repCollectionLeaderboard.rows[0]).toMatchObject({ name: 'Rep', totalAmount: 500, entryCount: 1 });
   });
 });
