@@ -30,3 +30,4 @@ export * from './omnisearch';
 export * from './firmographic-enrichment';
 export * from './rep-collections';
 export * from './support';
+export * from './sales';

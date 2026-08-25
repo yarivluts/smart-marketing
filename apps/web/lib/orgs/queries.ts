@@ -41,6 +41,8 @@ import {
   type ExperimentResultsOutcome,
   getSupportLeaderboardForProject as getSupportLeaderboardForProjectInOrganization,
   type SupportLeaderboardResult,
+  getDemoFunnelForProject as getDemoFunnelForProjectInOrganization,
+  type DemoFunnelResult,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -453,6 +455,16 @@ export async function getSupportLeaderboardForProject(
 ): Promise<SupportLeaderboardResult> {
   await ensureFirestoreOrm();
   return getSupportLeaderboardForProjectInOrganization(organizationId, projectId, options);
+}
+
+/** The demo funnel (scheduled/held/no-show/show-rate) + per-rep breakdown (KAN-92, plan `14 §Gap 9`), computed fresh from bounded, landed `demo_event` raw records — no warehouse dependency, same "fetch once, aggregate in TypeScript" posture `getSupportLeaderboardForProject` establishes. */
+export async function getDemoFunnelForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number },
+): Promise<DemoFunnelResult> {
+  await ensureFirestoreOrm();
+  return getDemoFunnelForProjectInOrganization(organizationId, projectId, options);
 }
 
 /** The bounded, landed `cancellation_reason` raw records `getCancellationReasonCodeBreakdownForProject`/`getCancellationReasonThemeDigestForProject` each read — fetch once via this and pass the result to both via `precomputedRecords`, same posture `listSurveyResponseRecordsForProject` establishes. */

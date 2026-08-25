@@ -26,6 +26,7 @@ const PACK_LABEL_KEYS: Record<string, { title: string; description: string }> = 
   'com.growthos.firmographic-enrichment-pack': { title: 'builtinPackFirmographicTitle', description: 'builtinPackFirmographicDescription' },
   'com.growthos.experiment-pack': { title: 'builtinPackExperimentTitle', description: 'builtinPackExperimentDescription' },
   'com.growthos.support-pack': { title: 'builtinPackSupportTitle', description: 'builtinPackSupportDescription' },
+  'com.growthos.sales-pack': { title: 'builtinPackSalesTitle', description: 'builtinPackSalesDescription' },
 };
 
 /**
