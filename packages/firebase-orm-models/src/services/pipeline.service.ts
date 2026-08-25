@@ -403,9 +403,19 @@ export const DEFAULT_CHURN_FEED_LIMIT = 100;
  */
 const CHURN_FEED_CANDIDATE_WINDOW = 500;
 
-/** A subscription entity record counts as a churn signal once it's canceled or scheduled to cancel — mirrors the `mrr_movements` "downgrade" slice `CHURNED_MRR` (`saas-metric-pack/metrics.ts`) uses at the warehouse layer, at the raw-record level. */
-function isChurnSignal(payload: Record<string, unknown>): boolean {
-  return payload.cancel_at_period_end === true || typeof payload.canceled_at === 'string';
+/**
+ * A subscription entity record counts as a churn signal once it's canceled or scheduled to cancel —
+ * mirrors the `mrr_movements` "downgrade" slice `CHURNED_MRR` (`saas-metric-pack/metrics.ts`) uses at
+ * the warehouse layer, at the raw-record level. Reads through `declaredFieldsForRecord` (not
+ * `record.payload` directly) for the same reason `record-feed-view.ts`'s `toRecordFeedEntryView` fix
+ * (KAN-81 slice 6, PR #247) had to: a landed `RawRecordModel.payload` is the whole ingest envelope, so
+ * an entity's declared fields (incl. `cancel_at_period_end`/`canceled_at`) live under `payload.attributes`,
+ * not at the payload's top level — reading `payload` directly silently never matched a real Stripe-landed
+ * subscription, only a hand-built flat-payload test fixture.
+ */
+function isChurnSignal(record: RawRecordModel): boolean {
+  const fields = declaredFieldsForRecord(record);
+  return fields.cancel_at_period_end === true || typeof fields.canceled_at === 'string';
 }
 
 /**
@@ -427,7 +437,7 @@ export async function listRecentChurnedSubscriptionsForProject(
     limit: Math.max(limit, CHURN_FEED_CANDIDATE_WINDOW),
   });
 
-  return candidates.filter((record) => isChurnSignal(record.payload)).slice(0, limit);
+  return candidates.filter((record) => isChurnSignal(record)).slice(0, limit);
 }
 
 /**

@@ -836,7 +836,10 @@ describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
       schemaName: 'stripe_subscription',
       kind: 'entity',
       landedAt: '2026-08-22T09:00:00.000Z',
-      payload: { customer_id: 'cus_active', status: 'active', currency: 'usd', mrr_normalized: 4900, cancel_at_period_end: false },
+      // A real landed entity payload is the whole ingest envelope (`id` alongside `attributes`), not
+      // a flat field map -- see `isChurnSignal`'s own doc comment for the bug this fixture shape
+      // regression-tests.
+      payload: { id: 'cus_active', attributes: { customer_id: 'cus_active', status: 'active', currency: 'usd', mrr_normalized: 4900, cancel_at_period_end: false } },
     });
     // Scheduled to cancel at period end.
     await landRawRecord({
@@ -846,7 +849,7 @@ describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
       schemaName: 'stripe_subscription',
       kind: 'entity',
       landedAt: '2026-08-22T10:00:00.000Z',
-      payload: { customer_id: 'cus_scheduled', status: 'active', currency: 'usd', mrr_normalized: 2900, cancel_at_period_end: true },
+      payload: { id: 'cus_scheduled', attributes: { customer_id: 'cus_scheduled', status: 'active', currency: 'usd', mrr_normalized: 2900, cancel_at_period_end: true } },
     });
     // Already canceled.
     await landRawRecord({
@@ -856,7 +859,10 @@ describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
       schemaName: 'stripe_subscription',
       kind: 'entity',
       landedAt: '2026-08-22T11:00:00.000Z',
-      payload: { customer_id: 'cus_canceled', status: 'canceled', currency: 'usd', mrr_normalized: 0, cancel_at_period_end: false, canceled_at: '2026-08-22T11:00:00.000Z' },
+      payload: {
+        id: 'cus_canceled',
+        attributes: { customer_id: 'cus_canceled', status: 'canceled', currency: 'usd', mrr_normalized: 0, cancel_at_period_end: false, canceled_at: '2026-08-22T11:00:00.000Z' },
+      },
     });
     // A non-subscription entity must never show up in the feed either.
     await landRawRecord({
@@ -866,12 +872,12 @@ describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
       schemaName: 'crm_account',
       kind: 'entity',
       landedAt: '2026-08-22T12:00:00.000Z',
-      payload: { cancel_at_period_end: true },
+      payload: { id: 'acct_1', attributes: { cancel_at_period_end: true } },
     });
 
     const entries = await listRecentChurnedSubscriptionsForProject(organization.id, project.id);
 
-    expect(entries.map((entry) => entry.payload.customer_id)).toEqual(['cus_canceled', 'cus_scheduled']);
+    expect(entries.map((entry) => (entry.payload.attributes as Record<string, unknown>).customer_id)).toEqual(['cus_canceled', 'cus_scheduled']);
     expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id, devEnvironment.id]);
   });
 
@@ -886,15 +892,15 @@ describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
         schemaName: 'stripe_subscription',
         kind: 'entity',
         landedAt: `2026-08-22T10:0${i}:00.000Z`,
-        payload: { customer_id: `cus_${i}`, canceled_at: `2026-08-22T10:0${i}:00.000Z` },
+        payload: { id: `cus_${i}`, attributes: { customer_id: `cus_${i}`, canceled_at: `2026-08-22T10:0${i}:00.000Z` } },
       });
     }
 
     const entries = await listRecentChurnedSubscriptionsForProject(organization.id, project.id, 3);
 
     expect(entries).toHaveLength(3);
-    expect(entries[0].payload.customer_id).toBe('cus_4');
-    expect(entries[2].payload.customer_id).toBe('cus_2');
+    expect((entries[0].payload.attributes as Record<string, unknown>).customer_id).toBe('cus_4');
+    expect((entries[2].payload.attributes as Record<string, unknown>).customer_id).toBe('cus_2');
   });
 
   it('throws ProjectNotFoundError for a project id that does not belong to the given org', async () => {

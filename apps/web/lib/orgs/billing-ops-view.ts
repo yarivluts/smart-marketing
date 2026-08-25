@@ -1,4 +1,4 @@
-import { BILLING_OPS_FEED_EVENT_SCHEMA_NAMES, type RawRecordModel } from '@growthos/firebase-orm-models';
+import { BILLING_OPS_FEED_EVENT_SCHEMA_NAMES, checkRecordEnvelope, type RawRecordModel } from '@growthos/firebase-orm-models';
 
 const [CHARGE_SCHEMA_NAME, FAILED_PAYMENT_SCHEMA_NAME, REFUND_SCHEMA_NAME] = BILLING_OPS_FEED_EVENT_SCHEMA_NAMES;
 
@@ -52,7 +52,12 @@ export interface BillingOpsFeedEntryView {
 }
 
 export function toBillingOpsFeedEntryView(record: RawRecordModel): BillingOpsFeedEntryView {
-  const payload = record.payload;
+  // A landed `RawRecordModel.payload` is the *whole* ingest envelope (an event's own `event_id`/
+  // `event`/`ts` alongside its `properties`), not a flat map of the schema's declared fields — same
+  // bug class `record-feed-view.ts`'s `toRecordFeedEntryView` fix (KAN-81 slice 6, PR #247) already
+  // corrected. Reading `record.payload` directly here meant every field below silently rendered blank
+  // for any charge/refund/failed-payment record landed through the real Stripe plugin.
+  const payload = checkRecordEnvelope(record.kind, record.payload).fieldsToValidate;
   return {
     id: record.id,
     type: billingOpsFeedEntryType(record.schema_name),
