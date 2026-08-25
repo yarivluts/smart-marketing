@@ -87,6 +87,14 @@ export function buildTestCatalog(): MetricCatalog {
       formula: 'ltv / cac',
       dimensions: [],
     },
+    {
+      name: 'floored_net_spend',
+      definitionKind: 'formula',
+      // A formula floored at zero via the compiler's max() function (KAN-90's
+      // support_open_backlog follow-up) — compiles to BigQuery's GREATEST().
+      formula: 'max(ad_spend - new_paying, 0)',
+      dimensions: ['channel'],
+    },
   ];
 
   return new Map(definitions.map((definition) => [definition.name, definition]));

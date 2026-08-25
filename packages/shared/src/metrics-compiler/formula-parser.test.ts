@@ -147,6 +147,70 @@ describe('parseFormula', () => {
     expect(() => parseFormula('a + b )')).toThrow(MetricCompilerError);
     expect(() => parseFormula('a + b )')).toThrow(/Unexpected trailing content/);
   });
+
+  describe('max()/min() function calls', () => {
+    it('parses a 2-argument max() call', () => {
+      expect(parseFormula('max(a, b)')).toEqual({
+        type: 'call',
+        name: 'max',
+        args: [
+          { type: 'identifier', name: 'a' },
+          { type: 'identifier', name: 'b' },
+        ],
+      });
+    });
+
+    it('parses a 2-argument min() call with an expression and a number literal argument', () => {
+      expect(parseFormula('min(a - b, 0)')).toEqual({
+        type: 'call',
+        name: 'min',
+        args: [
+          { type: 'binary', op: '-', left: { type: 'identifier', name: 'a' }, right: { type: 'identifier', name: 'b' } },
+          { type: 'number', value: '0' },
+        ],
+      });
+    });
+
+    it('parses a 3+-argument call', () => {
+      expect(parseFormula('max(a, b, c)')).toEqual({
+        type: 'call',
+        name: 'max',
+        args: [
+          { type: 'identifier', name: 'a' },
+          { type: 'identifier', name: 'b' },
+          { type: 'identifier', name: 'c' },
+        ],
+      });
+    });
+
+    it('treats a function call as just another factor, so it composes with the surrounding expression', () => {
+      expect(parseFormula('1 + max(a, b) * 2')).toEqual({
+        type: 'binary',
+        op: '+',
+        left: { type: 'number', value: '1' },
+        right: {
+          type: 'binary',
+          op: '*',
+          left: { type: 'call', name: 'max', args: [{ type: 'identifier', name: 'a' }, { type: 'identifier', name: 'b' }] },
+          right: { type: 'number', value: '2' },
+        },
+      });
+    });
+
+    it('throws MetricCompilerError on an unsupported function name', () => {
+      expect(() => parseFormula('round(a)')).toThrow(MetricCompilerError);
+      expect(() => parseFormula('round(a)')).toThrow(/Unknown function "round\(\.\.\.\)"/);
+    });
+
+    it('throws MetricCompilerError when max()/min() is called with fewer than 2 arguments', () => {
+      expect(() => parseFormula('max(a)')).toThrow(MetricCompilerError);
+      expect(() => parseFormula('max(a)')).toThrow(/requires at least 2 arguments/);
+    });
+
+    it('throws MetricCompilerError on a call missing its closing paren', () => {
+      expect(() => parseFormula('max(a, b')).toThrow(MetricCompilerError);
+    });
+  });
 });
 
 describe('collectIdentifiers', () => {
@@ -168,5 +232,15 @@ describe('collectIdentifiers', () => {
 
   it('collects identifiers through nested parens', () => {
     expect(collectIdentifiers(parseFormula('(a + (b * c)) / d'))).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('collects identifiers from every argument of a call, in order, without including the function name itself', () => {
+    expect(collectIdentifiers(parseFormula('max(a - b, c)'))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('never treats a call\'s function name as a referenced identifier even when a same-named metric exists elsewhere in the formula', () => {
+    // regression: extractFormulaReferences (metric-registry.service.ts) must not
+    // mistake "max" itself for a metric name it needs to exist in the catalog.
+    expect(collectIdentifiers(parseFormula('max(max_spend, 0)'))).toEqual(['max_spend']);
   });
 });

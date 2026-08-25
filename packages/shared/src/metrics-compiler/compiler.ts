@@ -185,6 +185,15 @@ function emitFormulaAst(catalog: MetricCatalog, node: FormulaAstNode, resolving:
       // `/` compiles to SAFE_DIVIDE, not a literal `/` — see formula-parser.ts's doc comment.
       return node.op === '/' ? `SAFE_DIVIDE(${left}, ${right})` : `(${left} ${node.op} ${right})`;
     }
+    case 'call': {
+      // `max`/`min` compile to BigQuery's own variadic GREATEST/LEAST — lets a
+      // formula metric express a floor/ceiling (e.g. `max(opened - resolved, 0)`
+      // for a backlog that must never render negative), which no combination of
+      // `+`/`-`/`*`/`/` alone can express. See formula-parser.ts's doc comment.
+      const fn = node.name === 'max' ? 'GREATEST' : 'LEAST';
+      const args = node.args.map((arg) => emitFormulaAst(catalog, arg, resolving));
+      return `${fn}(${args.join(', ')})`;
+    }
   }
 }
 

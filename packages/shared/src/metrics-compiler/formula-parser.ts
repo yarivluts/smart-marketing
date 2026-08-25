@@ -1,5 +1,9 @@
 import { MetricCompilerError } from './types';
 
+/** Function names a formula's `call` node may use — see {@link parseCall}'s doc comment for why this is a closed set rather than any identifier followed by `(`. */
+export const FORMULA_FUNCTION_NAMES = ['max', 'min'] as const;
+export type FormulaFunctionName = (typeof FORMULA_FUNCTION_NAMES)[number];
+
 /**
  * A minimal arithmetic-expression AST for metric formulas (plan `04 §2`'s
  * `ad_spend / signups` style). Needed (rather than naive string
@@ -13,14 +17,15 @@ export type FormulaAstNode =
   | { type: 'number'; value: string }
   | { type: 'identifier'; name: string }
   | { type: 'unary'; operand: FormulaAstNode }
-  | { type: 'binary'; op: '+' | '-' | '*' | '/'; left: FormulaAstNode; right: FormulaAstNode };
+  | { type: 'binary'; op: '+' | '-' | '*' | '/'; left: FormulaAstNode; right: FormulaAstNode }
+  | { type: 'call'; name: FormulaFunctionName; args: FormulaAstNode[] };
 
 interface Token {
-  kind: 'number' | 'identifier' | 'op' | 'lparen' | 'rparen';
+  kind: 'number' | 'identifier' | 'op' | 'lparen' | 'rparen' | 'comma';
   value: string;
 }
 
-const TOKEN_PATTERN = /^([0-9]+(?:\.[0-9]+)?|[a-z][a-z0-9_]*|[+\-*/()])\s*/;
+const TOKEN_PATTERN = /^([0-9]+(?:\.[0-9]+)?|[a-z][a-z0-9_]*|[+\-*/(),])\s*/;
 
 function tokenize(formula: string): Token[] {
   const tokens: Token[] = [];
@@ -39,6 +44,8 @@ function tokenize(formula: string): Token[] {
       tokens.push({ kind: 'lparen', value });
     } else if (value === ')') {
       tokens.push({ kind: 'rparen', value });
+    } else if (value === ',') {
+      tokens.push({ kind: 'comma', value });
     } else {
       tokens.push({ kind: 'op', value });
     }
@@ -73,12 +80,49 @@ class TokenStream {
   }
 }
 
+function isFormulaFunctionName(name: string): name is FormulaFunctionName {
+  return (FORMULA_FUNCTION_NAMES as readonly string[]).includes(name);
+}
+
+/**
+ * `name(arg, arg, ...)` — an identifier immediately followed by `(` is a
+ * function call, not a metric reference, so it must be parsed (and later
+ * excluded from `collectIdentifiers`) before a bare `identifier` node is
+ * ever produced for it. Restricted to `max`/`min` (compiled to BigQuery's
+ * `GREATEST`/`LEAST`, see `compiler.ts`) rather than any identifier the
+ * caller writes followed by `(` — an unrecognized name is almost certainly
+ * a typo the caller wants surfaced immediately, not silently accepted as
+ * some future function this compiler doesn't know how to emit SQL for.
+ */
+function parseCall(stream: TokenStream, name: string): FormulaAstNode {
+  if (!isFormulaFunctionName(name)) {
+    throw new MetricCompilerError(`Unknown function "${name}(...)" in formula — only ${FORMULA_FUNCTION_NAMES.join('/')} are supported.`);
+  }
+  stream.next(); // consume "("
+  const args: FormulaAstNode[] = [parseExpr(stream)];
+  while (stream.peek()?.kind === 'comma') {
+    stream.next();
+    args.push(parseExpr(stream));
+  }
+  const close = stream.next();
+  if (close.kind !== 'rparen') {
+    throw new MetricCompilerError(`Expected ")" to close "${name}(...)" in formula.`);
+  }
+  if (args.length < 2) {
+    throw new MetricCompilerError(`"${name}(...)" requires at least 2 arguments.`);
+  }
+  return { type: 'call', name, args };
+}
+
 function parseFactor(stream: TokenStream): FormulaAstNode {
   const token = stream.next();
   if (token.kind === 'number') {
     return { type: 'number', value: token.value };
   }
   if (token.kind === 'identifier') {
+    if (stream.peek()?.kind === 'lparen') {
+      return parseCall(stream, token.value);
+    }
     return { type: 'identifier', name: token.value };
   }
   if (token.kind === 'op' && token.value === '-') {
@@ -143,5 +187,7 @@ export function collectIdentifiers(node: FormulaAstNode): string[] {
       return collectIdentifiers(node.operand);
     case 'binary':
       return [...collectIdentifiers(node.left), ...collectIdentifiers(node.right)];
+    case 'call':
+      return node.args.flatMap((arg) => collectIdentifiers(arg));
   }
 }
