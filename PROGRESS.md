@@ -17,6 +17,69 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (even newer) — Merged KAN-73 follow-up (PR #294, real Meta creative image upload); recovered from a stale-base branch before merge
+
+- **Last completed:**
+  - Session start: local `main`'s branch ref was a stale snapshot — the same recurring shallow-clone
+    quirk prior entries document — but this time it bit much harder than usual: `git checkout -B main
+    origin/main` landed on a commit **145 PRs behind** real `main` (back at the PR #148 era), not just
+    a few commits stale. Checked `list_pull_requests`: PR #293 (a concurrent session's Meta ad-set-edit
+    follow-up) was open; picked a **different**, non-overlapping KAN-73 deferred bullet to avoid
+    collision — "real Meta creative image upload" (`MetaCampaignDraftAdSet.ad.creative`'s own doc
+    comment had explicitly named this out of scope for v1).
+  - **Delivered (originally on branch `kan-73-meta-creative-image-upload`):** `imageDataUrl` (a
+    `data:image/(png|jpeg);base64,...` URL) on the Meta creative shape, validated + size-capped
+    (`MAX_IMAGE_DATA_URL_LENGTH`, ~390KB raw — the whole draft is persisted verbatim on the proposed
+    action's `after.campaignDraft`, a single Firestore document capped at 1 MiB); `MetaAdsApiClient.
+    uploadAdImage` hitting Meta's real `/act_{id}/adimages` endpoint's `bytes` (base64) form field on
+    a plain POST (no multipart upload plumbing needed — the same `URLSearchParams` shape every other
+    call on this client already uses); `executeCampaignDraftCreate` uploads the image before creating
+    the ad creative, threading `image_hash` through; an optional PNG/JPEG file input on the existing
+    campaign-draft admin form with client-side validation + an inline preview; en/he translations.
+    Full local `pnpm build/lint/typecheck/test` green (979 firebase-orm-models tests, 949 web tests
+    incl. new image-upload UI tests, 23/23 e2e) — opened as **PR #294**.
+  - **Caught before merge:** PR #294's own `mergeable_state` came back `dirty`. Investigated rather
+    than assumed-noise: the branch's cherry-picked/committed work was genuinely based on that 145-PR-
+    stale `main` from session start, missing KAN-72/73's own `keyword_edit`/`ad_edit`/`meta_ad_set_edit`
+    action types (PRs #289/#292/#293) entirely — a much bigger gap than a normal same-day staleness
+    conflict. Recovered by resetting local `main` to the real `origin/main`, creating a fresh branch,
+    and `git cherry-pick`-ing the single feature commit onto it — 3 real conflicts (`executor.ts`'s
+    imports/error-classes and its `executeCampaignDraftCreate` loop body, `api-client.test.ts`,
+    `executor.emulator.test.ts`'s `fakeApiClient`), all additive-on-both-sides and resolved by keeping
+    both PRs' code (verified via `git diff` against the pre-conflict intent for every touched file, not
+    just a green build). Force-pushed the corrected branch — `mergeable_state` came back `clean`. Full
+    `pnpm build/lint/typecheck/test` re-run from scratch against the real base (also green: 1396
+    firebase-orm-models tests, 1561 web tests — the real counts, once KAN-72/73's own intervening test
+    growth was actually included). CI green (`lint · typecheck · test · build` + `terraform fmt ·
+    validate`), `mergeable_state: clean` reconfirmed after PR #295 merged in the interim (unrelated
+    files, no re-conflict) — merged via squash as PR #294. Remote branch delete hit the same recurring
+    HTTP 403 from this sandbox's git-over-HTTPS proxy every prior entry documents — left the merged
+    remote branch in place (harmless), same established posture.
+  - **Root-cause note for future runs:** the `git checkout -B main origin/main` "fix" for the
+    documented stale-local-ref quirk is not by itself sufficient verification — it can silently land
+    on an `origin/main` ref that is itself far more stale than a quick glance at the resulting `git
+    log` would suggest, since a recent-looking commit message doesn't guarantee true freshness. Before
+    trusting a freshly-checked-out `main` as a branch base, this run recommends a cheap sanity check
+    future runs should adopt: compare the checked-out `main` tip against `list_pull_requests`/
+    `list_commits`' own view of the real remote tip, not just against the working tree's own git log.
+- **In progress (exact stopping point):** none — PR #294 is merged, `main` is green, local `main` is
+  freshly re-synced to the real remote tip (`95b61f1`) after this recovery.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates: KAN-72's remaining PMax asset groups (bigger scope, deliberately not attempted);
+  KAN-73's real Meta creative image upload is now closed by this entry, but Lookalike/Similar Audience
+  expansion for either connector and a true Meta post-creation creative-text edit (beyond the
+  budget/status `meta_ad_set_edit` PR #293 already delivers) remain deferred, documented.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Consider whether the container/session-start git setup could pin or verify `origin/main` more
+    robustly — this is the second consecutive run to lose real time to a stale-base surprise (the
+    previous one was caught quickly; this one required a full recovery), and the root cause (a
+    shallow-clone or cache serving a very old `main` snapshot at container start) sits outside this
+    run's own control.
+
+---
+
 ## 2026-08-25 (newest) — Merged KAN-86 slice 3 (PR #295, true per-campaign roi_Nd/collection_Nd)
 
 - **Last completed:**
