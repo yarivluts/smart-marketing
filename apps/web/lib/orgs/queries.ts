@@ -30,10 +30,12 @@ import {
   type FirmographicQueryOutcome,
   type FirmographicCompositionAlertModel,
   getCampaignSpendBreakdownForProject as getCampaignSpendBreakdownForProjectInOrganization,
+  getCampaignPaybackBreakdownForProject as getCampaignPaybackBreakdownForProjectInOrganization,
   getPaybackOverviewForProject as getPaybackOverviewForProjectInOrganization,
   getQualityCalibrationBreakdownForProject as getQualityCalibrationBreakdownForProjectInOrganization,
   listCampaignTargetsForProject as listCampaignTargetsForProjectInOrganization,
   type CampaignSpendBreakdownOutcome,
+  type CampaignPaybackBreakdownOutcome,
   type CampaignTargetModel,
   type PaybackOverviewOutcome,
   type QualityCalibrationBreakdownOutcome,
@@ -582,6 +584,11 @@ export async function listFirmographicCompositionAlertsForProject(organizationId
 export async function getCampaignSpendBreakdownForProject(organizationId: string, projectId: string): Promise<CampaignSpendBreakdownOutcome> {
   await ensureFirestoreOrm();
   return getCampaignSpendBreakdownForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getCampaignPaybackBreakdownForProject(organizationId: string, projectId: string): Promise<CampaignPaybackBreakdownOutcome> {
+  await ensureFirestoreOrm();
+  return getCampaignPaybackBreakdownForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listCampaignTargetsForProject(organizationId: string, projectId: string): Promise<CampaignTargetModel[]> {

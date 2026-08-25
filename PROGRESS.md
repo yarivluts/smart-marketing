@@ -17,6 +17,88 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (newest) — Merged KAN-86 slice 3 (PR #295, true per-campaign roi_Nd/collection_Nd)
+
+- **Last completed:**
+  - Session start: same recurring stale-local-`main`-ref quirk every recent entry documents (local
+    `main` shared no common ancestor with `origin/main` — `git reset --hard origin/main` fixed it).
+    Found PR #293 (`kan-73-meta-adset-edit`) already open from an earlier run in this session, `dirty`
+    against a `main` that had advanced past its base — merged current `main` into it, resolved a
+    `TASKS.md` content conflict (kept the branch's own superset text, which already carried both PR
+    #292's and #293's notes), re-verified the full monorepo suite green, and merged it (PR #293 is now
+    closed/merged — see the entry below this one, already present from that same work).
+  - Read `PROGRESS.md`/`TASKS.md` again for the next task: every row was `done` or a standing blocker
+    (KAN-18/19 real-infra, KAN-43 `needs-human`, KAN-50/51 `blocked-by`) except **KAN-86**, still
+    `in-progress` with one named remaining bullet: "true per-campaign `roi_nd`/`collection_nd`",
+    documented as blocked on both a real ad-spend connector (KAN-50/51/KAN-43) and "a metrics-compiler
+    join feature". Checked both premises before accepting them: `ad_spend` already exists as a real,
+    currently-registered, `campaign_id`-dimensioned metric (KAN-59's SaaS pack, backed by
+    `fact_ad_spend`) — no connector gap actually blocks this; and the metrics compiler already FULL
+    JOINs independent leaf CTEs on shared dimension columns in production today (`cac`,
+    `quality_adjusted_cac`) — no compiler feature was missing either. The real, single gap: nothing in
+    `fact_customer_payback` (KAN-86's own payback mart) carried a `campaign_id` at all, since
+    `fact_revenue_event` doesn't have one to begin with.
+  - **Delivered (PR #295, branch `kan-86-per-campaign-roi-collection`):** rewrote
+    `fact_customer_payback.sql`'s acquisition CTE from a bare `min(occurred_at)` group-by to a
+    `row_number()`-partitioned winner-pick (same tiebreak: earliest `occurred_at`, then `event_id`) so
+    the winning event's own `event_id` survives to left-join against `fact_attribution` (filtered to
+    `model = 'last_touch'`, proven one-row-per-`conversion_event_id` by that model's own existing dbt
+    test) — inheriting `channel_id`/`campaign_id` onto every payback row, `unattributed`/`null` for a
+    customer whose acquisition event had no attributable touchpoint (matching `fact_attribution`'s own
+    existing convention, not a new special case). `campaign-ops-pack/metrics.ts`: `collection_Nd` now
+    declares a `campaign_id` dimension; `ad_spend` is reused verbatim from the SaaS pack (identical
+    cross-pack-dependency pattern `quality-score-pack` already established for the same metric); new
+    `roi_Nd = collection_Nd / ad_spend` formulas, registered in the same phase order convention
+    (schema provision -> aggregations incl. reused `ad_spend` -> formulas -> existing calibration
+    phases). New admin UI: a "Payback & ROI by campaign" table on the Campaign Ops page, backed by a
+    new `getCampaignPaybackBreakdownForProject` service function; new en/he translation keys. New dbt
+    fixture project (`proj_23`) + two dbt tests (attributed and unattributed acquisition cases).
+  - **Self-review:** delegated to an independent subagent (fresh context, no prior investment in the
+    diff) rather than reviewing it myself, per the same "second pair of eyes" posture many prior
+    entries use for exactly this reason. It checked the SQL join for fan-out/correctness, the TS
+    dimension/registration-order plumbing against the `quality-score-pack` precedent this PR explicitly
+    modeled itself on, and test coverage — found nothing to fix.
+  - **A real, pre-existing environmental flake surfaced along the way, diagnosed rather than papered
+    over:** the first full `pnpm test` run timed out one test
+    (`campaign-ops-pack.emulator.test.ts`'s "is idempotent: a second call..." — grew from 9 to 14
+    metrics-worth of registration round-trips by this PR) at the package's global 120s
+    `testTimeout`. Rather than assume a real regression, reproduced it in isolation via the package's
+    actual `firebase emulators:exec` test script (not a bare `vitest run`, which silently has no
+    emulator to talk to) — it passed in under 1 second, with the exact same
+    `RESOURCE_EXHAUSTED: Received message larger than max (3+ GB vs 4MB)` symptom
+    `vitest.config.ts`'s own doc comment already documents as a confirmed upstream Firestore-emulator
+    bug that self-heals given enough wall-clock time within one attempt. Gave the specific test a
+    generous explicit 300s timeout override (this codebase's own established fix for this exact bug
+    class) rather than touching the global default or the test's logic.
+  - Full `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green across the whole monorepo
+    (firebase-orm-models: 126 files / 1365 tests against a real Firestore emulator; a real
+    `dbt build --target dev` run as part of typecheck/build). PR #295 opened, subscribed to its
+    activity; CI (`lint · typecheck · test · build` + `terraform fmt · validate`) came back green
+    ~35 minutes later with `mergeable_state: clean` and no review comments — merged via squash.
+  - Both PR #293's and PR #295's remote branches hit the same recurring HTTP 403 from this sandbox's
+    git-over-HTTPS proxy on delete (every prior entry documents this) — left in place, harmless; both
+    are merged and dead. Local branches deleted cleanly.
+- **In progress (exact stopping point):** none — PR #295 is merged, `main` is green. KAN-86 is fully
+  `done` — no remaining scope on its own AC.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** every `TASKS.md` row is now `done` or a standing blocker (KAN-18/19 real-infra
+  reconciliation, KAN-43 `needs-human`, KAN-50/51 `blocked-by` KAN-43). The next run should go back to
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass recent entries have been
+  running once the primary backlog empties out — open candidates named by recent entries: KAN-72's
+  PMax asset groups (structurally different asset-group model, bigger scope); KAN-73's real Meta
+  creative image upload and a real Meta post-creation creative edit (primary text/headline/description
+  — Meta's own field-update semantics likely support a true in-place edit unlike Google's
+  create-new/pause-old RSA pattern, worth a design look before assuming Meta needs the same shape);
+  Lookalike/Similar Audience expansion for either connector (doesn't fit the existing
+  "sync segment members" `SinkPluginExecutor` shape cleanly — a real design decision, not a quick
+  follow-up); KAN-72/73's still-deferred mailing-address/mobile-device-id Customer
+  Match/Custom-Audience identifiers (both need structured source data no ingested schema carries
+  today).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+
+---
+
 ## 2026-08-25 (latest) — Merged KAN-73 follow-up (PR #293, Meta post-creation ad-set edits)
 
 - **Last completed:**
