@@ -107,6 +107,82 @@ describe('registerMetricDefinition', () => {
     expect(costPerSignup.formula).toBe('ad_spend / signups');
   });
 
+  it('registers a formula metric using max()/min() to floor/ceiling another formula (KAN-90 follow-up: support_open_backlog needed a way to never render negative)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Formula Clamp Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: adSpendDefinition,
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups',
+      definition: signupsDefinition,
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const flooredDelta = await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'floored_delta',
+      definition: { kind: 'formula', formula: 'max(ad_spend - signups, 0)' },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    expect(flooredDelta.definition_kind).toBe('formula');
+    expect(flooredDelta.formula).toBe('max(ad_spend - signups, 0)');
+
+    const cappedDelta = await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'capped_delta',
+      definition: { kind: 'formula', formula: 'min(ad_spend, signups)' },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    expect(cappedDelta.definition_kind).toBe('formula');
+    expect(cappedDelta.formula).toBe('min(ad_spend, signups)');
+  });
+
+  it('rejects a formula calling an unsupported function name, and max()/min() called with fewer than 2 arguments', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Metric Bad Function Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: adSpendDefinition,
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'unsupported_fn',
+        definition: { kind: 'formula', formula: 'round(ad_spend)' },
+        dimensions: [],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidMetricDefinitionError);
+
+    await expect(
+      registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'too_few_args',
+        definition: { kind: 'formula', formula: 'max(ad_spend)' },
+        dimensions: [],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidMetricDefinitionError);
+  });
+
   it('rejects registering the same name twice', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Metric Duplicate Org');
     await registerMetricDefinition({

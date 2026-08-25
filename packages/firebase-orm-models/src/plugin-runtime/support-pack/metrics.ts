@@ -79,23 +79,22 @@ export const SUPPORT_PACK_AGGREGATION_METRICS: readonly SupportPackMetricDefinit
  * metrics), so `dimensions: []` even though one of its two referenced
  * aggregations declares its own.
  *
- * Unlike `SupportLeaderboardResult.openBacklog` (`support.service.ts`),
- * this formula has no `Math.max(0, ...)` floor — the metrics-compiler
- * formula parser (`packages/shared/src/metrics-compiler/formula-parser.ts`)
- * only supports `+`/`-`/`*`/`/`, no clamp/greatest function — so a period
- * whose `support_tickets_resolved` exceeds its `support_tickets_opened`
- * (a `resolved` event landing for a ticket whose `opened` event fell
- * outside the requested time window, or was never sent — the same
- * connector-backfill-gap case that function's own doc comment names) can
- * render a negative backlog here, on a board tile or goal, even though the
- * project's own Support admin page (which reads the clamped service
- * function directly) never shows one for the same underlying data. A
- * known, documented compiler-shape limitation, not a bug in this metric.
+ * Floored at zero via the compiler's `max(...)` formula function (the same
+ * `Math.max(0, ...)` clamp `SupportLeaderboardResult.openBacklog`
+ * — `support.service.ts` — already applies) so a period whose
+ * `support_tickets_resolved` exceeds its `support_tickets_opened` (a
+ * `resolved` event landing for a ticket whose `opened` event fell outside
+ * the requested time window, or was never sent) can never render a negative
+ * backlog on a board tile or goal. Previously a known, documented
+ * limitation of the metrics-compiler formula parser (no clamp/greatest
+ * function) — closed by adding `max`/`min` formula functions
+ * (`packages/shared/src/metrics-compiler/formula-parser.ts`, compiled to
+ * BigQuery's `GREATEST`/`LEAST`) once this metric's own gap flagged the need.
  */
 const SUPPORT_OPEN_BACKLOG: SupportPackMetricDefinition = {
   name: 'support_open_backlog',
   dimensions: [],
-  definition: { kind: 'formula', formula: 'support_tickets_opened - support_tickets_resolved' },
+  definition: { kind: 'formula', formula: 'max(support_tickets_opened - support_tickets_resolved, 0)' },
 };
 
 /** Phase 2 (formula): references only the phase-1 aggregations above. */

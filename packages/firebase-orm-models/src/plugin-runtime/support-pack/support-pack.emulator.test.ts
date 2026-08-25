@@ -103,10 +103,10 @@ describe('ensureSupportPackRegistered — schema + metric definitions', () => {
     expect(avgCsat?.aggregation).toMatchObject({ function: 'avg', column: 'csat_score' });
   });
 
-  it('registers support_open_backlog as an undimensioned formula referencing the two ticket-count aggregations', async () => {
+  it('registers support_open_backlog as an undimensioned formula referencing the two ticket-count aggregations, floored at zero', async () => {
     const backlog = await activeMetric('support_open_backlog');
     expect(backlog?.definition_kind).toBe('formula');
-    expect(backlog?.formula).toBe('support_tickets_opened - support_tickets_resolved');
+    expect(backlog?.formula).toBe('max(support_tickets_opened - support_tickets_resolved, 0)');
     expect(backlog?.dimensions).toEqual([]);
   });
 });

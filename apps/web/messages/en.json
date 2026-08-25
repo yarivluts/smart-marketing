@@ -514,7 +514,7 @@
     "addFilter": "Add filter",
     "removeFilter": "Remove",
     "formulaLabel": "Formula",
-    "formulaPlaceholder": "e.g. ad_spend / signups",
+    "formulaPlaceholder": "e.g. ad_spend / signups, or max(opened - resolved, 0)",
     "dimensionsLabel": "Dimensions (comma-separated)",
     "dimensionsPlaceholder": "e.g. channel, campaign, geo",
     "register": "Register metric",

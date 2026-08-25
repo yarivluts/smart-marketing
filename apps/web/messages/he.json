@@ -514,7 +514,7 @@
     "addFilter": "הוספת מסנן",
     "removeFilter": "הסרה",
     "formulaLabel": "נוסחה",
-    "formulaPlaceholder": "למשל ad_spend / signups",
+    "formulaPlaceholder": "למשל ad_spend / signups, או max(opened - resolved, 0)",
     "dimensionsLabel": "ממדים (מופרדים בפסיקים)",
     "dimensionsPlaceholder": "למשל channel, campaign, geo",
     "register": "רישום מדד",

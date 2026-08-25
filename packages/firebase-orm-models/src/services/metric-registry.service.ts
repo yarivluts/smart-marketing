@@ -1,3 +1,4 @@
+import { collectIdentifiers, MetricCompilerError, parseFormula } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import {
   isMetricAggFunction,
@@ -47,23 +48,24 @@ async function requireProjectInOrg(organizationId: string, projectId: string): P
 /** A metric name (and every name a formula references) must be a valid identifier — the same vocabulary plan `04 §2`'s examples use (`cac`, `cost_per_signup`). */
 const METRIC_NAME_PATTERN = /^[a-z][a-z0-9_]*$/;
 
-/** Only arithmetic-expression characters are allowed in a formula body — catches typos/injections early, before the definition is ever compiled (KAN-41). */
-const FORMULA_ALLOWED_CHARS_PATTERN = /^[a-z0-9_.\s+\-*/()]+$/;
-
-function hasBalancedParens(formula: string): boolean {
-  let depth = 0;
-  for (const char of formula) {
-    if (char === '(') depth += 1;
-    else if (char === ')') depth -= 1;
-    if (depth < 0) return false;
-  }
-  return depth === 0;
-}
-
-/** Every metric-name-shaped identifier referenced in a formula, e.g. `ad_spend / signups` -> `['ad_spend', 'signups']`. */
+/**
+ * Every metric-shaped identifier a formula references, e.g. `ad_spend /
+ * signups` -> `['ad_spend', 'signups']`. Reuses the same
+ * `packages/shared/src/metrics-compiler` parser `compileMetricQueryForProject`
+ * (`metrics-compiler.service.ts`) already resolves formulas with, rather than
+ * a second hand-rolled character-class/regex validator — besides the reuse
+ * win, a second implementation would need its own carve-out for `max`/`min`
+ * function-call syntax (`FORMULA_FUNCTION_NAMES`) so `max(...)`/`min(...)`
+ * aren't themselves mistaken for referenced metric names needing to exist in
+ * the catalog. `parseFormula` throws `MetricCompilerError` on anything
+ * structurally invalid (bad characters, unbalanced parens, an unknown
+ * function name, trailing content, ...) — left to propagate;
+ * `validateDefinitionBody` catches it and folds the message into the batched
+ * `reasons` list exactly like the old regex checks did, rather than this
+ * function short-circuiting validation with its own separate error type.
+ */
 function extractFormulaReferences(formula: string): string[] {
-  const matches = formula.match(/[a-z][a-z0-9_]*/g) ?? [];
-  return [...new Set(matches)];
+  return [...new Set(collectIdentifiers(parseFormula(formula)))];
 }
 
 /** Caller-facing shape for one base filter before it's validated into a `MetricFilterDef`. */
@@ -226,15 +228,13 @@ function validateDefinitionBody(definition: MetricDefinitionInput, reasons: stri
     reasons.push('A formula must be a non-empty expression.');
     return undefined;
   }
-  if (!FORMULA_ALLOWED_CHARS_PATTERN.test(formula)) {
-    reasons.push('A formula may only reference metric names and the operators + - * / ( ).');
+  let formulaReferences: string[];
+  try {
+    formulaReferences = extractFormulaReferences(formula);
+  } catch (error) {
+    reasons.push(error instanceof MetricCompilerError ? error.message : 'A formula is not a valid expression.');
     return undefined;
   }
-  if (!hasBalancedParens(formula)) {
-    reasons.push('A formula has unbalanced parentheses.');
-    return undefined;
-  }
-  const formulaReferences = extractFormulaReferences(formula);
   if (formulaReferences.length === 0) {
     reasons.push('A formula must reference at least one other metric.');
     return undefined;

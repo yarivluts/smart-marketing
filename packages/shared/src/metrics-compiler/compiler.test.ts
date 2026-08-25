@@ -130,6 +130,38 @@ describe('compileMetricQuery — golden-file SQL tests', () => {
       { organizationId: 'org-1', projectId: 'project-1', environmentId: 'env-prod-1' },
     );
   });
+
+  it('14: a formula using the max() function compiles to BigQuery\'s GREATEST(), broken down by a dimension, day grain', () => {
+    expectGolden('14-formula-with-max-function', {
+      metrics: ['floored_net_spend'],
+      dimensions: ['channel'],
+      time: { start: '2026-06-01', end: '2026-06-01', grain: 'day' },
+    });
+  });
+});
+
+describe('compileMetricQuery — formula max()/min() functions', () => {
+  // Golden-file case 14 above covers max() end to end; this covers min()
+  // compiling to LEAST() without needing a second full fixture pair.
+  it('compiles min() to BigQuery\'s LEAST()', () => {
+    const catalog = new Map(buildTestCatalog());
+    catalog.set('capped_new_paying', { name: 'capped_new_paying', definitionKind: 'formula', formula: 'min(new_paying, ad_spend)', dimensions: [] });
+    const compiled = compileMetricQuery(catalog, {
+      metrics: ['capped_new_paying'],
+      time: { start: '2026-01-01', end: '2026-01-01', grain: 'day' },
+    });
+    expect(compiled.sql).toContain('LEAST(value_new_paying, value_ad_spend) AS `capped_new_paying`');
+  });
+
+  it('compiles a 3-argument max() call with all arguments joined by commas', () => {
+    const catalog = new Map(buildTestCatalog());
+    catalog.set('best_of_three', { name: 'best_of_three', definitionKind: 'formula', formula: 'max(ad_spend, new_paying, 0)', dimensions: [] });
+    const compiled = compileMetricQuery(catalog, {
+      metrics: ['best_of_three'],
+      time: { start: '2026-01-01', end: '2026-01-01', grain: 'day' },
+    });
+    expect(compiled.sql).toContain('GREATEST(value_ad_spend, value_new_paying, 0) AS `best_of_three`');
+  });
 });
 
 describe('compileMetricQuery — inclusive time-range semantics', () => {
