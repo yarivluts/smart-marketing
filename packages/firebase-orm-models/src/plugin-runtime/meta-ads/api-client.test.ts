@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MetaAdsApiError, MetaAdsHttpApiClient, type MetaAdsApiClientOptions } from './api-client';
+import { MetaAdsApiError, MetaAdsHttpApiClient, MetaAdsImageUploadFailedError, type MetaAdsApiClientOptions } from './api-client';
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return { ok, status, json: () => Promise.resolve(body), text: () => Promise.resolve(JSON.stringify(body)) } as unknown as Response;
@@ -93,6 +93,41 @@ describe('MetaAdsHttpApiClient', () => {
       page_id: 'page-1',
       link_data: { message: 'Big savings today.', link: 'https://example.com/widgets', name: 'Blue Widgets Sale', description: 'Shop now' },
     });
+  });
+
+  it('creates a link-ad creative with an image_hash when imageHash is provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'creative-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).createAdCreative('999', {
+      pageId: 'page-1',
+      primaryText: 'Big savings today.',
+      headline: 'Blue Widgets Sale',
+      linkUrl: 'https://example.com/widgets',
+      imageHash: 'hash-abc',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    const spec = JSON.parse(body.get('object_story_spec') as string);
+    expect(spec.link_data.image_hash).toBe('hash-abc');
+  });
+
+  it('omits image_hash from the object_story_spec when not provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'creative-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).createAdCreative('999', {
+      pageId: 'page-1',
+      primaryText: 'Big savings today.',
+      headline: 'Blue Widgets Sale',
+      linkUrl: 'https://example.com/widgets',
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    const spec = JSON.parse(body.get('object_story_spec') as string);
+    expect('image_hash' in spec.link_data).toBe(false);
   });
 
   it('omits description from the object_story_spec when not provided', async () => {
@@ -307,5 +342,32 @@ describe('MetaAdsHttpApiClient', () => {
     const result = await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [{ emailHash: 'hash-a' }]);
 
     expect(result).toEqual({ numReceived: 1 });
+  });
+
+  it('uploads an ad image as base64 bytes via a plain POST and returns its hash', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ images: { 'image.png': { hash: 'hash-abc', url: 'https://example.com/image.png' } } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).uploadAdImage('999', { base64Bytes: 'AAAA' });
+
+    expect(result).toEqual({ imageHash: 'hash-abc' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/adimages');
+    expect(init.method).toBe('POST');
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get('bytes')).toBe('AAAA');
+    expect(body.get('access_token')).toBe('access-token-1');
+  });
+
+  it('throws MetaAdsImageUploadFailedError when the response carries no image', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ images: {} })));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).uploadAdImage('999', { base64Bytes: 'AAAA' })).rejects.toBeInstanceOf(MetaAdsImageUploadFailedError);
+  });
+
+  it('throws MetaAdsApiError with the response status when the image upload request itself fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'bad bytes' }, false, 400)));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).uploadAdImage('999', { base64Bytes: 'AAAA' })).rejects.toBeInstanceOf(MetaAdsApiError);
   });
 });
