@@ -17,6 +17,71 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (newest) — Merged KAN-72/KAN-73 follow-up (PR #290, phone-number identifiers)
+
+- **Last completed:**
+  - Session start: local `main` was on a stale ref again (same recurring shallow-clone quirk every
+    prior entry documents) — `git fetch origin main && git checkout -B main origin/main` fixed it.
+  - Read `PROGRESS.md`/`TASKS.md`: every row was `done` or a standing blocker (KAN-18/19 real-infra,
+    KAN-43 `needs-human`, KAN-50/51 `blocked-by`, KAN-86's `roi_nd` gap). The prior two entries' own
+    "next step" both named the same still-open candidate: KAN-72/KAN-73's shared "non-email
+    identifiers (phone, mailing address, device id)" deferred note on their respective Customer-Match/
+    Custom-Audience sink executors. Picked the phone-number slice (mailing address and device id each
+    need their own multi-field upload shape, left deferred, same posture the rest of this backlog's
+    "buildable-today slice" pattern establishes).
+  - **Delivered (PR #290, branch `kan-73-kan-72-phone-identifiers`):** `hashPhoneForMetaCustomAudience`/
+    `hashPhoneForGoogleCustomerMatch` (each platform's own documented phone-normalization spec — Meta
+    strips the leading `+` to digits-only, Google Ads keeps it per E.164); both
+    `MetaCustomAudienceSinkPluginExecutor`/`GoogleCustomerMatchSinkPluginExecutor` now read a record's
+    `properties.phone` the same best-effort way they already read `properties.email`, building a
+    per-row contact-match key carrying whichever of email/phone is present (dropping the row only if
+    neither is). `MetaAdsApiClient.addContactsToCustomAudience` (renamed from
+    `addHashedEmailsToCustomAudience`) builds Meta's multi-key `EMAIL`/`PHONE` `users` upload schema,
+    including a column only when at least one row in the call needs it — an email-only sync's payload
+    is byte-identical to before this change (verified by a dedicated test).
+    `GoogleAdsApiClient.addContactsToCustomerMatchUserList` (renamed from
+    `addHashedEmailsToCustomerMatchUserList`) combines a contact's `hashedEmail`/`hashedPhoneNumber`
+    onto the same `userIdentifiers` operation per Google's own multi-identifier match-rate guidance.
+  - New/updated tests: both hashing functions (normalization + digest shape), both executors
+    (email-only / phone-only / mixed / no-identifier-drop / same-instance-retry-reuse cases already
+    established by KAN-72/73's prior follow-ups), both real HTTP API clients (fixed EMAIL-only payload
+    preserved, new EMAIL+PHONE payload, combined `userIdentifiers` shape) — all against a real
+    Firestore emulator (`packages/firebase-orm-models`: 126 test files / 1308 tests green locally
+    before the PR, 1332 after the merge below picked up KAN-72's concurrently-merged PR #289).
+  - Opened PR #290, subscribed to its activity. First CI run (on the pre-merge commit) went green, but
+    by the time it reported back a **concurrent PR (#289, KAN-72's own "post-creation keyword edits"
+    follow-up) had merged to `main` first**, turning this PR `mergeable_state: dirty`. Merged
+    `origin/main` in: one real conflict in `GoogleAdsApiClient`'s interface declaration (both branches
+    added a method next to `addHashedEmailsToCustomerMatchUserList` — this PR renaming/extending it,
+    #289 adding `addAdGroupKeywords`/`removeAdGroupCriteria` right after it) — resolved by keeping all
+    three methods; the class body's own implementation and every test file auto-merged cleanly. A
+    second conflict in `TASKS.md`'s KAN-72 row (both branches appended a different follow-up paragraph)
+    — resolved by concatenating both follow-up notes in delivery order. Re-verified from scratch after
+    the merge: `pnpm lint`/`pnpm typecheck`/`pnpm build` green monorepo-wide, full
+    `packages/firebase-orm-models` suite green (126/126 files, 1332/1332 tests) against a real
+    Firestore emulator. Pushed the merge commit, waited out CI on it (~9 min, matching the local test
+    suite's own timing), confirmed `mergeable_state: clean` with base sha matching `main`'s current tip
+    and no open reviews, merged (squash). Remote branch deletion hit the same recurring HTTP 403 from
+    this sandbox's git-over-HTTPS proxy every prior entry documents — left undeleted. Unsubscribed from
+    the PR's activity.
+  - Updated `TASKS.md`'s KAN-72 and KAN-73 rows with their own phone-identifier follow-up notes.
+- **In progress (exact stopping point):** none — PR #290 is merged, `main`'s CI is green, `TASKS.md`
+  reflects the delivered scope.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates, same list recent entries have carried forward: KAN-72's own remaining PMax asset
+  groups and RSA ad edits (headline/description changes in place — needs real design thought per the
+  prior entry's own note, not a quick follow-up); KAN-73's real Meta creative image upload and
+  post-creation edits beyond activation; Lookalike/Similar Audience expansion for either Customer-
+  Match/Custom-Audience connector; the remaining non-phone identifiers (mailing address, mobile device
+  id) for both connectors, each needing its own multi-field upload shape.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-73-kan-72-phone-identifiers` branch on GitHub (the
+    git-over-HTTPS proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-25 (even newer) — Merged KAN-72 follow-up (PR #289, Google Ads post-creation keyword edits)
 
 - **Last completed:**
