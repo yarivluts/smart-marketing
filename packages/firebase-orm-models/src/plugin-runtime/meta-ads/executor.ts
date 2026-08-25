@@ -169,6 +169,20 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
    */
   private pendingMetaAdCreativeEditResourceName: string | null = null;
 
+  /**
+   * The ad's real pre-edit creative `executeMetaAdCreativeEdit` already read
+   * live during a still-in-flight execution, if any — a second, distinct
+   * retry-safety cache from {@link pendingMetaAdCreativeEditResourceName}:
+   * `getAd` is a live read of the *current* creative, and `updateAd` already
+   * repoints the ad at the new one, so a naive retry after `updateAd`
+   * succeeded but `target.save()` failed would call `getAd` a second time and
+   * read back the *new* creative as if it were the "previous" one —
+   * corrupting the value `rollbackMetaAdCreativeEdit` needs to restore the
+   * ad's real original copy. Caching the first read (before any mutation)
+   * closes that gap. Reset to `null` once an edit fully succeeds.
+   */
+  private pendingMetaAdCreativeEditPreviousResourceName: string | null = null;
+
   constructor(
     private readonly apiClient: MetaAdsApiClient,
     private readonly adAccountId: string,
@@ -374,10 +388,12 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
    * repoints the ad at it — never pausing/creating a second ad the way
    * `executeAdEdit` does for Google Ads, since a Meta ad's own `creative`
    * reference is mutable in place (see this action type's own doc comment).
-   * `pendingMetaAdCreativeEditResourceName` guards the create-then-use
-   * sequence against the same retry-orphan bug class
-   * `GoogleAdsAutomationActionExecutor.executeAdEdit`'s own doc comment
-   * documents.
+   * `pendingMetaAdCreativeEditResourceName`/`pendingMetaAdCreativeEditPreviousResourceName`
+   * guard the read-then-create-then-use sequence against the same
+   * retry-orphan bug class `GoogleAdsAutomationActionExecutor.executeAdEdit`'s
+   * own doc comment documents — both the live "previous creative" read and
+   * the newly-created creative must be cached, not just the latter, since
+   * `updateAd` (which a retry could land after) makes the live read stale.
    */
   async executeMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditExecutionInput): Promise<AutomationMetaAdCreativeEditExecutionResult> {
     const target = await loadTarget(input);
@@ -385,7 +401,11 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
       throw new MetaAdNotOwnedByTargetError(target.id, input.adResourceName);
     }
 
-    const current = await this.apiClient.getAd(input.adResourceName);
+    if (this.pendingMetaAdCreativeEditPreviousResourceName === null) {
+      const current = await this.apiClient.getAd(input.adResourceName);
+      this.pendingMetaAdCreativeEditPreviousResourceName = current.creativeId;
+    }
+    const previousCreativeResourceName = this.pendingMetaAdCreativeEditPreviousResourceName;
 
     if (this.pendingMetaAdCreativeEditResourceName === null) {
       const created = await this.apiClient.createAdCreative(this.adAccountId, {
@@ -405,7 +425,8 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     await target.save();
 
     this.pendingMetaAdCreativeEditResourceName = null;
-    return { previousCreativeResourceName: current.creativeId, newCreativeResourceName };
+    this.pendingMetaAdCreativeEditPreviousResourceName = null;
+    return { previousCreativeResourceName, newCreativeResourceName };
   }
 
   /** Repoints the ad back to its pre-edit creative `executeMetaAdCreativeEdit` captured — the orphaned replacement creative is simply left unlinked, never deleted (Meta creatives cost nothing to leave idle, unlike `ad_edit`'s superseded ad, which `rollbackAdEdit` must explicitly re-enable/remove). No ownership re-check needed (the action's own stored `adResourceName` was already validated at execute time, same posture `rollbackMetaAdSetEdit` establishes). */

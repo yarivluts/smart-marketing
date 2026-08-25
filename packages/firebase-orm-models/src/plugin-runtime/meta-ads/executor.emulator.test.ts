@@ -570,6 +570,46 @@ describe('MetaAutomationActionExecutor', () => {
       expect(createAdCreative).toHaveBeenCalledTimes(2);
     });
 
+    it('does not read a stale "previous" creative on retry after updateAd already succeeded but the retry is triggered anyway (retry-corruption regression)', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Creative Edit Previous Retry Org');
+      // If `getAd` were re-read on the retried attempt (instead of reusing the value the first
+      // attempt already cached), it would return 'creative-2' — the ad's own new creative, since a
+      // real Meta ad set's `updateAd` may have already applied by the time a retry lands — and
+      // `previousCreativeResourceName` would be corrupted to equal `newCreativeResourceName`.
+      const getAd = vi
+        .fn()
+        .mockResolvedValueOnce({ adId: 'ad-1', creativeId: 'creative-1' })
+        .mockResolvedValueOnce({ adId: 'ad-1', creativeId: 'creative-2' });
+      const createAdCreative = vi.fn().mockResolvedValue({ creativeId: 'creative-2' });
+      const updateAd = vi.fn().mockRejectedValueOnce(new MetaAdsApiError('transient', 500)).mockResolvedValueOnce(undefined);
+      const apiClient = fakeApiClient({ getAd, createAdCreative, updateAd });
+      const { target, executor } = await seedTargetWithAd(organization.id, project.id, owner.id, apiClient);
+
+      await expect(
+        executor.executeMetaAdCreativeEdit({
+          organizationId: organization.id,
+          projectId: project.id,
+          environmentId: 'live',
+          targetId: target.id,
+          adResourceName: 'ad-1',
+          creative: NEW_CREATIVE,
+        }),
+      ).rejects.toThrow();
+
+      const result = await executor.executeMetaAdCreativeEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adResourceName: 'ad-1',
+        creative: NEW_CREATIVE,
+      });
+
+      expect(result.previousCreativeResourceName).toBe('creative-1');
+      expect(result.newCreativeResourceName).toBe('creative-2');
+      expect(getAd).toHaveBeenCalledTimes(1);
+    });
+
     it('rolls back an ad creative edit by repointing the ad at the captured pre-edit creative', async () => {
       const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Creative Edit Rollback Org');
       const apiClient = fakeApiClient();
