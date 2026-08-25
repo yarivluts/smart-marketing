@@ -111,6 +111,7 @@
     "projectIntentQualityLink": "כוונה ואיכות",
     "projectFirmographicsLink": "נתונים פירמוגרפיים",
     "projectExperimentsLink": "ניסויים",
+    "projectSupportLink": "תמיכה",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
@@ -654,6 +655,19 @@
     "themeOnboarding": "הצטרפות",
     "themeUsability": "שימושיות"
   },
+  "Support": {
+    "metaTitle": "תמיכה",
+    "title": "תמיכה עבור {projectName}",
+    "description": "צבר פניות פתוחות ולוח מובילים לפי נציג: פניות שנפתרו, זמן תגובה ראשונית/פתרון ממוצע, ושביעות רצון (CSAT) ממוצעת.",
+    "setupIntro": "התקן/י את חבילת תמיכת הלקוחות כדי להתחיל לעקוב אחר אירועי מחזור חיי פנייה.",
+    "backlogHeading": "צבר פניות פתוחות",
+    "backlogLine": "{opened} פניות נפתחו",
+    "leaderboardHeading": "לוח מובילים לפי נציג",
+    "leaderboardEmpty": "טרם נחתו פניות שנפתרו עבור פרויקט זה.",
+    "rankedName": "{rank}. {name}",
+    "rowSummary": "{resolved} נפתרו · {firstResponse} תגובה ראשונית · {resolution} פתרון · {csat} CSAT",
+    "rowValueUnavailable": "—"
+  },
   "ChurnReasons": {
     "metaTitle": "סיבות נטישה",
     "title": "סיבות נטישה עבור {projectName}",
@@ -929,6 +943,8 @@
     "builtinPackFirmographicDescription": "סיווג ענף, גודל חברה ואזור באמצעות בינה מלאכותית, עם לוחות מחוונים להרכב לקוחות (# מול $) והתראות על שינוי בהרכב.",
     "builtinPackExperimentTitle": "ניסויים",
     "builtinPackExperimentDescription": "חשיפות והמרות בניסויי A/B לפי וריאנט, כולל בדיקת מובהקות סטטיסטית מול קבוצת ביקורת.",
+    "builtinPackSupportTitle": "תמיכת לקוחות",
+    "builtinPackSupportDescription": "זמן תגובה ראשונית/פתרון של פניות, שביעות רצון (CSAT), ולוח מובילים לפי נציג.",
     "builtinPackCampaignOpsTitle": "תפעול קמפיינים",
     "builtinPackCampaignOpsDescription": "החזר השקעה בחלון זמן קבוע (גביית הכנסות ל-7/14/30/40 יום) עבור לקוחות לפי מועד הרכישה."
   },
@@ -1180,11 +1196,13 @@
     "winTypeLabel": {
       "generic": "כללי",
       "reactivation": "הפעלה מחדש",
-      "trial_conversion": "המרת ניסיון"
+      "trial_conversion": "המרת ניסיון",
+      "good_review": "ביקורת טובה"
     },
     "winTypeHint": {
       "reactivation": "בדרך כלל מופעל על ידי אירוע המציין שלקוח שנטש חזר לפעילות.",
-      "trial_conversion": "בדרך כלל מופעל על ידי אירוע המציין שמנוי ניסיון הומר למנוי בתשלום."
+      "trial_conversion": "בדרך כלל מופעל על ידי אירוע המציין שמנוי ניסיון הומר למנוי בתשלום.",
+      "good_review": "בדרך כלל מופעל כאשר ציון שביעות רצון (CSAT) בפנייה שנפתרה חוצה סף שנבחר."
     },
     "createButton": "צור כלל ניצחון",
     "createError": "לא ניתן היה ליצור את כלל הניצחון. נסה שוב.",

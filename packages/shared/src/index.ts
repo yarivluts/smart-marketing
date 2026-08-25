@@ -29,3 +29,4 @@ export * from './onboarding-survey';
 export * from './omnisearch';
 export * from './firmographic-enrichment';
 export * from './rep-collections';
+export * from './support';

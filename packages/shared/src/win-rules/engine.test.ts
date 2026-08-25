@@ -72,7 +72,7 @@ describe('isWinRuleFilterOperator', () => {
 
 describe('isWinType', () => {
   it('accepts every catalog entry, including generic', () => {
-    expect(WIN_TYPES).toEqual(['generic', 'reactivation', 'trial_conversion']);
+    expect(WIN_TYPES).toEqual(['generic', 'reactivation', 'trial_conversion', 'good_review']);
     for (const winType of WIN_TYPES) {
       expect(isWinType(winType)).toBe(true);
     }
