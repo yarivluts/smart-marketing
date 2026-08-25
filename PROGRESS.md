@@ -17,6 +17,57 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (latest) — Merged KAN-73 follow-up (PR #293, Meta post-creation ad-set edits)
+
+- **Last completed:**
+  - Session start: found PR #293 already open (`kan-73-meta-adset-edit`, opened 14:15 by an earlier
+    run in this session), full-suite-green per its own description, but its base had drifted behind
+    `main`'s tip (PR #292, KAN-72's own `ad_edit` follow-up, had merged first) and its one open CI run
+    was genuinely hung — the `Test` step showed `in_progress` for 3+ hours with no progress past
+    14:18. Cancelled the stuck run (per the babysit rules' runner-loss/hang allowance).
+  - Merging `main` into the branch surfaced real conflicts across 13 files: PR #292 (`ad_edit` for
+    Google Ads RSAs) and PR #293 (`meta_ad_set_edit` for Meta ad sets) both added a new
+    post-creation-edit action type to the same shared automation pipeline concurrently (action-type
+    union, executor interface, both platform executors, `automation.service.ts` dispatch, admin page,
+    en/he messages). Delegated the resolution + full verification to a subagent given the scale;
+    after a few rounds of it under-communicating progress (deferring to a "wait for Monitor
+    notification" pattern instead of reporting synchronously), it resolved all 13 files keeping both
+    action types as siblings — nothing from either side dropped — and confirmed `pnpm lint`/
+    `typecheck`/`test`/`build` all green before committing the merge (6df4453).
+  - Pushed 6df4453, then a small `TASKS.md` note. Neither push triggered a CI run for over 20 minutes
+    (previously-unseen behavior in this repo's history — every prior PR got a run within ~1 minute) —
+    root cause never conclusively identified, still unexplained. While diagnosing, the same subagent
+    (still running in the background from the earlier delegation) independently pushed a further
+    merge (cb5899a, "picking up PR #292's PROGRESS.md/TASKS.md chore commit" — main had advanced
+    again meanwhile) and re-verified from scratch. CI eventually did fire for cb5899a (~1h46m after
+    the branch's first push, cause still unknown) and failed one test:
+    `vault.emulator.test.ts`'s KAN-44 audit-chain case timed out at 120s, amid pervasive
+    `RESOURCE_EXHAUSTED` gRPC errors with corrupted byte counts (e.g. "4001740756 vs 4194304") across
+    many unrelated test files — a clear Firestore-emulator resource-contention flake under concurrent
+    load, not a real regression (confirmed independently by the subagent's own re-run notes, which
+    cited the same emulator contention and re-ran tests standalone to avoid it). Re-ran the failed job
+    once (this story's first re-run on this specific commit) — green on retry (`Test Files 1 failed`
+    → full pass), `mergeable_state: clean`, base sha matching `main`'s current tip. Squash-merged.
+  - Remote branch deletion hit the same recurring HTTP 403 from this sandbox's git-over-HTTPS proxy
+    every prior entry documents — left undeleted. Unsubscribed from the PR's activity.
+- **In progress (exact stopping point):** none — PR #293 is merged, `main`'s CI is green, `TASKS.md`'s
+  KAN-73 row documents both the delivered feature and the PR #292/#293 conflict reconciliation.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates: KAN-72's remaining PMax asset groups (needs real design thought — Google Ads
+  models RSA assets as add/remove operations, not partial updates); KAN-73's real Meta creative image
+  upload, ad-set targeting-spec edits (countries/age/genders), and Lookalike Audience expansion;
+  mailing-address/mobile-device-id Customer Match/Custom Audience identifiers for both connectors.
+  Worth a look next run: whether the CI-not-triggering issue recurs — if it's a one-off it can stay
+  unexplained, but if it happens again on a fresh PR it may need surfacing to a human (webhook
+  delivery, Actions permissions, or proxy-level issue in this sandbox).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-73-meta-adset-edit` branch on GitHub (proxy 403 on remote
+    branch-delete, same as every recent entry).
+
+---
+
 ## 2026-08-25 (newer still) — KAN-72 follow-up: post-creation RSA ad edits (PR #292)
 
 - **Last completed:**
