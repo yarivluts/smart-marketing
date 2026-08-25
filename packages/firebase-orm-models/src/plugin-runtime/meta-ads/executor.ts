@@ -24,6 +24,7 @@ import {
   type MetaAdSetStatus,
 } from '../../automation-runtime';
 import { usdToCents, type MetaAdsApiClient, type MetaObjectStatus, type MetaUpdateAdSetParams } from './api-client';
+import { parseImageDataUrlBase64 } from './image-data-url';
 
 /** `AutomationMetaAdSetEditExecutionInput.status`/`AutomationMetaAdSetEditRollbackInput.beforeStatus`'s `enabled`/`paused` <-> Meta's own `ACTIVE`/`PAUSED` object-status vocabulary — the same mapping `executeCampaignActivation`/`rollbackCampaignActivation` apply inline for a whole campaign, pulled out here since `executeMetaAdSetEdit`/`rollbackMetaAdSetEdit` both need it in each direction. */
 const AD_SET_STATUS_TO_META: Record<MetaAdSetStatus, MetaObjectStatus> = { enabled: 'ACTIVE', paused: 'PAUSED' };
@@ -264,12 +265,16 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
         targeting: adSet.targeting,
       });
       metaAdSetResourceNames.push(adSetResult.adSetId);
+      const imageHash = adSet.ad.creative.imageDataUrl
+        ? (await this.apiClient.uploadAdImage(this.adAccountId, { base64Bytes: parseImageDataUrlBase64(adSet.ad.creative.imageDataUrl) })).imageHash
+        : undefined;
       const creativeResult = await this.apiClient.createAdCreative(this.adAccountId, {
         pageId: this.pageId,
         primaryText: adSet.ad.creative.primaryText,
         headline: adSet.ad.creative.headline,
         ...(adSet.ad.creative.description !== undefined ? { description: adSet.ad.creative.description } : {}),
         linkUrl: adSet.ad.creative.linkUrl,
+        ...(imageHash ? { imageHash } : {}),
       });
       const adResult = await this.apiClient.createAd(this.adAccountId, {
         adSetId: adSetResult.adSetId,

@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { MetaAdCreativeEditContent, MetaCampaignDraft, MetaCampaignDraftAdSet } from './executor';
 import { InvalidCampaignDraftError } from './invalid-campaign-draft-error';
-import { validateMetaAdCreativeEditActionInput, validateMetaCampaignDraft } from './meta-campaign-draft';
+import { MAX_IMAGE_DATA_URL_LENGTH, validateMetaAdCreativeEditActionInput, validateMetaCampaignDraft } from './meta-campaign-draft';
+
+const VALID_IMAGE_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
 function validDraft(overrides: Partial<MetaCampaignDraft> = {}): MetaCampaignDraft {
   return {
@@ -175,6 +177,42 @@ describe('validateMetaCampaignDraft', () => {
   it('rejects a non-http(s) link URL', () => {
     const draft = validDraft();
     draft.adSets[0].ad.creative.linkUrl = 'not-a-url';
+    expect(() => validateMetaCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('accepts a well-formed imageDataUrl (optional)', () => {
+    const draft = validDraft();
+    draft.adSets[0].ad.creative.imageDataUrl = VALID_IMAGE_DATA_URL;
+    expect(() => validateMetaCampaignDraft(draft)).not.toThrow();
+  });
+
+  it('accepts a draft with no imageDataUrl (optional)', () => {
+    const draft = validDraft();
+    expect(draft.adSets[0].ad.creative.imageDataUrl).toBeUndefined();
+    expect(() => validateMetaCampaignDraft(draft)).not.toThrow();
+  });
+
+  it('rejects an imageDataUrl with an unsupported mime type', () => {
+    const draft = validDraft();
+    draft.adSets[0].ad.creative.imageDataUrl = 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=';
+    expect(() => validateMetaCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an imageDataUrl that is not a data URL at all', () => {
+    const draft = validDraft();
+    draft.adSets[0].ad.creative.imageDataUrl = 'https://example.com/image.png';
+    expect(() => validateMetaCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an imageDataUrl over the size cap', () => {
+    const draft = validDraft();
+    draft.adSets[0].ad.creative.imageDataUrl = `data:image/png;base64,${'A'.repeat(MAX_IMAGE_DATA_URL_LENGTH)}`;
+    expect(() => validateMetaCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an imageDataUrl that is not a string when present', () => {
+    const draft = validDraft();
+    (draft.adSets[0].ad.creative as unknown as { imageDataUrl: unknown }).imageDataUrl = 12345;
     expect(() => validateMetaCampaignDraft(draft)).toThrow(InvalidCampaignDraftError);
   });
 

@@ -84,11 +84,21 @@ export interface MetaCampaignDraftAdSet {
       description?: string;
       /** Must be an http(s) URL. */
       linkUrl: string;
-      // `imageUrl` is deliberately omitted for v1 — real Meta image upload is
-      // a separate multipart `/act_{id}/adimages` endpoint against a real
-      // asset, out of scope for this story (see the KAN-73 PROGRESS.md entry's
-      // own "deferred gaps" note). Every ad this connector creates is a
-      // text-only link ad.
+      /**
+       * Optional creative image, as a `data:image/(png|jpeg);base64,...` URL
+       * (e.g. from a browser `FileReader.readAsDataURL()` read of a file
+       * input) — a KAN-73 follow-up closing the "real Meta image upload"
+       * deferred note. Meta's `/act_{id}/adimages` endpoint accepts raw image
+       * bytes as a plain `bytes` form field (base64-encoded) in a normal POST
+       * — no multipart/form-data upload plumbing needed, so this rides the
+       * exact same `URLSearchParams` request shape every other
+       * `MetaAdsHttpApiClient` call already uses (see `uploadAdImage`).
+       * Size-capped (`MAX_IMAGE_DATA_URL_LENGTH` in `meta-campaign-draft.ts`)
+       * because this whole draft is persisted verbatim on the proposed
+       * action's `after.campaignDraft` — a single Firestore document, capped
+       * at 1 MiB.
+       */
+      imageDataUrl?: string;
     };
   };
 }

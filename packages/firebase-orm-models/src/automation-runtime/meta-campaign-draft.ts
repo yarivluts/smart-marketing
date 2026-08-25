@@ -11,6 +11,17 @@ const MAX_DESCRIPTION_LENGTH = 30;
 const GENDERS = ['male', 'female'] as const;
 /** ISO-3166 alpha-2: exactly two uppercase letters. */
 const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
+/**
+ * A whole `campaign_draft_create` action (including this creative's own
+ * `imageDataUrl`) is persisted verbatim on the proposed action's
+ * `after.campaignDraft` — a single Firestore document, capped at 1 MiB. This
+ * caps the data URL's own string length well under that (~530K base64
+ * characters is ~390KB of raw image bytes after the ~4/3 base64 expansion),
+ * leaving comfortable headroom for the rest of the draft/action document.
+ */
+export const MAX_IMAGE_DATA_URL_LENGTH = 530_000;
+/** Meta's `/adimages` endpoint accepts common web image formats; JPEG/PNG cover the vast majority of real ad creative assets and keep this validation simple. */
+const IMAGE_DATA_URL_PATTERN = /^data:image\/(png|jpe?g);base64,[A-Za-z0-9+/]+=*$/;
 
 function isHttpUrl(value: string): boolean {
   try {
@@ -89,6 +100,19 @@ function validateAdSet(adSet: MetaCampaignDraftAdSet, index: number, reasons: st
 
   const creative = isRecord(ad.creative) ? ad.creative : undefined;
   validateMetaAdCreativeContent(creative, `${fieldPath}.ad.creative`, reasons);
+  // `imageDataUrl` is only ever meaningful at brand-new-ad creation time — `meta_ad_creative_edit`
+  // (KAN-73 follow-up) has no image-upload support (its own `MetaAdCreativeEditContent` type has no
+  // such field, and `MetaAutomationActionExecutor.executeMetaAdCreativeEdit` never reads one), so this
+  // check stays here rather than in the shared {@link validateMetaAdCreativeContent}, which
+  // `validateMetaAdCreativeEditActionInput` also calls — silently validating-but-then-ignoring an
+  // image on an edit request would be misleading.
+  if (creative && creative.imageDataUrl !== undefined) {
+    if (typeof creative.imageDataUrl !== 'string' || creative.imageDataUrl.length > MAX_IMAGE_DATA_URL_LENGTH || !IMAGE_DATA_URL_PATTERN.test(creative.imageDataUrl)) {
+      reasons.push(
+        `${fieldPath}.ad.creative.imageDataUrl must be a base64 data:image/(png|jpeg) URL of at most ${MAX_IMAGE_DATA_URL_LENGTH} characters when present.`,
+      );
+    }
+  }
 }
 
 /**
@@ -101,7 +125,9 @@ function validateAdSet(adSet: MetaCampaignDraftAdSet, index: number, reasons: st
  * two never drift, mirroring `campaign-draft.ts`'s own
  * `validateResponsiveSearchAdContent`/`validateAdEditActionInput` pairing.
  * `fieldPath` is the caller's own prefix (e.g. `adSets[0].ad.creative` or
- * just `creative`).
+ * just `creative`). Deliberately excludes `imageDataUrl` — see
+ * {@link validateAdSet}'s own doc comment for why that check stays
+ * creation-only rather than living here.
  */
 export function validateMetaAdCreativeContent(creative: Record<string, unknown> | undefined, fieldPath: string, reasons: string[]): void {
   if (!creative) {

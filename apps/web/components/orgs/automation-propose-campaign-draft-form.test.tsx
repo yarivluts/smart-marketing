@@ -96,6 +96,57 @@ describe('AutomationProposeCampaignDraftForm', () => {
     });
   });
 
+  it('includes imageDataUrl in the Meta draft once a valid PNG is selected', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
+    fireEvent.change(screen.getByLabelText('Campaign name'), { target: { value: 'Summer Sale' } });
+    fireEvent.change(screen.getByLabelText('Daily budget (USD)'), { target: { value: '40' } });
+    fireEvent.change(screen.getByLabelText('Ad set name'), { target: { value: 'Ad Set 1' } });
+    fireEvent.change(screen.getByLabelText('Minimum age'), { target: { value: '21' } });
+    fireEvent.change(screen.getByLabelText('Maximum age'), { target: { value: '55' } });
+    fireEvent.change(screen.getByLabelText(/Countries/), { target: { value: 'US' } });
+    fireEvent.change(screen.getByLabelText('Ad name'), { target: { value: 'Ad 1' } });
+    fireEvent.change(screen.getByLabelText('Link URL'), { target: { value: 'https://example.com/widgets' } });
+    fireEvent.change(screen.getByLabelText('Primary text'), { target: { value: 'Big summer savings.' } });
+    fireEvent.change(screen.getByLabelText('Headline'), { target: { value: 'Blue Widgets Sale' } });
+
+    const file = new File(['fake-png-bytes'], 'ad.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Ad creative image (optional)'), { target: { files: [file] } });
+    await screen.findByAltText('Selected ad creative image preview');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    const body = lastRequestBody() as { draft: Record<string, unknown> };
+    const adSets = body.draft.adSets as Array<{ ad: { creative: Record<string, unknown> } }>;
+    expect(adSets[0].ad.creative.imageDataUrl).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it('rejects a non-image file selection with an inline error and no preview', async () => {
+    renderForm();
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
+
+    const file = new File(['not an image'], 'ad.gif', { type: 'image/gif' });
+    fireEvent.change(screen.getByLabelText('Ad creative image (optional)'), { target: { files: [file] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Image must be a PNG or JPEG file.');
+    expect(screen.queryByAltText('Selected ad creative image preview')).not.toBeInTheDocument();
+  });
+
+  it('rejects an oversized image file with an inline error and no preview', async () => {
+    renderForm();
+    fireEvent.change(screen.getByLabelText('Platform'), { target: { value: 'meta' } });
+
+    const file = new File([new Uint8Array(400_001)], 'ad.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Ad creative image (optional)'), { target: { files: [file] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Image must be 390KB or smaller.');
+    expect(screen.queryByAltText('Selected ad creative image preview')).not.toBeInTheDocument();
+  });
+
   it('shows an inline error for a Meta draft with no countries, without submitting', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
     renderForm();

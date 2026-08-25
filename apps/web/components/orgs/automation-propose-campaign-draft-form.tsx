@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { AutomationTargetView } from '@/lib/orgs/automation-view';
+
+/** Mirrors `MAX_IMAGE_DATA_URL_LENGTH`/the mime-type allowlist in `@growthos/firebase-orm-models`'s `meta-campaign-draft.ts` — the server re-validates regardless, but rejecting an obviously-too-large or wrong-type file client-side avoids a wasted round trip. */
+const MAX_IMAGE_FILE_BYTES = 390_000;
+const ALLOWED_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg'];
 
 export interface AutomationProposeCampaignDraftFormProps {
   orgId: string;
@@ -64,6 +68,9 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
   const [metaHeadline, setMetaHeadline] = useState('');
   const [metaDescription, setMetaDescription] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [imageDataUrl, setImageDataUrl] = useState('');
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +105,39 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
     setMetaHeadline('');
     setMetaDescription('');
     setLinkUrl('');
+    setImageDataUrl('');
+    setImageError(null);
+    if (imageInputRef.current) {
+      imageInputRef.current.value = '';
+    }
+  }
+
+  function handleImageChange(event: ChangeEvent<HTMLInputElement>): void {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setImageDataUrl('');
+      setImageError(null);
+      return;
+    }
+    if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.type)) {
+      setImageDataUrl('');
+      setImageError(t('proposeDraftImageInvalidTypeError'));
+      return;
+    }
+    if (file.size > MAX_IMAGE_FILE_BYTES) {
+      setImageDataUrl('');
+      setImageError(t('proposeDraftImageTooLargeError'));
+      return;
+    }
+    setImageError(null);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageDataUrl(typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = () => {
+      setImageError(t('proposeDraftImageInvalidTypeError'));
+    };
+    reader.readAsDataURL(file);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
@@ -130,6 +170,10 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
         return;
       }
       const genders: Array<'male' | 'female'> = [...(genderMale ? (['male'] as const) : []), ...(genderFemale ? (['female'] as const) : [])];
+      if (imageError) {
+        setError(imageError);
+        return;
+      }
 
       draft = {
         platform: 'meta',
@@ -152,6 +196,7 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
                 headline: metaHeadline,
                 ...(metaDescription.trim().length > 0 ? { description: metaDescription } : {}),
                 linkUrl,
+                ...(imageDataUrl ? { imageDataUrl } : {}),
               },
             },
           },
@@ -418,6 +463,28 @@ export function AutomationProposeCampaignDraftForm({ orgId, projectId, targets }
                 {t('proposeDraftMetaDescriptionLabel')}
               </label>
               <Input id="draft-meta-description" value={metaDescription} onChange={(event) => setMetaDescription(event.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium" htmlFor="draft-image">
+                {t('proposeDraftImageLabel')}
+              </label>
+              <input
+                id="draft-image"
+                ref={imageInputRef}
+                type="file"
+                accept="image/png,image/jpeg"
+                onChange={handleImageChange}
+                className="text-sm"
+              />
+              <p className="text-xs text-muted-foreground">{t('proposeDraftImageHelp')}</p>
+              {imageError ? (
+                <p role="alert" className="text-xs text-destructive">
+                  {imageError}
+                </p>
+              ) : null}
+              {imageDataUrl ? (
+                <img src={imageDataUrl} alt={t('proposeDraftImagePreviewAlt')} className="h-16 w-16 rounded border object-cover" />
+              ) : null}
             </div>
           </div>
         </>

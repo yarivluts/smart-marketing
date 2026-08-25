@@ -17,6 +17,220 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (newer) — Opened PR #297 (KAN-73 follow-up, real Meta post-creation ad creative edit)
+
+- **Last completed:**
+  - Session start: the recurring stale-local-`main`-ref quirk every recent entry documents again
+    (local `main` shared no common ancestor with `origin/main` — `git reset --hard origin/main`
+    fixed it). Read `PROGRESS.md`/`TASKS.md`: every row is `done` or a standing blocker
+    (KAN-18/19 real-infra reconciliation, KAN-43 `needs-human`, KAN-50/51 `blocked-by` KAN-43) — the
+    most recent prior entry's own "next step" pointed at the "sweep every `done` row's own
+    deferred/not-yet doc-comment notes" pass once the primary backlog empties out. Delegated a
+    scoping investigation (Explore agent) across the named candidates in KAN-73's row and picked the
+    best-scoped one: "real Meta post-creation creative edit (primary text/headline/description)" —
+    it has direct, already-merged siblings (`keyword_edit`, `ad_edit`, `meta_ad_set_edit`) whose
+    exact conventions it could follow, unlike the other deferred candidates (PMax asset groups,
+    Lookalike Audience expansion, mailing-address/mobile-device-id identifiers) which each need a
+    real design decision or structured data this codebase doesn't ingest yet. (Not yet visible at
+    session start: two other concurrent sessions had already picked, and by merge time finished,
+    two *different* KAN-73/adjacent threads of their own — PR #294, real Meta creative image
+    upload, and PR #296, an unrelated billing-ops bugfix — so this run's own pick turned out to be
+    non-overlapping in practice too, same "avoid collision" outcome those runs' own entries
+    describe achieving deliberately.)
+  - The scoping agent's key finding, confirmed correct: Meta's `AdCreative` object is not editable
+    in place once created (no partial update of live `object_story_spec` text), but a Meta `Ad`'s own
+    `creative` reference *is* mutable via a normal field-POST — unlike Google Ads, where the whole
+    `Ad` resource is immutable and `ad_edit` must create-and-pause a second ad. So the new
+    `meta_ad_creative_edit` action type is a genuine hybrid: create a new `AdCreative`, then repoint
+    the existing ad at it (`MetaAdsApiClient.getAd`/`updateAd`, both new), no pause/second-ad needed.
+  - **Delivered (PR #297, branch `kan-73-meta-creative-edit`):** the new action type end to end,
+    following the `meta_ad_set_edit`/`ad_edit` precedents exactly — `AutomationTargetStateModel`
+    gained `meta_ad_resource_names` (the ad ids `campaign_draft_create` already produced but
+    discarded, mirroring `ad_resource_names`); `MetaAutomationActionExecutor.executeMetaAdCreativeEdit`/
+    `rollbackMetaAdCreativeEdit`; `GoogleAdsAutomationActionExecutor` throws a documented
+    `GoogleAdsMetaAdCreativeEditNotSupportedError` (already covered by `ad_edit` on that platform);
+    `automation.service.ts` gained `proposeMetaAdCreativeEditAction` + execute/rollback dispatch
+    (widens `after` with the new creative id, `before` with the real pre-edit one, same "the
+    service and executor both enforce ownership" posture every sibling action type established);
+    new admin UI section + `POST .../automation/actions/meta-ad-creative-edits` route + en/he
+    translations + diff-view formatting. Full test coverage across every layer (executor/API-client/
+    validation unit + emulator tests, service-layer propose/execute/rollback lifecycle, route +
+    cross-org isolation tests, a frontend form test).
+  - **Self-review found and fixed a real bug before merge-readiness:** delegated an independent
+    subagent review (fresh context, no prior investment in the diff — the same "second pair of eyes"
+    posture recent entries use for exactly this reason). It found the retry-orphan guard
+    (`pendingMetaAdCreativeEditResourceName`, mirroring `GoogleAdsAutomationActionExecutor.pendingAdEditResourceName`'s
+    established pattern) correctly prevented a duplicate `AdCreative` on retry, but missed a second,
+    distinct race: the live `getAd()` read used to compute `previousCreativeResourceName` wasn't
+    itself cached, so a retry landing *after* `updateAd` already succeeded (but before `target.save()`
+    did) would re-read the ad's now-already-updated creative and corrupt `previousCreativeResourceName`
+    to equal `newCreativeResourceName` — silently turning a later rollback into a no-op that could
+    never restore the ad's real original copy. Fixed by caching the first `getAd()` read in a second
+    mutable instance field, alongside a new regression test (mocks `getAd` to return two different
+    creative ids across a retried call pair, asserts it's only actually called once). Also caught and
+    fixed an accompanying regression-test-authoring bug in the same review pass: the original
+    retry-orphan test asserted `createAdCreative` was called exactly once, not accounting for the one
+    call the test's own `seedTargetWithAd` helper already makes via `executeCampaignDraftCreate` —
+    corrected to the right total (2).
+  - Full `pnpm build && pnpm lint && pnpm typecheck` green across the whole monorepo; full
+    `pnpm test` green too (firebase-orm-models: 1413/1413 against a real Firestore emulator;
+    apps/web: 1578/1578 vitest + Playwright e2e green apart from one confirmed pre-existing,
+    unrelated flake — `e2e/experiments.spec.ts` hit the same documented Firestore-emulator
+    `RESOURCE_EXHAUSTED` resource-contention bug class this repo's own history repeatedly names,
+    reproduced passing cleanly in isolation; this PR touches nothing related to Experiments/Feedback).
+    **This local-green snapshot predates discovering PR #294/#296 had merged into `main` in the
+    interim** (see "In progress" below) — a rebase + full re-verification against the real new base
+    is still needed before this can merge, same recovery posture the PR #294 entry below this one
+    itself documents needing after its own stale-base surprise.
+    PR #297 opened, subscribed to its activity, a 60-minute check-in scheduled as a webhook-delivery
+    fallback (same posture every prior PR-opening entry establishes).
+- **In progress (exact stopping point):** PR #297 is open and self-reviewed, but `main` has since
+  advanced past its base with PR #294 (real Meta creative image upload) and PR #296 (billing-ops
+  fix) — PR #294 in particular touches the exact same files this PR does
+  (`meta-ads/executor.ts`/`api-client.ts`, `meta-campaign-draft.ts`, both files' own test suites),
+  so a real merge-conflict-resolution pass (keep both features, same posture the PR #292/#293 and
+  PR #294 recovery entries both already document for this exact file family) plus a full
+  re-verification against the merged base is still needed before this can merge. Not done yet as of
+  this entry — the scheduled 60-minute check-in (or the next run, if this session ends first) picks
+  this up.
+- **Blocked + why:** nothing externally blocking; the remaining work (merge `main` in, resolve
+  conflicts, re-verify, merge) is mechanical but not yet done.
+- **Next step:** merge current `main` into `kan-73-meta-creative-edit`, resolve conflicts keeping
+  both PR #294's image-upload code and this PR's creative-edit code (they touch overlapping
+  functions/tests but are additive, not contradictory — same shape the PR #294 entry's own 3-conflict
+  resolution already proves out for this exact file set), re-run
+  `pnpm build && pnpm lint && pnpm typecheck && pnpm test` from scratch against the merged base, then
+  push and wait for real CI before merging. Once this closes out, KAN-73's row has no further named
+  deferred bullets left except PMax asset groups (Google-only, a genuinely bigger
+  structurally-different-model story) and Lookalike Audience expansion (both connectors, doesn't fit
+  the existing `SinkPluginExecutor` shape cleanly).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+
+---
+
+## 2026-08-25 (latest) — Merged billing-ops/churn envelope-unwrap fix (PR #296, KAN-80/KAN-81)
+
+- **Last completed:**
+  - Session start: local `main` was a stale shallow-clone snapshot (50 commits behind real `main`,
+    unrelated-histories on `git merge --ff-only` — same recurring quirk every recent entry documents,
+    confirmed via `git rev-parse --is-shallow-repository`) — `git reset --hard origin/main` fixed it.
+    `list_pull_requests` showed two open PRs from concurrent sessions (#294 Meta creative image upload,
+    #295 per-campaign roi_Nd/collection_Nd), both freshly opened (`mergeable_state: unknown`, 0 CI
+    checks yet) — left alone entirely to avoid collision.
+  - Delegated a research sweep (subagent) for a genuine, unclaimed, infra-free follow-up not
+    overlapping #294/#295's scope. It surfaced a real, previously-flagged, still-unfixed bug: KAN-81's
+    own PR #247 (2026-08-20) fixed `record-feed-view.ts`'s `toRecordFeedEntryView` for reading
+    `RawRecordModel.payload` flat instead of unwrapping the ingest envelope (`payload.properties`/
+    `payload.attributes`), and that PR's own PROGRESS.md entry explicitly flagged
+    `billing-ops-view.ts`/`isChurnSignal` as "very likely carrying the exact same bug for any record
+    landed through the real Stripe plugin" — but it was never fixed. Verified directly: confirmed via
+    grep/read that `toBillingOpsFeedEntryView` (KAN-80 Billing Ops feed), `toChurnFeedEntryView` (KAN-81
+    Churn feed, not itself named in the original flag but the same file family and same bug), and
+    `isChurnSignal` (`pipeline.service.ts`) were all still reading `payload[field]` directly, unchanged
+    since their original creation commits.
+  - **Fix (PR #296, branch `fix/billing-ops-churn-envelope-unwrap`):** all three now read through
+    `declaredFieldsForRecord` (`pipeline.service.ts`'s own existing private helper, already used for the
+    same purpose by its record-field-filter feature) / `checkRecordEnvelope` (already exported from
+    `@growthos/firebase-orm-models`, already used the same way by `rep-collection.service.ts` and
+    `record-feed-view.ts`) instead of the payload directly — no new abstractions, reusing the
+    established fix pattern exactly. In practice this bug meant every field on the Billing Ops feed page
+    (amount/currency/customer id/status/failure code/message/refund reason) rendered blank, and the
+    Churn feed never matched a single subscription landed through the real Stripe plugin — both pages
+    only ever worked against hand-built flat-payload test fixtures, never a real one.
+  - Updated every affected fixture (`billing-ops-view.test.ts`, `churn-feed-view.test.ts` — rewritten
+    cleanly rather than patched, `pipeline.emulator.test.ts`'s `listRecentChurnedSubscriptionsForProject`
+    suite against a real Firestore emulator) to build a real envelope shape instead of a flat one, so
+    this regression would be caught again.
+  - `pnpm lint && pnpm typecheck && pnpm build` green monorepo-wide; targeted `vitest run` on the two
+    touched `apps/web` view-mapper tests green, then a real Firestore-emulator run of `pipeline`'s own
+    test file (27/27) green, before running the full suite. While the first full local `pnpm test` was
+    still in flight, PR #295 merged to `main` — merged it in (clean, no file overlap with this PR's own
+    changes), re-verified lint/typecheck/build, and re-ran the full suite from scratch against the new
+    base. GitHub CI (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green
+    independently on the merged commit — `mergeable_state: clean`, no open reviews — merged via squash.
+    (The second local `pnpm test` run was still mid-flight with one transient, unrelated `plugins.spec.ts`
+    e2e flake at merge time; GitHub's own independent green run was the authoritative signal, so the
+    redundant local run wasn't blocked on further.) Remote branch deletion hit the same recurring HTTP
+    403 from this sandbox's git-over-HTTPS proxy every prior entry documents — left undeleted.
+  - Updated `TASKS.md`'s KAN-80 and KAN-81 rows with their own follow-up-closed notes.
+- **In progress (exact stopping point):** none — PR #296 is merged, `main`'s CI is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates per KAN-72/73's own rows (PMax asset groups, Lookalike/Similar Audience expansion,
+  mailing-address/mobile-device-id identifiers, a true Meta post-creation creative-text edit) — none
+  attempted here since this run intentionally picked a different, non-overlapping thread to avoid
+  colliding with #294/#295. Worth a fresh sweep next run rather than assuming this list is exhaustive.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `fix/billing-ops-churn-envelope-unwrap` branch on GitHub (proxy 403 on
+    remote branch-delete, same as every recent entry).
+
+---
+
+## 2026-08-25 (even newer) — Merged KAN-73 follow-up (PR #294, real Meta creative image upload); recovered from a stale-base branch before merge
+
+- **Last completed:**
+  - Session start: local `main`'s branch ref was a stale snapshot — the same recurring shallow-clone
+    quirk prior entries document — but this time it bit much harder than usual: `git checkout -B main
+    origin/main` landed on a commit **145 PRs behind** real `main` (back at the PR #148 era), not just
+    a few commits stale. Checked `list_pull_requests`: PR #293 (a concurrent session's Meta ad-set-edit
+    follow-up) was open; picked a **different**, non-overlapping KAN-73 deferred bullet to avoid
+    collision — "real Meta creative image upload" (`MetaCampaignDraftAdSet.ad.creative`'s own doc
+    comment had explicitly named this out of scope for v1).
+  - **Delivered (originally on branch `kan-73-meta-creative-image-upload`):** `imageDataUrl` (a
+    `data:image/(png|jpeg);base64,...` URL) on the Meta creative shape, validated + size-capped
+    (`MAX_IMAGE_DATA_URL_LENGTH`, ~390KB raw — the whole draft is persisted verbatim on the proposed
+    action's `after.campaignDraft`, a single Firestore document capped at 1 MiB); `MetaAdsApiClient.
+    uploadAdImage` hitting Meta's real `/act_{id}/adimages` endpoint's `bytes` (base64) form field on
+    a plain POST (no multipart upload plumbing needed — the same `URLSearchParams` shape every other
+    call on this client already uses); `executeCampaignDraftCreate` uploads the image before creating
+    the ad creative, threading `image_hash` through; an optional PNG/JPEG file input on the existing
+    campaign-draft admin form with client-side validation + an inline preview; en/he translations.
+    Full local `pnpm build/lint/typecheck/test` green (979 firebase-orm-models tests, 949 web tests
+    incl. new image-upload UI tests, 23/23 e2e) — opened as **PR #294**.
+  - **Caught before merge:** PR #294's own `mergeable_state` came back `dirty`. Investigated rather
+    than assumed-noise: the branch's cherry-picked/committed work was genuinely based on that 145-PR-
+    stale `main` from session start, missing KAN-72/73's own `keyword_edit`/`ad_edit`/`meta_ad_set_edit`
+    action types (PRs #289/#292/#293) entirely — a much bigger gap than a normal same-day staleness
+    conflict. Recovered by resetting local `main` to the real `origin/main`, creating a fresh branch,
+    and `git cherry-pick`-ing the single feature commit onto it — 3 real conflicts (`executor.ts`'s
+    imports/error-classes and its `executeCampaignDraftCreate` loop body, `api-client.test.ts`,
+    `executor.emulator.test.ts`'s `fakeApiClient`), all additive-on-both-sides and resolved by keeping
+    both PRs' code (verified via `git diff` against the pre-conflict intent for every touched file, not
+    just a green build). Force-pushed the corrected branch — `mergeable_state` came back `clean`. Full
+    `pnpm build/lint/typecheck/test` re-run from scratch against the real base (also green: 1396
+    firebase-orm-models tests, 1561 web tests — the real counts, once KAN-72/73's own intervening test
+    growth was actually included). CI green (`lint · typecheck · test · build` + `terraform fmt ·
+    validate`), `mergeable_state: clean` reconfirmed after PR #295 merged in the interim (unrelated
+    files, no re-conflict) — merged via squash as PR #294. Remote branch delete hit the same recurring
+    HTTP 403 from this sandbox's git-over-HTTPS proxy every prior entry documents — left the merged
+    remote branch in place (harmless), same established posture.
+  - **Root-cause note for future runs:** the `git checkout -B main origin/main` "fix" for the
+    documented stale-local-ref quirk is not by itself sufficient verification — it can silently land
+    on an `origin/main` ref that is itself far more stale than a quick glance at the resulting `git
+    log` would suggest, since a recent-looking commit message doesn't guarantee true freshness. Before
+    trusting a freshly-checked-out `main` as a branch base, this run recommends a cheap sanity check
+    future runs should adopt: compare the checked-out `main` tip against `list_pull_requests`/
+    `list_commits`' own view of the real remote tip, not just against the working tree's own git log.
+- **In progress (exact stopping point):** none — PR #294 is merged, `main` is green, local `main` is
+  freshly re-synced to the real remote tip (`95b61f1`) after this recovery.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates: KAN-72's remaining PMax asset groups (bigger scope, deliberately not attempted);
+  KAN-73's real Meta creative image upload is now closed by this entry, but Lookalike/Similar Audience
+  expansion for either connector and a true Meta post-creation creative-text edit (beyond the
+  budget/status `meta_ad_set_edit` PR #293 already delivers) remain deferred, documented.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Consider whether the container/session-start git setup could pin or verify `origin/main` more
+    robustly — this is the second consecutive run to lose real time to a stale-base surprise (the
+    previous one was caught quickly; this one required a full recovery), and the root cause (a
+    shallow-clone or cache serving a very old `main` snapshot at container start) sits outside this
+    run's own control.
+
+---
+
 ## 2026-08-25 (newest) — Merged KAN-86 slice 3 (PR #295, true per-campaign roi_Nd/collection_Nd)
 
 - **Last completed:**
