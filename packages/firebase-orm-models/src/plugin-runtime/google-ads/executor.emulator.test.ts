@@ -459,6 +459,39 @@ describe('GoogleAdsAutomationActionExecutor', () => {
     expect(reloaded.ad_resource_names).toEqual(['customers/999/adGroupAds/2']);
   });
 
+  it('does not create a second, orphaned ad when a retried executeAdEdit call reuses the same executor instance after a partial failure', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Ad Edit Retry Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Ad Edit Retry Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const setAdGroupAdStatus = vi.fn().mockRejectedValueOnce(new Error('transient network failure')).mockResolvedValue(undefined);
+    const apiClient = fakeApiClient({ setAdGroupAdStatus });
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    await executor.executeCampaignDraftCreate({ organizationId: organization.id, projectId: project.id, environmentId: 'live', targetId: target.id, draft: DRAFT });
+
+    const editInput = {
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      previousAdResourceName: CREATE_RESULT.adResourceNames[0],
+      responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+    };
+    await expect(executor.executeAdEdit(editInput)).rejects.toThrow('transient network failure');
+    expect(apiClient.createResponsiveSearchAd).toHaveBeenCalledTimes(1);
+
+    const result = await executor.executeAdEdit(editInput);
+    expect(apiClient.createResponsiveSearchAd).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ newAdResourceName: 'customers/999/adGroupAds/2' });
+  });
+
   it('rejects an ad_edit for an ad resource name that is not one of this target\'s own ads', async () => {
     const { owner, organization, project } = await setupOrgWithProject('GAds Executor Ad Edit Unknown Org');
     const target = await ensureAutomationTargetSeeded({

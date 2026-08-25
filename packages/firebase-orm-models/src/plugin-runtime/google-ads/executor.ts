@@ -83,6 +83,23 @@ async function loadTarget(input: TargetLookup): Promise<AutomationTargetStateMod
  * client even if the resolver ever mis-wires an executor.
  */
 export class GoogleAdsAutomationActionExecutor implements AutomationActionExecutor {
+  /**
+   * The ad `executeAdEdit` itself already created during a still-in-flight
+   * `ad_edit` execution, if any — `executeActionByType`
+   * (`automation.service.ts`) wraps a whole `executeAdEdit` call in
+   * `runWithRetryBackoff`, retrying the *same* executor instance on a
+   * transient failure. Without this cache, a naive retry after
+   * `createResponsiveSearchAd` already succeeded but the following
+   * `setAdGroupAdStatus` call failed would create a *second*, orphaned ad on
+   * the automatic retry — the exact same bug class
+   * `MetaCustomAudienceSinkPluginExecutor.audienceId`'s own doc comment
+   * documents and fixes for its own two-step create-then-use sequence. Reset
+   * to `null` once an `executeAdEdit` call fully succeeds, so a later,
+   * unrelated `ad_edit` action against the same executor instance still
+   * creates its own new ad rather than reusing a stale one.
+   */
+  private pendingAdEditResourceName: string | null = null;
+
   constructor(
     private readonly apiClient: GoogleAdsApiClient,
     private readonly customerId: string,
@@ -205,16 +222,13 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
    * {@link GoogleAdsAdResourceUnknownError} if it isn't one of this target's
    * own ads.
    */
-  private resolveAdGroupForAd(target: AutomationTargetStateModel, adResourceName: string): string {
+  private resolveAdGroupForAd(target: AutomationTargetStateModel, adResourceName: string): { adGroupResourceName: string; adIndex: number } {
     const adIndex = target.ad_resource_names?.indexOf(adResourceName) ?? -1;
-    if (adIndex === -1) {
-      throw new GoogleAdsAdResourceUnknownError(adResourceName);
-    }
-    const adGroupResourceName = target.ad_group_resource_names?.[adIndex];
+    const adGroupResourceName = adIndex === -1 ? undefined : target.ad_group_resource_names?.[adIndex];
     if (!adGroupResourceName) {
       throw new GoogleAdsAdResourceUnknownError(adResourceName);
     }
-    return adGroupResourceName;
+    return { adGroupResourceName, adIndex };
   }
 
   /**
@@ -230,19 +244,24 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
    */
   async executeAdEdit(input: AutomationAdEditExecutionInput): Promise<AutomationAdEditExecutionResult> {
     const target = await loadTarget(input);
-    const adIndex = target.ad_resource_names?.indexOf(input.previousAdResourceName) ?? -1;
-    const adGroupResourceName = this.resolveAdGroupForAd(target, input.previousAdResourceName);
+    const { adGroupResourceName, adIndex } = this.resolveAdGroupForAd(target, input.previousAdResourceName);
 
-    const created = await this.apiClient.createResponsiveSearchAd(this.customerId, adGroupResourceName, input.responsiveSearchAd, 'ENABLED');
+    if (this.pendingAdEditResourceName === null) {
+      const created = await this.apiClient.createResponsiveSearchAd(this.customerId, adGroupResourceName, input.responsiveSearchAd, 'ENABLED');
+      this.pendingAdEditResourceName = created.adResourceName;
+    }
+    const newAdResourceName = this.pendingAdEditResourceName;
+
     await this.apiClient.setAdGroupAdStatus(this.customerId, input.previousAdResourceName, 'PAUSED');
 
     const nextAdResourceNames = [...(target.ad_resource_names ?? [])];
-    nextAdResourceNames[adIndex] = created.adResourceName;
+    nextAdResourceNames[adIndex] = newAdResourceName;
     target.ad_resource_names = nextAdResourceNames;
     target.updated_at = new Date().toISOString();
     await target.save();
 
-    return { newAdResourceName: created.adResourceName };
+    this.pendingAdEditResourceName = null;
+    return { newAdResourceName };
   }
 
   /** Restores the superseded ad to `ENABLED` and removes the replacement ad `executeAdEdit` created, undoing exactly one `ad_edit` action. */
