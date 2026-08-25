@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { SupportLeaderboardResult } from '@growthos/firebase-orm-models';
-import { toSupportLeaderboardView } from './support-view';
+import { formatDurationSeconds, toSupportLeaderboardView } from './support-view';
 
 describe('toSupportLeaderboardView', () => {
   it('resolves each row against the people map, preserving order and pass-through metrics', () => {
@@ -36,5 +36,24 @@ describe('toSupportLeaderboardView', () => {
 
     const view = toSupportLeaderboardView(result, new Map());
     expect(view.rows[0]).toMatchObject({ name: 'agent-removed', photoUrl: null });
+  });
+});
+
+describe('formatDurationSeconds', () => {
+  it('rounds to whole seconds under a minute', () => {
+    expect(formatDurationSeconds(45.4)).toEqual({ value: 45, unitKey: 'durationSeconds' });
+  });
+
+  it('rounds to whole minutes under an hour', () => {
+    expect(formatDurationSeconds(300)).toEqual({ value: 5, unitKey: 'durationMinutes' });
+  });
+
+  it('rounds to one decimal place of hours at and above an hour', () => {
+    expect(formatDurationSeconds(5400)).toEqual({ value: 1.5, unitKey: 'durationHours' });
+  });
+
+  it('never bakes a unit word into the returned value — only a translation-lookup key', () => {
+    const { value } = formatDurationSeconds(120);
+    expect(typeof value).toBe('number');
   });
 });

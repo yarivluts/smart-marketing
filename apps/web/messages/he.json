@@ -666,7 +666,10 @@
     "leaderboardEmpty": "טרם נחתו פניות שנפתרו עבור פרויקט זה.",
     "rankedName": "{rank}. {name}",
     "rowSummary": "{resolved} נפתרו · {firstResponse} תגובה ראשונית · {resolution} פתרון · {csat} CSAT",
-    "rowValueUnavailable": "—"
+    "rowValueUnavailable": "—",
+    "durationSeconds": "{value} שניות",
+    "durationMinutes": "{value} דקות",
+    "durationHours": "{value} שעות"
   },
   "ChurnReasons": {
     "metaTitle": "סיבות נטישה",
