@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   createOrganizationWithOwner,
   createProject,
@@ -18,16 +18,24 @@ import {
   listAuditLogEntriesForOrg,
   listCrmSyncRunsForSegment,
   LocalKmsProvider,
+  MetaAudienceCredentialConfigError,
+  META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
+  META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD,
+  META_CUSTOM_AUDIENCE_PLUGIN_ID,
+  META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML,
   NotAnActionPluginError,
+  PluginInstallModel,
   PluginInstallNotActiveError,
   PluginInstallNotFoundError,
   registerPluginManifest,
   registerSchemaDefinition,
   requestResourceAttachment,
   resolveCrmWebhookCredentialSecret,
+  resolveMetaAudienceCredentialSecret,
   SegmentNotFoundError,
   setSharedCredentialSecret,
   syncSegmentToCrm,
+  UnsupportedSinkPluginError,
   type SchemaFieldInput,
   type SinkPluginExecutor,
 } from '../index';
@@ -37,6 +45,10 @@ const APP_NAME = 'crm-sync-tests';
 
 beforeAll(async () => {
   await connectToFirestoreEmulator(APP_NAME);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 function unique(prefix: string): string {
@@ -98,6 +110,49 @@ async function setupInstalledCrmWebhookPlugin(orgName: string, secret: { webhook
     version: '1.0.0',
     consentedScopes: ['action:execute'],
     config: { [CRM_WEBHOOK_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id },
+    installedByUserId: owner.id,
+  });
+
+  return { owner, organization, project, credential, attachment, install, kms };
+}
+
+/** The Meta Custom Audience sibling of {@link setupInstalledCrmWebhookPlugin} — a `meta_ads`-provider credential with its secret set, approved-attached to the project, and the manifest installed pointing its config at that attachment plus a configured `audience_name`. */
+async function setupInstalledMetaCustomAudiencePlugin(
+  orgName: string,
+  secret: { accessToken: string; adAccountId: string; pageId: string } = { accessToken: 'access-token-1', adAccountId: '999', pageId: 'page-1' },
+  audienceName = 'Warm leads',
+) {
+  const { owner, organization, project } = await setupOrgWithProject(orgName);
+  const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+  const kms = new LocalKmsProvider(keyRing, currentKeyId);
+
+  const credential = await createSharedCredential({
+    organizationId: organization.id,
+    name: 'Meta Ads (test)',
+    provider: 'meta_ads',
+    availableScopes: ['account'],
+    createdByUserId: owner.id,
+  });
+  await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify(secret), kms, actorId: owner.id });
+
+  const attachment = await requestResourceAttachment({
+    organizationId: organization.id,
+    projectId: project.id,
+    resourceKind: 'credential',
+    resourceId: credential.id,
+    requestedByUserId: owner.id,
+    scopeSelection: ['account'],
+  });
+  await decideResourceAttachment({ organizationId: organization.id, attachmentId: attachment.id, decidedByUserId: owner.id, approve: true });
+
+  await registerPluginManifest({ organizationId: organization.id, manifestYaml: META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML, registeredByUserId: owner.id });
+  const install = await installPlugin({
+    organizationId: organization.id,
+    projectId: project.id,
+    pluginId: META_CUSTOM_AUDIENCE_PLUGIN_ID,
+    version: '1.0.0',
+    consentedScopes: ['action:execute'],
+    config: { [META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id, [META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD]: audienceName },
     installedByUserId: owner.id,
   });
 
@@ -166,6 +221,79 @@ describe('resolveCrmWebhookCredentialSecret', () => {
     const install = await installPlugin({ organizationId: organization.id, projectId: project.id, pluginId: CRM_WEBHOOK_PLUGIN_ID, version: '1.0.0', consentedScopes: ['action:execute'], config: { [CRM_WEBHOOK_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id }, installedByUserId: owner.id });
 
     await expect(resolveCrmWebhookCredentialSecret(organization.id, project.id, install, kms)).rejects.toBeInstanceOf(CrmWebhookCredentialConfigError);
+  });
+});
+
+describe('resolveMetaAudienceCredentialSecret', () => {
+  it('resolves the real secret + configured audience name from an approved, configured attachment', async () => {
+    const { organization, project, install, kms } = await setupInstalledMetaCustomAudiencePlugin('Resolve Meta Audience Secret Org');
+
+    const secret = await resolveMetaAudienceCredentialSecret(organization.id, project.id, install, kms);
+
+    expect(secret).toEqual({ accessToken: 'access-token-1', adAccountId: '999', audienceName: 'Warm leads' });
+  });
+
+  it('rejects an install missing the credential-attachment config field', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Resolve Meta Audience Secret No Config Org');
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML, registeredByUserId: owner.id });
+    const install = await installPlugin({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: META_CUSTOM_AUDIENCE_PLUGIN_ID,
+      version: '1.0.0',
+      consentedScopes: ['action:execute'],
+      config: { [META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: 'nonexistent-attachment', [META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD]: 'Warm leads' },
+      installedByUserId: owner.id,
+    });
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+
+    await expect(resolveMetaAudienceCredentialSecret(organization.id, project.id, install, kms)).rejects.toBeInstanceOf(MetaAudienceCredentialConfigError);
+  });
+
+  it('rejects a credential whose provider is not "meta_ads"', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Resolve Meta Audience Secret Wrong Provider Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    const credential = await createSharedCredential({ organizationId: organization.id, name: 'Generic (wrong provider)', provider: 'generic', availableScopes: ['account'], createdByUserId: owner.id });
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify({ webhookUrl: 'https://x.example.com', bearerToken: 'tok' }), kms, actorId: owner.id });
+    const attachment = await requestResourceAttachment({ organizationId: organization.id, projectId: project.id, resourceKind: 'credential', resourceId: credential.id, requestedByUserId: owner.id, scopeSelection: ['account'] });
+    await decideResourceAttachment({ organizationId: organization.id, attachmentId: attachment.id, decidedByUserId: owner.id, approve: true });
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML, registeredByUserId: owner.id });
+    const install = await installPlugin({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: META_CUSTOM_AUDIENCE_PLUGIN_ID,
+      version: '1.0.0',
+      consentedScopes: ['action:execute'],
+      config: { [META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id, [META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD]: 'Warm leads' },
+      installedByUserId: owner.id,
+    });
+
+    await expect(resolveMetaAudienceCredentialSecret(organization.id, project.id, install, kms)).rejects.toBeInstanceOf(MetaAudienceCredentialConfigError);
+  });
+
+  it('rejects an install missing the audience_name config field', async () => {
+    const { owner, organization, project, attachment } = await setupInstalledMetaCustomAudiencePlugin('Resolve Meta Audience Secret No Name Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    // installPlugin's own config_schema validation requires the field to be present — build a
+    // second install with a config that skips it directly against the model, mirroring
+    // resolveCrmWebhookCredentialSecret's own "not at install time" test posture.
+    const install = new PluginInstallModel();
+    install.organization_id = organization.id;
+    install.project_id = project.id;
+    install.plugin_id = META_CUSTOM_AUDIENCE_PLUGIN_ID;
+    install.version = '1.0.0';
+    install.status = 'installed';
+    install.granted_scopes = ['action:execute'];
+    install.config = { [META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id };
+    install.installed_by = owner.id;
+    install.installed_at = new Date().toISOString();
+    install.setPathParams({ organization_id: organization.id, project_id: project.id });
+    await install.save();
+
+    await expect(resolveMetaAudienceCredentialSecret(organization.id, project.id, install, kms)).rejects.toBeInstanceOf(MetaAudienceCredentialConfigError);
   });
 });
 
@@ -302,6 +430,65 @@ describe('syncSegmentToCrm', () => {
     await expect(
       syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms }),
     ).rejects.toBeInstanceOf(NotAnActionPluginError);
+  });
+
+  it('throws UnsupportedSinkPluginError for an action-type install with no built-in executor', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Sync Crm Unsupported Plugin Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({ organizationId: organization.id, projectId: project.id, name: 'Pro customers', schemaName: 'customer', filters: [{ field: 'plan', op: '=', value: 'pro' }], createdByUserId: owner.id });
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: 'id: com.example.other-action\nversion: 1.0.0\ntype: action\ndisplay_name: Other Action\nscopes: [action:execute]\n', registeredByUserId: owner.id });
+    const install = await installPlugin({ organizationId: organization.id, projectId: project.id, pluginId: 'com.example.other-action', version: '1.0.0', consentedScopes: ['action:execute'], config: {}, installedByUserId: owner.id });
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+
+    await expect(
+      syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms }),
+    ).rejects.toBeInstanceOf(UnsupportedSinkPluginError);
+  });
+
+  it('persists a connector-created externalRef (e.g. a new Meta Custom Audience id) onto the install after a successful sync', async () => {
+    const { owner, organization, project, install, kms } = await setupInstalledMetaCustomAudiencePlugin('Sync Meta Audience Persist Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({ organizationId: organization.id, projectId: project.id, name: 'Pro customers', schemaName: 'customer', filters: [{ field: 'plan', op: '=', value: 'pro' }], createdByUserId: owner.id });
+    const membersExecutor = { execute: async () => [{ entity_id: 'cust_1', properties: JSON.stringify({ plan: 'pro' }), last_seen_at: '2026-08-20T00:00:00.000Z' }] };
+    const executor = fakeSinkExecutor({ push: async (params) => ({ pushed: params.records.length, externalRef: 'audience-abc' }) });
+
+    expect(install.meta_custom_audience_id).toBeUndefined();
+    const run = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, executor, membersExecutor });
+
+    expect(run.status).toBe('succeeded');
+    const reloaded = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
+    expect(reloaded?.meta_custom_audience_id).toBe('audience-abc');
+  });
+
+  it('creates a Custom Audience on the first real sync and reuses the same one on the second, via the real dispatch (no executor override)', async () => {
+    const { owner, organization, project, install, kms } = await setupInstalledMetaCustomAudiencePlugin('Sync Meta Audience Real Dispatch Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({ organizationId: organization.id, projectId: project.id, name: 'Pro customers', schemaName: 'customer', filters: [{ field: 'plan', op: '=', value: 'pro' }], createdByUserId: owner.id });
+    const membersExecutor = { execute: async () => [{ entity_id: 'cust_1', properties: JSON.stringify({ plan: 'pro', email: 'a@example.com' }), last_seen_at: '2026-08-20T00:00:00.000Z' }] };
+
+    const fetchMock = vi.fn(async (url: string) => {
+      const parsed = new URL(url);
+      if (parsed.pathname.endsWith('/customaudiences')) {
+        return { ok: true, status: 200, json: async () => ({ id: 'audience-real-1' }), text: async () => '{}' } as unknown as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({ num_received: 1 }), text: async () => '{}' } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const firstRun = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, membersExecutor });
+    expect(firstRun.status).toBe('succeeded');
+    const afterFirstSync = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
+    expect(afterFirstSync?.meta_custom_audience_id).toBe('audience-real-1');
+    const createAudienceCalls = fetchMock.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/customaudiences'));
+    expect(createAudienceCalls).toHaveLength(1);
+
+    const secondRun = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, membersExecutor });
+    expect(secondRun.status).toBe('succeeded');
+    const afterSecondSync = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
+    expect(afterSecondSync?.meta_custom_audience_id).toBe('audience-real-1');
+    // Still exactly one — the second sync reused the cached audience id instead of creating another.
+    expect(fetchMock.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/customaudiences'))).toHaveLength(1);
   });
 });
 

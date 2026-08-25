@@ -70,6 +70,20 @@ export interface SinkPluginPushParams {
 /** One push call's outcome — how many of {@link SinkPluginPushParams.records} the remote system actually accepted. */
 export interface SinkPluginPushResult {
   pushed: number;
+  /**
+   * An external resource id this push created or reused, for a connector
+   * whose destination is a single persistent remote object rather than a
+   * stateless endpoint (e.g. `MetaCustomAudienceSinkPluginExecutor`'s Custom
+   * Audience id) — `undefined` for a connector with no such concept (e.g.
+   * `CrmWebhookSinkPluginExecutor`, which just POSTs to a fixed URL every
+   * time). When set, the caller (`crm-sync.service.ts`'s `syncSegmentToCrm`)
+   * persists it onto the triggering `PluginInstallModel` so the *next* sync
+   * reuses the same remote object instead of creating a new one — the same
+   * "create once, cache and reuse the resource id" pattern
+   * `MetaAutomationActionExecutor.resolveCampaignBudgetResourceName` already
+   * establishes for automation targets.
+   */
+  externalRef?: string;
 }
 
 /**

@@ -80,4 +80,18 @@ export class PluginInstallModel extends BaseModel {
 
   @Field()
   public source_last_synced_at?: string;
+
+  /**
+   * The Meta Custom Audience id `crm-sync.service.ts`'s `syncSegmentToCrm`
+   * created the first time this install (when it's a
+   * `META_CUSTOM_AUDIENCE_PLUGIN_ID` install) synced a segment — persisted
+   * from that first sync's own `SinkPluginPushResult.externalRef` so every
+   * later sync adds to the same audience instead of creating a new one each
+   * time. `undefined` until this install's first sync ever succeeds; unused
+   * by every other built-in action plugin (e.g. the CRM webhook connector),
+   * the same "one persistent field, only meaningful for one connector"
+   * posture `source_cursor` already establishes for the inbound direction.
+   */
+  @Field()
+  public meta_custom_audience_id?: string;
 }
