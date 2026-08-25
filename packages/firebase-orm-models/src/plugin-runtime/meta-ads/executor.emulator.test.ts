@@ -565,7 +565,9 @@ describe('MetaAutomationActionExecutor', () => {
       });
 
       expect(result.newCreativeResourceName).toBe('creative-2');
-      expect(createAdCreative).toHaveBeenCalledTimes(1);
+      // 1 call from seedTargetWithAd's own executeCampaignDraftCreate (the ad's original creative) +
+      // 1 from the edit's first (failed) attempt — the retried second attempt must not call it again.
+      expect(createAdCreative).toHaveBeenCalledTimes(2);
     });
 
     it('rolls back an ad creative edit by repointing the ad at the captured pre-edit creative', async () => {
