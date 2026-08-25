@@ -17,6 +17,83 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (newer still) — KAN-72 follow-up: post-creation RSA ad edits (PR #292)
+
+- **Last completed:**
+  - Session start: local `main`'s branch ref was again a stale snapshot (same recurring shallow-clone
+    quirk every recent entry documents) — `git checkout -B main origin/main` fixed it cleanly. No
+    open PRs existed at session start (checked via `list_pull_requests`), so no collision risk this
+    time.
+  - Read `PROGRESS.md`/`TASKS.md`: every row was `done` or a standing blocker (KAN-18/19 real-infra,
+    KAN-43 `needs-human`, KAN-50/51 `blocked-by`, KAN-86 partially deferred). Picked the next
+    candidate the last several entries' own "next step" sections had named: KAN-72's own deferred
+    "post-creation ad edits" bullet (the RSA half of the same deferred note whose keyword half PR
+    #289 already closed).
+  - **Delivered (PR #292, branch `kan-72-ad-edit-rsa`):** a new provider-agnostic `ad_edit` automation
+    action type. Google Ads' `Ad` resource is immutable once created (no partial-update mutate for an
+    RSA's own headlines/descriptions), so "editing" an ad creates a brand-new `ENABLED` ad in the same
+    ad group and pauses the superseded one, rather than a true in-place update — same "add/create,
+    never edit in place" posture `keyword_edit` already established for its sibling action type.
+    `AutomationTargetStateModel` gained `ad_resource_names` (parallel to the existing
+    `ad_group_resource_names`) — `GoogleAdsApiClient.createCampaignDraft` already returned this via
+    `adResourceNames`, but the executor had been discarding it; now persisted and kept in sync (the
+    new ad's resource name replaces the old one at the same array index, so a second edit of the same
+    ad group targets the newest ad, and rollback knows exactly which ad to remove/restore).
+    `GoogleAdsApiClient` gained `createResponsiveSearchAd`/`setAdGroupAdStatus`; `createCampaignDraft`'s
+    own ad-creation step now reuses `createResponsiveSearchAd` instead of duplicating the mutate call
+    shape (a reuse win, not just new surface). `MetaAutomationActionExecutor` throws a documented
+    `MetaAdEditNotSupportedError` (Meta has no Responsive Search Ad concept), mirroring
+    `MetaKeywordEditNotSupportedError`'s exact precedent. New admin UI: a "Propose an ad edit" form +
+    `POST .../automation/actions/ad-edits` route, gated on `automation.execute` and Manage write tier
+    (same as `campaign_draft_create`/`campaign_activation`/`keyword_edit`) — all copy in `en`/`he`
+    message resources, no hardcoded strings.
+  - **Self-review before merge caught and fixed a real bug:** the same retry-orphan bug class this
+    codebase's own `MetaCustomAudienceSinkPluginExecutor.audienceId` doc comment documents —
+    `executeActionByType` wraps a whole `executeAdEdit` call in `runWithRetryBackoff`, retrying the
+    *same* executor instance on a transient failure. Without a fix, a retry after
+    `createResponsiveSearchAd` already succeeded but the following `setAdGroupAdStatus` pause call
+    failed would have created a *second*, orphaned ad. Fixed by caching the created ad's resource name
+    as mutable executor-instance state (reused across retries of one execute call, reset to `null` on
+    success), with a regression test proving `createResponsiveSearchAd` is called exactly once across
+    a failed-then-retried pair of `executeAdEdit` calls.
+  - New/updated tests: RSA validation (`campaign-draft.test.ts`, extracted a shared
+    `validateResponsiveSearchAdContent` helper reused by both `campaign_draft_create` and `ad_edit`
+    rather than duplicating the headline/description limit checks), new `GoogleAdsApiClient` mutate
+    calls (`api-client.test.ts`), the executor's execute/rollback/retry-orphan-regression paths
+    (`google-ads/executor.emulator.test.ts`), Meta's not-supported error
+    (`meta-ads/executor.emulator.test.ts`), and the full propose → approve → execute → rollback
+    lifecycle incl. guardrails and write-tier gating (`automation.emulator.test.ts`) — all against a
+    real Firestore emulator. New `apps/web` route + form unit tests, both green.
+  - Full `pnpm lint && pnpm typecheck && pnpm test && pnpm build` green across the whole monorepo
+    before merge. One pre-existing e2e spec (`resource-library.spec.ts`, unrelated to automation)
+    flaked once in the very first full run — traced to genuine resource contention from accidentally
+    running two concurrent `pnpm test` invocations locally (my own mistake, not a real regression); a
+    clean single re-run of that shard passed (with Playwright's own retry mechanism absorbing one
+    flake), confirming the flake wasn't caused by this change.
+  - CI on PR #292 took ~35 minutes (the `Test` step runs the full monorepo suite including sharded
+    Playwright e2e against a real Firestore/Auth emulator) — scheduled two `send_later` self check-ins
+    rather than blocking the run on a long poll; the second one found CI green
+    (`mergeable_state: clean`, no pending reviews) and merged via squash. Remote branch delete hit the
+    same recurring HTTP 403 from this sandbox's git-over-HTTPS proxy every prior entry documents —
+    left the merged remote branch in place (harmless), same established posture.
+- **In progress (exact stopping point):** none — PR #292 is merged, `main` is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates: KAN-72's own remaining PMax asset groups (structurally different asset-group model,
+  bigger scope, deliberately not attempted here); KAN-73's real Meta creative image upload and a real
+  Meta post-creation creative edit (primary text/headline/description, Meta's own field-update
+  semantics differ enough from Google's create-new/pause-old RSA pattern that this run didn't attempt
+  it); Lookalike/Similar Audience expansion for either connector (doesn't fit the existing
+  "sync segment members" `SinkPluginExecutor` shape cleanly — origin-audience-based derivation, not a
+  member-list sync — a real design decision, not a quick follow-up).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Consider whether the scheduled-run cadence needs adjusting for long CI runs: this run's own
+    `send_later` self-check-in loop worked, but a run without `send_later` available would have no
+    good way to avoid either blocking on a ~35-minute CI run or ending the turn before merge.
+
+---
+
 ## 2026-08-25 (even newer) — Collided with a concurrent session on the same KAN-72 phone-identifier gap; closed PR #291 as superseded
 
 - **Last completed:**
