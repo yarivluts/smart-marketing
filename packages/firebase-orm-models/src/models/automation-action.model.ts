@@ -41,19 +41,27 @@ export type AutomationActionStatus = (typeof AUTOMATION_ACTION_STATUSES)[number]
  * `automation.service.ts`'s `resolveWriteTierViolation`), unlike
  * `budget_change` which Optimize already permits.
  *
- * These four action types are provider-agnostic by design — `action_type`
+ * `ad_edit` (KAN-72 follow-up) replaces an already-created ad group's
+ * Responsive Search Ad with a new one — `before`/`after` are
+ * `{ previousAdResourceName }`/`{ previousAdResourceName, responsiveSearchAd }`,
+ * and `executeActionByType` widens `after` post-execution with
+ * `newAdResourceName` (the real resource name Google Ads assigned the
+ * replacement ad) so `rollbackActionByType` knows exactly which ad to remove
+ * and which to restore.
+ *
+ * These five action types are provider-agnostic by design — `action_type`
  * never says "google_ads" or "meta". KAN-72 (`GoogleAdsAutomationActionExecutor`)
- * drives all four for a target linked to a `provider: 'google_ads'`
+ * drives all five for a target linked to a `provider: 'google_ads'`
  * credential; KAN-73 (`MetaAutomationActionExecutor`) drives
  * `budget_change`/`campaign_draft_create`/`campaign_activation` for a target
- * linked to a `provider: 'meta_ads'` credential (`keyword_edit` has no Meta
- * equivalent — Meta has no ad-group/keyword concept, see
+ * linked to a `provider: 'meta_ads'` credential (`keyword_edit`/`ad_edit` have
+ * no Meta equivalent — Meta has no ad-group/keyword or RSA-asset concept, see
  * `MetaAutomationActionExecutor`'s own doc comment) — see `CampaignDraft`'s
  * own `platform`-discriminated-union doc comment (`automation-runtime/executor.ts`)
  * for how `campaign_draft_create` stays one action type across both
  * platforms' structurally different campaign shapes.
  */
-export const AUTOMATION_ACTION_TYPES = ['budget_change', 'campaign_draft_create', 'campaign_activation', 'keyword_edit'] as const;
+export const AUTOMATION_ACTION_TYPES = ['budget_change', 'campaign_draft_create', 'campaign_activation', 'keyword_edit', 'ad_edit'] as const;
 export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
 
 export type AutomationRollbackReason = 'manual' | 'guardrail_regression';

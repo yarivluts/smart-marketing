@@ -21,6 +21,7 @@ import {
   listAuditLogEntriesForOrg,
   listAutomationActionsForProject,
   listAutomationTargetStatesForProject,
+  proposeAdEditAction,
   proposeAutomationBudgetChangeAction,
   proposeCampaignActivationAction,
   proposeCampaignDraftCreateAction,
@@ -1302,5 +1303,198 @@ describe('proposeKeywordEditAction (KAN-72 follow-up)', () => {
       actorId: owner.id,
     });
     expect(rolledBack.status).toBe('rolled_back');
+  });
+});
+
+const EDITED_RESPONSIVE_SEARCH_AD = {
+  headlines: ['New Headline One', 'New Headline Two', 'New Headline Three'],
+  descriptions: ['New description one.', 'New description two.'],
+  finalUrl: 'https://example.com/new-widgets',
+};
+
+describe('proposeAdEditAction (KAN-72 follow-up)', () => {
+  /** Seeds a target and executes a `campaign_draft_create` against it, so `ad_resource_names` is populated (via the simulated executor). */
+  async function seedTargetWithCreatedCampaign(organizationId: string, projectId: string, ownerId: string) {
+    const target = await seedTarget(organizationId, projectId, ownerId, 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId,
+      projectId,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: ownerId,
+    });
+    await approveAutomationAction({ organizationId, projectId, actionId: created.id, approverId: ownerId });
+    await executeAutomationAction({ organizationId, projectId, actionId: created.id, executedByUserId: ownerId });
+    const [reloaded] = await listAutomationTargetStatesForProject(organizationId, projectId);
+    return reloaded;
+  }
+
+  it('proposes a clean ad edit as awaiting_approval with the dry-run diff', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Ad Edit Clean Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const previousAdResourceName = target.ad_resource_names?.[0] as string;
+
+    const action = await proposeAdEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      previousAdResourceName,
+      responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('awaiting_approval');
+    expect(action.action_type).toBe('ad_edit');
+    expect(action.before).toEqual({ previousAdResourceName });
+    expect(action.after).toEqual({ previousAdResourceName, responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD });
+    expect(action.guardrail_violations).toEqual([]);
+  });
+
+  it('rejects an invalid edit (too few headlines) before touching guardrails', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Ad Edit Invalid Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const previousAdResourceName = target.ad_resource_names?.[0] as string;
+
+    await expect(
+      proposeAdEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        previousAdResourceName,
+        responsiveSearchAd: { ...EDITED_RESPONSIVE_SEARCH_AD, headlines: ['Only One'] },
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('refuses an ad resource name that is not one of this target\'s own ads', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Ad Edit Wrong Ad Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeAdEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        previousAdResourceName: 'customers/999/adGroupAds/not-this-targets',
+        responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('refuses a target with no campaign (and so no ads) created yet', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Ad Edit No Campaign Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeAdEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        previousAdResourceName: 'customers/999/adGroupAds/1',
+        responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('blocks an ad edit targeting a protected campaign', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Ad Edit Protected Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const previousAdResourceName = target.ad_resource_names?.[0] as string;
+    await setAutomationGuardrailPolicy({
+      organizationId: organization.id,
+      projectId: project.id,
+      maxDailyBudgetChangePct: null,
+      spendCeilingUsd: null,
+      protectedTargetIds: [target.id],
+      allowedHours: null,
+      maxActionsPerDay: null,
+      maxGuardedMetricRegressionPct: null,
+      setByUserId: owner.id,
+    });
+
+    const action = await proposeAdEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      previousAdResourceName,
+      responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual([expect.objectContaining({ type: 'protected_target' })]);
+  });
+
+  it('requires the "manage" write tier specifically — "optimize" is not enough', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Ad Edit Optimize Org');
+    const { target, attachment } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'manage', 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, executedByUserId: owner.id });
+    await setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: attachment.id, tier: 'optimize', actorId: owner.id });
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+
+    const action = await proposeAdEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      previousAdResourceName: reloaded.ad_resource_names?.[0] as string,
+      responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'insufficient_write_tier' })]));
+  });
+
+  it('executes an ad edit end to end, widening the diff with the real new ad resource name, then rolls it back', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Ad Edit Lifecycle Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const previousAdResourceName = target.ad_resource_names?.[0] as string;
+
+    const proposed = await proposeAdEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      previousAdResourceName,
+      responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id });
+    const executed = await executeAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      executedByUserId: owner.id,
+    });
+
+    expect(executed.status).toBe('executed');
+    const after = executed.after as { newAdResourceName?: string };
+    expect(after.newAdResourceName).toEqual(expect.any(String));
+    expect(after.newAdResourceName).not.toBe(previousAdResourceName);
+
+    const [reloadedAfterExecute] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloadedAfterExecute.ad_resource_names?.[0]).toBe(after.newAdResourceName);
+
+    const rolledBack = await rollbackAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      reason: 'manual',
+      actorId: owner.id,
+    });
+    expect(rolledBack.status).toBe('rolled_back');
+
+    const [reloadedAfterRollback] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloadedAfterRollback.ad_resource_names?.[0]).toBe(previousAdResourceName);
   });
 });

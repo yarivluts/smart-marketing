@@ -48,6 +48,8 @@ export interface AutomationTargetView {
   campaignResourceName?: string;
   campaignStatus?: CampaignStatus;
   adGroupResourceNames?: string[];
+  /** Same order as {@link adGroupResourceNames} — `adResourceNames[i]` is the current RSA for `adGroupResourceNames[i]`. See `AutomationTargetStateModel.ad_resource_names`'s own doc comment. */
+  adResourceNames?: string[];
 }
 
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
@@ -61,6 +63,7 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     ...(target.campaign_resource_name !== undefined ? { campaignResourceName: target.campaign_resource_name } : {}),
     ...(target.campaign_status !== undefined ? { campaignStatus: target.campaign_status } : {}),
     ...(target.ad_group_resource_names !== undefined ? { adGroupResourceNames: target.ad_group_resource_names } : {}),
+    ...(target.ad_resource_names !== undefined ? { adResourceNames: target.ad_resource_names } : {}),
   };
 }
 

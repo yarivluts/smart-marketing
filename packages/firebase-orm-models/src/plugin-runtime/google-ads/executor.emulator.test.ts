@@ -10,7 +10,7 @@ import {
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { GoogleAdsApiError, type GoogleAdsApiClient, type GoogleAdsCreateCampaignDraftResult } from './api-client';
-import { GoogleAdsAutomationActionExecutor, GoogleAdsBudgetResourceUnknownError, GoogleAdsWrongPlatformCampaignDraftError } from './executor';
+import { GoogleAdsAdResourceUnknownError, GoogleAdsAutomationActionExecutor, GoogleAdsBudgetResourceUnknownError, GoogleAdsWrongPlatformCampaignDraftError } from './executor';
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('google-ads-executor-tests');
@@ -51,9 +51,17 @@ function fakeApiClient(overrides: Partial<GoogleAdsApiClient> = {}): GoogleAdsAp
       negativeKeywordResourceNames: ['customers/999/adGroupCriteria/2'],
     }),
     removeAdGroupCriteria: vi.fn().mockResolvedValue(undefined),
+    createResponsiveSearchAd: vi.fn().mockResolvedValue({ adResourceName: 'customers/999/adGroupAds/2' }),
+    setAdGroupAdStatus: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
+
+const EDITED_RESPONSIVE_SEARCH_AD = {
+  headlines: ['New Headline One', 'New Headline Two', 'New Headline Three'],
+  descriptions: ['New description one.', 'New description two.'],
+  finalUrl: 'https://example.com/new-widgets',
+};
 
 const DRAFT: GoogleAdsCampaignDraft = {
   platform: 'google_ads',
@@ -107,6 +115,7 @@ describe('GoogleAdsAutomationActionExecutor', () => {
     expect(reloaded.campaign_status).toBe('paused');
     expect(reloaded.daily_budget_usd).toBe(25);
     expect(reloaded.ad_group_resource_names).toEqual(CREATE_RESULT.adGroupResourceNames);
+    expect(reloaded.ad_resource_names).toEqual(CREATE_RESULT.adResourceNames);
   });
 
   it('rolls back a campaign draft creation by setting the campaign REMOVED', async () => {
@@ -415,5 +424,140 @@ describe('GoogleAdsAutomationActionExecutor', () => {
     });
 
     expect(apiClient.removeAdGroupCriteria).not.toHaveBeenCalled();
+  });
+
+  it('replaces an ad group\'s RSA with a new one, pausing the superseded ad and updating ad_resource_names in place (KAN-72 follow-up)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Ad Edit Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Ad Edit Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    await executor.executeCampaignDraftCreate({ organizationId: organization.id, projectId: project.id, environmentId: 'live', targetId: target.id, draft: DRAFT });
+
+    const result = await executor.executeAdEdit({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      previousAdResourceName: CREATE_RESULT.adResourceNames[0],
+      responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+    });
+
+    expect(result).toEqual({ newAdResourceName: 'customers/999/adGroupAds/2' });
+    expect(apiClient.createResponsiveSearchAd).toHaveBeenCalledWith('999', CREATE_RESULT.adGroupResourceNames[0], EDITED_RESPONSIVE_SEARCH_AD, 'ENABLED');
+    expect(apiClient.setAdGroupAdStatus).toHaveBeenCalledWith('999', CREATE_RESULT.adResourceNames[0], 'PAUSED');
+
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloaded.ad_resource_names).toEqual(['customers/999/adGroupAds/2']);
+  });
+
+  it('does not create a second, orphaned ad when a retried executeAdEdit call reuses the same executor instance after a partial failure', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Ad Edit Retry Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Ad Edit Retry Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const setAdGroupAdStatus = vi.fn().mockRejectedValueOnce(new Error('transient network failure')).mockResolvedValue(undefined);
+    const apiClient = fakeApiClient({ setAdGroupAdStatus });
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    await executor.executeCampaignDraftCreate({ organizationId: organization.id, projectId: project.id, environmentId: 'live', targetId: target.id, draft: DRAFT });
+
+    const editInput = {
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      previousAdResourceName: CREATE_RESULT.adResourceNames[0],
+      responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+    };
+    await expect(executor.executeAdEdit(editInput)).rejects.toThrow('transient network failure');
+    expect(apiClient.createResponsiveSearchAd).toHaveBeenCalledTimes(1);
+
+    const result = await executor.executeAdEdit(editInput);
+    expect(apiClient.createResponsiveSearchAd).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ newAdResourceName: 'customers/999/adGroupAds/2' });
+  });
+
+  it('rejects an ad_edit for an ad resource name that is not one of this target\'s own ads', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Ad Edit Unknown Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Ad Edit Unknown Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    await executor.executeCampaignDraftCreate({ organizationId: organization.id, projectId: project.id, environmentId: 'live', targetId: target.id, draft: DRAFT });
+
+    await expect(
+      executor.executeAdEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        previousAdResourceName: 'customers/999/adGroupAds/not-this-targets',
+        responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsAdResourceUnknownError);
+    expect(apiClient.createResponsiveSearchAd).not.toHaveBeenCalled();
+  });
+
+  it('rolls back an ad edit by removing the new ad and restoring the previous ad to ENABLED', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Ad Edit Rollback Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Ad Edit Rollback Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+    await executor.executeCampaignDraftCreate({ organizationId: organization.id, projectId: project.id, environmentId: 'live', targetId: target.id, draft: DRAFT });
+    await executor.executeAdEdit({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      previousAdResourceName: CREATE_RESULT.adResourceNames[0],
+      responsiveSearchAd: EDITED_RESPONSIVE_SEARCH_AD,
+    });
+
+    await executor.rollbackAdEdit({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      previousAdResourceName: CREATE_RESULT.adResourceNames[0],
+      newAdResourceName: 'customers/999/adGroupAds/2',
+    });
+
+    expect(apiClient.setAdGroupAdStatus).toHaveBeenCalledWith('999', 'customers/999/adGroupAds/2', 'REMOVED');
+    expect(apiClient.setAdGroupAdStatus).toHaveBeenCalledWith('999', CREATE_RESULT.adResourceNames[0], 'ENABLED');
+
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloaded.ad_resource_names).toEqual(CREATE_RESULT.adResourceNames);
   });
 });

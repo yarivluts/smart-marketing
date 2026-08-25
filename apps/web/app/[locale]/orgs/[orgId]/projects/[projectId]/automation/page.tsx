@@ -25,6 +25,7 @@ import { AutomationSeedTargetForm } from '@/components/orgs/automation-seed-targ
 import { AutomationProposeActionForm } from '@/components/orgs/automation-propose-action-form';
 import { AutomationProposeCampaignDraftForm } from '@/components/orgs/automation-propose-campaign-draft-form';
 import { AutomationProposeKeywordEditForm } from '@/components/orgs/automation-propose-keyword-edit-form';
+import { AutomationProposeAdEditForm } from '@/components/orgs/automation-propose-ad-edit-form';
 import { AutomationActivateCampaignButton } from '@/components/orgs/automation-activate-campaign-button';
 import { AutomationActionList } from '@/components/orgs/automation-action-list';
 
@@ -154,6 +155,11 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
           projectId={projectId}
           targets={targetViews.filter((target) => (target.adGroupResourceNames?.length ?? 0) > 0)}
         />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('proposeAdEditHeading')}</h2>
+        <AutomationProposeAdEditForm orgId={orgId} projectId={projectId} targets={targetViews.filter((target) => (target.adResourceNames?.length ?? 0) > 0)} />
       </section>
 
       <section className="flex flex-col gap-3">
