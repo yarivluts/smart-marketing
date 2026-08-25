@@ -17,6 +17,101 @@ Template for each entry:
 
 ---
 
+## 2026-08-24/25 (later than that) — New KAN-89: Experimentation & A/B results with significance testing (PR #278)
+
+- **Last completed:**
+  - With `TASKS.md` fully claimed (every row `done` or `in-progress` with its own documented remaining
+    gap, and every in-progress gap either needs-human or already double-blocked — see the last several
+    entries' own findings), scanned `docs/plan/14-gap-analysis.md` directly for a Gap bullet with no
+    KAN row at all yet. **Gap 3 — Experimentation & promo surfaces (A/B)** had none; confirmed via a
+    live Jira search (`project = KAN`) that no KAN-89+ ticket exists there either, and that the
+    existing KAN-80..88 rows in `TASKS.md` were themselves never actually synced to Jira (a pre-existing
+    drift from CLAUDE.md's own Jira-sync instruction, predating this run — not something this run
+    introduced or attempted to fix, out of scope for a single task pick). Proceeded anyway, matching
+    this repo's own established precedent of turning an unaddressed gap-analysis bullet into a new
+    TASKS.md row once the numbered backlog runs dry.
+  - Scoped a buildable-today slice 1 (no external connector needed): `experiment_exposure`/
+    `experiment_conversion` event schemas (`packages/shared/src/experiments`) — deliberately designed
+    so *both* event types carry `experiment_key`/`variant_key`, avoiding a touchpoint/attribution-style
+    join to know which variant a conversion belongs to (the client library that bucketed a visitor is
+    assumed to stamp the same variant on its later goal-event call). A new `fact_experiment_event` dbt
+    mart flattens both into real columns; a built-in "Experiments" metric pack registers
+    `experiment_exposures`/`experiment_conversions` (distinct-customer counts, broken down by
+    `[experiment_key, variant_key]` together — verified directly against `compiler.ts` that the
+    metrics compiler genuinely supports a multi-dimension `GROUP BY`, rather than assuming from the
+    single-dimension precedents every other pack's own breakdown code happened to use).
+  - `computeExperimentResult` (`packages/shared/src/experiments/significance.ts`): a dependency-free
+    two-proportion z-test (Abramowitz & Stegun `erf` rational approximation for the normal CDF, no
+    stats library) picking a control variant (literal `control` key if present, else alphabetically
+    first) and computing each other variant's conversion rate, uplift vs. control, p-value, and
+    95%-confidence significance. 13 unit tests verify the math by hand against known cases (identical
+    rates → p≈1; a large clearly-different sample → p<0.001, +100% uplift; a small modest-difference
+    sample → not significant; zero-exposure/zero-conversion edge cases → `null`, not a divide-by-zero
+    crash).
+  - New project-scoped Experiments admin page (one results table per experiment: variant / exposures /
+    conversions / conversion rate / uplift / significance badge), gated on `ingest.write` (same posture
+    as Feedback/Churn Reasons/Firmographics — a pure results surface, no editable state, unlike Campaign
+    Ops's `dashboards.write`).
+  - Independently verified rather than trusting the design on paper: ran every layer's own test suite
+    (`packages/shared` 541+13 tests, `packages/firebase-orm-models` 1215 tests incl. new emulator tests
+    for schema/metric registration idempotency + project isolation + warehouse-not-configured/query-error
+    degrade paths, `packages/dbt-transform` 230/230 incl. a new `proj_20` fixture with a
+    deliberately-asymmetric hand-computable exposure/conversion count per variant), then the full
+    monorepo `pnpm lint/typecheck/build/test`.
+  - Found and fixed **two real bugs** during that verification, neither caught by lint/typecheck since
+    both were pure content/logic gaps, not type errors:
+    1. `apps/web/e2e/experiments.spec.ts` initially failed reaching the page at all — traced via the
+       Playwright trace's raw DOM (not just the failure message) to discover `orgs/[orgId]/page.tsx`
+       carries its own **separate** plain-link list of project pages, duplicating (but distinct from)
+       `layout.tsx`'s AppShell sidebar — I'd only added the new nav entry to the sidebar. Added it to
+       both.
+    2. The e2e spec's own final assertion was simply wrong: it expected the "pack installed, zero rows"
+       empty state, but this sandbox has no BigQuery warehouse configured (same as every other pack's
+       own e2e test), so the real outcome is the "connect a data warehouse" degraded state instead —
+       fixed the assertion to match actual (and correct) behavior rather than the assumption.
+  - Also caught and fixed a **third**, pre-existing-pattern bug during the *first* full-suite run:
+    `metric-pack-dispatch.emulator.test.ts`'s `listBuiltinMetricPacks` test hard-codes the full expected
+    plugin-id list — every prior pack addition apparently updated this same assertion, and I'd missed it
+    on my own first pass. Added `EXPERIMENT_PACK_PLUGIN_ID` to both the import and the expected array.
+  - The only remaining failure across the whole full-suite run was `e2e/tv-pairing.spec.ts` — unrelated
+    to this diff (war-room TV pairing, no shared files) and a test this repo's own history already
+    documents as needing a raised timeout; confirmed via a standalone re-run (removing shard contention)
+    that it passes on Playwright's own automatic retry, the same "flaky, not broken" pattern this file
+    describes repeatedly elsewhere.
+  - Self-reviewed the full diff end to end before opening the PR (read every changed file, not just a
+    summary): confirmed no injection/XSS risk (dimension names are validated identifiers server-side,
+    values are bound query params or plain React-escaped text), checked for other route-enumeration
+    spots beyond the two nav-link locations already fixed (omnisearch's own index doesn't enumerate
+    admin pages like this one — confirmed by reading its own scope), and found no further correctness
+    issues.
+  - Opened PR #278; CI ran clean (lint/typecheck/test/build) and the PR was merged (by the account
+    owner, `yarivluts`, while this session was mid-check-in-cycle waiting on CI — no action needed on
+    this session's part beyond noticing the merge on the next scheduled check).
+  - Updated `TASKS.md`: new KAN-89 row (`in-progress`, sprint/phase columns left `-` since this story
+    has no real Jira epic/sprint assignment — same posture KAN-80/81's own rows without a phase number
+    would take if they hadn't been given one already).
+- **In progress (exact stopping point):** none — PR #278 is merged; this entry + the `TASKS.md` row are
+  the clean stopping point. This entry itself still needs its own small docs-reconciliation PR, per this
+  repo's own established convention (docs-only changes go through a PR too).
+- **Blocked + why:** nothing blocking.
+- **Next step:** KAN-89's own remaining scope (external experimentation-tool connector, AI rollout
+  verdict) needs either a human-provisioned third-party API key or a genuinely new AI-integration
+  feature — not urgent, same deferred-but-not-blocking posture every sibling gap-analysis story takes.
+  Check `git branch -a`/open PRs first before picking the next task, per this backlog's now-standard
+  collision-avoidance posture — with the numbered backlog and now Gap 3 both claimed, the next
+  candidate is most likely another unaddressed `docs/plan/14-gap-analysis.md` bullet (Gap 6 — CS
+  analytics, mostly connector-gated; Gap 7's remaining "unused/undocumented-event reports + tracking-plan
+  export" bullets, cheap per the doc's own note) or one of KAN-18/19/86's own documented remaining gaps.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - **KAN-89**'s real experimentation-tool connector (GrowthBook/Optimizely/VWO) — documented, not
+    blocking, same posture as every other third-party connector this backlog defers.
+  - Noted but not actioned: KAN-80..88's `TASKS.md` rows (and now KAN-89's) were never actually synced
+    to the real Jira `KAN` project despite CLAUDE.md's own instruction to do so — a pre-existing gap
+    across many prior runs, flagged here for whichever future run has Jira write credentials to reconcile.
+
+---
+
 ## 2026-08-24 (yet even later) — KAN-88's deferred /tv rotation integration delivered: rep-collections leaderboard frame (PR #276)
 
 - **Last completed:**
