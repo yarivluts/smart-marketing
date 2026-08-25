@@ -110,6 +110,7 @@
     "projectChurnReasonsLink": "Churn reasons",
     "projectIntentQualityLink": "Intent & quality",
     "projectFirmographicsLink": "Firmographics",
+    "projectExperimentsLink": "Experiments",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
@@ -751,6 +752,25 @@
     "industryNonprofit": "Nonprofit",
     "industryOther": "Other"
   },
+  "Experiments": {
+    "metaTitle": "Experiments",
+    "title": "Experiments for {projectName}",
+    "description": "A/B experiment results by variant, with exposures, conversions, and significance vs. control.",
+    "setupIntro": "Install the Experiment pack to start tracking exposures and conversions for your A/B tests.",
+    "resultsUnavailable": "No results available yet — connect a data warehouse to see this.",
+    "resultsEmpty": "No experiment data landed for this project yet.",
+    "columnVariant": "Variant",
+    "columnExposures": "Exposures",
+    "columnConversions": "Conversions",
+    "columnConversionRate": "Conversion rate",
+    "columnUplift": "Uplift vs. control",
+    "columnResult": "Result",
+    "noData": "No data",
+    "badgeControl": "Control",
+    "badgeSignificant": "Significant",
+    "badgeNotSignificant": "Not significant",
+    "badgeInsufficientData": "Insufficient data"
+  },
   "CampaignOps": {
     "metaTitle": "Campaign ops",
     "title": "Campaign ops for {projectName}",
@@ -907,6 +927,8 @@
     "builtinPackQualityScoreDescription": "At-signup quality score, quality-adjusted CAC/CPS, and channel mix-shift alerts.",
     "builtinPackFirmographicTitle": "Firmographic Enrichment",
     "builtinPackFirmographicDescription": "AI-classified company industry, size, and region, with # vs $ composition dashboards and composition-shift alerts.",
+    "builtinPackExperimentTitle": "Experiments",
+    "builtinPackExperimentDescription": "A/B experiment exposures and conversions by variant, with significance testing against a control.",
     "builtinPackCampaignOpsTitle": "Campaign Ops",
     "builtinPackCampaignOpsDescription": "Fixed-window payback (7/14/30/40-day revenue collection) for customers as they're acquired."
   },

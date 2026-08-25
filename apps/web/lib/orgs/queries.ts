@@ -37,6 +37,8 @@ import {
   type CampaignTargetModel,
   type PaybackOverviewOutcome,
   type QualityCalibrationBreakdownOutcome,
+  getExperimentResultsForProject as getExperimentResultsForProjectInOrganization,
+  type ExperimentResultsOutcome,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -571,6 +573,11 @@ export async function getPaybackOverviewForProject(organizationId: string, proje
 export async function getQualityCalibrationBreakdownForProject(organizationId: string, projectId: string): Promise<QualityCalibrationBreakdownOutcome> {
   await ensureFirestoreOrm();
   return getQualityCalibrationBreakdownForProjectInOrganization(organizationId, projectId);
+}
+
+export async function getExperimentResultsForProject(organizationId: string, projectId: string): Promise<ExperimentResultsOutcome> {
+  await ensureFirestoreOrm();
+  return getExperimentResultsForProjectInOrganization(organizationId, projectId);
 }
 
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
