@@ -286,6 +286,58 @@ export interface AutomationMetaAdSetEditRollbackInput {
   beforeStatus?: MetaAdSetStatus;
 }
 
+/** One Meta ad's editable creative content — the same shape `MetaCampaignDraftAdSet.ad.creative` uses. */
+export interface MetaAdCreativeEditContent {
+  primaryText: string;
+  headline: string;
+  description?: string;
+  linkUrl: string;
+}
+
+/**
+ * A `meta_ad_creative_edit` action (KAN-73 follow-up, plan `13 §E21.3`'s own
+ * deferred "real Meta post-creation creative edit" bullet, this story's Meta
+ * counterpart to `ad_edit`) — replaces an already-created ad's primary text/
+ * headline/description with revised copy (see
+ * `AutomationTargetStateModel.meta_ad_resource_names`). Unlike Google Ads'
+ * `Ad` resource, a Meta `Ad`'s own `creative` reference *is* mutable in
+ * place via a normal field-POST — but the `AdCreative` object it points at
+ * is not (Meta doesn't offer a partial update of a live creative's
+ * `object_story_spec` text once created), so `MetaAutomationActionExecutor.executeMetaAdCreativeEdit`
+ * creates a brand-new `AdCreative` carrying the revised copy and then
+ * repoints the existing ad at it — a genuine hybrid of `ad_edit`'s
+ * create-a-new-child-object shape and `meta_ad_set_edit`'s edit-the-parent-
+ * in-place shape, faithful to Meta's own object model (no new "old ad" to
+ * pause, unlike `ad_edit`).
+ */
+export interface AutomationMetaAdCreativeEditExecutionInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  adResourceName: string;
+  creative: MetaAdCreativeEditContent;
+}
+
+export interface AutomationMetaAdCreativeEditExecutionResult {
+  /** The ad's real pre-edit creative resource name, read live — `AutomationTargetStateModel` has no per-ad creative field to source it from, same "isn't known until execute time" reasoning `AutomationMetaAdSetEditExecutionResult` establishes for its own budget/status. */
+  previousCreativeResourceName: string;
+  /** The new `AdCreative` Meta created to carry the revised copy. */
+  newCreativeResourceName: string;
+}
+
+export interface AutomationMetaAdCreativeEditRollbackInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  adResourceName: string;
+  /** The real pre-edit creative resource name `executeMetaAdCreativeEdit` read live and `executeActionByType` widened `before` with — `rollbackMetaAdCreativeEdit` repoints the ad back to it. */
+  previousCreativeResourceName: string;
+  /** The replacement creative `executeMetaAdCreativeEdit` created — kept on the rollback input for the same audit-trail reasoning `AutomationAdEditRollbackInput.newAdResourceName` carries, even though repointing the ad back to `previousCreativeResourceName` alone is enough to undo the edit (the orphaned creative is simply left unlinked, never deleted). */
+  newCreativeResourceName: string;
+}
+
 /**
  * The seam KAN-72 (`GoogleAdsAutomationActionExecutor`) and KAN-73
  * (`MetaAutomationActionExecutor`) both implement for real —
@@ -299,16 +351,19 @@ export interface AutomationMetaAdSetEditRollbackInput {
  * `executeAdEdit`/`rollbackAdEdit` replace (and restore) an already-created ad
  * group's Responsive Search Ad; `executeMetaAdSetEdit`/`rollbackMetaAdSetEdit`
  * (KAN-73 follow-up) edit (and restore) an already-created Meta ad set's
- * budget/status. Same "provider-agnostic executor interface" posture as
+ * budget/status; `executeMetaAdCreativeEdit`/`rollbackMetaAdCreativeEdit`
+ * (KAN-73 follow-up) replace (and restore) an already-created Meta ad's
+ * creative copy. Same "provider-agnostic executor interface" posture as
  * `SourcePluginExecutor` (KAN-47) and `WarehouseQueryExecutor` (KAN-42) — the
  * interface itself never mentions a provider name;
  * `resolveAutomationActionExecutorForTarget`
  * (`services/automation-executor-resolver.service.ts`) is the one place that
  * picks a concrete implementation, based on a target's linked credential's
  * `provider`. Every implementation must still implement every method even
- * though `keyword_edit`/`ad_edit`/`meta_ad_set_edit` are each only ever
- * meaningful for one provider — `MetaAutomationActionExecutor.executeKeywordEdit`/
- * `executeAdEdit` and `GoogleAdsAutomationActionExecutor.executeMetaAdSetEdit`
+ * though `keyword_edit`/`ad_edit`/`meta_ad_set_edit`/`meta_ad_creative_edit`
+ * are each only ever meaningful for one provider —
+ * `MetaAutomationActionExecutor.executeKeywordEdit`/`executeAdEdit` and
+ * `GoogleAdsAutomationActionExecutor.executeMetaAdSetEdit`/`executeMetaAdCreativeEdit`
  * throw a documented "not supported" error instead (see each class's own doc
  * comment).
  */
@@ -325,4 +380,6 @@ export interface AutomationActionExecutor {
   rollbackAdEdit(input: AutomationAdEditRollbackInput): Promise<void>;
   executeMetaAdSetEdit(input: AutomationMetaAdSetEditExecutionInput): Promise<AutomationMetaAdSetEditExecutionResult>;
   rollbackMetaAdSetEdit(input: AutomationMetaAdSetEditRollbackInput): Promise<void>;
+  executeMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditExecutionInput): Promise<AutomationMetaAdCreativeEditExecutionResult>;
+  rollbackMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditRollbackInput): Promise<void>;
 }

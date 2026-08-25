@@ -127,6 +127,33 @@ describe('toAutomationActionView / formatDiffValue (KAN-73)', () => {
       after: 'act_999/adsets/1',
     });
   });
+
+  it('summarizes a meta_ad_creative_edit\'s creative as "headline (primary text)", widened post-execution with the real creative ids (KAN-73 follow-up)', () => {
+    const view = toAutomationActionView(
+      action({
+        id: 'a7',
+        action_type: 'meta_ad_creative_edit',
+        before: { adResourceName: 'act_999/ads/1', previousCreativeResourceName: 'creative-1' },
+        after: {
+          adResourceName: 'act_999/ads/1',
+          creative: { primaryText: 'Even bigger savings.', headline: 'Blue Widgets Mega Sale', linkUrl: 'https://example.com/widgets' },
+          newCreativeResourceName: 'creative-2',
+        },
+      }),
+    );
+
+    expect(view.diffEntries.find((candidate) => candidate.key === 'creative')?.after).toBe('"Blue Widgets Mega Sale" (Even bigger savings.)');
+    expect(view.diffEntries.find((candidate) => candidate.key === 'previousCreativeResourceName')).toEqual({
+      key: 'previousCreativeResourceName',
+      before: 'creative-1',
+      after: undefined,
+    });
+    expect(view.diffEntries.find((candidate) => candidate.key === 'newCreativeResourceName')).toEqual({
+      key: 'newCreativeResourceName',
+      before: undefined,
+      after: 'creative-2',
+    });
+  });
 });
 
 describe('toAutomationTargetView (KAN-73 follow-up)', () => {
@@ -153,5 +180,16 @@ describe('toAutomationTargetView (KAN-73 follow-up)', () => {
     const view = toAutomationTargetView(target({ id: 't2', ad_group_resource_names: ['customers/999/adGroups/1'] }));
     expect(view.metaAdSetResourceNames).toBeUndefined();
     expect(view.adGroupResourceNames).toEqual(['customers/999/adGroups/1']);
+  });
+
+  it('includes metaAdResourceNames when the target has them', () => {
+    const view = toAutomationTargetView(target({ id: 't3', meta_ad_resource_names: ['act_999/ads/1', 'act_999/ads/2'] }));
+    expect(view.metaAdResourceNames).toEqual(['act_999/ads/1', 'act_999/ads/2']);
+  });
+
+  it('omits metaAdResourceNames when the target has none (e.g. a Google Ads target)', () => {
+    const view = toAutomationTargetView(target({ id: 't4', ad_resource_names: ['customers/999/adGroupAds/1'] }));
+    expect(view.metaAdResourceNames).toBeUndefined();
+    expect(view.adResourceNames).toEqual(['customers/999/adGroupAds/1']);
   });
 });

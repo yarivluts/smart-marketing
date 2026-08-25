@@ -81,6 +81,16 @@ export interface MetaCreateAdResult {
   adId: string;
 }
 
+/** An ad's own live creative reference, as reported by Meta (KAN-73 follow-up: real Meta post-creation creative edit). */
+export interface MetaGetAdResult {
+  adId: string;
+  creativeId: string;
+}
+
+export interface MetaUpdateAdParams {
+  creativeId: string;
+}
+
 export interface MetaCreateCustomAudienceParams {
   name: string;
 }
@@ -128,6 +138,25 @@ export interface MetaAdsApiClient {
   createAdCreative(adAccountId: string, params: MetaCreateAdCreativeParams): Promise<MetaCreateAdCreativeResult>;
   /** Creates a paused ad referencing an already-created creative. */
   createAd(adAccountId: string, params: MetaCreateAdParams): Promise<MetaCreateAdResult>;
+  /**
+   * Reads an ad's own live creative reference (KAN-73 follow-up: real Meta
+   * post-creation creative edit) —
+   * `MetaAutomationActionExecutor.executeMetaAdCreativeEdit` calls this
+   * immediately before applying an edit, since `AutomationTargetStateModel`
+   * has no per-ad field to source the pre-edit creative from, the same
+   * "isn't known until execute time" reasoning `getAdSet` establishes for
+   * `meta_ad_set_edit`. Throws `MetaAdsApiError` if `adId` doesn't resolve
+   * to a real ad.
+   */
+  getAd(adId: string): Promise<MetaGetAdResult>;
+  /**
+   * Repoints an already-created ad at a different (also already-created)
+   * creative (KAN-73 follow-up) — unlike Google Ads' `Ad` resource, a Meta
+   * `Ad`'s own `creative` reference is mutable in place via a normal
+   * field-POST, even though the `AdCreative` object it points at is not (see
+   * `AutomationMetaAdCreativeEditExecutionInput`'s own doc comment).
+   */
+  updateAd(adId: string, params: MetaUpdateAdParams): Promise<void>;
   /** Updates a campaign's own daily budget (USD cents) — mirrors `GoogleAdsApiClient.setCampaignBudgetAmount`, except the "budget resource" here just is the campaign object itself. */
   setDailyBudgetCents(campaignId: string, dailyBudgetCents: number): Promise<void>;
   /** Sets any object's (campaign/ad set/ad) status — covers both `campaign_activation` (`ACTIVE`/`PAUSED`) and a creation rollback (`DELETED`). */
@@ -298,6 +327,15 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       creative: JSON.stringify({ creative_id: params.creativeId }),
     });
     return { adId: result.id };
+  }
+
+  async getAd(adId: string): Promise<MetaGetAdResult> {
+    const result = await this.getRequest<{ id: string; creative: { id: string } }>(adId, { fields: 'id,creative' });
+    return { adId: result.id, creativeId: result.creative.id };
+  }
+
+  async updateAd(adId: string, params: MetaUpdateAdParams): Promise<void> {
+    await this.request<{ success?: boolean }>(adId, { creative: JSON.stringify({ creative_id: params.creativeId }) });
   }
 
   async setDailyBudgetCents(campaignId: string, dailyBudgetCents: number): Promise<void> {

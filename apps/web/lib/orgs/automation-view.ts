@@ -51,6 +51,8 @@ export interface AutomationTargetView {
   /** Same order as {@link adGroupResourceNames} — `adResourceNames[i]` is the current RSA for `adGroupResourceNames[i]`. See `AutomationTargetStateModel.ad_resource_names`'s own doc comment. */
   adResourceNames?: string[];
   metaAdSetResourceNames?: string[];
+  /** Same order as {@link metaAdSetResourceNames} — `metaAdResourceNames[i]` is the current ad for `metaAdSetResourceNames[i]`. See `AutomationTargetStateModel.meta_ad_resource_names`'s own doc comment. */
+  metaAdResourceNames?: string[];
 }
 
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
@@ -66,6 +68,7 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     ...(target.ad_group_resource_names !== undefined ? { adGroupResourceNames: target.ad_group_resource_names } : {}),
     ...(target.ad_resource_names !== undefined ? { adResourceNames: target.ad_resource_names } : {}),
     ...(target.meta_ad_set_resource_names !== undefined ? { metaAdSetResourceNames: target.meta_ad_set_resource_names } : {}),
+    ...(target.meta_ad_resource_names !== undefined ? { metaAdResourceNames: target.meta_ad_resource_names } : {}),
   };
 }
 
@@ -124,9 +127,21 @@ function formatKeywordListDiffValue(value: unknown): unknown {
  * are handled by {@link formatKeywordListDiffValue} before this branch is
  * ever reached — see that function's own doc comment.
  */
+/** A `creative` diff value is a `MetaAdCreativeEditContent` object — `String(...)` on it would render `[object Object]`, so it gets a compact "headline (primary text)" summary instead, the same reasoning `formatDiffValue`'s own `campaignDraft` branch establishes for its own nested object value. */
+function formatCreativeDiffValue(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+  const creative = value as { primaryText?: unknown; headline?: unknown };
+  return `"${String(creative.headline)}" (${String(creative.primaryText)})`;
+}
+
 function formatDiffValue(key: string, value: unknown): unknown {
   if (key === 'addKeywords' || key === 'addNegativeKeywords') {
     return formatKeywordListDiffValue(value);
+  }
+  if (key === 'creative') {
+    return formatCreativeDiffValue(value);
   }
   if (key !== 'campaignDraft' || typeof value !== 'object' || value === null) {
     return value;
@@ -158,6 +173,10 @@ const DIFF_FIELD_LABEL_KEYS: Record<string, string> = {
   addedNegativeKeywordResourceNames: 'diffFieldAddedNegativeKeywordResourceNames',
   adSetResourceName: 'diffFieldAdSetResourceName',
   adSetStatus: 'diffFieldAdSetStatus',
+  adResourceName: 'diffFieldAdResourceName',
+  creative: 'diffFieldCreative',
+  previousCreativeResourceName: 'diffFieldPreviousCreativeResourceName',
+  newCreativeResourceName: 'diffFieldNewCreativeResourceName',
 };
 
 export function diffFieldLabelKey(key: string): string | undefined {

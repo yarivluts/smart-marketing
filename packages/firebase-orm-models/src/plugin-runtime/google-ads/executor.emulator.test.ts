@@ -14,6 +14,7 @@ import {
   GoogleAdsAdResourceUnknownError,
   GoogleAdsAutomationActionExecutor,
   GoogleAdsBudgetResourceUnknownError,
+  GoogleAdsMetaAdCreativeEditNotSupportedError,
   GoogleAdsMetaAdSetEditNotSupportedError,
   GoogleAdsWrongPlatformCampaignDraftError,
 } from './executor';
@@ -461,6 +462,39 @@ describe('GoogleAdsAutomationActionExecutor', () => {
         adSetResourceName: 'irrelevant',
       }),
     ).rejects.toBeInstanceOf(GoogleAdsMetaAdSetEditNotSupportedError);
+  });
+
+  it('throws GoogleAdsMetaAdCreativeEditNotSupportedError for executeMetaAdCreativeEdit — Google Ads has no mutable creative concept (KAN-73 follow-up)', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await expect(
+      executor.executeMetaAdCreativeEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adResourceName: 'irrelevant',
+        creative: { primaryText: 'Big savings.', headline: 'Sale', linkUrl: 'https://example.com' },
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsMetaAdCreativeEditNotSupportedError);
+  });
+
+  it('throws GoogleAdsMetaAdCreativeEditNotSupportedError for rollbackMetaAdCreativeEdit', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await expect(
+      executor.rollbackMetaAdCreativeEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adResourceName: 'irrelevant',
+        previousCreativeResourceName: 'irrelevant-creative',
+        newCreativeResourceName: 'irrelevant-creative-2',
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsMetaAdCreativeEditNotSupportedError);
   });
 
   it('replaces an ad group\'s RSA with a new one, pausing the superseded ad and updating ad_resource_names in place (KAN-72 follow-up)', async () => {

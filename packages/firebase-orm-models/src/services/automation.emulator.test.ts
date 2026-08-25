@@ -26,6 +26,7 @@ import {
   proposeCampaignActivationAction,
   proposeCampaignDraftCreateAction,
   proposeKeywordEditAction,
+  proposeMetaAdCreativeEditAction,
   proposeMetaAdSetEditAction,
   rejectAutomationAction,
   requestResourceAttachment,
@@ -1707,6 +1708,188 @@ describe('proposeMetaAdSetEditAction (KAN-73 follow-up)', () => {
     // The simulated executor reports the target's own campaign-level fields as the "previous"
     // values (see `SimulatedAdAccountExecutor.executeMetaAdSetEdit`'s own doc comment).
     expect(executed.before).toEqual({ adSetResourceName, dailyBudgetUsd: 25, adSetStatus: 'paused' });
+
+    const rolledBack = await rollbackAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      reason: 'manual',
+      actorId: owner.id,
+    });
+    expect(rolledBack.status).toBe('rolled_back');
+  });
+});
+
+describe('proposeMetaAdCreativeEditAction (KAN-73 follow-up)', () => {
+  /** Seeds a target and executes a `campaign_draft_create` (Meta platform) against it, so `meta_ad_resource_names` is populated (via the simulated executor, same posture every other ad-creative-edit test in this block relies on). */
+  async function seedTargetWithCreatedCampaign(organizationId: string, projectId: string, ownerId: string) {
+    const target = await seedTarget(organizationId, projectId, ownerId, 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId,
+      projectId,
+      targetId: target.id,
+      draft: metaCampaignDraft(),
+      requestedByUserId: ownerId,
+    });
+    await approveAutomationAction({ organizationId, projectId, actionId: created.id, approverId: ownerId });
+    await executeAutomationAction({ organizationId, projectId, actionId: created.id, executedByUserId: ownerId });
+    const [reloaded] = await listAutomationTargetStatesForProject(organizationId, projectId);
+    return reloaded;
+  }
+
+  const CREATIVE = { primaryText: 'Even bigger savings.', headline: 'Blue Widgets Mega Sale', linkUrl: 'https://example.com/widgets' };
+
+  it('proposes a clean ad creative edit as awaiting_approval with the dry-run diff', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Creative Edit Clean Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adResourceName = target.meta_ad_resource_names?.[0] as string;
+
+    const action = await proposeMetaAdCreativeEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adResourceName,
+      creative: CREATIVE,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('awaiting_approval');
+    expect(action.action_type).toBe('meta_ad_creative_edit');
+    expect(action.before).toEqual({ adResourceName });
+    expect(action.after).toEqual({ adResourceName, creative: CREATIVE });
+    expect(action.guardrail_violations).toEqual([]);
+  });
+
+  it('rejects an invalid creative (blank headline) before touching guardrails', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Creative Edit Invalid Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adResourceName = target.meta_ad_resource_names?.[0] as string;
+
+    await expect(
+      proposeMetaAdCreativeEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adResourceName,
+        creative: { ...CREATIVE, headline: '' },
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('refuses an ad resource name that is not one of this target\'s own ads', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Creative Edit Wrong Ad Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeMetaAdCreativeEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adResourceName: 'act_999/ads/not-this-targets',
+        creative: CREATIVE,
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('refuses a target with no campaign (and so no ads) created yet', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Creative Edit No Campaign Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeMetaAdCreativeEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adResourceName: 'act_999/ads/1',
+        creative: CREATIVE,
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('blocks an ad creative edit targeting a protected campaign', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Creative Edit Protected Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adResourceName = target.meta_ad_resource_names?.[0] as string;
+    await setAutomationGuardrailPolicy({
+      organizationId: organization.id,
+      projectId: project.id,
+      maxDailyBudgetChangePct: null,
+      spendCeilingUsd: null,
+      protectedTargetIds: [target.id],
+      allowedHours: null,
+      maxActionsPerDay: null,
+      maxGuardedMetricRegressionPct: null,
+      setByUserId: owner.id,
+    });
+
+    const action = await proposeMetaAdCreativeEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adResourceName,
+      creative: CREATIVE,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual([expect.objectContaining({ type: 'protected_target' })]);
+  });
+
+  it('requires the "manage" write tier specifically — "optimize" is not enough', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Creative Edit Optimize Org');
+    const { target, attachment } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'manage', 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: metaCampaignDraft(),
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, executedByUserId: owner.id });
+    await setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: attachment.id, tier: 'optimize', actorId: owner.id });
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+
+    const action = await proposeMetaAdCreativeEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adResourceName: reloaded.meta_ad_resource_names?.[0] as string,
+      creative: CREATIVE,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'insufficient_write_tier' })]));
+  });
+
+  it('executes an ad creative edit end to end, widening the diff with the real pre-edit/new creative ids, then rolls it back', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Ad Creative Edit Lifecycle Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adResourceName = target.meta_ad_resource_names?.[0] as string;
+
+    const proposed = await proposeMetaAdCreativeEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adResourceName,
+      creative: CREATIVE,
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id });
+    const executed = await executeAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      executedByUserId: owner.id,
+    });
+
+    expect(executed.status).toBe('executed');
+    expect(executed.before).toMatchObject({ adResourceName, previousCreativeResourceName: expect.any(String) });
+    expect(executed.after).toMatchObject({ adResourceName, creative: CREATIVE, newCreativeResourceName: expect.any(String) });
 
     const rolledBack = await rollbackAutomationAction({
       organizationId: organization.id,

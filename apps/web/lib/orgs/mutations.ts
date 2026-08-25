@@ -11,6 +11,7 @@ import {
   type AutomationTargetStateModel,
   type CampaignDraft,
   type CampaignDraftKeyword,
+  type MetaAdCreativeEditContent,
   type MetaAdSetStatus,
   disengageAutomationKillSwitch as disengageAutomationKillSwitchInOrganization,
   engageAutomationKillSwitch as engageAutomationKillSwitchInOrganization,
@@ -22,6 +23,7 @@ import {
   proposeCampaignActivationAction as proposeCampaignActivationActionInOrganization,
   proposeCampaignDraftCreateAction as proposeCampaignDraftCreateActionInOrganization,
   proposeKeywordEditAction as proposeKeywordEditActionInOrganization,
+  proposeMetaAdCreativeEditAction as proposeMetaAdCreativeEditActionInOrganization,
   proposeMetaAdSetEditAction as proposeMetaAdSetEditActionInOrganization,
   rejectAutomationAction as rejectAutomationActionInOrganization,
   resolveAutomationActionExecutorForTarget as resolveAutomationActionExecutorForTargetInOrganization,
@@ -1332,6 +1334,20 @@ interface ProposeMetaAdSetEditInput {
 export async function proposeMetaAdSetEditAction(input: ProposeMetaAdSetEditInput): Promise<AutomationActionModel> {
   await ensureFirestoreOrm();
   return proposeMetaAdSetEditActionInOrganization(input);
+}
+
+interface ProposeMetaAdCreativeEditInput {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  adResourceName: string;
+  creative: MetaAdCreativeEditContent;
+  requestedByUserId: string;
+}
+
+export async function proposeMetaAdCreativeEditAction(input: ProposeMetaAdCreativeEditInput): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return proposeMetaAdCreativeEditActionInOrganization(input);
 }
 
 export async function approveAutomationAction(

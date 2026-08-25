@@ -15,6 +15,9 @@ import {
   type AutomationKeywordEditExecutionInput,
   type AutomationKeywordEditExecutionResult,
   type AutomationKeywordEditRollbackInput,
+  type AutomationMetaAdCreativeEditExecutionInput,
+  type AutomationMetaAdCreativeEditExecutionResult,
+  type AutomationMetaAdCreativeEditRollbackInput,
   type AutomationMetaAdSetEditExecutionInput,
   type AutomationMetaAdSetEditExecutionResult,
   type AutomationMetaAdSetEditRollbackInput,
@@ -103,6 +106,14 @@ export class MetaAdSetNotOwnedByTargetError extends Error {
   }
 }
 
+/** A `meta_ad_creative_edit` action was proposed/executed against an `adResourceName` that isn't one of the target's own ads (`AutomationTargetStateModel.meta_ad_resource_names`) — defense in depth alongside `proposeMetaAdCreativeEditAction`'s own check (`automation.service.ts`), the same "both the service and the executor enforce it" posture {@link MetaAdSetNotOwnedByTargetError} establishes one action type over. */
+export class MetaAdNotOwnedByTargetError extends Error {
+  constructor(targetId: string, adResourceName: string) {
+    super(`Ad "${adResourceName}" is not one of automation target "${targetId}"'s own ads (created by a campaign_draft_create action).`);
+    this.name = 'MetaAdNotOwnedByTargetError';
+  }
+}
+
 interface TargetLookup {
   organizationId: string;
   projectId: string;
@@ -146,6 +157,18 @@ async function loadTarget(input: TargetLookup): Promise<AutomationTargetStateMod
  * executor (see `MetaAdsWrongPlatformCampaignDraftError`).
  */
 export class MetaAutomationActionExecutor implements AutomationActionExecutor {
+  /**
+   * The creative `executeMetaAdCreativeEdit` itself already created during a
+   * still-in-flight `meta_ad_creative_edit` execution, if any — same
+   * retry-orphan-prevention posture `GoogleAdsAutomationActionExecutor.pendingAdEditResourceName`'s
+   * own doc comment documents for its own two-step create-then-use sequence:
+   * without this cache, a naive retry after `createAdCreative` already
+   * succeeded but the following `updateAd` call failed would create a
+   * *second*, orphaned creative on the automatic retry. Reset to `null` once
+   * an edit fully succeeds.
+   */
+  private pendingMetaAdCreativeEditResourceName: string | null = null;
+
   constructor(
     private readonly apiClient: MetaAdsApiClient,
     private readonly adAccountId: string,
@@ -219,6 +242,7 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     // atomic batch — see this class's own doc comment and `MetaAdsHttpApiClient`'s
     // for why.
     const metaAdSetResourceNames: string[] = [];
+    const metaAdResourceNames: string[] = [];
     for (const adSet of draft.adSets) {
       const adSetResult = await this.apiClient.createAdSet(this.adAccountId, {
         campaignId: campaign.campaignId,
@@ -233,11 +257,12 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
         ...(adSet.ad.creative.description !== undefined ? { description: adSet.ad.creative.description } : {}),
         linkUrl: adSet.ad.creative.linkUrl,
       });
-      await this.apiClient.createAd(this.adAccountId, {
+      const adResult = await this.apiClient.createAd(this.adAccountId, {
         adSetId: adSetResult.adSetId,
         creativeId: creativeResult.creativeId,
         name: adSet.ad.name,
       });
+      metaAdResourceNames.push(adResult.adId);
     }
 
     target.campaign_resource_name = campaign.campaignId;
@@ -245,6 +270,7 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     target.campaign_status = 'paused';
     target.daily_budget_usd = draft.dailyBudgetUsd;
     target.meta_ad_set_resource_names = metaAdSetResourceNames;
+    target.meta_ad_resource_names = metaAdResourceNames;
     target.updated_at = new Date().toISOString();
     await target.save();
     return { campaignResourceName: campaign.campaignId };
@@ -336,6 +362,56 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     if (Object.keys(updateParams).length > 0) {
       await this.apiClient.updateAdSet(input.adSetResourceName, updateParams);
     }
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  /**
+   * Reads the ad's true pre-edit creative live (see
+   * `AutomationMetaAdCreativeEditExecutionResult`'s own doc comment for why —
+   * `AutomationTargetStateModel` has no per-ad creative field to source it
+   * from), creates a brand-new `AdCreative` carrying the revised copy, and
+   * repoints the ad at it — never pausing/creating a second ad the way
+   * `executeAdEdit` does for Google Ads, since a Meta ad's own `creative`
+   * reference is mutable in place (see this action type's own doc comment).
+   * `pendingMetaAdCreativeEditResourceName` guards the create-then-use
+   * sequence against the same retry-orphan bug class
+   * `GoogleAdsAutomationActionExecutor.executeAdEdit`'s own doc comment
+   * documents.
+   */
+  async executeMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditExecutionInput): Promise<AutomationMetaAdCreativeEditExecutionResult> {
+    const target = await loadTarget(input);
+    if (!target.meta_ad_resource_names?.includes(input.adResourceName)) {
+      throw new MetaAdNotOwnedByTargetError(target.id, input.adResourceName);
+    }
+
+    const current = await this.apiClient.getAd(input.adResourceName);
+
+    if (this.pendingMetaAdCreativeEditResourceName === null) {
+      const created = await this.apiClient.createAdCreative(this.adAccountId, {
+        pageId: this.pageId,
+        primaryText: input.creative.primaryText,
+        headline: input.creative.headline,
+        ...(input.creative.description !== undefined ? { description: input.creative.description } : {}),
+        linkUrl: input.creative.linkUrl,
+      });
+      this.pendingMetaAdCreativeEditResourceName = created.creativeId;
+    }
+    const newCreativeResourceName = this.pendingMetaAdCreativeEditResourceName;
+
+    await this.apiClient.updateAd(input.adResourceName, { creativeId: newCreativeResourceName });
+
+    target.updated_at = new Date().toISOString();
+    await target.save();
+
+    this.pendingMetaAdCreativeEditResourceName = null;
+    return { previousCreativeResourceName: current.creativeId, newCreativeResourceName };
+  }
+
+  /** Repoints the ad back to its pre-edit creative `executeMetaAdCreativeEdit` captured — the orphaned replacement creative is simply left unlinked, never deleted (Meta creatives cost nothing to leave idle, unlike `ad_edit`'s superseded ad, which `rollbackAdEdit` must explicitly re-enable/remove). No ownership re-check needed (the action's own stored `adResourceName` was already validated at execute time, same posture `rollbackMetaAdSetEdit` establishes). */
+  async rollbackMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    await this.apiClient.updateAd(input.adResourceName, { creativeId: input.previousCreativeResourceName });
     target.updated_at = new Date().toISOString();
     await target.save();
   }

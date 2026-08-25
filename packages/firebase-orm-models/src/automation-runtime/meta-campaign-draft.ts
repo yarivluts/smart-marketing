@@ -88,23 +88,39 @@ function validateAdSet(adSet: MetaCampaignDraftAdSet, index: number, reasons: st
   }
 
   const creative = isRecord(ad.creative) ? ad.creative : undefined;
+  validateMetaAdCreativeContent(creative, `${fieldPath}.ad.creative`, reasons);
+}
+
+/**
+ * Validates one Meta ad's own editable creative content (primary text,
+ * headline, description, link URL) against Meta's own real-world Feed
+ * link-ad recommended lengths — shared by {@link validateAdSet} (a
+ * brand-new ad set's own creative, nested under `ad.creative`) and
+ * {@link validateMetaAdCreativeEditActionInput} (a `meta_ad_creative_edit`
+ * action's replacement creative content, same shape one level up) so the
+ * two never drift, mirroring `campaign-draft.ts`'s own
+ * `validateResponsiveSearchAdContent`/`validateAdEditActionInput` pairing.
+ * `fieldPath` is the caller's own prefix (e.g. `adSets[0].ad.creative` or
+ * just `creative`).
+ */
+export function validateMetaAdCreativeContent(creative: Record<string, unknown> | undefined, fieldPath: string, reasons: string[]): void {
   if (!creative) {
-    reasons.push(`${fieldPath}.ad.creative must be an object.`);
+    reasons.push(`${fieldPath} must be an object.`);
     return;
   }
   if (typeof creative.primaryText !== 'string' || creative.primaryText.trim().length === 0 || creative.primaryText.length > MAX_PRIMARY_TEXT_LENGTH) {
-    reasons.push(`${fieldPath}.ad.creative.primaryText must be 1-${MAX_PRIMARY_TEXT_LENGTH} characters.`);
+    reasons.push(`${fieldPath}.primaryText must be 1-${MAX_PRIMARY_TEXT_LENGTH} characters.`);
   }
   if (typeof creative.headline !== 'string' || creative.headline.trim().length === 0 || creative.headline.length > MAX_HEADLINE_LENGTH) {
-    reasons.push(`${fieldPath}.ad.creative.headline must be 1-${MAX_HEADLINE_LENGTH} characters.`);
+    reasons.push(`${fieldPath}.headline must be 1-${MAX_HEADLINE_LENGTH} characters.`);
   }
   if (creative.description !== undefined) {
     if (typeof creative.description !== 'string' || creative.description.length > MAX_DESCRIPTION_LENGTH) {
-      reasons.push(`${fieldPath}.ad.creative.description must be at most ${MAX_DESCRIPTION_LENGTH} characters when present.`);
+      reasons.push(`${fieldPath}.description must be at most ${MAX_DESCRIPTION_LENGTH} characters when present.`);
     }
   }
   if (typeof creative.linkUrl !== 'string' || creative.linkUrl.length === 0 || !isHttpUrl(creative.linkUrl)) {
-    reasons.push(`${fieldPath}.ad.creative.linkUrl must be a valid http(s) URL.`);
+    reasons.push(`${fieldPath}.linkUrl must be a valid http(s) URL.`);
   }
 }
 
@@ -143,6 +159,41 @@ export function validateMetaCampaignDraft(draft: MetaCampaignDraft): void {
   } else {
     draft.adSets.forEach((adSet, index) => validateAdSet(adSet, index, reasons));
   }
+
+  if (reasons.length > 0) {
+    throw new InvalidCampaignDraftError(reasons);
+  }
+}
+
+/**
+ * Validates a `meta_ad_creative_edit` action's proposed input (KAN-73
+ * follow-up) — an `adResourceName` plus the replacement creative content.
+ * Reuses {@link validateMetaAdCreativeContent}'s own length/URL checks so a
+ * replacement creative is held to the exact same shape a
+ * `campaign_draft_create` ad set's own `ad.creative` is, mirroring
+ * `campaign-draft.ts`'s `validateAdEditActionInput`. Tolerates a malformed/
+ * untrusted-cast request body the same way `validateAdEditActionInput`
+ * does — the `meta-ad-creative-edits` route casts an arbitrary JSON body to
+ * this shape before calling in.
+ */
+export function validateMetaAdCreativeEditActionInput(input: {
+  adResourceName: unknown;
+  primaryText: unknown;
+  headline: unknown;
+  description: unknown;
+  linkUrl: unknown;
+}): void {
+  if (!isRecord(input)) {
+    throw new InvalidCampaignDraftError(['input must be an object.']);
+  }
+
+  const reasons: string[] = [];
+
+  if (typeof input.adResourceName !== 'string' || input.adResourceName.trim().length === 0) {
+    reasons.push('adResourceName must be a non-empty string.');
+  }
+
+  validateMetaAdCreativeContent(input, 'creative', reasons);
 
   if (reasons.length > 0) {
     throw new InvalidCampaignDraftError(reasons);

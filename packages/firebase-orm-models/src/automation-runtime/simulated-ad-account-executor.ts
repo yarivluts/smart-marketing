@@ -14,6 +14,9 @@ import type {
   AutomationKeywordEditExecutionInput,
   AutomationKeywordEditExecutionResult,
   AutomationKeywordEditRollbackInput,
+  AutomationMetaAdCreativeEditExecutionInput,
+  AutomationMetaAdCreativeEditExecutionResult,
+  AutomationMetaAdCreativeEditRollbackInput,
   AutomationMetaAdSetEditExecutionInput,
   AutomationMetaAdSetEditExecutionResult,
   AutomationMetaAdSetEditRollbackInput,
@@ -77,6 +80,7 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
     // draft's `adSets` gets simulated ad-set resource names (KAN-73 follow-up).
     if (input.draft.platform === 'meta') {
       target.meta_ad_set_resource_names = input.draft.adSets.map((_adSet, index) => `act/simulated/adSets/${target.id}-${index}`);
+      target.meta_ad_resource_names = input.draft.adSets.map((_adSet, index) => `act/simulated/ads/${target.id}-${index}`);
     } else {
       target.ad_group_resource_names = input.draft.adGroups.map((_adGroup, index) => `customers/simulated/adGroups/${target.id}-${index}`);
       target.ad_resource_names = input.draft.adGroups.map((_adGroup, index) => `customers/simulated/adGroupAds/${target.id}-${index}`);
@@ -173,6 +177,21 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
   }
 
   async rollbackMetaAdSetEdit(input: AutomationMetaAdSetEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  /** No per-ad live creative is tracked on `AutomationTargetStateModel` (a real Meta connector needs a live lookup, see `MetaAutomationActionExecutor.executeMetaAdCreativeEdit`'s own doc comment), so this stand-in fabricates a plausible "previous" creative id for a demo/simulated target without a real one to snapshot. */
+  async executeMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditExecutionInput): Promise<AutomationMetaAdCreativeEditExecutionResult> {
+    const target = await loadTarget(input);
+    const newCreativeResourceName = `act/simulated/adCreatives/${target.id}-edit-${Date.now()}`;
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return { previousCreativeResourceName: `act/simulated/adCreatives/${target.id}`, newCreativeResourceName };
+  }
+
+  async rollbackMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditRollbackInput): Promise<void> {
     const target = await loadTarget(input);
     target.updated_at = new Date().toISOString();
     await target.save();
