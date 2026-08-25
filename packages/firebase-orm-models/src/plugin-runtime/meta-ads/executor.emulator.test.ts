@@ -666,7 +666,10 @@ describe('MetaAutomationActionExecutor', () => {
         }),
       ).rejects.toBeInstanceOf(MetaAdNotOwnedByTargetError);
       expect(apiClient.getAd).not.toHaveBeenCalled();
-      expect(apiClient.createAdCreative).not.toHaveBeenCalled();
+      // `seedTargetWithAd`'s own `executeCampaignDraftCreate` call already invoked `createAdCreative`
+      // once (to create the ad's original creative) — the ownership check must fail before this
+      // edit attempt calls it a *second* time, not before `createAdCreative` has ever been called.
+      expect(apiClient.createAdCreative).toHaveBeenCalledTimes(1);
       expect(apiClient.updateAd).not.toHaveBeenCalled();
     });
   });
