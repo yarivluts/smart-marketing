@@ -12,10 +12,18 @@ import {
   parseCrmWebhookCredentialSecret,
   type CrmWebhookCredentialSecret,
 } from '../plugin-runtime/crm-webhook';
+import {
+  META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
+  META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD,
+  META_CUSTOM_AUDIENCE_PLUGIN_ID,
+  MetaCustomAudienceSinkPluginExecutor,
+} from '../plugin-runtime/meta-custom-audience';
+import { MetaAdsHttpApiClient } from '../plugin-runtime/meta-ads';
 import { mintPluginRuntimeCredential, runWithRetryBackoff, type RetryBackoffOptions, type SinkPluginExecutor } from '../plugin-runtime';
 import { ProjectNotFoundError, listActiveAttachmentsForProject } from './resource-library.service';
 import { PluginInstallNotFoundError, getPluginManifestVersion, PluginManifestNotFoundError } from './plugin-registry.service';
 import { CredentialSecretNotSetError, revealSharedCredentialSecret } from './vault.service';
+import { MetaAdsCredentialConfigError, resolveMetaAdsCredentialSecret } from './meta-ads-plugin.service';
 import { listSegmentMembers, type SegmentMemberListOutcome } from './segment.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import type { WarehouseQueryExecutor } from '../warehouse/query-executor';
@@ -37,6 +45,22 @@ export class CrmWebhookCredentialConfigError extends Error {
   constructor(public readonly reason: string) {
     super(`This install is not correctly configured to sync to a CRM yet: ${reason}`);
     this.name = 'CrmWebhookCredentialConfigError';
+  }
+}
+
+/** The Meta Custom Audience sibling of {@link CrmWebhookCredentialConfigError} — an install claims to be (or was resolved as) the built-in Meta Custom Audience plugin, but isn't configured with a usable Meta Ads credential or audience name yet. */
+export class MetaAudienceCredentialConfigError extends Error {
+  constructor(public readonly reason: string) {
+    super(`This install is not correctly configured to sync to a Meta Custom Audience yet: ${reason}`);
+    this.name = 'MetaAudienceCredentialConfigError';
+  }
+}
+
+/** An action-type install's `plugin_id` doesn't match any built-in connector this codebase actually knows how to sync to (`CRM_WEBHOOK_PLUGIN_ID`/`META_CUSTOM_AUDIENCE_PLUGIN_ID` today) — e.g. a third-party manifest registered and installed through the generic Plugin Registry flow (KAN-46) with no real runtime behind it yet, the same "installable but not runnable" gap `runSourcePluginInstall`'s own inbound dispatch would hit for an unrecognized source plugin. */
+export class UnsupportedSinkPluginError extends Error {
+  constructor(public readonly pluginId: string) {
+    super(`No built-in sync executor exists for plugin "${pluginId}" yet.`);
+    this.name = 'UnsupportedSinkPluginError';
   }
 }
 
@@ -105,6 +129,56 @@ export async function resolveCrmWebhookCredentialSecret(
   }
 }
 
+export interface MetaAudienceSyncSecret {
+  accessToken: string;
+  adAccountId: string;
+  audienceName: string;
+}
+
+/**
+ * Resolves what `MetaCustomAudienceSinkPluginExecutor` needs to sync a
+ * segment to Meta: the Meta Ads access token + ad account id an install's
+ * `meta_custom_audience_credential_attachment_id` config points at (via the
+ * *approved* `provider: 'meta_ads'` credential attachment, decrypted through
+ * `resolveMetaAdsCredentialSecret` — the exact same resolution KAN-73's own
+ * Meta Manage plugin already established, reused as-is rather than
+ * duplicating credential decryption for a second Meta connector), plus the
+ * install's own configured `audience_name`. Mirrors
+ * `resolveCrmWebhookCredentialSecret`'s exact "collapse every failure mode
+ * into one error type" shape, one connector over.
+ */
+export async function resolveMetaAudienceCredentialSecret(
+  organizationId: string,
+  projectId: string,
+  install: PluginInstallModel,
+  kms: KmsProvider,
+): Promise<MetaAudienceSyncSecret> {
+  const attachmentId = install.config[META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD];
+  if (typeof attachmentId !== 'string' || attachmentId.trim().length === 0) {
+    throw new MetaAudienceCredentialConfigError(`missing "${META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD}" config`);
+  }
+  const audienceName = install.config[META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD];
+  if (typeof audienceName !== 'string' || audienceName.trim().length === 0) {
+    throw new MetaAudienceCredentialConfigError(`missing "${META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD}" config`);
+  }
+
+  const attachments = await listActiveAttachmentsForProject(organizationId, projectId);
+  const attachment = attachments.find((entry) => entry.id === attachmentId && entry.resource_kind === 'credential');
+  if (!attachment) {
+    throw new MetaAudienceCredentialConfigError('no approved credential attachment matches the configured id');
+  }
+
+  try {
+    const { accessToken, adAccountId } = await resolveMetaAdsCredentialSecret(organizationId, attachment, kms);
+    return { accessToken, adAccountId, audienceName };
+  } catch (error) {
+    if (error instanceof MetaAdsCredentialConfigError) {
+      throw new MetaAudienceCredentialConfigError(error.reason);
+    }
+    throw error;
+  }
+}
+
 /** Retries a transient push failure twice (3 attempts total) — the same posture `plugin-runtime.service.ts`'s own `DEFAULT_RETRY_OPTIONS` establishes for the inbound direction. */
 const DEFAULT_RETRY_OPTIONS: RetryBackoffOptions = { maxAttempts: 3, baseDelayMs: 200, factor: 2 };
 
@@ -129,12 +203,18 @@ export interface SyncSegmentToCrmParams {
  * Pushes one saved segment's own currently-matching entity rows out to a
  * configured action-type plugin install "right now" (KAN-81, plan `14 §Gap
  * 5`: "export/sync to CRM ... action plugin") — the outbound mirror of
- * `triggerSourcePluginRun`. Resolves the segment's live member list
- * (`listSegmentMembers`), builds a real `CrmWebhookSinkPluginExecutor`
- * against the install's own configured credential (mirroring
- * `runSourcePluginInstall`'s per-connector dispatch, one connector so far),
- * and pushes with the same retry/backoff posture the source-side runtime
- * already established.
+ * `triggerSourcePluginRun`. Despite its CRM-specific name (kept to avoid
+ * rippling a rename through every existing caller/route/test), this is the
+ * one generic entry point the Segments page's "Sync" picker always calls
+ * regardless of which action-type plugin was chosen — `apps/web`'s picker
+ * already lists every installed action plugin, not just the CRM webhook one.
+ * Resolves the segment's live member list (`listSegmentMembers`), builds the
+ * right real `SinkPluginExecutor` for the install's own `plugin_id`
+ * (`defaultSinkExecutorForInstall` — `CrmWebhookSinkPluginExecutor` or, since
+ * the KAN-73 follow-up, `MetaCustomAudienceSinkPluginExecutor` too, mirroring
+ * `runSourcePluginInstall`'s own per-connector dispatch for the inbound
+ * direction), and pushes with the same retry/backoff posture the source-side
+ * runtime already established.
  *
  * Both the executor (credential resolution) and the segment's member list are
  * resolved *before* any {@link PluginSinkRunModel} is written, and in that
@@ -167,7 +247,7 @@ export async function syncSegmentToCrm(params: SyncSegmentToCrmParams): Promise<
     throw new NotAnActionPluginError(manifest.type);
   }
 
-  const executor = params.executor ?? (await defaultCrmSinkExecutorFor(params.organizationId, params.projectId, install, params.kms));
+  const executor = params.executor ?? (await defaultSinkExecutorForInstall(params.organizationId, params.projectId, install, params.kms));
 
   const membersOutcome = await listSegmentMembers({
     organizationId: params.organizationId,
@@ -214,6 +294,15 @@ export async function syncSegmentToCrm(params: SyncSegmentToCrmParams): Promise<
     run.records_pushed = result.pushed;
     run.status = 'succeeded';
     run.finished_at = new Date().toISOString();
+
+    // Persist a connector-created external resource id (e.g. a newly-created Meta Custom
+    // Audience) so the *next* sync reuses it instead of creating a duplicate — see
+    // `SinkPluginPushResult.externalRef`'s own doc comment. A no-op for a connector (e.g. CRM
+    // webhook) that never sets `externalRef`, and for a repeat sync that already reused the same id.
+    if (result.externalRef !== undefined && install.meta_custom_audience_id !== result.externalRef) {
+      install.meta_custom_audience_id = result.externalRef;
+      await install.save();
+    }
   } catch (error) {
     run.status = 'failed';
     run.finished_at = new Date().toISOString();
@@ -225,13 +314,32 @@ export async function syncSegmentToCrm(params: SyncSegmentToCrmParams): Promise<
   return run;
 }
 
-/** The only built-in sink connector today — resolves its credential and builds a real `CrmWebhookSinkPluginExecutor`, the exact "Run now"-time dispatch `runSourcePluginInstall` (KAN-49/52) already established for the inbound direction, one connector so far. Extracted so a test can override `executor` directly instead of round-tripping through the vault. */
-async function defaultCrmSinkExecutorFor(organizationId: string, projectId: string, install: PluginInstallModel, kms: KmsProvider): Promise<SinkPluginExecutor> {
-  if (install.plugin_id !== CRM_WEBHOOK_PLUGIN_ID) {
-    throw new CrmWebhookCredentialConfigError('this install is not a recognized action plugin with a built-in executor');
+/**
+ * Resolves the real `SinkPluginExecutor` for one of this codebase's two
+ * built-in action plugins by `install.plugin_id` — the exact "Run now"-time
+ * per-connector dispatch `runSourcePluginInstall` (KAN-49/52) already
+ * established for the inbound direction, extended outbound as a second
+ * connector (KAN-73 follow-up) joined the original CRM webhook one. Extracted
+ * so a test can override `executor` directly instead of round-tripping
+ * through the vault. Throws {@link UnsupportedSinkPluginError} for any other
+ * `plugin_id` — a third-party manifest registered through the generic Plugin
+ * Registry flow (KAN-46) with no real runtime built for it yet.
+ */
+async function defaultSinkExecutorForInstall(organizationId: string, projectId: string, install: PluginInstallModel, kms: KmsProvider): Promise<SinkPluginExecutor> {
+  if (install.plugin_id === CRM_WEBHOOK_PLUGIN_ID) {
+    const { webhookUrl, bearerToken } = await resolveCrmWebhookCredentialSecret(organizationId, projectId, install, kms);
+    return new CrmWebhookSinkPluginExecutor({ apiClient: new CrmWebhookHttpApiClient(), webhookUrl, bearerToken });
   }
-  const { webhookUrl, bearerToken } = await resolveCrmWebhookCredentialSecret(organizationId, projectId, install, kms);
-  return new CrmWebhookSinkPluginExecutor({ apiClient: new CrmWebhookHttpApiClient(), webhookUrl, bearerToken });
+  if (install.plugin_id === META_CUSTOM_AUDIENCE_PLUGIN_ID) {
+    const { accessToken, adAccountId, audienceName } = await resolveMetaAudienceCredentialSecret(organizationId, projectId, install, kms);
+    return new MetaCustomAudienceSinkPluginExecutor({
+      apiClient: new MetaAdsHttpApiClient({ accessToken }),
+      adAccountId,
+      audienceName,
+      existingAudienceId: install.meta_custom_audience_id ?? null,
+    });
+  }
+  throw new UnsupportedSinkPluginError(install.plugin_id);
 }
 
 /** Best-effort audit entry for one triggered sync — see `recordAuditLogEntry`'s own doc comment for why a failure here is swallowed rather than propagated. */

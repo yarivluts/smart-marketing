@@ -68,6 +68,19 @@ export interface MetaCreateAdResult {
   adId: string;
 }
 
+export interface MetaCreateCustomAudienceParams {
+  name: string;
+}
+
+export interface MetaCreateCustomAudienceResult {
+  audienceId: string;
+}
+
+/** How many of an `addHashedEmailsToCustomAudience` call's hashes Meta actually accepted onto the audience — mirrors `SinkPluginPushResult.pushed`'s own "how many did the remote system actually take" semantics for the KAN-73-follow-up Custom Audience connector. */
+export interface MetaAddHashedEmailsResult {
+  numReceived: number;
+}
+
 /**
  * The Meta Graph Marketing API (v21.0) calls this connector needs, kept as a
  * small interface — not the `facebook-nodejs-business-sdk` npm SDK — so a
@@ -104,6 +117,19 @@ export interface MetaAdsApiClient {
    * to a real campaign.
    */
   getCampaign(campaignId: string): Promise<{ campaignId: string }>;
+  /**
+   * Creates a `CUSTOM`-subtype, user-provided-data Custom Audience on the ad
+   * account (KAN-73 follow-up — see `plugin-runtime/meta-custom-audience`'s
+   * own doc comment). Starts empty; `addHashedEmailsToCustomAudience`
+   * populates it.
+   */
+  createCustomAudience(adAccountId: string, params: MetaCreateCustomAudienceParams): Promise<MetaCreateCustomAudienceResult>;
+  /**
+   * Adds already-hashed emails to an existing Custom Audience — the caller
+   * (`MetaCustomAudienceSinkPluginExecutor`) hashes every email before this
+   * call ever sees it; this client never receives a raw email address.
+   */
+  addHashedEmailsToCustomAudience(audienceId: string, hashedEmails: readonly string[]): Promise<MetaAddHashedEmailsResult>;
 }
 
 const META_API_VERSION = 'v21.0';
@@ -238,6 +264,22 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
   async getCampaign(campaignId: string): Promise<{ campaignId: string }> {
     const result = await this.getRequest<{ id: string }>(campaignId, { fields: 'id' });
     return { campaignId: result.id };
+  }
+
+  async createCustomAudience(adAccountId: string, params: MetaCreateCustomAudienceParams): Promise<MetaCreateCustomAudienceResult> {
+    const result = await this.request<{ id: string }>(`act_${adAccountId}/customaudiences`, {
+      name: params.name,
+      subtype: 'CUSTOM',
+      customer_file_source: 'USER_PROVIDED_ONLY',
+    });
+    return { audienceId: result.id };
+  }
+
+  async addHashedEmailsToCustomAudience(audienceId: string, hashedEmails: readonly string[]): Promise<MetaAddHashedEmailsResult> {
+    const result = await this.request<{ num_received?: number }>(`${audienceId}/users`, {
+      payload: JSON.stringify({ schema: ['EMAIL'], data: hashedEmails.map((hash) => [hash]) }),
+    });
+    return { numReceived: result.num_received ?? hashedEmails.length };
   }
 }
 

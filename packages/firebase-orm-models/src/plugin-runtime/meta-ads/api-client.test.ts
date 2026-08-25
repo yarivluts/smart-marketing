@@ -177,4 +177,41 @@ describe('MetaAdsHttpApiClient', () => {
 
     await expect(new MetaAdsHttpApiClient(OPTIONS).getCampaign('missing-campaign')).rejects.toMatchObject({ status: 404 });
   });
+
+  it('creates a CUSTOM, user-provided-data Custom Audience', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'audience-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).createCustomAudience('999', { name: 'Warm leads' });
+
+    expect(result).toEqual({ audienceId: 'audience-1' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/customaudiences');
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get('name')).toBe('Warm leads');
+    expect(body.get('subtype')).toBe('CUSTOM');
+    expect(body.get('customer_file_source')).toBe('USER_PROVIDED_ONLY');
+  });
+
+  it('adds already-hashed emails to a Custom Audience as an EMAIL-schema payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ num_received: 2, num_invalid_entries: 0 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).addHashedEmailsToCustomAudience('audience-1', ['hash-a', 'hash-b']);
+
+    expect(result).toEqual({ numReceived: 2 });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://graph.facebook.com/v21.0/audience-1/users');
+    const body = new URLSearchParams(String(init.body));
+    expect(JSON.parse(body.get('payload') as string)).toEqual({ schema: ['EMAIL'], data: [['hash-a'], ['hash-b']] });
+  });
+
+  it('falls back to the hash count when the response omits num_received', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).addHashedEmailsToCustomAudience('audience-1', ['hash-a']);
+
+    expect(result).toEqual({ numReceived: 1 });
+  });
 });

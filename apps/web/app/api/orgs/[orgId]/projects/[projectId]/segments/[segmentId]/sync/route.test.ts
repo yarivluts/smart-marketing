@@ -14,6 +14,10 @@ import {
   decideResourceAttachment,
   ensureUserForFirebaseSession,
   inviteMemberToOrganization,
+  META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
+  META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD,
+  META_CUSTOM_AUDIENCE_PLUGIN_ID,
+  META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML,
   registerSchemaDefinition,
   requestResourceAttachment,
   setSharedCredentialSecret,
@@ -100,6 +104,20 @@ async function setupInstalledCrmWebhookInstall(organizationId: string, projectId
     version: '1.0.0',
     consentedScopes: ['action:execute'],
     config: { [CRM_WEBHOOK_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id },
+    installedByUserId: ownerId,
+  });
+}
+
+/** Registers + installs the built-in Meta Custom Audience plugin with an id-only config — enough to exercise the route's "recognized plugin, missing credential" path without a real Meta credential attachment. */
+async function setupMetaCustomAudienceInstallWithoutCredential(organizationId: string, projectId: string, ownerId: string) {
+  await registerPluginManifest({ organizationId, manifestYaml: META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML, registeredByUserId: ownerId });
+  return installPlugin({
+    organizationId,
+    projectId,
+    pluginId: META_CUSTOM_AUDIENCE_PLUGIN_ID,
+    version: '1.0.0',
+    consentedScopes: ['action:execute'],
+    config: { [META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: 'nonexistent-attachment', [META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD]: 'Warm leads' },
     installedByUserId: ownerId,
   });
 }
@@ -209,6 +227,31 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/segments/[segmentId]/sync'
     expect(response.status).toBe(400);
     const body = (await response.json()) as { error: string };
     expect(body.error).toBe('crm_credential_not_configured');
+  });
+
+  it('returns 400 for the built-in Meta Custom Audience plugin with no configured credential attachment', async () => {
+    const { ownerSession, owner, organization, project, segment } = await setupOrgProjectSegment('Crm Sync Route No Meta Credential Org');
+    const install = await setupMetaCustomAudienceInstallWithoutCredential(organization.id, project.id, owner.id);
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = syncRequest(organization.id, project.id, segment.id, { installId: install.id });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe('meta_audience_credential_not_configured');
+  });
+
+  it('returns 400 for an action-type install with no built-in executor', async () => {
+    const { ownerSession, owner, organization, project, segment } = await setupOrgProjectSegment('Crm Sync Route Unsupported Plugin Org');
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: 'id: com.example.other-action\nversion: 1.0.0\ntype: action\ndisplay_name: Other Action\nscopes: [action:execute]\n', registeredByUserId: owner.id });
+    const install = await installPlugin({ organizationId: organization.id, projectId: project.id, pluginId: 'com.example.other-action', version: '1.0.0', consentedScopes: ['action:execute'], config: {}, installedByUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = syncRequest(organization.id, project.id, segment.id, { installId: install.id });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string };
+    expect(body.error).toBe('unsupported_action_plugin');
   });
 
   it('returns 200 with a failed run when the warehouse is not configured (this test environment has no live warehouse)', async () => {
