@@ -2,14 +2,21 @@ import { describe, expect, it } from 'vitest';
 import type { RawRecordModel } from '@growthos/firebase-orm-models';
 import { billingOpsFeedEntryTypeLabelKey, toBillingOpsFeedEntryView } from './billing-ops-view';
 
-function rawRecord(overrides: Partial<RawRecordModel> & Pick<RawRecordModel, 'schema_name' | 'payload'>): RawRecordModel {
+function rawRecord(
+  overrides: Partial<Omit<RawRecordModel, 'payload'>> & Pick<RawRecordModel, 'schema_name'> & { properties: Record<string, unknown> },
+): RawRecordModel {
+  const { properties, ...rest } = overrides;
   return {
     id: 'raw-1',
     environment_id: 'env-prod',
     client_id: 'evt-1',
     landed_at: '2026-08-22T12:00:00Z',
-    ...overrides,
-  } as RawRecordModel;
+    kind: 'event',
+    // A real landed `payload` is the whole ingest envelope, not a flat field map — an event's declared
+    // fields live under `properties` (see `toBillingOpsFeedEntryView`'s own doc comment).
+    payload: { event_id: 'evt-1', event: rest.schema_name, ts: '2026-08-22T12:00:00Z', properties },
+    ...rest,
+  } as unknown as RawRecordModel;
 }
 
 describe('toBillingOpsFeedEntryView', () => {
@@ -17,7 +24,7 @@ describe('toBillingOpsFeedEntryView', () => {
     const view = toBillingOpsFeedEntryView(
       rawRecord({
         schema_name: 'stripe_charge',
-        payload: { charge_id: 'ch_1', customer_id: 'cus_1', amount: 5000, currency: 'usd', status: 'succeeded', refunded: false, amount_refunded: 0 },
+        properties: { charge_id: 'ch_1', customer_id: 'cus_1', amount: 5000, currency: 'usd', status: 'succeeded', refunded: false, amount_refunded: 0 },
       }),
     );
     expect(view).toEqual({
@@ -40,7 +47,7 @@ describe('toBillingOpsFeedEntryView', () => {
     const view = toBillingOpsFeedEntryView(
       rawRecord({
         schema_name: 'stripe_failed_payment',
-        payload: { charge_id: 'ch_2', customer_id: 'cus_2', amount: 1200, currency: 'usd', failure_code: 'card_declined', failure_message: 'Your card was declined.' },
+        properties: { charge_id: 'ch_2', customer_id: 'cus_2', amount: 1200, currency: 'usd', failure_code: 'card_declined', failure_message: 'Your card was declined.' },
       }),
     );
     expect(view.type).toBe('failed_payment');
@@ -53,7 +60,7 @@ describe('toBillingOpsFeedEntryView', () => {
     const view = toBillingOpsFeedEntryView(
       rawRecord({
         schema_name: 'stripe_refund',
-        payload: { refund_id: 're_1', charge_id: 'ch_3', amount: 300, currency: 'usd', status: 'succeeded', reason: 'requested_by_customer' },
+        properties: { refund_id: 're_1', charge_id: 'ch_3', amount: 300, currency: 'usd', status: 'succeeded', reason: 'requested_by_customer' },
       }),
     );
     expect(view.type).toBe('refund');
@@ -61,7 +68,7 @@ describe('toBillingOpsFeedEntryView', () => {
   });
 
   it('falls back to null for a missing/wrongly-typed field rather than throwing', () => {
-    const view = toBillingOpsFeedEntryView(rawRecord({ schema_name: 'stripe_charge', payload: { amount: 'not-a-number', currency: 42 } }));
+    const view = toBillingOpsFeedEntryView(rawRecord({ schema_name: 'stripe_charge', properties: { amount: 'not-a-number', currency: 42 } }));
     expect(view.amount).toBeNull();
     expect(view.currency).toBeNull();
     expect(view.customerId).toBeNull();

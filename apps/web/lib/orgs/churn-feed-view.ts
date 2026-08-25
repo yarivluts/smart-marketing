@@ -1,4 +1,4 @@
-import type { RawRecordModel } from '@growthos/firebase-orm-models';
+import { checkRecordEnvelope, type RawRecordModel } from '@growthos/firebase-orm-models';
 
 function stringField(payload: Record<string, unknown>, field: string): string | null {
   const value = payload[field];
@@ -37,7 +37,13 @@ export interface ChurnFeedEntryView {
 }
 
 export function toChurnFeedEntryView(record: RawRecordModel): ChurnFeedEntryView {
-  const payload = record.payload;
+  // A landed `RawRecordModel.payload` is the *whole* ingest envelope (an entity's own `id` alongside
+  // its `attributes`), not a flat map of the schema's declared fields — same bug class
+  // `record-feed-view.ts`'s `toRecordFeedEntryView` fix (KAN-81 slice 6, PR #247) and
+  // `billing-ops-view.ts`'s `toBillingOpsFeedEntryView` already correct. Reading `record.payload`
+  // directly here meant every field below silently rendered blank for any subscription record landed
+  // through the real Stripe plugin.
+  const payload = checkRecordEnvelope(record.kind, record.payload).fieldsToValidate;
   return {
     id: record.id,
     environmentId: record.environment_id,
