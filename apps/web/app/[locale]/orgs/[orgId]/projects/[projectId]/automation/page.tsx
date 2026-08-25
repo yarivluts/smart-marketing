@@ -24,6 +24,7 @@ import { AutomationGuardrailPolicyForm } from '@/components/orgs/automation-guar
 import { AutomationSeedTargetForm } from '@/components/orgs/automation-seed-target-form';
 import { AutomationProposeActionForm } from '@/components/orgs/automation-propose-action-form';
 import { AutomationProposeCampaignDraftForm } from '@/components/orgs/automation-propose-campaign-draft-form';
+import { AutomationProposeKeywordEditForm } from '@/components/orgs/automation-propose-keyword-edit-form';
 import { AutomationActivateCampaignButton } from '@/components/orgs/automation-activate-campaign-button';
 import { AutomationActionList } from '@/components/orgs/automation-action-list';
 
@@ -143,6 +144,15 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
           orgId={orgId}
           projectId={projectId}
           targets={targetViews.filter((target) => !target.campaignResourceName)}
+        />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('proposeKeywordEditHeading')}</h2>
+        <AutomationProposeKeywordEditForm
+          orgId={orgId}
+          projectId={projectId}
+          targets={targetViews.filter((target) => (target.adGroupResourceNames?.length ?? 0) > 0)}
         />
       </section>
 

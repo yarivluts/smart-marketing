@@ -8,6 +8,9 @@ import type {
   AutomationCampaignDraftCreateExecutionInput,
   AutomationCampaignDraftCreateExecutionResult,
   AutomationCampaignDraftRollbackInput,
+  AutomationKeywordEditExecutionInput,
+  AutomationKeywordEditExecutionResult,
+  AutomationKeywordEditRollbackInput,
 } from './executor';
 
 interface TargetLookup {
@@ -63,6 +66,11 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
     target.campaign_budget_resource_name = `customers/simulated/campaignBudgets/${target.id}`;
     target.campaign_status = 'paused';
     target.daily_budget_usd = input.draft.dailyBudgetUsd;
+    // Meta drafts have no ad-group concept (see `MetaAutomationActionExecutor`'s own doc comment) —
+    // only a Google Ads draft's `adGroups` gets simulated ad-group resource names.
+    if (input.draft.platform !== 'meta') {
+      target.ad_group_resource_names = input.draft.adGroups.map((_adGroup, index) => `customers/simulated/adGroups/${target.id}-${index}`);
+    }
     target.updated_at = new Date().toISOString();
     await target.save();
     return { campaignResourceName };
@@ -85,6 +93,23 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
   async rollbackCampaignActivation(input: AutomationCampaignActivationExecutionInput): Promise<void> {
     const target = await loadTarget(input);
     target.campaign_status = 'paused';
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  async executeKeywordEdit(input: AutomationKeywordEditExecutionInput): Promise<AutomationKeywordEditExecutionResult> {
+    const target = await loadTarget(input);
+    const addedKeywordResourceNames = input.addKeywords.map((_keyword, index) => `customers/simulated/adGroupCriteria/${target.id}-kw-${index}`);
+    const addedNegativeKeywordResourceNames = input.addNegativeKeywords.map(
+      (_keyword, index) => `customers/simulated/adGroupCriteria/${target.id}-neg-${index}`,
+    );
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return { addedKeywordResourceNames, addedNegativeKeywordResourceNames };
+  }
+
+  async rollbackKeywordEdit(input: AutomationKeywordEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
     target.updated_at = new Date().toISOString();
     await target.save();
   }

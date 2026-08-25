@@ -9,6 +9,9 @@ import {
   type AutomationCampaignDraftCreateExecutionInput,
   type AutomationCampaignDraftCreateExecutionResult,
   type AutomationCampaignDraftRollbackInput,
+  type AutomationKeywordEditExecutionInput,
+  type AutomationKeywordEditExecutionResult,
+  type AutomationKeywordEditRollbackInput,
 } from '../../automation-runtime';
 import type { GoogleAdsApiClient } from './api-client';
 
@@ -133,6 +136,7 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
     target.campaign_budget_resource_name = result.campaignBudgetResourceName;
     target.campaign_status = 'paused';
     target.daily_budget_usd = input.draft.dailyBudgetUsd;
+    target.ad_group_resource_names = result.adGroupResourceNames;
     target.updated_at = new Date().toISOString();
     await target.save();
     return { campaignResourceName: result.campaignResourceName };
@@ -158,6 +162,24 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
     const target = await loadTarget(input);
     await this.apiClient.setCampaignStatus(this.customerId, input.campaignResourceName, 'PAUSED');
     target.campaign_status = 'paused';
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  async executeKeywordEdit(input: AutomationKeywordEditExecutionInput): Promise<AutomationKeywordEditExecutionResult> {
+    const target = await loadTarget(input);
+    const result = await this.apiClient.addAdGroupKeywords(this.customerId, input.adGroupResourceName, input.addKeywords, input.addNegativeKeywords);
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return { addedKeywordResourceNames: result.keywordResourceNames, addedNegativeKeywordResourceNames: result.negativeKeywordResourceNames };
+  }
+
+  async rollbackKeywordEdit(input: AutomationKeywordEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    const criterionResourceNames = [...input.addedKeywordResourceNames, ...input.addedNegativeKeywordResourceNames];
+    if (criterionResourceNames.length > 0) {
+      await this.apiClient.removeAdGroupCriteria(this.customerId, criterionResourceNames);
+    }
     target.updated_at = new Date().toISOString();
     await target.save();
   }

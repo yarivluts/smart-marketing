@@ -9,6 +9,7 @@ import {
   type AutomationKillSwitchStatus,
   type AutomationTargetStateModel,
   type CampaignDraft,
+  type CampaignDraftKeyword,
   disengageAutomationKillSwitch as disengageAutomationKillSwitchInOrganization,
   engageAutomationKillSwitch as engageAutomationKillSwitchInOrganization,
   ensureAutomationTargetSeeded as ensureAutomationTargetSeededInOrganization,
@@ -17,6 +18,7 @@ import {
   proposeAutomationBudgetChangeAction as proposeAutomationBudgetChangeActionInOrganization,
   proposeCampaignActivationAction as proposeCampaignActivationActionInOrganization,
   proposeCampaignDraftCreateAction as proposeCampaignDraftCreateActionInOrganization,
+  proposeKeywordEditAction as proposeKeywordEditActionInOrganization,
   rejectAutomationAction as rejectAutomationActionInOrganization,
   resolveAutomationActionExecutorForTarget as resolveAutomationActionExecutorForTargetInOrganization,
   rollbackAutomationAction as rollbackAutomationActionInOrganization,
@@ -1282,6 +1284,21 @@ interface ProposeCampaignActivationInput {
 export async function proposeCampaignActivationAction(input: ProposeCampaignActivationInput): Promise<AutomationActionModel> {
   await ensureFirestoreOrm();
   return proposeCampaignActivationActionInOrganization(input);
+}
+
+interface ProposeKeywordEditInput {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  adGroupResourceName: string;
+  addKeywords: CampaignDraftKeyword[];
+  addNegativeKeywords: CampaignDraftKeyword[];
+  requestedByUserId: string;
+}
+
+export async function proposeKeywordEditAction(input: ProposeKeywordEditInput): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return proposeKeywordEditActionInOrganization(input);
 }
 
 export async function approveAutomationAction(
