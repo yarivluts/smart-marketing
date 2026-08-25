@@ -71,6 +71,7 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
     listActionPluginInstallsForProject(orgId, projectId).then((rows) => rows.map(toActionPluginInstallOptionView)),
   ]);
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
+  const eventSchemaNames = activeSchemaNamesForKind(schemaDefs, 'event');
   const t = await getTranslations('Segments');
 
   // Fanned out per segment via `Promise.all` — the same known, deliberately
@@ -112,6 +113,9 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
                     <span className="font-medium">{segment.name}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">{t('filterCount', { count: segment.filterCount })}</span>
+                      {segment.eventConditionCount > 0 ? (
+                        <span className="text-xs text-muted-foreground">{t('eventConditionCount', { count: segment.eventConditionCount })}</span>
+                      ) : null}
                       <DeleteSegmentButton orgId={orgId} projectId={projectId} segmentId={segment.id} />
                     </div>
                   </div>
@@ -155,7 +159,7 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
         {entitySchemaNames.length === 0 ? (
           <p className="text-xs text-muted-foreground">{t('noEntitySchemasRegistered')}</p>
         ) : (
-          <CreateSegmentForm orgId={orgId} projectId={projectId} entitySchemaNames={entitySchemaNames} />
+          <CreateSegmentForm orgId={orgId} projectId={projectId} entitySchemaNames={entitySchemaNames} eventSchemaNames={eventSchemaNames} />
         )}
       </section>
     </main>

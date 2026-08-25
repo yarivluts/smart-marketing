@@ -54,6 +54,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       name: parsed.name,
       schemaName: parsed.schemaName,
       filters: parsed.filters,
+      eventConditions: parsed.eventConditions,
       createdByUserId: user.id,
     });
     return NextResponse.json({ segment: toSegmentSummaryView(segment) }, { status: 201 });

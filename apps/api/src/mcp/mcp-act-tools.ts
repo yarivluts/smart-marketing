@@ -130,7 +130,13 @@ const createGoalInputShape = {
 const createSegmentInputShape = {
   name: z.string().min(1),
   schema_name: z.string().min(1).describe('A registered and active entity schema name, e.g. "customer".'),
-  filters: z.unknown().describe('Array of { field, op, value } — op is one of =, !=, >, >=, <, <=, contains. ANDed together.'),
+  filters: z.unknown().optional().describe('Array of { field, op, value } — op is one of =, !=, >, >=, <, <=, contains. ANDed together. May be omitted/empty if event_conditions is non-empty.'),
+  event_conditions: z
+    .unknown()
+    .optional()
+    .describe(
+      'Array of { kind, schema_name, filters?, within_days? } — kind is "has_event" or "no_event". Expresses "has (or has never had) a matching event in some other registered event schema", e.g. { kind: "no_event", schema_name: "demo_event" } for a "no demo" condition. ANDed with filters and with each other.',
+    ),
 };
 
 export function registerMcpActTools(server: McpServer, auth: McpAuthContext): void {
@@ -234,24 +240,36 @@ export function registerMcpActTools(server: McpServer, auth: McpAuthContext): vo
     {
       title: 'Create segment',
       description:
-        'Save a named customer segment definition — an ANDed set of filter conditions over one registered entity schema (e.g. "paying, no demo, MRR > $200"). A definition only: no live member list is materialized yet. Requires "dashboards.write".',
+        'Save a named customer segment definition — an ANDed set of filter conditions over one registered entity schema, optionally combined with cross-schema event_conditions (e.g. "paying, no demo" via { kind: "no_event", schema_name: "demo_event" }, or "MRR > $200"). A definition only: no live member list is materialized yet. Requires "dashboards.write".',
       inputSchema: toolInputSchema(createSegmentInputShape),
     },
     auditedToolHandler(auth, 'create_segment', async (args: any) =>
-      runActTool(auth, 'dashboards.write', args, async (a: { name: string; schema_name: string; filters: unknown }) => {
-        if (!Array.isArray(a.filters)) {
+      runActTool(auth, 'dashboards.write', args, async (a: { name: string; schema_name: string; filters?: unknown; event_conditions?: unknown }) => {
+        const filters = a.filters ?? [];
+        if (!Array.isArray(filters)) {
           return errorResult('"filters" must be an array of { field, op, value } conditions.');
         }
+        const rawEventConditions = a.event_conditions ?? [];
+        if (!Array.isArray(rawEventConditions)) {
+          return errorResult('"event_conditions" must be an array of { kind, schema_name, filters?, within_days? } conditions.');
+        }
+        const eventConditions = rawEventConditions.map((condition: any) => ({
+          kind: condition?.kind,
+          schemaName: condition?.schema_name,
+          ...(condition?.filters !== undefined ? { filters: condition.filters } : {}),
+          ...(condition?.within_days !== undefined ? { withinDays: condition.within_days } : {}),
+        }));
         const segment = await createSegment({
           organizationId: auth.organizationId,
           projectId: auth.projectId,
           name: a.name,
           schemaName: a.schema_name,
-          filters: a.filters,
+          filters,
+          eventConditions,
           createdByUserId: actorId(auth),
           createdByActorType: actorType(auth),
         });
-        return textResult({ id: segment.id, name: segment.name, schemaName: segment.schema_name, filters: segment.filters });
+        return textResult({ id: segment.id, name: segment.name, schemaName: segment.schema_name, filters: segment.filters, eventConditions: segment.event_conditions });
       }),
     ),
   );

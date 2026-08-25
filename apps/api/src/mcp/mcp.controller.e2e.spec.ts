@@ -399,6 +399,52 @@ describe('McpController (e2e)', () => {
       }
     });
 
+    it('create_segment saves a real "paying, no demo" cross-schema segment via event_conditions (KAN-93)', async () => {
+      const { owner, organization, project, rawKey } = await setupProjectWithKey('Act Tools Create Segment Event Condition Org', ['mcp.read', 'dashboards.write']);
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'entity',
+        name: 'customer',
+        fields: [
+          { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+          { name: 'is_paying', type: 'boolean', isRequired: true, isPii: false, isIdentityKey: false },
+        ],
+        createdByUserId: owner.id,
+      });
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name: 'demo_event',
+        fields: [{ name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true }],
+        createdByUserId: owner.id,
+      });
+
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({
+          name: 'create_segment',
+          arguments: {
+            name: 'Paying, no demo',
+            schema_name: 'customer',
+            filters: [{ field: 'is_paying', op: '=', value: true }],
+            event_conditions: [{ kind: 'no_event', schema_name: 'demo_event' }],
+          },
+        });
+        expect(result.isError).not.toBe(true);
+        const body = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as {
+          id: string;
+          name: string;
+          eventConditions: Array<{ kind: string; schemaName: string }>;
+        };
+        expect(body.name).toBe('Paying, no demo');
+        expect(body.eventConditions).toEqual([{ kind: 'no_event', schemaName: 'demo_event' }]);
+      } finally {
+        await client.close();
+      }
+    });
+
     it('propose_action then approve_action succeed end to end for an OAuth-authenticated org owner', async () => {
       const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
       const { organization } = await createOrganizationWithOwner({ name: 'Act Tools OAuth Org', ownerUserId: owner.id });

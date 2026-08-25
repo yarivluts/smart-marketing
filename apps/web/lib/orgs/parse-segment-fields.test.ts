@@ -19,7 +19,7 @@ const validBody = {
 describe('parseCreateSegmentRequestBody', () => {
   it('accepts a well-formed request', async () => {
     const parsed = await parseCreateSegmentRequestBody(request(validBody));
-    expect(parsed).toEqual(validBody);
+    expect(parsed).toEqual({ ...validBody, eventConditions: [] });
   });
 
   it('accepts numeric and boolean filter values', async () => {
@@ -62,5 +62,52 @@ describe('parseCreateSegmentRequestBody', () => {
 
   it('rejects a filter entry that is not an object', async () => {
     expect((await parseCreateSegmentRequestBody(request({ ...validBody, filters: ['not-a-filter'] }))).error?.status).toBe(400);
+  });
+
+  it('accepts an empty (or omitted) filters array when at least one event condition is present (KAN-93)', async () => {
+    const body = { name: 'No demo', schemaName: 'customer', filters: [], eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }] };
+    const parsed = await parseCreateSegmentRequestBody(request(body));
+    expect(parsed).toEqual(body);
+
+    const omittedFilters = { name: 'No demo', schemaName: 'customer', eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }] };
+    expect(await parseCreateSegmentRequestBody(request(omittedFilters))).toEqual({ ...omittedFilters, filters: [] });
+  });
+
+  it('accepts a "has_event" event condition with a nested filter and a withinDays lookback', async () => {
+    const body = {
+      ...validBody,
+      eventConditions: [{ kind: 'has_event', schemaName: 'demo_event', withinDays: 30, filters: [{ field: 'stage', op: '=', value: 'held' }] }],
+    };
+    expect(await parseCreateSegmentRequestBody(request(body))).toEqual(body);
+  });
+
+  it('rejects a non-array eventConditions', async () => {
+    expect((await parseCreateSegmentRequestBody(request({ ...validBody, eventConditions: 'nope' }))).error?.status).toBe(400);
+  });
+
+  it('rejects an event condition with an unknown kind', async () => {
+    const body = { ...validBody, eventConditions: [{ kind: 'sometimes_event', schemaName: 'demo_event' }] };
+    expect((await parseCreateSegmentRequestBody(request(body))).error?.status).toBe(400);
+  });
+
+  it('rejects an event condition with a missing/blank schemaName', async () => {
+    const body = { ...validBody, eventConditions: [{ kind: 'no_event' }] };
+    expect((await parseCreateSegmentRequestBody(request(body))).error?.status).toBe(400);
+  });
+
+  it('rejects an event condition with a malformed nested filter', async () => {
+    const body = { ...validBody, eventConditions: [{ kind: 'no_event', schemaName: 'demo_event', filters: [{ field: 'stage', op: 'like', value: 'held' }] }] };
+    expect((await parseCreateSegmentRequestBody(request(body))).error?.status).toBe(400);
+  });
+
+  it('rejects an event condition with a zero, negative, or non-integer withinDays', async () => {
+    expect(
+      (await parseCreateSegmentRequestBody(request({ ...validBody, eventConditions: [{ kind: 'no_event', schemaName: 'demo_event', withinDays: 0 }] })))
+        .error?.status,
+    ).toBe(400);
+    expect(
+      (await parseCreateSegmentRequestBody(request({ ...validBody, eventConditions: [{ kind: 'no_event', schemaName: 'demo_event', withinDays: 2.5 }] })))
+        .error?.status,
+    ).toBe(400);
   });
 });

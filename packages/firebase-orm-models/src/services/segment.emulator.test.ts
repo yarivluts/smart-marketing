@@ -76,6 +76,22 @@ async function registerCustomerSchema(organizationId: string, projectId: string,
   });
 }
 
+const demoEventFieldsV1: SchemaFieldInput[] = [
+  { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+  { name: 'stage', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
+];
+
+async function registerDemoEventSchema(organizationId: string, projectId: string, createdByUserId: string) {
+  return registerSchemaDefinition({
+    organizationId,
+    projectId,
+    kind: 'event',
+    name: 'demo_event',
+    fields: demoEventFieldsV1,
+    createdByUserId,
+  });
+}
+
 describe('createSegment', () => {
   it('creates a segment with valid filter conditions', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Segment Create Org');
@@ -192,6 +208,102 @@ describe('createSegment', () => {
         name: 'Everyone',
         schemaName: 'customer',
         filters: [],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidSegmentError);
+  });
+
+  it('accepts an empty filters array when at least one event condition is present (KAN-93)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment No Filters Event Condition Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'No demo yet',
+      schemaName: 'customer',
+      filters: [],
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+      createdByUserId: owner.id,
+    });
+
+    expect(segment.event_conditions).toEqual([{ kind: 'no_event', schemaName: 'demo_event' }]);
+  });
+
+  it('creates a segment combining an entity filter and a "no_event" cross-schema condition (the "paying_no_demo" case, KAN-93)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Paying No Demo Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Paying, no demo',
+      schemaName: 'customer',
+      filters: [{ field: 'is_paying', op: '=', value: true }],
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event', withinDays: 90 }],
+      createdByUserId: owner.id,
+    });
+
+    expect(segment.filters).toEqual([{ field: 'is_paying', op: '=', value: true }]);
+    expect(segment.event_conditions).toEqual([{ kind: 'no_event', schemaName: 'demo_event', withinDays: 90 }]);
+  });
+
+  it('rejects an event condition referencing an unregistered event schema, alongside its other validation failures', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Event Condition Unregistered Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+
+    let caught: unknown;
+    try {
+      await createSegment({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'Broken',
+        schemaName: 'customer',
+        filters: [{ field: 'plan', op: '=', value: 'pro' }],
+        eventConditions: [{ kind: 'no_event', schemaName: 'does_not_exist' }],
+        createdByUserId: owner.id,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(InvalidSegmentError);
+    const reasons = (caught as InstanceType<typeof InvalidSegmentError>).reasons;
+    expect(reasons.some((reason) => reason.includes('Event schema "does_not_exist"') && reason.includes('is not registered'))).toBe(true);
+  });
+
+  it('rejects a malformed event condition', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Event Condition Malformed Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+
+    await expect(
+      createSegment({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'Broken',
+        schemaName: 'customer',
+        filters: [{ field: 'plan', op: '=', value: 'pro' }],
+        eventConditions: [{ kind: 'sometimes_event', schemaName: 'demo_event' }],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidSegmentError);
+  });
+
+  it('rejects an entity schema that an event condition points at an event-kind schema is not itself an entity schema', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Event Condition Wrong Kind Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+
+    await expect(
+      createSegment({
+        organizationId: organization.id,
+        projectId: project.id,
+        name: 'Broken',
+        // "demo_event" is an event-kind schema, not entity-kind — using it as the segment's own schemaName should fail.
+        schemaName: 'demo_event',
+        filters: [{ field: 'stage', op: '=', value: 'held' }],
         createdByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(InvalidSegmentError);
@@ -582,6 +694,77 @@ describe('countSegmentMembers', () => {
     expect(executor.calls[0].params.environmentId).toBe('env-test');
   });
 
+  it('compiles a "no_event" cross-schema condition as a NOT EXISTS correlated subquery against events (KAN-93, the "paying_no_demo" case)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count No Event Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Paying, no demo',
+      schemaName: 'customer',
+      filters: [{ field: 'is_paying', op: '=', value: true }],
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ member_count: 5 }]);
+
+    const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(outcome).toEqual({ ok: true, count: 5 });
+    const { sql, params } = executor.calls[0];
+    expect(sql).toContain('NOT EXISTS (SELECT 1 FROM events AS ev WHERE');
+    expect(sql).toContain('ev.event_type = @event_schema_0');
+    expect(sql).toContain('ev.entity_id = entities.entity_id');
+    expect(params.event_schema_0).toBe('demo_event');
+  });
+
+  it('compiles a "has_event" cross-schema condition as a plain EXISTS subquery, with a nested field filter and a lookback window', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Has Event Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Held a demo recently',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      eventConditions: [{ kind: 'has_event', schemaName: 'demo_event', withinDays: 30, filters: [{ field: 'stage', op: '=', value: 'held' }] }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([{ member_count: 2 }]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    const { sql, params } = executor.calls[0];
+    expect(sql).toContain('EXISTS (SELECT 1 FROM events AS ev WHERE');
+    expect(sql).not.toContain('NOT EXISTS');
+    expect(sql).toContain('ev.occurred_at >= TIMESTAMP(@event_since_0)');
+    expect(sql).toContain("LAX_STRING(ev.properties['stage']) = @event_0_filter_0");
+    expect(params.event_0_filter_0).toBe('held');
+    expect(typeof params.event_since_0).toBe('string');
+  });
+
+  it('scopes a cross-schema condition to the requested environment, same as the entity-side filters', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Event Env Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'No demo',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, environmentId: 'env-test', executor });
+
+    expect(executor.calls[0].sql).toContain('ev.environment_id = @environmentId');
+  });
+
   it('returns 0 when the executor reports no matching rows', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Segment Count Zero Org');
     await registerCustomerSchema(organization.id, project.id, owner.id);
@@ -701,6 +884,27 @@ describe('countSegmentMembers', () => {
 });
 
 describe('listSegmentMembers', () => {
+  it('applies a "no_event" cross-schema condition the same way countSegmentMembers does (shared compilation via buildSegmentMemberWhereClause)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Members No Event Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Paying, no demo',
+      schemaName: 'customer',
+      filters: [{ field: 'is_paying', op: '=', value: true }],
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+      createdByUserId: owner.id,
+    });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await listSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(executor.calls[0].sql).toContain('NOT EXISTS (SELECT 1 FROM events AS ev WHERE');
+    expect(executor.calls[0].params.event_schema_0).toBe('demo_event');
+  });
+
   it('builds a parameterized row-select scoped to the segment’s schema and org/project, mapping rows to SegmentMemberRow', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Segment Members Org');
     await registerCustomerSchema(organization.id, project.id, owner.id);
