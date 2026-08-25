@@ -17,6 +17,73 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 — New story KAN-89 (Experimentation & A/B, Gap 3) delivered and closed out (PR #278)
+
+- **Last completed:**
+  - This scheduled run started with the standard resync: local `main` was in a detached-HEAD state
+    behind `origin/main` (a forced update from another session's earlier push). Reset to
+    `origin/main`, checked `git branch -a`/open PRs first per this backlog's own established
+    collision-avoidance posture — found exactly one open PR (**#276**, KAN-88's `/tv` rotation
+    follow-up, another concurrent session's work, left untouched).
+  - Read `PROGRESS.md`/`TASKS.md`: every row was `done`, a standing `needs-human`/`blocked-by`
+    (KAN-43/KAN-50/KAN-51), or an `in-progress` row (KAN-18/KAN-19/KAN-86) whose own documented
+    remaining gap is genuinely blocked (real infra, or a connector/compiler feature that doesn't
+    exist yet) — no freely-buildable `todo` left, same finding the last several entries have all
+    made.
+  - Did the "fresh sweep" the prior entry recommended: `git fetch --all --prune` turned up **256**
+    remote branches. Almost all are dead (merged-but-undeleted, per this sandbox's standing branch-
+    delete-403 restriction, or superseded PRs never cleaned up) — but one, `kan-89-experimentation-
+    ab-pack`, was a complete, well-tested, already-`main`-rebased commit (author `Claude`, a
+    different session) implementing a **new** story with no existing KAN ticket: Experimentation &
+    A/B testing (`docs/plan/14-gap-analysis.md` Gap 3), the next unaddressed gap-analysis bullet —
+    exactly this repo's established "turn the next gap into a buildable-today slice" pattern
+    (KAN-80/81/82/84/87 etc.), just not yet picked up as its own row.
+  - Independently verified the whole branch from scratch rather than trusting the commit alone:
+    `pnpm install && pnpm lint && pnpm typecheck && pnpm build` green monorepo-wide; read every new
+    file end to end (`computeExperimentResult`'s two-proportion z-test math, the schema/metric-pack
+    registration idempotency posture, the dbt mart + fixture test, the admin page's warehouse-
+    degrade path, en/he i18n parity) — well-precedented, reuses `ensureSurveyResponseSchemaRegistered`
+    (KAN-82) / `ensureChurnReasonPackRegistered` (KAN-84)'s exact idempotent-registration shape and
+    `getNpsDimensionBreakdownForProject`'s catch-and-classify posture for warehouse errors. No
+    correctness issues found.
+  - `pnpm test` needed two attempts: the first (backgrounded with an internal `timeout 590`) was
+    killed by that wrapper before producing any output — re-ran unbounded, redirected to a log file.
+    That full run reported one real-looking failure (`record-feed.spec.ts`) plus 3 "flaky" (passed on
+    retry) e2e specs, none in files this diff touches; re-ran `record-feed.spec.ts` alone (1 worker,
+    same emulator setup) and reproduced the identical fail-then-pass-on-retry pattern, confirming it's
+    the same load-sensitive Firestore-emulator e2e flake class this file has documented dozens of
+    times before, not a regression. The new `e2e/experiments.spec.ts` itself also failed-then-passed
+    on its own retry in the full run — same flake class, not a logic bug (confirmed by reading the
+    page's own warehouse-degrade code path, which has no timing dependency of its own).
+  - Went to open a PR — found **PR #278** had just been opened moments earlier by the same
+    originating session, for the identical head SHA my own verification had just finished checking.
+    No duplicate PR created; subscribed to #278's activity instead (mirroring the KAN-82 entry's own
+    precedent for this exact race) and confirmed CI (`terraform fmt · validate` + `lint · typecheck ·
+    test · build`) came back green with no intervention needed, `mergeable_state: clean`. Merged
+    (squash).
+  - Branch deletion 403'd from this sandbox's git remote — the same standing, accepted restriction
+    every prior entry in this file has hit.
+  - Updated `TASKS.md`: added a new **KAN-89** row (`done`) documenting the delivered scope and its
+    deliberately-deferred pieces (a real GrowthBook/Optimizely/VWO connector, an AI rollout verdict —
+    same posture KAN-82/KAN-87 establish for their own third-party/AI-stand-in gaps).
+- **In progress (exact stopping point):** none — PR #278 is merged, `TASKS.md` + this entry are the
+  clean stopping point. This entry itself still needs a PR (docs-only changes go through a PR too,
+  per this repo's own established convention).
+- **Blocked + why:** nothing blocking.
+- **Next step:** pick the next unblocked task per `TASKS.md` — check `git branch -a`/open PRs first.
+  `KAN-18`/`KAN-19`/`KAN-86` are the other `in-progress` rows with their own documented remaining
+  gaps if a future run wants a different area; otherwise the gap-analysis doc (`docs/plan/14-gap-
+  analysis.md`) is this backlog's own source for the next new buildable-today slice, the same way
+  KAN-89 was found this run — check its still-open gaps against `TASKS.md`'s existing KAN-8x rows
+  before assuming one is unaddressed.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - KAN-89's real experimentation-tool connector (GrowthBook/Optimizely/VWO-style, needs a
+    human-provisioned API key) — documented, not blocking `done` status, same posture as the other
+    third-party connectors.
+
+---
+
 ## 2026-08-24 (yet even later) — KAN-88's deferred /tv rotation integration delivered: rep-collections leaderboard frame (PR #276)
 
 - **Last completed:**
