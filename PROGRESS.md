@@ -17,6 +17,104 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (later) — New story KAN-90 (Customer-support analytics & team leaderboards, Gap 6) delivered (PR #282)
+
+- **Last completed:**
+  - Session start: local `main` was a stale detached HEAD (again) — reset to `origin/main`
+    (`git checkout -B main origin/main`), same recurring local-ref fix every prior entry
+    documents. Read `PROGRESS.md`/`TASKS.md`: every row was `done` or a standing blocker
+    (KAN-18/19 real-infra, KAN-43 `needs-human`, KAN-50/51 `blocked-by`, KAN-86's `roi_nd` gap).
+    `git branch -a` and `list_pull_requests` (open, empty) confirmed no in-flight collision before
+    picking work — a clean slate, unlike several recent runs.
+  - Did the "fresh sweep" the last several entries have recommended: grepped
+    `docs/plan/14-gap-analysis.md`'s own Gap list against `TASKS.md`'s KAN rows. Every other gap
+    (1/2/3/4/5/7/8/9/10/11/12/13/14/15) already has a KAN story — **Gap 6** ("Customer-support
+    analytics & team leaderboards": per-agent leaderboard, first-response/resolution time,
+    CSAT/agent, a `good_review` war-room win type) was the one bullet nobody had ever picked up.
+    Confirmed via `git branch -a` that no branch/PR named anything support/ticket/CS-shaped
+    existed either.
+  - **Delivered (PR #282, branch `kan-90-support-analytics-leaderboard`):** a `support_ticket_event`
+    event schema (`packages/shared/src/support`, one schema/two `stage` values `opened`/`resolved`,
+    mirroring `SURVEY_RESPONSE_SCHEMA_FIELDS`'s stage-specific-optional-fields shape — the
+    connector/admin action that lands a `resolved`-stage event already knows the elapsed-time
+    deltas and resolving agent, so no dbt self-join against the ticket's own `opened` event is
+    needed, same tradeoff `experiment_key`/`variant_key` — KAN-89 — accept); a bare-flatten
+    `fact_support_ticket_event` dbt mart (no joins, same shape `fact_experiment_event` establishes,
+    new `proj_21` fixture + a fixture-matches-expected dbt test, `dbt build` 238/238 green); a
+    built-in "Customer Support" metric pack (`plugin-runtime/support-pack`) registering
+    `support_tickets_opened`/`support_tickets_resolved`/`support_avg_first_response_seconds`/
+    `support_avg_resolution_seconds`/`support_avg_csat_score` (broken down by
+    `agent_org_person_id`) plus an undimensioned `support_open_backlog` formula, wired into
+    `installPluginAndProvisionBuiltins`/`BUILTIN_METRIC_PACKS`; a **live** per-agent leaderboard
+    (`getSupportLeaderboardForProject`, `support.service.ts`) that reads landed raw records
+    directly and aggregates in TypeScript — deliberately *not* routed through the metrics
+    compiler/warehouse, the same "fetch once, aggregate in TypeScript, no warehouse dependency"
+    posture `getNpsOverviewForProject`/`aggregateRepCollectionLeaderboard` establish, so the
+    leaderboard renders correctly even before any dbt build has run against a live warehouse —
+    resolved against `OrgPersonModel` (already exactly the `dim_team_member` registry Gap 6 calls
+    for, per KAN-88's own prior finding) for name/photo at the view-mapper layer; a new
+    project-scoped Support admin page (backlog count + leaderboard table), gated on `ingest.write`
+    (the established "whole feature, not just mutation, is admin-only" posture for a read-only
+    analytics page, same as Feedback/Churn Reasons/Firmographics/Experiments), with the standard
+    one-click install card until the pack is installed, and a nav entry; and a new `good_review`
+    entry in the win catalog (`WIN_TYPES`, `packages/shared/src/win-rules/types.ts`) + a war-room
+    chime, so a human can create a win rule on the new schema (`csat_score >= <threshold>`) that
+    fires a war-room celebration on a great support outcome — same "label, not a canned rule
+    template" posture `reactivation`/`trial_conversion` (KAN-66) already establish. A real
+    Zendesk/Intercom/Freshdesk/Crisp connector is explicitly deferred — needs a human-provisioned
+    API key, same posture Stripe/GA4/KAN-82/KAN-84/KAN-87 established for their own third-party
+    connectors.
+  - **Self-reviewed** via the `/code-review` skill (medium effort) before opening the PR — one real
+    finding: `support_open_backlog`'s formula has no floor at zero (a period whose
+    `support_tickets_resolved` exceeds its `support_tickets_opened` — a `resolved` event landing
+    for a ticket whose `opened` event fell outside the query window or was never sent — renders a
+    negative backlog on a board tile/goal), unlike `SupportLeaderboardResult.openBacklog`'s own
+    `Math.max(0, ...)` clamp for the identical computation. Not fixed — the metrics-compiler
+    formula parser (`+`/`-`/`*`/`/` only, no clamp/greatest function) genuinely can't express a
+    floor — documented as a known, deliberate limitation in the metric's own doc comment instead
+    of silently left, the same "document, don't silently accept" posture this backlog's other
+    compiler-shape limitations (`nps_score`/`quality_calibration_paying_rate` not being
+    breakdownable) already take.
+  - **Checks:** fresh `pnpm install` (container had no `node_modules`), `pnpm build` (whole
+    monorepo) green, `pnpm lint`/`pnpm typecheck` green across every affected package. Full suites
+    green: `packages/shared` 559/559, `packages/dbt-transform` `dbt build` 238/238,
+    `packages/firebase-orm-models` 117 files/1234 tests (real Firestore emulator, run twice —
+    once caught a real gap, the exhaustive-`WIN_TYPES`-list assertion in `win-rules/engine.test.ts`
+    needing its own update, fixed before the second run), `apps/web` 249 files/1499 tests (real
+    Firestore/Auth emulator, incl. `messages/messages.test.ts` confirming en/he key parity for
+    every new translation key), `apps/api` build/typecheck/lint green (untouched). Opened PR #282,
+    subscribed to its activity, and drove it to green via two scheduled check-ins (~34 min total
+    for CI, matching this repo's own documented ~35-minute `Test` step) rather than polling — both
+    jobs (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green,
+    `mergeable_state: clean`, no open review threads. Merged (squash). Remote branch deletion for
+    `kan-90-support-analytics-leaderboard` hit the same recurring HTTP 403 from this sandbox's
+    git-over-HTTPS proxy every prior run has documented — left undeleted, same accepted posture.
+  - Added a new **KAN-90** row to `TASKS.md` (`done`) documenting PR #282's delivered scope.
+- **In progress (exact stopping point):** none — PR #282 is merged, `TASKS.md` reflects the
+  delivered scope, `main`'s CI is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** every gap-analysis bullet in `docs/plan/14-gap-analysis.md` now has a
+  corresponding KAN story (KAN-80..90), and `TASKS.md` has no remaining unblocked `todo`/
+  `in-progress` row beyond the standing KAN-18/19/43/50/51 blockers and KAN-86's infra-gated
+  `roi_nd` gap. A future run should re-check whether KAN-18 (real GCP/BigQuery infra) or KAN-19
+  (CI/CD preview+staging deploy) have any further self-contained, no-live-infra-required slices
+  left (their own rows document what's still open), or do a fresh top-to-bottom pass over every
+  `done` row's own "deferred"/"not yet" notes looking for a newly-buildable follow-up the way this
+  run and its predecessors found KAN-88's TV integration, the `collected_revenue` double-count fix,
+  and this run's own Gap 6 pickup. Always re-diff any found branch against the current
+  `origin/main` tip before trusting its own "merge main" commit (KAN-89's own finding), and always
+  `git fetch`/reset local `main` against `origin/main` at session start — this container's local
+  ref was stale yet again.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - KAN-90's real support-connector integration (Zendesk/Intercom/Freshdesk/Crisp) — documented,
+    not blocking `done` status, same posture as the other third-party connectors this backlog
+    defers.
+  - Optional: delete the merged `kan-90-support-analytics-leaderboard` branch on GitHub (the
+    git-over-HTTPS proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-25 — New story KAN-89 (Experimentation & A/B, Gap 3) merged; caught and fixed a stale-merge regression that would have reverted KAN-88's TV leaderboard (PR #278)
 
 - **Last completed:**
