@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { CampaignDraft, GoogleAdsCampaignDraft } from './executor';
-import { InvalidCampaignDraftError, validateCampaignDraft } from './campaign-draft';
+import type { CampaignDraft, CampaignDraftKeyword, GoogleAdsCampaignDraft } from './executor';
+import { InvalidCampaignDraftError, validateCampaignDraft, validateKeywordEditActionInput } from './campaign-draft';
 
 function validDraft(overrides: Partial<GoogleAdsCampaignDraft> = {}): GoogleAdsCampaignDraft {
   return {
@@ -158,5 +158,57 @@ describe('validateCampaignDraft', () => {
       // adSets: [] is invalid for Meta (mirrors "adGroups must have at least one"), proving dispatch actually happened.
       expect(() => validateCampaignDraft(metaDraft)).toThrow(InvalidCampaignDraftError);
     });
+  });
+});
+
+function keyword(overrides: Partial<CampaignDraftKeyword> = {}): CampaignDraftKeyword {
+  return { text: 'blue widgets', matchType: 'PHRASE', ...overrides };
+}
+
+describe('validateKeywordEditActionInput (KAN-72 follow-up)', () => {
+  it('accepts a well-formed edit adding only keywords', () => {
+    expect(() =>
+      validateKeywordEditActionInput({ adGroupResourceName: 'customers/123/adGroups/1', addKeywords: [keyword()], addNegativeKeywords: [] }),
+    ).not.toThrow();
+  });
+
+  it('accepts a well-formed edit adding only negative keywords', () => {
+    expect(() =>
+      validateKeywordEditActionInput({ adGroupResourceName: 'customers/123/adGroups/1', addKeywords: [], addNegativeKeywords: [keyword({ text: 'free' })] }),
+    ).not.toThrow();
+  });
+
+  it('rejects a blank adGroupResourceName', () => {
+    expect(() => validateKeywordEditActionInput({ adGroupResourceName: '  ', addKeywords: [keyword()], addNegativeKeywords: [] })).toThrow(
+      InvalidCampaignDraftError,
+    );
+  });
+
+  it('rejects when both addKeywords and addNegativeKeywords are empty — a no-op edit', () => {
+    expect(() => validateKeywordEditActionInput({ adGroupResourceName: 'customers/123/adGroups/1', addKeywords: [], addNegativeKeywords: [] })).toThrow(
+      InvalidCampaignDraftError,
+    );
+  });
+
+  it('rejects an invalid keyword match type', () => {
+    expect(() =>
+      validateKeywordEditActionInput({
+        adGroupResourceName: 'customers/123/adGroups/1',
+        addKeywords: [{ text: 'blue widgets', matchType: 'FUZZY' }],
+        addNegativeKeywords: [],
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a non-array addKeywords without throwing an unhandled error', () => {
+    expect(() =>
+      validateKeywordEditActionInput({ adGroupResourceName: 'customers/123/adGroups/1', addKeywords: 'not-an-array', addNegativeKeywords: [] }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a non-object input without throwing an unhandled error', () => {
+    expect(() => validateKeywordEditActionInput(null as unknown as { adGroupResourceName: unknown; addKeywords: unknown; addNegativeKeywords: unknown })).toThrow(
+      InvalidCampaignDraftError,
+    );
   });
 });

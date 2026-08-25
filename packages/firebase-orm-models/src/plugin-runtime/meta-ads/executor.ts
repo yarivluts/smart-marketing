@@ -9,8 +9,30 @@ import {
   type AutomationCampaignDraftCreateExecutionInput,
   type AutomationCampaignDraftCreateExecutionResult,
   type AutomationCampaignDraftRollbackInput,
+  type AutomationKeywordEditExecutionInput,
+  type AutomationKeywordEditExecutionResult,
+  type AutomationKeywordEditRollbackInput,
 } from '../../automation-runtime';
 import { usdToCents, type MetaAdsApiClient } from './api-client';
+
+/**
+ * A `keyword_edit` action (KAN-72 follow-up) reached `MetaAutomationActionExecutor`
+ * — Meta has no ad-group/keyword-targeting concept the way Google Ads Search
+ * does (the closest analog, an ad set, is a targeting spec, not a keyword
+ * list — see `MetaCampaignDraftAdSet`'s own doc comment), so this action type
+ * can never be supported for a Meta target. `proposeKeywordEditAction`
+ * (`automation.service.ts`) stays provider-agnostic and doesn't pre-check
+ * this — a `keyword_edit` proposed against a Meta-linked target fails here,
+ * at execute time, the same "the executor is the one place that knows what a
+ * provider can and can't do" posture `GoogleAdsWrongPlatformCampaignDraftError`
+ * establishes for a cross-provider `campaign_draft_create`.
+ */
+export class MetaKeywordEditNotSupportedError extends Error {
+  constructor() {
+    super('Meta Ads has no ad-group/keyword concept — a keyword_edit action is not supported for a Meta-linked target.');
+    this.name = 'MetaKeywordEditNotSupportedError';
+  }
+}
 
 /** A `budget_change` action was proposed against a target whose Meta campaign resource is unknown and couldn't be confirmed via a live lookup either (e.g. the target's id/`campaign_resource_name` doesn't correspond to a real campaign on this ad account). */
 export class MetaAdsBudgetResourceUnknownError extends Error {
@@ -204,5 +226,13 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     target.campaign_status = 'paused';
     target.updated_at = new Date().toISOString();
     await target.save();
+  }
+
+  async executeKeywordEdit(_input: AutomationKeywordEditExecutionInput): Promise<AutomationKeywordEditExecutionResult> {
+    throw new MetaKeywordEditNotSupportedError();
+  }
+
+  async rollbackKeywordEdit(_input: AutomationKeywordEditRollbackInput): Promise<void> {
+    throw new MetaKeywordEditNotSupportedError();
   }
 }

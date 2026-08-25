@@ -162,3 +162,51 @@ export function validateCampaignDraft(draft: CampaignDraft): void {
   }
   validateGoogleAdsCampaignDraft(draft as unknown as GoogleAdsCampaignDraft);
 }
+
+/**
+ * Validates a `keyword_edit` action's proposed input (KAN-72 follow-up) — an
+ * `adGroupResourceName` plus the keywords/negative keywords to add. Reuses
+ * `validateKeyword`'s own per-keyword checks (text length, match type) so a
+ * keyword edit is held to the exact same shape a `campaign_draft_create`
+ * ad group's own `keywords`/`negativeKeywords` are. Tolerates a malformed/
+ * untrusted-cast request body the same way `validateGoogleAdsCampaignDraft`
+ * does — the `keyword-edits` route casts an arbitrary JSON body to this
+ * shape before calling in.
+ */
+export function validateKeywordEditActionInput(input: {
+  adGroupResourceName: unknown;
+  addKeywords: unknown;
+  addNegativeKeywords: unknown;
+}): void {
+  if (!isRecord(input)) {
+    throw new InvalidCampaignDraftError(['input must be an object.']);
+  }
+
+  const reasons: string[] = [];
+
+  if (typeof input.adGroupResourceName !== 'string' || input.adGroupResourceName.trim().length === 0) {
+    reasons.push('adGroupResourceName must be a non-empty string.');
+  }
+
+  const addKeywords = Array.isArray(input.addKeywords) ? input.addKeywords : [];
+  if (input.addKeywords !== undefined && !Array.isArray(input.addKeywords)) {
+    reasons.push('addKeywords must be an array when present.');
+  } else {
+    addKeywords.forEach((keyword, index) => validateKeyword(keyword, `addKeywords[${index}]`, reasons));
+  }
+
+  const addNegativeKeywords = Array.isArray(input.addNegativeKeywords) ? input.addNegativeKeywords : [];
+  if (input.addNegativeKeywords !== undefined && !Array.isArray(input.addNegativeKeywords)) {
+    reasons.push('addNegativeKeywords must be an array when present.');
+  } else {
+    addNegativeKeywords.forEach((keyword, index) => validateKeyword(keyword, `addNegativeKeywords[${index}]`, reasons));
+  }
+
+  if (addKeywords.length === 0 && addNegativeKeywords.length === 0) {
+    reasons.push('at least one of addKeywords/addNegativeKeywords must have at least one entry.');
+  }
+
+  if (reasons.length > 0) {
+    throw new InvalidCampaignDraftError(reasons);
+  }
+}
