@@ -17,6 +17,98 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (newer) — Opened PR #297 (KAN-73 follow-up, real Meta post-creation ad creative edit)
+
+- **Last completed:**
+  - Session start: the recurring stale-local-`main`-ref quirk every recent entry documents again
+    (local `main` shared no common ancestor with `origin/main` — `git reset --hard origin/main`
+    fixed it). Read `PROGRESS.md`/`TASKS.md`: every row is `done` or a standing blocker
+    (KAN-18/19 real-infra reconciliation, KAN-43 `needs-human`, KAN-50/51 `blocked-by` KAN-43) — the
+    most recent prior entry's own "next step" pointed at the "sweep every `done` row's own
+    deferred/not-yet doc-comment notes" pass once the primary backlog empties out. Delegated a
+    scoping investigation (Explore agent) across the named candidates in KAN-73's row and picked the
+    best-scoped one: "real Meta post-creation creative edit (primary text/headline/description)" —
+    it has direct, already-merged siblings (`keyword_edit`, `ad_edit`, `meta_ad_set_edit`) whose
+    exact conventions it could follow, unlike the other deferred candidates (PMax asset groups,
+    Lookalike Audience expansion, mailing-address/mobile-device-id identifiers) which each need a
+    real design decision or structured data this codebase doesn't ingest yet. (Not yet visible at
+    session start: two other concurrent sessions had already picked, and by merge time finished,
+    two *different* KAN-73/adjacent threads of their own — PR #294, real Meta creative image
+    upload, and PR #296, an unrelated billing-ops bugfix — so this run's own pick turned out to be
+    non-overlapping in practice too, same "avoid collision" outcome those runs' own entries
+    describe achieving deliberately.)
+  - The scoping agent's key finding, confirmed correct: Meta's `AdCreative` object is not editable
+    in place once created (no partial update of live `object_story_spec` text), but a Meta `Ad`'s own
+    `creative` reference *is* mutable via a normal field-POST — unlike Google Ads, where the whole
+    `Ad` resource is immutable and `ad_edit` must create-and-pause a second ad. So the new
+    `meta_ad_creative_edit` action type is a genuine hybrid: create a new `AdCreative`, then repoint
+    the existing ad at it (`MetaAdsApiClient.getAd`/`updateAd`, both new), no pause/second-ad needed.
+  - **Delivered (PR #297, branch `kan-73-meta-creative-edit`):** the new action type end to end,
+    following the `meta_ad_set_edit`/`ad_edit` precedents exactly — `AutomationTargetStateModel`
+    gained `meta_ad_resource_names` (the ad ids `campaign_draft_create` already produced but
+    discarded, mirroring `ad_resource_names`); `MetaAutomationActionExecutor.executeMetaAdCreativeEdit`/
+    `rollbackMetaAdCreativeEdit`; `GoogleAdsAutomationActionExecutor` throws a documented
+    `GoogleAdsMetaAdCreativeEditNotSupportedError` (already covered by `ad_edit` on that platform);
+    `automation.service.ts` gained `proposeMetaAdCreativeEditAction` + execute/rollback dispatch
+    (widens `after` with the new creative id, `before` with the real pre-edit one, same "the
+    service and executor both enforce ownership" posture every sibling action type established);
+    new admin UI section + `POST .../automation/actions/meta-ad-creative-edits` route + en/he
+    translations + diff-view formatting. Full test coverage across every layer (executor/API-client/
+    validation unit + emulator tests, service-layer propose/execute/rollback lifecycle, route +
+    cross-org isolation tests, a frontend form test).
+  - **Self-review found and fixed a real bug before merge-readiness:** delegated an independent
+    subagent review (fresh context, no prior investment in the diff — the same "second pair of eyes"
+    posture recent entries use for exactly this reason). It found the retry-orphan guard
+    (`pendingMetaAdCreativeEditResourceName`, mirroring `GoogleAdsAutomationActionExecutor.pendingAdEditResourceName`'s
+    established pattern) correctly prevented a duplicate `AdCreative` on retry, but missed a second,
+    distinct race: the live `getAd()` read used to compute `previousCreativeResourceName` wasn't
+    itself cached, so a retry landing *after* `updateAd` already succeeded (but before `target.save()`
+    did) would re-read the ad's now-already-updated creative and corrupt `previousCreativeResourceName`
+    to equal `newCreativeResourceName` — silently turning a later rollback into a no-op that could
+    never restore the ad's real original copy. Fixed by caching the first `getAd()` read in a second
+    mutable instance field, alongside a new regression test (mocks `getAd` to return two different
+    creative ids across a retried call pair, asserts it's only actually called once). Also caught and
+    fixed an accompanying regression-test-authoring bug in the same review pass: the original
+    retry-orphan test asserted `createAdCreative` was called exactly once, not accounting for the one
+    call the test's own `seedTargetWithAd` helper already makes via `executeCampaignDraftCreate` —
+    corrected to the right total (2).
+  - Full `pnpm build && pnpm lint && pnpm typecheck` green across the whole monorepo; full
+    `pnpm test` green too (firebase-orm-models: 1413/1413 against a real Firestore emulator;
+    apps/web: 1578/1578 vitest + Playwright e2e green apart from one confirmed pre-existing,
+    unrelated flake — `e2e/experiments.spec.ts` hit the same documented Firestore-emulator
+    `RESOURCE_EXHAUSTED` resource-contention bug class this repo's own history repeatedly names,
+    reproduced passing cleanly in isolation; this PR touches nothing related to Experiments/Feedback).
+    **This local-green snapshot predates discovering PR #294/#296 had merged into `main` in the
+    interim** (see "In progress" below) — a rebase + full re-verification against the real new base
+    is still needed before this can merge, same recovery posture the PR #294 entry below this one
+    itself documents needing after its own stale-base surprise.
+    PR #297 opened, subscribed to its activity, a 60-minute check-in scheduled as a webhook-delivery
+    fallback (same posture every prior PR-opening entry establishes).
+- **In progress (exact stopping point):** PR #297 is open and self-reviewed, but `main` has since
+  advanced past its base with PR #294 (real Meta creative image upload) and PR #296 (billing-ops
+  fix) — PR #294 in particular touches the exact same files this PR does
+  (`meta-ads/executor.ts`/`api-client.ts`, `meta-campaign-draft.ts`, both files' own test suites),
+  so a real merge-conflict-resolution pass (keep both features, same posture the PR #292/#293 and
+  PR #294 recovery entries both already document for this exact file family) plus a full
+  re-verification against the merged base is still needed before this can merge. Not done yet as of
+  this entry — the scheduled 60-minute check-in (or the next run, if this session ends first) picks
+  this up.
+- **Blocked + why:** nothing externally blocking; the remaining work (merge `main` in, resolve
+  conflicts, re-verify, merge) is mechanical but not yet done.
+- **Next step:** merge current `main` into `kan-73-meta-creative-edit`, resolve conflicts keeping
+  both PR #294's image-upload code and this PR's creative-edit code (they touch overlapping
+  functions/tests but are additive, not contradictory — same shape the PR #294 entry's own 3-conflict
+  resolution already proves out for this exact file set), re-run
+  `pnpm build && pnpm lint && pnpm typecheck && pnpm test` from scratch against the merged base, then
+  push and wait for real CI before merging. Once this closes out, KAN-73's row has no further named
+  deferred bullets left except PMax asset groups (Google-only, a genuinely bigger
+  structurally-different-model story) and Lookalike Audience expansion (both connectors, doesn't fit
+  the existing `SinkPluginExecutor` shape cleanly).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+
+---
+
 ## 2026-08-25 (latest) — Merged billing-ops/churn envelope-unwrap fix (PR #296, KAN-80/KAN-81)
 
 - **Last completed:**
