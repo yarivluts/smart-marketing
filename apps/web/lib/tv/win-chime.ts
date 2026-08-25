@@ -17,6 +17,7 @@ const CHIME_SEQUENCES: Record<WinType, number[]> = {
   generic: [880],
   reactivation: [660, 880],
   trial_conversion: [523.25, 659.25, 783.99],
+  good_review: [783.99, 987.77],
 };
 
 const NOTE_DURATION_SECONDS = 0.18;

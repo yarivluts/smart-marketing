@@ -47,6 +47,11 @@ import {
   EXPERIMENT_PACK_MANIFEST_YAML,
   EXPERIMENT_PACK_PLUGIN_ID,
 } from '../plugin-runtime/experiment-pack';
+import {
+  ensureSupportPackRegistered,
+  SUPPORT_PACK_MANIFEST_YAML,
+  SUPPORT_PACK_PLUGIN_ID,
+} from '../plugin-runtime/support-pack';
 import { getLatestPluginManifestVersion, installPlugin, registerPluginManifest, type InstallPluginParams } from './plugin-registry.service';
 
 /**
@@ -132,6 +137,8 @@ export async function installPluginAndProvisionBuiltins(params: InstallPluginPar
     await ensureFirmographicPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
   } else if (install.plugin_id === EXPERIMENT_PACK_PLUGIN_ID) {
     await ensureExperimentPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
+  } else if (install.plugin_id === SUPPORT_PACK_PLUGIN_ID) {
+    await ensureSupportPackRegistered(params.organizationId, params.projectId, params.installedByUserId);
   }
 
   return install;
@@ -168,6 +175,7 @@ const BUILTIN_METRIC_PACKS: readonly BuiltinMetricPackCatalogEntry[] = [
   { pluginId: CAMPAIGN_OPS_PACK_PLUGIN_ID, manifestYaml: CAMPAIGN_OPS_PACK_MANIFEST_YAML },
   { pluginId: FIRMOGRAPHIC_PACK_PLUGIN_ID, manifestYaml: FIRMOGRAPHIC_PACK_MANIFEST_YAML },
   { pluginId: EXPERIMENT_PACK_PLUGIN_ID, manifestYaml: EXPERIMENT_PACK_MANIFEST_YAML },
+  { pluginId: SUPPORT_PACK_PLUGIN_ID, manifestYaml: SUPPORT_PACK_MANIFEST_YAML },
 ];
 
 /**

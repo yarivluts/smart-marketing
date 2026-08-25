@@ -165,6 +165,8 @@ export * from './plugin-runtime/firmographic-pack';
 export * from './plugin-runtime/experiment-pack';
 export * from './services/churn-reason.service';
 export * from './services/experiment.service';
+export * from './plugin-runtime/support-pack';
+export * from './services/support.service';
 export * from './plugin-runtime/quality-score-pack';
 export * from './services/quality-score.service';
 export * from './services/firmographic.service';

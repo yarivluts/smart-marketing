@@ -111,6 +111,7 @@
     "projectIntentQualityLink": "Intent & quality",
     "projectFirmographicsLink": "Firmographics",
     "projectExperimentsLink": "Experiments",
+    "projectSupportLink": "Support",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
@@ -654,6 +655,19 @@
     "themeOnboarding": "Onboarding",
     "themeUsability": "Usability"
   },
+  "Support": {
+    "metaTitle": "Support",
+    "title": "Support for {projectName}",
+    "description": "Open-ticket backlog and a per-agent leaderboard: tickets resolved, average first-response/resolution time, and average CSAT.",
+    "setupIntro": "Install the Customer Support pack to start tracking ticket lifecycle events.",
+    "backlogHeading": "Open backlog",
+    "backlogLine": "{opened} tickets opened",
+    "leaderboardHeading": "Agent leaderboard",
+    "leaderboardEmpty": "No resolved tickets landed for this project yet.",
+    "rankedName": "{rank}. {name}",
+    "rowSummary": "{resolved} resolved · {firstResponse} first response · {resolution} resolution · {csat} CSAT",
+    "rowValueUnavailable": "—"
+  },
   "ChurnReasons": {
     "metaTitle": "Churn reasons",
     "title": "Churn reasons for {projectName}",
@@ -929,6 +943,8 @@
     "builtinPackFirmographicDescription": "AI-classified company industry, size, and region, with # vs $ composition dashboards and composition-shift alerts.",
     "builtinPackExperimentTitle": "Experiments",
     "builtinPackExperimentDescription": "A/B experiment exposures and conversions by variant, with significance testing against a control.",
+    "builtinPackSupportTitle": "Customer Support",
+    "builtinPackSupportDescription": "Ticket first-response/resolution time, CSAT, and a per-agent leaderboard.",
     "builtinPackCampaignOpsTitle": "Campaign Ops",
     "builtinPackCampaignOpsDescription": "Fixed-window payback (7/14/30/40-day revenue collection) for customers as they're acquired."
   },
@@ -1180,11 +1196,13 @@
     "winTypeLabel": {
       "generic": "Generic",
       "reactivation": "Reactivation",
-      "trial_conversion": "Trial conversion"
+      "trial_conversion": "Trial conversion",
+      "good_review": "Good review"
     },
     "winTypeHint": {
       "reactivation": "Typically fires on an event marking a previously churned customer as active again.",
-      "trial_conversion": "Typically fires on an event marking a trial subscription converting to a paid plan."
+      "trial_conversion": "Typically fires on an event marking a trial subscription converting to a paid plan.",
+      "good_review": "Typically fires on a support ticket resolution whose CSAT score crosses a chosen threshold."
     },
     "createButton": "Create win rule",
     "createError": "Could not create the win rule. Please try again.",

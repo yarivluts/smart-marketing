@@ -36,16 +36,21 @@ export interface WinRuleFilter {
  * of recognized win "shapes" a rule can be tagged with, on top of KAN-65's
  * otherwise-generic event-pattern engine. `generic` is the default and
  * covers every rule KAN-65 itself could already express (`first_charge`,
- * "order > X"); `reactivation`/`trial_conversion` are the two named types
- * this story adds so a rule author can flag *why* an event counts as a win,
- * and so a future celebration/rendering layer (KAN-67's TV mode: "confetti +
- * sound per win type") has something concrete to key off besides a rule's
- * own free-text name. This module intentionally does not prescribe *which*
- * schema/filters make a rule "a reactivation" — that's still project-
- * specific (every project registers its own event schema names), so the
- * catalog is a label, not a canned rule template.
+ * "order > X"); `reactivation`/`trial_conversion` were the first two named
+ * types this catalog added so a rule author can flag *why* an event counts
+ * as a win, and so a future celebration/rendering layer (KAN-67's TV mode:
+ * "confetti + sound per win type") has something concrete to key off besides
+ * a rule's own free-text name. `good_review` (KAN-90, plan `14 §Gap 6`) is
+ * the same idea applied to a support-ticket `csat_score` crossing a
+ * project-chosen threshold — a human still creates the actual win rule
+ * (schema `support_ticket_event`, a `csat_score >= <threshold>` filter),
+ * this catalog only gives it a recognized label. This module intentionally
+ * does not prescribe *which* schema/filters make a rule "a reactivation" (or
+ * "a good review") — that's still project-specific (every project registers
+ * its own event schema names), so the catalog is a label, not a canned rule
+ * template.
  */
-export const WIN_TYPES = ['generic', 'reactivation', 'trial_conversion'] as const;
+export const WIN_TYPES = ['generic', 'reactivation', 'trial_conversion', 'good_review'] as const;
 export type WinType = (typeof WIN_TYPES)[number];
 
 export function isWinType(value: string): value is WinType {

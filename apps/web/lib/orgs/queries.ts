@@ -39,6 +39,8 @@ import {
   type QualityCalibrationBreakdownOutcome,
   getExperimentResultsForProject as getExperimentResultsForProjectInOrganization,
   type ExperimentResultsOutcome,
+  getSupportLeaderboardForProject as getSupportLeaderboardForProjectInOrganization,
+  type SupportLeaderboardResult,
   getEventVolumeOverviewForProject as getEventVolumeOverviewForProjectInOrganization,
   getFeedbackThemeDigestForProject as getFeedbackThemeDigestForProjectInOrganization,
   getGoal as getGoalInOrganization,
@@ -441,6 +443,16 @@ export async function listSurveyResponseRecordsForProject(
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
   return listSurveyResponseRecordsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+/** The per-agent leaderboard + open-ticket backlog (KAN-90, plan `14 §Gap 6`), computed fresh from bounded, landed `support_ticket_event` raw records — no warehouse dependency, same "fetch once, aggregate in TypeScript" posture `getNpsOverviewForProject` establishes. */
+export async function getSupportLeaderboardForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { limit?: number },
+): Promise<SupportLeaderboardResult> {
+  await ensureFirestoreOrm();
+  return getSupportLeaderboardForProjectInOrganization(organizationId, projectId, options);
 }
 
 /** The bounded, landed `cancellation_reason` raw records `getCancellationReasonCodeBreakdownForProject`/`getCancellationReasonThemeDigestForProject` each read — fetch once via this and pass the result to both via `precomputedRecords`, same posture `listSurveyResponseRecordsForProject` establishes. */

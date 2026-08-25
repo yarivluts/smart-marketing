@@ -58,7 +58,12 @@ seeds:
       converts, one who doesn't) and two `treatment` visitors (both
       convert) — exercising the mart's exposure/conversion flattening
       with a hand-computable, deliberately asymmetric expected count per
-      (event_type, variant_key) — isolated the same way.
+      (event_type, variant_key) — isolated the same way. `proj_21`'s rows
+      are a synthetic support-ticket lifecycle journey (KAN-90:
+      `fact_support_ticket_event`) — four tickets opened, three resolved
+      (two by `agent_a1`, one by `agent_a2`, each with its own first-
+      response/resolution/CSAT values) and one left open (exercising the
+      leaderboard's open-backlog count) — isolated the same way.
     columns:
       - name: organization_id
         tests:
