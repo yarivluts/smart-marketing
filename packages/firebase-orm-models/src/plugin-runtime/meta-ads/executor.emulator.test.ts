@@ -51,6 +51,7 @@ function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiCli
     updateAdSet: vi.fn().mockResolvedValue(undefined),
     createCustomAudience: vi.fn().mockResolvedValue({ audienceId: 'audience-1' }),
     addContactsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 0 }),
+    uploadAdImage: vi.fn().mockResolvedValue({ imageHash: 'image-hash-1' }),
     ...overrides,
   };
 }
@@ -125,6 +126,74 @@ describe('MetaAutomationActionExecutor', () => {
     expect(reloaded.campaign_status).toBe('paused');
     expect(reloaded.daily_budget_usd).toBe(25);
     expect(reloaded.meta_ad_set_resource_names).toEqual(['adset-1']);
+  });
+
+  it('uploads a creative image before creating the ad creative when imageDataUrl is present, and skips the upload when absent', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor Image Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Image Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient();
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+    const draftWithImage: MetaCampaignDraft = {
+      ...DRAFT,
+      adSets: [
+        {
+          ...DRAFT.adSets[0],
+          ad: { ...DRAFT.adSets[0].ad, creative: { ...DRAFT.adSets[0].ad.creative, imageDataUrl: 'data:image/png;base64,AAAA' } },
+        },
+      ],
+    };
+
+    await executor.executeCampaignDraftCreate({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      draft: draftWithImage,
+    });
+
+    expect(apiClient.uploadAdImage).toHaveBeenCalledWith('999', { base64Bytes: 'AAAA' });
+    expect(apiClient.createAdCreative).toHaveBeenCalledWith(
+      '999',
+      expect.objectContaining({ imageHash: 'image-hash-1' }),
+    );
+    const uploadOrder = (apiClient.uploadAdImage as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    const createAdCreativeOrder = (apiClient.createAdCreative as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+    expect(uploadOrder).toBeLessThan(createAdCreativeOrder);
+
+    // Absent imageDataUrl (the DRAFT fixture used by every other test in this
+    // file): no image upload call at all, and no `imageHash` key on the
+    // createAdCreative params — not even `imageHash: undefined`.
+    const apiClientNoImage = fakeApiClient();
+    const executorNoImage = new MetaAutomationActionExecutor(apiClientNoImage, '999', 'page-1');
+    const otherTarget = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'No Image Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    await executorNoImage.executeCampaignDraftCreate({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: otherTarget.id,
+      draft: DRAFT,
+    });
+    expect(apiClientNoImage.uploadAdImage).not.toHaveBeenCalled();
+    const noImageCreativeCall = (apiClientNoImage.createAdCreative as ReturnType<typeof vi.fn>).mock.calls[0][1] as Record<string, unknown>;
+    expect('imageHash' in noImageCreativeCall).toBe(false);
   });
 
   it('rolls back a campaign draft creation by deleting the campaign', async () => {

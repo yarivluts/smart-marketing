@@ -8,6 +8,14 @@ export class MetaAdsApiError extends Error {
   }
 }
 
+/** `POST /act_{id}/adimages` returned a 2xx response but its `images` object was empty — Meta's own documented shape for the call always keys the uploaded image by filename, so an empty object means the upload silently didn't take (a malformed `bytes` payload, most likely), not a network/auth failure `MetaAdsApiError` already covers. */
+export class MetaAdsImageUploadFailedError extends Error {
+  constructor() {
+    super('Meta ad image upload returned no image hash.');
+    this.name = 'MetaAdsImageUploadFailedError';
+  }
+}
+
 /** Meta's own campaign/ad-set/ad `status` vocabulary — `DELETED` is the closest analog to Google Ads' `REMOVED` (Meta has no hard delete either), used by `MetaAutomationActionExecutor.rollbackCampaignDraftCreate`. */
 export type MetaObjectStatus = 'ACTIVE' | 'PAUSED' | 'DELETED';
 
@@ -65,10 +73,21 @@ export interface MetaCreateAdCreativeParams {
   headline: string;
   description?: string;
   linkUrl: string;
+  /** A hash returned by {@link MetaAdsApiClient.uploadAdImage} — referenced via `object_story_spec.link_data.image_hash`. Omitted entirely for a text-only link ad (the pre-existing behavior). */
+  imageHash?: string;
 }
 
 export interface MetaCreateAdCreativeResult {
   creativeId: string;
+}
+
+export interface MetaUploadAdImageParams {
+  /** Raw image bytes, base64-encoded (no `data:image/...;base64,` prefix). */
+  base64Bytes: string;
+}
+
+export interface MetaUploadAdImageResult {
+  imageHash: string;
 }
 
 export interface MetaCreateAdParams {
@@ -124,8 +143,16 @@ export interface MetaAdsApiClient {
   createCampaign(adAccountId: string, params: MetaCreateCampaignParams): Promise<MetaCreateCampaignResult>;
   /** Creates a paused ad set (targeting spec) under a campaign. */
   createAdSet(adAccountId: string, params: MetaCreateAdSetParams): Promise<MetaCreateAdSetResult>;
-  /** Creates a link-ad creative (`object_story_spec`: page id, message, link, headline/name, description). */
+  /** Creates a link-ad creative (`object_story_spec`: page id, message, link, headline/name, description, optional image hash). */
   createAdCreative(adAccountId: string, params: MetaCreateAdCreativeParams): Promise<MetaCreateAdCreativeResult>;
+  /**
+   * Uploads a creative image and returns the hash `createAdCreative`
+   * references via `image_hash`. Real Meta image upload (KAN-73 follow-up) —
+   * `bytes` (base64) rides a normal form POST, same as every other mutating
+   * call this client makes; no multipart/form-data upload is needed. Throws
+   * {@link MetaAdsImageUploadFailedError} if the response carries no image.
+   */
+  uploadAdImage(adAccountId: string, params: MetaUploadAdImageParams): Promise<MetaUploadAdImageResult>;
   /** Creates a paused ad referencing an already-created creative. */
   createAd(adAccountId: string, params: MetaCreateAdParams): Promise<MetaCreateAdResult>;
   /** Updates a campaign's own daily budget (USD cents) — mirrors `GoogleAdsApiClient.setCampaignBudgetAmount`, except the "budget resource" here just is the campaign object itself. */
@@ -281,6 +308,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
         link: params.linkUrl,
         name: params.headline,
         ...(params.description ? { description: params.description } : {}),
+        ...(params.imageHash ? { image_hash: params.imageHash } : {}),
       },
     };
     const result = await this.request<{ id: string }>(`act_${adAccountId}/adcreatives`, {
@@ -288,6 +316,17 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       object_story_spec: JSON.stringify(objectStorySpec),
     });
     return { creativeId: result.id };
+  }
+
+  async uploadAdImage(adAccountId: string, params: MetaUploadAdImageParams): Promise<MetaUploadAdImageResult> {
+    const result = await this.request<{ images: Record<string, { hash: string }> }>(`act_${adAccountId}/adimages`, {
+      bytes: params.base64Bytes,
+    });
+    const uploaded = Object.values(result.images ?? {})[0];
+    if (!uploaded?.hash) {
+      throw new MetaAdsImageUploadFailedError();
+    }
+    return { imageHash: uploaded.hash };
   }
 
   async createAd(adAccountId: string, params: MetaCreateAdParams): Promise<MetaCreateAdResult> {
