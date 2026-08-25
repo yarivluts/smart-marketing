@@ -62,21 +62,37 @@ export type AutomationActionStatus = (typeof AUTOMATION_ACTION_STATUSES)[number]
  * the real assigned resource names; this one fills in `before` because an
  * overwrite has nothing to restore without knowing the real prior values).
  *
- * These six action types are provider-agnostic by design — `action_type`
+ * `meta_ad_creative_edit` (KAN-73 follow-up, "real Meta post-creation
+ * creative edit") replaces an already-created ad's primary text/headline/
+ * description — `before`/`after` are `{ adResourceName }`/
+ * `{ adResourceName, creative }`, and `executeActionByType` widens `after`
+ * post-execution with `newCreativeResourceName` (the new `AdCreative` Meta
+ * created — a Creative's own content can't be edited in place, only the
+ * parent `Ad`'s `creative` reference can be repointed, unlike Google Ads'
+ * `ad_edit`, which must also create-and-pause a whole new `Ad`) and `before`
+ * with `previousCreativeResourceName` (the ad's real pre-edit creative,
+ * read live — this connector never mirrors a Meta ad's live creative id on
+ * `AutomationTargetStateModel`, same "isn't known until execute time"
+ * reasoning `meta_ad_set_edit` establishes for its own budget/status), so
+ * `rollbackActionByType` knows exactly which creative to repoint the ad
+ * back to.
+ *
+ * These seven action types are provider-agnostic by design — `action_type`
  * never says "google_ads" or "meta". KAN-72 (`GoogleAdsAutomationActionExecutor`)
  * drives `budget_change`/`campaign_draft_create`/`campaign_activation`/
  * `keyword_edit`/`ad_edit` for a target linked to a `provider: 'google_ads'`
  * credential; KAN-73 (`MetaAutomationActionExecutor`) drives
  * `budget_change`/`campaign_draft_create`/`campaign_activation`/
- * `meta_ad_set_edit` for a target linked to a `provider: 'meta_ads'`
- * credential (`keyword_edit`/`ad_edit` have no Meta equivalent — Meta has no
- * ad-group/keyword or RSA-asset concept, see `MetaAutomationActionExecutor`'s
- * own doc comment; symmetrically, `meta_ad_set_edit` has no Google Ads
- * equivalent — Google Ads' closest analog, an ad group, is edited via
- * `keyword_edit`/`ad_edit` instead, and its own budget lives on the campaign,
- * not the ad group, see `GoogleAdsAutomationActionExecutor`'s own doc
- * comment) — see `CampaignDraft`'s own `platform`-discriminated-union doc
- * comment (`automation-runtime/executor.ts`) for how `campaign_draft_create`
+ * `meta_ad_set_edit`/`meta_ad_creative_edit` for a target linked to a
+ * `provider: 'meta_ads'` credential (`keyword_edit`/`ad_edit` have no Meta
+ * equivalent — Meta has no ad-group/keyword or RSA-asset concept, see
+ * `MetaAutomationActionExecutor`'s own doc comment; symmetrically,
+ * `meta_ad_set_edit`/`meta_ad_creative_edit` have no Google Ads equivalent —
+ * Google Ads' closest analogs, an ad group and an RSA's own text, are edited
+ * via `keyword_edit`/`ad_edit` instead, and its own budget lives on the
+ * campaign, not the ad group, see `GoogleAdsAutomationActionExecutor`'s own
+ * doc comment) — see `CampaignDraft`'s own `platform`-discriminated-union
+ * doc comment (`automation-runtime/executor.ts`) for how `campaign_draft_create`
  * stays one action type across both platforms' structurally different
  * campaign shapes.
  */
@@ -87,6 +103,7 @@ export const AUTOMATION_ACTION_TYPES = [
   'keyword_edit',
   'ad_edit',
   'meta_ad_set_edit',
+  'meta_ad_creative_edit',
 ] as const;
 export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
 

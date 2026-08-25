@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import type { MetaCampaignDraft, MetaCampaignDraftAdSet } from './executor';
+import type { MetaAdCreativeEditContent, MetaCampaignDraft, MetaCampaignDraftAdSet } from './executor';
 import { InvalidCampaignDraftError } from './invalid-campaign-draft-error';
-import { MAX_IMAGE_DATA_URL_LENGTH, validateMetaCampaignDraft } from './meta-campaign-draft';
+import { MAX_IMAGE_DATA_URL_LENGTH, validateMetaAdCreativeEditActionInput, validateMetaCampaignDraft } from './meta-campaign-draft';
 
 const VALID_IMAGE_DATA_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 
@@ -231,5 +231,116 @@ describe('validateMetaCampaignDraft', () => {
       const reasons = (error as InvalidCampaignDraftError).reasons;
       expect(reasons.length).toBeGreaterThanOrEqual(2);
     }
+  });
+});
+
+function validCreative(overrides: Partial<MetaAdCreativeEditContent> = {}): MetaAdCreativeEditContent {
+  return {
+    primaryText: 'Even bigger savings on blue widgets.',
+    headline: 'Blue Widgets Mega Sale',
+    description: 'Shop now',
+    linkUrl: 'https://example.com/widgets',
+    ...overrides,
+  };
+}
+
+describe('validateMetaAdCreativeEditActionInput (KAN-73 follow-up)', () => {
+  it('accepts a well-formed ad creative edit', () => {
+    const creative = validCreative();
+    expect(() =>
+      validateMetaAdCreativeEditActionInput({
+        adResourceName: 'act_999/ads/1',
+        primaryText: creative.primaryText,
+        headline: creative.headline,
+        description: creative.description,
+        linkUrl: creative.linkUrl,
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts a well-formed ad creative edit with no description (optional)', () => {
+    const creative = validCreative();
+    expect(() =>
+      validateMetaAdCreativeEditActionInput({
+        adResourceName: 'act_999/ads/1',
+        primaryText: creative.primaryText,
+        headline: creative.headline,
+        description: undefined,
+        linkUrl: creative.linkUrl,
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects a blank adResourceName', () => {
+    const creative = validCreative();
+    expect(() =>
+      validateMetaAdCreativeEditActionInput({
+        adResourceName: '  ',
+        primaryText: creative.primaryText,
+        headline: creative.headline,
+        description: creative.description,
+        linkUrl: creative.linkUrl,
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a blank primary text', () => {
+    const creative = validCreative();
+    expect(() =>
+      validateMetaAdCreativeEditActionInput({
+        adResourceName: 'act_999/ads/1',
+        primaryText: '',
+        headline: creative.headline,
+        description: creative.description,
+        linkUrl: creative.linkUrl,
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a headline over 40 characters', () => {
+    const creative = validCreative();
+    expect(() =>
+      validateMetaAdCreativeEditActionInput({
+        adResourceName: 'act_999/ads/1',
+        primaryText: creative.primaryText,
+        headline: 'x'.repeat(41),
+        description: creative.description,
+        linkUrl: creative.linkUrl,
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a description over 30 characters when present', () => {
+    const creative = validCreative();
+    expect(() =>
+      validateMetaAdCreativeEditActionInput({
+        adResourceName: 'act_999/ads/1',
+        primaryText: creative.primaryText,
+        headline: creative.headline,
+        description: 'x'.repeat(31),
+        linkUrl: creative.linkUrl,
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a non-http(s) link URL', () => {
+    const creative = validCreative();
+    expect(() =>
+      validateMetaAdCreativeEditActionInput({
+        adResourceName: 'act_999/ads/1',
+        primaryText: creative.primaryText,
+        headline: creative.headline,
+        description: creative.description,
+        linkUrl: 'not-a-url',
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a non-object input without throwing an unhandled error', () => {
+    expect(() =>
+      validateMetaAdCreativeEditActionInput(
+        null as unknown as { adResourceName: unknown; primaryText: unknown; headline: unknown; description: unknown; linkUrl: unknown },
+      ),
+    ).toThrow(InvalidCampaignDraftError);
   });
 });

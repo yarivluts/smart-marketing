@@ -13,12 +13,14 @@ import {
   validateAdEditActionInput,
   validateCampaignDraft,
   validateKeywordEditActionInput,
+  validateMetaAdCreativeEditActionInput,
   validateMetaAdSetEditActionInput,
   InvalidCampaignDraftError,
   type AdEditResponsiveSearchAdContent,
   type AutomationActionExecutor,
   type CampaignDraft,
   type CampaignDraftKeyword,
+  type MetaAdCreativeEditContent,
   type MetaAdSetStatus,
 } from '../automation-runtime';
 import {
@@ -66,13 +68,14 @@ async function loadTargetForAction(organizationId: string, projectId: string, ta
   return target;
 }
 
-/** `campaign_draft_create`/`campaign_activation`/`keyword_edit`/`ad_edit`/`meta_ad_set_edit` (KAN-72/KAN-73) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
+/** `campaign_draft_create`/`campaign_activation`/`keyword_edit`/`ad_edit`/`meta_ad_set_edit`/`meta_ad_creative_edit` (KAN-72/KAN-73) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
 const MANAGE_ONLY_ACTION_TYPES: ReadonlySet<AutomationActionType> = new Set([
   'campaign_draft_create',
   'campaign_activation',
   'keyword_edit',
   'ad_edit',
   'meta_ad_set_edit',
+  'meta_ad_creative_edit',
 ]);
 
 function minimumWriteTierForActionType(actionType: AutomationActionType): ConnectionWriteTier {
@@ -95,6 +98,9 @@ function actionSummaryVerb(actionType: AutomationActionType): string {
   }
   if (actionType === 'meta_ad_set_edit') {
     return 'the ad set edit';
+  }
+  if (actionType === 'meta_ad_creative_edit') {
+    return 'the ad creative edit';
   }
   return 'the budget change';
 }
@@ -888,6 +894,114 @@ export async function proposeMetaAdSetEditAction(params: ProposeMetaAdSetEditAct
   return action;
 }
 
+export interface ProposeMetaAdCreativeEditActionParams {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  adResourceName: string;
+  creative: MetaAdCreativeEditContent;
+  requestedByUserId: string;
+  now?: Date;
+}
+
+/**
+ * KAN-73 follow-up's dry-run-diff step for replacing an already-created Meta
+ * ad's primary text/headline/description ("real Meta post-creation creative
+ * edit", plan `13 §E21.3`'s own deferred bullet — the Meta sibling of
+ * `proposeAdEditAction`). `adResourceName` must be one of
+ * `target.meta_ad_resource_names` — set by a `campaign_draft_create` action
+ * this same target already executed — so a caller can never point an edit
+ * at an arbitrary ad outside this target's own campaign (same invariant
+ * `proposeAdEditAction` established for Google Ads ads). The ad's true
+ * pre-edit creative isn't known until execute time (an ad's live creative
+ * reference isn't mirrored on `AutomationTargetStateModel`) — `before` only
+ * records `adResourceName` here; `executeActionByType` widens it
+ * post-execution with the real value `MetaAutomationActionExecutor` reads
+ * live, see `AUTOMATION_ACTION_TYPES`'s own doc comment.
+ */
+export async function proposeMetaAdCreativeEditAction(params: ProposeMetaAdCreativeEditActionParams): Promise<AutomationActionModel> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  try {
+    validateMetaAdCreativeEditActionInput({
+      adResourceName: params.adResourceName,
+      primaryText: params.creative.primaryText,
+      headline: params.creative.headline,
+      description: params.creative.description,
+      linkUrl: params.creative.linkUrl,
+    });
+  } catch (error) {
+    if (error instanceof InvalidCampaignDraftError) {
+      throw new InvalidAutomationActionError(error.message);
+    }
+    throw error;
+  }
+
+  const target = await loadTargetForAction(params.organizationId, params.projectId, params.targetId);
+  if (!target.meta_ad_resource_names?.includes(params.adResourceName)) {
+    throw new InvalidAutomationActionError("adResourceName must be one of this target's own ads (created by a campaign_draft_create action)");
+  }
+
+  const now = params.now ?? new Date();
+  const policy = await getActiveAutomationGuardrailPolicy(params.organizationId, params.projectId);
+  const actionsExecutedToday =
+    policy.maxActionsPerDay !== null
+      ? await countAutomationActionsExecutedToday(params.organizationId, params.projectId, now, policy.maxActionsPerDay)
+      : 0;
+
+  const violations: GuardrailViolation[] = evaluateCampaignActivationGuardrails(
+    toPureGuardrailPolicy(policy),
+    { targetId: params.targetId },
+    { nowUtc: now, actionsExecutedToday },
+  );
+
+  if (await isAutomationKillSwitchEngaged(params.organizationId)) {
+    violations.push({ type: 'automation_paused', message: 'Automation is paused for this organization (kill switch engaged).' });
+  }
+
+  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target, 'manage');
+  if (tierViolation) {
+    violations.push(tierViolation);
+  }
+
+  const before = { adResourceName: params.adResourceName };
+  const after = { adResourceName: params.adResourceName, creative: params.creative };
+  const status: AutomationActionStatus = violations.length > 0 ? 'blocked' : 'awaiting_approval';
+
+  const action = new AutomationActionModel();
+  action.organization_id = params.organizationId;
+  action.project_id = params.projectId;
+  action.environment_id = target.environment_id;
+  action.action_type = 'meta_ad_creative_edit';
+  action.target_id = params.targetId;
+  action.target_label = target.label;
+  action.before = before;
+  action.after = after;
+  action.status = status;
+  action.guardrail_violations = violations;
+  action.requested_by_user_id = params.requestedByUserId;
+  action.proposed_at = now.toISOString();
+  action.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await action.save();
+
+  await auditBestEffort({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: target.environment_id,
+    actorType: 'user',
+    actorId: params.requestedByUserId,
+    action: 'automation_action.propose',
+    targetId: action.id,
+    summary:
+      status === 'blocked'
+        ? `Proposed an ad creative edit for "${target.label}" — blocked by ${violations.length} guardrail(s)`
+        : `Proposed an ad creative edit for "${target.label}"`,
+    before,
+    after,
+  });
+
+  return action;
+}
+
 export interface ApproveAutomationActionParams {
   organizationId: string;
   projectId: string;
@@ -1134,6 +1248,29 @@ async function executeActionByType(
     return attempts;
   }
 
+  if (action.action_type === 'meta_ad_creative_edit') {
+    const before = action.before as { adResourceName: string };
+    const after = action.after as { adResourceName: string; creative: MetaAdCreativeEditContent };
+    const { result, attempts } = await runWithRetryBackoff(
+      () =>
+        executor.executeMetaAdCreativeEdit({
+          organizationId,
+          projectId,
+          environmentId: action.environment_id,
+          targetId: action.target_id,
+          adResourceName: after.adResourceName,
+          creative: after.creative,
+        }),
+      EXECUTE_RETRY_OPTIONS,
+    );
+    // Widens `after` with the new creative Meta created and `before` with the real pre-edit
+    // creative it reported live, so `rollbackActionByType` knows exactly which creative to
+    // repoint the ad back to — see `AUTOMATION_ACTION_TYPES`'s own doc comment.
+    action.after = { ...after, newCreativeResourceName: result.newCreativeResourceName };
+    action.before = { ...before, previousCreativeResourceName: result.previousCreativeResourceName };
+    return attempts;
+  }
+
   const target = await loadTargetForAction(organizationId, projectId, action.target_id);
   if (!target.campaign_resource_name) {
     throw new InvalidAutomationActionError('this target has no campaign resource name to activate');
@@ -1264,6 +1401,24 @@ async function rollbackActionByType(
       adSetResourceName: before.adSetResourceName,
       ...(before.dailyBudgetUsd !== undefined ? { beforeDailyBudgetUsd: before.dailyBudgetUsd } : {}),
       ...(before.adSetStatus !== undefined ? { beforeStatus: before.adSetStatus } : {}),
+    });
+    return;
+  }
+
+  if (action.action_type === 'meta_ad_creative_edit') {
+    const before = action.before as { adResourceName: string; previousCreativeResourceName?: string };
+    const after = action.after as { newCreativeResourceName?: string };
+    if (!before.previousCreativeResourceName || !after.newCreativeResourceName) {
+      throw new InvalidAutomationActionError('this meta_ad_creative_edit action has no creative resource names to roll back (it never finished executing)');
+    }
+    await executor.rollbackMetaAdCreativeEdit({
+      organizationId,
+      projectId,
+      environmentId: action.environment_id,
+      targetId: action.target_id,
+      adResourceName: before.adResourceName,
+      previousCreativeResourceName: before.previousCreativeResourceName,
+      newCreativeResourceName: after.newCreativeResourceName,
     });
     return;
   }

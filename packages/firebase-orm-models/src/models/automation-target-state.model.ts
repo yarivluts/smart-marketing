@@ -143,4 +143,25 @@ export class AutomationTargetStateModel extends BaseModel {
    */
   @Field()
   public meta_ad_set_resource_names?: string[];
+
+  /**
+   * The real Meta ad platform's own resource name/id for each ad set's
+   * current ad, in the same order as {@link meta_ad_set_resource_names}
+   * (`meta_ad_resource_names[i]` is the current ad for
+   * `meta_ad_set_resource_names[i]`) — set alongside it by
+   * `campaign_draft_create`. A `meta_ad_creative_edit` action (KAN-73
+   * follow-up, "real Meta post-creation creative edit") may only target one
+   * of these, never an arbitrary caller-supplied resource name — same
+   * invariant {@link ad_resource_names}'s own doc comment establishes for
+   * `ad_edit`, see `automation.service.ts`'s `proposeMetaAdCreativeEditAction`.
+   * Unlike `ad_resource_names`, this array is never updated in place by the
+   * edit itself — a Meta `Ad`'s own resource name never changes, only which
+   * `AdCreative` it points at (see `MetaAutomationActionExecutor.executeMetaAdCreativeEdit`'s
+   * own doc comment for why that's Meta's real object-model shape). Absent
+   * for a Google Ads-platform target (Google Ads' ads live in
+   * {@link ad_resource_names} instead) or one that hasn't had a creation
+   * action executed yet.
+   */
+  @Field()
+  public meta_ad_resource_names?: string[];
 }
