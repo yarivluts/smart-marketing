@@ -28,6 +28,15 @@ export interface GoogleAdsCreateCampaignDraftResult {
   adResourceNames: string[];
 }
 
+export interface GoogleAdsCreateCustomerMatchUserListResult {
+  userListResourceName: string;
+}
+
+export interface GoogleAdsAddCustomerMatchOperationsResult {
+  /** The number of hashed-email member operations submitted to the offline user data job — Google processes the job asynchronously, so this is "accepted", not "matched" (Google Ads has no synchronous match-count response, unlike Meta's `num_received`). */
+  numReceived: number;
+}
+
 /**
  * The Google Ads REST API (v17) mutate/OAuth calls this connector needs,
  * kept as a small interface (not the `google-ads-api` npm SDK) so a run's
@@ -50,6 +59,25 @@ export interface GoogleAdsApiClient {
    * campaign.
    */
   lookupCampaignBudgetResourceName(customerId: string, campaignResourceName: string): Promise<string>;
+  /**
+   * Creates a CRM-based (Customer Match) `UserList` on the given customer —
+   * used by `GoogleCustomerMatchSinkPluginExecutor` (KAN-72 follow-up,
+   * plan `13 §E21.2`'s own deferred "audience attach" bullet) the first
+   * time an install syncs a segment, mirroring `MetaAdsApiClient.createCustomAudience`'s
+   * own "create once, reuse on every later sync" role for the sibling
+   * connector.
+   */
+  createCustomerMatchUserList(customerId: string, params: { name: string }): Promise<GoogleAdsCreateCustomerMatchUserListResult>;
+  /**
+   * Uploads a batch of already-SHA-256-hashed emails to an existing
+   * Customer Match user list — the Google Ads member-upload flow is itself
+   * three sequential calls (create an `OfflineUserDataJob`, add its member
+   * operations, run the job), unlike Meta's single "add hashed emails"
+   * endpoint; this method sequences all three so the executor sees one
+   * upload call, mirroring `MetaAdsApiClient.addHashedEmailsToCustomAudience`'s
+   * shape for the sibling connector.
+   */
+  addHashedEmailsToCustomerMatchUserList(customerId: string, userListResourceName: string, hashedEmails: readonly string[]): Promise<GoogleAdsAddCustomerMatchOperationsResult>;
 }
 
 const GOOGLE_ADS_API_BASE_URL = 'https://googleads.googleapis.com/v17';
@@ -236,5 +264,66 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
       throw new GoogleAdsApiError(`No Google Ads campaign found for resource name "${campaignResourceName}".`, 404);
     }
     return budgetResourceName;
+  }
+
+  /**
+   * A non-`:mutate` action call (`:create`/`:addOperations`/`:run` on an
+   * offline user data job) — same auth/header shape as {@link mutate}, but
+   * the endpoint path and body shape differ per action, so this takes the
+   * path *as-is* (not auto-prefixed with `customers/{customerId}/` the way
+   * {@link mutate} prefixes a bare resource name) since an `:addOperations`/
+   * `:run` call targets a job's own already-fully-qualified resource name
+   * (e.g. `customers/123/offlineUserDataJobs/456`), not a bare resource
+   * under the customer.
+   */
+  private async postAction<T>(path: string, body: unknown): Promise<T> {
+    const accessToken = await this.getAccessToken();
+    const response = await fetch(`${GOOGLE_ADS_API_BASE_URL}/${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'developer-token': this.options.developerToken,
+        ...(this.options.loginCustomerId ? { 'login-customer-id': this.options.loginCustomerId } : {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new GoogleAdsApiError(`Google Ads API request to ${path} failed with status ${response.status}: ${detail}`, response.status);
+    }
+    return (await response.json()) as T;
+  }
+
+  async createCustomerMatchUserList(customerId: string, params: { name: string }): Promise<GoogleAdsCreateCustomerMatchUserListResult> {
+    const result = await this.mutate(customerId, 'userLists', [
+      {
+        create: {
+          name: params.name,
+          membershipStatus: 'OPEN',
+          crmBasedUserListInfo: { uploadKeyType: 'CONTACT_INFO' },
+        },
+      },
+    ]);
+    return { userListResourceName: result.results[0].resourceName };
+  }
+
+  async addHashedEmailsToCustomerMatchUserList(
+    customerId: string,
+    userListResourceName: string,
+    hashedEmails: readonly string[],
+  ): Promise<GoogleAdsAddCustomerMatchOperationsResult> {
+    const jobResult = await this.postAction<{ resourceName: string }>(`customers/${customerId}/offlineUserDataJobs:create`, {
+      job: { type: 'CUSTOMER_MATCH_USER_LIST', customerMatchUserListMetadata: { userList: userListResourceName } },
+    });
+    const jobResourceName = jobResult.resourceName;
+
+    await this.postAction(`${jobResourceName}:addOperations`, {
+      operations: hashedEmails.map((hashedEmail) => ({ create: { userIdentifiers: [{ hashedEmail }] } })),
+    });
+
+    await this.postAction(`${jobResourceName}:run`, {});
+
+    return { numReceived: hashedEmails.length };
   }
 }

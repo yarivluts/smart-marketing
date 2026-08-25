@@ -82,16 +82,22 @@ export class PluginInstallModel extends BaseModel {
   public source_last_synced_at?: string;
 
   /**
-   * The Meta Custom Audience id `crm-sync.service.ts`'s `syncSegmentToCrm`
-   * created the first time this install (when it's a
-   * `META_CUSTOM_AUDIENCE_PLUGIN_ID` install) synced a segment — persisted
-   * from that first sync's own `SinkPluginPushResult.externalRef` so every
-   * later sync adds to the same audience instead of creating a new one each
-   * time. `undefined` until this install's first sync ever succeeds; unused
-   * by every other built-in action plugin (e.g. the CRM webhook connector),
-   * the same "one persistent field, only meaningful for one connector"
-   * posture `source_cursor` already establishes for the inbound direction.
+   * The external resource id `crm-sync.service.ts`'s `syncSegmentToCrm`
+   * created the first time this install synced a segment — persisted from
+   * that first sync's own `SinkPluginPushResult.externalRef` so every later
+   * sync adds to the same external resource instead of creating a new one
+   * each time. Connector-agnostic (a Meta Custom Audience id for a
+   * `META_CUSTOM_AUDIENCE_PLUGIN_ID` install, a Google Ads Customer Match
+   * user list resource name for a `GOOGLE_CUSTOMER_MATCH_PLUGIN_ID` install
+   * — KAN-72 follow-up — one field, since an install is only ever one
+   * connector at a time so there's never more than one "the id I already
+   * created" to remember). `undefined` until this install's first sync ever
+   * succeeds; unused by a connector that never creates an external resource
+   * to reuse (e.g. the CRM webhook connector, which POSTs to an
+   * already-existing destination URL), the same "one persistent field, only
+   * meaningful for the connector that needs it" posture `source_cursor`
+   * already establishes for the inbound direction.
    */
   @Field()
-  public meta_custom_audience_id?: string;
+  public sink_external_ref?: string;
 }

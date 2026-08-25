@@ -9,7 +9,7 @@ export interface MetaCustomAudienceSinkPluginExecutorOptions {
   audienceName: string;
   /**
    * The Custom Audience id a previous sync already created for this install
-   * (`PluginInstallModel.meta_custom_audience_id`), or `null` on this
+   * (`PluginInstallModel.sink_external_ref`), or `null` on this
    * install's first-ever sync. When set, `push()` adds to the same audience
    * instead of creating a duplicate one on every sync — resolved by the
    * caller (`crm-sync.service.ts`'s dispatch, mirroring

@@ -4,7 +4,7 @@ export const META_CUSTOM_AUDIENCE_PLUGIN_ID = 'com.growthos.meta-custom-audience
 /** The config field an org admin fills in at install time — the id of an *approved* `credential`-kind resource attachment (KAN-27) whose `SharedCredentialModel.provider` is `'meta_ads'` and whose secret (KAN-29) is the JSON blob `MetaAdsCredentialSecret` (`plugin-runtime/meta-ads/credential-secret.ts`) describes — the exact same credential shape KAN-73's Meta Manage plugin already resolves, reused here rather than a second Meta credential concept. */
 export const META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD = 'meta_custom_audience_credential_attachment_id';
 
-/** The config field naming the Custom Audience's display name on Meta — set once at install time, used to create the audience the first time a segment syncs to this install (see `PluginInstallModel.meta_custom_audience_id`'s own doc comment for how the created audience is then reused on every later sync). */
+/** The config field naming the Custom Audience's display name on Meta — set once at install time, used to create the audience the first time a segment syncs to this install (see `PluginInstallModel.sink_external_ref`'s own doc comment for how the created audience is then reused on every later sync). */
 export const META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD = 'audience_name';
 
 /**

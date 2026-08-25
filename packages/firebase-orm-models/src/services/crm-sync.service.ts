@@ -18,12 +18,20 @@ import {
   META_CUSTOM_AUDIENCE_PLUGIN_ID,
   MetaCustomAudienceSinkPluginExecutor,
 } from '../plugin-runtime/meta-custom-audience';
+import {
+  GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
+  GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD,
+  GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
+  GoogleCustomerMatchSinkPluginExecutor,
+} from '../plugin-runtime/google-customer-match';
 import { MetaAdsHttpApiClient } from '../plugin-runtime/meta-ads';
+import { GoogleAdsHttpApiClient } from '../plugin-runtime/google-ads';
 import { mintPluginRuntimeCredential, runWithRetryBackoff, type RetryBackoffOptions, type SinkPluginExecutor } from '../plugin-runtime';
 import { ProjectNotFoundError, listActiveAttachmentsForProject } from './resource-library.service';
 import { PluginInstallNotFoundError, getPluginManifestVersion, PluginManifestNotFoundError } from './plugin-registry.service';
 import { CredentialSecretNotSetError, revealSharedCredentialSecret } from './vault.service';
 import { MetaAdsCredentialConfigError, resolveMetaAdsCredentialSecret } from './meta-ads-plugin.service';
+import { GoogleAdsCredentialConfigError, resolveGoogleAdsCredentialSecret } from './google-ads-plugin.service';
 import { listSegmentMembers, type SegmentMemberListOutcome } from './segment.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import type { WarehouseQueryExecutor } from '../warehouse/query-executor';
@@ -56,7 +64,15 @@ export class MetaAudienceCredentialConfigError extends Error {
   }
 }
 
-/** An action-type install's `plugin_id` doesn't match any built-in connector this codebase actually knows how to sync to (`CRM_WEBHOOK_PLUGIN_ID`/`META_CUSTOM_AUDIENCE_PLUGIN_ID` today) — e.g. a third-party manifest registered and installed through the generic Plugin Registry flow (KAN-46) with no real runtime behind it yet, the same "installable but not runnable" gap `runSourcePluginInstall`'s own inbound dispatch would hit for an unrecognized source plugin. */
+/** The Google Ads Customer Match sibling of {@link MetaAudienceCredentialConfigError} (KAN-72 follow-up) — an install claims to be (or was resolved as) the built-in Google Customer Match plugin, but isn't configured with a usable Google Ads credential or user list name yet. */
+export class GoogleCustomerMatchCredentialConfigError extends Error {
+  constructor(public readonly reason: string) {
+    super(`This install is not correctly configured to sync to a Google Ads Customer Match list yet: ${reason}`);
+    this.name = 'GoogleCustomerMatchCredentialConfigError';
+  }
+}
+
+/** An action-type install's `plugin_id` doesn't match any built-in connector this codebase actually knows how to sync to (`CRM_WEBHOOK_PLUGIN_ID`/`META_CUSTOM_AUDIENCE_PLUGIN_ID`/`GOOGLE_CUSTOMER_MATCH_PLUGIN_ID` today) — e.g. a third-party manifest registered and installed through the generic Plugin Registry flow (KAN-46) with no real runtime behind it yet, the same "installable but not runnable" gap `runSourcePluginInstall`'s own inbound dispatch would hit for an unrecognized source plugin. */
 export class UnsupportedSinkPluginError extends Error {
   constructor(public readonly pluginId: string) {
     super(`No built-in sync executor exists for plugin "${pluginId}" yet.`);
@@ -179,6 +195,61 @@ export async function resolveMetaAudienceCredentialSecret(
   }
 }
 
+export interface GoogleCustomerMatchSyncSecret {
+  developerToken: string;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+  customerId: string;
+  loginCustomerId?: string;
+  userListName: string;
+}
+
+/**
+ * The Google Ads Customer Match sibling of {@link resolveMetaAudienceCredentialSecret}
+ * (KAN-72 follow-up, plan `13 §E21.2`'s own deferred "audience attach" bullet):
+ * resolves what `GoogleCustomerMatchSinkPluginExecutor` needs to sync a
+ * segment to Google Ads — the OAuth app credentials, refresh token,
+ * developer token, and target customer id an install's
+ * `google_customer_match_credential_attachment_id` config points at (via
+ * the *approved* `provider: 'google_ads'` credential attachment, decrypted
+ * through `resolveGoogleAdsCredentialSecret` — the exact same resolution
+ * KAN-72's own Google Ads Manage plugin already established, reused as-is
+ * rather than duplicating credential decryption for a second Google Ads
+ * connector), plus the install's own configured `user_list_name`.
+ */
+export async function resolveGoogleCustomerMatchCredentialSecret(
+  organizationId: string,
+  projectId: string,
+  install: PluginInstallModel,
+  kms: KmsProvider,
+): Promise<GoogleCustomerMatchSyncSecret> {
+  const attachmentId = install.config[GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD];
+  if (typeof attachmentId !== 'string' || attachmentId.trim().length === 0) {
+    throw new GoogleCustomerMatchCredentialConfigError(`missing "${GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD}" config`);
+  }
+  const userListName = install.config[GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD];
+  if (typeof userListName !== 'string' || userListName.trim().length === 0) {
+    throw new GoogleCustomerMatchCredentialConfigError(`missing "${GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD}" config`);
+  }
+
+  const attachments = await listActiveAttachmentsForProject(organizationId, projectId);
+  const attachment = attachments.find((entry) => entry.id === attachmentId && entry.resource_kind === 'credential');
+  if (!attachment) {
+    throw new GoogleCustomerMatchCredentialConfigError('no approved credential attachment matches the configured id');
+  }
+
+  try {
+    const secret = await resolveGoogleAdsCredentialSecret(organizationId, attachment, kms);
+    return { ...secret, userListName };
+  } catch (error) {
+    if (error instanceof GoogleAdsCredentialConfigError) {
+      throw new GoogleCustomerMatchCredentialConfigError(error.reason);
+    }
+    throw error;
+  }
+}
+
 /** Retries a transient push failure twice (3 attempts total) — the same posture `plugin-runtime.service.ts`'s own `DEFAULT_RETRY_OPTIONS` establishes for the inbound direction. */
 const DEFAULT_RETRY_OPTIONS: RetryBackoffOptions = { maxAttempts: 3, baseDelayMs: 200, factor: 2 };
 
@@ -210,8 +281,9 @@ export interface SyncSegmentToCrmParams {
  * already lists every installed action plugin, not just the CRM webhook one.
  * Resolves the segment's live member list (`listSegmentMembers`), builds the
  * right real `SinkPluginExecutor` for the install's own `plugin_id`
- * (`defaultSinkExecutorForInstall` — `CrmWebhookSinkPluginExecutor` or, since
- * the KAN-73 follow-up, `MetaCustomAudienceSinkPluginExecutor` too, mirroring
+ * (`defaultSinkExecutorForInstall` — `CrmWebhookSinkPluginExecutor`, or since
+ * the KAN-73 follow-up `MetaCustomAudienceSinkPluginExecutor`, or since the
+ * KAN-72 follow-up `GoogleCustomerMatchSinkPluginExecutor` too, mirroring
  * `runSourcePluginInstall`'s own per-connector dispatch for the inbound
  * direction), and pushes with the same retry/backoff posture the source-side
  * runtime already established.
@@ -296,11 +368,12 @@ export async function syncSegmentToCrm(params: SyncSegmentToCrmParams): Promise<
     run.finished_at = new Date().toISOString();
 
     // Persist a connector-created external resource id (e.g. a newly-created Meta Custom
-    // Audience) so the *next* sync reuses it instead of creating a duplicate — see
-    // `SinkPluginPushResult.externalRef`'s own doc comment. A no-op for a connector (e.g. CRM
-    // webhook) that never sets `externalRef`, and for a repeat sync that already reused the same id.
-    if (result.externalRef !== undefined && install.meta_custom_audience_id !== result.externalRef) {
-      install.meta_custom_audience_id = result.externalRef;
+    // Audience, or a Google Ads Customer Match user list) so the *next* sync reuses it instead of
+    // creating a duplicate — see `SinkPluginPushResult.externalRef`'s own doc comment. A no-op for
+    // a connector (e.g. CRM webhook) that never sets `externalRef`, and for a repeat sync that
+    // already reused the same id.
+    if (result.externalRef !== undefined && install.sink_external_ref !== result.externalRef) {
+      install.sink_external_ref = result.externalRef;
       await install.save();
     }
   } catch (error) {
@@ -336,7 +409,21 @@ async function defaultSinkExecutorForInstall(organizationId: string, projectId: 
       apiClient: new MetaAdsHttpApiClient({ accessToken }),
       adAccountId,
       audienceName,
-      existingAudienceId: install.meta_custom_audience_id ?? null,
+      existingAudienceId: install.sink_external_ref ?? null,
+    });
+  }
+  if (install.plugin_id === GOOGLE_CUSTOMER_MATCH_PLUGIN_ID) {
+    const { developerToken, clientId, clientSecret, refreshToken, customerId, loginCustomerId, userListName } = await resolveGoogleCustomerMatchCredentialSecret(
+      organizationId,
+      projectId,
+      install,
+      kms,
+    );
+    return new GoogleCustomerMatchSinkPluginExecutor({
+      apiClient: new GoogleAdsHttpApiClient({ developerToken, clientId, clientSecret, refreshToken, loginCustomerId }),
+      customerId,
+      userListName,
+      existingUserListResourceName: install.sink_external_ref ?? null,
     });
   }
   throw new UnsupportedSinkPluginError(install.plugin_id);
