@@ -112,6 +112,7 @@
     "projectFirmographicsLink": "נתונים פירמוגרפיים",
     "projectExperimentsLink": "ניסויים",
     "projectSupportLink": "תמיכה",
+    "projectDemosLink": "הדגמות",
     "projectMetricRegistryLink": "קטלוג מדדים",
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
@@ -671,6 +672,24 @@
     "durationMinutes": "{value} דקות",
     "durationHours": "{value} שעות"
   },
+  "Demos": {
+    "metaTitle": "הדגמות",
+    "title": "הדגמות עבור {projectName}",
+    "description": "הדגמות שנקבעו, התקיימו ולא הגיעו אליהן, שיעור ההגעה ברמת הפרויקט, ופילוח לפי נציג.",
+    "setupIntro": "התקן/י את חבילת צינור המכירות כדי להתחיל לעקוב אחר אירועי מחזור חיי הדגמה.",
+    "funnelHeading": "משפך הדגמות",
+    "scheduledLabel": "נקבעו",
+    "heldLabel": "התקיימו",
+    "noShowLabel": "לא הגיעו",
+    "showRateLabel": "שיעור הגעה",
+    "showRateValue": "{value}%",
+    "rowValueUnavailable": "—",
+    "repBreakdownHeading": "לפי נציג",
+    "repBreakdownEmpty": "טרם נחתו הדגמות שהתקיימו או שלא הגיעו אליהן עבור פרויקט זה.",
+    "repRowSummary": "{held} התקיימו · {noShow} לא הגיעו · {showRate} שיעור הגעה",
+    "recentDemosIntro": "עיין/י ברשומות הדגמה בודדות:",
+    "recentDemosLinkLabel": "הדגמות אחרונות"
+  },
   "ChurnReasons": {
     "metaTitle": "סיבות נטישה",
     "title": "סיבות נטישה עבור {projectName}",
@@ -948,6 +967,8 @@
     "builtinPackExperimentDescription": "חשיפות והמרות בניסויי A/B לפי וריאנט, כולל בדיקת מובהקות סטטיסטית מול קבוצת ביקורת.",
     "builtinPackSupportTitle": "תמיכת לקוחות",
     "builtinPackSupportDescription": "זמן תגובה ראשונית/פתרון של פניות, שביעות רצון (CSAT), ולוח מובילים לפי נציג.",
+    "builtinPackSalesTitle": "צינור מכירות",
+    "builtinPackSalesDescription": "קביעת הדגמות, שיעור הגעה, ופילוח לפי נציג.",
     "builtinPackCampaignOpsTitle": "תפעול קמפיינים",
     "builtinPackCampaignOpsDescription": "החזר השקעה בחלון זמן קבוע (גביית הכנסות ל-7/14/30/40 יום) עבור לקוחות לפי מועד הרכישה."
   },

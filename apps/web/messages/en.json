@@ -112,6 +112,7 @@
     "projectFirmographicsLink": "Firmographics",
     "projectExperimentsLink": "Experiments",
     "projectSupportLink": "Support",
+    "projectDemosLink": "Demos",
     "projectMetricRegistryLink": "Metric catalog",
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
@@ -671,6 +672,24 @@
     "durationMinutes": "{value}m",
     "durationHours": "{value}h"
   },
+  "Demos": {
+    "metaTitle": "Demos",
+    "title": "Demos for {projectName}",
+    "description": "Scheduled, held, and no-show demos, the project-wide show rate, and a per-rep breakdown.",
+    "setupIntro": "Install the Sales Pipeline pack to start tracking demo lifecycle events.",
+    "funnelHeading": "Demo funnel",
+    "scheduledLabel": "Scheduled",
+    "heldLabel": "Held",
+    "noShowLabel": "No-show",
+    "showRateLabel": "Show rate",
+    "showRateValue": "{value}%",
+    "rowValueUnavailable": "—",
+    "repBreakdownHeading": "By rep",
+    "repBreakdownEmpty": "No held or no-show demos landed for this project yet.",
+    "repRowSummary": "{held} held · {noShow} no-show · {showRate} show rate",
+    "recentDemosIntro": "Browse individual demo records:",
+    "recentDemosLinkLabel": "recent demos"
+  },
   "ChurnReasons": {
     "metaTitle": "Churn reasons",
     "title": "Churn reasons for {projectName}",
@@ -948,6 +967,8 @@
     "builtinPackExperimentDescription": "A/B experiment exposures and conversions by variant, with significance testing against a control.",
     "builtinPackSupportTitle": "Customer Support",
     "builtinPackSupportDescription": "Ticket first-response/resolution time, CSAT, and a per-agent leaderboard.",
+    "builtinPackSalesTitle": "Sales Pipeline",
+    "builtinPackSalesDescription": "Demo scheduling, show rate, and a per-rep breakdown.",
     "builtinPackCampaignOpsTitle": "Campaign Ops",
     "builtinPackCampaignOpsDescription": "Fixed-window payback (7/14/30/40-day revenue collection) for customers as they're acquired."
   },

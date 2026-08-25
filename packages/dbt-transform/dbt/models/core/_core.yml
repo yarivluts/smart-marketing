@@ -608,3 +608,30 @@ models:
       - name: ts
         tests:
           - not_null
+
+  - name: fact_demo_event
+    description: >
+      Sales-assist workflows: demos pipeline (KAN-92, plan `14 §Gap 9`): one
+      row per landed `demo_event`, with the payload's
+      `demo_id`/`stage`/`rep_org_person_id`/`account_name` pulled into real
+      columns. Feeds the Sales Pipeline pack's
+      `demos_scheduled`/`demos_held`/`demos_no_show` metrics (each
+      filtering this mart's own `stage` column), broken down by
+      `rep_org_person_id`.
+    columns:
+      - name: demo_event_key
+        description: Composite (project_id, environment_id, event_id) uniqueness key.
+        tests:
+          - not_null
+          - unique
+      - name: demo_id
+        tests:
+          - not_null
+      - name: stage
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['scheduled', 'held', 'no_show', 'canceled']
+      - name: ts
+        tests:
+          - not_null

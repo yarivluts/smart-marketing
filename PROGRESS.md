@@ -17,6 +17,88 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (even later) — New story KAN-92 (Sales-assist workflows / demos pipeline, Gap 9) — PR #287 open
+
+- **Last completed:**
+  - Session start: local `main`'s ref had reset to a stale ~50-commits-behind snapshot again
+    (`781108e`, matching PR #148/#149 vintage) even though `git checkout -B main origin/main` had
+    already been run once earlier in the session — the same recurring environment quirk many prior
+    entries document, just caught mid-session this time via a background research agent whose
+    findings (claiming `packages/shared/src/support` etc. didn't exist) directly contradicted what
+    had just been read from `TASKS.md`/`git log`. Re-ran `git checkout -B main origin/main` a second
+    time and re-verified directly (not via a delegated agent) before trusting the repo state again.
+    `git branch -a` / `list_pull_requests` (open, empty) confirmed a clean slate.
+  - Did the "sweep every gap-analysis bullet for the next unaddressed one" pass the last several
+    entries recommend: `TASKS.md` covers Gaps 1-8 and 10-15 (KAN-80..91); **Gap 9** ("Sales-assist
+    workflows (demos pipeline)": `docs/plan/14-gap-analysis.md` §Gap 9 — "demo/meeting events in the
+    SaaS pack ... 'recent demos' feed ... paying_no_demo-style lists via Gap 5's segments. We do NOT
+    build a CRM — we read/write to one.") was the one bullet nobody had picked up. `git branch -a`
+    confirmed no branch/PR named anything demo/sales-shaped existed either.
+  - **Delivered (PR #287, branch `kan-92-sales-demos-pipeline`):** a `demo_event` event schema
+    (`packages/shared/src/sales`, one schema/four `stage` values `scheduled`/`held`/`no_show`/
+    `canceled`, mirroring `SUPPORT_TICKET_SCHEMA_FIELDS`'s (KAN-90) stage-specific-optional-fields
+    shape — `rep_org_person_id` is carried on every stage rather than only-on-resolution, since a
+    demo's rep is normally already known at scheduling time, unlike a support ticket's unassigned
+    `opened` stage); a bare-flatten `fact_demo_event` dbt mart (no joins, same shape
+    `fact_support_ticket_event` establishes; new `proj_22` fixture + a fixture-matches-expected dbt
+    test, `dbt build` 246/246 green); a built-in "Sales Pipeline" metric pack
+    (`plugin-runtime/sales-pack`) registering `demos_scheduled`/`demos_held`/`demos_no_show` (broken
+    down by `rep_org_person_id`) plus a `demo_show_rate` formula (`demos_held / (demos_held +
+    demos_no_show)`), wired into `installPluginAndProvisionBuiltins`/`BUILTIN_METRIC_PACKS`; a
+    **live** demo funnel + per-rep breakdown (`getDemoFunnelForProject`, `sales.service.ts`) that
+    reads landed raw records directly and aggregates in TypeScript — deliberately *not* routed
+    through the metrics compiler/warehouse, the same "fetch once, aggregate in TypeScript, no
+    warehouse dependency" posture `getSupportLeaderboardForProject` (KAN-90) establishes — resolved
+    against `OrgPersonModel` for name/photo at the view-mapper layer (`sales-view.ts`); a new
+    project-scoped Demos admin page (funnel summary + per-rep table), gated on `ingest.write` (same
+    "whole feature, not just mutation, is admin-only" posture Support/Feedback/Churn Reasons take),
+    with the standard one-click install card until the pack is installed, and a nav entry (new
+    `Presentation` lucide icon).
+  - **Deliberate scope cuts, documented on the Demos page's own doc comment and the `TASKS.md` row:**
+    the AC's "recent demos feed" is satisfied by linking to the existing generic `/record-feed` page
+    (KAN-81) rather than duplicating it — once the pack registers `demo_event`, it's automatically
+    browsable there for free. The AC's "`paying_no_demo`-style work list via Gap 5's segments" is
+    **not** built: `segment.service.ts` (KAN-76/81) only ever filters one *entity* schema's own
+    fields, with no cross-schema join or negation, so "paying AND no demo" isn't expressible with the
+    segment engine as it exists today — would need either a denormalized demo-status field on a
+    paying-customer entity (no connector populates one) or a segment-engine cross-schema join
+    feature, both out of scope here. A real calendar/CRM connector (Calendly/HubSpot/Salesforce) is
+    deferred, same posture Stripe/GA4/KAN-82/84/87/90 established for their own third-party
+    connectors.
+  - **Checks:** `packages/shared` — `pnpm test` (574/574), `typecheck`, `lint` all green.
+    `packages/firebase-orm-models` — `pnpm test` against a real Firestore emulator (1254/1254),
+    `typecheck`, `lint` all green. `packages/dbt-transform` — real `dbt build` 246/246 green,
+    including the new `fact_demo_event` model + its fixture test. `apps/web` —
+    `pnpm run test:unit:emulator` against real Firestore+Auth emulators: **first run showed one
+    failure** (`trigger-orchestration-run` route test expecting a real `dbt build` subprocess to
+    report `succeeded`, got `failed`) — traced to a DuckDB single-writer-lock conflict from this run's
+    own overlapping background test invocations (the `firebase-orm-models` suite's own
+    `local-dbt-executor.test.ts`, which also shells out to a real `dbt build` against the same
+    on-disk DuckDB file, was still finishing when the `apps/web` suite's own dbt-invoking test
+    started) rather than a real bug — confirmed by re-running the `apps/web` suite alone, with
+    nothing else touching dbt: clean, 250/250 files, 1506/1506 tests. Root `pnpm build` (turbo, all
+    8 packages) green. Root `pnpm lint`/`pnpm typecheck` (turbo) green. Opened PR #287, subscribed to
+    its activity, added a new **KAN-92** row to `TASKS.md` (`done`).
+- **In progress (exact stopping point):** PR #287 is open, subscribed, and pushed with everything
+  above; CI (including the sharded Playwright e2e suite, not re-run locally — same "watch CI rather
+  than run the full ~35min local e2e sweep" posture recent entries have taken) has not reported back
+  yet as of this entry. Once it's green, merge (squash), delete the branch (the git-over-HTTPS proxy
+  in this sandbox has rejected every remote branch-delete attempt in every prior entry with HTTP
+  403 — expect the same here), and record the merge in a follow-up `PROGRESS.md`/`TASKS.md` entry
+  per this repo's own convention.
+- **Blocked + why:** nothing blocking — waiting on CI to report back on PR #287.
+- **Next step:** once PR #287's CI is green, merge it and record the merge. With KAN-92 delivered,
+  every one of `docs/plan/14-gap-analysis.md`'s 15 gap bullets now has a story (KAN-80..92) — a
+  future run should go back to sweeping each `done` row's own "deferred"/"not yet" doc-comment notes
+  for a newly-buildable follow-up (the pattern that produced KAN-91 from KAN-90's own limitation, and
+  that this run's own "paying_no_demo segment" and "recent-demos feed" scope cuts above are two fresh
+  candidates for), same as the last several entries have been doing since KAN-89.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Review/merge PR #287 if this run doesn't get to a green-CI merge itself before ending.
+
+---
+
 ## 2026-08-25 (later still, 2) — Closed KAN-73's own deferred "Custom Audience from a GrowthOS segment" bullet (PR #286)
 
 - **Last completed:**

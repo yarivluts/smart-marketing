@@ -15,6 +15,7 @@ import {
   installBuiltinMetricPack,
   installPluginAndProvisionBuiltins,
   LANDING_PAGE_PACK_PLUGIN_ID,
+  SALES_PACK_PLUGIN_ID,
   SUPPORT_PACK_PLUGIN_ID,
   listBoardsForProject,
   listBuiltinMetricPacks,
@@ -198,6 +199,7 @@ describe('listBuiltinMetricPacks', () => {
       FIRMOGRAPHIC_PACK_PLUGIN_ID,
       EXPERIMENT_PACK_PLUGIN_ID,
       SUPPORT_PACK_PLUGIN_ID,
+      SALES_PACK_PLUGIN_ID,
     ]);
   });
 });

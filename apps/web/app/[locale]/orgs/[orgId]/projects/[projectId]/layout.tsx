@@ -193,6 +193,11 @@ export default async function ProjectLayout({
             label: t('projectSupportLink'),
             icon: 'Headset' as const,
           },
+          {
+            href: `${base}/demos`,
+            label: t('projectDemosLink'),
+            icon: 'Presentation' as const,
+          },
         ]
       : []),
   ];
