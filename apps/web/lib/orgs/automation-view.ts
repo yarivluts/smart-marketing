@@ -93,17 +93,6 @@ export interface AutomationActionDiffEntry {
   after: unknown;
 }
 
-/**
- * A `campaignDraft` diff value is a whole {@link CampaignDraft} object —
- * `String(...)` on it would render `[object Object]`, so it gets a compact
- * human summary instead. Every other diff field's value is a plain
- * string/number/undefined, which `String(...)` already renders sensibly.
- * `CampaignDraft` is a `platform`-discriminated union (KAN-73): a Google Ads
- * draft's `adGroups` is `undefined` on a Meta draft (and vice versa for
- * `adSets`), which would silently degrade to "0 ad group(s)" for a Meta
- * draft if left unbranched — so this branches on `platform` explicitly
- * rather than relying on that degradation.
- */
 /** A keyword edit's `addKeywords`/`addNegativeKeywords` diff value is an array of `{text, matchType}` objects — `String(...)` on it would render `[object Object]` per entry, so it gets a compact "text (matchType)" summary instead, same reasoning `formatDiffValue`'s own `campaignDraft` branch already established for a nested object value. */
 function formatKeywordListDiffValue(value: unknown): unknown {
   if (!Array.isArray(value)) {
@@ -117,6 +106,19 @@ function formatKeywordListDiffValue(value: unknown): unknown {
     .join(', ');
 }
 
+/**
+ * A `campaignDraft` diff value is a whole {@link CampaignDraft} object —
+ * `String(...)` on it would render `[object Object]`, so it gets a compact
+ * human summary instead. Every other diff field's value is a plain
+ * string/number/undefined, which `String(...)` already renders sensibly.
+ * `CampaignDraft` is a `platform`-discriminated union (KAN-73): a Google Ads
+ * draft's `adGroups` is `undefined` on a Meta draft (and vice versa for
+ * `adSets`), which would silently degrade to "0 ad group(s)" for a Meta
+ * draft if left unbranched — so this branches on `platform` explicitly
+ * rather than relying on that degradation. `addKeywords`/`addNegativeKeywords`
+ * are handled by {@link formatKeywordListDiffValue} before this branch is
+ * ever reached — see that function's own doc comment.
+ */
 function formatDiffValue(key: string, value: unknown): unknown {
   if (key === 'addKeywords' || key === 'addNegativeKeywords') {
     return formatKeywordListDiffValue(value);
