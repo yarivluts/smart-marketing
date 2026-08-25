@@ -17,6 +17,58 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (newest) — Merged KAN-73 follow-up (PR #297, real Meta post-creation ad creative edit)
+
+- **Last completed:**
+  - Session start: picked up exactly where the prior entry (below) left off — PR #297 was already
+    open, self-reviewed, and rebased onto current `main` (its own "Merge main into
+    kan-73-meta-creative-edit" commit, `49daf46`), with `mergeable_state: unstable` (CI still
+    settling after the prior session's one already-spent re-run). Subscribed to PR activity and
+    checked out the branch locally as a ready-to-fix fallback.
+  - CI's `lint · typecheck · test · build` check failed a **second** time on this same head
+    (`49daf46`) — this time on the sharded Playwright job, hard-failing `e2e/experiments.spec.ts`
+    (timed out across all 3 retries) and flaking-then-passing on `e2e/feedback.spec.ts`/
+    `e2e/metric-defs.spec.ts`, all three showing the same `RESOURCE_EXHAUSTED: Received message
+    larger than max (... vs 4194304)` gRPC error against the real Firestore emulator that this PR's
+    own body already flagged as a known, pre-existing flake class (reproduced independently before
+    the PR was even opened) and that this repo's history documents recurring across many unrelated
+    PRs. None of the three failing specs touch anything this PR's diff changes (confined to
+    `apps/web/src/plugin-runtime/meta-ads/*`, the automation service, and the new admin UI/routes —
+    verified via `git diff --stat` against `main` showing zero changes under `apps/web/e2e/`).
+  - Per this repo's CI-red policy, the one-re-run budget for this PR had already been spent by the
+    prior session (its own PR comment documents `rerun_failed_jobs` on the same workflow run). Since
+    a second failure on an already-flagged flake class is "real" under that policy (no further
+    re-run from this session), posted a standing-down comment on the PR naming the failing check,
+    confirming it isn't this PR's own code, and noting the budget was spent rather than triggering
+    another re-run — then sent a push notification to the repo owner flagging that merging was
+    blocked pending a human-triggered CI re-run.
+  - A human (or some external trigger) re-ran the failed job shortly after: a fresh check run
+    (`lint · typecheck · test · build`, started 20:40:41Z) came back **green** at 21:17:27Z, with
+    `terraform fmt · validate` already green and `mergeable_state: clean`. Merged PR #297 (squash).
+    Remote branch deletion hit the same recurring HTTP 403 from this sandbox's git-over-HTTPS proxy
+    every prior entry documents — left undeleted, same as always.
+  - Updated `TASKS.md`'s KAN-73 row with the merge outcome, closing out this thread.
+- **In progress (exact stopping point):** none — PR #297 is merged, `main`'s CI is green on the
+  merge commit's parent chain (verified via the PR's own pre-merge check runs; no separate post-
+  merge CI run was awaited since squash-merging a PR whose head was already green against the exact
+  current `main` cannot introduce new failures).
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** every `TASKS.md` row is now `done` except the standing infra/human items
+  (KAN-18/19 in-progress on real infra, KAN-43 `needs-human`, KAN-50/51 `blocked-by` KAN-43) — the
+  next run should do a fresh "sweep every `done` row's own deferred/not-yet doc-comment notes" pass
+  for a newly-buildable follow-up (same pattern that produced KAN-89..92 and this PR). Remaining
+  named-but-deferred candidates as of this entry: PMax asset groups (Google Ads-only, a genuinely
+  bigger structurally-different-model story) and Lookalike/Similar Audience expansion (both ad
+  connectors, doesn't fit the existing `SinkPluginExecutor` shape cleanly) on KAN-72/73's rows — both
+  likely warrant a real design decision before picking, same reasoning the last two runs used to
+  route around them in favor of better-scoped bullets.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-73-meta-creative-edit` branch on GitHub (proxy 403 on remote
+    branch-delete from this sandbox, same as every recent entry).
+
+---
+
 ## 2026-08-25 (newer) — Opened PR #297 (KAN-73 follow-up, real Meta post-creation ad creative edit)
 
 - **Last completed:**
