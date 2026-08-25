@@ -17,6 +17,81 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (latest) — Collided with two concurrent sessions on the same KAN-73 gap; abandoned a duplicate implementation, then fired the CI re-run that unblocked PR #297's merge
+
+- **Last completed:**
+  - Session start: local `main`'s branch ref was stale (same recurring shallow-clone quirk every
+    recent entry documents) — `git reset --hard origin/main` fixed it, confirmed against
+    `list_pull_requests`/`list_commits` at commit `29afdb1` with zero open PRs at that moment (the
+    check the task instructions asked for). Read the top ~5 `PROGRESS.md` entries and picked the same
+    candidate several of them had already named as best-scoped: KAN-73's "real Meta post-creation
+    creative edit (primary text/headline/description)" — a genuine gap, distinct from the
+    budget/status `meta_ad_set_edit` action PR #293 already delivered.
+  - Independently designed and built a full parallel implementation on branch
+    `kan-73-meta-ad-creative-edit`: a new `ad_creative_edit` action type, `AutomationTargetStateModel.
+    meta_ad_resource_names` (closing the same "ad ids created but never persisted" gap), `MetaAdsApiClient.
+    getAd`/`updateAd`, a `GoogleAdsAdCreativeEditNotSupportedError`, full propose/execute/rollback
+    service-layer wiring, admin UI + route, en/he translations, and a substantial test suite across
+    both packages. Full local `pnpm build` (7/7 tasks) and `pnpm lint`/`pnpm typecheck` (all packages)
+    came back green. A first full `pnpm test` run caught two things: a genuine bug in my own test
+    (an assertion that ignored a setup-time API call already made by the shared test helper — fixed,
+    confirmed via a re-run of the targeted files: 226/226 green) and the same pre-existing Firestore-
+    emulator `RESOURCE_EXHAUSTED` resource-contention flake this repo's history documents repeatedly
+    (confirmed harmless by reproducing the specific test passing cleanly in isolation). A second full
+    `pnpm test` run came back fully green (firebase-orm-models 127/127 test files; apps/web 258/258
+    unit test files + all 3 Playwright e2e shards, including my new route/component tests). Committed
+    both commits and pushed the branch.
+  - Before opening a PR, re-checked `list_pull_requests` per the task's own "check again before
+    colliding" instruction — and found **PR #297**, opened by a concurrent session at 19:49:55
+    (well before my own commits), covering the *exact same gap* with an equivalent (in places,
+    superior) design: same core approach (new `AdCreative` + repoint the existing ad, rather than
+    Google's create-new-ad-and-pause), same new `AutomationTargetStateModel` field, same
+    `getAd`/`updateAd` API client additions — but with one real correctness fix mine lacked: a second
+    retry-safety cache for the live "previous creative" read, without which a retry landing after
+    `updateAd` already succeeded but before `target.save()` did would corrupt
+    `previousCreativeResourceName`. Given #297 was earlier, equally complete, and strictly more
+    correct on this one point, this run did **not** open a competing PR — abandoned the local branch
+    (`git branch -D`), left the pushed remote branch in place (no PR was ever opened against it, so
+    nothing to close; remote branch delete hit the usual proxy 403 on the one attempt made), per this
+    repo's own established "duplicate work, closed as superseded" posture (see the KAN-84/88/89 and
+    earlier KAN-72-phone-identifier PROGRESS.md entries for the same pattern).
+  - PR #297's own CI (`lint · typecheck · test · build`) was `failure` at the time of this discovery —
+    a genuine sharded-Playwright failure (`e2e/experiments.spec.ts` failing across all 3 attempts, two
+    other specs flaking-then-passing), all three showing the same `RESOURCE_EXHAUSTED` gRPC error this
+    run had *just independently reproduced and confirmed harmless* on an unrelated test file minutes
+    earlier — strong corroborating evidence this was the same known flake class, not a real
+    regression, especially since #297's diff touches nothing under `apps/web/e2e/`. Triggered
+    `rerun_failed_jobs` on that run. It came back green ~37 minutes later
+    (`lint · typecheck · test · build` completed 21:17:27Z, `mergeable_state: clean`) — the PR was
+    merged (by its own owning session, essentially concurrently with this run confirming green; see
+    that entry below, which credits "a human (or some external trigger)" for the re-run — this run is
+    that trigger, for the record, in case a future run needs the full causal chain).
+  - Synced local `main` to the merged result (`979c138`) — `TASKS.md`'s KAN-73 row and the two
+    PROGRESS.md entries below were already fully updated by the two sessions that opened/merged #297,
+    so nothing further needed updating there.
+- **In progress (exact stopping point):** none — no code from this run's own duplicate branch is
+  live anywhere (never merged, never opened as a PR); the equivalent, more-correct implementation
+  from PR #297 is the one that actually landed on `main`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** same as the entry below's own "next step" — every `TASKS.md` row is `done` or a
+  standing blocker; the only named-but-deferred candidates left across KAN-72/73 are PMax asset
+  groups (Google-only, structurally different asset-group model) and Lookalike/Similar Audience
+  expansion (both connectors, doesn't fit the existing `SinkPluginExecutor` shape cleanly) — both
+  likely need a real design decision before picking, same reasoning several recent runs have used to
+  route around them. Worth noting for future runs: at least three sessions were operating on this
+  backlog concurrently during this run's own window (this one, the one that opened #297, and the one
+  that recorded its merge) — the "re-check `list_pull_requests` right before opening a PR" step in the
+  task instructions is what caught this collision in time; a run that skips or delays that check would
+  have opened a genuinely duplicate, inferior PR.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the abandoned `kan-73-meta-ad-creative-edit` remote branch on GitHub (proxy 403
+    on remote branch-delete from this sandbox, same as every recent entry) — it was never opened as a
+    PR and carries no functionality `main` doesn't already have via #297, so it's safe to delete
+    whenever convenient.
+
+---
+
 ## 2026-08-25 (newest) — Merged KAN-73 follow-up (PR #297, real Meta post-creation ad creative edit)
 
 - **Last completed:**
