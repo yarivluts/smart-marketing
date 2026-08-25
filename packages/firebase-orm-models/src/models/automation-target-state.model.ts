@@ -112,6 +112,22 @@ export class AutomationTargetStateModel extends BaseModel {
   public ad_group_resource_names?: string[];
 
   /**
+   * The real ad platform's own resource name/id for each ad group's current
+   * Responsive Search Ad, in the same order as {@link ad_group_resource_names}
+   * (`ad_resource_names[i]` is the current ad for `ad_group_resource_names[i]`)
+   * — set alongside it by `campaign_draft_create`, and updated in place by an
+   * `ad_edit` action (KAN-72 follow-up, "post-creation ad edits"): Google Ads
+   * models an RSA's headlines/descriptions as immutable once created (no
+   * partial update), so "editing" an ad really creates a new one and pauses
+   * the old one — see `GoogleAdsAutomationActionExecutor.executeAdEdit`'s own
+   * doc comment. Absent for a Meta-platform target (no RSA-equivalent
+   * in-place-edit action is modeled for Meta yet) or one that hasn't had a
+   * creation action executed yet.
+   */
+  @Field()
+  public ad_resource_names?: string[];
+
+  /**
    * The real Meta ad platform's own resource name/id for each ad set a
    * `campaign_draft_create` action (KAN-73) created against this target's
    * campaign, in the same order as the draft's own `adSets` array — set

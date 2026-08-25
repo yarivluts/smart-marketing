@@ -384,4 +384,81 @@ describe('GoogleAdsHttpApiClient', () => {
       status: 400,
     });
   });
+
+  it('creates a Responsive Search Ad in an existing ad group with the given status via one adGroupAds mutate call', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/adGroupAds/2' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).createResponsiveSearchAd(
+      '123',
+      'customers/123/adGroups/1',
+      {
+        headlines: ['New Headline One', 'New Headline Two', 'New Headline Three'],
+        descriptions: ['New description one.', 'New description two.'],
+        finalUrl: 'https://example.com/new-widgets',
+      },
+      'ENABLED',
+    );
+
+    expect(result).toEqual({ adResourceName: 'customers/123/adGroupAds/2' });
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupAds:mutate');
+    const body = JSON.parse(String(init.body));
+    expect(body.operations).toEqual([
+      {
+        create: {
+          adGroup: 'customers/123/adGroups/1',
+          status: 'ENABLED',
+          ad: {
+            responsiveSearchAd: {
+              headlines: [{ text: 'New Headline One' }, { text: 'New Headline Two' }, { text: 'New Headline Three' }],
+              descriptions: [{ text: 'New description one.' }, { text: 'New description two.' }],
+            },
+            finalUrls: ['https://example.com/new-widgets'],
+          },
+        },
+      },
+    ]);
+  });
+
+  it('throws GoogleAdsApiError with the response status on a failed createResponsiveSearchAd call', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 400));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      new GoogleAdsHttpApiClient(OPTIONS).createResponsiveSearchAd(
+        '123',
+        'customers/123/adGroups/1',
+        { headlines: ['A', 'B', 'C'], descriptions: ['D', 'E'], finalUrl: 'https://example.com' },
+        'ENABLED',
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('sets an existing ad\'s own status via an adGroupAds update mutate call', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/adGroupAds/1' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new GoogleAdsHttpApiClient(OPTIONS).setAdGroupAdStatus('123', 'customers/123/adGroupAds/1', 'PAUSED');
+
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupAds:mutate');
+    const body = JSON.parse(String(init.body));
+    expect(body.operations).toEqual([{ update: { resourceName: 'customers/123/adGroupAds/1', status: 'PAUSED' }, updateMask: 'status' }]);
+  });
+
+  it('throws GoogleAdsApiError with the response status on a failed setAdGroupAdStatus call', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 400));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(new GoogleAdsHttpApiClient(OPTIONS).setAdGroupAdStatus('123', 'customers/123/adGroupAds/1', 'ENABLED')).rejects.toMatchObject({
+      status: 400,
+    });
+  });
 });

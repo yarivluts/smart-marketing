@@ -41,6 +41,42 @@ function validateKeyword(keyword: CampaignDraftKeyword, fieldPath: string, reaso
   }
 }
 
+/**
+ * Validates one Responsive Search Ad's own editable content (headlines,
+ * descriptions, final URL) against Google Ads' real-world RSA limits —
+ * shared by {@link validateAdGroup} (a brand-new ad group's own RSA, nested
+ * under `responsiveSearchAd`) and {@link validateAdEditActionInput} (an
+ * `ad_edit` action's replacement RSA content, same shape one level up) so the
+ * two never drift. `fieldPath` is the caller's own prefix for `responsiveSearchAd`
+ * (e.g. `adGroups[0].responsiveSearchAd` or just `responsiveSearchAd`).
+ */
+function validateResponsiveSearchAdContent(responsiveSearchAd: Record<string, unknown> | undefined, fieldPath: string, reasons: string[]): void {
+  const headlines = Array.isArray(responsiveSearchAd?.headlines) ? responsiveSearchAd.headlines : [];
+  if (headlines.length < MIN_HEADLINES || headlines.length > MAX_HEADLINES) {
+    reasons.push(`${fieldPath}.headlines must have between ${MIN_HEADLINES} and ${MAX_HEADLINES} entries.`);
+  }
+  headlines.forEach((headline, headlineIndex) => {
+    if (typeof headline !== 'string' || headline.trim().length === 0 || headline.length > MAX_HEADLINE_LENGTH) {
+      reasons.push(`${fieldPath}.headlines[${headlineIndex}] must be 1-${MAX_HEADLINE_LENGTH} characters.`);
+    }
+  });
+
+  const descriptions = Array.isArray(responsiveSearchAd?.descriptions) ? responsiveSearchAd.descriptions : [];
+  if (descriptions.length < MIN_DESCRIPTIONS || descriptions.length > MAX_DESCRIPTIONS) {
+    reasons.push(`${fieldPath}.descriptions must have between ${MIN_DESCRIPTIONS} and ${MAX_DESCRIPTIONS} entries.`);
+  }
+  descriptions.forEach((description, descriptionIndex) => {
+    if (typeof description !== 'string' || description.trim().length === 0 || description.length > MAX_DESCRIPTION_LENGTH) {
+      reasons.push(`${fieldPath}.descriptions[${descriptionIndex}] must be 1-${MAX_DESCRIPTION_LENGTH} characters.`);
+    }
+  });
+
+  const finalUrl = responsiveSearchAd?.finalUrl;
+  if (typeof finalUrl !== 'string' || finalUrl.length === 0 || !isHttpUrl(finalUrl)) {
+    reasons.push(`${fieldPath}.finalUrl must be a valid http(s) URL.`);
+  }
+}
+
 function validateAdGroup(adGroup: CampaignDraftAdGroup, index: number, reasons: string[]): void {
   const fieldPath = `adGroups[${index}]`;
   if (!isRecord(adGroup)) {
@@ -52,30 +88,7 @@ function validateAdGroup(adGroup: CampaignDraftAdGroup, index: number, reasons: 
   }
 
   const responsiveSearchAd = isRecord(adGroup.responsiveSearchAd) ? adGroup.responsiveSearchAd : undefined;
-  const headlines = Array.isArray(responsiveSearchAd?.headlines) ? responsiveSearchAd.headlines : [];
-  if (headlines.length < MIN_HEADLINES || headlines.length > MAX_HEADLINES) {
-    reasons.push(`${fieldPath}.responsiveSearchAd.headlines must have between ${MIN_HEADLINES} and ${MAX_HEADLINES} entries.`);
-  }
-  headlines.forEach((headline, headlineIndex) => {
-    if (typeof headline !== 'string' || headline.trim().length === 0 || headline.length > MAX_HEADLINE_LENGTH) {
-      reasons.push(`${fieldPath}.responsiveSearchAd.headlines[${headlineIndex}] must be 1-${MAX_HEADLINE_LENGTH} characters.`);
-    }
-  });
-
-  const descriptions = Array.isArray(responsiveSearchAd?.descriptions) ? responsiveSearchAd.descriptions : [];
-  if (descriptions.length < MIN_DESCRIPTIONS || descriptions.length > MAX_DESCRIPTIONS) {
-    reasons.push(`${fieldPath}.responsiveSearchAd.descriptions must have between ${MIN_DESCRIPTIONS} and ${MAX_DESCRIPTIONS} entries.`);
-  }
-  descriptions.forEach((description, descriptionIndex) => {
-    if (typeof description !== 'string' || description.trim().length === 0 || description.length > MAX_DESCRIPTION_LENGTH) {
-      reasons.push(`${fieldPath}.responsiveSearchAd.descriptions[${descriptionIndex}] must be 1-${MAX_DESCRIPTION_LENGTH} characters.`);
-    }
-  });
-
-  const finalUrl = responsiveSearchAd?.finalUrl;
-  if (typeof finalUrl !== 'string' || finalUrl.length === 0 || !isHttpUrl(finalUrl)) {
-    reasons.push(`${fieldPath}.responsiveSearchAd.finalUrl must be a valid http(s) URL.`);
-  }
+  validateResponsiveSearchAdContent(responsiveSearchAd, `${fieldPath}.responsiveSearchAd`, reasons);
 
   if (!Array.isArray(adGroup.keywords) || adGroup.keywords.length === 0) {
     reasons.push(`${fieldPath}.keywords must have at least one keyword.`);
@@ -205,6 +218,35 @@ export function validateKeywordEditActionInput(input: {
   if (addKeywords.length === 0 && addNegativeKeywords.length === 0) {
     reasons.push('at least one of addKeywords/addNegativeKeywords must have at least one entry.');
   }
+
+  if (reasons.length > 0) {
+    throw new InvalidCampaignDraftError(reasons);
+  }
+}
+
+/**
+ * Validates an `ad_edit` action's proposed input (KAN-72 follow-up) — a
+ * `previousAdResourceName` plus the replacement Responsive Search Ad content.
+ * Reuses {@link validateResponsiveSearchAdContent}'s own RSA limit checks so a
+ * replacement ad is held to the exact same shape a `campaign_draft_create`
+ * ad group's own `responsiveSearchAd` is. Tolerates a malformed/untrusted-cast
+ * request body the same way `validateKeywordEditActionInput` does — the
+ * `ad-edits` route casts an arbitrary JSON body to this shape before calling
+ * in.
+ */
+export function validateAdEditActionInput(input: { previousAdResourceName: unknown; responsiveSearchAd: unknown }): void {
+  if (!isRecord(input)) {
+    throw new InvalidCampaignDraftError(['input must be an object.']);
+  }
+
+  const reasons: string[] = [];
+
+  if (typeof input.previousAdResourceName !== 'string' || input.previousAdResourceName.trim().length === 0) {
+    reasons.push('previousAdResourceName must be a non-empty string.');
+  }
+
+  const responsiveSearchAd = isRecord(input.responsiveSearchAd) ? input.responsiveSearchAd : undefined;
+  validateResponsiveSearchAdContent(responsiveSearchAd, 'responsiveSearchAd', reasons);
 
   if (reasons.length > 0) {
     throw new InvalidCampaignDraftError(reasons);

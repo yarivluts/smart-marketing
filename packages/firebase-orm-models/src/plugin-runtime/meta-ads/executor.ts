@@ -3,6 +3,9 @@ import { AutomationTargetNotFoundError } from '../../services/automation-errors'
 import {
   validateCampaignDraft,
   type AutomationActionExecutor,
+  type AutomationAdEditExecutionInput,
+  type AutomationAdEditExecutionResult,
+  type AutomationAdEditRollbackInput,
   type AutomationBudgetChangeExecutionInput,
   type AutomationBudgetChangeExecutionResult,
   type AutomationCampaignActivationExecutionInput,
@@ -43,6 +46,26 @@ export class MetaKeywordEditNotSupportedError extends Error {
   constructor() {
     super('Meta Ads has no ad-group/keyword concept — a keyword_edit action is not supported for a Meta-linked target.');
     this.name = 'MetaKeywordEditNotSupportedError';
+  }
+}
+
+/**
+ * An `ad_edit` action (KAN-72 follow-up) reached `MetaAutomationActionExecutor`
+ * — this action type is defined in terms of Google Ads' own Responsive
+ * Search Ad shape (`AdEditResponsiveSearchAdContent`'s headlines/descriptions/
+ * final URL), which has no Meta equivalent modeled in this codebase yet (a
+ * Meta ad's creative is a single primary text/headline/description, not an
+ * RSA asset list — see `MetaCampaignDraftAdSet.ad.creative`'s own doc
+ * comment). A real Meta post-creation creative edit is a distinct, still-
+ * deferred follow-up (plan `13 §E21.3`'s own "post-creation edits beyond
+ * activation" bullet), not this action type reused — same "the executor is
+ * the one place that knows what a provider can and can't do" posture
+ * {@link MetaKeywordEditNotSupportedError} establishes one action type over.
+ */
+export class MetaAdEditNotSupportedError extends Error {
+  constructor() {
+    super('Meta Ads has no Responsive Search Ad concept — an ad_edit action is not supported for a Meta-linked target.');
+    this.name = 'MetaAdEditNotSupportedError';
   }
 }
 
@@ -257,6 +280,14 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
 
   async rollbackKeywordEdit(_input: AutomationKeywordEditRollbackInput): Promise<void> {
     throw new MetaKeywordEditNotSupportedError();
+  }
+
+  async executeAdEdit(_input: AutomationAdEditExecutionInput): Promise<AutomationAdEditExecutionResult> {
+    throw new MetaAdEditNotSupportedError();
+  }
+
+  async rollbackAdEdit(_input: AutomationAdEditRollbackInput): Promise<void> {
+    throw new MetaAdEditNotSupportedError();
   }
 
   /**

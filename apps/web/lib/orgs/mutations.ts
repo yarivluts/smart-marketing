@@ -1,6 +1,7 @@
 import 'server-only';
 import {
   acceptInvite as acceptInviteForOrganization,
+  type AdEditResponsiveSearchAdContent,
   type ApiKeyModel,
   type ApiKeyScope,
   approveAutomationAction as approveAutomationActionInOrganization,
@@ -16,6 +17,7 @@ import {
   ensureAutomationTargetSeeded as ensureAutomationTargetSeededInOrganization,
   executeAutomationAction as executeAutomationActionInOrganization,
   getAutomationActionTargetId as getAutomationActionTargetIdInOrganization,
+  proposeAdEditAction as proposeAdEditActionInOrganization,
   proposeAutomationBudgetChangeAction as proposeAutomationBudgetChangeActionInOrganization,
   proposeCampaignActivationAction as proposeCampaignActivationActionInOrganization,
   proposeCampaignDraftCreateAction as proposeCampaignDraftCreateActionInOrganization,
@@ -1301,6 +1303,20 @@ interface ProposeKeywordEditInput {
 export async function proposeKeywordEditAction(input: ProposeKeywordEditInput): Promise<AutomationActionModel> {
   await ensureFirestoreOrm();
   return proposeKeywordEditActionInOrganization(input);
+}
+
+interface ProposeAdEditInput {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  previousAdResourceName: string;
+  responsiveSearchAd: AdEditResponsiveSearchAdContent;
+  requestedByUserId: string;
+}
+
+export async function proposeAdEditAction(input: ProposeAdEditInput): Promise<AutomationActionModel> {
+  await ensureFirestoreOrm();
+  return proposeAdEditActionInOrganization(input);
 }
 
 interface ProposeMetaAdSetEditInput {

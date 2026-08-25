@@ -11,6 +11,7 @@ import {
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { MetaAdsApiError, type MetaAdsApiClient } from './api-client';
 import {
+  MetaAdEditNotSupportedError,
   MetaAdSetNotOwnedByTargetError,
   MetaAdsBudgetResourceUnknownError,
   MetaAdsWrongPlatformCampaignDraftError,
@@ -487,5 +488,37 @@ describe('MetaAutomationActionExecutor', () => {
       expect(apiClient.getAdSet).not.toHaveBeenCalled();
       expect(apiClient.updateAdSet).not.toHaveBeenCalled();
     });
+  });
+
+  it('throws MetaAdEditNotSupportedError for executeAdEdit — Meta has no Responsive Search Ad concept (KAN-72 follow-up)', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+
+    await expect(
+      executor.executeAdEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        previousAdResourceName: 'irrelevant',
+        responsiveSearchAd: { headlines: ['A', 'B', 'C'], descriptions: ['D', 'E'], finalUrl: 'https://example.com' },
+      }),
+    ).rejects.toBeInstanceOf(MetaAdEditNotSupportedError);
+  });
+
+  it('throws MetaAdEditNotSupportedError for rollbackAdEdit', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+
+    await expect(
+      executor.rollbackAdEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        previousAdResourceName: 'irrelevant',
+        newAdResourceName: 'irrelevant-2',
+      }),
+    ).rejects.toBeInstanceOf(MetaAdEditNotSupportedError);
   });
 });

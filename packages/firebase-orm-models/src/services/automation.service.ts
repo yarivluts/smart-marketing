@@ -10,10 +10,12 @@ import { isAutomationKillSwitchEngaged } from './automation-kill-switch.service'
 import { runWithRetryBackoff } from '../plugin-runtime/retry';
 import {
   defaultAutomationActionExecutor,
+  validateAdEditActionInput,
   validateCampaignDraft,
   validateKeywordEditActionInput,
   validateMetaAdSetEditActionInput,
   InvalidCampaignDraftError,
+  type AdEditResponsiveSearchAdContent,
   type AutomationActionExecutor,
   type CampaignDraft,
   type CampaignDraftKeyword,
@@ -64,8 +66,14 @@ async function loadTargetForAction(organizationId: string, projectId: string, ta
   return target;
 }
 
-/** `campaign_draft_create`/`campaign_activation`/`keyword_edit`/`meta_ad_set_edit` (KAN-72/KAN-73) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
-const MANAGE_ONLY_ACTION_TYPES: ReadonlySet<AutomationActionType> = new Set(['campaign_draft_create', 'campaign_activation', 'keyword_edit', 'meta_ad_set_edit']);
+/** `campaign_draft_create`/`campaign_activation`/`keyword_edit`/`ad_edit`/`meta_ad_set_edit` (KAN-72/KAN-73) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
+const MANAGE_ONLY_ACTION_TYPES: ReadonlySet<AutomationActionType> = new Set([
+  'campaign_draft_create',
+  'campaign_activation',
+  'keyword_edit',
+  'ad_edit',
+  'meta_ad_set_edit',
+]);
 
 function minimumWriteTierForActionType(actionType: AutomationActionType): ConnectionWriteTier {
   return MANAGE_ONLY_ACTION_TYPES.has(actionType) ? 'manage' : 'optimize';
@@ -81,6 +89,9 @@ function actionSummaryVerb(actionType: AutomationActionType): string {
   }
   if (actionType === 'keyword_edit') {
     return 'the keyword edit';
+  }
+  if (actionType === 'ad_edit') {
+    return 'the ad edit';
   }
   if (actionType === 'meta_ad_set_edit') {
     return 'the ad set edit';
@@ -659,6 +670,108 @@ export async function proposeKeywordEditAction(params: ProposeKeywordEditActionP
   return action;
 }
 
+export interface ProposeAdEditActionParams {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  previousAdResourceName: string;
+  responsiveSearchAd: AdEditResponsiveSearchAdContent;
+  requestedByUserId: string;
+  now?: Date;
+}
+
+/**
+ * KAN-72 follow-up's dry-run-diff step for replacing an already-created ad
+ * group's Responsive Search Ad with revised headlines/descriptions/final URL
+ * ("post-creation ad edits", plan `13 §E21.2`'s own deferred bullet).
+ * `previousAdResourceName` must be one of `target.ad_resource_names` — set by
+ * a `campaign_draft_create` action this same target already executed (and
+ * updated by a prior `ad_edit`) — so a caller can never point an ad edit at
+ * an arbitrary ad outside this target's own campaign. Reuses
+ * `evaluateCampaignActivationGuardrails`'s shape (no budget number involved),
+ * the same guardrail posture `proposeKeywordEditAction` already established
+ * for its own sibling action type.
+ */
+export async function proposeAdEditAction(params: ProposeAdEditActionParams): Promise<AutomationActionModel> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  try {
+    validateAdEditActionInput({
+      previousAdResourceName: params.previousAdResourceName,
+      responsiveSearchAd: params.responsiveSearchAd,
+    });
+  } catch (error) {
+    if (error instanceof InvalidCampaignDraftError) {
+      throw new InvalidAutomationActionError(error.message);
+    }
+    throw error;
+  }
+
+  const target = await loadTargetForAction(params.organizationId, params.projectId, params.targetId);
+  if (!target.ad_resource_names?.includes(params.previousAdResourceName)) {
+    throw new InvalidAutomationActionError('previousAdResourceName must be one of this target\'s own ads (created by a campaign_draft_create action)');
+  }
+
+  const now = params.now ?? new Date();
+  const policy = await getActiveAutomationGuardrailPolicy(params.organizationId, params.projectId);
+  const actionsExecutedToday =
+    policy.maxActionsPerDay !== null
+      ? await countAutomationActionsExecutedToday(params.organizationId, params.projectId, now, policy.maxActionsPerDay)
+      : 0;
+
+  const violations: GuardrailViolation[] = evaluateCampaignActivationGuardrails(
+    toPureGuardrailPolicy(policy),
+    { targetId: params.targetId },
+    { nowUtc: now, actionsExecutedToday },
+  );
+
+  if (await isAutomationKillSwitchEngaged(params.organizationId)) {
+    violations.push({ type: 'automation_paused', message: 'Automation is paused for this organization (kill switch engaged).' });
+  }
+
+  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target, 'manage');
+  if (tierViolation) {
+    violations.push(tierViolation);
+  }
+
+  const before = { previousAdResourceName: params.previousAdResourceName };
+  const after = { previousAdResourceName: params.previousAdResourceName, responsiveSearchAd: params.responsiveSearchAd };
+  const status: AutomationActionStatus = violations.length > 0 ? 'blocked' : 'awaiting_approval';
+
+  const action = new AutomationActionModel();
+  action.organization_id = params.organizationId;
+  action.project_id = params.projectId;
+  action.environment_id = target.environment_id;
+  action.action_type = 'ad_edit';
+  action.target_id = params.targetId;
+  action.target_label = target.label;
+  action.before = before;
+  action.after = after;
+  action.status = status;
+  action.guardrail_violations = violations;
+  action.requested_by_user_id = params.requestedByUserId;
+  action.proposed_at = now.toISOString();
+  action.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await action.save();
+
+  await auditBestEffort({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: target.environment_id,
+    actorType: 'user',
+    actorId: params.requestedByUserId,
+    action: 'automation_action.propose',
+    targetId: action.id,
+    summary:
+      status === 'blocked'
+        ? `Proposed an ad edit for "${target.label}" — blocked by ${violations.length} guardrail(s)`
+        : `Proposed an ad edit for "${target.label}"`,
+    before,
+    after,
+  });
+
+  return action;
+}
+
 export interface ProposeMetaAdSetEditActionParams {
   organizationId: string;
   projectId: string;
@@ -974,6 +1087,26 @@ async function executeActionByType(
     return attempts;
   }
 
+  if (action.action_type === 'ad_edit') {
+    const after = action.after as { previousAdResourceName: string; responsiveSearchAd: AdEditResponsiveSearchAdContent };
+    const { result, attempts } = await runWithRetryBackoff(
+      () =>
+        executor.executeAdEdit({
+          organizationId,
+          projectId,
+          environmentId: action.environment_id,
+          targetId: action.target_id,
+          previousAdResourceName: after.previousAdResourceName,
+          responsiveSearchAd: after.responsiveSearchAd,
+        }),
+      EXECUTE_RETRY_OPTIONS,
+    );
+    // Widens `after` with the real resource name Google Ads assigned the replacement ad, so
+    // `rollbackActionByType` knows exactly which ad to remove and which to restore.
+    action.after = { ...after, newAdResourceName: result.newAdResourceName };
+    return attempts;
+  }
+
   if (action.action_type === 'meta_ad_set_edit') {
     const before = action.before as { adSetResourceName: string };
     const after = action.after as { adSetResourceName: string; dailyBudgetUsd?: number; adSetStatus?: MetaAdSetStatus };
@@ -1100,6 +1233,23 @@ async function rollbackActionByType(
       targetId: action.target_id,
       addedKeywordResourceNames: after.addedKeywordResourceNames ?? [],
       addedNegativeKeywordResourceNames: after.addedNegativeKeywordResourceNames ?? [],
+    });
+    return;
+  }
+
+  if (action.action_type === 'ad_edit') {
+    const before = action.before as { previousAdResourceName: string };
+    const after = action.after as { newAdResourceName?: string };
+    if (!after.newAdResourceName) {
+      throw new InvalidAutomationActionError('this ad_edit action has no new ad resource name to roll back (it never finished executing)');
+    }
+    await executor.rollbackAdEdit({
+      organizationId,
+      projectId,
+      environmentId: action.environment_id,
+      targetId: action.target_id,
+      previousAdResourceName: before.previousAdResourceName,
+      newAdResourceName: after.newAdResourceName,
     });
     return;
   }

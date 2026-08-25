@@ -2,6 +2,9 @@ import { AutomationTargetStateModel } from '../models/automation-target-state.mo
 import { AutomationTargetNotFoundError } from '../services/automation-errors';
 import type {
   AutomationActionExecutor,
+  AutomationAdEditExecutionInput,
+  AutomationAdEditExecutionResult,
+  AutomationAdEditRollbackInput,
   AutomationBudgetChangeExecutionInput,
   AutomationBudgetChangeExecutionResult,
   AutomationCampaignActivationExecutionInput,
@@ -76,6 +79,7 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
       target.meta_ad_set_resource_names = input.draft.adSets.map((_adSet, index) => `act/simulated/adSets/${target.id}-${index}`);
     } else {
       target.ad_group_resource_names = input.draft.adGroups.map((_adGroup, index) => `customers/simulated/adGroups/${target.id}-${index}`);
+      target.ad_resource_names = input.draft.adGroups.map((_adGroup, index) => `customers/simulated/adGroupAds/${target.id}-${index}`);
     }
     target.updated_at = new Date().toISOString();
     await target.save();
@@ -116,6 +120,32 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
 
   async rollbackKeywordEdit(input: AutomationKeywordEditRollbackInput): Promise<void> {
     const target = await loadTarget(input);
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  async executeAdEdit(input: AutomationAdEditExecutionInput): Promise<AutomationAdEditExecutionResult> {
+    const target = await loadTarget(input);
+    const adIndex = target.ad_resource_names?.indexOf(input.previousAdResourceName) ?? -1;
+    const newAdResourceName = `customers/simulated/adGroupAds/${target.id}-edit-${Date.now()}`;
+    if (adIndex !== -1) {
+      const nextAdResourceNames = [...(target.ad_resource_names ?? [])];
+      nextAdResourceNames[adIndex] = newAdResourceName;
+      target.ad_resource_names = nextAdResourceNames;
+    }
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return { newAdResourceName };
+  }
+
+  async rollbackAdEdit(input: AutomationAdEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    const adIndex = target.ad_resource_names?.indexOf(input.newAdResourceName) ?? -1;
+    if (adIndex !== -1) {
+      const nextAdResourceNames = [...(target.ad_resource_names ?? [])];
+      nextAdResourceNames[adIndex] = input.previousAdResourceName;
+      target.ad_resource_names = nextAdResourceNames;
+    }
     target.updated_at = new Date().toISOString();
     await target.save();
   }

@@ -156,12 +156,12 @@ export interface AutomationCampaignActivationExecutionInput {
  * A `keyword_edit` action (KAN-72 follow-up, plan `13 §E21.2`'s own deferred
  * "post-creation ad/keyword edits" bullet) — adds keywords/negative keywords
  * to an ad group a `campaign_draft_create` action already created (see
- * `AutomationTargetStateModel.ad_group_resource_names`). Editing an RSA ad's
- * own headlines/descriptions in place isn't supported yet (Google Ads models
- * RSA assets as add/remove operations rather than a partial update, and Meta
- * has no ad-group/keyword concept at all — see `MetaAutomationActionExecutor`'s
- * own doc comment) — only ever adding new keyword-level criteria, never
- * removing/editing an existing one, is this action type's whole scope.
+ * `AutomationTargetStateModel.ad_group_resource_names`). Only ever adding new
+ * keyword-level criteria, never removing/editing an existing one, is this
+ * action type's whole scope (Meta has no ad-group/keyword concept at all —
+ * see `MetaAutomationActionExecutor`'s own doc comment). Editing an RSA ad's
+ * own headlines/descriptions is a separate action type, `ad_edit` (below) —
+ * see its own doc comment for why it can't reuse this add-only shape.
  */
 export interface AutomationKeywordEditExecutionInput {
   organizationId: string;
@@ -187,7 +187,54 @@ export interface AutomationKeywordEditRollbackInput {
   addedNegativeKeywordResourceNames: string[];
 }
 
-/** Mirrors `CampaignStatus`'s `paused`/`enabled` vocabulary, scoped to one Meta ad set rather than a whole campaign — see `MetaAdSetEditExecutionInput`'s own doc comment for why an ad set needs its own status vocabulary distinct from `CampaignStatus`. */
+/** One Responsive Search Ad's editable creative content — the same shape `CampaignDraftAdGroup.responsiveSearchAd` uses, minus the ad-group-only keyword lists. */
+export interface AdEditResponsiveSearchAdContent {
+  /** 3-15 headlines, each <=30 characters — Google Ads' own RSA limits. */
+  headlines: string[];
+  /** 2-4 descriptions, each <=90 characters — Google Ads' own RSA limits. */
+  descriptions: string[];
+  finalUrl: string;
+}
+
+/**
+ * An `ad_edit` action (KAN-72 follow-up, plan `13 §E21.2`'s own deferred
+ * "post-creation ad edits" bullet) — replaces an already-created ad group's
+ * Responsive Search Ad with a new one carrying revised headlines/
+ * descriptions/final URL. `previousAdResourceName` must be one of
+ * `AutomationTargetStateModel.ad_resource_names` — the caller can never point
+ * an edit at an arbitrary ad outside this target's own campaign, mirroring
+ * `AutomationKeywordEditExecutionInput.adGroupResourceName`'s own
+ * "must be one of this target's own ad groups" constraint. Unlike
+ * `keyword_edit`, this isn't an add-only shape: Google Ads' `Ad` resource is
+ * immutable once created (a real in-place partial update of an RSA's own
+ * creative text isn't offered by the API), so the only way to change an ad's
+ * copy is to create a new ad carrying the revised content and pause the old
+ * one — see `GoogleAdsAutomationActionExecutor.executeAdEdit`'s own doc
+ * comment for exactly how.
+ */
+export interface AutomationAdEditExecutionInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  previousAdResourceName: string;
+  responsiveSearchAd: AdEditResponsiveSearchAdContent;
+}
+
+export interface AutomationAdEditExecutionResult {
+  newAdResourceName: string;
+}
+
+export interface AutomationAdEditRollbackInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  previousAdResourceName: string;
+  newAdResourceName: string;
+}
+
+/** Mirrors `CampaignStatus`'s `paused`/`enabled` vocabulary, scoped to one Meta ad set rather than a whole campaign — see `AutomationMetaAdSetEditExecutionInput`'s own doc comment for why an ad set needs its own status vocabulary distinct from `CampaignStatus`. */
 export type MetaAdSetStatus = 'enabled' | 'paused';
 
 /**
@@ -249,18 +296,20 @@ export interface AutomationMetaAdSetEditRollbackInput {
  * `rollbackCampaignActivation` flip an already-created campaign between
  * paused and enabled; `executeKeywordEdit`/`rollbackKeywordEdit` add (and
  * remove) keywords/negative keywords on an already-created ad group;
- * `executeMetaAdSetEdit`/`rollbackMetaAdSetEdit` (KAN-73 follow-up) edit (and
- * restore) an already-created Meta ad set's budget/status. Same
- * "provider-agnostic executor interface" posture as `SourcePluginExecutor`
- * (KAN-47) and `WarehouseQueryExecutor` (KAN-42) — the interface itself never
- * mentions a provider name; `resolveAutomationActionExecutorForTarget`
+ * `executeAdEdit`/`rollbackAdEdit` replace (and restore) an already-created ad
+ * group's Responsive Search Ad; `executeMetaAdSetEdit`/`rollbackMetaAdSetEdit`
+ * (KAN-73 follow-up) edit (and restore) an already-created Meta ad set's
+ * budget/status. Same "provider-agnostic executor interface" posture as
+ * `SourcePluginExecutor` (KAN-47) and `WarehouseQueryExecutor` (KAN-42) — the
+ * interface itself never mentions a provider name;
+ * `resolveAutomationActionExecutorForTarget`
  * (`services/automation-executor-resolver.service.ts`) is the one place that
  * picks a concrete implementation, based on a target's linked credential's
  * `provider`. Every implementation must still implement every method even
- * though `keyword_edit`/`meta_ad_set_edit` are each only ever meaningful for
- * one provider — `MetaAutomationActionExecutor.executeKeywordEdit`/
- * `GoogleAdsAutomationActionExecutor.executeMetaAdSetEdit` throw a
- * documented "not supported" error instead (see each class's own doc
+ * though `keyword_edit`/`ad_edit`/`meta_ad_set_edit` are each only ever
+ * meaningful for one provider — `MetaAutomationActionExecutor.executeKeywordEdit`/
+ * `executeAdEdit` and `GoogleAdsAutomationActionExecutor.executeMetaAdSetEdit`
+ * throw a documented "not supported" error instead (see each class's own doc
  * comment).
  */
 export interface AutomationActionExecutor {
@@ -272,6 +321,8 @@ export interface AutomationActionExecutor {
   rollbackCampaignActivation(input: AutomationCampaignActivationExecutionInput): Promise<void>;
   executeKeywordEdit(input: AutomationKeywordEditExecutionInput): Promise<AutomationKeywordEditExecutionResult>;
   rollbackKeywordEdit(input: AutomationKeywordEditRollbackInput): Promise<void>;
+  executeAdEdit(input: AutomationAdEditExecutionInput): Promise<AutomationAdEditExecutionResult>;
+  rollbackAdEdit(input: AutomationAdEditRollbackInput): Promise<void>;
   executeMetaAdSetEdit(input: AutomationMetaAdSetEditExecutionInput): Promise<AutomationMetaAdSetEditExecutionResult>;
   rollbackMetaAdSetEdit(input: AutomationMetaAdSetEditRollbackInput): Promise<void>;
 }
