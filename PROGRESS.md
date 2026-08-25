@@ -17,6 +17,33 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (even newer) — Merged KAN-72 follow-up (PR #289, Google Ads post-creation keyword edits)
+
+- **Last completed:**
+  - PR #289's CI (`terraform fmt · validate`, `lint · typecheck · test · build`) reported back green via
+    the `check_suite.completed` webhook event (subscribed via `subscribe_pr_activity` before the wait),
+    `mergeable_state: clean`, base sha matching `main`'s current tip, no open reviews. Merged (squash).
+    Remote branch deletion hit the same recurring HTTP 403 from this sandbox's git-over-HTTPS proxy
+    every prior entry documents — left undeleted. Unsubscribed from the PR's activity.
+  - Updated `TASKS.md`'s KAN-72 row with a follow-up note (same convention KAN-72/73's own prior
+    follow-up rows used for PR #286/#288).
+- **In progress (exact stopping point):** none — PR #289 is merged, `main`'s CI is green, `TASKS.md`
+  reflects the delivered scope.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates: KAN-72's own remaining PMax asset groups and RSA ad edits (headline/description
+  changes in place — Google Ads models RSA assets as add/remove operations rather than a partial
+  update, so this needs real design thought, not a quick follow-up); KAN-73's real Meta creative image
+  upload and post-creation edits beyond activation; Lookalike/Similar Audience expansion for either
+  Customer-Match/Custom-Audience connector; non-email Customer Match identifiers (phone, mailing
+  address, device id).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-72-google-ads-keyword-edits` branch on GitHub (the git-over-HTTPS
+    proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-25 (newest) — New follow-up: Google Ads post-creation keyword edits (KAN-72) — PR #289 open
 
 - **Last completed:**
