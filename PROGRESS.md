@@ -17,6 +17,61 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (even later still) — Merged KAN-92 (PR #287, Sales-assist workflows / demos pipeline)
+
+- **Last completed:**
+  - Session start: local `main` was again on a stale detached HEAD (`3add50f`'s own ancestor chain,
+    ~50 commits behind a shallow-fetch boundary) — same recurring environment quirk every prior entry
+    documents; `git merge --ff-only` failed with "refusing to merge unrelated histories" (the shallow
+    clone's truncated history), so used `git reset --hard origin/main` instead, verified clean after.
+  - `list_pull_requests` (open) found **PR #287** already sitting open from the prior run in this same
+    session (the entry directly below this one): KAN-92 fully implemented and self-tested locally, but
+    its own branch was cut from `c4f1134` — 4 commits behind `main`'s actual tip (`3add50f`, which had
+    since picked up PR #286's Meta Custom Audience merge) — and CI hadn't reported back yet.
+  - Merged `origin/main` into `kan-92-sales-demos-pipeline`: one real conflict, in `PROGRESS.md`'s own
+    top-of-file entry (both branches had appended a new dated entry at the same position) — resolved
+    by keeping both entries, main's (PR #286's completed record) above this branch's own KAN-92 entry.
+    `TASKS.md` merged cleanly (no conflict — the two branches touched different rows).
+  - Re-verified from a clean slate after the merge: fresh `pnpm install`, then `pnpm lint` / `pnpm
+    typecheck` / `pnpm build` all green monorepo-wide. `pnpm test` (full turbo run, all 11 packages):
+    **first run showed 3 failures**, all in `apps/api`'s `mcp-oauth.controller.e2e.spec.ts` (OAuth
+    token-exchange e2e tests timing out at 30s) — none of them touch this PR's sales/demo code.
+    Firestore emulator logs around the failure showed `RESOURCE_EXHAUSTED`/backoff errors, and the
+    whole monorepo suite runs many emulators/dbt/Playwright processes concurrently — re-ran `apps/api`
+    alone, uncontended: 140/140 green in 14.7s (vs. 371s under the full-suite run), confirming
+    resource contention rather than a real regression. Re-ran the *entire* `pnpm test` fresh once
+    more end to end to get an authoritative signal: 11/11 turbo tasks green (`packages/shared`
+    574/574, `packages/firebase-orm-models` 1275/1275 real-emulator, `apps/api` 140/140, `apps/web`
+    250 test files incl. e2e, `mcp-headless-example`/`tracking-sdk` green).
+  - Confirmed PR #287's own CI (GitHub Actions `lint · typecheck · test · build` + `terraform fmt ·
+    validate`) reported back green via the `check_suite.completed` webhook event (subscribed via
+    `subscribe_pr_activity` before starting the check-suite wait), `mergeable_state: clean`, base sha
+    matching current `main` tip, no open review threads. Merged (squash). Remote branch deletion hit
+    the same recurring HTTP 403 from this sandbox's git-over-HTTPS proxy every prior entry
+    documents — left undeleted. Unsubscribed from the PR's activity.
+- **In progress (exact stopping point):** none — PR #287 is merged, `TASKS.md`'s KAN-92 row (added by
+  the prior run's own branch) reflects the delivered scope, `main`'s CI is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** every one of `docs/plan/14-gap-analysis.md`'s 15 gap bullets now has a story
+  (KAN-80..92) and `TASKS.md` has no remaining unblocked `todo`/`in-progress` row beyond the standing
+  KAN-18/KAN-19 infra work, KAN-43/KAN-50/KAN-51's human-gated blockers, and KAN-86's infra-gated
+  `roi_nd` gap. A future run should go back to sweeping each `done` row's own "deferred"/"not yet"
+  doc-comment notes for a newly-buildable follow-up (the pattern that produced KAN-91 from KAN-90's
+  own limitation, and KAN-92's own "paying_no_demo segment"/"recent-demos feed" scope cuts are two
+  fresh candidates) — same posture the last several entries have taken since KAN-89. Worth a look:
+  KAN-72's own deferred Google Ads bullets (PMax asset groups, post-creation ad/keyword edits,
+  audience attach) — a Google Ads "Customer Match" list from a segment, the direct sibling of KAN-73's
+  own Meta Custom Audience follow-up (PR #286), is still unbuilt. When a full `pnpm test` run shows a
+  failure unrelated to the PR's own diff, re-run just that failing package alone before treating it as
+  a real regression — this run's own `apps/api` MCP-OAuth timeout was resource contention from the
+  full-suite run's concurrent emulators, not a bug.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-92-sales-demos-pipeline` branch on GitHub (the git-over-HTTPS
+    proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-25 (even later) — New story KAN-92 (Sales-assist workflows / demos pipeline, Gap 9) — PR #287 open
 
 - **Last completed:**
