@@ -666,7 +666,10 @@
     "leaderboardEmpty": "No resolved tickets landed for this project yet.",
     "rankedName": "{rank}. {name}",
     "rowSummary": "{resolved} resolved · {firstResponse} first response · {resolution} resolution · {csat} CSAT",
-    "rowValueUnavailable": "—"
+    "rowValueUnavailable": "—",
+    "durationSeconds": "{value}s",
+    "durationMinutes": "{value}m",
+    "durationHours": "{value}h"
   },
   "ChurnReasons": {
     "metaTitle": "Churn reasons",
