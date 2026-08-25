@@ -10,7 +10,13 @@ import {
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { GoogleAdsApiError, type GoogleAdsApiClient, type GoogleAdsCreateCampaignDraftResult } from './api-client';
-import { GoogleAdsAdResourceUnknownError, GoogleAdsAutomationActionExecutor, GoogleAdsBudgetResourceUnknownError, GoogleAdsWrongPlatformCampaignDraftError } from './executor';
+import {
+  GoogleAdsAdResourceUnknownError,
+  GoogleAdsAutomationActionExecutor,
+  GoogleAdsBudgetResourceUnknownError,
+  GoogleAdsMetaAdSetEditNotSupportedError,
+  GoogleAdsWrongPlatformCampaignDraftError,
+} from './executor';
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('google-ads-executor-tests');
@@ -424,6 +430,37 @@ describe('GoogleAdsAutomationActionExecutor', () => {
     });
 
     expect(apiClient.removeAdGroupCriteria).not.toHaveBeenCalled();
+  });
+
+  it('throws GoogleAdsMetaAdSetEditNotSupportedError for executeMetaAdSetEdit — Google Ads has no ad-set concept (KAN-73 follow-up)', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await expect(
+      executor.executeMetaAdSetEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adSetResourceName: 'irrelevant',
+        dailyBudgetUsd: 40,
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsMetaAdSetEditNotSupportedError);
+  });
+
+  it('throws GoogleAdsMetaAdSetEditNotSupportedError for rollbackMetaAdSetEdit', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await expect(
+      executor.rollbackMetaAdSetEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adSetResourceName: 'irrelevant',
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsMetaAdSetEditNotSupportedError);
   });
 
   it('replaces an ad group\'s RSA with a new one, pausing the superseded ad and updating ad_resource_names in place (KAN-72 follow-up)', async () => {

@@ -15,8 +15,20 @@ import {
   type AutomationKeywordEditExecutionInput,
   type AutomationKeywordEditExecutionResult,
   type AutomationKeywordEditRollbackInput,
+  type AutomationMetaAdSetEditExecutionInput,
+  type AutomationMetaAdSetEditExecutionResult,
+  type AutomationMetaAdSetEditRollbackInput,
+  type MetaAdSetStatus,
 } from '../../automation-runtime';
-import { usdToCents, type MetaAdsApiClient } from './api-client';
+import { usdToCents, type MetaAdsApiClient, type MetaObjectStatus, type MetaUpdateAdSetParams } from './api-client';
+
+/** `AutomationMetaAdSetEditExecutionInput.status`/`AutomationMetaAdSetEditRollbackInput.beforeStatus`'s `enabled`/`paused` <-> Meta's own `ACTIVE`/`PAUSED` object-status vocabulary — the same mapping `executeCampaignActivation`/`rollbackCampaignActivation` apply inline for a whole campaign, pulled out here since `executeMetaAdSetEdit`/`rollbackMetaAdSetEdit` both need it in each direction. */
+const AD_SET_STATUS_TO_META: Record<MetaAdSetStatus, MetaObjectStatus> = { enabled: 'ACTIVE', paused: 'PAUSED' };
+
+/** The reverse of {@link AD_SET_STATUS_TO_META} — an ad set this connector created is never `DELETED` (only a whole campaign gets deleted on a `campaign_draft_create` rollback), so any non-`ACTIVE` status reported live is treated as `paused`. */
+function metaStatusToAdSetStatus(status: MetaObjectStatus): MetaAdSetStatus {
+  return status === 'ACTIVE' ? 'enabled' : 'paused';
+}
 
 /**
  * A `keyword_edit` action (KAN-72 follow-up) reached `MetaAutomationActionExecutor`
@@ -80,6 +92,14 @@ export class MetaAdsWrongPlatformCampaignDraftError extends Error {
   constructor() {
     super('MetaAutomationActionExecutor can only execute a campaign draft with platform: "meta".');
     this.name = 'MetaAdsWrongPlatformCampaignDraftError';
+  }
+}
+
+/** A `meta_ad_set_edit` action was proposed/executed against an `adSetResourceName` that isn't one of the target's own ad sets (`AutomationTargetStateModel.meta_ad_set_resource_names`) — defense in depth alongside `proposeMetaAdSetEditAction`'s own check (`automation.service.ts`), the same "both the service and the executor enforce it" posture `MetaAdsWrongPlatformCampaignDraftError` establishes for cross-provider isolation. */
+export class MetaAdSetNotOwnedByTargetError extends Error {
+  constructor(targetId: string, adSetResourceName: string) {
+    super(`Ad set "${adSetResourceName}" is not one of automation target "${targetId}"'s own ad sets (created by a campaign_draft_create action).`);
+    this.name = 'MetaAdSetNotOwnedByTargetError';
   }
 }
 
@@ -198,12 +218,14 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     // Sequential per-ad-set creation (ad set -> creative -> ad), not one
     // atomic batch — see this class's own doc comment and `MetaAdsHttpApiClient`'s
     // for why.
+    const metaAdSetResourceNames: string[] = [];
     for (const adSet of draft.adSets) {
       const adSetResult = await this.apiClient.createAdSet(this.adAccountId, {
         campaignId: campaign.campaignId,
         name: adSet.name,
         targeting: adSet.targeting,
       });
+      metaAdSetResourceNames.push(adSetResult.adSetId);
       const creativeResult = await this.apiClient.createAdCreative(this.adAccountId, {
         pageId: this.pageId,
         primaryText: adSet.ad.creative.primaryText,
@@ -222,6 +244,7 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     target.campaign_budget_resource_name = campaign.campaignId;
     target.campaign_status = 'paused';
     target.daily_budget_usd = draft.dailyBudgetUsd;
+    target.meta_ad_set_resource_names = metaAdSetResourceNames;
     target.updated_at = new Date().toISOString();
     await target.save();
     return { campaignResourceName: campaign.campaignId };
@@ -265,5 +288,55 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
 
   async rollbackAdEdit(_input: AutomationAdEditRollbackInput): Promise<void> {
     throw new MetaAdEditNotSupportedError();
+  }
+
+  /**
+   * Reads the ad set's true pre-edit budget/status live (see
+   * `AutomationMetaAdSetEditExecutionInput`'s own doc comment for why —
+   * `AutomationTargetStateModel` has no per-ad-set field to source them
+   * from), applies only the field(s) this edit actually touches via a single
+   * `updateAdSet` call, and returns the real pre-edit values so
+   * `executeActionByType` (`automation.service.ts`) can widen `action.before`
+   * with them for `rollbackMetaAdSetEdit` to restore later.
+   */
+  async executeMetaAdSetEdit(input: AutomationMetaAdSetEditExecutionInput): Promise<AutomationMetaAdSetEditExecutionResult> {
+    const target = await loadTarget(input);
+    if (!target.meta_ad_set_resource_names?.includes(input.adSetResourceName)) {
+      throw new MetaAdSetNotOwnedByTargetError(target.id, input.adSetResourceName);
+    }
+
+    const current = await this.apiClient.getAdSet(input.adSetResourceName);
+    const updateParams: MetaUpdateAdSetParams = {};
+    const result: AutomationMetaAdSetEditExecutionResult = {};
+    if (input.dailyBudgetUsd !== undefined) {
+      updateParams.dailyBudgetCents = usdToCents(input.dailyBudgetUsd);
+      result.previousDailyBudgetUsd = current.dailyBudgetCents !== undefined ? current.dailyBudgetCents / 100 : 0;
+    }
+    if (input.status !== undefined) {
+      updateParams.status = AD_SET_STATUS_TO_META[input.status];
+      result.previousStatus = metaStatusToAdSetStatus(current.status);
+    }
+
+    await this.apiClient.updateAdSet(input.adSetResourceName, updateParams);
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return result;
+  }
+
+  /** Re-applies exactly the pre-edit budget/status `executeMetaAdSetEdit` captured — no ownership re-check needed (the action's own stored `adSetResourceName` was already validated at execute time, same posture `rollbackKeywordEdit` establishes for `keyword_edit`). */
+  async rollbackMetaAdSetEdit(input: AutomationMetaAdSetEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    const updateParams: MetaUpdateAdSetParams = {};
+    if (input.beforeDailyBudgetUsd !== undefined) {
+      updateParams.dailyBudgetCents = usdToCents(input.beforeDailyBudgetUsd);
+    }
+    if (input.beforeStatus !== undefined) {
+      updateParams.status = AD_SET_STATUS_TO_META[input.beforeStatus];
+    }
+    if (Object.keys(updateParams).length > 0) {
+      await this.apiClient.updateAdSet(input.adSetResourceName, updateParams);
+    }
+    target.updated_at = new Date().toISOString();
+    await target.save();
   }
 }

@@ -252,3 +252,45 @@ export function validateAdEditActionInput(input: { previousAdResourceName: unkno
     throw new InvalidCampaignDraftError(reasons);
   }
 }
+
+const META_AD_SET_STATUSES = ['enabled', 'paused'] as const;
+
+/**
+ * Validates a `meta_ad_set_edit` action's proposed input (KAN-73
+ * follow-up) — an `adSetResourceName` plus at least one of a new
+ * `dailyBudgetUsd`/`status` to apply. Tolerates a malformed/untrusted-cast
+ * request body the same way `validateKeywordEditActionInput` does — the
+ * `meta-ad-set-edits` route casts an arbitrary JSON body to this shape
+ * before calling in.
+ */
+export function validateMetaAdSetEditActionInput(input: {
+  adSetResourceName: unknown;
+  dailyBudgetUsd: unknown;
+  status: unknown;
+}): void {
+  if (!isRecord(input)) {
+    throw new InvalidCampaignDraftError(['input must be an object.']);
+  }
+
+  const reasons: string[] = [];
+
+  if (typeof input.adSetResourceName !== 'string' || input.adSetResourceName.trim().length === 0) {
+    reasons.push('adSetResourceName must be a non-empty string.');
+  }
+
+  if (input.dailyBudgetUsd !== undefined && (typeof input.dailyBudgetUsd !== 'number' || !Number.isFinite(input.dailyBudgetUsd) || input.dailyBudgetUsd <= 0)) {
+    reasons.push('dailyBudgetUsd must be a positive number when present.');
+  }
+
+  if (input.status !== undefined && !(META_AD_SET_STATUSES as readonly unknown[]).includes(input.status)) {
+    reasons.push(`status must be one of ${META_AD_SET_STATUSES.join(', ')} when present.`);
+  }
+
+  if (input.dailyBudgetUsd === undefined && input.status === undefined) {
+    reasons.push('at least one of dailyBudgetUsd/status must be set.');
+  }
+
+  if (reasons.length > 0) {
+    throw new InvalidCampaignDraftError(reasons);
+  }
+}

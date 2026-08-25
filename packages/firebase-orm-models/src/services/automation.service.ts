@@ -13,11 +13,13 @@ import {
   validateAdEditActionInput,
   validateCampaignDraft,
   validateKeywordEditActionInput,
+  validateMetaAdSetEditActionInput,
   InvalidCampaignDraftError,
   type AdEditResponsiveSearchAdContent,
   type AutomationActionExecutor,
   type CampaignDraft,
   type CampaignDraftKeyword,
+  type MetaAdSetStatus,
 } from '../automation-runtime';
 import {
   AutomationActionInvalidStateError,
@@ -64,8 +66,14 @@ async function loadTargetForAction(organizationId: string, projectId: string, ta
   return target;
 }
 
-/** `campaign_draft_create`/`campaign_activation`/`keyword_edit`/`ad_edit` (KAN-72) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
-const MANAGE_ONLY_ACTION_TYPES: ReadonlySet<AutomationActionType> = new Set(['campaign_draft_create', 'campaign_activation', 'keyword_edit', 'ad_edit']);
+/** `campaign_draft_create`/`campaign_activation`/`keyword_edit`/`ad_edit`/`meta_ad_set_edit` (KAN-72/KAN-73) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
+const MANAGE_ONLY_ACTION_TYPES: ReadonlySet<AutomationActionType> = new Set([
+  'campaign_draft_create',
+  'campaign_activation',
+  'keyword_edit',
+  'ad_edit',
+  'meta_ad_set_edit',
+]);
 
 function minimumWriteTierForActionType(actionType: AutomationActionType): ConnectionWriteTier {
   return MANAGE_ONLY_ACTION_TYPES.has(actionType) ? 'manage' : 'optimize';
@@ -84,6 +92,9 @@ function actionSummaryVerb(actionType: AutomationActionType): string {
   }
   if (actionType === 'ad_edit') {
     return 'the ad edit';
+  }
+  if (actionType === 'meta_ad_set_edit') {
+    return 'the ad set edit';
   }
   return 'the budget change';
 }
@@ -761,6 +772,122 @@ export async function proposeAdEditAction(params: ProposeAdEditActionParams): Pr
   return action;
 }
 
+export interface ProposeMetaAdSetEditActionParams {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  adSetResourceName: string;
+  /** Omit to leave the ad set's daily budget untouched. */
+  dailyBudgetUsd?: number;
+  /** Omit to leave the ad set's status untouched. */
+  status?: MetaAdSetStatus;
+  requestedByUserId: string;
+  now?: Date;
+}
+
+/**
+ * KAN-73 follow-up's dry-run-diff step for editing an already-created Meta ad
+ * set's budget and/or status ("post-creation ad-set edits", plan `13 §E21.2`'s
+ * own deferred bullet — the Meta sibling of `proposeKeywordEditAction`).
+ * `adSetResourceName` must be one of `target.meta_ad_set_resource_names` —
+ * set by a `campaign_draft_create` action this same target already executed
+ * — so a caller can never point an edit at an arbitrary ad set outside this
+ * target's own campaign (same invariant `proposeKeywordEditAction`
+ * established for ad groups). Unlike `keyword_edit`'s purely additive shape,
+ * a budget/status edit overwrites live state, and the true pre-edit values
+ * aren't known until execute time (an ad set's budget/status isn't mirrored
+ * on `AutomationTargetStateModel` the way a whole campaign's is) — `before`
+ * only records `adSetResourceName` here; `executeActionByType` widens it
+ * post-execution with the real values `MetaAutomationActionExecutor` reads
+ * live, see `AUTOMATION_ACTION_TYPES`'s own doc comment.
+ */
+export async function proposeMetaAdSetEditAction(params: ProposeMetaAdSetEditActionParams): Promise<AutomationActionModel> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  try {
+    validateMetaAdSetEditActionInput({
+      adSetResourceName: params.adSetResourceName,
+      dailyBudgetUsd: params.dailyBudgetUsd,
+      status: params.status,
+    });
+  } catch (error) {
+    if (error instanceof InvalidCampaignDraftError) {
+      throw new InvalidAutomationActionError(error.message);
+    }
+    throw error;
+  }
+
+  const target = await loadTargetForAction(params.organizationId, params.projectId, params.targetId);
+  if (!target.meta_ad_set_resource_names?.includes(params.adSetResourceName)) {
+    throw new InvalidAutomationActionError("adSetResourceName must be one of this target's own ad sets (created by a campaign_draft_create action)");
+  }
+
+  const now = params.now ?? new Date();
+  const policy = await getActiveAutomationGuardrailPolicy(params.organizationId, params.projectId);
+  const actionsExecutedToday =
+    policy.maxActionsPerDay !== null
+      ? await countAutomationActionsExecutedToday(params.organizationId, params.projectId, now, policy.maxActionsPerDay)
+      : 0;
+
+  const violations: GuardrailViolation[] = evaluateCampaignActivationGuardrails(
+    toPureGuardrailPolicy(policy),
+    { targetId: params.targetId },
+    { nowUtc: now, actionsExecutedToday },
+  );
+
+  if (await isAutomationKillSwitchEngaged(params.organizationId)) {
+    violations.push({ type: 'automation_paused', message: 'Automation is paused for this organization (kill switch engaged).' });
+  }
+
+  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target, 'manage');
+  if (tierViolation) {
+    violations.push(tierViolation);
+  }
+
+  const before = { adSetResourceName: params.adSetResourceName };
+  const after: Record<string, unknown> = { adSetResourceName: params.adSetResourceName };
+  if (params.dailyBudgetUsd !== undefined) {
+    after.dailyBudgetUsd = params.dailyBudgetUsd;
+  }
+  if (params.status !== undefined) {
+    after.adSetStatus = params.status;
+  }
+  const status: AutomationActionStatus = violations.length > 0 ? 'blocked' : 'awaiting_approval';
+
+  const action = new AutomationActionModel();
+  action.organization_id = params.organizationId;
+  action.project_id = params.projectId;
+  action.environment_id = target.environment_id;
+  action.action_type = 'meta_ad_set_edit';
+  action.target_id = params.targetId;
+  action.target_label = target.label;
+  action.before = before;
+  action.after = after;
+  action.status = status;
+  action.guardrail_violations = violations;
+  action.requested_by_user_id = params.requestedByUserId;
+  action.proposed_at = now.toISOString();
+  action.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await action.save();
+
+  await auditBestEffort({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: target.environment_id,
+    actorType: 'user',
+    actorId: params.requestedByUserId,
+    action: 'automation_action.propose',
+    targetId: action.id,
+    summary:
+      status === 'blocked'
+        ? `Proposed an ad set edit for "${target.label}" — blocked by ${violations.length} guardrail(s)`
+        : `Proposed an ad set edit for "${target.label}"`,
+    before,
+    after,
+  });
+
+  return action;
+}
+
 export interface ApproveAutomationActionParams {
   organizationId: string;
   projectId: string;
@@ -980,6 +1107,33 @@ async function executeActionByType(
     return attempts;
   }
 
+  if (action.action_type === 'meta_ad_set_edit') {
+    const before = action.before as { adSetResourceName: string };
+    const after = action.after as { adSetResourceName: string; dailyBudgetUsd?: number; adSetStatus?: MetaAdSetStatus };
+    const { result, attempts } = await runWithRetryBackoff(
+      () =>
+        executor.executeMetaAdSetEdit({
+          organizationId,
+          projectId,
+          environmentId: action.environment_id,
+          targetId: action.target_id,
+          adSetResourceName: after.adSetResourceName,
+          ...(after.dailyBudgetUsd !== undefined ? { dailyBudgetUsd: after.dailyBudgetUsd } : {}),
+          ...(after.adSetStatus !== undefined ? { status: after.adSetStatus } : {}),
+        }),
+      EXECUTE_RETRY_OPTIONS,
+    );
+    // Widens `before` (not `after` — see `AUTOMATION_ACTION_TYPES`'s own doc comment) with the
+    // real pre-edit values Meta reported, so `rollbackActionByType` knows exactly what state to
+    // restore — the mirror image of `keyword_edit`'s own post-execution `after`-widening above.
+    action.before = {
+      ...before,
+      ...(result.previousDailyBudgetUsd !== undefined ? { dailyBudgetUsd: result.previousDailyBudgetUsd } : {}),
+      ...(result.previousStatus !== undefined ? { adSetStatus: result.previousStatus } : {}),
+    };
+    return attempts;
+  }
+
   const target = await loadTargetForAction(organizationId, projectId, action.target_id);
   if (!target.campaign_resource_name) {
     throw new InvalidAutomationActionError('this target has no campaign resource name to activate');
@@ -1096,6 +1250,20 @@ async function rollbackActionByType(
       targetId: action.target_id,
       previousAdResourceName: before.previousAdResourceName,
       newAdResourceName: after.newAdResourceName,
+    });
+    return;
+  }
+
+  if (action.action_type === 'meta_ad_set_edit') {
+    const before = action.before as { adSetResourceName: string; dailyBudgetUsd?: number; adSetStatus?: MetaAdSetStatus };
+    await executor.rollbackMetaAdSetEdit({
+      organizationId,
+      projectId,
+      environmentId: action.environment_id,
+      targetId: action.target_id,
+      adSetResourceName: before.adSetResourceName,
+      ...(before.dailyBudgetUsd !== undefined ? { beforeDailyBudgetUsd: before.dailyBudgetUsd } : {}),
+      ...(before.adSetStatus !== undefined ? { beforeStatus: before.adSetStatus } : {}),
     });
     return;
   }

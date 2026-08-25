@@ -50,6 +50,7 @@ export interface AutomationTargetView {
   adGroupResourceNames?: string[];
   /** Same order as {@link adGroupResourceNames} — `adResourceNames[i]` is the current RSA for `adGroupResourceNames[i]`. See `AutomationTargetStateModel.ad_resource_names`'s own doc comment. */
   adResourceNames?: string[];
+  metaAdSetResourceNames?: string[];
 }
 
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
@@ -64,6 +65,7 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     ...(target.campaign_status !== undefined ? { campaignStatus: target.campaign_status } : {}),
     ...(target.ad_group_resource_names !== undefined ? { adGroupResourceNames: target.ad_group_resource_names } : {}),
     ...(target.ad_resource_names !== undefined ? { adResourceNames: target.ad_resource_names } : {}),
+    ...(target.meta_ad_set_resource_names !== undefined ? { metaAdSetResourceNames: target.meta_ad_set_resource_names } : {}),
   };
 }
 
@@ -154,6 +156,8 @@ const DIFF_FIELD_LABEL_KEYS: Record<string, string> = {
   addNegativeKeywords: 'diffFieldAddNegativeKeywords',
   addedKeywordResourceNames: 'diffFieldAddedKeywordResourceNames',
   addedNegativeKeywordResourceNames: 'diffFieldAddedNegativeKeywordResourceNames',
+  adSetResourceName: 'diffFieldAdSetResourceName',
+  adSetStatus: 'diffFieldAdSetStatus',
 };
 
 export function diffFieldLabelKey(key: string): string | undefined {

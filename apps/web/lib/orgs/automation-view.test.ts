@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { AutomationActionModel } from '@growthos/firebase-orm-models';
-import { toAutomationActionView } from './automation-view';
+import type { AutomationActionModel, AutomationTargetStateModel } from '@growthos/firebase-orm-models';
+import { toAutomationActionView, toAutomationTargetView } from './automation-view';
 
 function action(overrides: Partial<AutomationActionModel> & Pick<AutomationActionModel, 'id'>): AutomationActionModel {
   return {
@@ -107,5 +107,51 @@ describe('toAutomationActionView / formatDiffValue (KAN-73)', () => {
 
     expect(view.diffEntries.find((candidate) => candidate.key === 'addKeywords')?.after).toBe('blue widgets (PHRASE)');
     expect(view.diffEntries.find((candidate) => candidate.key === 'addNegativeKeywords')?.after).toBe('free (BROAD)');
+  });
+
+  it('renders a meta_ad_set_edit diff, widened post-execution with the real pre-edit values (KAN-73 follow-up)', () => {
+    const view = toAutomationActionView(
+      action({
+        id: 'a6',
+        action_type: 'meta_ad_set_edit',
+        before: { adSetResourceName: 'act_999/adsets/1', dailyBudgetUsd: 25, adSetStatus: 'enabled' },
+        after: { adSetResourceName: 'act_999/adsets/1', dailyBudgetUsd: 40, adSetStatus: 'paused' },
+      }),
+    );
+
+    expect(view.diffEntries.find((candidate) => candidate.key === 'dailyBudgetUsd')).toEqual({ key: 'dailyBudgetUsd', before: 25, after: 40 });
+    expect(view.diffEntries.find((candidate) => candidate.key === 'adSetStatus')).toEqual({ key: 'adSetStatus', before: 'enabled', after: 'paused' });
+    expect(view.diffEntries.find((candidate) => candidate.key === 'adSetResourceName')).toEqual({
+      key: 'adSetResourceName',
+      before: 'act_999/adsets/1',
+      after: 'act_999/adsets/1',
+    });
+  });
+});
+
+describe('toAutomationTargetView (KAN-73 follow-up)', () => {
+  function target(overrides: Partial<AutomationTargetStateModel> & Pick<AutomationTargetStateModel, 'id'>): AutomationTargetStateModel {
+    return {
+      organization_id: 'org-1',
+      project_id: 'project-1',
+      environment_id: 'live',
+      target_type: 'campaign',
+      label: 'Summer Sale',
+      daily_budget_usd: 25,
+      seeded_at: '2026-07-15T00:00:00.000Z',
+      updated_at: '2026-07-15T00:00:00.000Z',
+      ...overrides,
+    } as AutomationTargetStateModel;
+  }
+
+  it('includes metaAdSetResourceNames when the target has them', () => {
+    const view = toAutomationTargetView(target({ id: 't1', meta_ad_set_resource_names: ['act_999/adsets/1', 'act_999/adsets/2'] }));
+    expect(view.metaAdSetResourceNames).toEqual(['act_999/adsets/1', 'act_999/adsets/2']);
+  });
+
+  it('omits metaAdSetResourceNames when the target has none (e.g. a Google Ads target)', () => {
+    const view = toAutomationTargetView(target({ id: 't2', ad_group_resource_names: ['customers/999/adGroups/1'] }));
+    expect(view.metaAdSetResourceNames).toBeUndefined();
+    expect(view.adGroupResourceNames).toEqual(['customers/999/adGroups/1']);
   });
 });
