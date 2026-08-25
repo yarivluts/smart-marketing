@@ -12,8 +12,28 @@ import {
   type AutomationKeywordEditExecutionInput,
   type AutomationKeywordEditExecutionResult,
   type AutomationKeywordEditRollbackInput,
+  type AutomationMetaAdSetEditExecutionInput,
+  type AutomationMetaAdSetEditExecutionResult,
+  type AutomationMetaAdSetEditRollbackInput,
 } from '../../automation-runtime';
 import type { GoogleAdsApiClient } from './api-client';
+
+/**
+ * A `meta_ad_set_edit` action (KAN-73 follow-up) reached
+ * `GoogleAdsAutomationActionExecutor` — Google Ads has no "ad set" concept
+ * (its closest analog, an ad group, is edited via `keyword_edit` instead,
+ * and its own budget lives on the campaign, not the ad group — see
+ * `GoogleAdsAutomationActionExecutor`'s own doc comment), so this action
+ * type can never be supported for a Google Ads target. Mirrors
+ * `MetaKeywordEditNotSupportedError`'s own "the executor is the one place
+ * that knows what a provider can and can't do" posture, symmetrically.
+ */
+export class GoogleAdsMetaAdSetEditNotSupportedError extends Error {
+  constructor() {
+    super('Google Ads has no ad-set concept — a meta_ad_set_edit action is not supported for a Google Ads-linked target.');
+    this.name = 'GoogleAdsMetaAdSetEditNotSupportedError';
+  }
+}
 
 /** A `budget_change` action was proposed against a target whose Google Ads budget-resource name is unknown and couldn't be resolved via a live GAQL lookup either (e.g. the target's id/`campaign_resource_name` doesn't correspond to a real campaign on this Google Ads account). */
 export class GoogleAdsBudgetResourceUnknownError extends Error {
@@ -182,5 +202,13 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
     }
     target.updated_at = new Date().toISOString();
     await target.save();
+  }
+
+  async executeMetaAdSetEdit(_input: AutomationMetaAdSetEditExecutionInput): Promise<AutomationMetaAdSetEditExecutionResult> {
+    throw new GoogleAdsMetaAdSetEditNotSupportedError();
+  }
+
+  async rollbackMetaAdSetEdit(_input: AutomationMetaAdSetEditRollbackInput): Promise<void> {
+    throw new GoogleAdsMetaAdSetEditNotSupportedError();
   }
 }

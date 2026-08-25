@@ -110,4 +110,21 @@ export class AutomationTargetStateModel extends BaseModel {
    */
   @Field()
   public ad_group_resource_names?: string[];
+
+  /**
+   * The real Meta ad platform's own resource name/id for each ad set a
+   * `campaign_draft_create` action (KAN-73) created against this target's
+   * campaign, in the same order as the draft's own `adSets` array — set
+   * alongside {@link campaign_resource_name}. A `meta_ad_set_edit` action
+   * (KAN-73 follow-up) may only target one of these, never an arbitrary
+   * caller-supplied resource name — same "can only ever target one of a
+   * target's own [child resources]" invariant {@link ad_group_resource_names}'s
+   * own doc comment establishes for `keyword_edit`, see
+   * `automation.service.ts`'s `proposeMetaAdSetEditAction`. Absent for a
+   * Google Ads-platform target (Google Ads' ad groups live in
+   * {@link ad_group_resource_names} instead) or one that hasn't had a
+   * creation action executed yet.
+   */
+  @Field()
+  public meta_ad_set_resource_names?: string[];
 }

@@ -10,7 +10,13 @@ import {
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { MetaAdsApiError, type MetaAdsApiClient } from './api-client';
-import { MetaAdsBudgetResourceUnknownError, MetaAdsWrongPlatformCampaignDraftError, MetaAutomationActionExecutor, MetaKeywordEditNotSupportedError } from './executor';
+import {
+  MetaAdSetNotOwnedByTargetError,
+  MetaAdsBudgetResourceUnknownError,
+  MetaAdsWrongPlatformCampaignDraftError,
+  MetaAutomationActionExecutor,
+  MetaKeywordEditNotSupportedError,
+} from './executor';
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('meta-ads-executor-tests');
@@ -40,6 +46,8 @@ function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiCli
     setDailyBudgetCents: vi.fn().mockResolvedValue(undefined),
     setObjectStatus: vi.fn().mockResolvedValue(undefined),
     getCampaign: vi.fn().mockRejectedValue(new MetaAdsApiError('No campaign found.', 404)),
+    getAdSet: vi.fn().mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE' }),
+    updateAdSet: vi.fn().mockResolvedValue(undefined),
     createCustomAudience: vi.fn().mockResolvedValue({ audienceId: 'audience-1' }),
     addContactsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 0 }),
     ...overrides,
@@ -115,6 +123,7 @@ describe('MetaAutomationActionExecutor', () => {
     expect(reloaded.campaign_budget_resource_name).toBe('campaign-1');
     expect(reloaded.campaign_status).toBe('paused');
     expect(reloaded.daily_budget_usd).toBe(25);
+    expect(reloaded.meta_ad_set_resource_names).toEqual(['adset-1']);
   });
 
   it('rolls back a campaign draft creation by deleting the campaign', async () => {
@@ -368,5 +377,115 @@ describe('MetaAutomationActionExecutor', () => {
         addedNegativeKeywordResourceNames: [],
       }),
     ).rejects.toBeInstanceOf(MetaKeywordEditNotSupportedError);
+  });
+
+  describe('executeMetaAdSetEdit / rollbackMetaAdSetEdit (KAN-73 follow-up)', () => {
+    async function seedTargetWithAdSet(organizationId: string, projectId: string, ownerId: string, apiClient: MetaAdsApiClient) {
+      const target = await ensureAutomationTargetSeeded({
+        organizationId,
+        projectId,
+        environmentId: 'live',
+        targetId: unique('campaign'),
+        targetType: 'campaign',
+        label: 'Ad Set Edit Target',
+        initialDailyBudgetUsd: 0,
+        seededByUserId: ownerId,
+      });
+      const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+      await executor.executeCampaignDraftCreate({ organizationId, projectId, environmentId: 'live', targetId: target.id, draft: DRAFT });
+      const [reloaded] = await listAutomationTargetStatesForProject(organizationId, projectId);
+      return { target: reloaded, executor };
+    }
+
+    it('edits an ad set\'s budget and status, reading the real pre-edit values live', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Set Edit Org');
+      const apiClient = fakeApiClient({ getAdSet: vi.fn().mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE' }) });
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+
+      const result = await executor.executeMetaAdSetEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adSetResourceName: 'adset-1',
+        dailyBudgetUsd: 40,
+        status: 'paused',
+      });
+
+      expect(result).toEqual({ previousDailyBudgetUsd: 25, previousStatus: 'enabled' });
+      expect(apiClient.getAdSet).toHaveBeenCalledWith('adset-1');
+      expect(apiClient.updateAdSet).toHaveBeenCalledWith('adset-1', { dailyBudgetCents: 4000, status: 'PAUSED' });
+    });
+
+    it('edits only budget when status is omitted, leaving status untouched in the updateAdSet call', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Set Budget Only Org');
+      const apiClient = fakeApiClient();
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+
+      const result = await executor.executeMetaAdSetEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adSetResourceName: 'adset-1',
+        dailyBudgetUsd: 40,
+      });
+
+      expect(result).toEqual({ previousDailyBudgetUsd: 25 });
+      expect(apiClient.updateAdSet).toHaveBeenCalledWith('adset-1', { dailyBudgetCents: 4000 });
+    });
+
+    it('rolls back an ad set edit by re-applying the captured pre-edit values', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Set Edit Rollback Org');
+      const apiClient = fakeApiClient();
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+
+      await executor.rollbackMetaAdSetEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adSetResourceName: 'adset-1',
+        beforeDailyBudgetUsd: 25,
+        beforeStatus: 'enabled',
+      });
+
+      expect(apiClient.updateAdSet).toHaveBeenCalledWith('adset-1', { dailyBudgetCents: 2500, status: 'ACTIVE' });
+    });
+
+    it('does not call updateAdSet on rollback when neither field was ever touched', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Set Edit Rollback Noop Org');
+      const apiClient = fakeApiClient();
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+
+      await executor.rollbackMetaAdSetEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adSetResourceName: 'adset-1',
+      });
+
+      expect(apiClient.updateAdSet).not.toHaveBeenCalled();
+    });
+
+    it('throws MetaAdSetNotOwnedByTargetError for an ad set that is not one of this target\'s own ad sets', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Wrong Ad Set Org');
+      const apiClient = fakeApiClient();
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+
+      await expect(
+        executor.executeMetaAdSetEdit({
+          organizationId: organization.id,
+          projectId: project.id,
+          environmentId: 'live',
+          targetId: target.id,
+          adSetResourceName: 'act_999/adsets/not-this-targets',
+          dailyBudgetUsd: 40,
+        }),
+      ).rejects.toBeInstanceOf(MetaAdSetNotOwnedByTargetError);
+      expect(apiClient.getAdSet).not.toHaveBeenCalled();
+      expect(apiClient.updateAdSet).not.toHaveBeenCalled();
+    });
   });
 });

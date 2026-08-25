@@ -11,6 +11,9 @@ import type {
   AutomationKeywordEditExecutionInput,
   AutomationKeywordEditExecutionResult,
   AutomationKeywordEditRollbackInput,
+  AutomationMetaAdSetEditExecutionInput,
+  AutomationMetaAdSetEditExecutionResult,
+  AutomationMetaAdSetEditRollbackInput,
 } from './executor';
 
 interface TargetLookup {
@@ -67,8 +70,11 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
     target.campaign_status = 'paused';
     target.daily_budget_usd = input.draft.dailyBudgetUsd;
     // Meta drafts have no ad-group concept (see `MetaAutomationActionExecutor`'s own doc comment) —
-    // only a Google Ads draft's `adGroups` gets simulated ad-group resource names.
-    if (input.draft.platform !== 'meta') {
+    // only a Google Ads draft's `adGroups` gets simulated ad-group resource names, and only a Meta
+    // draft's `adSets` gets simulated ad-set resource names (KAN-73 follow-up).
+    if (input.draft.platform === 'meta') {
+      target.meta_ad_set_resource_names = input.draft.adSets.map((_adSet, index) => `act/simulated/adSets/${target.id}-${index}`);
+    } else {
       target.ad_group_resource_names = input.draft.adGroups.map((_adGroup, index) => `customers/simulated/adGroups/${target.id}-${index}`);
     }
     target.updated_at = new Date().toISOString();
@@ -109,6 +115,34 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
   }
 
   async rollbackKeywordEdit(input: AutomationKeywordEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  /**
+   * No per-ad-set budget/status is tracked on `AutomationTargetStateModel`
+   * (KAN-73 follow-up's own `AutomationMetaAdSetEditExecutionInput` doc
+   * comment explains why a real Meta connector needs a live lookup instead),
+   * so this stand-in reports the target's own campaign-level fields as the
+   * simulated "previous" values — plausible for a demo/simulated target
+   * without a real per-ad-set state to snapshot.
+   */
+  async executeMetaAdSetEdit(input: AutomationMetaAdSetEditExecutionInput): Promise<AutomationMetaAdSetEditExecutionResult> {
+    const target = await loadTarget(input);
+    const result: AutomationMetaAdSetEditExecutionResult = {};
+    if (input.dailyBudgetUsd !== undefined) {
+      result.previousDailyBudgetUsd = target.daily_budget_usd;
+    }
+    if (input.status !== undefined) {
+      result.previousStatus = target.campaign_status === 'enabled' ? 'enabled' : 'paused';
+    }
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return result;
+  }
+
+  async rollbackMetaAdSetEdit(input: AutomationMetaAdSetEditRollbackInput): Promise<void> {
     const target = await loadTarget(input);
     target.updated_at = new Date().toISOString();
     await target.save();

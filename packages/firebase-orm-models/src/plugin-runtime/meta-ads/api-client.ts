@@ -45,6 +45,19 @@ export interface MetaCreateAdSetResult {
   adSetId: string;
 }
 
+/** An ad set's own live daily budget (USD cents, if the ad set has one — see `MetaAutomationActionExecutor`'s own doc comment for why an ad set created by this connector starts with no independent budget) and status, as reported by Meta. */
+export interface MetaGetAdSetResult {
+  adSetId: string;
+  dailyBudgetCents?: number;
+  status: MetaObjectStatus;
+}
+
+/** At least one of `dailyBudgetCents`/`status` should be set — an empty edit is a caller bug, though this client itself doesn't enforce that (see `MetaAutomationActionExecutor.executeMetaAdSetEdit`, which never calls `updateAdSet` with an empty params object). */
+export interface MetaUpdateAdSetParams {
+  dailyBudgetCents?: number;
+  status?: MetaObjectStatus;
+}
+
 export interface MetaCreateAdCreativeParams {
   /** The Facebook Page this link ad posts as — required by Meta's `object_story_spec.page_id`. */
   pageId: string;
@@ -129,6 +142,27 @@ export interface MetaAdsApiClient {
    * to a real campaign.
    */
   getCampaign(campaignId: string): Promise<{ campaignId: string }>;
+  /**
+   * Reads an ad set's own live daily budget/status (KAN-73 follow-up:
+   * post-creation ad-set edits) — `MetaAutomationActionExecutor.executeMetaAdSetEdit`
+   * calls this immediately before applying an edit, since `AutomationTargetStateModel`
+   * has no per-ad-set field to source the pre-edit values from the way
+   * `campaign_budget_resource_name`/`campaign_status` do for a whole
+   * campaign (see `AutomationMetaAdSetEditExecutionInput`'s own doc
+   * comment). Throws `MetaAdsApiError` if `adSetId` doesn't resolve to a
+   * real ad set.
+   */
+  getAdSet(adSetId: string): Promise<MetaGetAdSetResult>;
+  /**
+   * Updates an already-created ad set's daily budget (USD cents) and/or
+   * status in a single field-POST (KAN-73 follow-up) — mirrors
+   * `setDailyBudgetCents`/`setObjectStatus` (both of which already work
+   * against any object id, ad sets included, since Meta's Graph API POST
+   * endpoint is generic over object type), but bundles both possible fields
+   * into one request rather than two separate round trips when an edit
+   * touches both at once.
+   */
+  updateAdSet(adSetId: string, params: MetaUpdateAdSetParams): Promise<void>;
   /**
    * Creates a `CUSTOM`-subtype, user-provided-data Custom Audience on the ad
    * account (KAN-73 follow-up — see `plugin-runtime/meta-custom-audience`'s
@@ -277,6 +311,28 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
   async getCampaign(campaignId: string): Promise<{ campaignId: string }> {
     const result = await this.getRequest<{ id: string }>(campaignId, { fields: 'id' });
     return { campaignId: result.id };
+  }
+
+  async getAdSet(adSetId: string): Promise<MetaGetAdSetResult> {
+    const result = await this.getRequest<{ id: string; daily_budget?: string; status: MetaObjectStatus }>(adSetId, {
+      fields: 'id,daily_budget,status',
+    });
+    return {
+      adSetId: result.id,
+      ...(result.daily_budget !== undefined ? { dailyBudgetCents: Number(result.daily_budget) } : {}),
+      status: result.status,
+    };
+  }
+
+  async updateAdSet(adSetId: string, params: MetaUpdateAdSetParams): Promise<void> {
+    const body: Record<string, string> = {};
+    if (params.dailyBudgetCents !== undefined) {
+      body.daily_budget = String(params.dailyBudgetCents);
+    }
+    if (params.status !== undefined) {
+      body.status = params.status;
+    }
+    await this.request<{ success?: boolean }>(adSetId, body);
   }
 
   async createCustomAudience(adAccountId: string, params: MetaCreateCustomAudienceParams): Promise<MetaCreateCustomAudienceResult> {

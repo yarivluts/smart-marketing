@@ -178,6 +178,79 @@ describe('MetaAdsHttpApiClient', () => {
     await expect(new MetaAdsHttpApiClient(OPTIONS).getCampaign('missing-campaign')).rejects.toMatchObject({ status: 404 });
   });
 
+  it('fetches an ad set by id via a GET request, including its daily budget and status (KAN-73 follow-up)', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'adset-1', daily_budget: '2500', status: 'ACTIVE' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).getAdSet('adset-1');
+
+    expect(result).toEqual({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe('GET');
+    const parsedUrl = new URL(url);
+    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v21.0/adset-1');
+    expect(parsedUrl.searchParams.get('fields')).toBe('id,daily_budget,status');
+  });
+
+  it('omits dailyBudgetCents from getAdSet when the ad set has no daily_budget field', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'adset-1', status: 'PAUSED' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).getAdSet('adset-1');
+
+    expect(result).toEqual({ adSetId: 'adset-1', status: 'PAUSED' });
+    expect('dailyBudgetCents' in result).toBe(false);
+  });
+
+  it('throws MetaAdsApiError with the response status when the ad set lookup fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'not found' }, false, 404)));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).getAdSet('missing-adset')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('updates an ad set with both daily budget and status in a single POST', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).updateAdSet('adset-1', { dailyBudgetCents: 4000, status: 'PAUSED' });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://graph.facebook.com/v21.0/adset-1');
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get('daily_budget')).toBe('4000');
+    expect(body.get('status')).toBe('PAUSED');
+  });
+
+  it('updates an ad set with only budget, omitting status from the request body', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).updateAdSet('adset-1', { dailyBudgetCents: 4000 });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get('daily_budget')).toBe('4000');
+    expect(body.has('status')).toBe(false);
+  });
+
+  it('updates an ad set with only status, omitting daily_budget from the request body', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).updateAdSet('adset-1', { status: 'ACTIVE' });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get('status')).toBe('ACTIVE');
+    expect(body.has('daily_budget')).toBe(false);
+  });
+
+  it('throws MetaAdsApiError with the response status when updateAdSet fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'nope' }, false, 400)));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).updateAdSet('adset-1', { status: 'PAUSED' })).rejects.toBeInstanceOf(MetaAdsApiError);
+  });
+
   it('creates a CUSTOM, user-provided-data Custom Audience', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'audience-1' }));
     vi.stubGlobal('fetch', fetchMock);

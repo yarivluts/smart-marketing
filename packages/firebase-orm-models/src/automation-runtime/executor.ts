@@ -187,6 +187,58 @@ export interface AutomationKeywordEditRollbackInput {
   addedNegativeKeywordResourceNames: string[];
 }
 
+/** Mirrors `CampaignStatus`'s `paused`/`enabled` vocabulary, scoped to one Meta ad set rather than a whole campaign — see `MetaAdSetEditExecutionInput`'s own doc comment for why an ad set needs its own status vocabulary distinct from `CampaignStatus`. */
+export type MetaAdSetStatus = 'enabled' | 'paused';
+
+/**
+ * A `meta_ad_set_edit` action (KAN-73 follow-up, plan `13 §E21.2`'s own
+ * deferred "post-creation ad/keyword edits" bullet, this story's Meta
+ * counterpart to `keyword_edit`) — edits an already-created Meta ad set's
+ * daily budget and/or status (see `AutomationTargetStateModel.meta_ad_set_resource_names`).
+ * `dailyBudgetUsd`/`status` are each independently optional — an edit may
+ * touch either field alone or both at once; `undefined` means "leave this
+ * field alone." Unlike `keyword_edit`'s purely additive shape, this
+ * overwrites live state, so `MetaAutomationActionExecutor.executeMetaAdSetEdit`
+ * reads the ad set's true pre-edit values from Meta itself before applying
+ * the edit and returns them (see `AutomationMetaAdSetEditExecutionResult`) —
+ * `AutomationTargetStateModel` has no per-ad-set budget/status field to
+ * source them from the way `campaign_budget_resource_name`/`campaign_status`
+ * do for `budget_change`/`campaign_activation`. Editing an ad set's
+ * targeting spec (countries/age range/genders) or its ad's creative isn't
+ * supported yet — out of this follow-up's scope, see its own PROGRESS.md
+ * entry's "deferred gaps" note.
+ */
+export interface AutomationMetaAdSetEditExecutionInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  adSetResourceName: string;
+  /** Omit to leave the ad set's daily budget untouched. */
+  dailyBudgetUsd?: number;
+  /** Omit to leave the ad set's status untouched. */
+  status?: MetaAdSetStatus;
+}
+
+export interface AutomationMetaAdSetEditExecutionResult {
+  /** The ad set's real pre-edit daily budget, present only when this edit touched budget. */
+  previousDailyBudgetUsd?: number;
+  /** The ad set's real pre-edit status, present only when this edit touched status. */
+  previousStatus?: MetaAdSetStatus;
+}
+
+export interface AutomationMetaAdSetEditRollbackInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  adSetResourceName: string;
+  /** Present only when the original edit touched budget — the real pre-edit value `executeMetaAdSetEdit` read live and `executeActionByType` widened `before` with. */
+  beforeDailyBudgetUsd?: number;
+  /** Present only when the original edit touched status — same provenance as `beforeDailyBudgetUsd`. */
+  beforeStatus?: MetaAdSetStatus;
+}
+
 /**
  * The seam KAN-72 (`GoogleAdsAutomationActionExecutor`) and KAN-73
  * (`MetaAutomationActionExecutor`) both implement for real —
@@ -196,13 +248,20 @@ export interface AutomationKeywordEditRollbackInput {
  * remove) a brand-new paused campaign; `executeCampaignActivation`/
  * `rollbackCampaignActivation` flip an already-created campaign between
  * paused and enabled; `executeKeywordEdit`/`rollbackKeywordEdit` add (and
- * remove) keywords/negative keywords on an already-created ad group. Same
+ * remove) keywords/negative keywords on an already-created ad group;
+ * `executeMetaAdSetEdit`/`rollbackMetaAdSetEdit` (KAN-73 follow-up) edit (and
+ * restore) an already-created Meta ad set's budget/status. Same
  * "provider-agnostic executor interface" posture as `SourcePluginExecutor`
  * (KAN-47) and `WarehouseQueryExecutor` (KAN-42) — the interface itself never
  * mentions a provider name; `resolveAutomationActionExecutorForTarget`
  * (`services/automation-executor-resolver.service.ts`) is the one place that
  * picks a concrete implementation, based on a target's linked credential's
- * `provider`.
+ * `provider`. Every implementation must still implement every method even
+ * though `keyword_edit`/`meta_ad_set_edit` are each only ever meaningful for
+ * one provider — `MetaAutomationActionExecutor.executeKeywordEdit`/
+ * `GoogleAdsAutomationActionExecutor.executeMetaAdSetEdit` throw a
+ * documented "not supported" error instead (see each class's own doc
+ * comment).
  */
 export interface AutomationActionExecutor {
   executeBudgetChange(input: AutomationBudgetChangeExecutionInput): Promise<AutomationBudgetChangeExecutionResult>;
@@ -213,4 +272,6 @@ export interface AutomationActionExecutor {
   rollbackCampaignActivation(input: AutomationCampaignActivationExecutionInput): Promise<void>;
   executeKeywordEdit(input: AutomationKeywordEditExecutionInput): Promise<AutomationKeywordEditExecutionResult>;
   rollbackKeywordEdit(input: AutomationKeywordEditRollbackInput): Promise<void>;
+  executeMetaAdSetEdit(input: AutomationMetaAdSetEditExecutionInput): Promise<AutomationMetaAdSetEditExecutionResult>;
+  rollbackMetaAdSetEdit(input: AutomationMetaAdSetEditRollbackInput): Promise<void>;
 }
