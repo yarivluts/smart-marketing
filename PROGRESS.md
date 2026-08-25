@@ -17,6 +17,74 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (newest) — Merged PR #298 (KAN-93, segment engine cross-schema has_event/no_event conditions)
+
+- **Last completed:**
+  - Session start: local `main` had diverged from `origin/main` (same recurring stale-ref quirk this
+    file's history documents repeatedly) — `git fetch` + `git reset --hard origin/main` fixed it. Read
+    `PROGRESS.md`/`TASKS.md`: every row KAN-17..KAN-92 `done` except the standing KAN-18/19 infra items
+    and KAN-43/50/51 (`needs-human`/`blocked-by`). Per the "sweep every `done` row's own deferred/
+    not-yet doc-comment notes for a newly-buildable follow-up" pattern this repo's history establishes,
+    found the same gap independently named by KAN-92's own doc comment, KAN-76/81's, and the MCP
+    `create_segment` tool's own description: a saved segment (`segment.service.ts`) could only ever
+    filter one entity schema's own fields, so "paying AND no demo" — the plan's own recurring example —
+    was never expressible without a denormalized field no connector populates.
+  - **Delivered (PR #298, branch `kan-93-segment-event-conditions`):** `SegmentEventCondition`
+    (`packages/shared/src/segments/segment-filter.ts`) — `{ kind: "has_event"|"no_event", schemaName,
+    filters?, withinDays? }`, ANDed with a segment's existing entity `filters` and with each other;
+    `SegmentModel.event_conditions` (optional field, same posture `owner_person_id`/`status`
+    established). `createSegment` validates each condition's `schemaName` is a registered+active
+    *event*-kind schema, relaxing the old "at least one entity filter" rule to "at least one filter or
+    event condition." `countSegmentMembers`/`listSegmentMembers` compile each condition to a
+    `[NOT ]EXISTS (SELECT 1 FROM events AS ev WHERE ...)` correlated subquery joined on
+    `ev.entity_id = entities.entity_id` (an event's `client_id`/`entity_id` is already the same identity
+    a customer entity is keyed by, the same convention `bridge_identity`/`fact_attribution` rely on — no
+    denormalized field or extra join table needed), reusing the existing `emitSegmentFilterClause`/
+    `jsonFieldExtraction` compiler (parameterized on a `columnRef`) for a condition's own nested filters.
+    Admin UI: an "Event conditions" section on the create-segment form. MCP `create_segment` act tool
+    gained an `event_conditions` parameter.
+  - **Self-review (`/code-review`) caught and fixed a real bug before merge-readiness:** the first draft
+    compiled `ev.schema_name = @event_schema_0`, but `events` (KAN-37's core dbt model) names that
+    column `event_type`, not `schema_name` like `entities` does — this would have thrown
+    `Unrecognized name: schema_name` against a real BigQuery warehouse, invisibly, since the emulator
+    tests only exercise a `FakeWarehouseQueryExecutor` that never validates SQL against a real schema.
+    Fixed to `ev.event_type`, with the test assertion tightened to pin the column name so this bug class
+    can't silently regress again.
+  - Full local verification before opening the PR: `pnpm build`/`pnpm lint`/`pnpm typecheck` green
+    monorepo-wide; full `pnpm test` green (`packages/shared` 32/32, `firebase-orm-models` 1440/1440 vs a
+    real Firestore emulator, `apps/web` 1595/1595 unit + Playwright e2e vs Firestore/Auth emulators,
+    `apps/api` 141/141 vs Firestore emulator).
+  - **CI took three attempts, neither related to this PR's code:** first run failed before any test ran
+    — the runner's `pnpm/action-setup@v4` action download hit `Name or service not known
+    (internal-api.service.iad.github.net:443)`, a GitHub Actions infra DNS failure; re-ran once. Second
+    run hit the Firestore-emulator `RESOURCE_EXHAUSTED` resource-contention flake this repo's own
+    history documents repeatedly (KAN-22's original entry, PR #259's sharding fix, and many since), in
+    spec files this PR never touches (`feedback.spec.ts` failed all 3 attempts; `experiments.spec.ts`/
+    `hooks.spec.ts`/`metric-defs.spec.ts` passed on retry) — posted a standing-down comment naming the
+    failure and why it wasn't this PR's, then re-ran once more per the "one re-run after that
+    standing-down comment" allowance. Third run green on both checks (`lint · typecheck · test · build`,
+    `terraform fmt · validate`); merged (squash) and deleted the branch.
+  - A concurrent session (see the entry directly below, now superseded by this one) correctly found
+    PR #298 already in flight ~2 minutes after it opened and deferred rather than duplicating it — the
+    "check `list_pull_requests` before picking anything" posture this repo's history establishes working
+    exactly as intended.
+- **In progress (exact stopping point):** none — KAN-93 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-93 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. The only
+  named-but-deferred candidates left anywhere are PMax asset groups and Lookalike/Similar Audience
+  expansion on KAN-72/73's own rows — both explicitly flagged as needing real design work, not a
+  buildable-today slice. A future run should sweep `TASKS.md`'s `done` rows again for a fresh follow-up
+  (same pattern that found KAN-91/92/93), and check `list_pull_requests` first in case a concurrent
+  session already has one open.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+
+---
+
 ## 2026-08-25 (latest) — No unblocked task available; backlog exhausted, one concurrent PR (#298, KAN-93) already in flight for the only newly-identified gap
 
 - **Last completed:**
