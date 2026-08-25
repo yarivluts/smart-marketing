@@ -17,6 +17,60 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (latest) — Merged KAN-72 follow-up (PR #288, Google Ads Customer Match sync)
+
+- **Last completed:**
+  - Session start: local `main`'s branch ref was again a stale ~50-commits-behind snapshot with an
+    unrelated shallow-clone history (`git merge-base` found no common ancestor at all — this
+    container's shallow clone had grafted a different truncated root than the one `main` pointed at),
+    same recurring quirk every recent entry documents. `git reset --hard origin/main` fixed it
+    cleanly (confirmed no local-only commits existed to lose).
+  - Read `PROGRESS.md`/`TASKS.md`: every row was `done` or a standing blocker (KAN-18/19 real-infra,
+    KAN-43 `needs-human`, KAN-50/51 `blocked-by`, KAN-86's `roi_nd` gap). The prior entry's own "next
+    step" named a concrete, still-open candidate: KAN-72's own deferred Google Ads "audience attach"
+    bullet (a Google Ads Customer Match list from a segment — the direct sibling of KAN-73's own Meta
+    Custom Audience follow-up, PR #286). `list_pull_requests` (open) found it had **already been
+    delivered** as **PR #288**, opened moments earlier by a prior run in this same session window,
+    branched off the current `main` tip, CI in progress — so this run reviewed and drove it to merge
+    instead of duplicating the work (the collision-avoidance posture recent entries have taken
+    repeatedly).
+  - Read the full diff locally (`git diff main...kan-72-google-ads-customer-match`, 15 files/+805/-25):
+    a new built-in `com.growthos.google-customer-match` action plugin, two new `GoogleAdsApiClient`
+    methods for the real `userLists:mutate` + offline-user-data-job create/addOperations/run upload
+    flow, SHA-256 email hashing, the `meta_custom_audience_id` → `sink_external_ref` generalization,
+    and — already present, not something this run had to catch — the same "cache the created external
+    id as mutable executor state so a same-instance retry doesn't orphan a duplicate list" fix KAN-73's
+    own follow-up needed a post-hoc patch for. Judged the diff correct, well-tested (11 new unit tests
+    + 3 new emulator-test cases against a real Firestore emulator, incl. a dedicated regression test
+    for the retry-reuse behavior), and consistent with this codebase's established connector patterns
+    — no changes requested.
+  - Subscribed to the PR's activity and polled its CI to completion (`lint · typecheck · test · build`
+    took ~35 minutes — the full monorepo suite incl. sharded Playwright e2e, consistent with prior
+    entries' own timings): both check runs (`terraform fmt · validate`, `lint · typecheck · test ·
+    build`) green, `mergeable_state: clean`, base sha matching `main`'s current tip, no open reviews.
+    Merged (squash). Remote branch deletion hit the same recurring HTTP 403 from this sandbox's
+    git-over-HTTPS proxy every prior entry documents — left undeleted. Unsubscribed from the PR's
+    activity.
+  - Updated `TASKS.md`'s KAN-72 row with a follow-up note (same convention KAN-73's own row used for
+    its PR #286 follow-up).
+- **In progress (exact stopping point):** none — PR #288 is merged, `main`'s CI is green, `TASKS.md`
+  reflects the delivered scope.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** every `docs/plan/14-gap-analysis.md` gap bullet has a story (KAN-80..92), and both of
+  KAN-72/KAN-73's own deferred "audience attach" bullets are now closed. A future run should continue
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable
+  follow-up" pass — remaining candidates flagged by earlier entries: KAN-72's own still-unbuilt PMax
+  asset groups and post-creation ad/keyword edits; KAN-73's own still-deferred real Meta creative
+  image upload and post-creation edits beyond activation; Lookalike/Similar Audience expansion for
+  either of this run's and PR #286's own Customer-Match/Custom-Audience connectors; non-email
+  Customer Match identifiers (phone, mailing address, device id).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-72-google-ads-customer-match` branch on GitHub (the
+    git-over-HTTPS proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-25 (even later still) — Merged KAN-92 (PR #287, Sales-assist workflows / demos pipeline)
 
 - **Last completed:**
