@@ -17,6 +17,52 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (even newer) — Collided with a concurrent session on the same KAN-72 phone-identifier gap; closed PR #291 as superseded
+
+- **Last completed:**
+  - Session start: local `main`'s branch ref was again a stale snapshot (same recurring shallow-clone
+    quirk every recent entry documents; this time `main` was a strict ancestor of `origin/main` with no
+    local-only commits) — `git reset --hard origin/main` fixed it cleanly.
+  - Read `PROGRESS.md`/`TASKS.md`: every row was `done` or a standing blocker (KAN-18/19 real-infra,
+    KAN-43 `needs-human`, KAN-50/51 `blocked-by`). Ran a research agent over the KAN-72/73 Customer
+    Match/Custom Audience connectors' own deferred notes and picked the same candidate several prior
+    entries had already named: non-email Customer Match identifiers, scoped down to just phone number
+    for Google Ads Customer Match (mailing address/device id both need structured source data no
+    ingested schema carries, same reasoning this run's own research reached independently).
+  - Implemented `hashPhoneNumberForGoogleCustomerMatch`, a `buildUserIdentifierSet` combining a record's
+    email and/or phone into one Customer Match operation, and renamed
+    `GoogleAdsApiClient.addHashedEmailsToCustomerMatchUserList` to `addCustomerMatchUserIdentifiers`
+    (accepting `GoogleAdsCustomerMatchUserIdentifierSet[]` instead of a bare `string[]`). New/updated
+    tests across `hashing.test.ts`/`executor.test.ts`/`api-client.test.ts`; full
+    `packages/firebase-orm-models` suite green (126 files/1324 tests, real Firestore emulator), root
+    `pnpm build`/`typecheck`/`lint` green. Opened PR #291, subscribed to its activity.
+  - By the time PR #291's own CI reported back green (~36 min later), **a concurrent session's PR #290
+    ("phone-number identifiers for Meta/Google Ads audience sync", opened ~1h before #291, same KAN-72
+    gap plus the KAN-73/Meta sibling this run didn't attempt) had already merged to `main`**, turning
+    #291 `mergeable_state: dirty`. Reviewed #290's merged diff (`git show --stat` against the shared
+    base): same approach end to end — read `properties.phone`, hash per-platform, combine onto one
+    identifier set/operation with email, rename the "add hashed emails" API client method to something
+    contact-shaped — fully tested (126 files/1308 tests) and already covering both platforms, a strict
+    superset of #291's own Google-only scope. No gap left for #291 to fill, so rather than resolving a
+    same-feature merge conflict, closed #291 with a comment pointing at #290 and unsubscribed from its
+    activity (this backlog's own established "duplicate work, closed as superseded" posture — see
+    KAN-84/88/89's own PROGRESS.md entries for the same pattern). Reset local `main` to `origin/main`
+    (now containing #290) and deleted the local branch; the remote branch delete hit the same recurring
+    HTTP 403 from this sandbox's git-over-HTTPS proxy every prior entry documents.
+- **In progress (exact stopping point):** none — PR #291 is closed, `main` already has the equivalent
+  (broader) functionality via #290, nothing further to reconcile.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates, per KAN-72/73's own rows: mailing address and mobile device id Customer
+  Match/Custom Audience identifiers (both need structured source data no ingested schema carries
+  today — a real design decision, not a quick follow-up); KAN-72's PMax asset groups and RSA
+  in-place ad edits; KAN-73's real Meta creative image upload and post-creation edits beyond
+  activation; Lookalike/Similar Audience expansion for either connector.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+
+---
+
 ## 2026-08-25 (newest) — Merged KAN-72/KAN-73 follow-up (PR #290, phone-number identifiers)
 
 - **Last completed:**
