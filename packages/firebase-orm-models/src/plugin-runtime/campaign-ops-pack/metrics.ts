@@ -1,4 +1,5 @@
 import type { MetricDefinitionInput } from '../../services/metric-registry.service';
+import { SAAS_METRIC_PACK_METRICS } from '../saas-metric-pack';
 
 /**
  * The `collection_nd` half of KAN-86's "roi_nd / collection_nd metric
@@ -6,17 +7,23 @@ import type { MetricDefinitionInput } from '../../services/metric-registry.servi
  * `fact_customer_payback` (`packages/dbt-transform/dbt/models/core/
  * fact_customer_payback.sql`) — see that model's own doc comment for why
  * the window set is a fixed 7/14/30/40-day catalog rather than a single
- * runtime-configurable N, and why this pack does not also register
- * `roi_Nd` formulas: those would need to divide by the SaaS metric pack's
- * own `ad_spend` metric, and the metrics compiler only allows a formula to
- * reference an already-*active* metric at registration time (`04 §2`'s own
- * commerce-metric family already documents this ordering requirement) — an
- * inter-pack "install this pack first" dependency this codebase's install
- * flow (`installPluginAndProvisionBuiltins`) doesn't model yet. Once both
- * packs are installed in a project, a human can already compose
- * `collection_40d / ad_spend` by hand today via the existing Metric Defs
- * "evolve"/custom-formula admin flow — no code change needed for that; only
- * shipping it as a pre-built pack metric is deferred.
+ * runtime-configurable N. Broken down by `campaign_id`
+ * (2026-08-25 follow-up) now that `fact_customer_payback` joins the
+ * customer's acquisition event to its own last-touch attribution.
+ *
+ * `roi_Nd = collection_Nd / ad_spend` (below) reuses the SaaS metric pack's
+ * own `ad_spend` metric verbatim, the exact same "register the dependency's
+ * metric under this pack too, tolerating `DuplicateMetricDefinitionError`
+ * either way" pattern `quality-score-pack/metrics.ts`'s own `AD_SPEND`
+ * already establishes for the identical cross-pack dependency — whichever
+ * of the SaaS/Quality/Campaign Ops packs installs first in a project "wins"
+ * registering the real metric, the other two's own attempt is a no-op. This
+ * closes the ordering gap the old deferred note here named: the compiler
+ * itself never needed a join-graph feature (see `fact_customer_payback.sql`'s
+ * own updated doc comment) — `registerMetricDefinition` just requires a
+ * formula's references to already be *active*, so `index.ts` registers
+ * `ad_spend` in the same phase as `collection_Nd` (both aggregation-kind),
+ * before the `roi_Nd` formulas.
  */
 export interface CampaignOpsPackMetricDefinition {
   name: string;
@@ -27,7 +34,7 @@ export interface CampaignOpsPackMetricDefinition {
 function collectionMetric(windowDays: 7 | 14 | 30 | 40): CampaignOpsPackMetricDefinition {
   return {
     name: `collection_${windowDays}d`,
-    dimensions: [],
+    dimensions: ['campaign_id'],
     definition: {
       kind: 'aggregation',
       aggregation: {
@@ -41,12 +48,38 @@ function collectionMetric(windowDays: 7 | 14 | 30 | 40): CampaignOpsPackMetricDe
   };
 }
 
-/** Phase 1: every `collection_Nd` aggregation, plus the calibration aggregations below — none reference each other, so they can all register together. */
+/** Reused from the SaaS pack verbatim — see this module's own doc comment. */
+const AD_SPEND: CampaignOpsPackMetricDefinition = (() => {
+  const found = SAAS_METRIC_PACK_METRICS.find((metric) => metric.name === 'ad_spend');
+  if (!found) {
+    throw new Error('campaign-ops-pack: expected the SaaS pack to declare an "ad_spend" metric to reuse.');
+  }
+  return { name: found.name, dimensions: found.dimensions, definition: found.definition };
+})();
+
+function roiMetric(windowDays: 7 | 14 | 30 | 40): CampaignOpsPackMetricDefinition {
+  return {
+    name: `roi_${windowDays}d`,
+    dimensions: ['campaign_id'],
+    definition: { kind: 'formula', formula: `collection_${windowDays}d / ad_spend` },
+  };
+}
+
+/** Phase 1: every `collection_Nd` aggregation plus the reused `ad_spend`, plus the calibration aggregations below — none reference each other, so they can all register together. */
 export const CAMPAIGN_OPS_PACK_METRICS: readonly CampaignOpsPackMetricDefinition[] = [
   collectionMetric(7),
   collectionMetric(14),
   collectionMetric(30),
   collectionMetric(40),
+  AD_SPEND,
+];
+
+/** Phase 2 (formulas): `roi_Nd`, each dividing its own `collection_Nd` by the phase-1 `ad_spend`. */
+export const CAMPAIGN_OPS_PACK_ROI_FORMULA_METRICS: readonly CampaignOpsPackMetricDefinition[] = [
+  roiMetric(7),
+  roiMetric(14),
+  roiMetric(30),
+  roiMetric(40),
 ];
 
 /**

@@ -1,8 +1,10 @@
 import { DuplicateMetricDefinitionError, registerMetricDefinition } from '../../services/metric-registry.service';
+import { ensureSaasMetricPackSchemasRegistered } from '../saas-metric-pack';
 import {
   CAMPAIGN_OPS_PACK_CALIBRATION_AGGREGATION_METRICS,
   CAMPAIGN_OPS_PACK_CALIBRATION_FORMULA_METRICS,
   CAMPAIGN_OPS_PACK_METRICS,
+  CAMPAIGN_OPS_PACK_ROI_FORMULA_METRICS,
   type CampaignOpsPackMetricDefinition,
 } from './metrics';
 
@@ -56,23 +58,33 @@ async function registerPhase(
 }
 
 /**
- * Idempotently registers the KAN-86 Campaign Ops pack's `collection_Nd`
- * metrics (all aggregation-kind, no schema to self-provision first — see
- * `manifest.ts`'s own doc comment), then the predicted-vs-actual calibration
- * metrics across two ordered phases (see `metrics.ts`'s own doc comment for
- * why the phase-2 formulas need their phase-1 references already active).
+ * Idempotently registers the KAN-86 Campaign Ops pack: the SaaS pack's own
+ * `ad_spend` measure schema first (idempotently — same posture
+ * `ensureQualityScorePackRegistered` already establishes for the identical
+ * cross-pack `ad_spend` reuse), then `collection_Nd` + the reused `ad_spend`
+ * metric (all aggregation-kind, so they can register together), then the
+ * `roi_Nd` formulas (each needs its own `collection_Nd` and `ad_spend`
+ * already active), then the predicted-vs-actual calibration metrics across
+ * two further ordered phases (see `metrics.ts`'s own doc comment for why
+ * each formula phase needs its references already active).
  */
 export async function ensureCampaignOpsPackRegistered(
   organizationId: string,
   projectId: string,
   createdByUserId: string,
 ): Promise<EnsureCampaignOpsPackRegisteredResult> {
+  await ensureSaasMetricPackSchemasRegistered(organizationId, projectId, createdByUserId);
+
   const registered: string[] = [];
   const alreadyRegistered: string[] = [];
 
   const collection = await registerPhase(organizationId, projectId, createdByUserId, CAMPAIGN_OPS_PACK_METRICS);
   registered.push(...collection.registered);
   alreadyRegistered.push(...collection.alreadyRegistered);
+
+  const roi = await registerPhase(organizationId, projectId, createdByUserId, CAMPAIGN_OPS_PACK_ROI_FORMULA_METRICS);
+  registered.push(...roi.registered);
+  alreadyRegistered.push(...roi.alreadyRegistered);
 
   const calibrationPhase1 = await registerPhase(organizationId, projectId, createdByUserId, CAMPAIGN_OPS_PACK_CALIBRATION_AGGREGATION_METRICS);
   registered.push(...calibrationPhase1.registered);

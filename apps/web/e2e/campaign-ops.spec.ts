@@ -24,7 +24,7 @@ async function createOrganization(page: Page, name: string): Promise<string> {
 }
 
 test.describe('Campaign ops (KAN-86)', () => {
-  test('an org owner reaches Campaign ops via nav, installs the payback pack, and sees both sections degrade cleanly with no warehouse configured', async ({ page }) => {
+  test('an org owner reaches Campaign ops via nav, installs the payback pack, and sees every section degrade cleanly with no warehouse configured', async ({ page }) => {
     const email = uniqueEmail('campaign-ops-owner');
     await signUp(page, email);
     const orgId = await createOrganization(page, 'Campaign Ops E2E Org');
@@ -44,9 +44,10 @@ test.describe('Campaign ops (KAN-86)', () => {
     // Spend targets don't need the pack installed at all — no warehouse configured in this environment.
     await expect(page.getByText('No spend data available yet — connect a data warehouse to see this.')).toBeVisible();
 
-    // Payback needs the Campaign Ops pack installed.
+    // Payback (and the per-campaign collection/ROI breakdown) needs the Campaign Ops pack installed.
     await expect(page.getByText('No payback data available yet — connect a data warehouse to see this.')).not.toBeVisible();
     await page.getByRole('button', { name: 'Install' }).click();
     await expect(page.getByText('No payback data available yet — connect a data warehouse to see this.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('No per-campaign payback data available yet — connect a data warehouse to see this.')).toBeVisible();
   });
 });

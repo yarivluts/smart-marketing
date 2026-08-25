@@ -24,18 +24,38 @@
 -- alongside a customer's first `charge` row for the exact same dollar amount
 -- (see that model's own doc comment), so including both would double-count
 -- a customer's very first payment. Only `status = 'succeeded'` charges count
--- as "collected". Deliberately does NOT join to `campaign_id`/`channel_id`:
--- `fact_revenue_event` carries no such column (only `fact_attribution` does,
--- keyed by conversion event, not by charge), and the compiler has no join
--- graph to bridge the two (see `metrics.ts`'s own `troi` doc comment for the
--- identical, already-documented limitation) — so this mart, and therefore
--- `roi_nd`/`collection_nd`, are project-level cohort metrics for now, not
--- per-campaign ones. A genuine per-campaign `roi_nd` needs both a real
--- ad-spend connector (KAN-50/51, blocked by KAN-43) and a compiler join
--- feature; tracked as follow-up, not attempted here.
+-- as "collected".
+--
+-- `campaign_id`/`channel_id` (2026-08-25 KAN-86 follow-up): the customer's
+-- own acquisition event (their first customer-side event, same row this
+-- model already keys off) is joined to `fact_attribution`'s `last_touch`
+-- model by `conversion_event_id`, the same "join a specific event's own
+-- event_id to `fact_attribution` where `model = 'last_touch'`" pattern
+-- `fact_signup_quality_score.sql` (KAN-83) already established. The
+-- acquisition CTE below is rewritten from a bare `min(occurred_at)` group-by
+-- to a `row_number()` winner-pick so it can carry that specific event's
+-- `event_id` forward (mirrors `fact_attribution`'s own touched_at/
+-- touchpoint_event_id tiebreak convention: earliest `occurred_at`, ties
+-- broken by `event_id`) — a customer's acquisition is still exactly one
+-- event, this only makes its identity explicit instead of discarding it.
+-- A left join: an organic customer with no attributable touchpoint at all
+-- still gets a row (`channel_id = 'unattributed'`, `campaign_id = null`),
+-- same posture the left join to `revenue` already establishes for zero
+-- charges. This closes the "compiler has no join graph to bridge the two"
+-- half of the old deferred note — `metric-registry.service.ts` places no
+-- constraint on a metric's declared `dimensions` beyond name syntax, and
+-- `compiler.ts` already FULL JOINs one leaf CTE per aggregation on shared
+-- dimension columns (proven in production by `cac`/`quality_adjusted_cac`,
+-- both of which divide `ad_spend` by a `fact_signup_quality_score`-derived
+-- metric on `channel_id`) — so a real dbt column was the only missing
+-- piece. `roi_nd`/`collection_nd` remain project-level-only unless broken
+-- down by this new `campaign_id` dimension (`campaign-ops-pack/metrics.ts`
+-- does so). A genuine per-campaign `roi_nd` still needs a real ad-spend
+-- connector (KAN-50/51, blocked by KAN-43) before `ad_spend` carries any
+-- live rows to divide by — that half is unchanged.
 
 with customer_events as (
-    select organization_id, project_id, environment_id, entity_id as customer_id, occurred_at
+    select organization_id, project_id, environment_id, entity_id as customer_id, event_id, occurred_at
     from {{ ref('events') }}
     where event_type != 'touchpoint'
 ),
@@ -46,9 +66,24 @@ acquisition as (
         project_id,
         environment_id,
         customer_id,
-        min(occurred_at) as acquired_at
-    from customer_events
-    group by 1, 2, 3, 4
+        event_id as acquisition_event_id,
+        occurred_at as acquired_at
+    from (
+        select
+            *,
+            row_number() over (
+                partition by organization_id, project_id, environment_id, customer_id
+                order by occurred_at asc, event_id asc
+            ) as rn
+        from customer_events
+    )
+    where rn = 1
+),
+
+channel_attribution as (
+    select organization_id, project_id, environment_id, conversion_event_id, channel_id, campaign_id
+    from {{ ref('fact_attribution') }}
+    where model = 'last_touch'
 ),
 
 revenue as (
@@ -68,12 +103,19 @@ joined as (
         a.environment_id,
         a.customer_id,
         a.acquired_at,
+        coalesce(ca.channel_id, 'unattributed') as channel_id,
+        ca.campaign_id,
         r.amount,
         case
             when r.ts is null then null
             else {{ growthos_datediff('a.acquired_at', 'r.ts', 'day') }}
         end as days_since_acquisition
     from acquisition a
+    left join channel_attribution ca
+        on ca.organization_id = a.organization_id
+        and ca.project_id = a.project_id
+        and ca.environment_id = a.environment_id
+        and ca.conversion_event_id = a.acquisition_event_id
     left join revenue r
         on r.organization_id = a.organization_id
         and r.project_id = a.project_id
@@ -89,12 +131,14 @@ aggregated as (
         environment_id,
         customer_id,
         acquired_at,
+        channel_id,
+        campaign_id,
         sum(case when days_since_acquisition <= 7 then amount else 0 end) as collected_revenue_7d,
         sum(case when days_since_acquisition <= 14 then amount else 0 end) as collected_revenue_14d,
         sum(case when days_since_acquisition <= 30 then amount else 0 end) as collected_revenue_30d,
         sum(case when days_since_acquisition <= 40 then amount else 0 end) as collected_revenue_40d
     from joined
-    group by 1, 2, 3, 4, 5
+    group by 1, 2, 3, 4, 5, 6, 7
 )
 
 select
@@ -107,6 +151,8 @@ select
     environment_id,
     customer_id,
     acquired_at,
+    channel_id,
+    campaign_id,
     collected_revenue_7d,
     collected_revenue_14d,
     collected_revenue_30d,
