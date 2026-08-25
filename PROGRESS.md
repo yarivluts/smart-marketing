@@ -17,6 +17,94 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (later still) — Merged a leftover KAN-90 i18n fix (PR #284) and closed its documented compiler gap as new story KAN-91 (PR #285)
+
+- **Last completed:**
+  - Session start: local `main` was a stale detached HEAD (again) — reset to `origin/main`
+    (`git reset --hard origin/main`, same recurring local-ref fix every prior entry documents; this
+    time the local ref was 50 commits behind, from an old container snapshot). `list_pull_requests`
+    (open) found **PR #284** already sitting open: a small, complete, self-reviewed follow-up from an
+    earlier run in this same session — `support/page.tsx`'s `formatSeconds` helper baked literal
+    English unit letters (`"s"`/`"m"`/`"h"`) into the `rowSummary` translation instead of returning a
+    bare number + translation key the way `formatMinutesAgo`/`formatThroughput` (ingest-health) do, a
+    real CLAUDE.md "no hard-coded UI strings" violation the `react/jsx-no-literals` lint rule can't
+    catch (it only targets literal JSX text children, not `t()` interpolation arguments).
+  - **Caught before merging PR #284:** its branch (`kan-90-support-i18n-duration-fix`) was cut
+    *before* `main`'s own KAN-90 bookkeeping commit (`1b9a878`, "record KAN-90 merge... in
+    PROGRESS.md/TASKS.md") landed — diffing the PR against current `main` showed it would have
+    **deleted** that entire PROGRESS.md entry and the KAN-90 `TASKS.md` row on merge, the identical
+    "stale merge commit, GitHub still reports `mergeable_state: clean`" trap a prior entry (2026-08-25
+    earlier, KAN-89/PR #278) documents catching for KAN-88's `/tv` rotation leaderboard. Merged
+    `origin/main` into the branch properly (clean, no conflicts), confirmed `PROGRESS.md`/`TASKS.md`
+    came back byte-identical to `main` plus the branch's own `support-view.ts` changes, then verified
+    from scratch: `pnpm install` (no `node_modules` in this container), `pnpm lint`/`typecheck`/`build`
+    green, full `pnpm test` green (11/11 turbo tasks, the 2 documented-flaky Playwright e2e specs
+    passed on retry). Pushed the fix to the PR's own branch, watched its CI (~35min, matches this
+    repo's documented job duration) via `subscribe_pr_activity` rather than polling, merged (squash)
+    once green and `mergeable_state: clean`. Remote branch deletion hit the same recurring HTTP 403
+    from this sandbox's git-over-HTTPS proxy every prior run documents — left undeleted.
+  - **New story, KAN-91 (PR #285):** with PR #284 merged and `TASKS.md` otherwise all `done`/blocked
+    (per KAN-90's own "Next step" note), did the "sweep every `done` row's own deferred/not-yet notes
+    for a newly-buildable follow-up" pass that entry recommended. KAN-90's own doc comment on
+    `support_open_backlog` named an exact, self-contained, no-infra-required gap: the
+    metrics-compiler formula parser (`packages/shared/src/metrics-compiler/formula-parser.ts`) only
+    supported `+`/`-`/`*`/`/`, so that formula metric had no way to floor itself at zero the way
+    `SupportLeaderboardResult.openBacklog`'s own `Math.max(0, ...)` does for the identical
+    computation — a period whose `support_tickets_resolved` exceeds its `support_tickets_opened`
+    could render a negative backlog on a board tile/goal. Delivered: a `call` AST node (`max`/`min`,
+    a closed function-name set — an unrecognized name throws immediately as a likely typo, not
+    silently accepted) with comma-separated argument parsing, compiling to BigQuery's variadic
+    `GREATEST`/`LEAST` (`compiler.ts`); `collectIdentifiers` recurses into a call's arguments without
+    ever treating the function name itself as a referenced-metric identifier (the correctness-critical
+    part, since `metric-registry.service.ts`'s existence/cycle validation resolves every formula
+    reference against the active-metric catalog). `metric-registry.service.ts`'s own hand-rolled
+    formula validation (a character-class regex + a separate paren-balance walk + a separate
+    identifier-extraction regex) is deleted in favor of reusing the shared parser directly
+    (`parseFormula`/`collectIdentifiers`, the same functions `metrics-compiler.service.ts` already
+    uses to resolve transitive formula references) — both a reuse win and the only way to get
+    `max`/`min` support there without a second, parallel function-name carve-out.
+    `support_open_backlog` now reads `max(support_tickets_opened - support_tickets_resolved, 0)`,
+    closing its own documented limitation. New coverage: `formula-parser.test.ts` (call parsing,
+    precedence composition with the surrounding expression, unknown-function/too-few-args errors,
+    `collectIdentifiers` never surfacing the function name as a reference even when a same-named
+    metric exists), a new golden-file compiler fixture (case 14, `max()` → `GREATEST()`, broken down
+    by a dimension) + a direct `min()`/`LEAST()` and 3-argument-call unit test, and
+    `metric-registry.emulator.test.ts` (registers a `max()`/`min()` formula against a real Firestore
+    emulator; rejects an unsupported function name and a too-few-argument call) — plus the
+    `support-pack.emulator.test.ts` formula-string assertion updated to match. The metric-defs admin
+    form's formula placeholder (`en`/`he`) now shows a `max(...)` example.
+  - **Self-review before pushing** (own read of the diff, not a subagent this time): caught one real
+    placement bug — the pre-existing `FormulaAstNode` doc comment ended up sitting above the new
+    `FORMULA_FUNCTION_NAMES` constant instead of above the type it actually describes, purely from
+    where the insertion landed. Fixed (moved the new constant above the doc comment) and re-verified
+    the affected package's tests before amending the not-yet-pushed commit.
+  - **Checks:** `pnpm lint`/`typecheck`/`build` green monorepo-wide; full `pnpm test` green (11/11
+    turbo tasks, `packages/shared` 571/571 incl. 80 metrics-compiler-scoped tests, real-emulator
+    `packages/firebase-orm-models`/`apps/web` suites green, the 2 documented-flaky Playwright e2e
+    specs passed on retry same as every prior run reports). Opened PR #285, subscribed, watched CI to
+    green (~35min), merged (squash). Remote branch deletion hit the same HTTP 403 — left undeleted.
+  - Added a new **KAN-91** row to `TASKS.md` (`done`).
+- **In progress (exact stopping point):** none — both PR #284 and PR #285 are merged, `TASKS.md`
+  reflects the delivered scope, `main`'s CI is green (`e41500f`).
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` still has no remaining unblocked `todo`/`in-progress` row beyond the
+  standing KAN-18 (real GCP/BigQuery infra slices)/KAN-19 (CI preview+staging deploy) infra work,
+  KAN-43/KAN-50/KAN-51's human-gated blockers, and KAN-86's infra-gated `roi_nd` gap. A future run
+  should keep doing the top-to-bottom "sweep every `done` row's own deferred/not-yet notes for a
+  newly-buildable follow-up" pass this run and its immediate predecessor (KAN-90) both used to find
+  real, scoped work once every `docs/plan/14-gap-analysis.md` bullet had a story — this run's own
+  KAN-91 is one example of that pattern (a "not yet possible" note in one story's own doc comment
+  turning into the next story). Always re-diff any found open PR/branch against the current
+  `origin/main` tip before trusting its own "merge main" commit or GitHub's `mergeable_state` — this
+  is now the *third* run in a row to have caught that exact trap (KAN-89, then this run's PR #284).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-90-support-i18n-duration-fix` and
+    `kan-91-metrics-compiler-clamp-functions` branches on GitHub (the git-over-HTTPS proxy rejects
+    every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-25 (later) — New story KAN-90 (Customer-support analytics & team leaderboards, Gap 6) delivered (PR #282)
 
 - **Last completed:**
