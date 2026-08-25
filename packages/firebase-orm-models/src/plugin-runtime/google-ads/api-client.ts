@@ -33,13 +33,26 @@ export interface GoogleAdsCreateCustomerMatchUserListResult {
 }
 
 export interface GoogleAdsAddCustomerMatchOperationsResult {
-  /** The number of hashed-email member operations submitted to the offline user data job — Google processes the job asynchronously, so this is "accepted", not "matched" (Google Ads has no synchronous match-count response, unlike Meta's `num_received`). */
+  /** The number of member operations submitted to the offline user data job — Google processes the job asynchronously, so this is "accepted", not "matched" (Google Ads has no synchronous match-count response, unlike Meta's `num_received`). */
   numReceived: number;
 }
 
 export interface GoogleAdsAddAdGroupKeywordsResult {
   keywordResourceNames: string[];
   negativeKeywordResourceNames: string[];
+}
+
+/**
+ * One contact's already-hashed Customer Match user identifier(s) —
+ * `hashedEmail` and/or `hashedPhoneNumber`, mirroring `MetaContactMatchKey`'s
+ * shape for the sibling Meta connector. Both, when present, ride the same
+ * `userIdentifiers` array on one operation (Google's own docs: multiple
+ * identifiers on one `UserData` improve match rate the same way Meta's
+ * multi-key schema does).
+ */
+export interface GoogleAdsContactMatchKey {
+  hashedEmail?: string;
+  hashedPhoneNumber?: string;
 }
 
 /**
@@ -74,15 +87,15 @@ export interface GoogleAdsApiClient {
    */
   createCustomerMatchUserList(customerId: string, params: { name: string }): Promise<GoogleAdsCreateCustomerMatchUserListResult>;
   /**
-   * Uploads a batch of already-SHA-256-hashed emails to an existing
-   * Customer Match user list — the Google Ads member-upload flow is itself
-   * three sequential calls (create an `OfflineUserDataJob`, add its member
-   * operations, run the job), unlike Meta's single "add hashed emails"
-   * endpoint; this method sequences all three so the executor sees one
-   * upload call, mirroring `MetaAdsApiClient.addHashedEmailsToCustomAudience`'s
+   * Uploads a batch of already-SHA-256-hashed contact match keys to an
+   * existing Customer Match user list — the Google Ads member-upload flow is
+   * itself three sequential calls (create an `OfflineUserDataJob`, add its
+   * member operations, run the job), unlike Meta's single "add hashed
+   * contacts" endpoint; this method sequences all three so the executor sees
+   * one upload call, mirroring `MetaAdsApiClient.addContactsToCustomAudience`'s
    * shape for the sibling connector.
    */
-  addHashedEmailsToCustomerMatchUserList(customerId: string, userListResourceName: string, hashedEmails: readonly string[]): Promise<GoogleAdsAddCustomerMatchOperationsResult>;
+  addContactsToCustomerMatchUserList(customerId: string, userListResourceName: string, contacts: readonly GoogleAdsContactMatchKey[]): Promise<GoogleAdsAddCustomerMatchOperationsResult>;
   /**
    * Adds keywords and/or negative keywords to an already-created ad group
    * (KAN-72 follow-up, "post-creation keyword edits") — the same
@@ -335,10 +348,10 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
     return { userListResourceName: result.results[0].resourceName };
   }
 
-  async addHashedEmailsToCustomerMatchUserList(
+  async addContactsToCustomerMatchUserList(
     customerId: string,
     userListResourceName: string,
-    hashedEmails: readonly string[],
+    contacts: readonly GoogleAdsContactMatchKey[],
   ): Promise<GoogleAdsAddCustomerMatchOperationsResult> {
     const jobResult = await this.postAction<{ resourceName: string }>(`customers/${customerId}/offlineUserDataJobs:create`, {
       job: { type: 'CUSTOMER_MATCH_USER_LIST', customerMatchUserListMetadata: { userList: userListResourceName } },
@@ -346,12 +359,19 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
     const jobResourceName = jobResult.resourceName;
 
     await this.postAction(`${jobResourceName}:addOperations`, {
-      operations: hashedEmails.map((hashedEmail) => ({ create: { userIdentifiers: [{ hashedEmail }] } })),
+      operations: contacts.map((contact) => ({
+        create: {
+          userIdentifiers: [
+            ...(contact.hashedEmail !== undefined ? [{ hashedEmail: contact.hashedEmail }] : []),
+            ...(contact.hashedPhoneNumber !== undefined ? [{ hashedPhoneNumber: contact.hashedPhoneNumber }] : []),
+          ],
+        },
+      })),
     });
 
     await this.postAction(`${jobResourceName}:run`, {});
 
-    return { numReceived: hashedEmails.length };
+    return { numReceived: contacts.length };
   }
 
   async addAdGroupKeywords(
