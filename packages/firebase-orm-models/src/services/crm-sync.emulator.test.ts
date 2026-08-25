@@ -13,6 +13,11 @@ import {
   disablePlugin,
   ensureUserForFirebaseSession,
   generateLocalKmsKeyRing,
+  GoogleCustomerMatchCredentialConfigError,
+  GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
+  GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD,
+  GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
+  GOOGLE_CUSTOMER_MATCH_PLUGIN_MANIFEST_YAML,
   installPlugin,
   listActionPluginInstallsForProject,
   listAuditLogEntriesForOrg,
@@ -31,6 +36,7 @@ import {
   registerSchemaDefinition,
   requestResourceAttachment,
   resolveCrmWebhookCredentialSecret,
+  resolveGoogleCustomerMatchCredentialSecret,
   resolveMetaAudienceCredentialSecret,
   SegmentNotFoundError,
   setSharedCredentialSecret,
@@ -153,6 +159,55 @@ async function setupInstalledMetaCustomAudiencePlugin(
     version: '1.0.0',
     consentedScopes: ['action:execute'],
     config: { [META_CUSTOM_AUDIENCE_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id, [META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD]: audienceName },
+    installedByUserId: owner.id,
+  });
+
+  return { owner, organization, project, credential, attachment, install, kms };
+}
+
+/** The Google Ads Customer Match sibling of {@link setupInstalledMetaCustomAudiencePlugin} — a `google_ads`-provider credential with its secret set, approved-attached to the project, and the manifest installed pointing its config at that attachment plus a configured `user_list_name`. */
+async function setupInstalledGoogleCustomerMatchPlugin(
+  orgName: string,
+  secret: { developerToken: string; clientId: string; clientSecret: string; refreshToken: string; customerId: string } = {
+    developerToken: 'dev-token',
+    clientId: 'client-id',
+    clientSecret: 'client-secret',
+    refreshToken: 'refresh-token',
+    customerId: '1234567890',
+  },
+  userListName = 'Warm leads',
+) {
+  const { owner, organization, project } = await setupOrgWithProject(orgName);
+  const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+  const kms = new LocalKmsProvider(keyRing, currentKeyId);
+
+  const credential = await createSharedCredential({
+    organizationId: organization.id,
+    name: 'Google Ads (test)',
+    provider: 'google_ads',
+    availableScopes: ['account'],
+    createdByUserId: owner.id,
+  });
+  await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify(secret), kms, actorId: owner.id });
+
+  const attachment = await requestResourceAttachment({
+    organizationId: organization.id,
+    projectId: project.id,
+    resourceKind: 'credential',
+    resourceId: credential.id,
+    requestedByUserId: owner.id,
+    scopeSelection: ['account'],
+  });
+  await decideResourceAttachment({ organizationId: organization.id, attachmentId: attachment.id, decidedByUserId: owner.id, approve: true });
+
+  await registerPluginManifest({ organizationId: organization.id, manifestYaml: GOOGLE_CUSTOMER_MATCH_PLUGIN_MANIFEST_YAML, registeredByUserId: owner.id });
+  const install = await installPlugin({
+    organizationId: organization.id,
+    projectId: project.id,
+    pluginId: GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
+    version: '1.0.0',
+    consentedScopes: ['action:execute'],
+    config: { [GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id, [GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD]: userListName },
     installedByUserId: owner.id,
   });
 
@@ -294,6 +349,86 @@ describe('resolveMetaAudienceCredentialSecret', () => {
     await install.save();
 
     await expect(resolveMetaAudienceCredentialSecret(organization.id, project.id, install, kms)).rejects.toBeInstanceOf(MetaAudienceCredentialConfigError);
+  });
+});
+
+describe('resolveGoogleCustomerMatchCredentialSecret', () => {
+  it('resolves the real secret + configured user list name from an approved, configured attachment', async () => {
+    const { organization, project, install, kms } = await setupInstalledGoogleCustomerMatchPlugin('Resolve Google Customer Match Secret Org');
+
+    const secret = await resolveGoogleCustomerMatchCredentialSecret(organization.id, project.id, install, kms);
+
+    expect(secret).toEqual({
+      developerToken: 'dev-token',
+      clientId: 'client-id',
+      clientSecret: 'client-secret',
+      refreshToken: 'refresh-token',
+      customerId: '1234567890',
+      userListName: 'Warm leads',
+    });
+  });
+
+  it('rejects an install missing the credential-attachment config field', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Resolve Google Customer Match Secret No Config Org');
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: GOOGLE_CUSTOMER_MATCH_PLUGIN_MANIFEST_YAML, registeredByUserId: owner.id });
+    const install = await installPlugin({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
+      version: '1.0.0',
+      consentedScopes: ['action:execute'],
+      config: { [GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: 'nonexistent-attachment', [GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD]: 'Warm leads' },
+      installedByUserId: owner.id,
+    });
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+
+    await expect(resolveGoogleCustomerMatchCredentialSecret(organization.id, project.id, install, kms)).rejects.toBeInstanceOf(GoogleCustomerMatchCredentialConfigError);
+  });
+
+  it('rejects a credential whose provider is not "google_ads"', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Resolve Google Customer Match Secret Wrong Provider Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    const credential = await createSharedCredential({ organizationId: organization.id, name: 'Generic (wrong provider)', provider: 'generic', availableScopes: ['account'], createdByUserId: owner.id });
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: JSON.stringify({ webhookUrl: 'https://x.example.com', bearerToken: 'tok' }), kms, actorId: owner.id });
+    const attachment = await requestResourceAttachment({ organizationId: organization.id, projectId: project.id, resourceKind: 'credential', resourceId: credential.id, requestedByUserId: owner.id, scopeSelection: ['account'] });
+    await decideResourceAttachment({ organizationId: organization.id, attachmentId: attachment.id, decidedByUserId: owner.id, approve: true });
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: GOOGLE_CUSTOMER_MATCH_PLUGIN_MANIFEST_YAML, registeredByUserId: owner.id });
+    const install = await installPlugin({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
+      version: '1.0.0',
+      consentedScopes: ['action:execute'],
+      config: { [GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id, [GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD]: 'Warm leads' },
+      installedByUserId: owner.id,
+    });
+
+    await expect(resolveGoogleCustomerMatchCredentialSecret(organization.id, project.id, install, kms)).rejects.toBeInstanceOf(GoogleCustomerMatchCredentialConfigError);
+  });
+
+  it('rejects an install missing the user_list_name config field', async () => {
+    const { owner, organization, project, attachment } = await setupInstalledGoogleCustomerMatchPlugin('Resolve Google Customer Match Secret No Name Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    // installPlugin's own config_schema validation requires the field to be present — build a
+    // second install with a config that skips it directly against the model, mirroring
+    // resolveMetaAudienceCredentialSecret's own "not at install time" test posture.
+    const install = new PluginInstallModel();
+    install.organization_id = organization.id;
+    install.project_id = project.id;
+    install.plugin_id = GOOGLE_CUSTOMER_MATCH_PLUGIN_ID;
+    install.version = '1.0.0';
+    install.status = 'installed';
+    install.granted_scopes = ['action:execute'];
+    install.config = { [GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD]: attachment.id };
+    install.installed_by = owner.id;
+    install.installed_at = new Date().toISOString();
+    install.setPathParams({ organization_id: organization.id, project_id: project.id });
+    await install.save();
+
+    await expect(resolveGoogleCustomerMatchCredentialSecret(organization.id, project.id, install, kms)).rejects.toBeInstanceOf(GoogleCustomerMatchCredentialConfigError);
   });
 });
 
@@ -453,12 +588,12 @@ describe('syncSegmentToCrm', () => {
     const membersExecutor = { execute: async () => [{ entity_id: 'cust_1', properties: JSON.stringify({ plan: 'pro' }), last_seen_at: '2026-08-20T00:00:00.000Z' }] };
     const executor = fakeSinkExecutor({ push: async (params) => ({ pushed: params.records.length, externalRef: 'audience-abc' }) });
 
-    expect(install.meta_custom_audience_id).toBeUndefined();
+    expect(install.sink_external_ref).toBeUndefined();
     const run = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, executor, membersExecutor });
 
     expect(run.status).toBe('succeeded');
     const reloaded = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
-    expect(reloaded?.meta_custom_audience_id).toBe('audience-abc');
+    expect(reloaded?.sink_external_ref).toBe('audience-abc');
   });
 
   it('creates a Custom Audience on the first real sync and reuses the same one on the second, via the real dispatch (no executor override)', async () => {
@@ -479,16 +614,67 @@ describe('syncSegmentToCrm', () => {
     const firstRun = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, membersExecutor });
     expect(firstRun.status).toBe('succeeded');
     const afterFirstSync = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
-    expect(afterFirstSync?.meta_custom_audience_id).toBe('audience-real-1');
+    expect(afterFirstSync?.sink_external_ref).toBe('audience-real-1');
     const createAudienceCalls = fetchMock.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/customaudiences'));
     expect(createAudienceCalls).toHaveLength(1);
 
     const secondRun = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, membersExecutor });
     expect(secondRun.status).toBe('succeeded');
     const afterSecondSync = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
-    expect(afterSecondSync?.meta_custom_audience_id).toBe('audience-real-1');
+    expect(afterSecondSync?.sink_external_ref).toBe('audience-real-1');
     // Still exactly one — the second sync reused the cached audience id instead of creating another.
     expect(fetchMock.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/customaudiences'))).toHaveLength(1);
+  });
+
+  it('persists a connector-created externalRef (a new Google Ads Customer Match user list resource name) onto the install after a successful sync', async () => {
+    const { owner, organization, project, install, kms } = await setupInstalledGoogleCustomerMatchPlugin('Sync Google Customer Match Persist Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({ organizationId: organization.id, projectId: project.id, name: 'Pro customers', schemaName: 'customer', filters: [{ field: 'plan', op: '=', value: 'pro' }], createdByUserId: owner.id });
+    const membersExecutor = { execute: async () => [{ entity_id: 'cust_1', properties: JSON.stringify({ plan: 'pro' }), last_seen_at: '2026-08-20T00:00:00.000Z' }] };
+    const executor = fakeSinkExecutor({ push: async (params) => ({ pushed: params.records.length, externalRef: 'customers/1234567890/userLists/abc' }) });
+
+    expect(install.sink_external_ref).toBeUndefined();
+    const run = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, executor, membersExecutor });
+
+    expect(run.status).toBe('succeeded');
+    const reloaded = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
+    expect(reloaded?.sink_external_ref).toBe('customers/1234567890/userLists/abc');
+  });
+
+  it('creates a Customer Match user list on the first real sync and reuses the same one on the second, via the real dispatch (no executor override)', async () => {
+    const { owner, organization, project, install, kms } = await setupInstalledGoogleCustomerMatchPlugin('Sync Google Customer Match Real Dispatch Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({ organizationId: organization.id, projectId: project.id, name: 'Pro customers', schemaName: 'customer', filters: [{ field: 'plan', op: '=', value: 'pro' }], createdByUserId: owner.id });
+    const membersExecutor = { execute: async () => [{ entity_id: 'cust_1', properties: JSON.stringify({ plan: 'pro', email: 'a@example.com' }), last_seen_at: '2026-08-20T00:00:00.000Z' }] };
+
+    const fetchMock = vi.fn(async (url: string) => {
+      const parsed = new URL(url);
+      if (parsed.pathname === '/token') {
+        return { ok: true, status: 200, json: async () => ({ access_token: 'access-token-1', expires_in: 3600 }), text: async () => '{}' } as unknown as Response;
+      }
+      if (parsed.pathname.endsWith('/userLists:mutate')) {
+        return { ok: true, status: 200, json: async () => ({ results: [{ resourceName: 'customers/1234567890/userLists/real-1' }] }), text: async () => '{}' } as unknown as Response;
+      }
+      if (parsed.pathname.endsWith('/offlineUserDataJobs:create')) {
+        return { ok: true, status: 200, json: async () => ({ resourceName: 'customers/1234567890/offlineUserDataJobs/real-job-1' }), text: async () => '{}' } as unknown as Response;
+      }
+      return { ok: true, status: 200, json: async () => ({}), text: async () => '{}' } as unknown as Response;
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const firstRun = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, membersExecutor });
+    expect(firstRun.status).toBe('succeeded');
+    const afterFirstSync = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
+    expect(afterFirstSync?.sink_external_ref).toBe('customers/1234567890/userLists/real-1');
+    const createListCalls = fetchMock.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/userLists:mutate'));
+    expect(createListCalls).toHaveLength(1);
+
+    const secondRun = await syncSegmentToCrm({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, installId: install.id, triggeredByUserId: owner.id, kms, membersExecutor });
+    expect(secondRun.status).toBe('succeeded');
+    const afterSecondSync = await PluginInstallModel.init(install.id, { organization_id: organization.id, project_id: project.id });
+    expect(afterSecondSync?.sink_external_ref).toBe('customers/1234567890/userLists/real-1');
+    // Still exactly one — the second sync reused the cached user list resource name instead of creating another.
+    expect(fetchMock.mock.calls.filter(([url]) => new URL(String(url)).pathname.endsWith('/userLists:mutate'))).toHaveLength(1);
   });
 });
 
