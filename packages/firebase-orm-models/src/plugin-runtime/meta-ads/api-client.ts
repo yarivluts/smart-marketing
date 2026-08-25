@@ -76,9 +76,21 @@ export interface MetaCreateCustomAudienceResult {
   audienceId: string;
 }
 
-/** How many of an `addHashedEmailsToCustomAudience` call's hashes Meta actually accepted onto the audience — mirrors `SinkPluginPushResult.pushed`'s own "how many did the remote system actually take" semantics for the KAN-73-follow-up Custom Audience connector. */
+/** How many of an `addContactsToCustomAudience` call's contact rows Meta actually accepted onto the audience — mirrors `SinkPluginPushResult.pushed`'s own "how many did the remote system actually take" semantics for the KAN-73-follow-up Custom Audience connector. */
 export interface MetaAddHashedEmailsResult {
   numReceived: number;
+}
+
+/**
+ * One contact's already-hashed Custom Audience match key(s) — `emailHash`
+ * and/or `phoneHash`, matching Meta's own multi-key `users` upload schema
+ * (a row can carry either or both; Meta improves match rate when both are
+ * present for the same person). `MetaCustomAudienceSinkPluginExecutor`
+ * builds these; this client never receives a raw email or phone number.
+ */
+export interface MetaContactMatchKey {
+  emailHash?: string;
+  phoneHash?: string;
 }
 
 /**
@@ -120,16 +132,17 @@ export interface MetaAdsApiClient {
   /**
    * Creates a `CUSTOM`-subtype, user-provided-data Custom Audience on the ad
    * account (KAN-73 follow-up — see `plugin-runtime/meta-custom-audience`'s
-   * own doc comment). Starts empty; `addHashedEmailsToCustomAudience`
+   * own doc comment). Starts empty; `addContactsToCustomAudience`
    * populates it.
    */
   createCustomAudience(adAccountId: string, params: MetaCreateCustomAudienceParams): Promise<MetaCreateCustomAudienceResult>;
   /**
-   * Adds already-hashed emails to an existing Custom Audience — the caller
-   * (`MetaCustomAudienceSinkPluginExecutor`) hashes every email before this
-   * call ever sees it; this client never receives a raw email address.
+   * Adds already-hashed contact match keys to an existing Custom Audience —
+   * the caller (`MetaCustomAudienceSinkPluginExecutor`) hashes every email/
+   * phone before this call ever sees it; this client never receives a raw
+   * email address or phone number.
    */
-  addHashedEmailsToCustomAudience(audienceId: string, hashedEmails: readonly string[]): Promise<MetaAddHashedEmailsResult>;
+  addContactsToCustomAudience(audienceId: string, contacts: readonly MetaContactMatchKey[]): Promise<MetaAddHashedEmailsResult>;
 }
 
 const META_API_VERSION = 'v21.0';
@@ -275,11 +288,25 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
     return { audienceId: result.id };
   }
 
-  async addHashedEmailsToCustomAudience(audienceId: string, hashedEmails: readonly string[]): Promise<MetaAddHashedEmailsResult> {
+  async addContactsToCustomAudience(audienceId: string, contacts: readonly MetaContactMatchKey[]): Promise<MetaAddHashedEmailsResult> {
+    // Meta's multi-key `users` upload schema is one fixed column list for the
+    // whole payload — include EMAIL/PHONE only if at least one contact in
+    // this call actually carries it (keeps a phone-less call's payload
+    // byte-identical to the pre-phone-support `{schema: ['EMAIL'], ...}`
+    // shape), and fill a missing key with `''` per row per Meta's own spec.
+    const schema: Array<'EMAIL' | 'PHONE'> = [];
+    if (contacts.some((contact) => contact.emailHash !== undefined)) {
+      schema.push('EMAIL');
+    }
+    if (contacts.some((contact) => contact.phoneHash !== undefined)) {
+      schema.push('PHONE');
+    }
+    const data = contacts.map((contact) => schema.map((key) => (key === 'EMAIL' ? (contact.emailHash ?? '') : (contact.phoneHash ?? ''))));
+
     const result = await this.request<{ num_received?: number }>(`${audienceId}/users`, {
-      payload: JSON.stringify({ schema: ['EMAIL'], data: hashedEmails.map((hash) => [hash]) }),
+      payload: JSON.stringify({ schema, data }),
     });
-    return { numReceived: result.num_received ?? hashedEmails.length };
+    return { numReceived: result.num_received ?? contacts.length };
   }
 }
 

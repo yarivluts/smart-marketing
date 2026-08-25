@@ -245,7 +245,7 @@ describe('GoogleAdsHttpApiClient', () => {
     ]);
   });
 
-  it('uploads hashed emails to a Customer Match user list via create -> addOperations -> run, in order, against the job\'s own resource name', async () => {
+  it('uploads hashed-email-only contacts to a Customer Match user list via create -> addOperations -> run, in order, against the job\'s own resource name', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
@@ -254,7 +254,10 @@ describe('GoogleAdsHttpApiClient', () => {
       .mockResolvedValueOnce(jsonResponse({}));
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await new GoogleAdsHttpApiClient(OPTIONS).addHashedEmailsToCustomerMatchUserList('123', 'customers/123/userLists/1', ['hash-a', 'hash-b']);
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [
+      { hashedEmail: 'hash-a' },
+      { hashedEmail: 'hash-b' },
+    ]);
 
     expect(result).toEqual({ numReceived: 2 });
     const urls = fetchMock.mock.calls.slice(1).map(([url]: [string]) => url);
@@ -277,12 +280,33 @@ describe('GoogleAdsHttpApiClient', () => {
     expect(runBody).toEqual({});
   });
 
+  it('combines a contact\'s hashedEmail and hashedPhoneNumber onto the same userIdentifiers array for better match rate', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ resourceName: 'customers/123/offlineUserDataJobs/456' }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [
+      { hashedEmail: 'hash-email-a', hashedPhoneNumber: 'hash-phone-a' },
+      { hashedPhoneNumber: 'hash-phone-b' },
+    ]);
+
+    const addOperationsBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
+    expect(addOperationsBody.operations).toEqual([
+      { create: { userIdentifiers: [{ hashedEmail: 'hash-email-a' }, { hashedPhoneNumber: 'hash-phone-a' }] } },
+      { create: { userIdentifiers: [{ hashedPhoneNumber: 'hash-phone-b' }] } },
+    ]);
+  });
+
   it('throws GoogleAdsApiError with the response status when the offline user data job create call fails', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 400));
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
-      new GoogleAdsHttpApiClient(OPTIONS).addHashedEmailsToCustomerMatchUserList('123', 'customers/123/userLists/1', ['hash-a']),
+      new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [{ hashedEmail: 'hash-a' }]),
     ).rejects.toMatchObject({ status: 400 });
   });
 });

@@ -18,3 +18,25 @@ export function hashEmailForGoogleCustomerMatch(email: string): string {
   const normalized = email.trim().toLowerCase();
   return createHash('sha256').update(normalized).digest('hex');
 }
+
+/**
+ * Google Ads' documented Customer Match upload format for a `hashedPhoneNumber`
+ * user identifier: the raw value is never sent — only a SHA-256 hex digest of
+ * the number formatted to E.164 (leading `+`, country code, digits only, no
+ * spaces/dashes/parens — Google Ads' own "Formatting guidelines for offline
+ * data" spec, which keeps the `+` for phone numbers unlike Meta's own PHONE
+ * schema, see `meta-custom-audience/hashing.ts`'s sibling function's own doc
+ * comment for that difference). This function does not itself validate that
+ * `phone` is a real, correctly-country-coded number (same "best effort, not
+ * every row is eligible" posture `hashEmailForGoogleCustomerMatch`/`extractEmail`
+ * establish) — a source system that stores a national-only number with no
+ * country code will still hash and upload, it just won't match on Google's
+ * side.
+ */
+export function hashPhoneForGoogleCustomerMatch(phone: string): string {
+  const trimmed = phone.trim();
+  const hasPlus = trimmed.startsWith('+');
+  const digitsOnly = trimmed.replace(/[^0-9]/g, '');
+  const normalized = digitsOnly.length > 0 ? `${hasPlus ? '+' : ''}${digitsOnly}` : '';
+  return createHash('sha256').update(normalized).digest('hex');
+}

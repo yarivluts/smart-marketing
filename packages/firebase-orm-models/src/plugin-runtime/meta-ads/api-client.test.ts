@@ -193,11 +193,11 @@ describe('MetaAdsHttpApiClient', () => {
     expect(body.get('customer_file_source')).toBe('USER_PROVIDED_ONLY');
   });
 
-  it('adds already-hashed emails to a Custom Audience as an EMAIL-schema payload', async () => {
+  it('adds already-hashed email-only contacts to a Custom Audience as an EMAIL-schema payload', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ num_received: 2, num_invalid_entries: 0 }));
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await new MetaAdsHttpApiClient(OPTIONS).addHashedEmailsToCustomAudience('audience-1', ['hash-a', 'hash-b']);
+    const result = await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [{ emailHash: 'hash-a' }, { emailHash: 'hash-b' }]);
 
     expect(result).toEqual({ numReceived: 2 });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
@@ -206,11 +206,32 @@ describe('MetaAdsHttpApiClient', () => {
     expect(JSON.parse(body.get('payload') as string)).toEqual({ schema: ['EMAIL'], data: [['hash-a'], ['hash-b']] });
   });
 
-  it('falls back to the hash count when the response omits num_received', async () => {
+  it('adds mixed email/phone contacts to a Custom Audience as an EMAIL+PHONE-schema payload, filling a missing key with an empty string', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ num_received: 2, num_invalid_entries: 0 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [
+      { emailHash: 'hash-email-a', phoneHash: 'hash-phone-a' },
+      { phoneHash: 'hash-phone-b' },
+    ]);
+
+    expect(result).toEqual({ numReceived: 2 });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    expect(JSON.parse(body.get('payload') as string)).toEqual({
+      schema: ['EMAIL', 'PHONE'],
+      data: [
+        ['hash-email-a', 'hash-phone-a'],
+        ['', 'hash-phone-b'],
+      ],
+    });
+  });
+
+  it('falls back to the contact count when the response omits num_received', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({}));
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await new MetaAdsHttpApiClient(OPTIONS).addHashedEmailsToCustomAudience('audience-1', ['hash-a']);
+    const result = await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [{ emailHash: 'hash-a' }]);
 
     expect(result).toEqual({ numReceived: 1 });
   });
