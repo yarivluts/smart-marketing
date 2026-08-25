@@ -153,6 +153,41 @@ export interface AutomationCampaignActivationExecutionInput {
 }
 
 /**
+ * A `keyword_edit` action (KAN-72 follow-up, plan `13 §E21.2`'s own deferred
+ * "post-creation ad/keyword edits" bullet) — adds keywords/negative keywords
+ * to an ad group a `campaign_draft_create` action already created (see
+ * `AutomationTargetStateModel.ad_group_resource_names`). Editing an RSA ad's
+ * own headlines/descriptions in place isn't supported yet (Google Ads models
+ * RSA assets as add/remove operations rather than a partial update, and Meta
+ * has no ad-group/keyword concept at all — see `MetaAutomationActionExecutor`'s
+ * own doc comment) — only ever adding new keyword-level criteria, never
+ * removing/editing an existing one, is this action type's whole scope.
+ */
+export interface AutomationKeywordEditExecutionInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  adGroupResourceName: string;
+  addKeywords: CampaignDraftKeyword[];
+  addNegativeKeywords: CampaignDraftKeyword[];
+}
+
+export interface AutomationKeywordEditExecutionResult {
+  addedKeywordResourceNames: string[];
+  addedNegativeKeywordResourceNames: string[];
+}
+
+export interface AutomationKeywordEditRollbackInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  addedKeywordResourceNames: string[];
+  addedNegativeKeywordResourceNames: string[];
+}
+
+/**
  * The seam KAN-72 (`GoogleAdsAutomationActionExecutor`) and KAN-73
  * (`MetaAutomationActionExecutor`) both implement for real —
  * `executeBudgetChange` applies a proposed change to the live ad platform,
@@ -160,9 +195,11 @@ export interface AutomationCampaignActivationExecutionInput {
  * `executeCampaignDraftCreate`/`rollbackCampaignDraftCreate` create (and
  * remove) a brand-new paused campaign; `executeCampaignActivation`/
  * `rollbackCampaignActivation` flip an already-created campaign between
- * paused and enabled. Same "provider-agnostic executor interface" posture as
- * `SourcePluginExecutor` (KAN-47) and `WarehouseQueryExecutor` (KAN-42) — the
- * interface itself never mentions a provider name; `resolveAutomationActionExecutorForTarget`
+ * paused and enabled; `executeKeywordEdit`/`rollbackKeywordEdit` add (and
+ * remove) keywords/negative keywords on an already-created ad group. Same
+ * "provider-agnostic executor interface" posture as `SourcePluginExecutor`
+ * (KAN-47) and `WarehouseQueryExecutor` (KAN-42) — the interface itself never
+ * mentions a provider name; `resolveAutomationActionExecutorForTarget`
  * (`services/automation-executor-resolver.service.ts`) is the one place that
  * picks a concrete implementation, based on a target's linked credential's
  * `provider`.
@@ -174,4 +211,6 @@ export interface AutomationActionExecutor {
   rollbackCampaignDraftCreate(input: AutomationCampaignDraftRollbackInput): Promise<void>;
   executeCampaignActivation(input: AutomationCampaignActivationExecutionInput): Promise<void>;
   rollbackCampaignActivation(input: AutomationCampaignActivationExecutionInput): Promise<void>;
+  executeKeywordEdit(input: AutomationKeywordEditExecutionInput): Promise<AutomationKeywordEditExecutionResult>;
+  rollbackKeywordEdit(input: AutomationKeywordEditRollbackInput): Promise<void>;
 }

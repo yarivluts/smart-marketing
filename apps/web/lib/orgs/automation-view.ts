@@ -47,6 +47,7 @@ export interface AutomationTargetView {
   resourceAttachmentId?: string;
   campaignResourceName?: string;
   campaignStatus?: CampaignStatus;
+  adGroupResourceNames?: string[];
 }
 
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
@@ -59,6 +60,7 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     ...(target.resource_attachment_id !== undefined ? { resourceAttachmentId: target.resource_attachment_id } : {}),
     ...(target.campaign_resource_name !== undefined ? { campaignResourceName: target.campaign_resource_name } : {}),
     ...(target.campaign_status !== undefined ? { campaignStatus: target.campaign_status } : {}),
+    ...(target.ad_group_resource_names !== undefined ? { adGroupResourceNames: target.ad_group_resource_names } : {}),
   };
 }
 
@@ -91,6 +93,19 @@ export interface AutomationActionDiffEntry {
   after: unknown;
 }
 
+/** A keyword edit's `addKeywords`/`addNegativeKeywords` diff value is an array of `{text, matchType}` objects — `String(...)` on it would render `[object Object]` per entry, so it gets a compact "text (matchType)" summary instead, same reasoning `formatDiffValue`'s own `campaignDraft` branch already established for a nested object value. */
+function formatKeywordListDiffValue(value: unknown): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+  return value
+    .map((entry) => {
+      const keyword = entry as { text?: unknown; matchType?: unknown };
+      return `${String(keyword.text)} (${String(keyword.matchType)})`;
+    })
+    .join(', ');
+}
+
 /**
  * A `campaignDraft` diff value is a whole {@link CampaignDraft} object —
  * `String(...)` on it would render `[object Object]`, so it gets a compact
@@ -100,9 +115,14 @@ export interface AutomationActionDiffEntry {
  * draft's `adGroups` is `undefined` on a Meta draft (and vice versa for
  * `adSets`), which would silently degrade to "0 ad group(s)" for a Meta
  * draft if left unbranched — so this branches on `platform` explicitly
- * rather than relying on that degradation.
+ * rather than relying on that degradation. `addKeywords`/`addNegativeKeywords`
+ * are handled by {@link formatKeywordListDiffValue} before this branch is
+ * ever reached — see that function's own doc comment.
  */
 function formatDiffValue(key: string, value: unknown): unknown {
+  if (key === 'addKeywords' || key === 'addNegativeKeywords') {
+    return formatKeywordListDiffValue(value);
+  }
   if (key !== 'campaignDraft' || typeof value !== 'object' || value === null) {
     return value;
   }
@@ -126,6 +146,11 @@ const DIFF_FIELD_LABEL_KEYS: Record<string, string> = {
   dailyBudgetUsd: 'diffFieldDailyBudgetUsd',
   campaignDraft: 'diffFieldCampaignDraft',
   status: 'diffFieldCampaignStatus',
+  adGroupResourceName: 'diffFieldAdGroupResourceName',
+  addKeywords: 'diffFieldAddKeywords',
+  addNegativeKeywords: 'diffFieldAddNegativeKeywords',
+  addedKeywordResourceNames: 'diffFieldAddedKeywordResourceNames',
+  addedNegativeKeywordResourceNames: 'diffFieldAddedNegativeKeywordResourceNames',
 };
 
 export function diffFieldLabelKey(key: string): string | undefined {

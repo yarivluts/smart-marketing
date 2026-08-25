@@ -24,6 +24,7 @@ import {
   proposeAutomationBudgetChangeAction,
   proposeCampaignActivationAction,
   proposeCampaignDraftCreateAction,
+  proposeKeywordEditAction,
   rejectAutomationAction,
   requestResourceAttachment,
   rollbackAutomationAction,
@@ -31,6 +32,7 @@ import {
   setResourceAttachmentWriteTier,
   verifyAutomationAction,
   type CampaignDraft,
+  type CampaignDraftKeyword,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -1090,5 +1092,215 @@ describe('proposeCampaignDraftCreateAction / proposeCampaignActivationAction (KA
     });
     expect(activation.status).toBe('blocked');
     expect(activation.guardrail_violations).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'insufficient_write_tier' })]));
+  });
+});
+
+describe('proposeKeywordEditAction (KAN-72 follow-up)', () => {
+  /** Seeds a target and executes a `campaign_draft_create` against it, so `ad_group_resource_names` is populated (via the simulated executor, same posture every other keyword-edit test in this block relies on). */
+  async function seedTargetWithCreatedCampaign(organizationId: string, projectId: string, ownerId: string) {
+    const target = await seedTarget(organizationId, projectId, ownerId, 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId,
+      projectId,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: ownerId,
+    });
+    await approveAutomationAction({ organizationId, projectId, actionId: created.id, approverId: ownerId });
+    await executeAutomationAction({ organizationId, projectId, actionId: created.id, executedByUserId: ownerId });
+    const [reloaded] = await listAutomationTargetStatesForProject(organizationId, projectId);
+    return reloaded;
+  }
+
+  it('proposes a clean keyword edit as awaiting_approval with the dry-run diff', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Keyword Edit Clean Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adGroupResourceName = target.ad_group_resource_names?.[0] as string;
+
+    const action = await proposeKeywordEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adGroupResourceName,
+      addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+      addNegativeKeywords: [{ text: 'free', matchType: 'BROAD' }],
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('awaiting_approval');
+    expect(action.action_type).toBe('keyword_edit');
+    expect(action.before).toEqual({ adGroupResourceName });
+    expect(action.after).toEqual({
+      adGroupResourceName,
+      addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+      addNegativeKeywords: [{ text: 'free', matchType: 'BROAD' }],
+    });
+    expect(action.guardrail_violations).toEqual([]);
+  });
+
+  it('rejects an invalid edit (bad match type) before touching guardrails', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Keyword Edit Invalid Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adGroupResourceName = target.ad_group_resource_names?.[0] as string;
+
+    await expect(
+      proposeKeywordEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adGroupResourceName,
+        addKeywords: [{ text: 'blue widgets', matchType: 'FUZZY' } as unknown as CampaignDraftKeyword],
+        addNegativeKeywords: [],
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects a no-op edit with neither keywords nor negative keywords', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Keyword Edit Empty Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adGroupResourceName = target.ad_group_resource_names?.[0] as string;
+
+    await expect(
+      proposeKeywordEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adGroupResourceName,
+        addKeywords: [],
+        addNegativeKeywords: [],
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('refuses an ad group resource name that is not one of this target\'s own ad groups', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Keyword Edit Wrong AdGroup Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeKeywordEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adGroupResourceName: 'customers/999/adGroups/not-this-targets',
+        addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+        addNegativeKeywords: [],
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('refuses a target with no campaign (and so no ad groups) created yet', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Keyword Edit No Campaign Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeKeywordEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adGroupResourceName: 'customers/999/adGroups/1',
+        addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+        addNegativeKeywords: [],
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('blocks a keyword edit targeting a protected campaign', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Keyword Edit Protected Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adGroupResourceName = target.ad_group_resource_names?.[0] as string;
+    await setAutomationGuardrailPolicy({
+      organizationId: organization.id,
+      projectId: project.id,
+      maxDailyBudgetChangePct: null,
+      spendCeilingUsd: null,
+      protectedTargetIds: [target.id],
+      allowedHours: null,
+      maxActionsPerDay: null,
+      maxGuardedMetricRegressionPct: null,
+      setByUserId: owner.id,
+    });
+
+    const action = await proposeKeywordEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adGroupResourceName,
+      addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+      addNegativeKeywords: [],
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual([expect.objectContaining({ type: 'protected_target' })]);
+  });
+
+  it('requires the "manage" write tier specifically — "optimize" is not enough', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Keyword Edit Optimize Org');
+    const { target, attachment } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'manage', 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: campaignDraft(),
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, executedByUserId: owner.id });
+    await setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: attachment.id, tier: 'optimize', actorId: owner.id });
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+
+    const action = await proposeKeywordEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adGroupResourceName: reloaded.ad_group_resource_names?.[0] as string,
+      addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+      addNegativeKeywords: [],
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'insufficient_write_tier' })]));
+  });
+
+  it('executes a keyword edit end to end, widening the diff with the real added resource names, then rolls it back', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Keyword Edit Lifecycle Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adGroupResourceName = target.ad_group_resource_names?.[0] as string;
+
+    const proposed = await proposeKeywordEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adGroupResourceName,
+      addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+      addNegativeKeywords: [{ text: 'free', matchType: 'BROAD' }],
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id });
+    const executed = await executeAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      executedByUserId: owner.id,
+    });
+
+    expect(executed.status).toBe('executed');
+    const after = executed.after as { addedKeywordResourceNames?: string[]; addedNegativeKeywordResourceNames?: string[] };
+    expect(after.addedKeywordResourceNames).toHaveLength(1);
+    expect(after.addedNegativeKeywordResourceNames).toHaveLength(1);
+
+    const rolledBack = await rollbackAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      reason: 'manual',
+      actorId: owner.id,
+    });
+    expect(rolledBack.status).toBe('rolled_back');
   });
 });

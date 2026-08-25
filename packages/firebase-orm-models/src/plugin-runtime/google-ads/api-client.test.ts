@@ -309,4 +309,79 @@ describe('GoogleAdsHttpApiClient', () => {
       new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [{ hashedEmail: 'hash-a' }]),
     ).rejects.toMatchObject({ status: 400 });
   });
+
+  it('adds keywords and negative keywords to an existing ad group via one adGroupCriteria mutate call, splitting the results by input order', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          results: [
+            { resourceName: 'customers/123/adGroupCriteria/1' },
+            { resourceName: 'customers/123/adGroupCriteria/2' },
+            { resourceName: 'customers/123/adGroupCriteria/3' },
+          ],
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).addAdGroupKeywords(
+      '123',
+      'customers/123/adGroups/1',
+      [
+        { text: 'blue widgets', matchType: 'PHRASE' },
+        { text: 'cheap widgets', matchType: 'BROAD' },
+      ],
+      [{ text: 'free', matchType: 'BROAD' }],
+    );
+
+    expect(result).toEqual({
+      keywordResourceNames: ['customers/123/adGroupCriteria/1', 'customers/123/adGroupCriteria/2'],
+      negativeKeywordResourceNames: ['customers/123/adGroupCriteria/3'],
+    });
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupCriteria:mutate');
+    const body = JSON.parse(String(init.body));
+    expect(body.operations).toEqual([
+      { create: { adGroup: 'customers/123/adGroups/1', status: 'ENABLED', keyword: { text: 'blue widgets', matchType: 'PHRASE' } } },
+      { create: { adGroup: 'customers/123/adGroups/1', status: 'ENABLED', keyword: { text: 'cheap widgets', matchType: 'BROAD' } } },
+      { create: { adGroup: 'customers/123/adGroups/1', negative: true, keyword: { text: 'free', matchType: 'BROAD' } } },
+    ]);
+  });
+
+  it('throws GoogleAdsApiError with the response status on a failed addAdGroupKeywords call', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 400));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      new GoogleAdsHttpApiClient(OPTIONS).addAdGroupKeywords('123', 'customers/123/adGroups/1', [{ text: 'blue widgets', matchType: 'PHRASE' }], []),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  it('removes ad-group criteria by resource name via a remove mutate operation', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/adGroupCriteria/1' }, { resourceName: 'customers/123/adGroupCriteria/2' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new GoogleAdsHttpApiClient(OPTIONS).removeAdGroupCriteria('123', ['customers/123/adGroupCriteria/1', 'customers/123/adGroupCriteria/2']);
+
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupCriteria:mutate');
+    const body = JSON.parse(String(init.body));
+    expect(body.operations).toEqual([
+      { remove: 'customers/123/adGroupCriteria/1' },
+      { remove: 'customers/123/adGroupCriteria/2' },
+    ]);
+  });
+
+  it('throws GoogleAdsApiError with the response status on a failed removeAdGroupCriteria call', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 400));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(new GoogleAdsHttpApiClient(OPTIONS).removeAdGroupCriteria('123', ['customers/123/adGroupCriteria/1'])).rejects.toMatchObject({
+      status: 400,
+    });
+  });
 });

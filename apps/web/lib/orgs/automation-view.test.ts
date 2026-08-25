@@ -90,4 +90,22 @@ describe('toAutomationActionView / formatDiffValue (KAN-73)', () => {
     const entry = view.diffEntries.find((candidate) => candidate.key === 'dailyBudgetUsd');
     expect(entry).toEqual({ key: 'dailyBudgetUsd', before: 100, after: 150 });
   });
+
+  it('summarizes a keyword edit\'s addKeywords/addNegativeKeywords as "text (matchType)" pairs (KAN-72 follow-up)', () => {
+    const view = toAutomationActionView(
+      action({
+        id: 'a5',
+        action_type: 'keyword_edit',
+        before: { adGroupResourceName: 'customers/999/adGroups/1' },
+        after: {
+          adGroupResourceName: 'customers/999/adGroups/1',
+          addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+          addNegativeKeywords: [{ text: 'free', matchType: 'BROAD' }],
+        },
+      }),
+    );
+
+    expect(view.diffEntries.find((candidate) => candidate.key === 'addKeywords')?.after).toBe('blue widgets (PHRASE)');
+    expect(view.diffEntries.find((candidate) => candidate.key === 'addNegativeKeywords')?.after).toBe('free (BROAD)');
+  });
 });

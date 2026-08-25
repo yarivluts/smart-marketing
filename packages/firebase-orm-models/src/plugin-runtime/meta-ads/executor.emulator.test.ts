@@ -10,7 +10,7 @@ import {
 } from '../../index';
 import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { MetaAdsApiError, type MetaAdsApiClient } from './api-client';
-import { MetaAdsBudgetResourceUnknownError, MetaAdsWrongPlatformCampaignDraftError, MetaAutomationActionExecutor } from './executor';
+import { MetaAdsBudgetResourceUnknownError, MetaAdsWrongPlatformCampaignDraftError, MetaAutomationActionExecutor, MetaKeywordEditNotSupportedError } from './executor';
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('meta-ads-executor-tests');
@@ -335,5 +335,38 @@ describe('MetaAutomationActionExecutor', () => {
       }),
     ).rejects.toBeInstanceOf(MetaAdsWrongPlatformCampaignDraftError);
     expect(apiClient.createCampaign).not.toHaveBeenCalled();
+  });
+
+  it('throws MetaKeywordEditNotSupportedError for executeKeywordEdit — Meta has no ad-group/keyword concept (KAN-72 follow-up)', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+
+    await expect(
+      executor.executeKeywordEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adGroupResourceName: 'irrelevant',
+        addKeywords: [],
+        addNegativeKeywords: [],
+      }),
+    ).rejects.toBeInstanceOf(MetaKeywordEditNotSupportedError);
+  });
+
+  it('throws MetaKeywordEditNotSupportedError for rollbackKeywordEdit', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+
+    await expect(
+      executor.rollbackKeywordEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        addedKeywordResourceNames: [],
+        addedNegativeKeywordResourceNames: [],
+      }),
+    ).rejects.toBeInstanceOf(MetaKeywordEditNotSupportedError);
   });
 });

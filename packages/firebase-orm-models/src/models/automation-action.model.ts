@@ -31,21 +31,29 @@ export type AutomationActionStatus = (typeof AUTOMATION_ACTION_STATUSES)[number]
  * `before`/`after` for this type are `{}`/`{ campaignDraft: CampaignDraft }`.
  * `campaign_activation` flips an already-created campaign from paused to
  * enabled — `before`/`after` are `{ status: 'paused' }`/`{ status: 'enabled' }`.
- * Both are Manage-tier-only (see `automation.service.ts`'s
- * `resolveWriteTierViolation`), unlike `budget_change` which Optimize
- * already permits.
+ * `keyword_edit` (KAN-72 follow-up) adds keywords/negative keywords to an
+ * already-created ad group — `before`/`after` are `{ adGroupResourceName }`/
+ * `{ adGroupResourceName, addKeywords, addNegativeKeywords }`, and
+ * `automation.service.ts`'s `executeActionByType` widens `after` post-execution
+ * with `addedKeywordResourceNames`/`addedNegativeKeywordResourceNames` (the
+ * real resource names Google Ads assigned) so `rollbackActionByType` knows
+ * exactly which criteria to remove. All three are Manage-tier-only (see
+ * `automation.service.ts`'s `resolveWriteTierViolation`), unlike
+ * `budget_change` which Optimize already permits.
  *
- * These three action types are provider-agnostic by design — `action_type`
+ * These four action types are provider-agnostic by design — `action_type`
  * never says "google_ads" or "meta". KAN-72 (`GoogleAdsAutomationActionExecutor`)
- * drives all three for a target linked to a `provider: 'google_ads'`
- * credential; KAN-73 (`MetaAutomationActionExecutor`) drives the same three
- * for a target linked to a `provider: 'meta_ads'` credential — see
- * `CampaignDraft`'s own `platform`-discriminated-union doc comment
- * (`automation-runtime/executor.ts`) for how `campaign_draft_create` stays
- * one action type across both platforms' structurally different campaign
- * shapes.
+ * drives all four for a target linked to a `provider: 'google_ads'`
+ * credential; KAN-73 (`MetaAutomationActionExecutor`) drives
+ * `budget_change`/`campaign_draft_create`/`campaign_activation` for a target
+ * linked to a `provider: 'meta_ads'` credential (`keyword_edit` has no Meta
+ * equivalent — Meta has no ad-group/keyword concept, see
+ * `MetaAutomationActionExecutor`'s own doc comment) — see `CampaignDraft`'s
+ * own `platform`-discriminated-union doc comment (`automation-runtime/executor.ts`)
+ * for how `campaign_draft_create` stays one action type across both
+ * platforms' structurally different campaign shapes.
  */
-export const AUTOMATION_ACTION_TYPES = ['budget_change', 'campaign_draft_create', 'campaign_activation'] as const;
+export const AUTOMATION_ACTION_TYPES = ['budget_change', 'campaign_draft_create', 'campaign_activation', 'keyword_edit'] as const;
 export type AutomationActionType = (typeof AUTOMATION_ACTION_TYPES)[number];
 
 export type AutomationRollbackReason = 'manual' | 'guardrail_regression';

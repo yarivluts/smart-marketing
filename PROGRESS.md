@@ -17,6 +17,105 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (even newer) — Merged KAN-72 follow-up (PR #289, Google Ads post-creation keyword edits)
+
+- **Last completed:**
+  - PR #289's CI (`terraform fmt · validate`, `lint · typecheck · test · build`) reported back green via
+    the `check_suite.completed` webhook event (subscribed via `subscribe_pr_activity` before the wait),
+    `mergeable_state: clean`, base sha matching `main`'s current tip, no open reviews. Merged (squash).
+    Remote branch deletion hit the same recurring HTTP 403 from this sandbox's git-over-HTTPS proxy
+    every prior entry documents — left undeleted. Unsubscribed from the PR's activity.
+  - Updated `TASKS.md`'s KAN-72 row with a follow-up note (same convention KAN-72/73's own prior
+    follow-up rows used for PR #286/#288).
+- **In progress (exact stopping point):** none — PR #289 is merged, `main`'s CI is green, `TASKS.md`
+  reflects the delivered scope.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates: KAN-72's own remaining PMax asset groups and RSA ad edits (headline/description
+  changes in place — Google Ads models RSA assets as add/remove operations rather than a partial
+  update, so this needs real design thought, not a quick follow-up); KAN-73's real Meta creative image
+  upload and post-creation edits beyond activation; Lookalike/Similar Audience expansion for either
+  Customer-Match/Custom-Audience connector; non-email Customer Match identifiers (phone, mailing
+  address, device id).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-72-google-ads-keyword-edits` branch on GitHub (the git-over-HTTPS
+    proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
+## 2026-08-25 (newest) — New follow-up: Google Ads post-creation keyword edits (KAN-72) — PR #289 open
+
+- **Last completed:**
+  - Session start: `git status` was clean and `main` matched `origin/main` (no stale-ref quirk this time).
+    `list_pull_requests` (open) was empty. Read `PROGRESS.md`/`TASKS.md`: every row is `done`,
+    `blocked-by` (KAN-50/51 on KAN-43), `needs-human` (KAN-43), or standing real-infra work (KAN-18/19).
+    Per the last several entries' own recommended pattern ("sweep every `done` row's own
+    deferred/not-yet doc-comment notes for a newly-buildable follow-up"), picked KAN-72's own
+    still-open deferred bullet: "post-creation ad/keyword edits" (PMax asset groups and audience
+    attach were the other two — audience attach shipped in PR #288; PMax asset groups is a
+    materially larger follow-up, left for a future run).
+  - Explored the existing KAN-71/72/73 automation pipeline (action model, executor interface,
+    Google Ads API client, guardrail evaluators, admin UI form/route pattern) via a research agent
+    before writing any code, to make sure the new action type actually fit the established
+    provider-agnostic-interface/guardrail/write-tier conventions rather than inventing a parallel one.
+  - **Delivered (PR #289, branch `kan-72-google-ads-keyword-edits`):** a new `keyword_edit`
+    automation action type — adds keywords/negative keywords to an ad group an earlier
+    `campaign_draft_create` action already created. `AutomationTargetStateModel` gained
+    `ad_group_resource_names` (the real ad-group resource names `GoogleAdsHttpApiClient.createCampaignDraft`
+    already returned but the executor previously discarded) so a keyword edit can only ever target
+    one of a target's own ad groups, never an arbitrary caller-supplied resource name — enforced in
+    `proposeKeywordEditAction`. `GoogleAdsApiClient` gained `addAdGroupKeywords`/`removeAdGroupCriteria`
+    (real `adGroupCriteria:mutate` create/remove calls, same operation shape `createCampaignDraft`
+    already uses); `GoogleAdsAutomationActionExecutor` implements the real execute/rollback, capturing
+    the real per-criterion resource names Google Ads assigns so rollback removes exactly what was
+    added. `MetaAutomationActionExecutor` throws a new `MetaKeywordEditNotSupportedError` — Meta has
+    no ad-group/keyword-targeting concept, documented on both the error and the action-type's own doc
+    comment. `SimulatedAdAccountExecutor` gets a working stand-in. Reuses
+    `evaluateCampaignActivationGuardrails`'s shape (no budget number involved) for guardrails, and the
+    existing Manage-tier gating. Admin UI: a new "Propose a keyword edit" section on the project
+    Automation page (target + ad-group picker, add-keywords/add-negative-keywords textareas), a new
+    `POST .../automation/actions/keyword-edits` route, en/he translations, and a new diff-formatter
+    for the `addKeywords`/`addNegativeKeywords` fields (an array of `{text, matchType}` objects,
+    same "would render `[object Object]`" problem `campaignDraft`'s own diff formatting solved).
+  - Self-review before pushing found and fixed one real bug: the new keyword-list diff formatter had
+    been inserted between `formatDiffValue`'s own doc comment and its function declaration, silently
+    mis-attributing that comment to the wrong function — reordered so each function keeps its own doc
+    comment (no behavior change, but a real doc-accuracy bug a future reader would have hit).
+  - **Checks:** `packages/firebase-orm-models` — real-Firestore-emulator `pnpm test`, 1319/1319.
+    `apps/web` — real-Firestore+Auth-emulator `pnpm run test:unit:emulator`, 1523/1523 (new route
+    test, form-component test, `automation-view.ts` diff-formatting test, and a new KAN-26
+    isolation-test scenario for the `keyword-edits` route). Root `pnpm build`/`pnpm lint`/`pnpm
+    typecheck` (turbo, all 8 packages) all green. Full `pnpm test` (incl. sharded Playwright e2e,
+    ~22min): green except one failure + two flaky results, all diff-unrelated — `e2e/boards.spec.ts`'s
+    drag-and-drop board-layout test (dashboard boards, nothing this PR touches) failed all 3 in-suite
+    retries; re-ran it alone and it passed on the very next retry, confirming resource-contention/UI-
+    timing flakiness rather than a regression, same posture prior entries document for this exact
+    kind of test. `billing-ops-feed.spec.ts`/`cost-guardrails.spec.ts` were already labeled "flaky"
+    (passed on retry) by Playwright itself in the same run.
+  - Opened PR #289, subscribed to its activity, scheduled a ~1h check-in via `send_later`.
+- **In progress (exact stopping point):** PR #289 is open, subscribed, pushed, and self-reviewed;
+  CI has not reported back yet as of this entry (same "watch CI rather than re-run the full ~35min
+  local e2e sweep a second time" posture recent entries take). Once green and mergeable, merge
+  (squash), delete the branch, and record the merge in a follow-up `PROGRESS.md`/`TASKS.md` entry —
+  add a follow-up note to KAN-72's own `TASKS.md` row (same convention its PR #286/#288 follow-ups
+  used).
+- **Blocked + why:** nothing blocking — waiting on PR #289's CI to report back.
+- **Next step:** once PR #289 merges, the next candidate from the same "sweep deferred notes" pass is
+  still open: KAN-72's own PMax asset groups (a materially larger effort — Performance Max uses a
+  structurally different "asset group" model, not ad-group keywords/RSAs, so `CampaignDraft`'s
+  `advertisingChannelType` would need a real second variant, not just a new action type); KAN-73's
+  real Meta creative image upload and post-creation edits beyond activation; Lookalike/Similar
+  Audience expansion for either Customer-Match/Custom-Audience connector; non-email Customer Match
+  identifiers (phone, mailing address, device id).
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-72-google-ads-keyword-edits` branch on GitHub once merged (the
+    git-over-HTTPS proxy has rejected every scheduled run's remote branch-delete attempt in every
+    prior entry with HTTP 403 — expect the same here).
+
+---
+
 ## 2026-08-25 (latest) — Merged KAN-72 follow-up (PR #288, Google Ads Customer Match sync)
 
 - **Last completed:**

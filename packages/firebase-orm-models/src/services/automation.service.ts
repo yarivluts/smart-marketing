@@ -11,9 +11,11 @@ import { runWithRetryBackoff } from '../plugin-runtime/retry';
 import {
   defaultAutomationActionExecutor,
   validateCampaignDraft,
+  validateKeywordEditActionInput,
   InvalidCampaignDraftError,
   type AutomationActionExecutor,
   type CampaignDraft,
+  type CampaignDraftKeyword,
 } from '../automation-runtime';
 import {
   AutomationActionInvalidStateError,
@@ -60,20 +62,23 @@ async function loadTargetForAction(organizationId: string, projectId: string, ta
   return target;
 }
 
-/** `campaign_draft_create`/`campaign_activation` (KAN-72) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
-const MANAGE_ONLY_ACTION_TYPES: ReadonlySet<AutomationActionType> = new Set(['campaign_draft_create', 'campaign_activation']);
+/** `campaign_draft_create`/`campaign_activation`/`keyword_edit` (KAN-72) touch a campaign's full lifecycle, so — unlike `budget_change`, which Optimize already permits — they require the linked connection to be approved at the `manage` tier specifically. */
+const MANAGE_ONLY_ACTION_TYPES: ReadonlySet<AutomationActionType> = new Set(['campaign_draft_create', 'campaign_activation', 'keyword_edit']);
 
 function minimumWriteTierForActionType(actionType: AutomationActionType): ConnectionWriteTier {
   return MANAGE_ONLY_ACTION_TYPES.has(actionType) ? 'manage' : 'optimize';
 }
 
-/** A short human phrase for an action's `action_type`, reused across every audit-log summary so none of them stay hardcoded to "the budget change" for the two KAN-72 action types. */
+/** A short human phrase for an action's `action_type`, reused across every audit-log summary so none of them stay hardcoded to "the budget change" for the KAN-72 action types. */
 function actionSummaryVerb(actionType: AutomationActionType): string {
   if (actionType === 'campaign_draft_create') {
     return 'the new campaign draft';
   }
   if (actionType === 'campaign_activation') {
     return 'the campaign activation';
+  }
+  if (actionType === 'keyword_edit') {
+    return 'the keyword edit';
   }
   return 'the budget change';
 }
@@ -546,6 +551,109 @@ export async function proposeCampaignActivationAction(params: ProposeCampaignAct
   return action;
 }
 
+export interface ProposeKeywordEditActionParams {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  adGroupResourceName: string;
+  addKeywords: CampaignDraftKeyword[];
+  addNegativeKeywords: CampaignDraftKeyword[];
+  requestedByUserId: string;
+  now?: Date;
+}
+
+/**
+ * KAN-72 follow-up's dry-run-diff step for adding keywords/negative keywords
+ * to an already-created ad group ("post-creation keyword edits", plan
+ * `13 §E21.2`'s own deferred bullet). `adGroupResourceName` must be one of
+ * `target.ad_group_resource_names` — set by a `campaign_draft_create` action
+ * this same target already executed — so a caller can never point a keyword
+ * edit at an arbitrary ad group outside this target's own campaign. Reuses
+ * `evaluateCampaignActivationGuardrails`'s shape (no budget number involved,
+ * same as an activation) for the protected-target/allowed-hours/blast-radius
+ * checks.
+ */
+export async function proposeKeywordEditAction(params: ProposeKeywordEditActionParams): Promise<AutomationActionModel> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  try {
+    validateKeywordEditActionInput({
+      adGroupResourceName: params.adGroupResourceName,
+      addKeywords: params.addKeywords,
+      addNegativeKeywords: params.addNegativeKeywords,
+    });
+  } catch (error) {
+    if (error instanceof InvalidCampaignDraftError) {
+      throw new InvalidAutomationActionError(error.message);
+    }
+    throw error;
+  }
+
+  const target = await loadTargetForAction(params.organizationId, params.projectId, params.targetId);
+  if (!target.ad_group_resource_names?.includes(params.adGroupResourceName)) {
+    throw new InvalidAutomationActionError('adGroupResourceName must be one of this target\'s own ad groups (created by a campaign_draft_create action)');
+  }
+
+  const now = params.now ?? new Date();
+  const policy = await getActiveAutomationGuardrailPolicy(params.organizationId, params.projectId);
+  const actionsExecutedToday =
+    policy.maxActionsPerDay !== null
+      ? await countAutomationActionsExecutedToday(params.organizationId, params.projectId, now, policy.maxActionsPerDay)
+      : 0;
+
+  const violations: GuardrailViolation[] = evaluateCampaignActivationGuardrails(
+    toPureGuardrailPolicy(policy),
+    { targetId: params.targetId },
+    { nowUtc: now, actionsExecutedToday },
+  );
+
+  if (await isAutomationKillSwitchEngaged(params.organizationId)) {
+    violations.push({ type: 'automation_paused', message: 'Automation is paused for this organization (kill switch engaged).' });
+  }
+
+  const tierViolation = await resolveWriteTierViolation(params.organizationId, params.projectId, target, 'manage');
+  if (tierViolation) {
+    violations.push(tierViolation);
+  }
+
+  const before = { adGroupResourceName: params.adGroupResourceName };
+  const after = { adGroupResourceName: params.adGroupResourceName, addKeywords: params.addKeywords, addNegativeKeywords: params.addNegativeKeywords };
+  const status: AutomationActionStatus = violations.length > 0 ? 'blocked' : 'awaiting_approval';
+
+  const action = new AutomationActionModel();
+  action.organization_id = params.organizationId;
+  action.project_id = params.projectId;
+  action.environment_id = target.environment_id;
+  action.action_type = 'keyword_edit';
+  action.target_id = params.targetId;
+  action.target_label = target.label;
+  action.before = before;
+  action.after = after;
+  action.status = status;
+  action.guardrail_violations = violations;
+  action.requested_by_user_id = params.requestedByUserId;
+  action.proposed_at = now.toISOString();
+  action.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await action.save();
+
+  await auditBestEffort({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: target.environment_id,
+    actorType: 'user',
+    actorId: params.requestedByUserId,
+    action: 'automation_action.propose',
+    targetId: action.id,
+    summary:
+      status === 'blocked'
+        ? `Proposed a keyword edit for "${target.label}" — blocked by ${violations.length} guardrail(s)`
+        : `Proposed a keyword edit for "${target.label}"`,
+    before,
+    after,
+  });
+
+  return action;
+}
+
 export interface ApproveAutomationActionParams {
   organizationId: string;
   projectId: string;
@@ -720,6 +828,31 @@ async function executeActionByType(
     return attempts;
   }
 
+  if (action.action_type === 'keyword_edit') {
+    const after = action.after as { adGroupResourceName: string; addKeywords: CampaignDraftKeyword[]; addNegativeKeywords: CampaignDraftKeyword[] };
+    const { result, attempts } = await runWithRetryBackoff(
+      () =>
+        executor.executeKeywordEdit({
+          organizationId,
+          projectId,
+          environmentId: action.environment_id,
+          targetId: action.target_id,
+          adGroupResourceName: after.adGroupResourceName,
+          addKeywords: after.addKeywords,
+          addNegativeKeywords: after.addNegativeKeywords,
+        }),
+      EXECUTE_RETRY_OPTIONS,
+    );
+    // Widens `after` with the real resource names Google Ads assigned, so `rollbackActionByType`
+    // knows exactly which criteria to remove — see `AUTOMATION_ACTION_TYPES`'s own doc comment.
+    action.after = {
+      ...after,
+      addedKeywordResourceNames: result.addedKeywordResourceNames,
+      addedNegativeKeywordResourceNames: result.addedNegativeKeywordResourceNames,
+    };
+    return attempts;
+  }
+
   const target = await loadTargetForAction(organizationId, projectId, action.target_id);
   if (!target.campaign_resource_name) {
     throw new InvalidAutomationActionError('this target has no campaign resource name to activate');
@@ -806,6 +939,19 @@ async function rollbackActionByType(
       targetId: action.target_id,
       beforeDailyBudgetUsd: before.dailyBudgetUsd,
       afterDailyBudgetUsd: after.dailyBudgetUsd,
+    });
+    return;
+  }
+
+  if (action.action_type === 'keyword_edit') {
+    const after = action.after as { addedKeywordResourceNames?: string[]; addedNegativeKeywordResourceNames?: string[] };
+    await executor.rollbackKeywordEdit({
+      organizationId,
+      projectId,
+      environmentId: action.environment_id,
+      targetId: action.target_id,
+      addedKeywordResourceNames: after.addedKeywordResourceNames ?? [],
+      addedNegativeKeywordResourceNames: after.addedNegativeKeywordResourceNames ?? [],
     });
     return;
   }

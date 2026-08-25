@@ -96,4 +96,18 @@ export class AutomationTargetStateModel extends BaseModel {
   /** Set alongside {@link campaign_resource_name} by `campaign_draft_create`/`campaign_activation` executions; a target with no campaign created yet has this unset. */
   @Field()
   public campaign_status?: CampaignStatus;
+
+  /**
+   * The real ad platform's own resource name/id for each ad group a
+   * `campaign_draft_create` action (KAN-72) created against this target's
+   * campaign, in the same order as the draft's own `adGroups` array — set
+   * alongside {@link campaign_resource_name}. A `keyword_edit` action (KAN-72
+   * follow-up) may only target one of these, never an arbitrary
+   * caller-supplied resource name — see `automation.service.ts`'s
+   * `proposeKeywordEditAction`. Absent for a Meta-platform target (Meta has
+   * no ad-group concept, see `MetaAutomationActionExecutor`'s own doc
+   * comment) or one that hasn't had a creation action executed yet.
+   */
+  @Field()
+  public ad_group_resource_names?: string[];
 }

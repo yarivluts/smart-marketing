@@ -44,6 +44,13 @@ function fakeApiClient(overrides: Partial<GoogleAdsApiClient> = {}): GoogleAdsAp
     setCampaignBudgetAmount: vi.fn().mockResolvedValue(undefined),
     setCampaignStatus: vi.fn().mockResolvedValue(undefined),
     lookupCampaignBudgetResourceName: vi.fn().mockRejectedValue(new GoogleAdsApiError('No campaign found.', 404)),
+    createCustomerMatchUserList: vi.fn().mockResolvedValue({ userListResourceName: 'customers/999/userLists/1' }),
+    addHashedEmailsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 0 }),
+    addAdGroupKeywords: vi.fn().mockResolvedValue({
+      keywordResourceNames: ['customers/999/adGroupCriteria/1'],
+      negativeKeywordResourceNames: ['customers/999/adGroupCriteria/2'],
+    }),
+    removeAdGroupCriteria: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
@@ -99,6 +106,7 @@ describe('GoogleAdsAutomationActionExecutor', () => {
     expect(reloaded.campaign_budget_resource_name).toBe(CREATE_RESULT.campaignBudgetResourceName);
     expect(reloaded.campaign_status).toBe('paused');
     expect(reloaded.daily_budget_usd).toBe(25);
+    expect(reloaded.ad_group_resource_names).toEqual(CREATE_RESULT.adGroupResourceNames);
   });
 
   it('rolls back a campaign draft creation by setting the campaign REMOVED', async () => {
@@ -316,5 +324,96 @@ describe('GoogleAdsAutomationActionExecutor', () => {
       }),
     ).rejects.toBeInstanceOf(GoogleAdsWrongPlatformCampaignDraftError);
     expect(apiClient.createCampaignDraft).not.toHaveBeenCalled();
+  });
+
+  it('adds keywords to an existing ad group, returning the real resource names Google Ads assigned (KAN-72 follow-up)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Keyword Edit Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Keyword Edit Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    const result = await executor.executeKeywordEdit({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      adGroupResourceName: 'customers/999/adGroups/1',
+      addKeywords: [{ text: 'blue widgets', matchType: 'PHRASE' }],
+      addNegativeKeywords: [{ text: 'free', matchType: 'BROAD' }],
+    });
+
+    expect(result).toEqual({
+      addedKeywordResourceNames: ['customers/999/adGroupCriteria/1'],
+      addedNegativeKeywordResourceNames: ['customers/999/adGroupCriteria/2'],
+    });
+    expect(apiClient.addAdGroupKeywords).toHaveBeenCalledWith(
+      '999',
+      'customers/999/adGroups/1',
+      [{ text: 'blue widgets', matchType: 'PHRASE' }],
+      [{ text: 'free', matchType: 'BROAD' }],
+    );
+  });
+
+  it('rolls back a keyword edit by removing exactly the criteria it added', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Keyword Rollback Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Keyword Rollback Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await executor.rollbackKeywordEdit({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      addedKeywordResourceNames: ['customers/999/adGroupCriteria/1'],
+      addedNegativeKeywordResourceNames: ['customers/999/adGroupCriteria/2'],
+    });
+
+    expect(apiClient.removeAdGroupCriteria).toHaveBeenCalledWith('999', ['customers/999/adGroupCriteria/1', 'customers/999/adGroupCriteria/2']);
+  });
+
+  it('does not call removeAdGroupCriteria on rollback when nothing was ever added (e.g. a failed execution)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Keyword Rollback Noop Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Keyword Rollback Noop Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await executor.rollbackKeywordEdit({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+      addedKeywordResourceNames: [],
+      addedNegativeKeywordResourceNames: [],
+    });
+
+    expect(apiClient.removeAdGroupCriteria).not.toHaveBeenCalled();
   });
 });

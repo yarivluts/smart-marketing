@@ -1,4 +1,4 @@
-import type { GoogleAdsCampaignDraft } from '../../automation-runtime';
+import type { CampaignDraftKeyword, GoogleAdsCampaignDraft } from '../../automation-runtime';
 
 export class GoogleAdsApiError extends Error {
   constructor(
@@ -35,6 +35,11 @@ export interface GoogleAdsCreateCustomerMatchUserListResult {
 export interface GoogleAdsAddCustomerMatchOperationsResult {
   /** The number of member operations submitted to the offline user data job — Google processes the job asynchronously, so this is "accepted", not "matched" (Google Ads has no synchronous match-count response, unlike Meta's `num_received`). */
   numReceived: number;
+}
+
+export interface GoogleAdsAddAdGroupKeywordsResult {
+  keywordResourceNames: string[];
+  negativeKeywordResourceNames: string[];
 }
 
 /**
@@ -91,6 +96,28 @@ export interface GoogleAdsApiClient {
    * shape for the sibling connector.
    */
   addContactsToCustomerMatchUserList(customerId: string, userListResourceName: string, contacts: readonly GoogleAdsContactMatchKey[]): Promise<GoogleAdsAddCustomerMatchOperationsResult>;
+  /**
+   * Adds keywords and/or negative keywords to an already-created ad group
+   * (KAN-72 follow-up, "post-creation keyword edits") — the same
+   * `adGroupCriteria:mutate` `create` operation shape `createCampaignDraft`
+   * already uses for a brand-new ad group's own keywords, reused here
+   * against an existing one. A no-op call (`keywords` and `negativeKeywords`
+   * both empty) is never made — the caller validates at least one is
+   * non-empty before this is reached (see `validateKeywordEditActionInput`).
+   */
+  addAdGroupKeywords(
+    customerId: string,
+    adGroupResourceName: string,
+    keywords: readonly CampaignDraftKeyword[],
+    negativeKeywords: readonly CampaignDraftKeyword[],
+  ): Promise<GoogleAdsAddAdGroupKeywordsResult>;
+  /**
+   * Removes ad-group criteria (keywords/negative keywords) by their own
+   * resource name — used by `GoogleAdsAutomationActionExecutor.rollbackKeywordEdit`
+   * to undo exactly the criteria a `keyword_edit` action itself added, never
+   * an existing criterion the action didn't create.
+   */
+  removeAdGroupCriteria(customerId: string, criterionResourceNames: readonly string[]): Promise<void>;
 }
 
 const GOOGLE_ADS_API_BASE_URL = 'https://googleads.googleapis.com/v17';
@@ -345,5 +372,34 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
     await this.postAction(`${jobResourceName}:run`, {});
 
     return { numReceived: contacts.length };
+  }
+
+  async addAdGroupKeywords(
+    customerId: string,
+    adGroupResourceName: string,
+    keywords: readonly CampaignDraftKeyword[],
+    negativeKeywords: readonly CampaignDraftKeyword[],
+  ): Promise<GoogleAdsAddAdGroupKeywordsResult> {
+    const operations = [
+      ...keywords.map((keyword) => ({
+        create: { adGroup: adGroupResourceName, status: 'ENABLED', keyword: { text: keyword.text, matchType: keyword.matchType } },
+      })),
+      ...negativeKeywords.map((keyword) => ({
+        create: { adGroup: adGroupResourceName, negative: true, keyword: { text: keyword.text, matchType: keyword.matchType } },
+      })),
+    ];
+    const result = await this.mutate(customerId, 'adGroupCriteria', operations);
+    return {
+      keywordResourceNames: result.results.slice(0, keywords.length).map((entry) => entry.resourceName),
+      negativeKeywordResourceNames: result.results.slice(keywords.length).map((entry) => entry.resourceName),
+    };
+  }
+
+  async removeAdGroupCriteria(customerId: string, criterionResourceNames: readonly string[]): Promise<void> {
+    await this.mutate(
+      customerId,
+      'adGroupCriteria',
+      criterionResourceNames.map((resourceName) => ({ remove: resourceName })),
+    );
   }
 }
