@@ -18,3 +18,24 @@ export function hashEmailForGoogleCustomerMatch(email: string): string {
   const normalized = email.trim().toLowerCase();
   return createHash('sha256').update(normalized).digest('hex');
 }
+
+/**
+ * Google Ads' documented Customer Match upload format for a contact-info
+ * `hashedPhoneNumber` user identifier: the raw value is never sent — only a
+ * SHA-256 hex digest of the number normalized to E.164 (a leading `+`
+ * followed only by digits, per Google's own "Formatting guidelines for
+ * offline data" spec). Punctuation commonly present in an ingested phone
+ * field (spaces, dashes, parentheses) is stripped before hashing; a number
+ * with no leading `+` is hashed as digits-only rather than guessed at a
+ * country code, so a caller that already stores E.164 numbers (the only
+ * format Google actually matches against) gets a correct hash, while a
+ * bare local-format number normalizes to something Google simply won't
+ * match — the same "garbage in, no match, not a crash" posture
+ * {@link hashEmailForGoogleCustomerMatch} accepts for a malformed email.
+ */
+export function hashPhoneNumberForGoogleCustomerMatch(phoneNumber: string): string {
+  const trimmed = phoneNumber.trim();
+  const digitsOnly = trimmed.replace(/[^\d]/g, '');
+  const normalized = trimmed.startsWith('+') ? `+${digitsOnly}` : digitsOnly;
+  return createHash('sha256').update(normalized).digest('hex');
+}

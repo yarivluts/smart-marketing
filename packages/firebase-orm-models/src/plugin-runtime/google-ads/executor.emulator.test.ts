@@ -45,7 +45,7 @@ function fakeApiClient(overrides: Partial<GoogleAdsApiClient> = {}): GoogleAdsAp
     setCampaignStatus: vi.fn().mockResolvedValue(undefined),
     lookupCampaignBudgetResourceName: vi.fn().mockRejectedValue(new GoogleAdsApiError('No campaign found.', 404)),
     createCustomerMatchUserList: vi.fn().mockResolvedValue({ userListResourceName: 'customers/999/userLists/1' }),
-    addHashedEmailsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 0 }),
+    addCustomerMatchUserIdentifiers: vi.fn().mockResolvedValue({ numReceived: 0 }),
     addAdGroupKeywords: vi.fn().mockResolvedValue({
       keywordResourceNames: ['customers/999/adGroupCriteria/1'],
       negativeKeywordResourceNames: ['customers/999/adGroupCriteria/2'],

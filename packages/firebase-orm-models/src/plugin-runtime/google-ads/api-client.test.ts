@@ -245,7 +245,7 @@ describe('GoogleAdsHttpApiClient', () => {
     ]);
   });
 
-  it('uploads hashed emails to a Customer Match user list via create -> addOperations -> run, in order, against the job\'s own resource name', async () => {
+  it('uploads hashed user identifiers to a Customer Match user list via create -> addOperations -> run, in order, against the job\'s own resource name', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
@@ -254,9 +254,13 @@ describe('GoogleAdsHttpApiClient', () => {
       .mockResolvedValueOnce(jsonResponse({}));
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await new GoogleAdsHttpApiClient(OPTIONS).addHashedEmailsToCustomerMatchUserList('123', 'customers/123/userLists/1', ['hash-a', 'hash-b']);
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).addCustomerMatchUserIdentifiers('123', 'customers/123/userLists/1', [
+      { hashedEmail: 'hash-a' },
+      { hashedPhoneNumber: 'hash-phone-b' },
+      { hashedEmail: 'hash-c', hashedPhoneNumber: 'hash-phone-c' },
+    ]);
 
-    expect(result).toEqual({ numReceived: 2 });
+    expect(result).toEqual({ numReceived: 3 });
     const urls = fetchMock.mock.calls.slice(1).map(([url]: [string]) => url);
     expect(urls).toEqual([
       'https://googleads.googleapis.com/v17/customers/123/offlineUserDataJobs:create',
@@ -270,7 +274,8 @@ describe('GoogleAdsHttpApiClient', () => {
     const addOperationsBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
     expect(addOperationsBody.operations).toEqual([
       { create: { userIdentifiers: [{ hashedEmail: 'hash-a' }] } },
-      { create: { userIdentifiers: [{ hashedEmail: 'hash-b' }] } },
+      { create: { userIdentifiers: [{ hashedPhoneNumber: 'hash-phone-b' }] } },
+      { create: { userIdentifiers: [{ hashedEmail: 'hash-c' }, { hashedPhoneNumber: 'hash-phone-c' }] } },
     ]);
 
     const runBody = JSON.parse(String((fetchMock.mock.calls[3] as [string, RequestInit])[1].body));
@@ -282,7 +287,7 @@ describe('GoogleAdsHttpApiClient', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
-      new GoogleAdsHttpApiClient(OPTIONS).addHashedEmailsToCustomerMatchUserList('123', 'customers/123/userLists/1', ['hash-a']),
+      new GoogleAdsHttpApiClient(OPTIONS).addCustomerMatchUserIdentifiers('123', 'customers/123/userLists/1', [{ hashedEmail: 'hash-a' }]),
     ).rejects.toMatchObject({ status: 400 });
   });
 

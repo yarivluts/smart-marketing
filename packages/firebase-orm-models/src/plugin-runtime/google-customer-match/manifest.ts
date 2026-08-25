@@ -20,12 +20,15 @@ export const GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD = 'user_list_name';
  * way `CRM_WEBHOOK_PLUGIN_MANIFEST_YAML`/`META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML`
  * already established (`crm-sync.service.ts`'s `syncSegmentToCrm`).
  * `type: action` + `scopes: [action:execute]`, mirroring
- * `META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML`'s shape exactly. Only a
- * contact-info (email) Customer Match list is built here — Similar Audience
- * expansion from a Customer Match seed, and non-email identifiers (phone,
- * mailing address, mobile device id), are explicitly deferred, same
- * "documented, not built" posture KAN-72's own PMax-asset-groups/
- * post-creation-edits bullets already carry.
+ * `META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML`'s shape exactly. A
+ * contact-info Customer Match list is built here, matching on a member
+ * row's hashed email and/or hashed phone number (whichever the row's
+ * `properties` carries — see `executor.ts`'s `buildUserIdentifierSet`).
+ * Similar Audience expansion from a Customer Match seed, and the remaining
+ * non-phone/email identifiers (mailing address, mobile device id) — both
+ * needing structured source data no ingested schema carries today — are
+ * explicitly deferred, same "documented, not built" posture KAN-72's own
+ * PMax-asset-groups/post-creation-edits bullets already carry.
  */
 export const GOOGLE_CUSTOMER_MATCH_PLUGIN_MANIFEST_YAML = `
 id: ${GOOGLE_CUSTOMER_MATCH_PLUGIN_ID}

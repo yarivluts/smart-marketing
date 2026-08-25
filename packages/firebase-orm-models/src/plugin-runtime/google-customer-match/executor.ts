@@ -1,6 +1,6 @@
 import { SinkPluginExecutionError, type SinkPluginExecutor, type SinkPluginPushParams, type SinkPluginPushResult } from '../executor';
-import { GoogleAdsApiError, type GoogleAdsApiClient } from '../google-ads';
-import { hashEmailForGoogleCustomerMatch } from './hashing';
+import { GoogleAdsApiError, type GoogleAdsApiClient, type GoogleAdsCustomerMatchUserIdentifierSet } from '../google-ads';
+import { hashEmailForGoogleCustomerMatch, hashPhoneNumberForGoogleCustomerMatch } from './hashing';
 
 export interface GoogleCustomerMatchSinkPluginExecutorOptions {
   apiClient: GoogleAdsApiClient;
@@ -23,14 +23,49 @@ export interface GoogleCustomerMatchSinkPluginExecutorOptions {
   existingUserListResourceName: string | null;
 }
 
-/** A record's `properties` blob has no usable `email` string field — expected for many rows (not every entity carries an email), so `push()` silently skips it rather than treating it as an error, the same "not every row is eligible" posture `MetaCustomAudienceSinkPluginExecutor`'s own `extractEmail` establishes. */
-function extractEmail(record: Record<string, unknown>): string | undefined {
+function stringProperty(record: Record<string, unknown>, key: string): string | undefined {
   const properties = record.properties;
   if (typeof properties !== 'object' || properties === null) {
     return undefined;
   }
-  const email = (properties as Record<string, unknown>).email;
-  return typeof email === 'string' && email.trim().length > 0 ? email : undefined;
+  const value = (properties as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+/** A record's `properties` blob has no usable `email` string field — expected for many rows (not every entity carries an email), so `push()` silently skips the email identifier rather than treating it as an error, the same "not every row is eligible" posture `MetaCustomAudienceSinkPluginExecutor`'s own `extractEmail` establishes. */
+function extractEmail(record: Record<string, unknown>): string | undefined {
+  return stringProperty(record, 'email');
+}
+
+/**
+ * A record's `properties.phone` string field, Google Ads' one additional
+ * Customer Match identifier this executor supports today (KAN-72 follow-up
+ * — mailing address and mobile device id remain deferred, see this
+ * module's own class doc comment). Optional the same way {@link extractEmail}
+ * is: a row can carry a phone with no email, an email with no phone, or
+ * both — {@link buildUserIdentifierSet} combines whichever are present into
+ * one Customer Match member operation per row.
+ */
+function extractPhoneNumber(record: Record<string, unknown>): string | undefined {
+  return stringProperty(record, 'phone');
+}
+
+/**
+ * Builds one Customer Match member operation's worth of hashed identifiers
+ * for a single record, or `undefined` if the record has neither a usable
+ * email nor phone number — {@link GoogleCustomerMatchSinkPluginExecutor.push}
+ * drops such rows entirely, the same way it always has for email-only rows.
+ */
+function buildUserIdentifierSet(record: Record<string, unknown>): GoogleAdsCustomerMatchUserIdentifierSet | undefined {
+  const email = extractEmail(record);
+  const phoneNumber = extractPhoneNumber(record);
+  if (email === undefined && phoneNumber === undefined) {
+    return undefined;
+  }
+  return {
+    ...(email !== undefined ? { hashedEmail: hashEmailForGoogleCustomerMatch(email) } : {}),
+    ...(phoneNumber !== undefined ? { hashedPhoneNumber: hashPhoneNumberForGoogleCustomerMatch(phoneNumber) } : {}),
+  };
 }
 
 /**
@@ -42,22 +77,29 @@ function extractEmail(record: Record<string, unknown>): string | undefined {
  * "before/after" here to diff or roll back, just "push these matching rows
  * out").
  *
- * Every record without a usable `email` string field is silently dropped
- * (see {@link extractEmail}) — `pushed` counts only the emails actually
- * submitted to Google's offline user data job, which may therefore be
- * smaller than the segment's own member count reported elsewhere on the
- * page. Unlike Meta's synchronous "num received" response, Google Ads
- * processes an offline user data job asynchronously (member matching can
- * take up to several hours per Google's own docs) — `pushed` is therefore
- * "accepted for processing", not "confirmed matched"; there is no
- * synchronous signal this executor could report instead.
+ * A record contributes a Customer Match member operation only if it has a
+ * usable `email` and/or `phone` string field (see {@link buildUserIdentifierSet});
+ * a record with neither is silently dropped — `pushed` counts only the
+ * member operations actually submitted to Google's offline user data job,
+ * which may therefore be smaller than the segment's own member count
+ * reported elsewhere on the page. Unlike Meta's synchronous "num received"
+ * response, Google Ads processes an offline user data job asynchronously
+ * (member matching can take up to several hours per Google's own docs) —
+ * `pushed` is therefore "accepted for processing", not "confirmed matched";
+ * there is no synchronous signal this executor could report instead.
+ *
+ * Mailing address and mobile device id identifiers remain deferred — see
+ * `google-customer-match/manifest.ts`'s own doc comment for why (both need
+ * structured source data — first/last name + postal code, or a device id —
+ * that no ingested schema carries today, unlike email/phone which are
+ * already-common single string fields).
  *
  * `crm-sync.service.ts`'s `syncSegmentToCrm` wraps a whole `push()` call in
  * `runWithRetryBackoff`, retrying the *same* executor instance on a
  * transient failure. If `createCustomerMatchUserList` itself already
  * succeeded on an earlier attempt and only the later
- * `addHashedEmailsToCustomerMatchUserList` call failed, a naive re-read of
- * the constructor's `existingUserListResourceName` on retry would create a
+ * `addCustomerMatchUserIdentifiers` call failed, a naive re-read of the
+ * constructor's `existingUserListResourceName` on retry would create a
  * second, orphaned list — so the resource name created mid-way through one
  * `push()` is cached on `this.userListResourceName` (mutable, unlike the
  * rest of this class's fields) rather than only ever read from the
@@ -79,7 +121,9 @@ export class GoogleCustomerMatchSinkPluginExecutor implements SinkPluginExecutor
   }
 
   async push(params: SinkPluginPushParams): Promise<SinkPluginPushResult> {
-    const emails = params.records.map(extractEmail).filter((email): email is string => email !== undefined);
+    const identifierSets = params.records
+      .map(buildUserIdentifierSet)
+      .filter((set): set is GoogleAdsCustomerMatchUserIdentifierSet => set !== undefined);
 
     try {
       if (this.userListResourceName === null) {
@@ -87,12 +131,11 @@ export class GoogleCustomerMatchSinkPluginExecutor implements SinkPluginExecutor
       }
       const userListResourceName = this.userListResourceName;
 
-      if (emails.length === 0) {
+      if (identifierSets.length === 0) {
         return { pushed: 0, externalRef: userListResourceName };
       }
 
-      const hashedEmails = emails.map(hashEmailForGoogleCustomerMatch);
-      const result = await this.apiClient.addHashedEmailsToCustomerMatchUserList(this.customerId, userListResourceName, hashedEmails);
+      const result = await this.apiClient.addCustomerMatchUserIdentifiers(this.customerId, userListResourceName, identifierSets);
       return { pushed: result.numReceived, externalRef: userListResourceName };
     } catch (error) {
       if (error instanceof GoogleAdsApiError) {

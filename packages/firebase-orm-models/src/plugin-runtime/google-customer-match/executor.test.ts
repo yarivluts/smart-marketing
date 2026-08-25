@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GoogleAdsApiError, type GoogleAdsApiClient } from '../google-ads';
 import { SinkPluginExecutionError } from '../executor';
 import type { PluginRuntimeCredential } from '../credential';
-import { hashEmailForGoogleCustomerMatch } from './hashing';
+import { hashEmailForGoogleCustomerMatch, hashPhoneNumberForGoogleCustomerMatch } from './hashing';
 import { GoogleCustomerMatchSinkPluginExecutor } from './executor';
 
 const CREDENTIAL: PluginRuntimeCredential = {
@@ -21,7 +21,7 @@ function fakeApiClient(overrides: Partial<GoogleAdsApiClient> = {}): GoogleAdsAp
     setCampaignStatus: vi.fn(),
     lookupCampaignBudgetResourceName: vi.fn(),
     createCustomerMatchUserList: vi.fn().mockResolvedValue({ userListResourceName: 'customers/999/userLists/new' }),
-    addHashedEmailsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 0 }),
+    addCustomerMatchUserIdentifiers: vi.fn().mockResolvedValue({ numReceived: 0 }),
     ...overrides,
   };
 }
@@ -32,21 +32,21 @@ function pushParams(records: readonly Record<string, unknown>[]): Parameters<Goo
 
 describe('GoogleCustomerMatchSinkPluginExecutor', () => {
   it('creates a new Customer Match user list on first sync, hashes emails, and reports the list resource name as externalRef', async () => {
-    const apiClient = fakeApiClient({ addHashedEmailsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 2 }) });
+    const apiClient = fakeApiClient({ addCustomerMatchUserIdentifiers: vi.fn().mockResolvedValue({ numReceived: 2 }) });
     const executor = new GoogleCustomerMatchSinkPluginExecutor({ apiClient, customerId: '999', userListName: 'Warm leads', existingUserListResourceName: null });
 
     const result = await executor.push(pushParams([{ properties: { email: 'a@example.com' } }, { properties: { email: 'b@example.com' } }]));
 
     expect(apiClient.createCustomerMatchUserList).toHaveBeenCalledWith('999', { name: 'Warm leads' });
-    expect(apiClient.addHashedEmailsToCustomerMatchUserList).toHaveBeenCalledWith('999', 'customers/999/userLists/new', [
-      hashEmailForGoogleCustomerMatch('a@example.com'),
-      hashEmailForGoogleCustomerMatch('b@example.com'),
+    expect(apiClient.addCustomerMatchUserIdentifiers).toHaveBeenCalledWith('999', 'customers/999/userLists/new', [
+      { hashedEmail: hashEmailForGoogleCustomerMatch('a@example.com') },
+      { hashedEmail: hashEmailForGoogleCustomerMatch('b@example.com') },
     ]);
     expect(result).toEqual({ pushed: 2, externalRef: 'customers/999/userLists/new' });
   });
 
   it('reuses an already-known user list resource name and never creates a duplicate list', async () => {
-    const apiClient = fakeApiClient({ addHashedEmailsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const apiClient = fakeApiClient({ addCustomerMatchUserIdentifiers: vi.fn().mockResolvedValue({ numReceived: 1 }) });
     const executor = new GoogleCustomerMatchSinkPluginExecutor({
       apiClient,
       customerId: '999',
@@ -57,14 +57,14 @@ describe('GoogleCustomerMatchSinkPluginExecutor', () => {
     const result = await executor.push(pushParams([{ properties: { email: 'a@example.com' } }]));
 
     expect(apiClient.createCustomerMatchUserList).not.toHaveBeenCalled();
-    expect(apiClient.addHashedEmailsToCustomerMatchUserList).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
-      hashEmailForGoogleCustomerMatch('a@example.com'),
+    expect(apiClient.addCustomerMatchUserIdentifiers).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
+      { hashedEmail: hashEmailForGoogleCustomerMatch('a@example.com') },
     ]);
     expect(result).toEqual({ pushed: 1, externalRef: 'customers/999/userLists/existing' });
   });
 
-  it('drops records with no usable email field before hashing anything', async () => {
-    const apiClient = fakeApiClient({ addHashedEmailsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+  it('drops records with no usable email or phone field before hashing anything', async () => {
+    const apiClient = fakeApiClient({ addCustomerMatchUserIdentifiers: vi.fn().mockResolvedValue({ numReceived: 1 }) });
     const executor = new GoogleCustomerMatchSinkPluginExecutor({
       apiClient,
       customerId: '999',
@@ -77,14 +77,38 @@ describe('GoogleCustomerMatchSinkPluginExecutor', () => {
         { properties: { email: 'a@example.com' } },
         { properties: { email: '' } },
         { properties: { email: 42 } },
+        { properties: { phone: '' } },
+        { properties: { phone: 42 } },
         { properties: {} },
         { properties: null },
         {},
       ]),
     );
 
-    expect(apiClient.addHashedEmailsToCustomerMatchUserList).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
-      hashEmailForGoogleCustomerMatch('a@example.com'),
+    expect(apiClient.addCustomerMatchUserIdentifiers).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
+      { hashedEmail: hashEmailForGoogleCustomerMatch('a@example.com') },
+    ]);
+  });
+
+  it('hashes a phone number alongside or instead of email, combining both into one identifier set per record', async () => {
+    const apiClient = fakeApiClient({ addCustomerMatchUserIdentifiers: vi.fn().mockResolvedValue({ numReceived: 2 }) });
+    const executor = new GoogleCustomerMatchSinkPluginExecutor({
+      apiClient,
+      customerId: '999',
+      userListName: 'Warm leads',
+      existingUserListResourceName: 'customers/999/userLists/existing',
+    });
+
+    await executor.push(
+      pushParams([
+        { properties: { phone: '+1 (555) 123-4567' } },
+        { properties: { email: 'a@example.com', phone: '5551234567' } },
+      ]),
+    );
+
+    expect(apiClient.addCustomerMatchUserIdentifiers).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
+      { hashedPhoneNumber: hashPhoneNumberForGoogleCustomerMatch('+1 (555) 123-4567') },
+      { hashedEmail: hashEmailForGoogleCustomerMatch('a@example.com'), hashedPhoneNumber: hashPhoneNumberForGoogleCustomerMatch('5551234567') },
     ]);
   });
 
@@ -95,19 +119,19 @@ describe('GoogleCustomerMatchSinkPluginExecutor', () => {
     const result = await executor.push(pushParams([{ properties: {} }]));
 
     expect(apiClient.createCustomerMatchUserList).toHaveBeenCalledWith('999', { name: 'Warm leads' });
-    expect(apiClient.addHashedEmailsToCustomerMatchUserList).not.toHaveBeenCalled();
+    expect(apiClient.addCustomerMatchUserIdentifiers).not.toHaveBeenCalled();
     expect(result).toEqual({ pushed: 0, externalRef: 'customers/999/userLists/new' });
   });
 
   it('reuses the user list it just created on a same-instance retry, instead of creating a second one', async () => {
     // Regression test: crm-sync.service.ts's syncSegmentToCrm retries a whole push() call on the
     // *same* executor instance via runWithRetryBackoff. If createCustomerMatchUserList already
-    // succeeded and only the later addHashedEmailsToCustomerMatchUserList call failed transiently,
+    // succeeded and only the later addCustomerMatchUserIdentifiers call failed transiently,
     // the retried push() must reuse the list it already created rather than creating an orphaned
     // duplicate — the exact same fix MetaCustomAudienceSinkPluginExecutor already applies.
     let addEmailsAttempts = 0;
     const apiClient = fakeApiClient({
-      addHashedEmailsToCustomerMatchUserList: vi.fn().mockImplementation(() => {
+      addCustomerMatchUserIdentifiers: vi.fn().mockImplementation(() => {
         addEmailsAttempts += 1;
         if (addEmailsAttempts === 1) {
           return Promise.reject(new GoogleAdsApiError('Google Ads API request failed with status 500', 500));
