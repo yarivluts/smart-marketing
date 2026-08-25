@@ -7,18 +7,21 @@ export interface SegmentSummaryView {
   name: string;
   schemaName: string;
   filterCount: number;
+  /** KAN-93 — count of cross-schema `has_event`/`no_event` conditions ANDed alongside `filters`. */
+  eventConditionCount: number;
   createdAt: string;
   ownerPersonId: string | null;
   status: SegmentWorkListStatus;
 }
 
-/** `owner_person_id`/`status` default to `null`/`'open'` when absent — a segment saved before KAN-81 added these fields loads with them simply missing, never throws. */
+/** `owner_person_id`/`status`/`event_conditions` default to `null`/`'open'`/`[]` when absent — a segment saved before KAN-81/KAN-93 added these fields loads with them simply missing, never throws. */
 export function toSegmentSummaryView(segment: SegmentModel): SegmentSummaryView {
   return {
     id: segment.id,
     name: segment.name,
     schemaName: segment.schema_name,
     filterCount: segment.filters.length,
+    eventConditionCount: (segment.event_conditions ?? []).length,
     createdAt: segment.created_at,
     ownerPersonId: segment.owner_person_id ?? null,
     status: segment.status ?? 'open',

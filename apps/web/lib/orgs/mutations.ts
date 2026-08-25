@@ -964,6 +964,7 @@ interface CreateSegmentInput {
   name: string;
   schemaName: string;
   filters: readonly unknown[];
+  eventConditions?: readonly unknown[];
   createdByUserId: string;
 }
 

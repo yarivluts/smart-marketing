@@ -1,8 +1,10 @@
 import {
   isSegmentFilterOperator,
   isSegmentWorkListStatus,
+  isValidSegmentEventCondition,
   isValidSegmentFilterCondition,
   suggestSegmentCandidates,
+  type SegmentEventCondition,
   type SegmentFilterCondition,
   type SegmentSuggestion,
   type SegmentWorkListStatus,
@@ -47,17 +49,26 @@ export interface CreateSegmentParams {
   name: string;
   schemaName: string;
   filters: readonly unknown[];
+  /**
+   * Cross-schema conditions (KAN-93) — "has (or has never had) a matching
+   * event in some other registered event schema", e.g. the plan's own
+   * "paying_no_demo" example. ANDed with `filters` and with each other.
+   * Defaults to `[]` — most segments still only ever need `filters`.
+   */
+  eventConditions?: readonly unknown[];
   createdByUserId: string;
   /** Defaults to `'user'` — set to `'api_key'` when the caller authenticated with a machine key (KAN-76's MCP `create_segment` tool) rather than a human, so the audit trail doesn't mislabel a key as a user. */
   createdByActorType?: 'user' | 'api_key';
 }
 
 /**
- * Creates a segment (KAN-76, E22.2): validates the name, that `schemaName`
- * is a registered+active `entity`-kind schema in this project, and every
- * filter condition's shape — collecting every problem before throwing,
- * mirroring `createGoal`'s own "collect all reasons, don't fail fast"
- * convention.
+ * Creates a segment (KAN-76, E22.2; cross-schema event conditions added by
+ * KAN-93): validates the name, that `schemaName` is a registered+active
+ * `entity`-kind schema in this project, every filter condition's shape, and
+ * every event condition's shape + that its own `schemaName` is a
+ * registered+active `event`-kind schema — collecting every problem before
+ * throwing, mirroring `createGoal`'s own "collect all reasons, don't fail
+ * fast" convention.
  */
 export async function createSegment(params: CreateSegmentParams): Promise<SegmentModel> {
   await requireProjectInOrg(params.organizationId, params.projectId);
@@ -69,8 +80,9 @@ export async function createSegment(params: CreateSegmentParams): Promise<Segmen
     reasons.push('A segment must have a non-empty name.');
   }
 
-  if (params.filters.length === 0) {
-    reasons.push('A segment requires at least one filter condition.');
+  const eventConditionInputs = params.eventConditions ?? [];
+  if (params.filters.length === 0 && eventConditionInputs.length === 0) {
+    reasons.push('A segment requires at least one filter condition or event condition.');
   }
   const validFilters: SegmentFilterCondition[] = [];
   params.filters.forEach((filter, index) => {
@@ -80,6 +92,20 @@ export async function createSegment(params: CreateSegmentParams): Promise<Segmen
       reasons.push(`Filter at index ${index} is invalid — expected { field: string, op: one of ${['=', '!=', '>', '>=', '<', '<=', 'contains'].join(', ')}, value: string|number|boolean }.`);
     }
   });
+
+  const validEventConditions: SegmentEventCondition[] = [];
+  for (const [index, condition] of eventConditionInputs.entries()) {
+    if (!isValidSegmentEventCondition(condition)) {
+      reasons.push(`Event condition at index ${index} is invalid — expected { kind: "has_event"|"no_event", schemaName: string, filters?: [...], withinDays?: number }.`);
+      continue;
+    }
+    const eventSchemaDef = await getActiveSchemaDefinition(params.organizationId, params.projectId, 'event', condition.schemaName);
+    if (!eventSchemaDef) {
+      reasons.push(`Event schema "${condition.schemaName}" (event condition at index ${index}) is not registered (or not active) in this project.`);
+      continue;
+    }
+    validEventConditions.push(condition);
+  }
 
   const schemaDef = await getActiveSchemaDefinition(params.organizationId, params.projectId, 'entity', params.schemaName);
   if (!schemaDef) {
@@ -97,6 +123,7 @@ export async function createSegment(params: CreateSegmentParams): Promise<Segmen
   segment.name = name;
   segment.schema_name = params.schemaName;
   segment.filters = validFilters;
+  segment.event_conditions = validEventConditions;
   segment.created_by = params.createdByUserId;
   segment.created_at = now;
   segment.owner_person_id = null;
@@ -114,7 +141,7 @@ export async function createSegment(params: CreateSegmentParams): Promise<Segmen
       targetType: 'segment',
       targetId: segment.id,
       summary: `Created segment "${segment.name}"`,
-      after: { schemaName: segment.schema_name, filters: segment.filters },
+      after: { schemaName: segment.schema_name, filters: segment.filters, eventConditions: segment.event_conditions },
     });
   } catch {
     // Best-effort — audit logging must never turn a successful create into a failure for the caller.
@@ -301,33 +328,80 @@ function assertSafeSegmentFieldName(field: string): string {
   return field;
 }
 
-/** The BigQuery JSON-extraction expression for one filter field, typed by the field's declared schema type (defaulting to a plain string extraction when the field isn't found on the active schema — e.g. a segment saved against a field an evolution later dropped). Mirrors `dbt/macros/cross_database.sql`'s `bigquery__json_text_field` convention (`LAX_STRING` over the JSON subscript operator) but adds the `LAX_FLOAT64`/`LAX_BOOL` typed variants a segment's `>`/`>=`/`<`/`<=` numeric filters and boolean-field equality checks need. */
-function jsonFieldExtraction(fieldName: string, fieldType: SchemaFieldType | undefined): string {
+/** The BigQuery JSON-extraction expression for one filter field, typed by the field's declared schema type (defaulting to a plain string extraction when the field isn't found on the active schema — e.g. a segment saved against a field an evolution later dropped). Mirrors `dbt/macros/cross_database.sql`'s `bigquery__json_text_field` convention (`LAX_STRING` over the JSON subscript operator) but adds the `LAX_FLOAT64`/`LAX_BOOL` typed variants a segment's `>`/`>=`/`<`/`<=` numeric filters and boolean-field equality checks need. `columnRef` defaults to the segment's own `entities.properties` column; `emitSegmentEventCondition` (KAN-93) passes `ev.properties` to extract from the correlated `events` subquery instead — always a fixed literal the calling code controls, never user input, so splicing it in directly carries no injection risk. */
+function jsonFieldExtraction(fieldName: string, fieldType: SchemaFieldType | undefined, columnRef = 'properties'): string {
   const safeField = assertSafeSegmentFieldName(fieldName);
   if (fieldType === 'number') {
-    return `LAX_FLOAT64(properties['${safeField}'])`;
+    return `LAX_FLOAT64(${columnRef}['${safeField}'])`;
   }
   if (fieldType === 'boolean') {
-    return `LAX_BOOL(properties['${safeField}'])`;
+    return `LAX_BOOL(${columnRef}['${safeField}'])`;
   }
-  return `LAX_STRING(properties['${safeField}'])`;
+  return `LAX_STRING(${columnRef}['${safeField}'])`;
 }
 
-/** Compiles one saved filter condition into a `WHERE`-clause fragment plus its own bound parameter(s) — mirroring `mcp-tools.service.ts`'s hand-written-SQL-over-a-`WarehouseQueryExecutor` convention, since a segment's filters (unlike a metric's) run against the JSON `properties` column rather than a typed fact-table column. `contains` always compares as text (a `LIKE`, wildcard-escaped the same way `searchProjectCustomers` escapes its own search term); every other operator casts the bound parameter to the field's declared type first, since every parameter this executor abstraction accepts is a plain string (`CompilerParamValue`) and BigQuery infers a `STRING` parameter's type from the value it's given, not from how the SQL uses it. */
-function emitSegmentFilterClause(condition: SegmentFilterCondition, paramName: string, fieldType: SchemaFieldType | undefined, params: Record<string, string>): string {
+/** Compiles one saved filter condition into a `WHERE`-clause fragment plus its own bound parameter(s) — mirroring `mcp-tools.service.ts`'s hand-written-SQL-over-a-`WarehouseQueryExecutor` convention, since a segment's filters (unlike a metric's) run against the JSON `properties` column rather than a typed fact-table column. `contains` always compares as text (a `LIKE`, wildcard-escaped the same way `searchProjectCustomers` escapes its own search term); every other operator casts the bound parameter to the field's declared type first, since every parameter this executor abstraction accepts is a plain string (`CompilerParamValue`) and BigQuery infers a `STRING` parameter's type from the value it's given, not from how the SQL uses it. `columnRef` (see {@link jsonFieldExtraction}) lets `emitSegmentEventCondition` (KAN-93) reuse this exact compiler for an event condition's own nested filters. */
+function emitSegmentFilterClause(
+  condition: SegmentFilterCondition,
+  paramName: string,
+  fieldType: SchemaFieldType | undefined,
+  params: Record<string, string>,
+  columnRef = 'properties',
+): string {
   if (!isSegmentFilterOperator(condition.op)) {
     throw new InvalidSegmentError([`Unknown filter operator "${condition.op}" on "${condition.field}".`]);
   }
 
   if (condition.op === 'contains') {
     params[paramName] = `%${escapeLikePattern(String(condition.value))}%`;
-    return `LAX_STRING(properties['${assertSafeSegmentFieldName(condition.field)}']) LIKE @${paramName}`;
+    return `LAX_STRING(${columnRef}['${assertSafeSegmentFieldName(condition.field)}']) LIKE @${paramName}`;
   }
 
-  const extraction = jsonFieldExtraction(condition.field, fieldType);
+  const extraction = jsonFieldExtraction(condition.field, fieldType, columnRef);
   params[paramName] = String(condition.value);
   const boundValue = fieldType === 'number' ? `SAFE_CAST(@${paramName} AS FLOAT64)` : fieldType === 'boolean' ? `SAFE_CAST(@${paramName} AS BOOL)` : `@${paramName}`;
   return `${extraction} ${condition.op} ${boundValue}`;
+}
+
+/**
+ * Compiles one cross-schema {@link SegmentEventCondition} (KAN-93) into an
+ * `[NOT ]EXISTS (...)` correlated-subquery fragment against the `events`
+ * fact table, joined back to the outer `entities` row by id — `events.entity_id`
+ * is the record's own `client_id` (see `events.sql`), the same identity an
+ * `entities` row is keyed by (see `entities.sql`), so no denormalized field
+ * or extra join table is needed. Scoped to the same org/project(/environment)
+ * the entity-side filters already are, so a segment never leaks another
+ * project's events into its own member count.
+ */
+function emitSegmentEventCondition(
+  condition: SegmentEventCondition,
+  index: number,
+  environmentId: string | undefined,
+  fieldTypeByName: ReadonlyMap<string, SchemaFieldType>,
+  params: Record<string, string>,
+): string {
+  const schemaParam = `event_schema_${index}`;
+  params[schemaParam] = condition.schemaName;
+
+  // `events` (KAN-37's core dbt model) names this column `event_type`, not
+  // `schema_name` — unlike `entities`, which does use `schema_name` (see
+  // `mcp-tools.service.ts`'s own `event_type IN (...)` filter for the same
+  // distinction on its event-side query).
+  const innerFilters = ['ev.organization_id = @organizationId', 'ev.project_id = @projectId', `ev.event_type = @${schemaParam}`, 'ev.entity_id = entities.entity_id'];
+  if (environmentId !== undefined) {
+    innerFilters.push('ev.environment_id = @environmentId');
+  }
+  if (condition.withinDays !== undefined) {
+    const sinceParam = `event_since_${index}`;
+    params[sinceParam] = new Date(Date.now() - condition.withinDays * 24 * 60 * 60 * 1000).toISOString();
+    innerFilters.push(`ev.occurred_at >= TIMESTAMP(@${sinceParam})`);
+  }
+  (condition.filters ?? []).forEach((filter, filterIndex) => {
+    innerFilters.push(emitSegmentFilterClause(filter, `event_${index}_filter_${filterIndex}`, fieldTypeByName.get(filter.field), params, 'ev.properties'));
+  });
+
+  const existsClause = `EXISTS (SELECT 1 FROM events AS ev WHERE ${innerFilters.join(' AND ')})`;
+  return condition.kind === 'no_event' ? `NOT ${existsClause}` : existsClause;
 }
 
 export interface CountSegmentMembersParams {
@@ -381,6 +455,12 @@ async function buildSegmentMemberWhereClause(
   segment.filters.forEach((condition, index) => {
     filters.push(emitSegmentFilterClause(condition, `filter_${index}`, fieldTypeByName.get(condition.field), queryParams));
   });
+
+  for (const [index, condition] of (segment.event_conditions ?? []).entries()) {
+    const eventSchemaDef = await getActiveSchemaDefinition(organizationId, projectId, 'event', condition.schemaName);
+    const eventFieldTypeByName = new Map((eventSchemaDef?.field_defs ?? []).map((field) => [field.name, field.type]));
+    filters.push(emitSegmentEventCondition(condition, index, environmentId, eventFieldTypeByName, queryParams));
+  }
 
   return { filters, queryParams };
 }

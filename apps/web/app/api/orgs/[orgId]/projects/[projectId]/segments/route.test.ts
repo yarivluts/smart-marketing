@@ -204,4 +204,64 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/segments', () => {
     expect(listed.segments).toHaveLength(1);
     expect(listed.segments[0].id).toBe(body.segment.id);
   });
+
+  it('creates a "paying, no demo" segment via a cross-schema event condition, with an empty entity filters array (KAN-93)', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Segment Create Event Condition Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'customer',
+      fields: [
+        { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+        { name: 'is_paying', type: 'boolean', isRequired: true, isPii: false, isIdentityKey: false },
+      ],
+      createdByUserId: owner.id,
+    });
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'demo_event',
+      fields: [{ name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true }],
+      createdByUserId: owner.id,
+    });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = segmentsRequest(organization.id, project.id, {
+      name: 'Paying, no demo',
+      schemaName: 'customer',
+      filters: [{ field: 'is_paying', op: '=', value: true }],
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { segment: { name: string } };
+    expect(body.segment).toMatchObject({ name: 'Paying, no demo' });
+  });
+
+  it('rejects an event condition referencing an unregistered event schema (400 + reasons)', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Segment Create Event Condition Invalid Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'customer',
+      fields: [{ name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true }],
+      createdByUserId: owner.id,
+    });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = segmentsRequest(organization.id, project.id, {
+      name: 'Broken',
+      schemaName: 'customer',
+      filters: [],
+      eventConditions: [{ kind: 'no_event', schemaName: 'does_not_exist' }],
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string; reasons: string[] };
+    expect(body.error).toBe('invalid_segment');
+    expect(body.reasons.some((reason) => reason.includes('does_not_exist'))).toBe(true);
+  });
 });

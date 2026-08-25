@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { SEGMENT_FILTER_OPERATORS, type SegmentFilterOperator } from '@growthos/shared';
+import { SEGMENT_EVENT_CONDITION_KINDS, SEGMENT_FILTER_OPERATORS, type SegmentEventConditionKind, type SegmentFilterOperator } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,8 @@ export interface CreateSegmentFormProps {
   orgId: string;
   projectId: string;
   entitySchemaNames: string[];
+  /** KAN-93 — registered `event`-kind schema names an event condition row can target. A project with none yet simply can't offer the event-condition section (same "nothing to pick from" posture `entitySchemaNames.length === 0` already gets for the whole form). */
+  eventSchemaNames: string[];
 }
 
 export interface FilterRow {
@@ -20,22 +22,54 @@ export interface FilterRow {
   value: string;
 }
 
+/**
+ * One cross-schema condition row (KAN-93) — the UI slice of
+ * `SegmentEventCondition`: kind + target event schema + an optional
+ * lookback window. Nested per-condition field filters are supported by the
+ * data model/service/MCP tool but deliberately not exposed here, to keep
+ * this row editor as simple as the entity-filter one; a human who needs
+ * that can still reach it via the MCP `create_segment` tool.
+ */
+export interface EventConditionRow {
+  kind: SegmentEventConditionKind;
+  schemaName: string;
+  /** Empty string means "no lookback window" (the condition matches ever, not just recently). */
+  withinDays: string;
+}
+
 function emptyRow(): FilterRow {
   return { field: '', op: '=', value: '' };
 }
 
-/** Creates a segment definition (KAN-76, E22.2), then navigates back to the segments list — the human-facing counterpart to the MCP `create_segment` act tool. Filter values are always submitted as strings; the service layer's `isValidSegmentFilterCondition` accepts a string value for every operator, so this keeps the row editor simple (no per-row type picker) without narrowing what a human can express. */
-export function CreateSegmentForm({ orgId, projectId, entitySchemaNames }: CreateSegmentFormProps): React.ReactElement {
+function emptyEventConditionRow(eventSchemaNames: string[]): EventConditionRow {
+  return { kind: 'no_event', schemaName: eventSchemaNames[0] ?? '', withinDays: '' };
+}
+
+/** Creates a segment definition (KAN-76, E22.2; cross-schema event conditions added by KAN-93), then navigates back to the segments list — the human-facing counterpart to the MCP `create_segment` act tool. Filter values are always submitted as strings; the service layer's `isValidSegmentFilterCondition` accepts a string value for every operator, so this keeps the row editor simple (no per-row type picker) without narrowing what a human can express. */
+export function CreateSegmentForm({ orgId, projectId, entitySchemaNames, eventSchemaNames }: CreateSegmentFormProps): React.ReactElement {
   const t = useTranslations('Segments');
   const router = useRouter();
   const [name, setName] = useState('');
   const [schemaName, setSchemaName] = useState(entitySchemaNames[0] ?? '');
   const [filters, setFilters] = useState<FilterRow[]>([emptyRow()]);
+  const [eventConditions, setEventConditions] = useState<EventConditionRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function isValidWithinDays(value: string): boolean {
+    if (value.trim().length === 0) {
+      return true;
+    }
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0;
+  }
+
   const canSubmit =
-    name.trim().length > 0 && schemaName.length > 0 && filters.every((row) => row.field.trim().length > 0 && row.value.trim().length > 0);
+    name.trim().length > 0 &&
+    schemaName.length > 0 &&
+    filters.every((row) => row.field.trim().length > 0 && row.value.trim().length > 0) &&
+    eventConditions.every((row) => row.schemaName.trim().length > 0 && isValidWithinDays(row.withinDays)) &&
+    (filters.length > 0 || eventConditions.length > 0);
 
   function updateRow(index: number, patch: Partial<FilterRow>): void {
     setFilters((rows) => rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
@@ -47,6 +81,18 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames }: Creat
 
   function removeRow(index: number): void {
     setFilters((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
+  }
+
+  function updateEventConditionRow(index: number, patch: Partial<EventConditionRow>): void {
+    setEventConditions((rows) => rows.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  }
+
+  function addEventConditionRow(): void {
+    setEventConditions((rows) => [...rows, emptyEventConditionRow(eventSchemaNames)]);
+  }
+
+  function removeEventConditionRow(index: number): void {
+    setEventConditions((rows) => rows.filter((_, rowIndex) => rowIndex !== index));
   }
 
   /** Applies an AI-suggested segment (KAN-81): replaces the filter rows outright (a suggestion is already a complete definition, not one row to merge) and fills in the name only if the user hasn't typed one yet — never overwrites something they already wrote. */
@@ -67,6 +113,11 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames }: Creat
           name,
           schemaName,
           filters: filters.map((row) => ({ field: row.field, op: row.op, value: row.value })),
+          eventConditions: eventConditions.map((row) => ({
+            kind: row.kind,
+            schemaName: row.schemaName,
+            ...(row.withinDays.trim().length > 0 ? { withinDays: Number(row.withinDays) } : {}),
+          })),
         }),
       });
       if (!response.ok) {
@@ -75,6 +126,7 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames }: Creat
       }
       setName('');
       setFilters([emptyRow()]);
+      setEventConditions([]);
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -146,7 +198,7 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames }: Creat
               value={row.value}
               onChange={(event) => updateRow(index, { value: event.target.value })}
             />
-            <Button type="button" variant="outline" onClick={() => removeRow(index)} disabled={filters.length === 1}>
+            <Button type="button" variant="outline" onClick={() => removeRow(index)} disabled={filters.length === 1 && eventConditions.length === 0}>
               {t('removeFilterButton')}
             </Button>
           </div>
@@ -155,6 +207,57 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames }: Creat
           {t('addFilterButton')}
         </Button>
       </div>
+
+      {eventSchemaNames.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <span className="text-sm font-medium">{t('eventConditionsLabel')}</span>
+          <p className="text-xs text-muted-foreground">{t('eventConditionsHint')}</p>
+          {eventConditions.map((row, index) => (
+            <div key={index} className="flex flex-wrap items-end gap-2">
+              <select
+                aria-label={t('eventConditionKindLabel')}
+                value={row.kind}
+                onChange={(event) => updateEventConditionRow(index, { kind: event.target.value as SegmentEventConditionKind })}
+                className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+              >
+                {SEGMENT_EVENT_CONDITION_KINDS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {t(`eventConditionKind.${kind}`)}
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label={t('eventConditionSchemaLabel')}
+                value={row.schemaName}
+                onChange={(event) => updateEventConditionRow(index, { schemaName: event.target.value })}
+                className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+              >
+                {eventSchemaNames.map((entry) => (
+                  <option key={entry} value={entry}>
+                    {entry}
+                  </option>
+                ))}
+              </select>
+              <Input
+                aria-label={t('eventConditionWithinDaysLabel')}
+                type="number"
+                min={1}
+                step={1}
+                placeholder={t('eventConditionWithinDaysPlaceholder')}
+                value={row.withinDays}
+                onChange={(event) => updateEventConditionRow(index, { withinDays: event.target.value })}
+                className="w-32"
+              />
+              <Button type="button" variant="outline" onClick={() => removeEventConditionRow(index)}>
+                {t('removeEventConditionButton')}
+              </Button>
+            </div>
+          ))}
+          <Button type="button" variant="outline" className="self-start" onClick={addEventConditionRow}>
+            {t('addEventConditionButton')}
+          </Button>
+        </div>
+      ) : null}
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">

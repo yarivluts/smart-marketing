@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { SegmentFilterCondition, SegmentWorkListStatus } from '@growthos/shared';
+import type { SegmentEventCondition, SegmentFilterCondition, SegmentWorkListStatus } from '@growthos/shared';
 
 /**
  * A project-scoped saved segment (KAN-76, E22.2): a named, ANDed set of
@@ -60,4 +60,16 @@ export class SegmentModel extends BaseModel {
    */
   @Field({ is_required: false })
   public status!: SegmentWorkListStatus;
+
+  /**
+   * ANDed with {@link filters} and with each other (KAN-93, plan `14 §Gap 9`'s
+   * "paying_no_demo"-style lists — see `SegmentEventCondition`'s own doc
+   * comment). `is_required: false` for the same explicit-always-assigned-but-
+   * optional-field posture {@link owner_person_id}/{@link status} document —
+   * a segment saved before this field existed loads with it simply absent;
+   * callers treat a missing value as `[]` (see `segment.service.ts`'s
+   * `buildSegmentMemberWhereClause`), never throw on it.
+   */
+  @Field({ is_required: false })
+  public event_conditions!: SegmentEventCondition[];
 }

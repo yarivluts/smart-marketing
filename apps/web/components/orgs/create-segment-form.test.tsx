@@ -10,10 +10,10 @@ vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ refresh }),
 }));
 
-function renderForm(): void {
+function renderForm(eventSchemaNames: string[] = []): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <CreateSegmentForm orgId="org-1" projectId="project-1" entitySchemaNames={['customer']} />
+      <CreateSegmentForm orgId="org-1" projectId="project-1" entitySchemaNames={['customer']} eventSchemaNames={eventSchemaNames} />
     </NextIntlClientProvider>,
   );
 }
@@ -54,6 +54,7 @@ describe('CreateSegmentForm', () => {
           name: 'Pro customers',
           schemaName: 'customer',
           filters: [{ field: 'plan', op: '=', value: 'pro' }],
+          eventConditions: [],
         }),
       }),
     );
@@ -122,5 +123,95 @@ describe('CreateSegmentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
 
     expect(screen.getByLabelText('Name')).toHaveValue('My own name');
+  });
+
+  it('does not render the event conditions section when no event schemas are registered', () => {
+    renderForm([]);
+    expect(screen.queryByText('Event conditions')).not.toBeInTheDocument();
+  });
+
+  it('lets a segment be created from only an event condition, with zero entity filters (the "paying_no_demo" case, KAN-93)', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ segment: { id: 'segment-1' } }) } as Response);
+    renderForm(['demo_event']);
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'No demo yet' } });
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+
+    // Adding an event condition unlocks removing the single default (empty)
+    // filter row — a segment can now stand on an event condition alone. The
+    // filter row's own remove button is the first "Remove" in DOM order.
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create segment' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/orgs/org-1/projects/project-1/segments',
+      expect.objectContaining({
+        body: JSON.stringify({
+          name: 'No demo yet',
+          schemaName: 'customer',
+          filters: [],
+          eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+        }),
+      }),
+    );
+  });
+
+  it('submits a withinDays lookback as a number, and omits it entirely when left blank', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ segment: { id: 'segment-1' } }) } as Response);
+    renderForm(['demo_event']);
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Held a demo recently' } });
+    fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'plan' } });
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'pro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    fireEvent.change(screen.getByLabelText('Condition'), { target: { value: 'has_event' } });
+    fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '30' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create segment' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/orgs/org-1/projects/project-1/segments',
+      expect.objectContaining({
+        body: JSON.stringify({
+          name: 'Held a demo recently',
+          schemaName: 'customer',
+          filters: [{ field: 'plan', op: '=', value: 'pro' }],
+          eventConditions: [{ kind: 'has_event', schemaName: 'demo_event', withinDays: 30 }],
+        }),
+      }),
+    );
+  });
+
+  it('disables submit until every event condition row has a target schema and a valid withinDays', () => {
+    renderForm(['demo_event']);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
+    fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'plan' } });
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'pro' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+
+    fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '-5' } });
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '10' } });
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+  });
+
+  it('adds and removes event condition rows', () => {
+    renderForm(['demo_event']);
+    expect(screen.queryAllByLabelText('Condition')).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    expect(screen.getAllByLabelText('Condition')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    expect(screen.getAllByLabelText('Condition')).toHaveLength(2);
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' }).at(-1)!);
+    expect(screen.getAllByLabelText('Condition')).toHaveLength(1);
   });
 });
