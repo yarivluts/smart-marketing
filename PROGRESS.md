@@ -17,6 +17,65 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (latest) — Merged billing-ops/churn envelope-unwrap fix (PR #296, KAN-80/KAN-81)
+
+- **Last completed:**
+  - Session start: local `main` was a stale shallow-clone snapshot (50 commits behind real `main`,
+    unrelated-histories on `git merge --ff-only` — same recurring quirk every recent entry documents,
+    confirmed via `git rev-parse --is-shallow-repository`) — `git reset --hard origin/main` fixed it.
+    `list_pull_requests` showed two open PRs from concurrent sessions (#294 Meta creative image upload,
+    #295 per-campaign roi_Nd/collection_Nd), both freshly opened (`mergeable_state: unknown`, 0 CI
+    checks yet) — left alone entirely to avoid collision.
+  - Delegated a research sweep (subagent) for a genuine, unclaimed, infra-free follow-up not
+    overlapping #294/#295's scope. It surfaced a real, previously-flagged, still-unfixed bug: KAN-81's
+    own PR #247 (2026-08-20) fixed `record-feed-view.ts`'s `toRecordFeedEntryView` for reading
+    `RawRecordModel.payload` flat instead of unwrapping the ingest envelope (`payload.properties`/
+    `payload.attributes`), and that PR's own PROGRESS.md entry explicitly flagged
+    `billing-ops-view.ts`/`isChurnSignal` as "very likely carrying the exact same bug for any record
+    landed through the real Stripe plugin" — but it was never fixed. Verified directly: confirmed via
+    grep/read that `toBillingOpsFeedEntryView` (KAN-80 Billing Ops feed), `toChurnFeedEntryView` (KAN-81
+    Churn feed, not itself named in the original flag but the same file family and same bug), and
+    `isChurnSignal` (`pipeline.service.ts`) were all still reading `payload[field]` directly, unchanged
+    since their original creation commits.
+  - **Fix (PR #296, branch `fix/billing-ops-churn-envelope-unwrap`):** all three now read through
+    `declaredFieldsForRecord` (`pipeline.service.ts`'s own existing private helper, already used for the
+    same purpose by its record-field-filter feature) / `checkRecordEnvelope` (already exported from
+    `@growthos/firebase-orm-models`, already used the same way by `rep-collection.service.ts` and
+    `record-feed-view.ts`) instead of the payload directly — no new abstractions, reusing the
+    established fix pattern exactly. In practice this bug meant every field on the Billing Ops feed page
+    (amount/currency/customer id/status/failure code/message/refund reason) rendered blank, and the
+    Churn feed never matched a single subscription landed through the real Stripe plugin — both pages
+    only ever worked against hand-built flat-payload test fixtures, never a real one.
+  - Updated every affected fixture (`billing-ops-view.test.ts`, `churn-feed-view.test.ts` — rewritten
+    cleanly rather than patched, `pipeline.emulator.test.ts`'s `listRecentChurnedSubscriptionsForProject`
+    suite against a real Firestore emulator) to build a real envelope shape instead of a flat one, so
+    this regression would be caught again.
+  - `pnpm lint && pnpm typecheck && pnpm build` green monorepo-wide; targeted `vitest run` on the two
+    touched `apps/web` view-mapper tests green, then a real Firestore-emulator run of `pipeline`'s own
+    test file (27/27) green, before running the full suite. While the first full local `pnpm test` was
+    still in flight, PR #295 merged to `main` — merged it in (clean, no file overlap with this PR's own
+    changes), re-verified lint/typecheck/build, and re-ran the full suite from scratch against the new
+    base. GitHub CI (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green
+    independently on the merged commit — `mergeable_state: clean`, no open reviews — merged via squash.
+    (The second local `pnpm test` run was still mid-flight with one transient, unrelated `plugins.spec.ts`
+    e2e flake at merge time; GitHub's own independent green run was the authoritative signal, so the
+    redundant local run wasn't blocked on further.) Remote branch deletion hit the same recurring HTTP
+    403 from this sandbox's git-over-HTTPS proxy every prior entry documents — left undeleted.
+  - Updated `TASKS.md`'s KAN-80 and KAN-81 rows with their own follow-up-closed notes.
+- **In progress (exact stopping point):** none — PR #296 is merged, `main`'s CI is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the "sweep every `done` row's own deferred/not-yet doc-comment notes" pass still has
+  open candidates per KAN-72/73's own rows (PMax asset groups, Lookalike/Similar Audience expansion,
+  mailing-address/mobile-device-id identifiers, a true Meta post-creation creative-text edit) — none
+  attempted here since this run intentionally picked a different, non-overlapping thread to avoid
+  colliding with #294/#295. Worth a fresh sweep next run rather than assuming this list is exhaustive.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `fix/billing-ops-churn-envelope-unwrap` branch on GitHub (proxy 403 on
+    remote branch-delete, same as every recent entry).
+
+---
+
 ## 2026-08-25 (even newer) — Merged KAN-73 follow-up (PR #294, real Meta creative image upload); recovered from a stale-base branch before merge
 
 - **Last completed:**
