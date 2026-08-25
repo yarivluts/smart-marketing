@@ -1,11 +1,13 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import {
   CrmWebhookCredentialConfigError,
+  MetaAudienceCredentialConfigError,
   NotAnActionPluginError,
   PluginInstallNotActiveError,
   PluginInstallNotFoundError,
   PluginManifestNotFoundError,
   SegmentNotFoundError,
+  UnsupportedSinkPluginError,
 } from '@growthos/firebase-orm-models';
 import { syncSegmentToCrm } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
@@ -72,6 +74,12 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     }
     if (err instanceof CrmWebhookCredentialConfigError) {
       return NextResponse.json({ error: 'crm_credential_not_configured', reason: err.reason }, { status: 400 });
+    }
+    if (err instanceof MetaAudienceCredentialConfigError) {
+      return NextResponse.json({ error: 'meta_audience_credential_not_configured', reason: err.reason }, { status: 400 });
+    }
+    if (err instanceof UnsupportedSinkPluginError) {
+      return NextResponse.json({ error: 'unsupported_action_plugin' }, { status: 400 });
     }
     throw err;
   }

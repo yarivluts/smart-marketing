@@ -40,6 +40,8 @@ function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiCli
     setDailyBudgetCents: vi.fn().mockResolvedValue(undefined),
     setObjectStatus: vi.fn().mockResolvedValue(undefined),
     getCampaign: vi.fn().mockRejectedValue(new MetaAdsApiError('No campaign found.', 404)),
+    createCustomAudience: vi.fn().mockResolvedValue({ audienceId: 'audience-1' }),
+    addHashedEmailsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 0 }),
     ...overrides,
   };
 }

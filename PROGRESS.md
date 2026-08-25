@@ -99,6 +99,92 @@ Template for each entry:
 
 ---
 
+## 2026-08-25 (later still, 2) — Closed KAN-73's own deferred "Custom Audience from a GrowthOS segment" bullet (PR #286)
+
+- **Last completed:**
+  - Session start: local `main` was a stale detached HEAD (once more, the container's recurring
+    issue) — reset to `origin/main`. Read `PROGRESS.md`/`TASKS.md`: every row was `done` or a
+    standing blocker (KAN-18/19 real-infra, KAN-43 `needs-human`, KAN-50/51 `blocked-by`, KAN-86's
+    `roi_nd` gap). `list_pull_requests` (open) and `git branch -a` were both clean — no in-flight
+    collision to reconcile, unlike several recent runs.
+  - Did the same "sweep every `done` row's own deferred/not-yet notes for a newly-buildable
+    follow-up" pass the last two entries recommend. **KAN-73**'s own row (E21.3 Meta Manage plugin)
+    named an exact, still-open gap: "Custom/Lookalike audience creation from a GrowthOS segment...
+    deferred — no 'segment' concept with live membership exists yet to build real audience upload
+    against." That prerequisite has since shipped (KAN-81's `listSegmentMembers`, well before this
+    run) but nobody had come back to close the loop KAN-73's own note left open.
+  - **Delivered (PR #286, branch `kan-73-meta-custom-audience`):** a new built-in action plugin
+    `com.growthos.meta-custom-audience` (`packages/firebase-orm-models/src/plugin-runtime/
+    meta-custom-audience`) that syncs a saved segment's currently-matching members to Meta as an
+    email-based Custom Audience. Rather than build a parallel UI/route, extended the *existing*
+    generic mechanism the Segments page's "Sync" picker already uses for any installed action-type
+    plugin (`crm-sync.service.ts`'s `syncSegmentToCrm`, previously CRM-webhook-only despite the UI
+    already listing every action install) — its executor-dispatch function now also builds a real
+    `MetaCustomAudienceSinkPluginExecutor` for this new plugin, reusing KAN-73's own
+    `resolveMetaAdsCredentialSecret` (no new credential type; same `provider: 'meta_ads'`
+    `SharedCredentialModel`). Two new `MetaAdsApiClient` methods (`createCustomAudience`,
+    `addHashedEmailsToCustomAudience`) hit the real Meta Graph API; emails are SHA-256 hashed
+    (trim+lowercase, per Meta's own upload spec) before ever leaving this codebase. The created
+    audience id is persisted onto a new `PluginInstallModel.meta_custom_audience_id` field (mirrors
+    `source_cursor`'s "one persistent field per connector" posture) so a repeat sync adds to the same
+    audience instead of creating a new one. Lookalike Audience creation is left deferred, documented
+    in the manifest's own doc comment — same posture KAN-73's own remaining PMax/post-creation-edit
+    bullets already carry.
+  - **Self-review before opening the PR** (`/code-review`, medium effort) caught one real bug:
+    `syncSegmentToCrm` retries a whole `push()` call on the *same* executor instance via
+    `runWithRetryBackoff`. The executor originally only ever read `existingAudienceId` from its
+    constructor, so if `createCustomAudience` already succeeded on attempt 1 and only the later
+    `addHashedEmailsToCustomAudience` call failed transiently, the retried `push()` would call
+    `createCustomAudience` again — leaking a second, orphaned audience on Meta's side (only the
+    *last* attempt's id ever gets persisted). Fixed by caching the created id as mutable
+    executor-instance state instead of a constructor-only value, with a regression test
+    (`executor.test.ts`: "reuses the audience it just created on a same-instance retry, instead of
+    creating a second one") confirming `createCustomAudience` is called exactly once across a
+    fail-then-succeed retry sequence.
+  - **Checks:** fresh `pnpm install` (container had no `node_modules`), `pnpm build`/`lint`/
+    `typecheck` green monorepo-wide. `pnpm test`: an interim background run raced its own concurrent
+    file edits (the self-review fix landed mid-run) and showed one spurious failure in the very test
+    the fix was for — re-ran the full `packages/firebase-orm-models` suite fresh from the committed
+    state afterward (120 files / 1255 tests, real Firestore emulator) to get an authoritative signal:
+    clean. Also re-ran the *whole* monorepo `pnpm test` fresh once more end to end: 11/11 turbo tasks
+    green, `apps/web` 249 files / 1505 tests + e2e (the same 2 documented-flaky, unrelated Playwright
+    specs — `resource-library.spec.ts`/`tv-pairing.spec.ts` — retried and passed). New coverage:
+    `hashing.test.ts`/`manifest.test.ts`/`executor.test.ts` for the new plugin-runtime module, new
+    cases on `meta-ads/api-client.test.ts` for the two new API methods, new `crm-sync.emulator.test.ts`
+    cases (`resolveMetaAudienceCredentialSecret` success + 3 misconfiguration modes, `externalRef`
+    persistence via an executor override, `UnsupportedSinkPluginError`, and a full real-dispatch
+    end-to-end test with a stubbed `fetch` proving a second sync reuses the first sync's audience
+    id — the retry-fix's own regression coverage lives at the unit level instead), and two new
+    `apps/web` sync-route tests for the new error-response mappings. Opened PR #286, subscribed to
+    its activity, watched CI to green (~35 min, matches this repo's documented job duration) rather
+    than polling, confirmed `mergeable_state: clean` and no open review threads, merged (squash).
+    Remote branch deletion hit the same recurring HTTP 403 from this sandbox's git-over-HTTPS proxy
+    every prior run documents — left undeleted.
+  - Updated **KAN-73**'s existing `TASKS.md` row (stays `done`) with a dated follow-up note
+    documenting PR #286's delivered scope, same convention KAN-59/KAN-82/KAN-88's own rows use for
+    their own post-merge follow-ups.
+- **In progress (exact stopping point):** none — PR #286 is merged, `TASKS.md` reflects the delivered
+  scope, `main`'s CI is green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` still has no remaining unblocked `todo`/`in-progress` row beyond the
+  standing KAN-18/KAN-19 infra work, KAN-43/KAN-50/KAN-51's human-gated blockers, and KAN-86's
+  infra-gated `roi_nd` gap. Keep doing the top-to-bottom "sweep every `done` row's own deferred/
+  not-yet notes for a newly-buildable follow-up" pass — this run's own KAN-73 pickup is the fourth
+  in a row to find real, scoped work this way (after KAN-88's TV integration, KAN-90's Gap-6 pickup,
+  and KAN-91's compiler `max`/`min` functions). Worth a fresh look next: KAN-72's own deferred
+  bullets (PMax asset groups, post-creation ad/keyword edits, audience attach for Google Ads) now
+  that this run's Meta-side Custom Audience precedent exists — a Google Ads "Customer Match" list
+  from a segment would be the direct sibling. Always re-diff any found open PR/branch against the
+  current `origin/main` tip before trusting its own "merge main" commit or GitHub's
+  `mergeable_state`, and always `git fetch`/reset local `main` against `origin/main` at session
+  start — this container's local ref was stale yet again.
+- **Waiting on human:**
+  - **KAN-43**/**KAN-18** — standing, unchanged.
+  - Optional: delete the merged `kan-73-meta-custom-audience` branch on GitHub (the git-over-HTTPS
+    proxy rejects every scheduled run's remote branch-delete attempt with HTTP 403).
+
+---
+
 ## 2026-08-25 (later still) — Merged a leftover KAN-90 i18n fix (PR #284) and closed its documented compiler gap as new story KAN-91 (PR #285)
 
 - **Last completed:**
