@@ -42,6 +42,16 @@ export interface GoogleAdsAddAdGroupKeywordsResult {
   negativeKeywordResourceNames: string[];
 }
 
+export interface GoogleAdsResponsiveSearchAdContent {
+  headlines: string[];
+  descriptions: string[];
+  finalUrl: string;
+}
+
+export interface GoogleAdsCreateResponsiveSearchAdResult {
+  adResourceName: string;
+}
+
 /**
  * One contact's already-hashed Customer Match user identifier(s) —
  * `hashedEmail` and/or `hashedPhoneNumber`, mirroring `MetaContactMatchKey`'s
@@ -118,6 +128,34 @@ export interface GoogleAdsApiClient {
    * an existing criterion the action didn't create.
    */
   removeAdGroupCriteria(customerId: string, criterionResourceNames: readonly string[]): Promise<void>;
+  /**
+   * Creates a new Responsive Search Ad in an already-existing ad group, with
+   * the given initial status — used both by `createCampaignDraft` (a
+   * brand-new ad group's own first ad, always `PAUSED`) and by
+   * `GoogleAdsAutomationActionExecutor.executeAdEdit` (KAN-72 follow-up,
+   * "post-creation ad edits") to create the replacement ad carrying a
+   * caller's edited headlines/descriptions/final URL, `ENABLED` so the edit
+   * takes effect immediately (this action executes only after human
+   * approval, same posture `keyword_edit`/`budget_change` already take).
+   * Google Ads' `Ad` resource is immutable once created — no partial update
+   * of an RSA's own creative text is offered by the API — so "editing" an ad
+   * is create-new + pause-old rather than a true in-place update; see
+   * `executeAdEdit`'s own doc comment for exactly how.
+   */
+  createResponsiveSearchAd(
+    customerId: string,
+    adGroupResourceName: string,
+    ad: GoogleAdsResponsiveSearchAdContent,
+    status: GoogleAdsCampaignStatus,
+  ): Promise<GoogleAdsCreateResponsiveSearchAdResult>;
+  /**
+   * Sets an existing ad's own status (`ENABLED`/`PAUSED`/`REMOVED`, the same
+   * vocabulary a campaign's own status uses) — used by `executeAdEdit`/
+   * `rollbackAdEdit` to pause the superseded ad on execute and restore it (or
+   * remove the replacement) on rollback, mirroring `setCampaignStatus`'s
+   * exact shape one resource type down.
+   */
+  setAdGroupAdStatus(customerId: string, adResourceName: string, status: GoogleAdsCampaignStatus): Promise<void>;
 }
 
 const GOOGLE_ADS_API_BASE_URL = 'https://googleads.googleapis.com/v17';
@@ -233,22 +271,8 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
       const adGroupResourceName = adGroupResult.results[0].resourceName;
       adGroupResourceNames.push(adGroupResourceName);
 
-      const adResult = await this.mutate(customerId, 'adGroupAds', [
-        {
-          create: {
-            adGroup: adGroupResourceName,
-            status: 'PAUSED',
-            ad: {
-              responsiveSearchAd: {
-                headlines: adGroup.responsiveSearchAd.headlines.map((text) => ({ text })),
-                descriptions: adGroup.responsiveSearchAd.descriptions.map((text) => ({ text })),
-              },
-              finalUrls: [adGroup.responsiveSearchAd.finalUrl],
-            },
-          },
-        },
-      ]);
-      adResourceNames.push(adResult.results[0].resourceName);
+      const adResult = await this.createResponsiveSearchAd(customerId, adGroupResourceName, adGroup.responsiveSearchAd, 'PAUSED');
+      adResourceNames.push(adResult.adResourceName);
 
       const criterionOperations = [
         ...adGroup.keywords.map((keyword) => ({
@@ -401,5 +425,33 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
       'adGroupCriteria',
       criterionResourceNames.map((resourceName) => ({ remove: resourceName })),
     );
+  }
+
+  async createResponsiveSearchAd(
+    customerId: string,
+    adGroupResourceName: string,
+    ad: GoogleAdsResponsiveSearchAdContent,
+    status: GoogleAdsCampaignStatus,
+  ): Promise<GoogleAdsCreateResponsiveSearchAdResult> {
+    const result = await this.mutate(customerId, 'adGroupAds', [
+      {
+        create: {
+          adGroup: adGroupResourceName,
+          status,
+          ad: {
+            responsiveSearchAd: {
+              headlines: ad.headlines.map((text) => ({ text })),
+              descriptions: ad.descriptions.map((text) => ({ text })),
+            },
+            finalUrls: [ad.finalUrl],
+          },
+        },
+      },
+    ]);
+    return { adResourceName: result.results[0].resourceName };
+  }
+
+  async setAdGroupAdStatus(customerId: string, adResourceName: string, status: GoogleAdsCampaignStatus): Promise<void> {
+    await this.mutate(customerId, 'adGroupAds', [{ update: { resourceName: adResourceName, status }, updateMask: 'status' }]);
   }
 }

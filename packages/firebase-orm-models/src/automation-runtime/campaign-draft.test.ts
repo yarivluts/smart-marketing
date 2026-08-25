@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CampaignDraft, CampaignDraftKeyword, GoogleAdsCampaignDraft } from './executor';
-import { InvalidCampaignDraftError, validateCampaignDraft, validateKeywordEditActionInput } from './campaign-draft';
+import { InvalidCampaignDraftError, validateAdEditActionInput, validateCampaignDraft, validateKeywordEditActionInput } from './campaign-draft';
 
 function validDraft(overrides: Partial<GoogleAdsCampaignDraft> = {}): GoogleAdsCampaignDraft {
   return {
@@ -210,5 +210,63 @@ describe('validateKeywordEditActionInput (KAN-72 follow-up)', () => {
     expect(() => validateKeywordEditActionInput(null as unknown as { adGroupResourceName: unknown; addKeywords: unknown; addNegativeKeywords: unknown })).toThrow(
       InvalidCampaignDraftError,
     );
+  });
+});
+
+function validResponsiveSearchAd(overrides: Partial<{ headlines: string[]; descriptions: string[]; finalUrl: string }> = {}) {
+  return {
+    headlines: ['Buy Blue Widgets', 'Best Widgets Online', 'Widgets For Less'],
+    descriptions: ['Free shipping on all widgets.', 'Order today, ships tomorrow.'],
+    finalUrl: 'https://example.com/widgets',
+    ...overrides,
+  };
+}
+
+describe('validateAdEditActionInput (KAN-72 follow-up)', () => {
+  it('accepts a well-formed ad edit', () => {
+    expect(() =>
+      validateAdEditActionInput({ previousAdResourceName: 'customers/123/adGroupAds/1', responsiveSearchAd: validResponsiveSearchAd() }),
+    ).not.toThrow();
+  });
+
+  it('rejects a blank previousAdResourceName', () => {
+    expect(() => validateAdEditActionInput({ previousAdResourceName: '  ', responsiveSearchAd: validResponsiveSearchAd() })).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects too few headlines', () => {
+    expect(() =>
+      validateAdEditActionInput({
+        previousAdResourceName: 'customers/123/adGroupAds/1',
+        responsiveSearchAd: validResponsiveSearchAd({ headlines: ['Only One'] }),
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a headline over 30 characters', () => {
+    expect(() =>
+      validateAdEditActionInput({
+        previousAdResourceName: 'customers/123/adGroupAds/1',
+        responsiveSearchAd: validResponsiveSearchAd({ headlines: ['A'.repeat(31), 'Best Widgets Online', 'Widgets For Less'] }),
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects too few descriptions', () => {
+    expect(() =>
+      validateAdEditActionInput({
+        previousAdResourceName: 'customers/123/adGroupAds/1',
+        responsiveSearchAd: validResponsiveSearchAd({ descriptions: ['Only one.'] }),
+      }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an invalid final URL', () => {
+    expect(() =>
+      validateAdEditActionInput({ previousAdResourceName: 'customers/123/adGroupAds/1', responsiveSearchAd: validResponsiveSearchAd({ finalUrl: 'not-a-url' }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a non-object input without throwing an unhandled error', () => {
+    expect(() => validateAdEditActionInput(null as unknown as { previousAdResourceName: unknown; responsiveSearchAd: unknown })).toThrow(InvalidCampaignDraftError);
   });
 });

@@ -3,6 +3,9 @@ import { AutomationTargetNotFoundError } from '../../services/automation-errors'
 import {
   validateCampaignDraft,
   type AutomationActionExecutor,
+  type AutomationAdEditExecutionInput,
+  type AutomationAdEditExecutionResult,
+  type AutomationAdEditRollbackInput,
   type AutomationBudgetChangeExecutionInput,
   type AutomationBudgetChangeExecutionResult,
   type AutomationCampaignActivationExecutionInput,
@@ -38,6 +41,14 @@ export class GoogleAdsWrongPlatformCampaignDraftError extends Error {
   constructor() {
     super('GoogleAdsAutomationActionExecutor can only execute a campaign draft with platform: "google_ads".');
     this.name = 'GoogleAdsWrongPlatformCampaignDraftError';
+  }
+}
+
+/** An `ad_edit` action's `previousAdResourceName` doesn't match any of the target's own `ad_resource_names` (KAN-72 follow-up) — the caller can never point an edit at an ad outside this target's own campaign, mirroring `AutomationTargetNotFoundError`'s "not this caller's resource" posture one level down. */
+export class GoogleAdsAdResourceUnknownError extends Error {
+  constructor(adResourceName: string) {
+    super(`Ad resource "${adResourceName}" is not one of this automation target's own ads (created by a campaign_draft_create action).`);
+    this.name = 'GoogleAdsAdResourceUnknownError';
   }
 }
 
@@ -137,6 +148,7 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
     target.campaign_status = 'paused';
     target.daily_budget_usd = input.draft.dailyBudgetUsd;
     target.ad_group_resource_names = result.adGroupResourceNames;
+    target.ad_resource_names = result.adResourceNames;
     target.updated_at = new Date().toISOString();
     await target.save();
     return { campaignResourceName: result.campaignResourceName };
@@ -179,6 +191,71 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
     const criterionResourceNames = [...input.addedKeywordResourceNames, ...input.addedNegativeKeywordResourceNames];
     if (criterionResourceNames.length > 0) {
       await this.apiClient.removeAdGroupCriteria(this.customerId, criterionResourceNames);
+    }
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  /**
+   * Resolves which of a target's own ad groups a `previousAdResourceName`
+   * belongs to, via its index in the target's parallel
+   * `ad_resource_names`/`ad_group_resource_names` arrays (the same
+   * "same index = same ad group" convention `createCampaignDraft` itself
+   * establishes, one RSA per ad group). Throws
+   * {@link GoogleAdsAdResourceUnknownError} if it isn't one of this target's
+   * own ads.
+   */
+  private resolveAdGroupForAd(target: AutomationTargetStateModel, adResourceName: string): string {
+    const adIndex = target.ad_resource_names?.indexOf(adResourceName) ?? -1;
+    if (adIndex === -1) {
+      throw new GoogleAdsAdResourceUnknownError(adResourceName);
+    }
+    const adGroupResourceName = target.ad_group_resource_names?.[adIndex];
+    if (!adGroupResourceName) {
+      throw new GoogleAdsAdResourceUnknownError(adResourceName);
+    }
+    return adGroupResourceName;
+  }
+
+  /**
+   * Replaces an ad group's Responsive Search Ad with a new one carrying the
+   * caller's revised headlines/descriptions/final URL (KAN-72 follow-up,
+   * "post-creation ad edits"). Google Ads' `Ad` resource is immutable once
+   * created — there is no partial-update mutate for an RSA's own creative
+   * text — so this creates a brand-new `ENABLED` ad in the same ad group and
+   * pauses the superseded one, rather than editing anything in place; the new
+   * ad's own resource name replaces the old one at the same index in
+   * `target.ad_resource_names` (so a second edit of the same ad group targets
+   * the *new* ad, and `rollbackAdEdit` knows exactly which ad to remove).
+   */
+  async executeAdEdit(input: AutomationAdEditExecutionInput): Promise<AutomationAdEditExecutionResult> {
+    const target = await loadTarget(input);
+    const adIndex = target.ad_resource_names?.indexOf(input.previousAdResourceName) ?? -1;
+    const adGroupResourceName = this.resolveAdGroupForAd(target, input.previousAdResourceName);
+
+    const created = await this.apiClient.createResponsiveSearchAd(this.customerId, adGroupResourceName, input.responsiveSearchAd, 'ENABLED');
+    await this.apiClient.setAdGroupAdStatus(this.customerId, input.previousAdResourceName, 'PAUSED');
+
+    const nextAdResourceNames = [...(target.ad_resource_names ?? [])];
+    nextAdResourceNames[adIndex] = created.adResourceName;
+    target.ad_resource_names = nextAdResourceNames;
+    target.updated_at = new Date().toISOString();
+    await target.save();
+
+    return { newAdResourceName: created.adResourceName };
+  }
+
+  /** Restores the superseded ad to `ENABLED` and removes the replacement ad `executeAdEdit` created, undoing exactly one `ad_edit` action. */
+  async rollbackAdEdit(input: AutomationAdEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    await this.apiClient.setAdGroupAdStatus(this.customerId, input.newAdResourceName, 'REMOVED');
+    await this.apiClient.setAdGroupAdStatus(this.customerId, input.previousAdResourceName, 'ENABLED');
+
+    const adIndex = target.ad_resource_names?.indexOf(input.newAdResourceName) ?? -1;
+    if (adIndex !== -1) {
+      const nextAdResourceNames = [...(target.ad_resource_names ?? [])];
+      nextAdResourceNames[adIndex] = input.previousAdResourceName;
+      target.ad_resource_names = nextAdResourceNames;
     }
     target.updated_at = new Date().toISOString();
     await target.save();
