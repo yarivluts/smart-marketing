@@ -185,25 +185,44 @@ export interface RequestResourceAttachmentParams {
   scopeSelection?: readonly string[];
 }
 
-/**
- * A project admin's request to attach a library resource — plan 08 §1.2
- * "project-admin initiated ... approved (or org-admin pushed)". Always lands
- * as `pending`; nothing in this codebase auto-approves an org-admin-pushed
- * attachment (a straightforward follow-up once there's a UI need for it).
- */
-export async function requestResourceAttachment(
-  params: RequestResourceAttachmentParams,
-): Promise<ResourceAttachmentModel> {
-  await requireProjectInOrg(params.organizationId, params.projectId);
-  const resource = await requireResourceInOrg(params.organizationId, params.resourceKind, params.resourceId);
+/** Shared by {@link requestResourceAttachment} and {@link pushResourceAttachment}: confirms the project/resource both belong to the org, and (for a credential) that the requested scope slice is a non-empty subset of what the credential actually offers. */
+async function validateAttachmentTarget(
+  organizationId: string,
+  projectId: string,
+  resourceKind: ResourceKind,
+  resourceId: string,
+  scopeSelection: readonly string[] | undefined,
+): Promise<SharedCredentialModel | ResourceTemplateModel | OrgPersonModel> {
+  await requireProjectInOrg(organizationId, projectId);
+  const resource = await requireResourceInOrg(organizationId, resourceKind, resourceId);
 
-  if (params.resourceKind === 'credential') {
+  if (resourceKind === 'credential') {
     const available = new Set((resource as SharedCredentialModel).available_scopes ?? []);
-    const requested = params.scopeSelection ?? [];
+    const requested = scopeSelection ?? [];
     if (requested.length === 0 || !requested.every((scope) => available.has(scope))) {
       throw new InvalidScopeSelectionError();
     }
   }
+
+  return resource;
+}
+
+/**
+ * A project admin's request to attach a library resource — plan 08 §1.2
+ * "project-admin initiated ... approved (or org-admin pushed)". Always lands
+ * as `pending` — the org-admin-pushed half of that sentence is
+ * {@link pushResourceAttachment}.
+ */
+export async function requestResourceAttachment(
+  params: RequestResourceAttachmentParams,
+): Promise<ResourceAttachmentModel> {
+  const resource = await validateAttachmentTarget(
+    params.organizationId,
+    params.projectId,
+    params.resourceKind,
+    params.resourceId,
+    params.scopeSelection,
+  );
 
   const attachment = new ResourceAttachmentModel();
   attachment.organization_id = params.organizationId;
@@ -230,6 +249,77 @@ export async function requestResourceAttachment(
       targetType: 'resource_attachment',
       targetId: attachment.id,
       summary: `Requested to attach ${params.resourceKind} "${params.resourceId}" to the project`,
+      after: {
+        status: attachment.status,
+        resourceKind: params.resourceKind,
+        resourceId: params.resourceId,
+        scopeSelection: attachment.scope_selection ?? null,
+      },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return attachment;
+}
+
+export interface PushResourceAttachmentParams {
+  organizationId: string;
+  projectId: string;
+  resourceKind: ResourceKind;
+  resourceId: string;
+  pushedByUserId: string;
+  /** Required (and validated against the credential's `available_scopes`) only when `resourceKind === 'credential'`. */
+  scopeSelection?: readonly string[];
+}
+
+/**
+ * The org-admin-pushed half of plan 08 §1.2's "project-admin initiated ...
+ * approved (or org-admin pushed)" — an org-resource-owner (`resources.manage`)
+ * attaches a library resource straight to a project, skipping the
+ * request/approve round trip {@link requestResourceAttachment} +
+ * `decideResourceAttachment` requires. Lands directly as `approved`, with the
+ * pushing admin recorded as both `requested_by` and `decided_by` (there was
+ * never a separate requester) so every downstream read — active-attachment
+ * lookups, the audit trail — treats it exactly like an already-decided
+ * request, no special-casing needed.
+ */
+export async function pushResourceAttachment(params: PushResourceAttachmentParams): Promise<ResourceAttachmentModel> {
+  const resource = await validateAttachmentTarget(
+    params.organizationId,
+    params.projectId,
+    params.resourceKind,
+    params.resourceId,
+    params.scopeSelection,
+  );
+
+  const now = new Date().toISOString();
+  const attachment = new ResourceAttachmentModel();
+  attachment.organization_id = params.organizationId;
+  attachment.project_id = params.projectId;
+  attachment.resource_kind = params.resourceKind;
+  attachment.resource_id = params.resourceId;
+  attachment.status = 'approved';
+  attachment.scope_selection = params.resourceKind === 'credential' ? [...(params.scopeSelection ?? [])] : undefined;
+  attachment.resource_version = params.resourceKind === 'template' ? (resource as ResourceTemplateModel).version : undefined;
+  attachment.write_tier = 'read';
+  attachment.requested_by = params.pushedByUserId;
+  attachment.requested_at = now;
+  attachment.decided_by = params.pushedByUserId;
+  attachment.decided_at = now;
+  attachment.setPathParams({ organization_id: params.organizationId });
+  await attachment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.pushedByUserId,
+      action: 'resource_attachment.push',
+      targetType: 'resource_attachment',
+      targetId: attachment.id,
+      summary: `Pushed ${params.resourceKind} "${params.resourceId}" to the project`,
       after: {
         status: attachment.status,
         resourceKind: params.resourceKind,

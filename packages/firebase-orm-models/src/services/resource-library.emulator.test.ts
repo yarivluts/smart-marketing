@@ -23,6 +23,7 @@ import {
   listResourceTemplates,
   listSharedCredentials,
   ProjectNotFoundError,
+  pushResourceAttachment,
   requestResourceAttachment,
   ResourceAttachmentModel,
   ResourceNotFoundError,
@@ -337,6 +338,74 @@ describe('resource attachment lifecycle: request -> approve -> detach', () => {
     ).resolves.toBeDefined();
   });
 
+  it('an org admin push lands directly as approved, with the pusher recorded as both requester and decider (plan 08 §1.2 "org-admin pushed")', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Push Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Pushed Credential',
+      provider: 'google_ads',
+      availableScopes: ['act_aaa', 'act_bbb'],
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Pushed-To Project' });
+
+    const attachment = await pushResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      pushedByUserId: owner.id,
+      scopeSelection: ['act_aaa'],
+    });
+
+    expect(attachment.status).toBe('approved');
+    expect(attachment.requested_by).toBe(owner.id);
+    expect(attachment.decided_by).toBe(owner.id);
+    expect(attachment.decided_at).toBeDefined();
+    // No pending step at all — it never shows up in the approval queue.
+    expect(await listPendingAttachmentsForOrg(organization.id)).toHaveLength(0);
+
+    const active = await listActiveAttachmentsForProject(organization.id, project.id);
+    expect(active).toHaveLength(1);
+    expect(active[0].id).toBe(attachment.id);
+    expect(active[0].scope_selection).toEqual(['act_aaa']);
+  });
+
+  it('a pushed attachment enforces the same scope-selection and org/project/resource-membership rules as a request', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Push Guard Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Narrow Pushed Credential',
+      provider: 'meta_ads',
+      availableScopes: ['act_only'],
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Push Guard Project' });
+    const { organization: otherOrg } = await setupOrgWithOwner('Other Org');
+
+    await expect(
+      pushResourceAttachment({
+        organizationId: organization.id,
+        projectId: project.id,
+        resourceKind: 'credential',
+        resourceId: credential.id,
+        pushedByUserId: owner.id,
+        scopeSelection: ['act_only', 'act_not_granted'],
+      }),
+    ).rejects.toThrow(InvalidScopeSelectionError);
+
+    await expect(
+      pushResourceAttachment({
+        organizationId: otherOrg.id,
+        projectId: project.id,
+        resourceKind: 'credential',
+        resourceId: credential.id,
+        pushedByUserId: owner.id,
+        scopeSelection: ['act_only'],
+      }),
+    ).rejects.toThrow(ProjectNotFoundError);
+  });
+
   it('rejects deciding or detaching an attachment id that does not exist', async () => {
     const { owner, organization } = await setupOrgWithOwner('Missing Attachment Org');
 
@@ -577,6 +646,42 @@ describe('resource attachment audit logging (KAN-44)', () => {
     expect(rejectEntry).toBeDefined();
     expect(rejectEntry.after).toEqual({ status: 'rejected', scopeSelection: ['act_aaa'] });
     expect(await entriesFor(rejected.organization.id, 'resource_attachment.approve')).toHaveLength(0);
+  });
+
+  it('records a push as its own action, distinct from a request, against the pushing admin', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Push Audit Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Audited Pushed Credential',
+      provider: 'meta_ads',
+      availableScopes: ['act_aaa'],
+      createdByUserId: owner.id,
+    });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Audited Pushed Project' });
+
+    const attachment = await pushResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      pushedByUserId: owner.id,
+      scopeSelection: ['act_aaa'],
+    });
+
+    const [pushEntry] = await entriesFor(organization.id, 'resource_attachment.push');
+    expect(pushEntry).toBeDefined();
+    expect(pushEntry.actor_id).toBe(owner.id);
+    expect(pushEntry.project_id).toBe(project.id);
+    expect(pushEntry.target_id).toBe(attachment.id);
+    expect(pushEntry.after).toEqual({
+      status: 'approved',
+      resourceKind: 'credential',
+      resourceId: credential.id,
+      scopeSelection: ['act_aaa'],
+    });
+    expect(await entriesFor(organization.id, 'resource_attachment.request')).toHaveLength(0);
+
+    await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
   });
 
   it('records the detach against the revoking admin, and keeps the whole lifecycle chain verifiable', async () => {

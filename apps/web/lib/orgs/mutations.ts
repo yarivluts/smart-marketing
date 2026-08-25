@@ -112,6 +112,7 @@ import {
   type ProcessStripeWebhookEventResult,
   registerMetricDefinition as registerMetricDefinitionInOrganization,
   registerPluginManifest as registerPluginManifestInOrganization,
+  pushResourceAttachment as pushResourceAttachmentInOrganization,
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
   replayFailedPipelineMessagesForProject as replayFailedPipelineMessagesForProjectInOrganization,
@@ -308,6 +309,22 @@ export async function requestResourceAttachment(
 ): Promise<ResourceAttachmentModel> {
   await ensureFirestoreOrm();
   return requestResourceAttachmentInOrganization(input);
+}
+
+interface PushResourceAttachmentInput {
+  organizationId: string;
+  projectId: string;
+  resourceKind: ResourceKind;
+  resourceId: string;
+  pushedByUserId: string;
+  scopeSelection?: readonly string[];
+}
+
+export async function pushResourceAttachment(
+  input: PushResourceAttachmentInput,
+): Promise<ResourceAttachmentModel> {
+  await ensureFirestoreOrm();
+  return pushResourceAttachmentInOrganization(input);
 }
 
 interface DecideResourceAttachmentInput {
