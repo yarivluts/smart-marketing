@@ -288,6 +288,94 @@ export async function getPaybackOverviewForProject(
   }
 }
 
+export interface CampaignPaybackRow {
+  campaignId: string;
+  collectedRevenue40d: number;
+  /** `null` when `ad_spend` has no data for this campaign yet — the compiler's own `SAFE_DIVIDE` returns null rather than a misleading `0`/`Infinity`. */
+  roi40d: number | null;
+}
+
+export type CampaignPaybackBreakdownOutcome =
+  | { ok: true; rows: CampaignPaybackRow[] }
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
+
+function toCampaignPaybackRow(row: WarehouseRow): CampaignPaybackRow | null {
+  const campaignId = String(row.campaign_id ?? '');
+  if (campaignId.length === 0) {
+    return null;
+  }
+  const rawCollected = row.collection_40d ?? null;
+  const collectedNum = rawCollected === null ? 0 : Number(rawCollected);
+  const rawRoi = row.roi_40d ?? null;
+  const roiNum = rawRoi === null ? null : Number(rawRoi);
+  return {
+    campaignId,
+    collectedRevenue40d: Number.isFinite(collectedNum) ? collectedNum : 0,
+    roi40d: roiNum !== null && Number.isFinite(roiNum) ? roiNum : null,
+  };
+}
+
+/**
+ * The "true per-campaign `roi_nd`/`collection_nd`" half of KAN-86's AC
+ * (2026-08-25 follow-up — see `fact_customer_payback.sql`'s own doc comment
+ * for how the mart now carries `campaign_id`): lifetime `collection_40d`/
+ * `roi_40d`, broken down by `campaign_id`, one query for both metrics at
+ * once (same "one wide `1970..2999` bucket" posture
+ * {@link getPaybackOverviewForProject} already establishes, so each
+ * campaign_id contributes at most one row — no cross-bucket fold needed for
+ * `roi_40d`, which (being a ratio) couldn't be summed correctly anyway, see
+ * `quality-score-pack/metrics.ts`'s own doc comment on the identical
+ * constraint). A campaign with `ad_spend` but literally zero attributed
+ * acquisitions in the window doesn't get a row here at all (`campaign_id`
+ * is only ever populated via `fact_attribution`'s own touchpoints, not from
+ * `ad_spend`'s payload) — that's `getCampaignSpendBreakdownForProject`'s own
+ * row to surface; this table is deliberately payback-first, not a full
+ * outer join across every campaign_id either metric has ever seen.
+ */
+export async function getCampaignPaybackBreakdownForProject(
+  organizationId: string,
+  projectId: string,
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+): Promise<CampaignPaybackBreakdownOutcome> {
+  try {
+    const result = await queryMetrics({
+      organizationId,
+      projectId,
+      request: {
+        metrics: ['collection_40d', 'roi_40d'],
+        dimensions: ['campaign_id'],
+        time: { start: '1970-01-01', end: '2999-12-31', grain: 'year' },
+      },
+      ...(options?.executor ? { executor: options.executor } : {}),
+      ...(options?.cache ? { cache: options.cache } : {}),
+    });
+
+    const rows = result.series.map(toCampaignPaybackRow).filter((row): row is CampaignPaybackRow => row !== null);
+    rows.sort((a, b) => b.collectedRevenue40d - a.collectedRevenue40d);
+
+    return { ok: true, rows };
+  } catch (error) {
+    if (error instanceof WarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured', message: error.message };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    if (error instanceof MetricTargetsUnbuiltWarehouseTableError) {
+      return { ok: false, reason: 'not_yet_backed', message: error.message };
+    }
+    if (
+      error instanceof MetricCompilerError ||
+      error instanceof ProjectNotFoundError ||
+      error instanceof MetricNotRegisteredError ||
+      error instanceof WarehouseQueryFailedError
+    ) {
+      return { ok: false, reason: 'query_error', message: error.message };
+    }
+    throw error;
+  }
+}
+
 /** Fixed display order for the calibration breakdown, reusing `signupQualityScoreTier`'s own tier vocabulary (`@growthos/shared`) — same "fixed catalog, not whatever the warehouse happens to return" posture {@link COLLECTION_WINDOW_DAYS} establishes; a tier with zero scored signups still gets a row (all zeros), not a gap. */
 export const QUALITY_CALIBRATION_TIERS: readonly SignupQualityScoreTier[] = SIGNUP_QUALITY_SCORE_TIERS;
 

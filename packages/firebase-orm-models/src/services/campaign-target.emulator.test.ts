@@ -8,6 +8,7 @@ import {
   ensureCampaignOpsPackRegistered,
   ensureSaasMetricPackRegistered,
   ensureSaasMetricPackSchemasRegistered,
+  getCampaignPaybackBreakdownForProject,
   getCampaignSpendBreakdownForProject,
   getPaybackOverviewForProject,
   getQualityCalibrationBreakdownForProject,
@@ -205,6 +206,44 @@ describe('getPaybackOverviewForProject', () => {
       { windowDays: 14, collectedRevenue: 170 },
       { windowDays: 30, collectedRevenue: 200 },
       { windowDays: 40, collectedRevenue: 220 },
+    ]);
+  });
+});
+
+describe('getCampaignPaybackBreakdownForProject', () => {
+  it('degrades to a "warehouse not configured" outcome when no BigQuery project is wired up (buildable-today default)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Campaign Payback Unconfigured Org');
+    await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
+
+    const outcome = await getCampaignPaybackBreakdownForProject(organization.id, project.id);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('warehouse_not_configured');
+  });
+
+  it('degrades to a "query error" outcome when the pack is not installed yet', async () => {
+    const { organization, project } = await setupOrgWithProject('Campaign Payback Unregistered Org');
+    const outcome = await getCampaignPaybackBreakdownForProject(organization.id, project.id);
+    expect(outcome.ok).toBe(false);
+    expect(outcome.ok === false && outcome.reason).toBe('query_error');
+  });
+
+  it('maps one row per campaign_id, dropping a row with no campaign_id (an unattributed acquisition)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Campaign Payback Merge Org');
+    await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
+
+    const rows: WarehouseRow[] = [
+      { bucket_date: '2026-01-01', campaign_id: 'fall_search', collection_40d: 200, roi_40d: 1.5 },
+      { bucket_date: '2026-01-01', campaign_id: 'spring_social', collection_40d: 50, roi_40d: null },
+      { bucket_date: '2026-01-01', campaign_id: null, collection_40d: 999, roi_40d: null },
+    ];
+    const executor = new FakeWarehouseQueryExecutor(rows);
+
+    const outcome = await getCampaignPaybackBreakdownForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    expect(outcome.rows).toEqual([
+      { campaignId: 'fall_search', collectedRevenue40d: 200, roi40d: 1.5 },
+      { campaignId: 'spring_social', collectedRevenue40d: 50, roi40d: null },
     ]);
   });
 });

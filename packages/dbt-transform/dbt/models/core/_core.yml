@@ -407,10 +407,11 @@ models:
     description: >
       Fixed-window payback (KAN-86, plan `14 §Gap 12`): one row per customer,
       with revenue collected within 7/14/30/40 days of that customer's own
-      acquisition (first customer-side event). Feeds the Campaign Ops pack's
+      acquisition (first customer-side event), joined to that acquisition
+      event's own last-touch `channel_id`/`campaign_id`
+      (`fact_attribution`). Feeds the Campaign Ops pack's
       `collection_7d`/`collection_14d`/`collection_30d`/`collection_40d`
-      metrics — project-level cohort payback, not per-campaign yet (see the
-      model's own doc comment for why).
+      metrics, now with a `campaign_id` breakdown available.
     columns:
       - name: customer_payback_key
         description: Composite (project_id, environment_id, customer_id) uniqueness key.
@@ -421,6 +422,10 @@ models:
         tests:
           - not_null
       - name: acquired_at
+        tests:
+          - not_null
+      - name: channel_id
+        description: Last-touch attribution channel for the customer's acquisition event; `unattributed` when no touchpoint could be resolved.
         tests:
           - not_null
       - name: collected_revenue_7d

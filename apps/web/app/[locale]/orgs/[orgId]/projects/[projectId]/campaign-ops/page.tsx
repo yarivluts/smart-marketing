@@ -7,6 +7,7 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   builtinMetricPacks,
+  getCampaignPaybackBreakdownForProject,
   getCampaignSpendBreakdownForProject,
   getPaybackOverviewForProject,
   getQualityCalibrationBreakdownForProject,
@@ -31,17 +32,19 @@ export async function generateMetadata({ params }: PageProps) {
 
 /**
  * Campaign ops (KAN-86, E18.x, plan `14 §Gap 12`): a fixed-window payback
- * overview, a predicted-vs-actual quality calibration table (both
- * `collection_Nd`/`quality_calibration_*`, the Campaign Ops pack — the AC's
- * own "predicted-vs-actual calibration views" bullet, this page's last
- * previously-undelivered piece), and a per-campaign spend budget table with
- * inline-editable targets driving red/green (`ad_spend`-by-`campaign_id`, no
- * pack install required — `ad_spend` is the SaaS pack's own metric). Spend
- * targets are independent of the other two: a project can have spend targets
- * with the Campaign Ops pack never installed, and vice versa; payback and
- * calibration share one pack-install gate since both read marts that pack
- * registers. Gated on `dashboards.write`, the same permission Goals/Segments
- * use for a project-scoped editable-target admin surface.
+ * overview, a per-campaign `collection_40d`/`roi_40d` breakdown (2026-08-25
+ * follow-up — the AC's own "true per-campaign roi_nd/collection_nd" bullet,
+ * `getCampaignPaybackBreakdownForProject`), a predicted-vs-actual quality
+ * calibration table (`quality_calibration_*`, the Campaign Ops pack), and a
+ * per-campaign spend budget table with inline-editable targets driving
+ * red/green (`ad_spend`-by-`campaign_id`, no pack install required —
+ * `ad_spend` is the SaaS pack's own metric). Spend targets are independent
+ * of the other three: a project can have spend targets with the Campaign
+ * Ops pack never installed, and vice versa; the payback overview, the
+ * per-campaign breakdown, and calibration all share one pack-install gate
+ * since every one of them reads a mart that pack registers. Gated on
+ * `dashboards.write`, the same permission Goals/Segments use for a
+ * project-scoped editable-target admin surface.
  */
 export default async function CampaignOpsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -67,8 +70,9 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
   const installViews = installs.map(toPluginInstallView);
   const paybackPackInstalled = hasActiveInstall(installViews, CAMPAIGN_OPS_PACK_PLUGIN_ID);
 
-  const [paybackOutcome, spendOutcome, calibrationOutcome] = await Promise.all([
+  const [paybackOutcome, campaignPaybackOutcome, spendOutcome, calibrationOutcome] = await Promise.all([
     paybackPackInstalled ? getPaybackOverviewForProject(orgId, projectId) : Promise.resolve(null),
+    paybackPackInstalled ? getCampaignPaybackBreakdownForProject(orgId, projectId) : Promise.resolve(null),
     getCampaignSpendBreakdownForProject(orgId, projectId),
     paybackPackInstalled ? getQualityCalibrationBreakdownForProject(orgId, projectId) : Promise.resolve(null),
   ]);
@@ -97,6 +101,37 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
           </ul>
         )}
       </section>
+
+      {paybackPackInstalled && (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xl font-semibold tracking-tight">{t('campaignPaybackHeading')}</h2>
+          <p className="text-xs text-muted-foreground">{t('campaignPaybackDescription')}</p>
+          {!campaignPaybackOutcome || !campaignPaybackOutcome.ok ? (
+            <p className="text-muted-foreground">{t('campaignPaybackUnavailable')}</p>
+          ) : campaignPaybackOutcome.rows.length === 0 ? (
+            <p className="text-muted-foreground">{t('campaignPaybackEmpty')}</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-input text-left text-xs text-muted-foreground">
+                  <th className="py-2 pe-3 font-medium">{t('columnCampaign')}</th>
+                  <th className="py-2 pe-3 font-medium">{t('columnCollectedRevenue40d')}</th>
+                  <th className="py-2 font-medium">{t('columnRoi40d')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {campaignPaybackOutcome.rows.map((row) => (
+                  <tr key={row.campaignId} className="border-b border-input last:border-0">
+                    <td className="py-2 pe-3 font-medium">{row.campaignId}</td>
+                    <td className="py-2 pe-3 tabular-nums">{row.collectedRevenue40d.toLocaleString(locale)}</td>
+                    <td className="py-2 tabular-nums">{row.roi40d === null ? t('campaignPaybackNoData') : row.roi40d.toLocaleString(locale, { maximumFractionDigits: 2 })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
 
       {paybackPackInstalled && (
         <section className="flex flex-col gap-3">

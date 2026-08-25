@@ -5,28 +5,33 @@ import {
   CAMPAIGN_OPS_PACK_CALIBRATION_AGGREGATION_METRICS,
   CAMPAIGN_OPS_PACK_CALIBRATION_FORMULA_METRICS,
   CAMPAIGN_OPS_PACK_METRICS,
+  CAMPAIGN_OPS_PACK_ROI_FORMULA_METRICS,
 } from './metrics';
 
 const ALL_PACK_METRIC_NAMES = [
   ...CAMPAIGN_OPS_PACK_METRICS,
+  ...CAMPAIGN_OPS_PACK_ROI_FORMULA_METRICS,
   ...CAMPAIGN_OPS_PACK_CALIBRATION_AGGREGATION_METRICS,
   ...CAMPAIGN_OPS_PACK_CALIBRATION_FORMULA_METRICS,
-].map((metric) => metric.name);
+]
+  .map((metric) => metric.name)
+  .filter((name) => name !== 'ad_spend');
 
 describe('CAMPAIGN_OPS_PACK_MANIFEST_YAML', () => {
   it('parses as a valid plugin manifest (the exact registerPluginManifest input path)', () => {
     const manifest = parsePluginManifest(CAMPAIGN_OPS_PACK_MANIFEST_YAML);
     expect(manifest.id).toBe(CAMPAIGN_OPS_PACK_PLUGIN_ID);
     expect(manifest.type).toBe('metric_pack');
-    expect(manifest.scopes).toEqual(['metrics:write']);
+    expect(manifest.scopes).toEqual(['metrics:write', 'schema:write']);
     expect(manifest.configSchema).toEqual({});
     expect(manifest.registers.entities).toEqual([]);
     expect(manifest.registers.events).toEqual([]);
   });
 
-  it('declares registers.metrics as exactly the nine metric names this pack registers, regardless of order', () => {
+  it('declares registers.metrics as every metric this pack defines, except the reused ad_spend (see the manifest\'s own doc comment)', () => {
     const manifest = parsePluginManifest(CAMPAIGN_OPS_PACK_MANIFEST_YAML);
     expect(new Set(manifest.registers.metrics)).toEqual(new Set(ALL_PACK_METRIC_NAMES));
-    expect(manifest.registers.metrics).toHaveLength(9);
+    expect(manifest.registers.metrics).not.toContain('ad_spend');
+    expect(manifest.registers.metrics).toHaveLength(13);
   });
 });
