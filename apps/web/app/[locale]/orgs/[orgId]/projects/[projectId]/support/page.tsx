@@ -7,7 +7,7 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { builtinMetricPacks, getSupportLeaderboardForProject, listOrgPeople, listOrgProjects, listPluginInstallsForProject } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
-import { toSupportLeaderboardView } from '@/lib/orgs/support-view';
+import { formatDurationSeconds, toSupportLeaderboardView } from '@/lib/orgs/support-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 
 type PageProps = Readonly<{
@@ -18,12 +18,6 @@ export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'Support' });
   return { title: t('metaTitle') };
-}
-
-function formatSeconds(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  return `${(seconds / 3600).toFixed(1)}h`;
 }
 
 /**
@@ -86,6 +80,12 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
   const peopleById = new Map(people.map((person) => [person.id, { name: person.name, photoUrl: person.photo_url ?? null }]));
   const leaderboard = toSupportLeaderboardView(leaderboardResult, peopleById);
 
+  const formatDuration = (seconds: number | null): string => {
+    if (seconds === null) return t('rowValueUnavailable');
+    const { value, unitKey } = formatDurationSeconds(seconds);
+    return t(unitKey, { value });
+  };
+
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
@@ -116,8 +116,8 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
                 <span className="text-muted-foreground">
                   {t('rowSummary', {
                     resolved: row.ticketsResolved,
-                    firstResponse: row.avgFirstResponseSeconds === null ? t('rowValueUnavailable') : formatSeconds(row.avgFirstResponseSeconds),
-                    resolution: row.avgResolutionSeconds === null ? t('rowValueUnavailable') : formatSeconds(row.avgResolutionSeconds),
+                    firstResponse: formatDuration(row.avgFirstResponseSeconds),
+                    resolution: formatDuration(row.avgResolutionSeconds),
                     csat: row.avgCsatScore === null ? t('rowValueUnavailable') : row.avgCsatScore.toFixed(1),
                   })}
                 </span>
