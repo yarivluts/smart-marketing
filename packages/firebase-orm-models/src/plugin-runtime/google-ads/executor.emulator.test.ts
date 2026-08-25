@@ -14,6 +14,7 @@ import {
   GoogleAdsAdResourceUnknownError,
   GoogleAdsAutomationActionExecutor,
   GoogleAdsBudgetResourceUnknownError,
+  GoogleAdsAdCreativeEditNotSupportedError,
   GoogleAdsMetaAdSetEditNotSupportedError,
   GoogleAdsWrongPlatformCampaignDraftError,
 } from './executor';
@@ -461,6 +462,38 @@ describe('GoogleAdsAutomationActionExecutor', () => {
         adSetResourceName: 'irrelevant',
       }),
     ).rejects.toBeInstanceOf(GoogleAdsMetaAdSetEditNotSupportedError);
+  });
+
+  it('throws GoogleAdsAdCreativeEditNotSupportedError for executeAdCreativeEdit — Google Ads has no Meta-style creative concept (KAN-73 follow-up)', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await expect(
+      executor.executeAdCreativeEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adResourceName: 'irrelevant',
+        creative: { primaryText: 'Irrelevant.', headline: 'Irrelevant', linkUrl: 'https://example.com' },
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsAdCreativeEditNotSupportedError);
+  });
+
+  it('throws GoogleAdsAdCreativeEditNotSupportedError for rollbackAdCreativeEdit', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await expect(
+      executor.rollbackAdCreativeEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adResourceName: 'irrelevant',
+        previousCreativeResourceName: 'irrelevant-2',
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsAdCreativeEditNotSupportedError);
   });
 
   it('replaces an ad group\'s RSA with a new one, pausing the superseded ad and updating ad_resource_names in place (KAN-72 follow-up)', async () => {

@@ -51,6 +51,8 @@ export interface AutomationTargetView {
   /** Same order as {@link adGroupResourceNames} — `adResourceNames[i]` is the current RSA for `adGroupResourceNames[i]`. See `AutomationTargetStateModel.ad_resource_names`'s own doc comment. */
   adResourceNames?: string[];
   metaAdSetResourceNames?: string[];
+  /** Same order as {@link metaAdSetResourceNames} — `metaAdResourceNames[i]` is the current ad for `metaAdSetResourceNames[i]`. See `AutomationTargetStateModel.meta_ad_resource_names`'s own doc comment. */
+  metaAdResourceNames?: string[];
 }
 
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
@@ -66,6 +68,7 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     ...(target.ad_group_resource_names !== undefined ? { adGroupResourceNames: target.ad_group_resource_names } : {}),
     ...(target.ad_resource_names !== undefined ? { adResourceNames: target.ad_resource_names } : {}),
     ...(target.meta_ad_set_resource_names !== undefined ? { metaAdSetResourceNames: target.meta_ad_set_resource_names } : {}),
+    ...(target.meta_ad_resource_names !== undefined ? { metaAdResourceNames: target.meta_ad_resource_names } : {}),
   };
 }
 

@@ -3,6 +3,9 @@ import { AutomationTargetNotFoundError } from '../../services/automation-errors'
 import {
   validateCampaignDraft,
   type AutomationActionExecutor,
+  type AutomationAdCreativeEditExecutionInput,
+  type AutomationAdCreativeEditExecutionResult,
+  type AutomationAdCreativeEditRollbackInput,
   type AutomationAdEditExecutionInput,
   type AutomationAdEditExecutionResult,
   type AutomationAdEditRollbackInput,
@@ -35,6 +38,23 @@ export class GoogleAdsMetaAdSetEditNotSupportedError extends Error {
   constructor() {
     super('Google Ads has no ad-set concept — a meta_ad_set_edit action is not supported for a Google Ads-linked target.');
     this.name = 'GoogleAdsMetaAdSetEditNotSupportedError';
+  }
+}
+
+/**
+ * An `ad_creative_edit` action (KAN-73 follow-up) reached
+ * `GoogleAdsAutomationActionExecutor` — this action type is defined in terms
+ * of Meta's own single primary-text/headline/description/link creative
+ * shape (`AdCreativeEditContent`), which has no Google Ads equivalent: a
+ * Google Search ad's copy is edited via `ad_edit`'s Responsive Search Ad
+ * shape instead. Mirrors `GoogleAdsMetaAdSetEditNotSupportedError`'s own
+ * "the executor is the one place that knows what a provider can and can't
+ * do" posture, symmetrically.
+ */
+export class GoogleAdsAdCreativeEditNotSupportedError extends Error {
+  constructor() {
+    super('Google Ads has no Meta-style ad creative concept — an ad_creative_edit action is not supported for a Google Ads-linked target. Use ad_edit instead.');
+    this.name = 'GoogleAdsAdCreativeEditNotSupportedError';
   }
 }
 
@@ -306,5 +326,13 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
 
   async rollbackMetaAdSetEdit(_input: AutomationMetaAdSetEditRollbackInput): Promise<void> {
     throw new GoogleAdsMetaAdSetEditNotSupportedError();
+  }
+
+  async executeAdCreativeEdit(_input: AutomationAdCreativeEditExecutionInput): Promise<AutomationAdCreativeEditExecutionResult> {
+    throw new GoogleAdsAdCreativeEditNotSupportedError();
+  }
+
+  async rollbackAdCreativeEdit(_input: AutomationAdCreativeEditRollbackInput): Promise<void> {
+    throw new GoogleAdsAdCreativeEditNotSupportedError();
   }
 }

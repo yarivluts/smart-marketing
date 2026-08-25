@@ -103,24 +103,40 @@ function validateAdSet(adSet: MetaCampaignDraftAdSet, index: number, reasons: st
     reasons.push(`${fieldPath}.ad.creative must be an object.`);
     return;
   }
-  if (typeof creative.primaryText !== 'string' || creative.primaryText.trim().length === 0 || creative.primaryText.length > MAX_PRIMARY_TEXT_LENGTH) {
-    reasons.push(`${fieldPath}.ad.creative.primaryText must be 1-${MAX_PRIMARY_TEXT_LENGTH} characters.`);
+  validateMetaCreativeContent(creative, `${fieldPath}.ad.creative`, reasons);
+}
+
+/**
+ * Validates one Meta link-ad creative's own editable content (primary text,
+ * headline, description, link URL, optional image) against Meta's own
+ * real-world Feed link-ad limits — shared by {@link validateAdSet} (a
+ * brand-new ad set's own creative, nested under `ad.creative`) and
+ * `validateAdCreativeEditActionInput` (`campaign-draft.ts`, an
+ * `ad_creative_edit` action's replacement creative content, same shape one
+ * level up) so the two never drift, mirroring
+ * `validateResponsiveSearchAdContent`'s own reuse posture for Google's RSA
+ * content one file over. `fieldPath` is the caller's own prefix (e.g.
+ * `adSets[0].ad.creative` or just `creative`).
+ */
+export function validateMetaCreativeContent(creative: Record<string, unknown> | undefined, fieldPath: string, reasons: string[]): void {
+  if (typeof creative?.primaryText !== 'string' || creative.primaryText.trim().length === 0 || creative.primaryText.length > MAX_PRIMARY_TEXT_LENGTH) {
+    reasons.push(`${fieldPath}.primaryText must be 1-${MAX_PRIMARY_TEXT_LENGTH} characters.`);
   }
-  if (typeof creative.headline !== 'string' || creative.headline.trim().length === 0 || creative.headline.length > MAX_HEADLINE_LENGTH) {
-    reasons.push(`${fieldPath}.ad.creative.headline must be 1-${MAX_HEADLINE_LENGTH} characters.`);
+  if (typeof creative?.headline !== 'string' || creative.headline.trim().length === 0 || creative.headline.length > MAX_HEADLINE_LENGTH) {
+    reasons.push(`${fieldPath}.headline must be 1-${MAX_HEADLINE_LENGTH} characters.`);
   }
-  if (creative.description !== undefined) {
+  if (creative?.description !== undefined) {
     if (typeof creative.description !== 'string' || creative.description.length > MAX_DESCRIPTION_LENGTH) {
-      reasons.push(`${fieldPath}.ad.creative.description must be at most ${MAX_DESCRIPTION_LENGTH} characters when present.`);
+      reasons.push(`${fieldPath}.description must be at most ${MAX_DESCRIPTION_LENGTH} characters when present.`);
     }
   }
-  if (typeof creative.linkUrl !== 'string' || creative.linkUrl.length === 0 || !isHttpUrl(creative.linkUrl)) {
-    reasons.push(`${fieldPath}.ad.creative.linkUrl must be a valid http(s) URL.`);
+  if (typeof creative?.linkUrl !== 'string' || creative.linkUrl.length === 0 || !isHttpUrl(creative.linkUrl)) {
+    reasons.push(`${fieldPath}.linkUrl must be a valid http(s) URL.`);
   }
-  if (creative.imageDataUrl !== undefined) {
+  if (creative?.imageDataUrl !== undefined) {
     if (typeof creative.imageDataUrl !== 'string' || creative.imageDataUrl.length > MAX_IMAGE_DATA_URL_LENGTH || !IMAGE_DATA_URL_PATTERN.test(creative.imageDataUrl)) {
       reasons.push(
-        `${fieldPath}.ad.creative.imageDataUrl must be a base64 data:image/(png|jpeg) URL of at most ${MAX_IMAGE_DATA_URL_LENGTH} characters when present.`,
+        `${fieldPath}.imageDataUrl must be a base64 data:image/(png|jpeg) URL of at most ${MAX_IMAGE_DATA_URL_LENGTH} characters when present.`,
       );
     }
   }

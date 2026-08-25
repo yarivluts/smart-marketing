@@ -100,6 +100,17 @@ export interface MetaCreateAdResult {
   adId: string;
 }
 
+/** An ad's own live creative reference, as reported by Meta (KAN-73 follow-up: `ad_creative_edit`). */
+export interface MetaGetAdResult {
+  adId: string;
+  creativeId: string;
+}
+
+/** Points an already-created ad at a different (already-created) `AdCreative` object. */
+export interface MetaUpdateAdParams {
+  creativeId: string;
+}
+
 export interface MetaCreateCustomAudienceParams {
   name: string;
 }
@@ -190,6 +201,27 @@ export interface MetaAdsApiClient {
    * touches both at once.
    */
   updateAdSet(adSetId: string, params: MetaUpdateAdSetParams): Promise<void>;
+  /**
+   * Reads an ad's own live creative reference (KAN-73 follow-up:
+   * `ad_creative_edit`) — `MetaAutomationActionExecutor.executeAdCreativeEdit`
+   * calls this immediately before applying an edit, since
+   * `AutomationTargetStateModel` has no per-ad creative field to source the
+   * pre-edit value from (same reasoning `getAdSet` documents for its own
+   * pre-edit budget/status). Throws `MetaAdsApiError` if `adId` doesn't
+   * resolve to a real ad.
+   */
+  getAd(adId: string): Promise<MetaGetAdResult>;
+  /**
+   * Points an already-created ad at a different, already-created creative
+   * (KAN-73 follow-up: `ad_creative_edit`) — Meta's `AdCreative` object is
+   * immutable once created (no endpoint edits an existing creative's own
+   * `object_story_spec` fields), so "editing" an ad's copy means creating a
+   * brand-new creative (`createAdCreative`) and then repointing the same ad
+   * at it via this call, rather than creating a whole new ad the way
+   * Google's `ad_edit` does — see `AutomationAdCreativeEditExecutionInput`'s
+   * own doc comment for why this is a genuinely different shape.
+   */
+  updateAd(adId: string, params: MetaUpdateAdParams): Promise<void>;
   /**
    * Creates a `CUSTOM`-subtype, user-provided-data Custom Audience on the ad
    * account (KAN-73 follow-up — see `plugin-runtime/meta-custom-audience`'s
@@ -372,6 +404,18 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       body.status = params.status;
     }
     await this.request<{ success?: boolean }>(adSetId, body);
+  }
+
+  async getAd(adId: string): Promise<MetaGetAdResult> {
+    const result = await this.getRequest<{ id: string; creative?: { id: string } }>(adId, { fields: 'id,creative' });
+    if (!result.creative?.id) {
+      throw new MetaAdsApiError(`Meta Graph API request to ${adId} returned no creative.`, 200);
+    }
+    return { adId: result.id, creativeId: result.creative.id };
+  }
+
+  async updateAd(adId: string, params: MetaUpdateAdParams): Promise<void> {
+    await this.request<{ success?: boolean }>(adId, { creative: JSON.stringify({ creative_id: params.creativeId }) });
   }
 
   async createCustomAudience(adAccountId: string, params: MetaCreateCustomAudienceParams): Promise<MetaCreateCustomAudienceResult> {

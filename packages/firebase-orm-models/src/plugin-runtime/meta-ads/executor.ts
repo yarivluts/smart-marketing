@@ -3,6 +3,9 @@ import { AutomationTargetNotFoundError } from '../../services/automation-errors'
 import {
   validateCampaignDraft,
   type AutomationActionExecutor,
+  type AutomationAdCreativeEditExecutionInput,
+  type AutomationAdCreativeEditExecutionResult,
+  type AutomationAdCreativeEditRollbackInput,
   type AutomationAdEditExecutionInput,
   type AutomationAdEditExecutionResult,
   type AutomationAdEditRollbackInput,
@@ -101,6 +104,14 @@ export class MetaAdSetNotOwnedByTargetError extends Error {
   constructor(targetId: string, adSetResourceName: string) {
     super(`Ad set "${adSetResourceName}" is not one of automation target "${targetId}"'s own ad sets (created by a campaign_draft_create action).`);
     this.name = 'MetaAdSetNotOwnedByTargetError';
+  }
+}
+
+/** An `ad_creative_edit` action was proposed/executed against an `adResourceName` that isn't one of the target's own ads (`AutomationTargetStateModel.meta_ad_resource_names`) — the Meta counterpart to {@link MetaAdSetNotOwnedByTargetError}, same "both the service and the executor enforce it" posture. */
+export class MetaAdNotOwnedByTargetError extends Error {
+  constructor(targetId: string, adResourceName: string) {
+    super(`Ad "${adResourceName}" is not one of automation target "${targetId}"'s own ads (created by a campaign_draft_create action).`);
+    this.name = 'MetaAdNotOwnedByTargetError';
   }
 }
 
@@ -220,6 +231,7 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     // atomic batch — see this class's own doc comment and `MetaAdsHttpApiClient`'s
     // for why.
     const metaAdSetResourceNames: string[] = [];
+    const metaAdResourceNames: string[] = [];
     for (const adSet of draft.adSets) {
       const adSetResult = await this.apiClient.createAdSet(this.adAccountId, {
         campaignId: campaign.campaignId,
@@ -238,11 +250,12 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
         linkUrl: adSet.ad.creative.linkUrl,
         ...(imageHash ? { imageHash } : {}),
       });
-      await this.apiClient.createAd(this.adAccountId, {
+      const adResult = await this.apiClient.createAd(this.adAccountId, {
         adSetId: adSetResult.adSetId,
         creativeId: creativeResult.creativeId,
         name: adSet.ad.name,
       });
+      metaAdResourceNames.push(adResult.adId);
     }
 
     target.campaign_resource_name = campaign.campaignId;
@@ -250,6 +263,7 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     target.campaign_status = 'paused';
     target.daily_budget_usd = draft.dailyBudgetUsd;
     target.meta_ad_set_resource_names = metaAdSetResourceNames;
+    target.meta_ad_resource_names = metaAdResourceNames;
     target.updated_at = new Date().toISOString();
     await target.save();
     return { campaignResourceName: campaign.campaignId };
@@ -341,6 +355,53 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     if (Object.keys(updateParams).length > 0) {
       await this.apiClient.updateAdSet(input.adSetResourceName, updateParams);
     }
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  /**
+   * Replaces an already-created Meta ad's creative (primary text/headline/
+   * description/link/image) — see `AutomationAdCreativeEditExecutionInput`'s
+   * own doc comment for why this creates a brand-new `AdCreative` and
+   * repoints the *same* ad at it (`this.apiClient.updateAd`), rather than
+   * creating a whole new ad the way Google's `executeAdEdit` does. Unlike
+   * that method, a retried `executeAdCreativeEdit` (transient failure after
+   * `createAdCreative` already succeeded) leaves at most a harmless unused
+   * orphaned creative object, never a duplicate *ad* an advertiser could see
+   * — Meta creative objects are inert until an ad references them — so no
+   * instance-level retry cache is needed here the way
+   * `GoogleAdsAutomationActionExecutor.pendingAdEditResourceName` guards its
+   * own live-orphaned-ad risk.
+   */
+  async executeAdCreativeEdit(input: AutomationAdCreativeEditExecutionInput): Promise<AutomationAdCreativeEditExecutionResult> {
+    const target = await loadTarget(input);
+    if (!target.meta_ad_resource_names?.includes(input.adResourceName)) {
+      throw new MetaAdNotOwnedByTargetError(target.id, input.adResourceName);
+    }
+
+    const current = await this.apiClient.getAd(input.adResourceName);
+    const imageHash = input.creative.imageDataUrl
+      ? (await this.apiClient.uploadAdImage(this.adAccountId, { base64Bytes: parseImageDataUrlBase64(input.creative.imageDataUrl) })).imageHash
+      : undefined;
+    const creativeResult = await this.apiClient.createAdCreative(this.adAccountId, {
+      pageId: this.pageId,
+      primaryText: input.creative.primaryText,
+      headline: input.creative.headline,
+      ...(input.creative.description !== undefined ? { description: input.creative.description } : {}),
+      linkUrl: input.creative.linkUrl,
+      ...(imageHash ? { imageHash } : {}),
+    });
+    await this.apiClient.updateAd(input.adResourceName, { creativeId: creativeResult.creativeId });
+
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return { newCreativeResourceName: creativeResult.creativeId, previousCreativeResourceName: current.creativeId };
+  }
+
+  /** Repoints the ad back at its pre-edit creative id `executeAdCreativeEdit` captured — no ownership re-check needed, same posture `rollbackMetaAdSetEdit` establishes for `meta_ad_set_edit`. */
+  async rollbackAdCreativeEdit(input: AutomationAdCreativeEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    await this.apiClient.updateAd(input.adResourceName, { creativeId: input.previousCreativeResourceName });
     target.updated_at = new Date().toISOString();
     await target.save();
   }

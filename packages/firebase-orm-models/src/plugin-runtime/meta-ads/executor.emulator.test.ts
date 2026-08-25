@@ -12,6 +12,7 @@ import { connectToFirestoreEmulator } from '../../test-utils/emulator';
 import { MetaAdsApiError, type MetaAdsApiClient } from './api-client';
 import {
   MetaAdEditNotSupportedError,
+  MetaAdNotOwnedByTargetError,
   MetaAdSetNotOwnedByTargetError,
   MetaAdsBudgetResourceUnknownError,
   MetaAdsWrongPlatformCampaignDraftError,
@@ -49,6 +50,8 @@ function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiCli
     getCampaign: vi.fn().mockRejectedValue(new MetaAdsApiError('No campaign found.', 404)),
     getAdSet: vi.fn().mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE' }),
     updateAdSet: vi.fn().mockResolvedValue(undefined),
+    getAd: vi.fn().mockResolvedValue({ adId: 'ad-1', creativeId: 'creative-1' }),
+    updateAd: vi.fn().mockResolvedValue(undefined),
     createCustomAudience: vi.fn().mockResolvedValue({ audienceId: 'audience-1' }),
     addContactsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 0 }),
     uploadAdImage: vi.fn().mockResolvedValue({ imageHash: 'image-hash-1' }),
@@ -126,6 +129,7 @@ describe('MetaAutomationActionExecutor', () => {
     expect(reloaded.campaign_status).toBe('paused');
     expect(reloaded.daily_budget_usd).toBe(25);
     expect(reloaded.meta_ad_set_resource_names).toEqual(['adset-1']);
+    expect(reloaded.meta_ad_resource_names).toEqual(['ad-1']);
   });
 
   it('uploads a creative image before creating the ad creative when imageDataUrl is present, and skips the upload when absent', async () => {
@@ -556,6 +560,114 @@ describe('MetaAutomationActionExecutor', () => {
       ).rejects.toBeInstanceOf(MetaAdSetNotOwnedByTargetError);
       expect(apiClient.getAdSet).not.toHaveBeenCalled();
       expect(apiClient.updateAdSet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('executeAdCreativeEdit / rollbackAdCreativeEdit (KAN-73 follow-up)', () => {
+    async function seedTargetWithAd(organizationId: string, projectId: string, ownerId: string, apiClient: MetaAdsApiClient) {
+      const target = await ensureAutomationTargetSeeded({
+        organizationId,
+        projectId,
+        environmentId: 'live',
+        targetId: unique('campaign'),
+        targetType: 'campaign',
+        label: 'Ad Creative Edit Target',
+        initialDailyBudgetUsd: 0,
+        seededByUserId: ownerId,
+      });
+      const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+      await executor.executeCampaignDraftCreate({ organizationId, projectId, environmentId: 'live', targetId: target.id, draft: DRAFT });
+      const [reloaded] = await listAutomationTargetStatesForProject(organizationId, projectId);
+      return { target: reloaded, executor };
+    }
+
+    const NEW_CREATIVE = { primaryText: 'Even bigger savings.', headline: 'Blue Widgets Mega Sale', linkUrl: 'https://example.com/mega-sale' };
+
+    it("replaces the ad's creative, reading the real pre-edit creative id live and returning both ids", async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Creative Edit Org');
+      const apiClient = fakeApiClient({
+        getAd: vi.fn().mockResolvedValue({ adId: 'ad-1', creativeId: 'creative-original' }),
+        createAdCreative: vi.fn().mockResolvedValue({ creativeId: 'creative-new' }),
+      });
+      const { target, executor } = await seedTargetWithAd(organization.id, project.id, owner.id, apiClient);
+
+      const result = await executor.executeAdCreativeEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adResourceName: 'ad-1',
+        creative: NEW_CREATIVE,
+      });
+
+      expect(result).toEqual({ newCreativeResourceName: 'creative-new', previousCreativeResourceName: 'creative-original' });
+      expect(apiClient.getAd).toHaveBeenCalledWith('ad-1');
+      expect(apiClient.createAdCreative).toHaveBeenCalledWith('999', {
+        pageId: 'page-1',
+        primaryText: 'Even bigger savings.',
+        headline: 'Blue Widgets Mega Sale',
+        linkUrl: 'https://example.com/mega-sale',
+      });
+      expect(apiClient.updateAd).toHaveBeenCalledWith('ad-1', { creativeId: 'creative-new' });
+      expect(apiClient.uploadAdImage).not.toHaveBeenCalled();
+    });
+
+    it('uploads a replacement image before creating the new creative when imageDataUrl is present', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Creative Edit Image Org');
+      const apiClient = fakeApiClient({
+        createAdCreative: vi.fn().mockResolvedValue({ creativeId: 'creative-new' }),
+        uploadAdImage: vi.fn().mockResolvedValue({ imageHash: 'image-hash-new' }),
+      });
+      const { target, executor } = await seedTargetWithAd(organization.id, project.id, owner.id, apiClient);
+
+      await executor.executeAdCreativeEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adResourceName: 'ad-1',
+        creative: { ...NEW_CREATIVE, imageDataUrl: 'data:image/png;base64,aGVsbG8=' },
+      });
+
+      expect(apiClient.uploadAdImage).toHaveBeenCalledWith('999', { base64Bytes: 'aGVsbG8=' });
+      expect(apiClient.createAdCreative).toHaveBeenCalledWith('999', expect.objectContaining({ imageHash: 'image-hash-new' }));
+    });
+
+    it('rolls back an ad creative edit by repointing the ad at the captured pre-edit creative id', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Creative Edit Rollback Org');
+      const apiClient = fakeApiClient();
+      const { target, executor } = await seedTargetWithAd(organization.id, project.id, owner.id, apiClient);
+
+      await executor.rollbackAdCreativeEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adResourceName: 'ad-1',
+        previousCreativeResourceName: 'creative-original',
+      });
+
+      expect(apiClient.updateAd).toHaveBeenCalledWith('ad-1', { creativeId: 'creative-original' });
+    });
+
+    it("throws MetaAdNotOwnedByTargetError for an ad that is not one of this target's own ads", async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Wrong Ad Org');
+      const apiClient = fakeApiClient();
+      const { target, executor } = await seedTargetWithAd(organization.id, project.id, owner.id, apiClient);
+
+      await expect(
+        executor.executeAdCreativeEdit({
+          organizationId: organization.id,
+          projectId: project.id,
+          environmentId: 'live',
+          targetId: target.id,
+          adResourceName: 'act_999/ads/not-this-targets',
+          creative: NEW_CREATIVE,
+        }),
+      ).rejects.toBeInstanceOf(MetaAdNotOwnedByTargetError);
+      expect(apiClient.getAd).not.toHaveBeenCalled();
+      expect(apiClient.createAdCreative).not.toHaveBeenCalled();
+      expect(apiClient.updateAd).not.toHaveBeenCalled();
     });
   });
 

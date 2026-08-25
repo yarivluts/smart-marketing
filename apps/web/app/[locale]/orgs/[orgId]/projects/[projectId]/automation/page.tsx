@@ -27,6 +27,7 @@ import { AutomationProposeCampaignDraftForm } from '@/components/orgs/automation
 import { AutomationProposeKeywordEditForm } from '@/components/orgs/automation-propose-keyword-edit-form';
 import { AutomationProposeAdEditForm } from '@/components/orgs/automation-propose-ad-edit-form';
 import { AutomationProposeMetaAdSetEditForm } from '@/components/orgs/automation-propose-meta-ad-set-edit-form';
+import { AutomationProposeAdCreativeEditForm } from '@/components/orgs/automation-propose-ad-creative-edit-form';
 import { AutomationActivateCampaignButton } from '@/components/orgs/automation-activate-campaign-button';
 import { AutomationActionList } from '@/components/orgs/automation-action-list';
 
@@ -169,6 +170,15 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
           orgId={orgId}
           projectId={projectId}
           targets={targetViews.filter((target) => (target.metaAdSetResourceNames?.length ?? 0) > 0)}
+        />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('proposeAdCreativeEditHeading')}</h2>
+        <AutomationProposeAdCreativeEditForm
+          orgId={orgId}
+          projectId={projectId}
+          targets={targetViews.filter((target) => (target.metaAdResourceNames?.length ?? 0) > 0)}
         />
       </section>
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CampaignDraft, CampaignDraftKeyword, GoogleAdsCampaignDraft } from './executor';
-import { InvalidCampaignDraftError, validateAdEditActionInput, validateCampaignDraft, validateKeywordEditActionInput } from './campaign-draft';
+import { InvalidCampaignDraftError, validateAdCreativeEditActionInput, validateAdEditActionInput, validateCampaignDraft, validateKeywordEditActionInput } from './campaign-draft';
 
 function validDraft(overrides: Partial<GoogleAdsCampaignDraft> = {}): GoogleAdsCampaignDraft {
   return {
@@ -268,5 +268,56 @@ describe('validateAdEditActionInput (KAN-72 follow-up)', () => {
 
   it('rejects a non-object input without throwing an unhandled error', () => {
     expect(() => validateAdEditActionInput(null as unknown as { previousAdResourceName: unknown; responsiveSearchAd: unknown })).toThrow(InvalidCampaignDraftError);
+  });
+});
+
+function validCreative(overrides: Partial<{ primaryText: string; headline: string; description?: string; linkUrl: string }> = {}) {
+  return {
+    primaryText: 'Big summer savings.',
+    headline: 'Blue Widgets Sale',
+    linkUrl: 'https://example.com/widgets',
+    ...overrides,
+  };
+}
+
+describe('validateAdCreativeEditActionInput (KAN-73 follow-up)', () => {
+  it('accepts a well-formed ad creative edit', () => {
+    expect(() => validateAdCreativeEditActionInput({ adResourceName: 'act_999/ads/1', creative: validCreative() })).not.toThrow();
+  });
+
+  it('accepts a creative with an optional description', () => {
+    expect(() =>
+      validateAdCreativeEditActionInput({ adResourceName: 'act_999/ads/1', creative: validCreative({ description: 'Now 30% off.' }) }),
+    ).not.toThrow();
+  });
+
+  it('rejects a blank adResourceName', () => {
+    expect(() => validateAdCreativeEditActionInput({ adResourceName: '  ', creative: validCreative() })).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a missing creative', () => {
+    expect(() => validateAdCreativeEditActionInput({ adResourceName: 'act_999/ads/1', creative: undefined })).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an empty primaryText', () => {
+    expect(() =>
+      validateAdCreativeEditActionInput({ adResourceName: 'act_999/ads/1', creative: validCreative({ primaryText: '' }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an empty headline', () => {
+    expect(() =>
+      validateAdCreativeEditActionInput({ adResourceName: 'act_999/ads/1', creative: validCreative({ headline: '' }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an invalid link URL', () => {
+    expect(() =>
+      validateAdCreativeEditActionInput({ adResourceName: 'act_999/ads/1', creative: validCreative({ linkUrl: 'not-a-url' }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a non-object input without throwing an unhandled error', () => {
+    expect(() => validateAdCreativeEditActionInput(null as unknown as { adResourceName: unknown; creative: unknown })).toThrow(InvalidCampaignDraftError);
   });
 });

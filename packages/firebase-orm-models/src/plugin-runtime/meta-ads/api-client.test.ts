@@ -286,6 +286,50 @@ describe('MetaAdsHttpApiClient', () => {
     await expect(new MetaAdsHttpApiClient(OPTIONS).updateAdSet('adset-1', { status: 'PAUSED' })).rejects.toBeInstanceOf(MetaAdsApiError);
   });
 
+  it("fetches an ad by id via a GET request, including its creative id (KAN-73 follow-up)", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'ad-1', creative: { id: 'creative-1' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).getAd('ad-1');
+
+    expect(result).toEqual({ adId: 'ad-1', creativeId: 'creative-1' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe('GET');
+    const parsedUrl = new URL(url);
+    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v21.0/ad-1');
+    expect(parsedUrl.searchParams.get('fields')).toBe('id,creative');
+  });
+
+  it('throws MetaAdsApiError when getAd returns no creative', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ id: 'ad-1' })));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).getAd('ad-1')).rejects.toBeInstanceOf(MetaAdsApiError);
+  });
+
+  it('throws MetaAdsApiError with the response status when the ad lookup fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'not found' }, false, 404)));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).getAd('missing-ad')).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('points an ad at a different creative via a JSON-encoded creative_id field', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).updateAd('ad-1', { creativeId: 'creative-new' });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://graph.facebook.com/v21.0/ad-1');
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get('creative')).toBe(JSON.stringify({ creative_id: 'creative-new' }));
+  });
+
+  it('throws MetaAdsApiError with the response status when updateAd fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'nope' }, false, 400)));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).updateAd('ad-1', { creativeId: 'creative-new' })).rejects.toBeInstanceOf(MetaAdsApiError);
+  });
+
   it('creates a CUSTOM, user-provided-data Custom Audience', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'audience-1' }));
     vi.stubGlobal('fetch', fetchMock);

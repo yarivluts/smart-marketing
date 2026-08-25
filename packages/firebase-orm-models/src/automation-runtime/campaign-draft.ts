@@ -1,6 +1,6 @@
 import type { CampaignDraft, CampaignDraftAdGroup, CampaignDraftKeyword, GoogleAdsCampaignDraft, MetaCampaignDraft } from './executor';
 import { InvalidCampaignDraftError } from './invalid-campaign-draft-error';
-import { validateMetaCampaignDraft } from './meta-campaign-draft';
+import { validateMetaCampaignDraft, validateMetaCreativeContent } from './meta-campaign-draft';
 
 export { InvalidCampaignDraftError };
 
@@ -288,6 +288,41 @@ export function validateMetaAdSetEditActionInput(input: {
 
   if (input.dailyBudgetUsd === undefined && input.status === undefined) {
     reasons.push('at least one of dailyBudgetUsd/status must be set.');
+  }
+
+  if (reasons.length > 0) {
+    throw new InvalidCampaignDraftError(reasons);
+  }
+}
+
+/**
+ * Validates an `ad_creative_edit` action's proposed input (KAN-73
+ * follow-up) — an `adResourceName` plus the replacement creative content.
+ * Reuses {@link validateMetaCreativeContent}'s own primary-text/headline/
+ * description/link/image checks so a replacement creative is held to the
+ * exact same shape a `campaign_draft_create` ad set's own `ad.creative` is —
+ * mirroring `validateAdEditActionInput`'s own reuse of
+ * `validateResponsiveSearchAdContent` for Google's sibling action type.
+ * Tolerates a malformed/untrusted-cast request body the same way
+ * `validateAdEditActionInput` does — the `ad-creative-edits` route casts an
+ * arbitrary JSON body to this shape before calling in.
+ */
+export function validateAdCreativeEditActionInput(input: { adResourceName: unknown; creative: unknown }): void {
+  if (!isRecord(input)) {
+    throw new InvalidCampaignDraftError(['input must be an object.']);
+  }
+
+  const reasons: string[] = [];
+
+  if (typeof input.adResourceName !== 'string' || input.adResourceName.trim().length === 0) {
+    reasons.push('adResourceName must be a non-empty string.');
+  }
+
+  const creative = isRecord(input.creative) ? input.creative : undefined;
+  if (!creative) {
+    reasons.push('creative must be an object.');
+  } else {
+    validateMetaCreativeContent(creative, 'creative', reasons);
   }
 
   if (reasons.length > 0) {
