@@ -226,8 +226,10 @@ describe('CreateSegmentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add event filter' }));
     expect(screen.getAllByLabelText('Event filter field')).toHaveLength(2);
 
-    // The top-level filter row's "Remove" is first in DOM order; the two nested
-    // event-filter rows' "Remove" buttons come after it.
+    // DOM order: the top-level filter row's own "Remove", then the event
+    // condition row's own "Remove", then each nested event-filter row's
+    // "Remove" — the last one removes the second (most recently added)
+    // nested filter row.
     const removeButtons = screen.getAllByRole('button', { name: 'Remove' });
     fireEvent.click(removeButtons[removeButtons.length - 1]);
     expect(screen.getAllByLabelText('Event filter field')).toHaveLength(1);
