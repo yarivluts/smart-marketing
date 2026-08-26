@@ -125,6 +125,20 @@ export interface MetaAddHashedEmailsResult {
   numReceived: number;
 }
 
+export interface MetaCreateLookalikeAudienceParams {
+  name: string;
+  /** The already-created Custom Audience id this Lookalike is expanded from — Meta requires the origin audience to already have members before a Lookalike can be built from it. */
+  originAudienceId: string;
+  /** ISO-3166 alpha-2 country code — Meta's own Lookalike Audience API targets exactly one country per audience. */
+  country: string;
+  /** Similarity ratio, 0.01-0.20 (1%-20% of the target country's population) — Meta's own documented range and increment for `lookalike_spec.ratio`. */
+  ratio: number;
+}
+
+export interface MetaCreateLookalikeAudienceResult {
+  audienceId: string;
+}
+
 /**
  * One contact's already-hashed Custom Audience match key(s) — `emailHash`
  * and/or `phoneHash`, matching Meta's own multi-key `users` upload schema
@@ -238,6 +252,13 @@ export interface MetaAdsApiClient {
    * email address or phone number.
    */
   addContactsToCustomAudience(audienceId: string, contacts: readonly MetaContactMatchKey[]): Promise<MetaAddHashedEmailsResult>;
+  /**
+   * Creates a `LOOKALIKE`-subtype Custom Audience seeded from an already-created
+   * Custom Audience (KAN-73 follow-up — see `meta-lookalike-audience.model.ts`'s
+   * own doc comment). Meta expands `originAudienceId`'s membership into a new
+   * audience of similar people within `country`, sized by `ratio`.
+   */
+  createLookalikeAudience(adAccountId: string, params: MetaCreateLookalikeAudienceParams): Promise<MetaCreateLookalikeAudienceResult>;
 }
 
 const META_API_VERSION = 'v21.0';
@@ -486,6 +507,16 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       payload: JSON.stringify({ schema, data }),
     });
     return { numReceived: result.num_received ?? contacts.length };
+  }
+
+  async createLookalikeAudience(adAccountId: string, params: MetaCreateLookalikeAudienceParams): Promise<MetaCreateLookalikeAudienceResult> {
+    const result = await this.request<{ id: string }>(`act_${adAccountId}/customaudiences`, {
+      name: params.name,
+      subtype: 'LOOKALIKE',
+      origin_audience_id: params.originAudienceId,
+      lookalike_spec: JSON.stringify({ type: 'similarity', country: params.country, ratio: params.ratio }),
+    });
+    return { audienceId: result.id };
   }
 }
 

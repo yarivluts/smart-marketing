@@ -1,12 +1,14 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { META_CUSTOM_AUDIENCE_PLUGIN_ID } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   builtinMetricPacks,
   listEnvironmentsForProject,
+  listMetaLookalikeAudiencesForInstall,
   listOrgProjects,
   listPluginInstallsForProject,
   listPluginManifestsForOrg,
@@ -21,8 +23,10 @@ import {
   toPluginManifestView,
   toSourcePluginRunView,
 } from '@/lib/orgs/plugin-view';
+import { toMetaLookalikeAudienceView } from '@/lib/orgs/crm-sync-view';
 import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
 import { InstallPluginForm } from '@/components/orgs/install-plugin-form';
+import { MetaLookalikeAudienceControls } from '@/components/orgs/meta-lookalike-audience-controls';
 import { PluginHealthSummary } from '@/components/orgs/plugin-health-summary';
 import { PluginInstallList } from '@/components/orgs/plugin-install-list';
 import { TriggerSourcePluginRunButton } from '@/components/orgs/trigger-source-plugin-run-button';
@@ -96,6 +100,18 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
     ),
   );
   const environmentOptions = environments.map((environment) => ({ id: environment.id, name: environment.name }));
+
+  // The Meta Custom Audience install(s) currently active in this project — a Lookalike Audience
+  // (KAN-73 follow-up) is created from this connector's own already-synced seed audience, not any
+  // action-type plugin, so this is scoped narrower than `listActionPluginInstallsForProject`.
+  const activeMetaCustomAudienceInstalls = installViews.filter((install) => install.status === 'installed' && install.pluginId === META_CUSTOM_AUDIENCE_PLUGIN_ID);
+  const lookalikeAudiencesByInstallId = new Map(
+    await Promise.all(
+      activeMetaCustomAudienceInstalls.map(
+        async (install) => [install.id, (await listMetaLookalikeAudiencesForInstall(orgId, projectId, install.id)).map(toMetaLookalikeAudienceView)] as const,
+      ),
+    ),
+  );
 
   const t = await getTranslations('ProjectPlugins');
 
@@ -177,6 +193,24 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
               </div>
             );
           })}
+        </section>
+      ) : null}
+
+      {activeMetaCustomAudienceInstalls.length > 0 ? (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold">{t('lookalikeHeading')}</h2>
+          {activeMetaCustomAudienceInstalls.map((install) => (
+            <div key={install.id} className="flex flex-col gap-3 rounded-md border border-input px-3 py-3 text-sm">
+              <span className="font-medium">{t('installLine', { pluginId: install.pluginId, version: install.version })}</span>
+              <MetaLookalikeAudienceControls
+                orgId={orgId}
+                projectId={projectId}
+                installId={install.id}
+                hasSeedAudience={install.sinkExternalRef !== null}
+                audiences={lookalikeAudiencesByInstallId.get(install.id) ?? []}
+              />
+            </div>
+          ))}
         </section>
       ) : null}
     </main>

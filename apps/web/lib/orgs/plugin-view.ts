@@ -75,6 +75,8 @@ export interface PluginInstallView {
   disabledAt: string | null;
   enabledAt: string | null;
   uninstalledAt: string | null;
+  /** The connector-created external resource id a first sync cached (KAN-81/KAN-73 follow-up) — e.g. a Meta Custom Audience id — or `null` before this install has ever synced. Only meaningful for the one connector that sets it (see `PluginInstallModel.sink_external_ref`'s own doc comment); the Plugins page uses this to gate the Lookalike Audience section on a Meta Custom Audience install already having a seed audience. */
+  sinkExternalRef: string | null;
 }
 
 export function toPluginInstallView(install: PluginInstallModel): PluginInstallView {
@@ -89,6 +91,7 @@ export function toPluginInstallView(install: PluginInstallModel): PluginInstallV
     disabledAt: install.disabled_at ?? null,
     enabledAt: install.enabled_at ?? null,
     uninstalledAt: install.uninstalled_at ?? null,
+    sinkExternalRef: install.sink_external_ref ?? null,
   };
 }
 

@@ -995,7 +995,20 @@
     "builtinPackSalesTitle": "צינור מכירות",
     "builtinPackSalesDescription": "קביעת הדגמות, שיעור הגעה, ופילוח לפי נציג.",
     "builtinPackCampaignOpsTitle": "תפעול קמפיינים",
-    "builtinPackCampaignOpsDescription": "החזר השקעה בחלון זמן קבוע (גביית הכנסות ל-7/14/30/40 יום) עבור לקוחות לפי מועד הרכישה."
+    "builtinPackCampaignOpsDescription": "החזר השקעה בחלון זמן קבוע (גביית הכנסות ל-7/14/30/40 יום) עבור לקוחות לפי מועד הרכישה.",
+    "lookalikeHeading": "קהלים דומים (Lookalike)",
+    "lookalikeIntro": "יצירת קהל Lookalike במטא, המבוסס על קהל מותאם אישית (Custom Audience) שכבר נוצר עבור התקנה זו.",
+    "lookalikeNoSeedAudience": "יש לסנכרן פילוח להתקנה זו לפחות פעם אחת קודם - קהל Lookalike דורש קהל מותאם אישית קיים להרחבה ממנו.",
+    "lookalikeNameLabel": "שם",
+    "lookalikeCountryLabel": "מדינה",
+    "lookalikeCountryHint": "קוד מדינה בן שתי אותיות לפי תקן ISO-3166, לדוגמה \"US\".",
+    "lookalikeRatioLabel": "דמיון (%)",
+    "lookalikeRatioHint": "1-20 אחוזים מאוכלוסיית מדינת היעד.",
+    "lookalikeCreateButton": "יצירת קהל Lookalike",
+    "lookalikeCreateError": "לא ניתן היה ליצור את קהל ה-Lookalike. נסו שוב.",
+    "lookalikeListHeading": "קהלי Lookalike שנוצרו",
+    "lookalikeListEmpty": "טרם נוצרו קהלי Lookalike.",
+    "lookalikeListItem": "{name} · {ratio}% · {country} · נוצר {createdAt}"
   },
   "Boards": {
     "metaTitle": "לוחות מחוונים",

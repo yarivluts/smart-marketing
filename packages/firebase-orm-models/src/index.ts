@@ -91,6 +91,7 @@ export * from './models/plugin-manifest.model';
 export * from './models/plugin-install.model';
 export * from './models/plugin-source-run.model';
 export * from './models/plugin-sink-run.model';
+export * from './models/meta-lookalike-audience.model';
 export * from './models/board.model';
 export * from './models/goal.model';
 export * from './models/campaign-target.model';

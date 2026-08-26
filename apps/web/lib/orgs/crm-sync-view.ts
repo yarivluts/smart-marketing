@@ -1,4 +1,4 @@
-import type { PluginInstallModel, PluginSinkRunModel, PluginSinkRunStatus } from '@growthos/firebase-orm-models';
+import type { MetaLookalikeAudienceModel, PluginInstallModel, PluginSinkRunModel, PluginSinkRunStatus } from '@growthos/firebase-orm-models';
 
 /** One action-type plugin install, as offered by the Segments page's "Sync to CRM" picker — never the full `@arbel/firebase-orm` model instance. */
 export interface ActionPluginInstallOptionView {
@@ -33,5 +33,28 @@ export function toCrmSyncRunView(run: PluginSinkRunModel): CrmSyncRunView {
     recordsAttempted: run.records_attempted,
     recordsPushed: run.records_pushed ?? null,
     errorMessage: run.error_message ?? null,
+  };
+}
+
+/** One Meta Lookalike Audience created from a Meta Custom Audience install's own seed audience (KAN-73 follow-up), as shown on the project Plugins page. */
+export interface MetaLookalikeAudienceView {
+  id: string;
+  audienceId: string;
+  name: string;
+  originAudienceId: string;
+  country: string;
+  ratio: number;
+  createdAt: string;
+}
+
+export function toMetaLookalikeAudienceView(audience: MetaLookalikeAudienceModel): MetaLookalikeAudienceView {
+  return {
+    id: audience.id,
+    audienceId: audience.audience_id,
+    name: audience.name,
+    originAudienceId: audience.origin_audience_id,
+    country: audience.country,
+    ratio: audience.ratio,
+    createdAt: audience.created_at,
   };
 }

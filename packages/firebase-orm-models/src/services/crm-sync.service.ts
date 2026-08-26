@@ -18,13 +18,14 @@ import {
   META_CUSTOM_AUDIENCE_PLUGIN_ID,
   MetaCustomAudienceSinkPluginExecutor,
 } from '../plugin-runtime/meta-custom-audience';
+import { MetaLookalikeAudienceModel } from '../models/meta-lookalike-audience.model';
 import {
   GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
   GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD,
   GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
   GoogleCustomerMatchSinkPluginExecutor,
 } from '../plugin-runtime/google-customer-match';
-import { MetaAdsHttpApiClient } from '../plugin-runtime/meta-ads';
+import { MetaAdsApiError, MetaAdsHttpApiClient, type MetaAdsApiClient } from '../plugin-runtime/meta-ads';
 import { GoogleAdsHttpApiClient } from '../plugin-runtime/google-ads';
 import { mintPluginRuntimeCredential, runWithRetryBackoff, type RetryBackoffOptions, type SinkPluginExecutor } from '../plugin-runtime';
 import { ProjectNotFoundError, listActiveAttachmentsForProject } from './resource-library.service';
@@ -69,6 +70,38 @@ export class GoogleCustomerMatchCredentialConfigError extends Error {
   constructor(public readonly reason: string) {
     super(`This install is not correctly configured to sync to a Google Ads Customer Match list yet: ${reason}`);
     this.name = 'GoogleCustomerMatchCredentialConfigError';
+  }
+}
+
+/** A `META_CUSTOM_AUDIENCE_PLUGIN_ID` install's `plugin_id` doesn't match — thrown by {@link createMetaLookalikeAudience}, which (unlike `syncSegmentToCrm`) only ever makes sense for this one connector, not any action-type plugin. */
+export class NotMetaCustomAudiencePluginError extends Error {
+  constructor(public readonly actualPluginId: string) {
+    super(`Only a Meta Custom Audience install can seed a Lookalike Audience — this install is "${actualPluginId}".`);
+    this.name = 'NotMetaCustomAudiencePluginError';
+  }
+}
+
+/** {@link createMetaLookalikeAudience} was called against an install that has never successfully synced a segment yet — Meta requires an existing, populated Custom Audience as the seed for a Lookalike, and `install.sink_external_ref` (the seed audience id) is only ever set once a sync has actually created one. */
+export class MetaLookalikeSeedAudienceNotReadyError extends Error {
+  constructor() {
+    super('This install has no Custom Audience yet — sync a segment to it at least once before creating a Lookalike Audience.');
+    this.name = 'MetaLookalikeSeedAudienceNotReadyError';
+  }
+}
+
+/** {@link createMetaLookalikeAudience}'s own request-shape validation failed (bad name/country/ratio) — collects every reason at once, mirroring `InvalidCampaignDraftError`'s "report every violation together" posture. */
+export class InvalidMetaLookalikeAudienceRequestError extends Error {
+  constructor(public readonly reasons: string[]) {
+    super(`Invalid Lookalike Audience request: ${reasons.join(' ')}`);
+    this.name = 'InvalidMetaLookalikeAudienceRequestError';
+  }
+}
+
+/** The real Meta API call in {@link createMetaLookalikeAudience} failed (bad request, expired token, ...) — collapses `MetaAdsApiError` into a typed error the caller/route can map to a clean 502, the same "don't leak the raw HTTP client error" posture `SinkPluginExecutionError` establishes for the sync path. */
+export class MetaLookalikeAudienceCreationFailedError extends Error {
+  constructor(public readonly reason: string) {
+    super(`Meta rejected the Lookalike Audience request: ${reason}`);
+    this.name = 'MetaLookalikeAudienceCreationFailedError';
   }
 }
 
@@ -486,4 +519,150 @@ export async function listActionPluginInstallsForProject(organizationId: string,
     }
   }
   return actionInstalls;
+}
+
+/** ISO-3166 alpha-2: exactly two uppercase letters — mirrors `meta-campaign-draft.ts`'s own `COUNTRY_CODE_PATTERN`. */
+const LOOKALIKE_COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
+/** Meta's own documented Lookalike Audience similarity range (1%-20% of the target country's population). */
+const LOOKALIKE_MIN_RATIO = 0.01;
+const LOOKALIKE_MAX_RATIO = 0.2;
+
+/** Validates a Lookalike Audience creation request — collects every violation before throwing one {@link InvalidMetaLookalikeAudienceRequestError}, mirroring `validateMetaAdSetTargeting`'s "report every reason at once" posture. */
+function validateMetaLookalikeAudienceRequest(name: string, country: string, ratio: number): void {
+  const reasons: string[] = [];
+  if (name.trim().length === 0) {
+    reasons.push('name must not be empty.');
+  }
+  if (!LOOKALIKE_COUNTRY_CODE_PATTERN.test(country)) {
+    reasons.push('country must be a two-letter ISO-3166 country code (e.g. "US").');
+  }
+  if (!(Number.isFinite(ratio) && ratio >= LOOKALIKE_MIN_RATIO && ratio <= LOOKALIKE_MAX_RATIO)) {
+    reasons.push(`ratio must be a number between ${LOOKALIKE_MIN_RATIO} and ${LOOKALIKE_MAX_RATIO}.`);
+  }
+  if (reasons.length > 0) {
+    throw new InvalidMetaLookalikeAudienceRequestError(reasons);
+  }
+}
+
+export interface CreateMetaLookalikeAudienceParams {
+  organizationId: string;
+  projectId: string;
+  installId: string;
+  name: string;
+  /** ISO-3166 alpha-2 country code. */
+  country: string;
+  /** Similarity ratio, 0.01-0.20. */
+  ratio: number;
+  createdByUserId: string;
+  kms: KmsProvider;
+  /** Overridable so tests can inject a fake client without a real HTTP call. */
+  apiClient?: MetaAdsApiClient;
+}
+
+/**
+ * Creates a Meta Lookalike Audience seeded from a `META_CUSTOM_AUDIENCE_PLUGIN_ID`
+ * install's own already-created Custom Audience (KAN-73 follow-up, plan `13
+ * §E21.3`'s own "Custom/Lookalike audience creation from GrowthOS segments"
+ * bullet — the Lookalike half `plugin-runtime/meta-custom-audience/manifest.ts`'s
+ * own doc comment had explicitly deferred once Custom Audiences themselves
+ * shipped). Unlike `syncSegmentToCrm`, this isn't a repeatable "push a
+ * segment's rows" action — Meta expands the seed audience's membership into a
+ * new audience once, at creation time — so there is no run/retry loop here;
+ * a transient Meta API failure simply throws straight through for the caller
+ * to retry by submitting again, the same "no partial state to reconcile"
+ * posture a single non-idempotent create call gets everywhere else in this
+ * codebase (e.g. `createOrganizationWithOwner`).
+ *
+ * Requires the install to already be an installed `META_CUSTOM_AUDIENCE_PLUGIN_ID`
+ * plugin with a seed audience (`install.sink_external_ref`, set by a prior
+ * `syncSegmentToCrm` call) — a fresh install with no successful sync yet has
+ * nothing for Meta to expand from, so this throws
+ * {@link MetaLookalikeSeedAudienceNotReadyError} rather than attempting a
+ * request Meta would just reject.
+ */
+export async function createMetaLookalikeAudience(params: CreateMetaLookalikeAudienceParams): Promise<MetaLookalikeAudienceModel> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const install = await requirePluginInstallInProject(params.organizationId, params.projectId, params.installId);
+
+  if (install.plugin_id !== META_CUSTOM_AUDIENCE_PLUGIN_ID) {
+    throw new NotMetaCustomAudiencePluginError(install.plugin_id);
+  }
+  if (install.status !== 'installed') {
+    throw new PluginInstallNotActiveError(install.status);
+  }
+  if (!install.sink_external_ref) {
+    throw new MetaLookalikeSeedAudienceNotReadyError();
+  }
+
+  validateMetaLookalikeAudienceRequest(params.name, params.country, params.ratio);
+
+  const { accessToken, adAccountId } = await resolveMetaAudienceCredentialSecret(params.organizationId, params.projectId, install, params.kms);
+  const apiClient = params.apiClient ?? new MetaAdsHttpApiClient({ accessToken });
+
+  let audienceId: string;
+  try {
+    audienceId = (
+      await apiClient.createLookalikeAudience(adAccountId, {
+        name: params.name,
+        originAudienceId: install.sink_external_ref,
+        country: params.country,
+        ratio: params.ratio,
+      })
+    ).audienceId;
+  } catch (error) {
+    if (error instanceof MetaAdsApiError) {
+      throw new MetaLookalikeAudienceCreationFailedError(error.message);
+    }
+    throw error;
+  }
+
+  const audience = new MetaLookalikeAudienceModel();
+  audience.organization_id = params.organizationId;
+  audience.project_id = params.projectId;
+  audience.plugin_install_id = install.id;
+  audience.audience_id = audienceId;
+  audience.name = params.name;
+  audience.origin_audience_id = install.sink_external_ref;
+  audience.country = params.country;
+  audience.ratio = params.ratio;
+  audience.created_by_user_id = params.createdByUserId;
+  audience.created_at = new Date().toISOString();
+  audience.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+  await audience.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.createdByUserId,
+      action: 'meta_lookalike_audience.create',
+      targetType: 'plugin_install',
+      targetId: install.id,
+      summary: `Created Meta Lookalike Audience "${params.name}"`,
+      after: { audienceId, originAudienceId: install.sink_external_ref, country: params.country, ratio: params.ratio },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return audience;
+}
+
+/** Same load-bounding reasoning as `DEFAULT_PLUGIN_SINK_RUN_LIST_LIMIT`. */
+export const DEFAULT_META_LOOKALIKE_AUDIENCE_LIST_LIMIT = 50;
+
+/** One install's own created Lookalike Audiences, newest-first, bounded to `limit` — the admin-facing browse list on the project Plugins page. */
+export async function listMetaLookalikeAudiencesForInstall(
+  organizationId: string,
+  projectId: string,
+  installId: string,
+  limit: number = DEFAULT_META_LOOKALIKE_AUDIENCE_LIST_LIMIT,
+): Promise<MetaLookalikeAudienceModel[]> {
+  await requireProjectInOrg(organizationId, projectId);
+  const audiences = await MetaLookalikeAudienceModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .where('project_id', '==', projectId)
+    .where('plugin_install_id', '==', installId)
+    .get();
+  return audiences.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit);
 }

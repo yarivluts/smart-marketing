@@ -368,6 +368,28 @@ describe('MetaAdsHttpApiClient', () => {
     expect(body.get('customer_file_source')).toBe('USER_PROVIDED_ONLY');
   });
 
+  it('creates a LOOKALIKE Custom Audience seeded from an origin audience', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'audience-lookalike-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).createLookalikeAudience('999', { name: 'Warm leads - Lookalike 5%', originAudienceId: 'audience-1', country: 'US', ratio: 0.05 });
+
+    expect(result).toEqual({ audienceId: 'audience-lookalike-1' });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/customaudiences');
+    const body = new URLSearchParams(String(init.body));
+    expect(body.get('name')).toBe('Warm leads - Lookalike 5%');
+    expect(body.get('subtype')).toBe('LOOKALIKE');
+    expect(body.get('origin_audience_id')).toBe('audience-1');
+    expect(JSON.parse(body.get('lookalike_spec') as string)).toEqual({ type: 'similarity', country: 'US', ratio: 0.05 });
+  });
+
+  it('throws MetaAdsApiError with the response status when createLookalikeAudience fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ error: 'nope' }, false, 400)));
+
+    await expect(new MetaAdsHttpApiClient(OPTIONS).createLookalikeAudience('999', { name: 'x', originAudienceId: 'audience-1', country: 'US', ratio: 0.05 })).rejects.toBeInstanceOf(MetaAdsApiError);
+  });
+
   it('adds already-hashed email-only contacts to a Custom Audience as an EMAIL-schema payload', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ num_received: 2, num_invalid_entries: 0 }));
     vi.stubGlobal('fetch', fetchMock);

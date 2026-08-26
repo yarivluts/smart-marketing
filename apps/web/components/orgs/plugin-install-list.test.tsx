@@ -23,6 +23,7 @@ function install(overrides: Partial<PluginInstallView> = {}): PluginInstallView 
     disabledAt: null,
     enabledAt: null,
     uninstalledAt: null,
+    sinkExternalRef: null,
     ...overrides,
   };
 }

@@ -85,6 +85,8 @@ import {
   updateSegmentStatus as updateSegmentStatusInOrganization,
   suggestSegments as suggestSegmentsInOrganization,
   syncSegmentToCrm as syncSegmentToCrmInOrganization,
+  createMetaLookalikeAudience as createMetaLookalikeAudienceInOrganization,
+  type MetaLookalikeAudienceModel,
   type SegmentModel,
   type SegmentSuggestion,
   createRepCollectionEntry as createRepCollectionEntryInOrganization,
@@ -900,6 +902,28 @@ interface SyncSegmentToCrmInput {
 export async function syncSegmentToCrm(input: SyncSegmentToCrmInput): Promise<PluginSinkRunModel> {
   await ensureFirestoreOrm();
   return syncSegmentToCrmInOrganization(input);
+}
+
+interface CreateMetaLookalikeAudienceInput {
+  organizationId: string;
+  projectId: string;
+  installId: string;
+  name: string;
+  country: string;
+  ratio: number;
+  createdByUserId: string;
+  kms: KmsProvider;
+}
+
+/**
+ * Creates a Meta Lookalike Audience seeded from a Meta Custom Audience
+ * install's own already-synced Custom Audience (KAN-73 follow-up, plan `13
+ * §E21.3`'s own "Custom/Lookalike audience creation from GrowthOS segments"
+ * bullet).
+ */
+export async function createMetaLookalikeAudience(input: CreateMetaLookalikeAudienceInput): Promise<MetaLookalikeAudienceModel> {
+  await ensureFirestoreOrm();
+  return createMetaLookalikeAudienceInOrganization(input);
 }
 
 interface ProcessStripeWebhookEventInput {
