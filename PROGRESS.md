@@ -129,6 +129,14 @@ Template for each entry:
     when the runner itself appears unresponsive (each cancel took 1-3 minutes of real time to actually
     register as `cancelled` rather than completing instantly) — consistent with the runner process
     itself being wedged, not just the job's own commands hanging.
+  - **Update (same session, later): the fresh run (started after the docs-only commit above) hung yet
+    again, same `Install Playwright browsers` step — a fifth hang. Tried cancelling it anyway (this
+    time the `cancel_workflow_run` call itself never registered even after 15+ minutes of waiting,
+    unlike every prior cancel which eventually took effect within a few minutes) — stopping here for
+    real.** No more `cancel_workflow_run`/`rerun_workflow_run` calls on this PR from this session. Purely
+    waiting now: either GitHub Actions recovers and a queued/future run completes normally, or a human
+    intervenes directly (cancels/re-runs from the UI, which may succeed where the API calls here didn't,
+    or fixes the underlying platform/runner issue).
 - **Waiting on human:**
   - **Escalated (this is now the primary open issue):** GitHub Actions is hanging mid-job on this
     repo's CI workflow, repeatedly, across multiple PRs and multiple fresh runs today — four confirmed
