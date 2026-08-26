@@ -604,6 +604,7 @@
     "canceledAtLine": "בוטל ב-{canceledAt}",
     "cancelAtPeriodEndLine": "מתוכנן לביטול בסוף התקופה הנוכחית ({currentPeriodEnd})",
     "churnCapNote": "מוצגים {count} המנויים שבוטלו או בסיכון הביטול האחרונים.",
+    "dunningUnknownCustomer": "לקוח לא ידוע",
     "dunningHeading": "מנויים בהליך גבייה כושלת",
     "dunningEmpty": "טרם נקלטו מנויים בהליך גבייה כושלת עבור פרויקט זה.",
     "statusPastDue": "באיחור תשלום",

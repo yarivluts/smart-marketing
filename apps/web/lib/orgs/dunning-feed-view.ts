@@ -1,14 +1,5 @@
 import { checkRecordEnvelope, type RawRecordModel } from '@growthos/firebase-orm-models';
-
-function stringField(payload: Record<string, unknown>, field: string): string | null {
-  const value = payload[field];
-  return typeof value === 'string' ? value : null;
-}
-
-function numberField(payload: Record<string, unknown>, field: string): number | null {
-  const value = payload[field];
-  return typeof value === 'number' ? value : null;
-}
+import { numberField, stringField } from './raw-record-field-view';
 
 /**
  * A plain, serializable projection of one dunning `stripe_subscription` entity `RawRecordModel`

@@ -1,18 +1,5 @@
 import { checkRecordEnvelope, type RawRecordModel } from '@growthos/firebase-orm-models';
-
-function stringField(payload: Record<string, unknown>, field: string): string | null {
-  const value = payload[field];
-  return typeof value === 'string' ? value : null;
-}
-
-function numberField(payload: Record<string, unknown>, field: string): number | null {
-  const value = payload[field];
-  return typeof value === 'number' ? value : null;
-}
-
-function booleanField(payload: Record<string, unknown>, field: string): boolean {
-  return payload[field] === true;
-}
+import { booleanField, numberField, stringField } from './raw-record-field-view';
 
 /**
  * A plain, serializable projection of one churned/at-risk `stripe_subscription` entity

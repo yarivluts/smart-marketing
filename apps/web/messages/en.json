@@ -604,6 +604,7 @@
     "canceledAtLine": "Canceled {canceledAt}",
     "cancelAtPeriodEndLine": "Scheduled to cancel at period end ({currentPeriodEnd})",
     "churnCapNote": "Showing the {count} most recent churned or at-risk subscriptions.",
+    "dunningUnknownCustomer": "Unknown customer",
     "dunningHeading": "Subscriptions in dunning",
     "dunningEmpty": "No subscriptions in dunning for this project yet.",
     "statusPastDue": "Past due",

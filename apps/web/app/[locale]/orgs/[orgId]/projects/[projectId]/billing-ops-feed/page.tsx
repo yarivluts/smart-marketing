@@ -161,7 +161,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
               <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-medium">
-                    {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('churnUnknownCustomer')}
+                    {entry.customerId ? t('customerLine', { customerId: entry.customerId }) : t('dunningUnknownCustomer')}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
