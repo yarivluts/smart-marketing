@@ -17,7 +17,46 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Opened PR #303 (KAN-97, Meta ad-set targeting-spec edit)
+## 2026-08-26 (latest) — Merged PR #303 (KAN-97, Meta ad-set targeting-spec edit)
+
+- **Last completed:**
+  - Picked up exactly where the previous entry left off: PR #303 was open, self-reviewed, and green
+    locally, with GitHub CI in progress.
+  - GitHub reported `mergeable_state: dirty` shortly after opening — PR #301 (KAN-95) had merged into
+    `main` in the meantime. Merged `main` into the branch; conflicts were purely in `TASKS.md` and
+    `PROGRESS.md` (both PRs appended a new row/entry near the same spot) — resolved by keeping both
+    rows/entries in order (KAN-95 before KAN-97); `apps/web/messages/en.json`/`he.json` merged cleanly
+    with no conflict. Re-verified `pnpm lint`/`pnpm typecheck` green and re-ran the full `apps/web`
+    unit+emulator suite against the merged state (1628/1628 green, up from 1625 — the 3 new tests
+    KAN-95 added) before pushing.
+  - CI (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green on the first
+    attempt after the merge push, `mergeable_state: clean`, no review comments. Merged (squash) into
+    `main`.
+  - Local branch deleted; `git push origin --delete kan-97-meta-ad-set-targeting-edit` failed with the
+    same recurring HTTP 403 this sandbox's git remote has rejected repeatedly in this file's history —
+    merged and dead but not deleted on GitHub; a human with direct repo access can delete
+    `kan-97-meta-ad-set-targeting-edit`.
+- **In progress (exact stopping point):** none — KAN-97 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-97 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable follow-up"
+  pattern for the next candidate — first re-check `list_pull_requests` for any other concurrent
+  session's in-flight work to avoid duplicating it (this run's own KAN-96 exclusion,
+  `kan-96-board-tile-batched-reads`, may have merged or may still be open). The only named-but-deferred
+  items left on KAN-72/73's own rows are PMax asset groups and Lookalike/Similar Audience expansion,
+  both flagged as needing real design work rather than a buildable-today slice.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional: delete the merged `kan-97-meta-ad-set-targeting-edit` branch on GitHub (this sandbox's
+    git remote rejected the delete with a 403).
+
+---
+
+## 2026-08-26 — Opened PR #303 (KAN-97, Meta ad-set targeting-spec edit)
 
 - **Last completed:**
   - Session start: local repo was on a detached `HEAD` matching `origin/main`'s tip; `git checkout -B
