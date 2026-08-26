@@ -17,7 +17,43 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Opened/renumbered PR #305 (KAN-100, org-person edit)
+## 2026-08-26 (latest) — Merged PR #305 (KAN-100, org-person edit)
+
+- **Last completed:**
+  - Picked up exactly where the previous entry left off: PR #305 (renumbered KAN-99 -> KAN-100 to
+    resolve a collision with concurrently-merged PR #306) was open with the merge/renumbering commit
+    pushed, waiting on CI.
+  - First CI attempt on the renumbering commit failed in `e2e/feedback.spec.ts` (KAN-82, unrelated to
+    this PR) with the same well-documented, self-healing Firestore-emulator `RESOURCE_EXHAUSTED` flake
+    this repo's history repeatedly names — a sibling test in the same shard hit the identical error but
+    recovered on its own retry. Posted a standing-down comment naming the failure and triggered one
+    re-run.
+  - The re-run came back fully green (`lint · typecheck · test · build` + `terraform fmt · validate`),
+    `mergeable_state: clean`. Merged (squash) into `main`.
+  - Local `main` fast-forwarded to the merge commit; confirmed `TASKS.md`'s KAN-100 row and this file's
+    entries landed correctly.
+- **In progress (exact stopping point):** none — KAN-100 is fully delivered, tested, merged, and this
+  entry is the last step. Cleaning up the now-dead `kan-99-org-person-edit` branch and its worktree
+  next.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable follow-up"
+  pattern for the next candidate — re-check `list_pull_requests` first for any concurrent session's
+  in-flight work, and given this run's own KAN-99/PR #306 collision, also re-check `TASKS.md` on a
+  freshly-pulled `main` immediately before minting a new KAN number (not just at pick time) to reduce
+  the chance of a repeat collision.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional: delete the merged `kan-99-org-person-edit` branch on GitHub if this session's own
+    deletion attempt hits the recurring HTTP 403 this sandbox's git remote has shown repeatedly in this
+    file's history.
+
+---
+
+## 2026-08-26 — Opened/renumbered PR #305 (KAN-100, org-person edit)
 
 - **Last completed:**
   - Session start: `main` at 4ad2b20, `TASKS.md` fully `done` except the standing KAN-18/19/43/50/51
