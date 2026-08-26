@@ -17,7 +17,92 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #312 (KAN-106, omnisearch win-rule indexing)
+## 2026-08-26 (latest) — KAN-107: segment live-members admin surface
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). No open PRs at pick time; `origin/main`
+    matched local `HEAD` (5a2c554, PR #312/KAN-106) once fetched (the container's cached ref was stale
+    at session start, not an actual divergence).
+  - Delegated a bounded background sweep agent (same "grep every `done` row's own deferred/not-yet
+    doc-comment note for a newly-buildable follow-up" pattern KAN-96/99/101/104/106 established) to
+    find the next candidate, explicitly excluding every already-parked item (real BigQuery/Terraform/
+    Redis/Pub/Sub infra, staging env, PMax/Lookalike expansions, GitHub Actions flakiness, third-party
+    connectors needing a human-provisioned API key, the `platform_admin` bootstrap gap a prior entry
+    flagged as needing a human's scoping decision, KAN-43/50/51).
+  - Top candidate (of three reported): `segment.service.ts`'s own `listSegmentMembers` (KAN-81) — a
+    fully implemented, bounded, warehouse-backed row-select sharing `countSegmentMembers`'s exact
+    filter compilation — was only ever called internally by `crm-sync.service.ts`'s
+    `syncSegmentToCrm`; confirmed via grep that no route or page anywhere under `apps/web` ever called
+    it. A human could see a segment's live member *count* (the Segments page's own badge) but never
+    the actual matching rows without first configuring a CRM-sync plugin install — a real, unflagged
+    gap against CLAUDE.md's "everything user-manageable gets an admin surface" rule. (The other two
+    candidates — a platform-wide kill switch and an org-ownership-recovery path — both trace back to
+    the same missing `platform_admin` bootstrap mechanism a prior PROGRESS.md entry already flagged as
+    needing a human's scoping decision, so left both for a future run once that's resolved.)
+  - **Delivered (KAN-107, branch `kan-107-segment-members-admin-surface`):**
+    - `SegmentMemberListOutcome`'s `ok` branch (`segment.service.ts`) gained a `schemaName` field —
+      free, since `listSegmentMembers` already loads the segment internally to compile the query — so
+      a caller rendering these rows can resolve the segment's own entity schema `field_defs` (for PII
+      redaction) without a second fetch. Purely additive; `crm-sync.service.ts`'s existing consumer is
+      unaffected.
+    - New `toSegmentMemberEntryView`/`buildSegmentMemberListView` (`apps/web/lib/orgs/segment-view.ts`)
+      redact any `is_pii`-flagged field the same way `record-feed-view.ts`'s `toRecordFeedEntryView`
+      does (never reading the real value into the view at all, not merely hiding it client-side) —
+      simpler than that sibling since `SegmentMemberRow.properties` is already the `entities` core
+      table's flat `attributes` column (no ingest-envelope unwrapping needed, unlike a
+      `RawRecordModel.payload`).
+    - New `listSegmentMembers` wrapper in `apps/web/lib/orgs/queries.ts`, mirroring the existing
+      `countSegmentMembers` wrapper.
+    - The Segments page gained an on-demand "view members" panel per segment, toggled via
+      `?viewMembers=<segmentId>` — the same query-string-driven pattern `record-feed/page.tsx` already
+      established for its own schema picker — rather than a new per-segment detail page, since
+      segments (like campaigns) deliberately have none in this codebase (per the KAN-106 omnisearch
+      entry's own note on that convention). Bounded to 50 rows inline (`INLINE_MEMBER_LIST_LIMIT`,
+      deliberately smaller than `listSegmentMembers`'s own 500-row default), fetched only for the one
+      segment actually being viewed — not fanned out across every segment on the page the way the
+      member-count badge and CRM-sync-run lookups already are. Gated on the page's existing
+      `dashboards.write` permission. en/he translations added; no Hebrew in source files.
+    - Full test coverage: extended the `packages/firebase-orm-models` `listSegmentMembers` emulator
+      test to assert the new `schemaName` field; new `apps/web` unit tests for
+      `toSegmentMemberEntryView` (field-defs-order projection, PII redaction, missing-field/object-
+      stringification, empty-field_defs fallback) and `buildSegmentMemberListView` (precomputed-map
+      resolution by `schemaName`, missing-schema fallback, degraded-outcome mapping).
+    - Self-reviewed the full diff before opening the PR: verified the `crm-sync.service.ts` consumer
+      of `SegmentMemberListOutcome` is unaffected by the additive `schemaName` field, confirmed the PII
+      redaction path is exercised by tests (not just written), and confirmed the "view members" toggle
+      correctly switches between segments (each Link targets exactly its own segment id, page
+      re-renders server-side on navigation, no client state to go stale). No issues found.
+  - Full local verification before opening the PR: `pnpm build`/`pnpm lint`/`pnpm typecheck` green
+    across all 8 packages; full monorepo `pnpm test` green (11/11 turbo tasks, exit 0) — the
+    `firebase-orm-models` `segment.emulator.test.ts` run (53/53) and the `apps/web`
+    `segment-view.test.ts` run (11/11, including the new tests) were also independently verified
+    in isolation before the full-suite run. Two Playwright e2e specs (`experiments.spec.ts`,
+    `omnisearch.spec.ts` in one shard; `resource-library.spec.ts`, `tv-pairing.spec.ts` in another)
+    flaked and passed on Playwright's own automatic retry — the same well-documented flake pattern
+    this repo's history repeatedly names, unrelated to this diff (none of the four touch segments).
+- **In progress (exact stopping point):** PR #313 opened against `main`, implementation-complete and
+  fully verified locally (see above). Subscribed to its activity (`subscribe_pr_activity`) — watching
+  for CI to return a result rather than polling.
+- **Blocked + why:** nothing blocking — waiting on CI to return a result for PR #313.
+- **Next step:** once CI is green, merge PR #313 (squash), delete the branch, and record the merge in
+  this file + confirm `TASKS.md`'s KAN-107 row (already updated to reference PR #313) reads `done`.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
+    rows — still outstanding, unchanged by this run.
+  - The `platform_admin` bootstrap gap (no code path anywhere provisions a platform-scoped role
+    binding) — flagged again this run as the blocker behind two of the three sweep candidates found
+    (a platform-wide automation kill switch, and an org-ownership-recovery path for an org with no
+    remaining `org_owner`). Worth a human's scoping decision on the bootstrap mechanism (e.g. a seed
+    script, an allowlisted-email system setting) before either is buildable.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin`.
+
+---
+
+## 2026-08-26 — Merged PR #312 (KAN-106, omnisearch win-rule indexing)
 
 - **Last completed:**
   - Resumed from the extended saga documented in the entry below: PR #312 (KAN-106, omnisearch now
