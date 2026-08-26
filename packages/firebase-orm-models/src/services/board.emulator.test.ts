@@ -15,6 +15,7 @@ import {
   listBoardsForProject,
   ProjectNotFoundError,
   queryBoardTile,
+  queryBoardTiles,
   registerMetricDefinition,
   saveBoardTiles,
   setProjectCostQuota,
@@ -791,5 +792,112 @@ describe('queryBoardTile', () => {
         cache: new InMemoryMetricQueryResultCache(),
       }),
     ).rejects.toBeInstanceOf(TypeError);
+  });
+});
+
+describe('queryBoardTiles', () => {
+  it('returns every tile\'s outcome, in board.tiles order, identical to what calling queryBoardTile per-tile would produce (board-tile-N+1 fix)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Batched Query Org');
+    await registerAdSpend(organization.id, project.id, owner.id);
+    await registerSignups(organization.id, project.id, owner.id);
+    const adSpendTile = bigNumberTile({ metricNames: ['ad_spend'], title: 'Ad spend' });
+    const signupsTile = bigNumberTile({ metricNames: ['signups'], title: 'Signups' });
+    const created = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+    await saveBoardTiles({ organizationId: organization.id, projectId: project.id, boardId: created.id, tiles: [adSpendTile, signupsTile], updatedByUserId: owner.id });
+    const board = (await getBoard(organization.id, project.id, created.id))!;
+
+    class PerMetricExecutor implements WarehouseQueryExecutor {
+      callCount = 0;
+      execute(query: { sql: string }): Promise<WarehouseRow[]> {
+        this.callCount += 1;
+        if (query.sql.includes('ad_spend')) {
+          return Promise.resolve([{ bucket_date: board.date_range.start, ad_spend: 42 }]);
+        }
+        return Promise.resolve([{ bucket_date: board.date_range.start, signups: 7 }]);
+      }
+    }
+
+    const batchedExecutor = new PerMetricExecutor();
+    const batchedOutcomes = await queryBoardTiles({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      executor: batchedExecutor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    const individualExecutor = new PerMetricExecutor();
+    const individualOutcomes = await Promise.all(
+      board.tiles.map((tile) =>
+        queryBoardTile({ organizationId: organization.id, projectId: project.id, board, tile, executor: individualExecutor, cache: new InMemoryMetricQueryResultCache() }),
+      ),
+    );
+
+    expect(batchedOutcomes).toEqual(individualOutcomes);
+    expect(batchedOutcomes).toEqual([
+      { ok: true, series: [{ bucket_date: board.date_range.start, ad_spend: 42 }] },
+      { ok: true, series: [{ bucket_date: board.date_range.start, signups: 7 }] },
+    ]);
+    expect(batchedExecutor.callCount).toBe(2);
+  });
+
+  it('applies the project\'s real quota config to every tile in a batched call (board-tile-N+1 fix)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Batched Quota Org');
+    await registerAdSpend(organization.id, project.id, owner.id);
+    await registerSignups(organization.id, project.id, owner.id);
+    const created = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+    await saveBoardTiles({
+      organizationId: organization.id,
+      projectId: project.id,
+      boardId: created.id,
+      tiles: [bigNumberTile({ metricNames: ['ad_spend'], title: 'Ad spend' }), bigNumberTile({ metricNames: ['signups'], title: 'Signups' })],
+      updatedByUserId: owner.id,
+    });
+    const board = (await getBoard(organization.id, project.id, created.id))!;
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    // Spends the day's one-attempt quota with its own, already-awaited call
+    // (a distinct metric, so it's a genuine cache miss) *before* the batched
+    // call below runs — this makes the assertion deterministic. The two
+    // tiles inside one `queryBoardTiles` call still run concurrently
+    // (`Promise.all` internally, same as the old per-tile fan-out), so
+    // whether *they* race each other for the last slot isn't this test's
+    // concern; `queryBoardTile`'s own sequential quota test above already
+    // covers that. What this test isolates is that the project's real quota
+    // *config* — spent to zero remaining attempts before either tile in this
+    // call even starts — is genuinely read and applied to both tiles, not
+    // silently bypassed (e.g. by an unthreaded precompute always reporting
+    // the generous, never-configured default).
+    await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ metricNames: ['ad_spend'], title: 'Ad spend' }),
+      executor: new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, ad_spend: 1 }]),
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: board.date_range.start, ad_spend: 1, signups: 1 }]);
+    const outcomes = await queryBoardTiles({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(outcomes.every((outcome) => !outcome.ok && outcome.reason === 'quota_exceeded')).toBe(true);
+    expect(executor.callCount).toBe(0);
+  });
+
+  it('rejects an unknown project id, the same as every other project-scoped lookup in this file', async () => {
+    const { organization } = await setupOrgWithProject('Board Batched No Project Org');
+
+    await expect(
+      queryBoardTiles({
+        organizationId: organization.id,
+        projectId: 'does-not-exist',
+        board: { date_range: { start: '2026-01-01', end: '2026-01-07', grain: 'day' }, compare: null, global_filters: [], tiles: [] },
+      }),
+    ).rejects.toThrow(ProjectNotFoundError);
   });
 });

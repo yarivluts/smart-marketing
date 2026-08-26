@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto';
 import { collectIdentifiers, parseFormula, type CompilerParamValue, type MetricQueryRequest } from '@growthos/shared';
-import type { MetricAggregationDef, MetricDefinitionKind } from '../models/metric-def.model';
+import type { ProjectModel } from '../models/project.model';
+import type { MetricAggregationDef, MetricDefModel, MetricDefinitionKind } from '../models/metric-def.model';
 import { compileMetricQueryForProject, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { getActiveMetricDefinition, listMetricDefinitionsForProject } from './metric-registry.service';
-import { checkProjectQueryQuota, recordQueryCostLogEntry, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
+import { checkProjectQueryQuota, recordQueryCostLogEntry, ProjectQueryQuotaExceededError, type ProjectCostQuota } from './cost-guardrail.service';
 import { defaultMetricQueryResultCache, type MetricQueryResultCache } from '../warehouse/result-cache';
 import { defaultWarehouseQueryExecutor, supportsQueryStats, WarehouseNotConfiguredError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 
@@ -66,6 +67,18 @@ export interface QueryMetricsParams {
   /** Defaults to {@link defaultMetricQueryResultCache} — overridable per-call for the same reason as `executor`. */
   cache?: MetricQueryResultCache;
   cacheTtlSeconds?: number;
+  /**
+   * Skips this call's own project/quota/metric-catalog fetches when a
+   * caller already has them (`board.service.ts`'s `queryBoardTiles` fetches
+   * each exactly once and shares it across every tile — see
+   * `queryBoardTile`'s own doc comment for the N+1 this closes). Threaded
+   * straight through to `compileMetricQueryForProject`/`checkProjectQueryQuota`,
+   * which document their own identical params; omitted entirely, this call
+   * behaves exactly as it did before these params existed.
+   */
+  precomputedProject?: ProjectModel;
+  precomputedActiveMetricDefsByName?: ReadonlyMap<string, MetricDefModel>;
+  precomputedQuota?: ProjectCostQuota;
 }
 
 export interface MetricQueryResult {
@@ -142,6 +155,8 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     projectId: params.projectId,
     ...(environmentId !== null ? { environmentId } : {}),
     request: params.request,
+    ...(params.precomputedProject ? { precomputedProject: params.precomputedProject } : {}),
+    ...(params.precomputedActiveMetricDefsByName ? { precomputedActiveMetricDefsByName: params.precomputedActiveMetricDefsByName } : {}),
   });
 
   if (compiled.unbuiltWarehouseTables.length > 0) {
@@ -155,7 +170,7 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     return { series: cached, definitionRefs: compiled.definitionRefs, cacheHit: true };
   }
 
-  const quota = await checkProjectQueryQuota(params.organizationId, params.projectId);
+  const quota = await checkProjectQueryQuota(params.organizationId, params.projectId, new Date(), params.precomputedQuota);
   if (!quota.allowed) {
     await logCostAttempt(params.organizationId, params.projectId, 'blocked_quota_exceeded', compiled.definitionRefs);
     throw new ProjectQueryQuotaExceededError(quota.limit);
