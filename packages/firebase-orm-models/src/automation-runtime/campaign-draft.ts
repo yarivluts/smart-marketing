@@ -1,6 +1,6 @@
 import type { CampaignDraft, CampaignDraftAdGroup, CampaignDraftKeyword, GoogleAdsCampaignDraft, MetaCampaignDraft } from './executor';
 import { InvalidCampaignDraftError } from './invalid-campaign-draft-error';
-import { validateMetaCampaignDraft } from './meta-campaign-draft';
+import { validateMetaAdSetTargeting, validateMetaCampaignDraft } from './meta-campaign-draft';
 
 export { InvalidCampaignDraftError };
 
@@ -288,6 +288,41 @@ export function validateMetaAdSetEditActionInput(input: {
 
   if (input.dailyBudgetUsd === undefined && input.status === undefined) {
     reasons.push('at least one of dailyBudgetUsd/status must be set.');
+  }
+
+  if (reasons.length > 0) {
+    throw new InvalidCampaignDraftError(reasons);
+  }
+}
+
+/**
+ * Validates a `meta_ad_set_targeting_edit` action's proposed input (KAN-73
+ * follow-up, this story's own "ad-set targeting-spec edits" deferred
+ * bullet) — an `adSetResourceName` plus the replacement targeting spec.
+ * Reuses `validateMetaAdSetTargeting`'s own age/country/gender checks
+ * (`meta-campaign-draft.ts`) so a replacement targeting spec is held to the
+ * exact same shape a `campaign_draft_create` ad set's own `targeting` is,
+ * mirroring `validateMetaAdSetEditActionInput`'s own reuse pattern one
+ * action type over. Tolerates a malformed/untrusted-cast request body the
+ * same way `validateMetaAdSetEditActionInput` does — the
+ * `meta-ad-set-targeting-edits` route casts an arbitrary JSON body to this
+ * shape before calling in.
+ */
+export function validateMetaAdSetTargetingEditActionInput(input: { adSetResourceName: unknown; targeting: unknown }): void {
+  if (!isRecord(input)) {
+    throw new InvalidCampaignDraftError(['input must be an object.']);
+  }
+
+  const reasons: string[] = [];
+
+  if (typeof input.adSetResourceName !== 'string' || input.adSetResourceName.trim().length === 0) {
+    reasons.push('adSetResourceName must be a non-empty string.');
+  }
+
+  if (!isRecord(input.targeting)) {
+    reasons.push('targeting must be an object.');
+  } else {
+    validateMetaAdSetTargeting(input.targeting, 'targeting', reasons);
   }
 
   if (reasons.length > 0) {

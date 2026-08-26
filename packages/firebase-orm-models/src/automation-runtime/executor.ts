@@ -296,6 +296,49 @@ export interface AutomationMetaAdSetEditRollbackInput {
   beforeStatus?: MetaAdSetStatus;
 }
 
+/** The full targeting spec `meta_ad_set_targeting_edit` applies to an ad set — the same shape `MetaCampaignDraftAdSet.targeting` uses. Unlike `meta_ad_set_edit`'s independently-optional budget/status fields, this always replaces the whole spec at once (Meta's own `targeting` field is one atomic JSON object, not independently patchable sub-fields), so there's no per-field "leave untouched" option here. */
+export type MetaAdSetTargetingEdit = MetaCampaignDraftAdSet['targeting'];
+
+/**
+ * A `meta_ad_set_targeting_edit` action (KAN-73 follow-up, this story's own
+ * "ad-set targeting-spec edits (countries/age range/genders)" deferred
+ * bullet — the direct sibling of `meta_ad_set_edit`'s budget/status edit, for
+ * an ad set's targeting spec instead) — replaces an already-created Meta ad
+ * set's whole targeting spec (see `AutomationTargetStateModel.meta_ad_set_resource_names`).
+ * Like `meta_ad_set_edit`, this overwrites live state, so
+ * `MetaAutomationActionExecutor.executeMetaAdSetTargetingEdit` reads the ad
+ * set's true pre-edit targeting from Meta itself before applying the edit and
+ * returns it (see `AutomationMetaAdSetTargetingEditExecutionResult`) — same
+ * "isn't known until execute time" reasoning `AutomationMetaAdSetEditExecutionResult`
+ * establishes for its own budget/status. No Google Ads equivalent is modeled
+ * (Google Ads' targeting model — location/demographic criteria on a campaign
+ * or ad group — is structurally different from Meta's per-ad-set targeting
+ * spec and out of this follow-up's scope).
+ */
+export interface AutomationMetaAdSetTargetingEditExecutionInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  adSetResourceName: string;
+  targeting: MetaAdSetTargetingEdit;
+}
+
+export interface AutomationMetaAdSetTargetingEditExecutionResult {
+  /** The ad set's real pre-edit targeting spec, read live — `AutomationTargetStateModel` has no per-ad-set targeting field to source it from, same reasoning `AutomationMetaAdSetEditExecutionResult`'s own doc comment carries for budget/status. */
+  previousTargeting: MetaAdSetTargetingEdit;
+}
+
+export interface AutomationMetaAdSetTargetingEditRollbackInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+  adSetResourceName: string;
+  /** The ad set's real pre-edit targeting spec `executeMetaAdSetTargetingEdit` read live and `executeActionByType` widened `before` with. */
+  previousTargeting: MetaAdSetTargetingEdit;
+}
+
 /** One Meta ad's editable creative content — the same shape `MetaCampaignDraftAdSet.ad.creative` uses. */
 export interface MetaAdCreativeEditContent {
   primaryText: string;
@@ -361,7 +404,10 @@ export interface AutomationMetaAdCreativeEditRollbackInput {
  * `executeAdEdit`/`rollbackAdEdit` replace (and restore) an already-created ad
  * group's Responsive Search Ad; `executeMetaAdSetEdit`/`rollbackMetaAdSetEdit`
  * (KAN-73 follow-up) edit (and restore) an already-created Meta ad set's
- * budget/status; `executeMetaAdCreativeEdit`/`rollbackMetaAdCreativeEdit`
+ * budget/status; `executeMetaAdSetTargetingEdit`/`rollbackMetaAdSetTargetingEdit`
+ * (KAN-73 follow-up) edit (and restore) an already-created Meta ad set's
+ * whole targeting spec (countries/age range/genders);
+ * `executeMetaAdCreativeEdit`/`rollbackMetaAdCreativeEdit`
  * (KAN-73 follow-up) replace (and restore) an already-created Meta ad's
  * creative copy. Same "provider-agnostic executor interface" posture as
  * `SourcePluginExecutor` (KAN-47) and `WarehouseQueryExecutor` (KAN-42) — the
@@ -370,10 +416,10 @@ export interface AutomationMetaAdCreativeEditRollbackInput {
  * (`services/automation-executor-resolver.service.ts`) is the one place that
  * picks a concrete implementation, based on a target's linked credential's
  * `provider`. Every implementation must still implement every method even
- * though `keyword_edit`/`ad_edit`/`meta_ad_set_edit`/`meta_ad_creative_edit`
+ * though `keyword_edit`/`ad_edit`/`meta_ad_set_edit`/`meta_ad_set_targeting_edit`/`meta_ad_creative_edit`
  * are each only ever meaningful for one provider —
  * `MetaAutomationActionExecutor.executeKeywordEdit`/`executeAdEdit` and
- * `GoogleAdsAutomationActionExecutor.executeMetaAdSetEdit`/`executeMetaAdCreativeEdit`
+ * `GoogleAdsAutomationActionExecutor.executeMetaAdSetEdit`/`executeMetaAdSetTargetingEdit`/`executeMetaAdCreativeEdit`
  * throw a documented "not supported" error instead (see each class's own doc
  * comment).
  */
@@ -390,6 +436,8 @@ export interface AutomationActionExecutor {
   rollbackAdEdit(input: AutomationAdEditRollbackInput): Promise<void>;
   executeMetaAdSetEdit(input: AutomationMetaAdSetEditExecutionInput): Promise<AutomationMetaAdSetEditExecutionResult>;
   rollbackMetaAdSetEdit(input: AutomationMetaAdSetEditRollbackInput): Promise<void>;
+  executeMetaAdSetTargetingEdit(input: AutomationMetaAdSetTargetingEditExecutionInput): Promise<AutomationMetaAdSetTargetingEditExecutionResult>;
+  rollbackMetaAdSetTargetingEdit(input: AutomationMetaAdSetTargetingEditRollbackInput): Promise<void>;
   executeMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditExecutionInput): Promise<AutomationMetaAdCreativeEditExecutionResult>;
   rollbackMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditRollbackInput): Promise<void>;
 }

@@ -21,6 +21,9 @@ import {
   type AutomationMetaAdSetEditExecutionInput,
   type AutomationMetaAdSetEditExecutionResult,
   type AutomationMetaAdSetEditRollbackInput,
+  type AutomationMetaAdSetTargetingEditExecutionInput,
+  type AutomationMetaAdSetTargetingEditExecutionResult,
+  type AutomationMetaAdSetTargetingEditRollbackInput,
   type MetaAdSetStatus,
 } from '../../automation-runtime';
 import { usdToCents, type MetaAdsApiClient, type MetaObjectStatus, type MetaUpdateAdSetParams } from './api-client';
@@ -381,6 +384,37 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     if (Object.keys(updateParams).length > 0) {
       await this.apiClient.updateAdSet(input.adSetResourceName, updateParams);
     }
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  /**
+   * Reads the ad set's true pre-edit targeting spec live (see
+   * `AutomationMetaAdSetTargetingEditExecutionInput`'s own doc comment for
+   * why — `AutomationTargetStateModel` has no per-ad-set targeting field to
+   * source it from, same reasoning `executeMetaAdSetEdit` establishes for
+   * budget/status), applies the new targeting spec as a whole via a single
+   * `updateAdSet` call, and returns the real pre-edit spec so
+   * `executeActionByType` (`automation.service.ts`) can widen `action.before`
+   * with it for `rollbackMetaAdSetTargetingEdit` to restore later.
+   */
+  async executeMetaAdSetTargetingEdit(input: AutomationMetaAdSetTargetingEditExecutionInput): Promise<AutomationMetaAdSetTargetingEditExecutionResult> {
+    const target = await loadTarget(input);
+    if (!target.meta_ad_set_resource_names?.includes(input.adSetResourceName)) {
+      throw new MetaAdSetNotOwnedByTargetError(target.id, input.adSetResourceName);
+    }
+
+    const current = await this.apiClient.getAdSet(input.adSetResourceName);
+    await this.apiClient.updateAdSet(input.adSetResourceName, { targeting: input.targeting });
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return { previousTargeting: current.targeting };
+  }
+
+  /** Re-applies exactly the pre-edit targeting spec `executeMetaAdSetTargetingEdit` captured — no ownership re-check needed (the action's own stored `adSetResourceName` was already validated at execute time, same posture `rollbackMetaAdSetEdit` establishes). */
+  async rollbackMetaAdSetTargetingEdit(input: AutomationMetaAdSetTargetingEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    await this.apiClient.updateAdSet(input.adSetResourceName, { targeting: input.previousTargeting });
     target.updated_at = new Date().toISOString();
     await target.save();
   }

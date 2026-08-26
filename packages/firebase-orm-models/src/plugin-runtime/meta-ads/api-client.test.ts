@@ -251,28 +251,43 @@ describe('MetaAdsHttpApiClient', () => {
     await expect(new MetaAdsHttpApiClient(OPTIONS).getCampaign('missing-campaign')).rejects.toMatchObject({ status: 404 });
   });
 
-  it('fetches an ad set by id via a GET request, including its daily budget and status (KAN-73 follow-up)', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'adset-1', daily_budget: '2500', status: 'ACTIVE' }));
+  it('fetches an ad set by id via a GET request, including its daily budget, status, and targeting (KAN-73 follow-up)', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({
+        id: 'adset-1',
+        daily_budget: '2500',
+        status: 'ACTIVE',
+        targeting: { geo_locations: { countries: ['US', 'CA'] }, age_min: 18, age_max: 45, genders: [2] },
+      }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await new MetaAdsHttpApiClient(OPTIONS).getAdSet('adset-1');
 
-    expect(result).toEqual({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE' });
+    expect(result).toEqual({
+      adSetId: 'adset-1',
+      dailyBudgetCents: 2500,
+      status: 'ACTIVE',
+      targeting: { countries: ['US', 'CA'], ageMin: 18, ageMax: 45, genders: ['female'] },
+    });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.method).toBe('GET');
     const parsedUrl = new URL(url);
     expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v21.0/adset-1');
-    expect(parsedUrl.searchParams.get('fields')).toBe('id,daily_budget,status');
+    expect(parsedUrl.searchParams.get('fields')).toBe('id,daily_budget,status,targeting');
   });
 
-  it('omits dailyBudgetCents from getAdSet when the ad set has no daily_budget field', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'adset-1', status: 'PAUSED' }));
+  it('omits dailyBudgetCents and genders from getAdSet when the ad set has no daily_budget/genders field', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      jsonResponse({ id: 'adset-1', status: 'PAUSED', targeting: { geo_locations: { countries: ['US'] }, age_min: 18, age_max: 65 } }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const result = await new MetaAdsHttpApiClient(OPTIONS).getAdSet('adset-1');
 
-    expect(result).toEqual({ adSetId: 'adset-1', status: 'PAUSED' });
+    expect(result).toEqual({ adSetId: 'adset-1', status: 'PAUSED', targeting: { countries: ['US'], ageMin: 18, ageMax: 65 } });
     expect('dailyBudgetCents' in result).toBe(false);
+    expect('genders' in result.targeting).toBe(false);
   });
 
   it('throws MetaAdsApiError with the response status when the ad set lookup fails', async () => {
@@ -316,6 +331,20 @@ describe('MetaAdsHttpApiClient', () => {
     const body = new URLSearchParams(String(init.body));
     expect(body.get('status')).toBe('ACTIVE');
     expect(body.has('daily_budget')).toBe(false);
+  });
+
+  it('updates an ad set with a JSON-encoded targeting spec, omitting budget/status from the request body (KAN-73 follow-up)', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).updateAdSet('adset-1', { targeting: { countries: ['FR'], ageMin: 21, ageMax: 55, genders: ['male'] } });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://graph.facebook.com/v21.0/adset-1');
+    const body = new URLSearchParams(String(init.body));
+    expect(body.has('daily_budget')).toBe(false);
+    expect(body.has('status')).toBe(false);
+    expect(JSON.parse(body.get('targeting') as string)).toEqual({ geo_locations: { countries: ['FR'] }, age_min: 21, age_max: 55, genders: [1] });
   });
 
   it('throws MetaAdsApiError with the response status when updateAdSet fails', async () => {

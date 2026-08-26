@@ -20,7 +20,13 @@ import type {
   AutomationMetaAdSetEditExecutionInput,
   AutomationMetaAdSetEditExecutionResult,
   AutomationMetaAdSetEditRollbackInput,
+  AutomationMetaAdSetTargetingEditExecutionInput,
+  AutomationMetaAdSetTargetingEditExecutionResult,
+  AutomationMetaAdSetTargetingEditRollbackInput,
 } from './executor';
+
+/** A plausible "previous" targeting spec for a demo/simulated target with no real per-ad-set targeting tracked on `AutomationTargetStateModel` — same fabrication posture `executeMetaAdCreativeEdit`'s own doc comment establishes for its simulated "previous" creative id. */
+const SIMULATED_PREVIOUS_TARGETING = { countries: ['US'], ageMin: 18, ageMax: 65 };
 
 interface TargetLookup {
   organizationId: string;
@@ -177,6 +183,20 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
   }
 
   async rollbackMetaAdSetEdit(input: AutomationMetaAdSetEditRollbackInput): Promise<void> {
+    const target = await loadTarget(input);
+    target.updated_at = new Date().toISOString();
+    await target.save();
+  }
+
+  /** No per-ad-set live targeting spec is tracked on `AutomationTargetStateModel` (a real Meta connector needs a live lookup, see `MetaAutomationActionExecutor.executeMetaAdSetTargetingEdit`'s own doc comment), so this stand-in reports a fixed plausible "previous" spec for a demo/simulated target without a real one to snapshot. */
+  async executeMetaAdSetTargetingEdit(input: AutomationMetaAdSetTargetingEditExecutionInput): Promise<AutomationMetaAdSetTargetingEditExecutionResult> {
+    const target = await loadTarget(input);
+    target.updated_at = new Date().toISOString();
+    await target.save();
+    return { previousTargeting: SIMULATED_PREVIOUS_TARGETING };
+  }
+
+  async rollbackMetaAdSetTargetingEdit(input: AutomationMetaAdSetTargetingEditRollbackInput): Promise<void> {
     const target = await loadTarget(input);
     target.updated_at = new Date().toISOString();
     await target.save();
