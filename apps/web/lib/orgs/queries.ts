@@ -164,6 +164,8 @@ import {
   type ResourceTemplateModel,
   type Role,
   type SchemaDefModel,
+  searchProjectCustomersForAdmin as searchProjectCustomersForAdminInOrganization,
+  type CustomerSearchOutcome,
   type SegmentMemberCountOutcome,
   type SegmentMemberListOutcome,
   type SegmentModel,
@@ -829,6 +831,24 @@ export async function listSegmentMembers(
 ): Promise<SegmentMemberListOutcome> {
   await ensureFirestoreOrm();
   return listSegmentMembersInOrganization({ organizationId, projectId, segmentId, ...options });
+}
+
+/**
+ * Substring search over the project's landed `entities` rows (KAN-108, the web admin counterpart of
+ * the MCP `search_customers` tool) — or a typed, renderable "why not" outcome (see
+ * `CustomerSearchOutcome`'s own doc comment) for the Customers page's own search results. `query` must
+ * be non-empty; the page itself is responsible for not calling this until a caller has actually typed
+ * something, the same "don't spend a warehouse query on nothing" posture the record feed's own filter
+ * form establishes.
+ */
+export async function searchProjectCustomers(
+  organizationId: string,
+  projectId: string,
+  query: string,
+  options?: { schemaName?: string; limit?: number },
+): Promise<CustomerSearchOutcome> {
+  await ensureFirestoreOrm();
+  return searchProjectCustomersForAdminInOrganization({ organizationId, projectId, query, ...options });
 }
 
 export async function getGoal(organizationId: string, projectId: string, goalId: string): Promise<GoalModel | null> {

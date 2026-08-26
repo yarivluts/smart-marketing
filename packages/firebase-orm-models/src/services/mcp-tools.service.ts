@@ -1,9 +1,9 @@
-import { defaultWarehouseQueryExecutor, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
 import { getOnboardingState } from './onboarding.service';
-import { runQuotaGatedWarehouseQuery } from './cost-guardrail.service';
+import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 
 /**
  * Read-only data adapters backing three of the MCP server's tools (KAN-75,
@@ -124,6 +124,40 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
     executor.execute({ sql, params: queryParams }),
   );
   return rows.map(rowToCustomerResult);
+}
+
+/** Mirrors `SegmentMemberCountOutcome`/`SegmentMemberListOutcome`'s exact ok/degraded shape and reason vocabulary (`segment.service.ts`) — `searchProjectCustomersForAdmin` below backs a page's own search box, not an MCP tool call that can just error out, so the same three expected-not-buggy warehouse failure modes degrade instead of throwing. */
+export type CustomerSearchOutcome =
+  | { ok: true; results: CustomerSearchResult[] }
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
+
+/**
+ * The admin-page counterpart of {@link searchProjectCustomers} (KAN-108) — same substring-search
+ * semantics and validation (an empty/whitespace-only `query` still throws
+ * `InvalidMcpToolRequestError`, a caller bug rather than an expected runtime failure a page should
+ * degrade for), but wraps the warehouse call the way `countSegmentMembers`/`listSegmentMembers`
+ * already do so a page rendering results can show a typed "why not" state instead of crashing. Closes
+ * the "Customer 360" admin-surface gap this MCP tool never got a human-facing home for — see
+ * `omnisearch/types.ts`'s "no first-class individual-customer index yet" doc comment, which this
+ * finally addresses without needing a new index: the same `entities` table `search_customers` already
+ * reads is now also browsable from the web app.
+ */
+export async function searchProjectCustomersForAdmin(params: SearchProjectCustomersParams): Promise<CustomerSearchOutcome> {
+  try {
+    const results = await searchProjectCustomers(params);
+    return { ok: true, results };
+  } catch (error) {
+    if (error instanceof WarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured', message: error.message };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    if (error instanceof WarehouseQueryFailedError) {
+      return { ok: false, reason: 'query_error', message: error.message };
+    }
+    throw error;
+  }
 }
 
 export interface QueryProjectCohortRetentionParams {
