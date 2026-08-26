@@ -84,10 +84,28 @@ Template for each entry:
     resolve the resulting `PROGRESS.md` merge conflict (both sessions' journal entries kept, no content
     dropped), then re-ran `pnpm lint`/`typecheck`/`build` (all green, cache-hit — no code changed by
     the merge or the renumber, only doc comments/journal) before pushing.
+  - **Update (same session, ~2h later): the infra problem is worse than "queued" — jobs hang mid-step.**
+    Once runs actually started, both PR #311's and PR #312's CI jobs stalled *inside* a running job on
+    steps that normally take seconds to low-minutes: PR #311's `lint · typecheck · test · build` job
+    sat on its `Test` step for 75+ minutes (`get_workflow_job` showed `status: in_progress` with no
+    `completed_at`, no further step ever starting); PR #312's own job similarly sat on `Typecheck` for
+    40+ minutes (a step that took well under a minute in every prior CI run this repo's history
+    records, and in this session's own local run). Both are `ubuntu-latest` GitHub-hosted runners, not
+    self-hosted — this looks like a GitHub Actions platform/runner health issue rather than anything
+    in either PR's diff (both PRs' code was independently verified green via full local
+    lint/typecheck/test/build before opening). Sent a second, more specific push notification (the
+    first one under-described the severity as "queued"; this one names the mid-job hang) since it's
+    materially new, actionable information a human with direct Actions access should act on (cancel +
+    re-run the stuck jobs, or check GitHub's own status page for a platform incident) — this session
+    has no way to cancel/restart another session's PR's run (#311) and cancelling its own run (#312)
+    without being confident a re-run would fare differently isn't obviously better than continuing to
+    wait, so kept watching with a widening interval instead of guessing.
 - **Waiting on human:**
-  - **New:** GitHub Actions appears stalled repo-wide (a `main`-branch push run has sat `queued` for
-    2+ hours with zero progress) — worth a human checking Actions runner availability/billing/
-    concurrency limits directly, since this session has no visibility into infra-level causes.
+  - **New (upgraded from the "queued" report above):** GitHub Actions CI jobs are now hanging
+    *mid-step* (not merely queued) on two different PRs' independent runs, both `ubuntu-latest`
+    GitHub-hosted runners — this reads as a genuine Actions platform/runner health problem. Direct
+    access to cancel + re-trigger the stuck runs, or to check GitHub's status page for an ongoing
+    incident, would help far more than this session continuing to poll.
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
     long-standing.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
