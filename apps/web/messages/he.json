@@ -26,12 +26,12 @@
   "OmniSearch": {
     "trigger": "חיפוש...",
     "shortcutHint": "⌘K",
-    "dialogLabel": "חיפוש לוחות, מדדים, פלחים וקמפיינים",
+    "dialogLabel": "חיפוש לוחות, מדדים, פלחים, קמפיינים, יעדים וכללי ניצחון",
     "inputPlaceholder": "חיפוש לוחות, מדדים, פלחים, קמפיינים...",
     "emptyPrompt": "התחילו להקליד כדי לחפש בפרויקט זה.",
     "loading": "טוען...",
     "noResults": "אין תוצאות עבור \"{query}\".",
-    "resultType": "{type, select, board {לוח} metric {מדד} segment {פלח} campaign {קמפיין} goal {יעד} other {תוצאה}}"
+    "resultType": "{type, select, board {לוח} metric {מדד} segment {פלח} campaign {קמפיין} goal {יעד} win_rule {כלל ניצחון} other {תוצאה}}"
   },
   "Auth": {
     "emailLabel": "אימייל",
