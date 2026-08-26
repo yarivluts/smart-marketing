@@ -429,6 +429,33 @@ export function activeSchemaNamesForKind(defs: readonly SchemaDefModel[], kind: 
   return [...new Set(defs.filter((def) => def.kind === kind && def.status === 'active').map((def) => def.name))].sort();
 }
 
+/** The lookup key {@link buildActiveSchemaDefsByKindAndName}'s map uses — exported so a caller looking up one specific entry (rather than iterating the whole map) builds the identical key. */
+export function schemaDefMapKey(kind: SchemaDefKind, name: string): string {
+  return `${kind}:${name}`;
+}
+
+/**
+ * Every currently-`active` schema def in `defs`, keyed by {@link schemaDefMapKey}
+ * — lets a caller that already loaded a project's full schema-def list (e.g.
+ * `listSchemaDefinitionsForProject`) look up a specific active version by
+ * kind+name without a fresh Firestore query. Same "derive view-side from data
+ * already fetched" posture {@link activeSchemaNamesForKind} uses one level up
+ * (names only, not the full def); this is the sibling a caller that also
+ * needs each schema's own `field_defs` (e.g. `segment.service.ts`'s
+ * per-segment filter compilation) reaches for instead of `getActiveSchemaDefinition`
+ * per lookup, the same "precomputed shared state" convention `board.service.ts`'s
+ * `queryBoardTiles` established for its own per-tile fan-out.
+ */
+export function buildActiveSchemaDefsByKindAndName(defs: readonly SchemaDefModel[]): ReadonlyMap<string, SchemaDefModel> {
+  const map = new Map<string, SchemaDefModel>();
+  for (const def of defs) {
+    if (def.status === 'active') {
+      map.set(schemaDefMapKey(def.kind, def.name), def);
+    }
+  }
+  return map;
+}
+
 /** The current `active` version of one schema family, or `null` if it's never been registered — the shape a future ingest validator (KAN-32) would consume. */
 export async function getActiveSchemaDefinition(
   organizationId: string,

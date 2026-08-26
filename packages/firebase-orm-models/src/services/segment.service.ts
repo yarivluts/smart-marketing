@@ -13,14 +13,14 @@ import {
 import { ProjectModel } from '../models/project.model';
 import { SegmentModel } from '../models/segment.model';
 import { OrgPersonModel } from '../models/org-person.model';
-import type { SchemaFieldType } from '../models/schema-def.model';
+import type { SchemaDefModel, SchemaFieldType } from '../models/schema-def.model';
 import { STRIPE_SUBSCRIPTION_ENTITY_NAME } from '../plugin-runtime/stripe/schemas';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
-import { getActiveSchemaDefinition } from './schema-registry.service';
+import { getActiveSchemaDefinition, schemaDefMapKey } from './schema-registry.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { escapeLikePattern, parseJsonColumn } from './mcp-tools.service';
-import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
+import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError, type ProjectCostQuota } from './cost-guardrail.service';
 import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor } from '../warehouse/query-executor';
 
 export class InvalidSegmentError extends Error {
@@ -449,6 +449,17 @@ export interface CountSegmentMembersParams {
   environmentId?: string;
   /** Defaults to `defaultWarehouseQueryExecutor` — overridable so tests can inject a fake executor without a real warehouse, the same convention `queryMetrics`/`searchProjectCustomers` establish. */
   executor?: WarehouseQueryExecutor;
+  /**
+   * Precomputed shared state a batched caller (the segments page, fanning
+   * this out once per segment) already fetched once for the whole page — the
+   * same `precomputed*` convention `board.service.ts`'s `queryBoardTiles`
+   * established for its own per-tile fan-out. A direct caller (every existing
+   * test, `syncSegmentToCrm`, an MCP tool) omits these and gets today's
+   * per-call-fetch behavior unchanged.
+   */
+  precomputedQuota?: ProjectCostQuota;
+  /** See {@link buildActiveSchemaDefsByKindAndName} — built once from a project's already-fetched schema-def list instead of one `getActiveSchemaDefinition` Firestore query per segment (plus one more per event condition). */
+  precomputedActiveSchemaDefsByKindAndName?: ReadonlyMap<string, SchemaDefModel>;
 }
 
 /** Mirrors `GoalProgressOutcome`/`BoardTileQueryOutcome`'s exact shape and reason vocabulary — a segment's member-count badge degrades on the segments page the same way a goal thermometer or board tile does, rather than crashing the page, for the same expected-not-buggy failure modes (no warehouse yet, the project's spent its daily query quota, or the warehouse rejected the query). Since KAN-39's quota guardrail was wired into this whole hand-written-SQL family (`runQuotaGatedWarehouseQuery` — also used by `searchProjectCustomers`/`queryProjectCohortRetention`/`queryProjectFunnelSteps`), `quota_exceeded` degrades the same way `queryBoardTile`/`queryGoalProgress` already do rather than throwing outright — the segments page can't "fail the whole page" the way an MCP tool call can just error out. */
@@ -469,14 +480,30 @@ export type SegmentMemberCountOutcome =
  * `queryBoardTile`/`queryGoalProgress` do, so an unconfigured/rejecting
  * warehouse degrades the badge instead of crashing the segments page.
  */
+/** Looks up one active schema def by kind+name, preferring `precomputed` (a caller's own already-fetched map) over a fresh `getActiveSchemaDefinition` Firestore query. */
+async function resolveActiveSchemaDefinition(
+  organizationId: string,
+  projectId: string,
+  kind: 'entity' | 'event',
+  name: string,
+  precomputed: ReadonlyMap<string, SchemaDefModel> | undefined,
+): Promise<SchemaDefModel | null> {
+  const fromPrecomputed = precomputed?.get(schemaDefMapKey(kind, name));
+  if (fromPrecomputed) {
+    return fromPrecomputed;
+  }
+  return getActiveSchemaDefinition(organizationId, projectId, kind, name);
+}
+
 /** The `WHERE`-clause fragments + bound parameters common to every warehouse read scoped to one segment's own schema+filters (`countSegmentMembers` and `listSegmentMembers` alike) — factored out once a second caller needed the exact same compilation `countSegmentMembers` already did. */
 async function buildSegmentMemberWhereClause(
   organizationId: string,
   projectId: string,
   segment: SegmentModel,
   environmentId: string | undefined,
+  precomputedActiveSchemaDefsByKindAndName?: ReadonlyMap<string, SchemaDefModel>,
 ): Promise<{ filters: string[]; queryParams: Record<string, string> }> {
-  const schemaDef = await getActiveSchemaDefinition(organizationId, projectId, 'entity', segment.schema_name);
+  const schemaDef = await resolveActiveSchemaDefinition(organizationId, projectId, 'entity', segment.schema_name, precomputedActiveSchemaDefsByKindAndName);
   const fieldTypeByName = new Map((schemaDef?.field_defs ?? []).map((field) => [field.name, field.type]));
 
   const filters = ['organization_id = @organizationId', 'project_id = @projectId', 'schema_name = @schemaName'];
@@ -494,7 +521,7 @@ async function buildSegmentMemberWhereClause(
   });
 
   for (const [index, condition] of (segment.event_conditions ?? []).entries()) {
-    const eventSchemaDef = await getActiveSchemaDefinition(organizationId, projectId, 'event', condition.schemaName);
+    const eventSchemaDef = await resolveActiveSchemaDefinition(organizationId, projectId, 'event', condition.schemaName, precomputedActiveSchemaDefsByKindAndName);
     const eventFieldTypeByName = new Map((eventSchemaDef?.field_defs ?? []).map((field) => [field.name, field.type]));
     filters.push(emitSegmentEventCondition(condition, index, environmentId, eventFieldTypeByName, queryParams));
   }
@@ -506,12 +533,22 @@ export async function countSegmentMembers(params: CountSegmentMembersParams): Pr
   const segment = await loadSegment(params.organizationId, params.projectId, params.segmentId);
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
   const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
-  const { filters, queryParams } = await buildSegmentMemberWhereClause(params.organizationId, params.projectId, segment, environmentId);
+  const { filters, queryParams } = await buildSegmentMemberWhereClause(
+    params.organizationId,
+    params.projectId,
+    segment,
+    environmentId,
+    params.precomputedActiveSchemaDefsByKindAndName,
+  );
 
   const sql = `SELECT COUNT(*) AS member_count FROM entities WHERE ${filters.join(' AND ')}`;
   try {
-    const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'count_segment_members' }, () =>
-      executor.execute({ sql, params: queryParams }),
+    const rows = await runQuotaGatedWarehouseQuery(
+      params.organizationId,
+      params.projectId,
+      { tool: 'count_segment_members' },
+      () => executor.execute({ sql, params: queryParams }),
+      params.precomputedQuota,
     );
     return { ok: true, count: Number(rows[0]?.member_count ?? 0) };
   } catch (error) {

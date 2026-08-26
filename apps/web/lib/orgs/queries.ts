@@ -3,6 +3,7 @@ import { cache } from 'react';
 import {
   checkProjectQueryQuota as checkProjectQueryQuotaInOrganization,
   countSegmentMembers as countSegmentMembersInOrganization,
+  resolveDefaultQueryEnvironment as resolveDefaultQueryEnvironmentInOrganization,
   getActiveAutomationGuardrailPolicy as getActiveAutomationGuardrailPolicyInOrganization,
   getAutomationKillSwitchStatus as getAutomationKillSwitchStatusInOrganization,
   getBoard as getBoardInOrganization,
@@ -255,6 +256,12 @@ export async function listEnvironmentsForProject(
 ): Promise<EnvironmentModel[]> {
   await ensureFirestoreOrm();
   return listEnvironmentsForProjectInOrganization(organizationId, projectId);
+}
+
+/** The project's `prod` environment, or its first if none is named `prod`, or `null` if it has none yet. */
+export async function resolveDefaultQueryEnvironment(organizationId: string, projectId: string): Promise<EnvironmentModel | null> {
+  await ensureFirestoreOrm();
+  return resolveDefaultQueryEnvironmentInOrganization(organizationId, projectId);
 }
 
 export async function listApiKeysForProject(organizationId: string, projectId: string): Promise<ApiKeySummary[]> {
@@ -783,10 +790,27 @@ export async function listBillingCollectionSignalsForProject(
   return listBillingCollectionSignalsForProjectInOrganization(organizationId, projectId, { existingEntries });
 }
 
-/** One segment's live member count (or a typed, renderable "why not" outcome — see `SegmentMemberCountOutcome`'s own doc comment) for the Segments page's own member-count badge. */
-export async function countSegmentMembers(organizationId: string, projectId: string, segmentId: string): Promise<SegmentMemberCountOutcome> {
+/**
+ * One segment's live member count (or a typed, renderable "why not" outcome
+ * — see `SegmentMemberCountOutcome`'s own doc comment) for the Segments
+ * page's own member-count badge. `options` lets a caller fanning this out
+ * per segment on one page (the only real caller today) pass in shared state
+ * it already fetched once — the environment, the project's cost quota, and
+ * the project's active schema defs — instead of paying for a fresh
+ * `resolveDefaultQueryEnvironment`/quota-config/schema-def read per segment.
+ */
+export async function countSegmentMembers(
+  organizationId: string,
+  projectId: string,
+  segmentId: string,
+  options?: {
+    environmentId?: string;
+    precomputedQuota?: ProjectCostQuota;
+    precomputedActiveSchemaDefsByKindAndName?: ReadonlyMap<string, SchemaDefModel>;
+  },
+): Promise<SegmentMemberCountOutcome> {
   await ensureFirestoreOrm();
-  return countSegmentMembersInOrganization({ organizationId, projectId, segmentId });
+  return countSegmentMembersInOrganization({ organizationId, projectId, segmentId, ...options });
 }
 
 export async function getGoal(organizationId: string, projectId: string, goalId: string): Promise<GoalModel | null> {

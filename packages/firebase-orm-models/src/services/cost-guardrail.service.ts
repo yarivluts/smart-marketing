@@ -271,14 +271,24 @@ async function logCostAttemptBestEffort(
  * hand-written read ran (e.g. `{ tool: 'search_customers' }`) rather than
  * which metric *definitions* it depended on, since none of these reads
  * depend on the metric registry at all.
+ *
+ * `precomputedQuota` mirrors `checkProjectQueryQuota`'s own param of the same
+ * name — a caller fanning this out per-item over one project (e.g. the
+ * segments page's per-segment `countSegmentMembers` calls) can fetch the
+ * quota config doc once and skip a redundant re-fetch on every item, the same
+ * "precomputed shared state" convention `board.service.ts`'s `queryBoardTiles`
+ * established. Each call still re-reads today's attempted-query count fresh
+ * (inside `checkProjectQueryQuota`), since every call is itself a real query
+ * attempt that changes that count for the next one.
  */
 export async function runQuotaGatedWarehouseQuery<T>(
   organizationId: string,
   projectId: string,
   definitionRefs: Record<string, string>,
   run: () => Promise<T>,
+  precomputedQuota?: ProjectCostQuota,
 ): Promise<T> {
-  const quota = await checkProjectQueryQuota(organizationId, projectId);
+  const quota = await checkProjectQueryQuota(organizationId, projectId, new Date(), precomputedQuota);
   if (!quota.allowed) {
     await logCostAttemptBestEffort(organizationId, projectId, 'blocked_quota_exceeded', definitionRefs);
     throw new ProjectQueryQuotaExceededError(quota.limit);
