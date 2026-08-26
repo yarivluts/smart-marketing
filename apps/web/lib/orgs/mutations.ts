@@ -41,6 +41,7 @@ import {
   createBoard as createBoardInOrganization,
   createOrganizationWithOwner,
   createOrgPerson as createOrgPersonInOrganization,
+  updateOrgPerson as updateOrgPersonInOrganization,
   createProject as createProjectInOrganization,
   createResourceTemplate as createResourceTemplateInOrganization,
   applyFieldMappingToDelivery as applyFieldMappingToDeliveryInOrganization,
@@ -295,6 +296,21 @@ interface CreateOrgPersonInput {
 export async function createOrgPerson(input: CreateOrgPersonInput): Promise<OrgPersonModel> {
   await ensureFirestoreOrm();
   return createOrgPersonInOrganization(input);
+}
+
+interface UpdateOrgPersonInput {
+  organizationId: string;
+  personId: string;
+  name: string;
+  email?: string;
+  title?: string;
+  photoUrl?: string;
+  actorId: string;
+}
+
+export async function updateOrgPerson(input: UpdateOrgPersonInput): Promise<OrgPersonModel> {
+  await ensureFirestoreOrm();
+  return updateOrgPersonInOrganization(input);
 }
 
 interface RequestResourceAttachmentInput {
