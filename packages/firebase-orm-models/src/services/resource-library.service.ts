@@ -156,18 +156,87 @@ export async function listOrgPeople(organizationId: string): Promise<OrgPersonMo
     .get();
 }
 
+/** Loads one org person and confirms it actually belongs to `organizationId` (never trust a caller-supplied id blindly). Shared by {@link requireResourceInOrg} and {@link updateOrgPerson}. */
+async function loadOrgPerson(organizationId: string, personId: string): Promise<OrgPersonModel> {
+  const person = await OrgPersonModel.init(personId, { organization_id: organizationId });
+  if (!person || person.organization_id !== organizationId) {
+    throw new ResourceNotFoundError();
+  }
+  return person;
+}
+
+export interface UpdateOrgPersonParams {
+  organizationId: string;
+  personId: string;
+  name: string;
+  /** Omit (or pass `undefined`) to clear the field — this is a full replace of the editable fields, not a sparse patch, matching `createOrgPerson`'s own optional-field posture. */
+  email?: string;
+  title?: string;
+  photoUrl?: string;
+  actorId: string;
+}
+
+/**
+ * Corrects an existing person's own registry entry. Unlike every other
+ * library resource this service manages, `createOrgPerson`/`listOrgPeople`
+ * had create + list but no way to fix a typo'd name or a stale
+ * email/title/photo once a person was registered — a real gap against this
+ * codebase's own "everything user-manageable gets an admin surface" rule,
+ * since a person here (KAN-27's `dim_team_member` registry) is referenced
+ * by id from goals, segments, and rep-collection entries (KAN-64/76/88), so
+ * a rename must update the one shared document those references already
+ * point at rather than requiring a delete-and-recreate that would orphan
+ * them.
+ */
+export async function updateOrgPerson(params: UpdateOrgPersonParams): Promise<OrgPersonModel> {
+  const person = await loadOrgPerson(params.organizationId, params.personId);
+
+  const before = {
+    name: person.name,
+    email: person.email ?? null,
+    title: person.title ?? null,
+    photoUrl: person.photo_url ?? null,
+  };
+
+  person.name = params.name;
+  person.email = params.email;
+  person.title = params.title;
+  person.photo_url = params.photoUrl;
+  await person.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'org_person.update',
+      targetType: 'org_person',
+      targetId: person.id,
+      summary: `Updated person "${person.name}"`,
+      before,
+      after: { name: person.name, email: person.email ?? null, title: person.title ?? null, photoUrl: person.photo_url ?? null },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return person;
+}
+
 /** Loads the named resource by kind and confirms it actually belongs to `organizationId` (never trust a caller-supplied id blindly). */
 async function requireResourceInOrg(
   organizationId: string,
   resourceKind: ResourceKind,
   resourceId: string,
 ): Promise<SharedCredentialModel | ResourceTemplateModel | OrgPersonModel> {
+  if (resourceKind === 'person') {
+    return loadOrgPerson(organizationId, resourceId);
+  }
+
   const resource =
     resourceKind === 'credential'
       ? await SharedCredentialModel.init(resourceId, { organization_id: organizationId })
-      : resourceKind === 'template'
-        ? await ResourceTemplateModel.init(resourceId, { organization_id: organizationId })
-        : await OrgPersonModel.init(resourceId, { organization_id: organizationId });
+      : await ResourceTemplateModel.init(resourceId, { organization_id: organizationId });
 
   if (!resource || resource.organization_id !== organizationId) {
     throw new ResourceNotFoundError();

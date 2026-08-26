@@ -17,6 +17,66 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — Opened/renumbered PR #305 (KAN-100, org-person edit)
+
+- **Last completed:**
+  - Session start: `main` at 4ad2b20, `TASKS.md` fully `done` except the standing KAN-18/19/43/50/51
+    items. `list_pull_requests` showed two concurrent sessions' open PRs at pick time: #302 (KAN-96,
+    board-tile batched reads) and #304 (KAN-98, org member role change). Delegated a sweep for a third,
+    unclaimed, buildable-today gap.
+  - The sweep's candidate: CLAUDE.md's own "everything user-manageable gets an admin surface" rule
+    applied to `resource-library.service.ts`'s `createOrgPerson`/`listOrgPeople` (KAN-27) — unlike every
+    other user-manageable entity in this codebase, the org's people registry had create + list but no
+    way to fix a typo'd name or a stale email/title/photo once a person was registered, only
+    delete-and-recreate (which would orphan the `org_person_id` references goals/segments/rep-collection
+    entries hold). No ticket existed for this — minted as **KAN-99** at pick time.
+  - **Delivered (PR #305, branch `kan-99-org-person-edit`):** `updateOrgPerson()`
+    (`resource-library.service.ts`, full replace of the editable fields, sharing a new `loadOrgPerson`
+    lookup helper with `requireResourceInOrg`'s existing person branch), audit-logged as
+    `org_person.update` with before/after values. New `PATCH /api/orgs/[orgId]/resources/people/[personId]`
+    route (`resources.manage` gated, same as create). New `EditPersonForm` admin control on the org
+    Resource Library page's people section (an "Edit" toggle pre-filled with current values, only shown
+    to callers who already hold `resources.manage`). en/he translations. Full test coverage: emulator
+    tests (all-fields update + list reflects it, omitted-optional-fields clear rather than staying
+    stale, not-found, cross-org isolation, audit-log before/after), route tests (401/403/400/404/200), a
+    KAN-26 isolation-test addition, and an `EditPersonForm` component test suite.
+  - **Collision found and fixed at merge time:** by the time this PR was ready to merge, `main` had
+    advanced past a *different* concurrent session's PR #306, which had independently minted the exact
+    same number — **KAN-99**, for global omnisearch goal-indexing — and already merged. Fetched and
+    merged `main` into this branch; the only real conflict was `TASKS.md`'s own row (both PRs inserted
+    a `| KAN-99 | ... |` row). Resolved by keeping PR #306's KAN-99 row as-is (it was already merged and
+    is the earlier-numbered claim) and **renumbering this PR's story to KAN-100** everywhere it appears
+    in-repo: the `TASKS.md` row (with a note on the renumbering), this entry, the PR title, and four
+    code-level doc comments/test descriptions that named "KAN-99"
+    (`resource-library.emulator.test.ts`, `edit-person-form.tsx`, the new route's own doc comment,
+    `isolation.test.ts`) — none of these were behavioral, all comment/description text only, so no
+    logic changed. `apps/web/messages/en.json`/`he.json` and the omnisearch-touching files merged
+    cleanly with no conflict (disjoint from this PR's own diff).
+  - Re-verified `pnpm lint`/`pnpm typecheck` clean and re-ran the directly affected test files
+    (`resource-library.emulator.test.ts`, `edit-person-form.test.tsx`, `route.test.ts`, `isolation.test.ts`)
+    green against the merged state before pushing; relying on CI for the full monorepo re-verification
+    given the rename-only nature of the merge conflict resolution.
+- **In progress (exact stopping point):** merge-conflict resolution pushed to `kan-99-org-person-edit`
+  (branch name unchanged from before the renumbering — only the story's own KAN number and PR title
+  changed) as KAN-100; PR title updated on GitHub to say KAN-100. Waiting on CI to report on the merge
+  commit, then merge (squash) into `main` and update `TASKS.md`'s KAN-100 row / this entry to reflect
+  the merge, same as every prior entry in this file does.
+- **Blocked + why:** nothing blocking; waiting on CI.
+- **Next step:** on the next check, verify CI is green and `mergeable_state` is clean, merge (squash),
+  delete the branch, and record the merge in a follow-up entry. After that, resume the sweep pattern for
+  the next unclaimed, buildable-today gap (re-check `list_pull_requests` first for any other concurrent
+  session's in-flight work — this run's own experience shows collisions on both the code and the KAN
+  number itself are a live risk when multiple sessions sweep concurrently; a future improvement worth
+  considering is checking `TASKS.md` on the freshest `main` immediately before minting a new KAN number,
+  not just at pick time).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+
+---
+
 ## 2026-08-26 (latest) — Merged PR #306 (KAN-99, omnisearch indexes goals)
 
 - **Last completed:**

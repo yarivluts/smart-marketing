@@ -28,6 +28,7 @@ import {
   ResourceAttachmentModel,
   ResourceNotFoundError,
   setResourceAttachmentWriteTier,
+  updateOrgPerson,
   verifyAuditLogChainForOrg,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -97,6 +98,110 @@ describe('shared credentials, templates, and people registry: create + list', ()
 
     const people = await listOrgPeople(organization.id);
     expect(people.map((p) => p.id)).toContain(person.id);
+  });
+});
+
+describe('updateOrgPerson (KAN-100)', () => {
+  it('updates a person\'s name, email, title, and photo URL, persisted for a later list', async () => {
+    const { owner, organization } = await setupOrgWithOwner('People Update Org');
+    const person = await createOrgPerson({
+      organizationId: organization.id,
+      name: 'Jordan Rep',
+      email: uniqueEmail('jordan'),
+      title: 'Account Manager',
+      createdByUserId: owner.id,
+    });
+
+    const newEmail = uniqueEmail('jordan-smith');
+    const updated = await updateOrgPerson({
+      organizationId: organization.id,
+      personId: person.id,
+      name: 'Jordan Smith',
+      email: newEmail,
+      title: 'Senior Account Manager',
+      photoUrl: 'https://example.com/jordan-smith.png',
+      actorId: owner.id,
+    });
+
+    expect(updated.name).toBe('Jordan Smith');
+    expect(updated.email).toBe(newEmail);
+    expect(updated.title).toBe('Senior Account Manager');
+    expect(updated.photo_url).toBe('https://example.com/jordan-smith.png');
+
+    const [reloaded] = (await listOrgPeople(organization.id)).filter((p) => p.id === person.id);
+    expect(reloaded.name).toBe('Jordan Smith');
+    expect(reloaded.email).toBe(newEmail);
+  });
+
+  it('clears email/title/photoUrl when omitted, without touching the name', async () => {
+    const { owner, organization } = await setupOrgWithOwner('People Clear Org');
+    const person = await createOrgPerson({
+      organizationId: organization.id,
+      name: 'Full Fields',
+      email: uniqueEmail('full'),
+      title: 'Rep',
+      photoUrl: 'https://example.com/full.png',
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateOrgPerson({
+      organizationId: organization.id,
+      personId: person.id,
+      name: 'Full Fields',
+      actorId: owner.id,
+    });
+
+    expect(updated.name).toBe('Full Fields');
+    expect(updated.email).toBeUndefined();
+    expect(updated.title).toBeUndefined();
+    expect(updated.photo_url).toBeUndefined();
+  });
+
+  it('rejects updating a person id that does not exist', async () => {
+    const { owner, organization } = await setupOrgWithOwner('People Missing Org');
+    await expect(
+      updateOrgPerson({ organizationId: organization.id, personId: 'does-not-exist', name: 'X', actorId: owner.id }),
+    ).rejects.toThrow(ResourceNotFoundError);
+  });
+
+  it("rejects updating another org's person, even with a real person id (isolation)", async () => {
+    const { owner: ownerA, organization: orgA } = await setupOrgWithOwner('People Isolation Org A');
+    const { owner: ownerB, organization: orgB } = await setupOrgWithOwner('People Isolation Org B');
+    const personInA = await createOrgPerson({ organizationId: orgA.id, name: 'Org A Rep', createdByUserId: ownerA.id });
+
+    await expect(
+      updateOrgPerson({ organizationId: orgB.id, personId: personInA.id, name: 'Hijacked', actorId: ownerB.id }),
+    ).rejects.toThrow(ResourceNotFoundError);
+  });
+
+  it('records an audit log entry with before/after values', async () => {
+    const { owner, organization } = await setupOrgWithOwner('People Audit Org');
+    const person = await createOrgPerson({
+      organizationId: organization.id,
+      name: 'Before Name',
+      email: uniqueEmail('before'),
+      createdByUserId: owner.id,
+    });
+    const beforeEmail = person.email;
+
+    await updateOrgPerson({
+      organizationId: organization.id,
+      personId: person.id,
+      name: 'After Name',
+      title: 'New Title',
+      actorId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const [entry] = entries.filter((e) => e.action === 'org_person.update');
+    expect(entry).toBeDefined();
+    expect(entry.actor_id).toBe(owner.id);
+    expect(entry.target_type).toBe('org_person');
+    expect(entry.target_id).toBe(person.id);
+    expect(entry.before).toEqual({ name: 'Before Name', email: beforeEmail, title: null, photoUrl: null });
+    expect(entry.after).toEqual({ name: 'After Name', email: null, title: 'New Title', photoUrl: null });
+
+    await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
   });
 });
 
