@@ -17,6 +17,75 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — PR #312 open (KAN-105, omnisearch win-rule indexing), CI stuck
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). No open PRs at pick time.
+  - Delegated a bounded background sweep agent (same "grep every `done` row's own deferred/not-yet
+    doc-comment note for a newly-buildable follow-up" pattern KAN-96/99/101/104 established) to find
+    the next candidate, explicitly excluding the `ServiceAccountModel`/project-scoped-permission gap
+    a prior entry flagged as needing a human's scoping decision, plus every other already-parked item
+    (real BigQuery orchestration, Terraform reconciliation, Redis/Pub/Sub, staging env, PMax/
+    Lookalike, branch-deletion cleanup).
+  - Top candidate: `omnisearch/types.ts`'s own inclusion criterion for the KAN-85 global omnisearch
+    index ("a project-scoped 'list everything' query plus a stable browse destination") already
+    applies to win rules exactly as it does to goals (KAN-99) — full CRUD exists
+    (`listWinRulesForProject`/`createWinRule`/`updateWinRule`/`deleteWinRule`), a named entity
+    (`WinRuleModel.name`), a dedicated `/win-rules` page gated on the same `dashboards.write`
+    permission goals/segments already reuse — but win rules were simply never added, the identical
+    "satisfies the criterion but missed" pattern KAN-99's own entry describes for goals.
+  - **Delivered (PR #312, branch `kan-105-omnisearch-win-rules`, filed as KAN-105):** `win_rule` added
+    to `OMNI_SEARCH_RESULT_TYPES` (`packages/shared`); `buildOmniSearchIndexForProject`
+    (`apps/web/lib/orgs/omnisearch.ts`) fetches `listWinRulesForProject` gated on a new
+    `canSearchWinRules` (= `canManageBoards`, mirroring goals/segments) and links each result to
+    `${base}/win-rules` (no per-item detail page exists for a win rule, so this follows the
+    segments/campaigns pattern rather than the goals per-item-page pattern); the omnisearch route
+    wires `canSearchWinRules: canManageBoards`; the Cmd/Ctrl-K palette gained a `Trophy` icon
+    (matching the icon `ProjectLayout` already uses for the Win Rules nav item) and en/he `resultType`
+    ICU branches. Every seam was purely additive — no new permission, model, or page needed.
+  - Test coverage: extended `omnisearch.test.ts` (win-rule inclusion + href, permission-gating,
+    only-fetches-permitted-types) mirroring the exact goal test cases KAN-99 added.
+  - Full local verification before opening the PR: `pnpm build`/`pnpm typecheck`/`pnpm lint` green
+    across all 8 packages; full monorepo `pnpm test` green (`@growthos/shared` 593/593,
+    `@growthos/web` unit + Firestore/Auth-emulator + Playwright e2e all green — 2 known-flaky e2e
+    specs unrelated to this diff, `resource-library.spec.ts` and `tv-pairing.spec.ts`, both passed on
+    Playwright's own automatic retry).
+  - Self-reviewed the full diff before opening the PR (correctness of the permission gate, href
+    choice, icon/translation consistency with the goal precedent) — no issues found; the change is a
+    line-for-line mirror of the already-merged, already-reviewed KAN-99 pattern.
+- **In progress (exact stopping point):** PR #312 is open, implementation-complete, and fully
+  verified locally, but **GitHub Actions has not returned a CI result for it** — `get_check_runs`
+  reports zero check runs registered at all more than two hours after the PR was opened, and a
+  same-day `main`-branch push run (`id 32984116108`, the KAN-101 merge commit) has been stuck in
+  `status: queued` for the same two-hour window with zero progress. This is a repo-wide GitHub
+  Actions runner-availability stall, not a problem with this diff or a flaky test — matching the
+  same "shared runner contention" class the 2026-07-04 KAN-20 entry and the KAN-103 entry both
+  independently diagnosed and documented rather than working around. Per CLAUDE.md's own rule ("CI
+  must be green before a PR is opened... merge once clean and green"), **not merging without an
+  actual CI result** — subscribed to PR activity (`subscribe_pr_activity`) and will keep checking in
+  with widening intervals until either CI clears on its own or a human intervenes.
+- **Blocked + why:** GitHub Actions runner-availability stall, repo-wide (not this PR's diff) —
+  outside this session's control. Not a code problem to fix.
+- **Next step:** once CI actually returns a result for PR #312 (or a human confirms the queue has
+  cleared), verify it's green, merge (squash), delete the branch, and update this file + `TASKS.md`'s
+  KAN-105 row from `in-progress` to `done`. If CI comes back red, diagnose per CLAUDE.md's CI-red
+  policy before deciding whether to re-run or fix. If the stall is still unresolved after a much
+  longer wait, a human may need to check the GitHub Actions runner/billing status directly (this
+  session has no visibility into *why* the queue isn't draining, only that it isn't).
+- **Waiting on human:**
+  - **New:** GitHub Actions appears stalled repo-wide (a `main`-branch push run has sat `queued` for
+    2+ hours with zero progress) — worth a human checking Actions runner availability/billing/
+    concurrency limits directly, since this session has no visibility into infra-level causes.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
+    rows — still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin`.
+
+---
+
 ## 2026-08-26 (latest) — Merged PR #310 (KAN-104, segments-page batched precompute)
 
 - **Last completed:**
