@@ -17,6 +17,96 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — Merged PR #302 (KAN-96, board-tile batched query reads)
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row KAN-17..KAN-94 `done` except the standing
+    KAN-18/19 infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). `list_pull_requests` showed one
+    open PR, #301 (KAN-95, segment-form nested event-condition filters) — unrelated, so no collision to
+    route around.
+  - Delegated a scoping sweep (subagent) for a genuine, unclaimed, buildable-today follow-up per this
+    repo's established "sweep every `done` row's own deferred/not-yet doc-comment notes" pattern. It
+    surfaced `board.service.ts`'s own `queryBoardTile` doc comment, which named a "known, deliberately
+    deferred inefficiency" verbatim: the board detail page and TV rotation route each fan out one
+    `queryBoardTile` call per tile via `Promise.all`, and every call independently re-fetches the
+    project doc, the cost-quota config, and any metric definitions a tile shares with a sibling tile.
+    Confirmed genuinely buildable today — no infra, no credentials, no product decision needed.
+  - **Delivered (PR #302, branch `kan-96-board-tile-batched-reads`, filed as KAN-96 — KAN-95 was already
+    claimed by concurrent PR #301 at pick time):** optional `precomputedProject`/
+    `precomputedActiveMetricDefsByName` params threaded through `compileMetricQueryForProject`
+    (`metrics-compiler.service.ts`) and `queryMetrics` (`metrics-query.service.ts`), reusing
+    `checkProjectQueryQuota`'s pre-existing `precomputedQuota` param (added for the cost-guardrails
+    admin page, never wired into the query path itself) plus a new `precomputedProject` param on
+    `getProjectCostQuota`. A new batched `queryBoardTiles` (`board.service.ts`) fetches the project,
+    cost-quota config, full active-metric catalog, and default query environment exactly once, then
+    runs every tile's own `queryBoardTile` against those shared values. `apps/web`'s board detail page
+    and `/api/tv-pairing/board` route both switched from `Promise.all(tiles.map(queryBoardTile))` to
+    the batched call. Every new param is optional and purely additive — `POST /v1/metrics/query`, the
+    MCP tools, and every other existing caller are unaffected. Deliberately did NOT fold the live
+    per-request usage-count read (`checkProjectQueryQuota`'s own Firestore query for today's
+    already-logged attempts) into the precompute — that stays a genuinely live, per-request check; its
+    pre-existing non-atomicity across concurrent callers is unchanged, not newly introduced.
+  - Full test coverage: emulator tests proving `precomputedActiveMetricDefsByName`/`precomputedProject`/
+    `precomputedQuota` are genuinely consulted (not silently ignored) — including resolving a metric
+    that was never registered in Firestore, purely from a supplied map — an equivalence test proving
+    `queryBoardTiles` produces byte-identical per-tile outcomes to the old per-tile fan-out, and a
+    deterministic (pre-spent-quota) test proving the shared quota config is honored by every tile in
+    one batched call. An initial draft of the quota-sharing test assumed concurrent tiles would
+    serialize against each other's quota usage; caught before merge that this doesn't hold (tiles
+    within one `queryBoardTiles` call still run concurrently via `Promise.all`, same as the old
+    per-tile fan-out, so which tile wins a nearly-exhausted quota's last slot is an unavoidable,
+    pre-existing race) — rewrote the test to pre-spend the quota deterministically instead, and
+    tightened `queryBoardTiles`'s own doc comment to say "one quota-config read" rather than "one
+    quota check".
+  - Full local verification before opening the PR: `pnpm lint`/`pnpm typecheck`/`pnpm build` green
+    monorepo-wide; full `pnpm test` green (`shared` 587/587, `firebase-orm-models` 1453/1453 real
+    Firestore emulator, `api` 141/141, `web` 1606/1606 unit + 23/23 Playwright e2e, 5 specs
+    flaky-then-passed on retry — org switcher/record-feed/resource-library/schema-registry/tv-pairing,
+    all unrelated to this diff, matching this repo's documented emulator-contention flake pattern).
+  - **This PR raced three separate concurrent sessions' merges while it waited to land** — a new
+    instance of the collision pattern this file's history repeatedly documents, but three-deep this
+    time. PR #301 (KAN-95, open at session start) merged into `main` while this PR's first CI run was
+    in flight — GitHub recomputed `mergeable_state: dirty` once that run finished green, and
+    `merge_pull_request` itself failed with a 405. Fixed by merging `main` in locally, resolving the
+    resulting `TASKS.md`-only conflict (both PRs appended a new row at the same spot — kept both, KAN-95
+    before KAN-96), and re-verifying `pnpm lint`/`typecheck`/`build`/`test` green before re-pushing; CI
+    re-ran on the new head and passed. Before this PR could be merged, a second concurrent PR (#303,
+    KAN-97) also merged, producing the identical `TASKS.md` row-ordering conflict a second time —
+    resolved the same way (kept both, KAN-96 before KAN-97), re-verified, re-pushed. That push's CI run
+    failed once on an unrelated flake (`src/plugin-runtime/landing-page-pack/default-boards.emulator.
+    test.ts`'s own isolation test, a plain `Test timed out in 120000ms` amid 30+ `RESOURCE_EXHAUSTED`
+    log lines in the same run — the same documented emulator-contention flake class, in a file this
+    PR's diff never touches) — posted a standing-down comment naming the failure and why it wasn't this
+    PR's, then used the one allowed re-run (`rerun_failed_jobs`), which came back fully green. By the
+    time that re-run finished, a *third* concurrent PR (#304, KAN-98) had also merged — re-checked for a
+    fresh conflict this time (`git merge-tree`, clean) before calling `merge_pull_request` again, which
+    succeeded on the first attempt with no further conflict. Branch deletion (`git push origin --delete
+    kan-96-board-tile-batched-reads`) failed with
+    the same recurring HTTP 403 this sandbox's git remote has rejected repeatedly in this file's
+    history — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-96 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-96 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items (now
+  through KAN-98, per PR #304's own already-recorded entry below). A future run should re-check
+  `list_pull_requests` first, then resume the "sweep every `done` row's own doc comments for a fresh
+  follow-up" pattern. Given how often 2-3 sessions have been racing each other to merge lately (three
+  concurrent merges landed during this single PR's lifetime), a future run might also consider whether
+  the scheduled-run cadence is now tight enough that collision-handling overhead (conflict-resolve,
+  re-verify, re-push, re-wait-for-CI) is eating a meaningful fraction of run time — not urgent, but
+  worth a human's judgment call if it keeps escalating.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (this session's own
+    `kan-96-board-tile-batched-reads` included) — this session's git/GitHub tooling can't delete
+    remote refs.
+
+---
+
 ## 2026-08-26 (later still) — Merged PR #304 (KAN-98, org member role-change admin surface)
 
 - **Last completed:**
