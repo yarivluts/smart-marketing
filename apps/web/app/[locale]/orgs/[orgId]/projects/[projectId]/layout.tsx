@@ -164,6 +164,11 @@ export default async function ProjectLayout({
             icon: 'Rows3' as const,
           },
           {
+            href: `${base}/customers`,
+            label: t('projectCustomersLink'),
+            icon: 'Search' as const,
+          },
+          {
             href: `${base}/feedback`,
             label: t('projectFeedbackLink'),
             icon: 'MessageSquare' as const,
