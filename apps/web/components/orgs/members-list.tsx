@@ -1,6 +1,8 @@
 import { getTranslations } from 'next-intl/server';
 import type { OrgMemberSummary } from '@growthos/firebase-orm-models';
+import { isInvitableRole } from '@growthos/shared';
 import { RemoveMemberButton } from './remove-member-button';
+import { ChangeRoleControl } from './change-role-control';
 
 export interface MembersListProps {
   orgId: string;
@@ -21,9 +23,16 @@ export async function MembersList({ orgId, members, canManageMembers }: MembersL
         >
           <span>{member.email}</span>
           <div className="flex items-center gap-3">
-            <span className="text-muted-foreground">
-              {t('roleAndStatus', { role: member.role, status: member.status })}
-            </span>
+            {canManageMembers && isInvitableRole(member.role) ? (
+              <ChangeRoleControl orgId={orgId} membershipId={member.membershipId} role={member.role} />
+            ) : (
+              <span className="text-muted-foreground">
+                {t('roleAndStatus', { role: member.role, status: member.status })}
+              </span>
+            )}
+            {canManageMembers && isInvitableRole(member.role) ? (
+              <span className="text-xs text-muted-foreground">{t('statusLabel', { status: member.status })}</span>
+            ) : null}
             {canManageMembers ? <RemoveMemberButton orgId={orgId} membershipId={member.membershipId} /> : null}
           </div>
         </li>

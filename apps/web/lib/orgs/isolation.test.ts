@@ -5,7 +5,7 @@ import { createOrganizationWithOwner, ensureUserForFirebaseSession } from '@grow
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST as createProject } from '@/app/api/orgs/[orgId]/projects/route';
 import { POST as sendInvite } from '@/app/api/orgs/[orgId]/invites/route';
-import { DELETE as removeMember } from '@/app/api/orgs/[orgId]/members/[membershipId]/route';
+import { DELETE as removeMember, PATCH as updateMemberRoleRoute } from '@/app/api/orgs/[orgId]/members/[membershipId]/route';
 import { POST as createCredential } from '@/app/api/orgs/[orgId]/resources/credentials/route';
 import { POST as requestAttachment } from '@/app/api/orgs/[orgId]/projects/[projectId]/resource-attachments/route';
 import { POST as pushAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/route';
@@ -155,6 +155,41 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         }),
       () =>
         removeMember(new Request('https://growthos.test'), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, membershipId: FAKE_MEMBERSHIP_ID }),
+        }),
+    );
+  });
+
+  it('PATCH /api/orgs/[orgId]/members/[membershipId]: org caller cannot see vs. fake org id', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-member-role-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (member role)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-member-role-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({
+      name: 'Isolation Org B (member role)',
+      ownerUserId: otherOwner.id,
+    });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const requestFor = (orgId: string, membershipId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/members/${membershipId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'org_admin' }),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        updateMemberRoleRoute(requestFor(orgB.id, FAKE_MEMBERSHIP_ID), {
+          params: Promise.resolve({ orgId: orgB.id, membershipId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        updateMemberRoleRoute(requestFor(FAKE_ORG_ID, FAKE_MEMBERSHIP_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, membershipId: FAKE_MEMBERSHIP_ID }),
         }),
     );

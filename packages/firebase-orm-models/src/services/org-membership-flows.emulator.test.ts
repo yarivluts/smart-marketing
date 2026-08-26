@@ -24,6 +24,8 @@ import {
   MembershipModel,
   MembershipNotFoundError,
   removeOrgMember,
+  RoleNotChangeableError,
+  updateMemberRole,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -452,5 +454,84 @@ describe('removeOrgMember', () => {
 
     const remaining = await listMembershipsWithOrganizations(ownerB.id);
     expect(remaining).toContainEqual(expect.objectContaining({ organizationId: organization.id, role: 'org_owner' }));
+  });
+});
+
+describe('updateMemberRole', () => {
+  it('changes an active member from org_admin to viewer, updating both the membership and its role binding', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('umr-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Role Update Org', ownerUserId: owner.id });
+
+    const memberEmail = uniqueEmail('umr-member');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: memberEmail,
+      role: 'org_admin',
+      invitedByUserId: owner.id,
+    });
+    const member = await ensureUserByEmail(memberEmail);
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: member.id,
+      callerEmailVerified: true,
+    });
+
+    const updated = await updateMemberRole(organization.id, invitation.id, 'viewer', owner.id);
+    expect(updated.role).toBe('viewer');
+
+    const reloaded = await MembershipModel.init(invitation.id, { organization_id: organization.id });
+    expect(reloaded?.role).toBe('viewer');
+
+    const bindings = await listRoleBindingsForUser(member.id, [organization.id]);
+    const orgBinding = bindings.find((binding) => binding.scope_level === 'org' && binding.scope_id === organization.id);
+    expect(orgBinding?.role).toBe('viewer');
+  });
+
+  it('changes a pending invite (no role binding yet) without erroring', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('umr-pending-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Role Update Pending Org', ownerUserId: owner.id });
+
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: uniqueEmail('umr-pending-invitee'),
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+
+    const updated = await updateMemberRole(organization.id, invitation.id, 'org_admin', owner.id);
+    expect(updated.role).toBe('org_admin');
+    expect(updated.status).toBe('invited');
+  });
+
+  it('records an audit log entry for the role change', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('umr-audit-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Role Update Audit Org', ownerUserId: owner.id });
+
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: uniqueEmail('umr-audit-invitee'),
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+
+    await updateMemberRole(organization.id, invitation.id, 'org_admin', owner.id);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries).toContainEqual(expect.objectContaining({ action: 'membership.role_updated', target_id: invitation.id }));
+  });
+
+  it('throws RoleNotChangeableError when the current role is org_owner', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('umr-owner-role') });
+    const { organization, membership } = await createOrganizationWithOwner({ name: 'Role Update Owner Org', ownerUserId: owner.id });
+
+    await expect(updateMemberRole(organization.id, membership.id, 'viewer', owner.id)).rejects.toThrow(RoleNotChangeableError);
+  });
+
+  it('throws MembershipNotFoundError for a membership that does not exist', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('umr-404-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Role Update 404 Org', ownerUserId: owner.id });
+
+    await expect(updateMemberRole(organization.id, 'does-not-exist', 'viewer', owner.id)).rejects.toThrow(MembershipNotFoundError);
   });
 });

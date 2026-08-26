@@ -115,6 +115,7 @@ import {
   pushResourceAttachment as pushResourceAttachmentInOrganization,
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
+  updateMemberRole as updateMemberRoleInOrganization,
   replayFailedPipelineMessagesForProject as replayFailedPipelineMessagesForProjectInOrganization,
   sweepQueuedPipelineMessagesForProject as sweepQueuedPipelineMessagesForProjectInOrganization,
   replayQuarantinedRecord as replayQuarantinedRecordInOrganization,
@@ -226,6 +227,19 @@ interface RemoveMemberInput {
 export async function removeMember(input: RemoveMemberInput): Promise<void> {
   await ensureFirestoreOrm();
   return removeOrgMember(input.organizationId, input.membershipId, input.performedByUserId);
+}
+
+interface UpdateMemberRoleInput {
+  organizationId: string;
+  membershipId: string;
+  role: InvitableRole;
+  performedByUserId: string;
+}
+
+/** Changes a member's role between `org_admin` and `viewer` — see `updateMemberRole`'s doc comment. */
+export async function updateMemberRole(input: UpdateMemberRoleInput): Promise<MembershipModel> {
+  await ensureFirestoreOrm();
+  return updateMemberRoleInOrganization(input.organizationId, input.membershipId, input.role, input.performedByUserId);
 }
 
 interface CreateSharedCredentialInput {
