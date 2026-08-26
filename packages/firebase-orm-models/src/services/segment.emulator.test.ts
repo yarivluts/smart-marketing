@@ -92,6 +92,23 @@ async function registerDemoEventSchema(organizationId: string, projectId: string
   });
 }
 
+const stripeSubscriptionFieldsV1: SchemaFieldInput[] = [
+  { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+  { name: 'status', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
+];
+
+/** Registers a minimal stand-in for Stripe's real `stripe_subscription` entity schema (KAN-49) — just enough (`status`) for `suggestSegments`'s curated "paying_no_demo" suggestion gate to recognize it, mirroring `registerDemoEventSchema`'s own minimal-fields posture. */
+async function registerStripeSubscriptionSchema(organizationId: string, projectId: string, createdByUserId: string) {
+  return registerSchemaDefinition({
+    organizationId,
+    projectId,
+    kind: 'entity',
+    name: 'stripe_subscription',
+    fields: stripeSubscriptionFieldsV1,
+    createdByUserId,
+  });
+}
+
 describe('createSegment', () => {
   it('creates a segment with valid filter conditions', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Segment Create Org');
@@ -1059,5 +1076,43 @@ describe('suggestSegments', () => {
     await expect(
       suggestSegments({ organizationId: organization.id, projectId: otherProject.id, schemaName: 'customer' }),
     ).rejects.toBeInstanceOf(ProjectNotFoundError);
+  });
+
+  it('prepends the curated "paying, no demo" suggestion for stripe_subscription once demo_event is also registered+active (KAN-103)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Suggest Paying No Demo Org');
+    await registerStripeSubscriptionSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+
+    const result = await suggestSegments({ organizationId: organization.id, projectId: project.id, schemaName: 'stripe_subscription' });
+
+    // `stripeSubscriptionFieldsV1` has no field the field-name heuristic itself recognizes, so the
+    // curated suggestion is the only one — and it's ANDed with an event condition, not just filters.
+    expect(result.suggestions).toEqual([
+      {
+        name: 'Paying customers with no demo',
+        filters: [{ field: 'status', op: '=', value: 'active' }],
+        confidence: 1,
+        eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+      },
+    ]);
+  });
+
+  it('does not propose the curated "paying, no demo" suggestion when demo_event is not registered (KAN-103)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Suggest No Demo Schema Org');
+    await registerStripeSubscriptionSchema(organization.id, project.id, owner.id);
+
+    const result = await suggestSegments({ organizationId: organization.id, projectId: project.id, schemaName: 'stripe_subscription' });
+
+    expect(result.suggestions).toEqual([]);
+  });
+
+  it('does not propose the curated "paying, no demo" suggestion for a schema other than stripe_subscription, even with demo_event registered (KAN-103)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Suggest Other Schema Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+
+    const result = await suggestSegments({ organizationId: organization.id, projectId: project.id, schemaName: 'customer' });
+
+    expect(result.suggestions).toEqual([{ name: 'High-value customers', filters: [{ field: 'mrr_usd', op: '>=', value: 100 }], confidence: 0.85 }]);
   });
 });

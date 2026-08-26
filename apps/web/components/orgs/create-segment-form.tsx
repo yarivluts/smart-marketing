@@ -124,10 +124,23 @@ export function CreateSegmentForm({ orgId, projectId, entitySchemaNames, eventSc
     );
   }
 
-  /** Applies an AI-suggested segment (KAN-81): replaces the filter rows outright (a suggestion is already a complete definition, not one row to merge) and fills in the name only if the user hasn't typed one yet — never overwrites something they already wrote. */
-  function applySuggestion(suggestion: { name: string; filters: FilterRow[] }): void {
+  /**
+   * Applies an AI-suggested segment (KAN-81; cross-schema event conditions,
+   * KAN-103): replaces the filter rows and event-condition rows outright (a
+   * suggestion is already a complete definition, not rows to merge) and
+   * fills in the name only if the user hasn't typed one yet — never
+   * overwrites something they already wrote. `eventConditions` is only ever
+   * present on a curated suggestion (e.g. the plan's own "paying, no demo"
+   * example) — omitted, this leaves the form's existing event-condition
+   * rows untouched, the same posture applying two plain field-heuristic
+   * suggestions in a row already has for each other.
+   */
+  function applySuggestion(suggestion: { name: string; filters: FilterRow[]; eventConditions?: EventConditionRow[] }): void {
     setFilters(suggestion.filters.length > 0 ? suggestion.filters : [emptyRow()]);
     setName((current) => (current.trim().length === 0 ? suggestion.name : current));
+    if (suggestion.eventConditions) {
+      setEventConditions(suggestion.eventConditions);
+    }
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {

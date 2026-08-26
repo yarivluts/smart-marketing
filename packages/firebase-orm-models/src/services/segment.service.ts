@@ -1,4 +1,5 @@
 import {
+  DEMO_EVENT_SCHEMA_NAME,
   isSegmentFilterOperator,
   isSegmentWorkListStatus,
   isValidSegmentEventCondition,
@@ -13,6 +14,7 @@ import { ProjectModel } from '../models/project.model';
 import { SegmentModel } from '../models/segment.model';
 import { OrgPersonModel } from '../models/org-person.model';
 import type { SchemaFieldType } from '../models/schema-def.model';
+import { STRIPE_SUBSCRIPTION_ENTITY_NAME } from '../plugin-runtime/stripe/schemas';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { getActiveSchemaDefinition } from './schema-registry.service';
@@ -161,6 +163,23 @@ export interface SuggestSegmentsResult {
 }
 
 /**
+ * A curated (not field-heuristic-derived) suggestion — the exact
+ * "paying_no_demo" worked example plan `14 §Gap 9`'s own gap-analysis doc
+ * and KAN-93's `SegmentEventCondition` doc comment both name verbatim, and
+ * that `demos/page.tsx`'s own doc comment used to flag as "deliberately
+ * not built" back when KAN-92 shipped (before KAN-93 added the cross-schema
+ * `event_conditions` this suggestion relies on). `confidence: 1` since this
+ * is a known-good, curated example, not a guessed field-name match — see
+ * `suggestSegments`'s own doc comment for when it's actually proposed.
+ */
+const PAYING_NO_DEMO_SEGMENT_SUGGESTION: SegmentSuggestion = {
+  name: 'Paying customers with no demo',
+  filters: [{ field: 'status', op: '=', value: 'active' }],
+  confidence: 1,
+  eventConditions: [{ kind: 'no_event', schemaName: DEMO_EVENT_SCHEMA_NAME }],
+};
+
+/**
  * Proposes candidate segment definitions for one registered entity schema
  * (KAN-81, E14.x, plan `14 §Gap 9` "AI-suggested lists") by running
  * `@growthos/shared`'s deterministic `suggestSegmentCandidates` heuristic
@@ -170,6 +189,15 @@ export interface SuggestSegmentsResult {
  * persisted here; the caller still creates the segment through the existing
  * `createSegment` confirm step, exactly like KAN-55's mapping suggestions
  * merge into the existing rule editor rather than saving directly.
+ *
+ * When `schemaName` is Stripe's `stripe_subscription` entity (KAN-49) and
+ * the project also has the Sales Pipeline pack's `demo_event` event schema
+ * (KAN-92) registered+active, {@link PAYING_NO_DEMO_SEGMENT_SUGGESTION} is
+ * prepended ahead of whatever the field heuristic itself proposes for
+ * `stripe_subscription`'s own fields — a curated example takes priority
+ * over a guessed one. Neither schema existing is itself new: this only
+ * wires an already-registered pair of schemas into the suggestion list a
+ * human reviews before creating the segment themselves.
  */
 export async function suggestSegments(params: SuggestSegmentsParams): Promise<SuggestSegmentsResult> {
   await requireProjectInOrg(params.organizationId, params.projectId);
@@ -180,7 +208,16 @@ export async function suggestSegments(params: SuggestSegmentsParams): Promise<Su
   }
 
   const fieldDefs = schemaDef.field_defs.map((field) => ({ name: field.name, type: field.type }));
-  return { suggestions: suggestSegmentCandidates(fieldDefs) };
+  const suggestions = suggestSegmentCandidates(fieldDefs);
+
+  if (params.schemaName === STRIPE_SUBSCRIPTION_ENTITY_NAME) {
+    const demoEventSchemaDef = await getActiveSchemaDefinition(params.organizationId, params.projectId, 'event', DEMO_EVENT_SCHEMA_NAME);
+    if (demoEventSchemaDef) {
+      suggestions.unshift(PAYING_NO_DEMO_SEGMENT_SUGGESTION);
+    }
+  }
+
+  return { suggestions };
 }
 
 /** Every segment in a project, newest-first — a saved definition has no inherent ordering the way a goal's deadline does. */

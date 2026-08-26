@@ -2,14 +2,23 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
-import type { SegmentFilterOperator } from '@growthos/shared';
+import type { SegmentEventConditionKind, SegmentFilterOperator } from '@growthos/shared';
 import { Button } from '@/components/ui/button';
-import type { FilterRow } from './create-segment-form';
+import type { EventConditionRow, FilterRow } from './create-segment-form';
+
+interface SegmentSuggestionEventCondition {
+  kind: SegmentEventConditionKind;
+  schemaName: string;
+  filters?: Array<{ field: string; op: SegmentFilterOperator; value: string | number | boolean }>;
+  withinDays?: number;
+}
 
 interface SegmentSuggestion {
   name: string;
   filters: Array<{ field: string; op: SegmentFilterOperator; value: string | number | boolean }>;
   confidence: number;
+  /** KAN-103 — carried through for a curated cross-schema suggestion (e.g. the plan's own "paying, no demo" example); absent for every plain field-heuristic suggestion. */
+  eventConditions?: SegmentSuggestionEventCondition[];
 }
 
 interface SuggestResponseBody {
@@ -20,12 +29,21 @@ export interface SuggestSegmentsPanelProps {
   orgId: string;
   projectId: string;
   schemaName: string;
-  /** Applies a suggestion's name + filters into the create-form's own state — nothing is saved directly from here, so the user still edits/removes rows and submits the form themselves (KAN-81 AC: "user confirms", the same posture `SuggestFieldMappingsPanel` (KAN-55) establishes). */
-  onApplySuggestion: (suggestion: { name: string; filters: FilterRow[] }) => void;
+  /** Applies a suggestion's name + filters (+ optional cross-schema event conditions, KAN-103) into the create-form's own state — nothing is saved directly from here, so the user still edits/removes rows and submits the form themselves (KAN-81 AC: "user confirms", the same posture `SuggestFieldMappingsPanel` (KAN-55) establishes). */
+  onApplySuggestion: (suggestion: { name: string; filters: FilterRow[]; eventConditions?: EventConditionRow[] }) => void;
 }
 
 function suggestionToFilterRows(suggestion: SegmentSuggestion): FilterRow[] {
   return suggestion.filters.map((filter) => ({ field: filter.field, op: filter.op, value: String(filter.value) }));
+}
+
+function suggestionToEventConditionRows(eventConditions: SegmentSuggestionEventCondition[]): EventConditionRow[] {
+  return eventConditions.map((condition) => ({
+    kind: condition.kind,
+    schemaName: condition.schemaName,
+    withinDays: condition.withinDays !== undefined ? String(condition.withinDays) : '',
+    filters: (condition.filters ?? []).map((filter) => ({ field: filter.field, op: filter.op, value: String(filter.value) })),
+  }));
 }
 
 /**
@@ -101,7 +119,13 @@ export function SuggestSegmentsPanel({ orgId, projectId, schemaName, onApplySugg
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => onApplySuggestion({ name: suggestion.name, filters: suggestionToFilterRows(suggestion) })}
+                  onClick={() =>
+                    onApplySuggestion({
+                      name: suggestion.name,
+                      filters: suggestionToFilterRows(suggestion),
+                      ...(suggestion.eventConditions ? { eventConditions: suggestionToEventConditionRows(suggestion.eventConditions) } : {}),
+                    })
+                  }
                 >
                   {t('useSuggestionButton')}
                 </Button>

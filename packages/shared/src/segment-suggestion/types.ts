@@ -1,4 +1,4 @@
-import type { SegmentFilterCondition } from '../segments';
+import type { SegmentEventCondition, SegmentFilterCondition } from '../segments';
 
 /**
  * The field-type vocabulary a suggestion candidate field may declare —
@@ -32,4 +32,13 @@ export interface SegmentSuggestion {
   name: string;
   filters: SegmentFilterCondition[];
   confidence: number;
+  /**
+   * Optional cross-schema conditions (KAN-93's `SegmentEventCondition`) a
+   * suggestion may also propose — e.g. the plan's own curated "paying, no
+   * demo" example (`segment.service.ts`'s `suggestSegments`), which isn't
+   * derived from `filters` alone. Omitted for every suggestion
+   * `suggestSegmentCandidates`'s own field-name heuristic proposes, since
+   * that heuristic only ever reasons about one schema's own fields.
+   */
+  eventConditions?: SegmentEventCondition[];
 }

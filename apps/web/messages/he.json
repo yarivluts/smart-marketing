@@ -706,7 +706,9 @@
     "repBreakdownEmpty": "טרם נחתו הדגמות שהתקיימו או שלא הגיעו אליהן עבור פרויקט זה.",
     "repRowSummary": "{held} התקיימו · {noShow} לא הגיעו · {showRate} שיעור הגעה",
     "recentDemosIntro": "עיין/י ברשומות הדגמה בודדות:",
-    "recentDemosLinkLabel": "הדגמות אחרונות"
+    "recentDemosLinkLabel": "הדגמות אחרונות",
+    "workListIntro": "רוצה למצוא לקוחות משלמים שמעולם לא קיבלו הדגמה?",
+    "workListLinkLabel": "בנה/י את הרשימה הזו בדף הסגמנטים"
   },
   "ChurnReasons": {
     "metaTitle": "סיבות נטישה",
