@@ -17,6 +17,80 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 — Opened PR #299 (KAN-27 follow-up, org-admin-pushed resource attachment); blocked on a CI flake needing a human re-run
+
+- **Last completed:**
+  - Session start: local `main`'s branch ref was stale (same recurring shallow-clone quirk this
+    file's history documents repeatedly) — `git reset --hard origin/main` fixed it. Read
+    `PROGRESS.md`/`TASKS.md`: every row KAN-17..KAN-93 `done` except the standing KAN-18/19 infra
+    items and KAN-43/50/51 (`needs-human`/`blocked-by`). `list_pull_requests` showed zero open PRs —
+    no concurrent-session collision to route around this time.
+  - Delegated a scoping sweep (subagent) for a genuine, unclaimed, infra-free follow-up per this
+    repo's established "sweep every `done` row's own deferred/not-yet doc-comment notes" pattern. It
+    surfaced a real gap: `resource-library.service.ts`'s own `requestResourceAttachment` doc comment
+    named plan `08 §1.2`'s "project-admin initiated ... approved (**or org-admin pushed**)" — the
+    org-admin-pushed half was never built, only the request/approve round trip KAN-27 originally
+    shipped. Runner-up candidates (an omnisearch per-customer index, KAN-93's own deferred nested-
+    filter UI widget) were smaller/less self-contained by comparison.
+  - **Delivered (PR #299, branch `kan-27-push-resource-attachment`):** `pushResourceAttachment`
+    (`packages/firebase-orm-models`) — an org-resource-owner (`resources.manage`) attaches a shared
+    credential/template/person straight to a project, landing `approved` immediately (pusher recorded
+    as both `requested_by` and `decided_by`, skipping the pending queue entirely) instead of the
+    request/decide round trip. Refactored the shared project/resource/scope-selection validation out
+    of `requestResourceAttachment` into a new `validateAttachmentTarget` helper both functions call —
+    reuse, not a parallel implementation. Audit-logs as a new `resource_attachment.push` action,
+    distinct from `.request`/`.approve`. New `POST /api/orgs/[orgId]/resource-attachments` route
+    (org-scoped, gated on `resources.manage`, same permission the existing decide/detach routes
+    already require) + a `PushAttachmentForm` control (project picker + scope input for credentials)
+    on the org Resource Library page's credential/template/person rows, visible only to callers who
+    already hold `resources.manage`. en/he translations for the new copy.
+  - Full test coverage: new `resource-library.emulator.test.ts` cases (push lands `approved` with the
+    pusher as both requester and decider, skips the pending queue, enforces the same scope/membership
+    guards as a request, audit-logs distinctly from a request), a new `route.test.ts` for the POST
+    handler (auth, 403 for a `viewer`, validation, cross-org 404, happy path), and a new
+    `isolation.test.ts` scenario (real-org-caller-can't-see vs. fake-org-id returns byte-identical
+    404s, per KAN-26 non-enumeration).
+  - Full local verification before opening the PR: `pnpm build`/`pnpm lint`/`pnpm typecheck` green
+    monorepo-wide; full `pnpm test` green (`shared` 587/587, `firebase-orm-models` 1443/1443 vs a real
+    Firestore emulator, `api` 141/141, `web` 1601/1601 unit + full Playwright e2e — 2 known-flaky e2e
+    specs unrelated to this diff passed on retry).
+  - **CI failed twice on the PR's head, both times in the same unrelated spot:**
+    `src/plugin-runtime/campaign-ops-pack/campaign-ops-pack.emulator.test.ts`'s "reuses the SaaS
+    pack's own ad_spend metric" case — first a `RESOURCE_EXHAUSTED` gRPC error, then (after the
+    re-run) a 120s test timeout preceded by the same `RESOURCE_EXHAUSTED`/`CANCELLED` gRPC pattern
+    against the real Firestore emulator. This repo's history documents this exact flake class
+    recurring across many unrelated PRs; this PR's diff touches nothing under
+    `plugin-runtime/campaign-ops-pack` (126/127 test files, 1442/1443 tests passed both times).
+    Per the CI-red policy, triggered the one allowed re-run after the first failure (posting a
+    standing-down comment naming the failure and why it wasn't this PR's); the second failure in the
+    exact same spot spent that allowance, so posted a second standing-down comment rather than
+    re-running again, and sent a push notification flagging that merging needs a human-triggered
+    re-run of the failed job.
+- **In progress (exact stopping point):** PR #299 is open, self-reviewed, and fully green locally —
+  not yet merged. Subscribed to its activity; a 15-minute check-in was already consumed handling the
+  two CI failures above, and this session will keep watching for either a human-triggered re-run
+  coming back green, or (if this session ends first) the next scheduled run should re-check
+  `pull_request_read`'s `get_check_runs` on run `32913903323` and, if still red in the same spot,
+  trigger its own re-run (a fresh PR/session gets its own one-re-run allowance).
+- **Blocked + why:** CI's `lint · typecheck · test · build` check is red on the PR head purely from
+  the known Firestore-emulator flake described above, not from this PR's own code — merging needs
+  either a human-triggered re-run or a future run's own re-run attempt.
+- **Next step:** once PR #299's CI comes back green, merge (squash), delete the branch, and update
+  `TASKS.md`'s KAN-27 row with a "Follow-up delivered" note (same pattern KAN-59/72/73/80/81 use for
+  a follow-up on an already-`done` story, rather than minting a new KAN number). After that, resume
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes" pattern for the next
+  buildable follow-up — `TASKS.md` will again be fully `done` except the standing KAN-18/19/43/50/51
+  items.
+- **Waiting on human:**
+  - A CI re-run on PR #299 (`lint · typecheck · test · build`, run `32913903323`) — the known
+    Firestore-emulator flake, not this PR's own regression.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
+    rows — still outstanding, unchanged by this run.
+
+---
+
 ## 2026-08-25 (newest) — Merged PR #298 (KAN-93, segment engine cross-schema has_event/no_event conditions)
 
 - **Last completed:**
