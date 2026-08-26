@@ -12,8 +12,11 @@ import {
   queryProjectCohortRetention,
   queryProjectFunnelSteps,
   searchProjectCustomers,
+  searchProjectCustomersForAdmin,
   setProjectCostQuota,
   TrackingAlertModel,
+  WarehouseNotConfiguredError,
+  WarehouseQueryFailedError,
   WinEventModel,
   type WarehouseQueryExecutor,
   type WarehouseRow,
@@ -111,6 +114,58 @@ describe('searchProjectCustomers', () => {
 
     const results = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
     expect(results[0].properties).toBe('not-json');
+  });
+});
+
+describe('searchProjectCustomersForAdmin (KAN-108)', () => {
+  it('returns an "ok" outcome wrapping the same results searchProjectCustomers returns', async () => {
+    const { organization, project } = await setupOrgWithProject('Search Customers Admin Ok Org');
+    const executor = new FakeWarehouseQueryExecutor([
+      { entity_id: 'cust_1', schema_name: 'customer', properties: '{"email":"a@example.com"}', last_seen_at: '2026-07-10T00:00:00Z' },
+    ]);
+
+    const outcome = await searchProjectCustomersForAdmin({ organizationId: organization.id, projectId: project.id, query: 'a@example.com', executor });
+
+    expect(outcome).toEqual({
+      ok: true,
+      results: [{ entityId: 'cust_1', schemaName: 'customer', properties: { email: 'a@example.com' }, lastSeenAt: '2026-07-10T00:00:00Z' }],
+    });
+  });
+
+  it('degrades to a "warehouse_not_configured" outcome instead of throwing, mirroring countSegmentMembers', async () => {
+    const { organization, project } = await setupOrgWithProject('Search Customers Admin Not Configured Org');
+    const executor: WarehouseQueryExecutor = { execute: () => Promise.reject(new WarehouseNotConfiguredError()) };
+
+    const outcome = await searchProjectCustomersForAdmin({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
+    expect(outcome).toEqual({ ok: false, reason: 'warehouse_not_configured', message: expect.any(String) });
+  });
+
+  it('degrades to a "query_error" outcome when the warehouse rejects the query', async () => {
+    const { organization, project } = await setupOrgWithProject('Search Customers Admin Query Error Org');
+    const executor: WarehouseQueryExecutor = { execute: () => Promise.reject(new WarehouseQueryFailedError('table not found')) };
+
+    const outcome = await searchProjectCustomersForAdmin({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
+    expect(outcome).toEqual({ ok: false, reason: 'query_error', message: 'table not found' });
+  });
+
+  it('degrades to a "quota_exceeded" outcome instead of throwing once the project has spent its daily quota', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Search Customers Admin Quota Blocked Org');
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await searchProjectCustomersForAdmin({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
+    const outcome = await searchProjectCustomersForAdmin({ organizationId: organization.id, projectId: project.id, query: 'other', executor });
+
+    expect(outcome).toEqual({ ok: false, reason: 'quota_exceeded', message: expect.any(String) });
+  });
+
+  it('still throws InvalidMcpToolRequestError for an empty query — a caller bug, not an expected runtime failure to degrade for', async () => {
+    const { organization, project } = await setupOrgWithProject('Search Customers Admin Empty Query Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await expect(
+      searchProjectCustomersForAdmin({ organizationId: organization.id, projectId: project.id, query: '   ', executor }),
+    ).rejects.toBeInstanceOf(InvalidMcpToolRequestError);
   });
 });
 
