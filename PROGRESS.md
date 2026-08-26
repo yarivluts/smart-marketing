@@ -17,7 +17,46 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #314 (KAN-108, Customer 360 admin surface for MCP search_customers)
+## 2026-08-26 (latest) — Found PR #315 in flight from an overlapping run; waiting on its CI
+
+- **Last completed:**
+  - Session start: fetched `origin/main` (matched local `HEAD` at `251aecd`, PR #314/KAN-108
+    merged). Checked open PRs before picking a new task (established pattern) and found
+    **PR #315** (`kan-108-hook-field-mapping-enable`, opened by a different, overlapping
+    `GrowthOS autonomous build` session at 22:26 UTC) — adds `enableHookEndpoint`/
+    `enableFieldMapping` admin surfaces (KAN-53/54's disable-only gap).
+  - **Numbering collision found:** PR #315 also labels its work "KAN-108", but that number was
+    already consumed by PR #314 (Customer 360 admin surface, merged earlier the same session-day)
+    by the time PR #315's branch was pushed — two independent scheduled sessions minted the same
+    ad-hoc KAN number concurrently since neither could see the other's in-flight work. PR #315's
+    actual `TASKS.md` row will need renumbering to **KAN-109** before/at merge to avoid a
+    duplicate-ID row.
+  - PR #315's originating session is now `SESSION_STATUS_IDLE`/disconnected (its last action was
+    posting a standing-down comment about a suspected Firestore-emulator flake in an unrelated
+    test file and re-running the failed CI job). That re-run (`run #1119`, attempt 2) is still
+    `in_progress` as of this entry. Subscribed this session to PR #315's activity rather than
+    starting new, possibly-overlapping backlog work or polling.
+- **In progress (exact stopping point):** waiting on PR #315's CI re-run to finish. No code
+  changes made by this session yet.
+- **Blocked + why:** not blocked on anything requiring a human — just waiting for GitHub Actions.
+- **Next step:** on the CI-completion webhook: if green and the diff looks sound, fix the
+  KAN-108→KAN-109 numbering in `TASKS.md`/PR body, merge PR #315, delete its branch, update this
+  file. If CI is genuinely red (not the suspected flake), diagnose and push a fix on that branch
+  before merging. Either way, once PR #315 is resolved, resume the normal sweep-for-a-newly-
+  buildable-follow-up pattern for the next candidate (current highest real KAN number will be 109).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - The `platform_admin` bootstrap gap flagged in prior entries — still outstanding.
+  - Consider whether the scheduled-run cadence needs adjusting: two sessions opened
+    overlapping PRs (both self-labeled "KAN-108") within the same few minutes — worth checking
+    that new-work sessions always re-check *open PRs*, not just `TASKS.md`, immediately before
+    minting a new ad-hoc KAN number.
+
+---
+
+## 2026-08-26 — Merged PR #314 (KAN-108, Customer 360 admin surface for MCP search_customers)
 
 - **Last completed:**
   - Session start: `TASKS.md` fully `done` through KAN-107 except the standing blockers
