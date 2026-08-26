@@ -17,6 +17,76 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — Merged PR #300 (KAN-94, billing-ops dunning-status feed)
+
+- **Last completed:**
+  - Session start: local repo was on a detached `HEAD` matching `origin/main`'s tip but the local
+    `main` ref was stale — `git checkout -B main origin/main` fixed it. Read `PROGRESS.md`/
+    `TASKS.md`: every row KAN-17..KAN-93 `done` except the standing KAN-18/19 infra items and
+    KAN-43/50/51 (`needs-human`/`blocked-by`). `list_pull_requests` showed one open PR, **#299**
+    (KAN-27's org-admin-pushed resource attachment), opened by a concurrent session minutes earlier —
+    the exact "sweep deferred doc-comment notes for the next gap" candidate a prior run had already
+    flagged as next. To avoid duplicating it, delegated a bounded background sweep (a `general-purpose`
+    agent) for any *other* unclaimed, buildable-today gap not covered by #299.
+  - The sweep's top candidate: **dunning-status tracking**, named twice in the codebase's own doc
+    comments as deliberately deferred (KAN-80's own `TASKS.md` row, and the billing-ops-feed page's own
+    doc comment) and never delivered. Confirmed it was genuinely buildable today, not actually gated on
+    anything: `stripe_subscription`'s own `status` field (KAN-49) already lands Stripe's real
+    subscription status including its two dunning values `past_due`/`unpaid` — no new model, connector,
+    or credential needed, only a new predicate over the same landed snapshots KAN-81's churn feed
+    already reads.
+  - **Delivered (PR #300, branch `kan-94-dunning-feed`, added as KAN-94 — no ticket existed for this
+    gap before this row):** `isDunningSignal`/`listRecentDunningSubscriptionsForProject` in
+    `packages/firebase-orm-models` (a direct sibling of `isChurnSignal`/
+    `listRecentChurnedSubscriptionsForProject`, reusing the same `CHURN_FEED_ENTITY_SCHEMA_NAMES`/
+    candidate-window/fold-across-environments posture), a new `dunning-feed-view.ts` view mapper
+    (mirrors `churn-feed-view.ts`), and a third section on the existing Billing ops feed page
+    (KAN-80/81), gated on the same `ingest.write` permission as the other two sections. en/he
+    translations for all new UI copy.
+  - **Self-review (`/code-review`) before merge found two minor reuse/consistency issues, both fixed:**
+    the new view mapper was a third copy-pasted `stringField`/`numberField`/`booleanField` set
+    (billing-ops-view.ts, churn-feed-view.ts now both had their own copies too) — extracted a shared
+    `raw-record-field-view.ts` all three feed views now import from instead; and the dunning section's
+    "unknown customer" fallback was borrowing the churn section's `churnUnknownCustomer` translation key
+    — gave it its own `dunningUnknownCustomer` key instead.
+  - Full local verification before opening the PR: `pnpm lint`/`pnpm typecheck`/`pnpm build` green
+    monorepo-wide; full `pnpm test` green (`shared` 587/587, `firebase-orm-models` 1443/1443 vs a real
+    Firestore emulator, `api` 141/141, `web` 1600/1600 unit + full 29/29 Playwright e2e). One package's
+    full-suite run hit 7 timeouts in a single file (`quality-score.emulator.test.ts`, untouched by this
+    diff) under this sandboxed environment's own CPU/emulator contention — confirmed as the documented
+    `RESOURCE_EXHAUSTED` self-heal flake this repo's history repeatedly names (not a regression) by
+    re-running that one file in isolation: all 13 tests passed cleanly. Re-ran the full build + the
+    affected unit tests again after the self-review refactor to confirm it stayed green.
+  - CI (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green on the first
+    attempt, no merge conflicts (`mergeable_state: clean`), no review comments — merged (squash).
+  - **Known limitation hit while cleaning up:** this session's git remote access can push commits/
+    branches but a direct `git push origin --delete kan-94-dunning-feed` was rejected with an HTTP 403
+    by the sandboxed git proxy, and no branch-deletion tool is exposed via the GitHub MCP server either
+    (only `create_branch`/`delete_file`/etc. — no ref-delete). The branch was left undeleted on origin;
+    this matches a large pre-existing pile of undeleted `feat/`/`fix/`/`chore/`/`docs/` branches already
+    on the remote from many prior sessions, suggesting this has been a standing tooling gap rather than
+    something new here. Flagging for whoever has full repo-admin access to prune stale branches in bulk
+    at some point — not urgent, doesn't block anything.
+- **In progress (exact stopping point):** none — KAN-94 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-94 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. A future
+  run should re-check `list_pull_requests` first (per this repo's own established collision-avoidance
+  pattern), then sweep `TASKS.md`'s `done` rows' own doc comments again for a fresh follow-up — the same
+  pattern that found KAN-91/92/93/94. PMax asset groups and Lookalike/Similar Audience expansion on
+  KAN-72/73's own rows remain the only named-but-deferred items needing real design work rather than a
+  buildable-today slice.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (this session's own `kan-94-dunning-feed`
+    included) — this session's git/GitHub tooling can't delete remote refs.
+
+---
+
 ## 2026-08-26 (later) — Merged PR #299 (KAN-27 follow-up, org-admin-pushed resource attachment)
 
 - **Last completed:**
