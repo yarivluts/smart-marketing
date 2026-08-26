@@ -17,7 +17,71 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #309 (KAN-103, "paying, no demo" AI-suggested segment)
+## 2026-08-26 (latest) — Merged PR #307 (KAN-101, goal trend-fitted pace projection)
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). One open PR (#305, KAN-100) at check
+    time — unrelated, no collision to route around.
+  - `goal-progress.ts`'s own module doc comment and `GoalProgressResult.projectedFinalValue`'s doc
+    comment named a documented v1 simplification verbatim: a minimize/range goal's
+    `projectedFinalValue` "just projects the current `actualValue` forward unchanged... a real
+    projection would need a trend over historical values, not just the value-to-date" — a prior
+    entry's own "next step" flagged this as a reasonable next pick once the primary backlog emptied.
+  - **Delivered (PR #307, branch `kan-101-goal-trend-projection`, filed as KAN-101):**
+    `calculateGoalProgress` (`packages/shared/src/goals/goal-progress.ts`) gained an optional
+    `history?: readonly { elapsedFraction, value }[]` input; for `minimize`/`range`, a new pure
+    `fitLinearTrendProjection` (ordinary-least-squares) fits a linear trend over `history` when it
+    has at least two observations at distinct `elapsedFraction`s and extrapolates it to
+    `elapsedFraction = 1`, falling back to the existing flat projection otherwise. `maximize` is
+    unaffected. `queryGoalProgress` (`goal.service.ts`) builds this `history` from the exact same
+    day-grain `result.series` rows it already queries for `actualValue`, via a new
+    `buildHistoryPoints` helper — no extra warehouse call, no new query. No admin UI change needed
+    (`projectedFinalValue`'s shape is unchanged). Full local verification (`pnpm lint`/`typecheck`/
+    `build`/`test` monorepo-wide) green before opening the PR, with one confirmed-flake local test
+    failure (`app/api/orgs/[orgId]/members/[membershipId]/route.test.ts`, 11/11 clean on an isolated
+    re-run against a fresh emulator).
+  - Self-reviewed the full diff before merge-readiness (correctness of the OLS fit and its edge
+    cases, `buildHistoryPoints`' `bucket_date`/value guards against the real BigQuery row-value
+    normalization, doc-comment accuracy) — no issues found.
+  - **CI flaked twice** on unrelated Firestore-emulator resource-contention failures, in files this
+    PR's diff never touches: first `metric-pack-dispatch.emulator.test.ts`
+    (`FIRESTORE INTERNAL ASSERTION FAILED: Unexpected state`), then — after this session's one
+    allowed re-run — `quality-score-pack.emulator.test.ts` (`RESOURCE_EXHAUSTED: Received message
+    larger than max`), both the same well-documented emulator-contention flake class this file's
+    history repeatedly names. Per the CI-red policy, a second failure on an already-flagged flake
+    class counts as "real" (no further re-run from this session): posted a standing-down comment on
+    the PR after each failure, and after the second, a push notification to the repo owner flagging
+    that merging was blocked pending a human-triggered re-run. Checked in periodically (widening the
+    interval from 10 to 60 minutes as time passed with no action) for roughly 5 hours until a human
+    triggered a fresh run, which came back fully green (`lint · typecheck · test · build` +
+    `terraform fmt · validate`, `mergeable_state: clean`). Merged (squash). Branch deletion
+    (`kan-101-goal-trend-projection`) failed with the same recurring HTTP 403 this sandbox's git
+    remote has rejected throughout this file's history — merged and dead but not deleted.
+  - While this PR was in flight, three concurrent sessions independently picked up the next few
+    backlog slots (KAN-102 Meta Lookalike Audience PR #308, KAN-103 "paying, no demo" AI-suggested
+    segment PR #309, both already merged by the time this entry was written) — both their own
+    `TASKS.md` rows note they skipped KAN-101 because this PR was already open, so no numbering
+    collision occurred; only the row itself (this entry) was still owed.
+- **In progress (exact stopping point):** none — KAN-101 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-101 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. A
+  future run should re-check `list_pull_requests` first, then resume the "sweep every `done` row's
+  own doc-comment notes for a newly-buildable follow-up" pattern.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows
+    — still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (this session's own
+    `kan-101-goal-trend-projection` included) — this session's git/GitHub tooling can't delete remote
+    refs.
+
+---
+
+## 2026-08-26 — Merged PR #309 (KAN-103, "paying, no demo" AI-suggested segment)
 
 - **Last completed:**
   - Picked up where a background agent's own run left off: PR #309 (`kan-103-paying-no-demo-segment-suggestion`)
