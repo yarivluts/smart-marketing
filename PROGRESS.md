@@ -17,6 +17,88 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — Merged PR #310 (KAN-104, segments-page batched precompute)
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items, KAN-43/50/51 (`needs-human`/`blocked-by`), and KAN-101 (PR #307, still open from a
+    concurrent session at pick time). Skipped KAN-101, then delegated a bounded background sweep
+    agent (explicitly excluding the already-deprioritized PMax/Lookalike/mailing-address items, the
+    real-BigQuery-orchestration item, and branch-deletion cleanup) to find a different, unclaimed,
+    infra-free follow-up.
+  - Investigated the sweep's top candidate (a `ServiceAccountModel` admin surface — the model has
+    existed since bootstrap with zero real callers) but judged it out of scope: `RoleBindingModel`
+    already supports a `service_account` principal type in the policy engine, but tracing every real
+    call site showed no production code path ever creates a project-scoped role binding for *any*
+    principal, human or machine — `requireOrgPermission` (the check every project-scoped route uses)
+    only ever passes `{ orgId }` into `can()`'s resource scope, never `projectId`, so a project-scoped
+    binding wouldn't even be honored today even if one existed. `roles.ts`'s own `INVITABLE_ROLES` doc
+    comment already names this precisely: "project-scoped invite flow ... a separate, not-yet-built
+    story." Building a service-account admin surface without a working project-scope permission path
+    behind it would be speculative (no real use), and retrofitting every project-scoped route to pass
+    `projectId` into `can()` is a large, security-sensitive refactor unsuited to a single autonomous
+    run — left both alone, matching this codebase's own established judgment on similarly large items.
+  - Picked the sweep's second candidate instead: `segments/page.tsx`'s own doc comment named a
+    concrete, small, unclaimed gap verbatim — the per-segment `countSegmentMembers` fan-out repeats
+    "the same known, deliberately deferred 'N independent queries' posture `board.service.ts`'s own
+    doc comment documents for its per-tile fan-out," the exact class KAN-96 already closed for board
+    tiles. Confirmed real: each segment's live-member-count call independently re-fetched the default
+    query environment, the project's cost-quota config, and its own active schema def (plus one more
+    per event condition) — three Firestore reads repeated once per segment on the page.
+  - **Delivered (PR #310, branch `kan-104-segments-page-batched-precompute`, minted as KAN-104 since
+    KAN-101/102/103 were already taken):** new optional `precomputedQuota`/
+    `precomputedActiveSchemaDefsByKindAndName` params on `countSegmentMembers` (`segment.service.ts`)
+    and a `precomputedQuota` passthrough on the shared `runQuotaGatedWarehouseQuery` helper
+    (`cost-guardrail.service.ts`), mirroring `queryBoardTiles`'s own `precomputed*` convention exactly
+    — every existing caller/test omits them and keeps today's per-call-fetch behavior unchanged. New
+    `buildActiveSchemaDefsByKindAndName`/`schemaDefMapKey` helpers (`schema-registry.service.ts`)
+    build the lookup from an already-fetched schema-def list, the same "derive view-side from data
+    already fetched" posture `activeSchemaNamesForKind` already established one level up. The
+    Segments page now fetches environment/quota/schema-defs once and threads them into every
+    `countSegmentMembers` call in its fan-out; the sibling `listCrmSyncRunsForSegment` fan-out is
+    untouched — a genuine per-segment Firestore list query with no shared state to hoist out.
+  - New emulator tests prove each precomputed override is actually consulted instead of a fresh
+    lookup, not just accepted and ignored: a precomputed schema def with `plan` retyped to `boolean`
+    changes the compiled SQL from `LAX_STRING(...) =` to `LAX_BOOL(...) = SAFE_CAST(... AS BOOL)`; a
+    precomputed quota with a much stricter limit than the real (never-set, 500/day default) config
+    blocks a second call the real config would have allowed.
+  - Full local verification before opening the PR: `pnpm --filter @growthos/firebase-orm-models
+    typecheck/lint` and `pnpm --filter web typecheck/lint` green; full `firebase-orm-models` emulator
+    suite 128/128 files, 1504/1504 tests green; full `web` unit+emulator suite 267/267 files,
+    1670/1670 tests green; `pnpm build` green across all 7 packages.
+  - CI's first run failed on one unrelated test (`onboarding/pack/route.test.ts`, a 60s timeout,
+    1669/1670 passed) alongside several `RESOURCE_EXHAUSTED` Firestore-emulator gRPC errors in the
+    log — this repo's own documented emulator-contention flake, on a file this PR's diff never
+    touches. Posted a standing-down comment naming the failing check and why it wasn't this PR's, then
+    used this session's one re-run; it came back green (`lint · typecheck · test · build` +
+    `terraform fmt · validate`, `mergeable_state: clean`, no open review threads). Merged squash.
+  - Branch deletion (`git push origin --delete kan-104-segments-page-batched-precompute`) failed with
+    the same recurring, pre-existing HTTP 403 this file has documented since 2026-07-04 — not new,
+    needs a human with direct repo access to bulk-clean up someday.
+- **In progress (exact stopping point):** none — KAN-104 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-104 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pattern for the
+  next candidate, re-checking open PRs and the freshest `main`'s highest KAN number immediately before
+  minting a new one. The `ServiceAccountModel`/project-scoped-permission gap investigated this run is
+  a real one but explicitly NOT picked up — it's genuinely large (a security-sensitive refactor
+  touching every project-scoped route's permission check) and deserves a human's scoping/design
+  decision before an autonomous run attempts it, not a quick sweep pick.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin`.
+  - New: a human should decide whether the project-scoped-role-binding gap (`INVITABLE_ROLES`'s own
+    "project-scoped invite flow ... not-yet-built story" note, and `requireOrgPermission` never
+    passing `projectId` into `can()`) is worth a dedicated story, since it's larger than this
+    autonomous run's usual scope.
+
+---
+
 ## 2026-08-26 (latest) — Merged PR #307 (KAN-101, goal trend-fitted pace projection)
 
 - **Last completed:**
