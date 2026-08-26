@@ -53,17 +53,19 @@ export interface MetaCreateAdSetResult {
   adSetId: string;
 }
 
-/** An ad set's own live daily budget (USD cents, if the ad set has one — see `MetaAutomationActionExecutor`'s own doc comment for why an ad set created by this connector starts with no independent budget) and status, as reported by Meta. */
+/** An ad set's own live daily budget (USD cents, if the ad set has one — see `MetaAutomationActionExecutor`'s own doc comment for why an ad set created by this connector starts with no independent budget), status, and targeting spec (KAN-73 follow-up: ad-set targeting-spec edits), as reported by Meta. */
 export interface MetaGetAdSetResult {
   adSetId: string;
   dailyBudgetCents?: number;
   status: MetaObjectStatus;
+  targeting: MetaAdSetTargeting;
 }
 
-/** At least one of `dailyBudgetCents`/`status` should be set — an empty edit is a caller bug, though this client itself doesn't enforce that (see `MetaAutomationActionExecutor.executeMetaAdSetEdit`, which never calls `updateAdSet` with an empty params object). */
+/** At least one of `dailyBudgetCents`/`status`/`targeting` should be set — an empty edit is a caller bug, though this client itself doesn't enforce that (see `MetaAutomationActionExecutor.executeMetaAdSetEdit`/`executeMetaAdSetTargetingEdit`, neither of which ever calls `updateAdSet` with an empty params object). Unlike `dailyBudgetCents`/`status`, `targeting` is always replaced as a whole object when present — Meta's own `targeting` field has no independently-patchable sub-fields, mirroring `MetaCreateAdSetParams.targeting`'s own all-or-nothing shape. */
 export interface MetaUpdateAdSetParams {
   dailyBudgetCents?: number;
   status?: MetaObjectStatus;
+  targeting?: MetaAdSetTargeting;
 }
 
 export interface MetaCreateAdCreativeParams {
@@ -199,9 +201,11 @@ export interface MetaAdsApiClient {
    */
   getCampaign(campaignId: string): Promise<{ campaignId: string }>;
   /**
-   * Reads an ad set's own live daily budget/status (KAN-73 follow-up:
-   * post-creation ad-set edits) — `MetaAutomationActionExecutor.executeMetaAdSetEdit`
-   * calls this immediately before applying an edit, since `AutomationTargetStateModel`
+   * Reads an ad set's own live daily budget/status/targeting spec (KAN-73
+   * follow-up: post-creation ad-set edits, and the later "ad-set
+   * targeting-spec edits" follow-up) —
+   * `MetaAutomationActionExecutor.executeMetaAdSetEdit`/`executeMetaAdSetTargetingEdit`
+   * call this immediately before applying an edit, since `AutomationTargetStateModel`
    * has no per-ad-set field to source the pre-edit values from the way
    * `campaign_budget_resource_name`/`campaign_status` do for a whole
    * campaign (see `AutomationMetaAdSetEditExecutionInput`'s own doc
@@ -210,13 +214,14 @@ export interface MetaAdsApiClient {
    */
   getAdSet(adSetId: string): Promise<MetaGetAdSetResult>;
   /**
-   * Updates an already-created ad set's daily budget (USD cents) and/or
-   * status in a single field-POST (KAN-73 follow-up) — mirrors
+   * Updates an already-created ad set's daily budget (USD cents), status,
+   * and/or targeting spec in a single field-POST (KAN-73 follow-up, the
+   * targeting-spec parameter added by a later follow-up) — mirrors
    * `setDailyBudgetCents`/`setObjectStatus` (both of which already work
    * against any object id, ad sets included, since Meta's Graph API POST
-   * endpoint is generic over object type), but bundles both possible fields
-   * into one request rather than two separate round trips when an edit
-   * touches both at once.
+   * endpoint is generic over object type), but bundles every possible field
+   * into one request rather than separate round trips when an edit touches
+   * more than one at once.
    */
   updateAdSet(adSetId: string, params: MetaUpdateAdSetParams): Promise<void>;
   /**
@@ -240,6 +245,46 @@ const META_GRAPH_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`
 
 /** Meta's real ad-set `targeting.genders` field is numeric: 1 = male, 2 = female. Omitted entirely means "all genders." */
 const GENDER_CODES: Record<'male' | 'female', number> = { male: 1, female: 2 };
+/** The reverse of {@link GENDER_CODES} — used by `getAdSet` to parse a live targeting spec back into {@link MetaAdSetTargeting}'s own vocabulary. */
+const GENDER_CODES_REVERSE: Record<number, 'male' | 'female'> = { 1: 'male', 2: 'female' };
+
+/**
+ * Builds Meta's own `targeting` JSON shape (`geo_locations`/`age_min`/
+ * `age_max`/optional numeric `genders`) from {@link MetaAdSetTargeting} —
+ * shared by `createAdSet` (a brand-new ad set) and `updateAdSet` (KAN-73
+ * follow-up: ad-set targeting-spec edits, an already-created one) so the two
+ * never drift.
+ */
+function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, unknown> {
+  const targetingSpec: Record<string, unknown> = {
+    geo_locations: { countries: targeting.countries },
+    age_min: targeting.ageMin,
+    age_max: targeting.ageMax,
+  };
+  if (targeting.genders && targeting.genders.length > 0) {
+    targetingSpec.genders = targeting.genders.map((gender) => GENDER_CODES[gender]);
+  }
+  return targetingSpec;
+}
+
+/**
+ * Parses Meta's own live `targeting` JSON shape back into
+ * {@link MetaAdSetTargeting} (KAN-73 follow-up: ad-set targeting-spec
+ * edits) — the reverse of {@link buildMetaTargetingSpec}, used by `getAdSet`
+ * to read an ad set's true pre-edit targeting. An empty/missing `genders`
+ * array parses back to `undefined` ("all genders"), matching
+ * {@link MetaAdSetTargeting.genders}'s own "omitted means all genders"
+ * convention.
+ */
+function parseMetaTargetingSpec(raw: { geo_locations: { countries: string[] }; age_min: number; age_max: number; genders?: number[] }): MetaAdSetTargeting {
+  const genders = (raw.genders ?? []).map((code) => GENDER_CODES_REVERSE[code]).filter((gender): gender is 'male' | 'female' => gender !== undefined);
+  return {
+    countries: raw.geo_locations.countries,
+    ageMin: raw.age_min,
+    ageMax: raw.age_max,
+    ...(genders.length > 0 ? { genders } : {}),
+  };
+}
 
 /** Meta requires USD cents (an integer), not fractional dollars — mirrors Google Ads' own `usdToMicros`. */
 function usdToCents(usd: number): number {
@@ -306,19 +351,11 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
   }
 
   async createAdSet(adAccountId: string, params: MetaCreateAdSetParams): Promise<MetaCreateAdSetResult> {
-    const targetingSpec: Record<string, unknown> = {
-      geo_locations: { countries: params.targeting.countries },
-      age_min: params.targeting.ageMin,
-      age_max: params.targeting.ageMax,
-    };
-    if (params.targeting.genders && params.targeting.genders.length > 0) {
-      targetingSpec.genders = params.targeting.genders.map((gender) => GENDER_CODES[gender]);
-    }
     const result = await this.request<{ id: string }>(`act_${adAccountId}/adsets`, {
       name: params.name,
       campaign_id: params.campaignId,
       status: 'PAUSED',
-      targeting: JSON.stringify(targetingSpec),
+      targeting: JSON.stringify(buildMetaTargetingSpec(params.targeting)),
       // Fixed, documented simplification (this connector always builds a
       // link-click campaign) — mirrors `GoogleAdsHttpApiClient`'s own
       // `manualCpc: {}` placeholder for a bidding detail this story doesn't
@@ -391,13 +428,19 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
   }
 
   async getAdSet(adSetId: string): Promise<MetaGetAdSetResult> {
-    const result = await this.getRequest<{ id: string; daily_budget?: string; status: MetaObjectStatus }>(adSetId, {
-      fields: 'id,daily_budget,status',
+    const result = await this.getRequest<{
+      id: string;
+      daily_budget?: string;
+      status: MetaObjectStatus;
+      targeting: { geo_locations: { countries: string[] }; age_min: number; age_max: number; genders?: number[] };
+    }>(adSetId, {
+      fields: 'id,daily_budget,status,targeting',
     });
     return {
       adSetId: result.id,
       ...(result.daily_budget !== undefined ? { dailyBudgetCents: Number(result.daily_budget) } : {}),
       status: result.status,
+      targeting: parseMetaTargetingSpec(result.targeting),
     };
   }
 
@@ -408,6 +451,9 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
     }
     if (params.status !== undefined) {
       body.status = params.status;
+    }
+    if (params.targeting !== undefined) {
+      body.targeting = JSON.stringify(buildMetaTargetingSpec(params.targeting));
     }
     await this.request<{ success?: boolean }>(adSetId, body);
   }

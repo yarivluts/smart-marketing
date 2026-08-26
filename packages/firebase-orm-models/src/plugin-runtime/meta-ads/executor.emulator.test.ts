@@ -48,7 +48,9 @@ function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiCli
     setDailyBudgetCents: vi.fn().mockResolvedValue(undefined),
     setObjectStatus: vi.fn().mockResolvedValue(undefined),
     getCampaign: vi.fn().mockRejectedValue(new MetaAdsApiError('No campaign found.', 404)),
-    getAdSet: vi.fn().mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE' }),
+    getAdSet: vi
+      .fn()
+      .mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE', targeting: { countries: ['US'], ageMin: 18, ageMax: 45 } }),
     updateAdSet: vi.fn().mockResolvedValue(undefined),
     getAd: vi.fn().mockResolvedValue({ adId: 'ad-1', creativeId: 'creative-1' }),
     updateAd: vi.fn().mockResolvedValue(undefined),
@@ -473,7 +475,11 @@ describe('MetaAutomationActionExecutor', () => {
 
     it('edits an ad set\'s budget and status, reading the real pre-edit values live', async () => {
       const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Set Edit Org');
-      const apiClient = fakeApiClient({ getAdSet: vi.fn().mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE' }) });
+      const apiClient = fakeApiClient({
+        getAdSet: vi
+          .fn()
+          .mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE', targeting: { countries: ['US'], ageMin: 18, ageMax: 45 } }),
+      });
       const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
 
       const result = await executor.executeMetaAdSetEdit({
@@ -556,6 +562,86 @@ describe('MetaAutomationActionExecutor', () => {
           targetId: target.id,
           adSetResourceName: 'act_999/adsets/not-this-targets',
           dailyBudgetUsd: 40,
+        }),
+      ).rejects.toBeInstanceOf(MetaAdSetNotOwnedByTargetError);
+      expect(apiClient.getAdSet).not.toHaveBeenCalled();
+      expect(apiClient.updateAdSet).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('executeMetaAdSetTargetingEdit / rollbackMetaAdSetTargetingEdit (KAN-73 follow-up)', () => {
+    async function seedTargetWithAdSet(organizationId: string, projectId: string, ownerId: string, apiClient: MetaAdsApiClient) {
+      const target = await ensureAutomationTargetSeeded({
+        organizationId,
+        projectId,
+        environmentId: 'live',
+        targetId: unique('campaign'),
+        targetType: 'campaign',
+        label: 'Ad Set Targeting Edit Target',
+        initialDailyBudgetUsd: 0,
+        seededByUserId: ownerId,
+      });
+      const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+      await executor.executeCampaignDraftCreate({ organizationId, projectId, environmentId: 'live', targetId: target.id, draft: DRAFT });
+      const [reloaded] = await listAutomationTargetStatesForProject(organizationId, projectId);
+      return { target: reloaded, executor };
+    }
+
+    it("edits an ad set's whole targeting spec, reading the real pre-edit spec live", async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Set Targeting Edit Org');
+      const apiClient = fakeApiClient({
+        getAdSet: vi
+          .fn()
+          .mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE', targeting: { countries: ['US'], ageMin: 18, ageMax: 45 } }),
+      });
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+
+      const newTargeting = { countries: ['FR', 'DE'], ageMin: 21, ageMax: 55, genders: ['male' as const] };
+      const result = await executor.executeMetaAdSetTargetingEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adSetResourceName: 'adset-1',
+        targeting: newTargeting,
+      });
+
+      expect(result).toEqual({ previousTargeting: { countries: ['US'], ageMin: 18, ageMax: 45 } });
+      expect(apiClient.getAdSet).toHaveBeenCalledWith('adset-1');
+      expect(apiClient.updateAdSet).toHaveBeenCalledWith('adset-1', { targeting: newTargeting });
+    });
+
+    it('rolls back an ad set targeting edit by re-applying the captured pre-edit spec', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Set Targeting Edit Rollback Org');
+      const apiClient = fakeApiClient();
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+      const previousTargeting = { countries: ['US'], ageMin: 18, ageMax: 45 };
+
+      await executor.rollbackMetaAdSetTargetingEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adSetResourceName: 'adset-1',
+        previousTargeting,
+      });
+
+      expect(apiClient.updateAdSet).toHaveBeenCalledWith('adset-1', { targeting: previousTargeting });
+    });
+
+    it("throws MetaAdSetNotOwnedByTargetError for an ad set that is not one of this target's own ad sets", async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Wrong Ad Set Targeting Org');
+      const apiClient = fakeApiClient();
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+
+      await expect(
+        executor.executeMetaAdSetTargetingEdit({
+          organizationId: organization.id,
+          projectId: project.id,
+          environmentId: 'live',
+          targetId: target.id,
+          adSetResourceName: 'act_999/adsets/not-this-targets',
+          targeting: { countries: ['US'], ageMin: 18, ageMax: 45 },
         }),
       ).rejects.toBeInstanceOf(MetaAdSetNotOwnedByTargetError);
       expect(apiClient.getAdSet).not.toHaveBeenCalled();

@@ -33,6 +33,7 @@ import { POST as proposeCampaignDraftRoute } from '@/app/api/orgs/[orgId]/projec
 import { POST as proposeCampaignActivationRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/campaign-activations/route';
 import { POST as proposeKeywordEditRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/keyword-edits/route';
 import { POST as proposeMetaAdSetEditRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/meta-ad-set-edits/route';
+import { POST as proposeMetaAdSetTargetingEditRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/meta-ad-set-targeting-edits/route';
 import { POST as proposeMetaAdCreativeEditRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/meta-ad-creative-edits/route';
 import { GET as getKillSwitchStatus, POST as toggleKillSwitchRoute } from '@/app/api/orgs/[orgId]/automation/kill-switch/route';
 
@@ -883,6 +884,32 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         proposeMetaAdSetEditRoute(postRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
       () =>
         proposeMetaAdSetEditRoute(postRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
+        }),
+    );
+  });
+
+  it('POST /api/orgs/[orgId]/projects/[projectId]/automation/actions/meta-ad-set-targeting-edits: org caller cannot see vs. fake org id (KAN-73 follow-up)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-meta-ad-set-targeting-edit-caller'));
+    const caller = await ensureUserForFirebaseSession({ firebaseUid: callerSession.uid, email: callerSession.email as string });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (meta ad set targeting edit)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-meta-ad-set-targeting-edit-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (meta ad set targeting edit)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const postRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/automation/actions/meta-ad-set-targeting-edits`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetId: 'does-not-exist', adSetResourceName: 'act_1/adsets/1', targeting: { countries: ['US'], ageMin: 18, ageMax: 45 } }),
+      });
+    await expectIndistinguishable(
+      () =>
+        proposeMetaAdSetTargetingEditRoute(postRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID }) }),
+      () =>
+        proposeMetaAdSetTargetingEditRoute(postRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
         }),
     );
