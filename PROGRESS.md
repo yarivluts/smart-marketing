@@ -17,7 +17,100 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #305 (KAN-100, org-person edit)
+## 2026-08-26 (latest) — Opened PR #309 (KAN-103, curated "paying, no demo" segment suggestion); waiting on CI
+
+- **Last completed:**
+  - Session start: `main` at `117fb78` (fully up to date), `TASKS.md` fully `done` except the standing
+    KAN-18/19/43/50/51 items. `list_pull_requests` showed one open PR, #307 (KAN-101, goal trend
+    projection) — avoided that topic per this run's own instructions.
+  - Swept `done` rows' own deferred/not-yet doc-comment notes per this repo's established pattern.
+    `demos/page.tsx`'s own doc comment named a concrete, still-open gap: the plan's own canonical
+    `docs/plan/14-gap-analysis.md` Gap 9 worked example ("paying_no_demo" — "paying accounts that
+    never got a demo → go talk to them") had both of its underlying primitives already built
+    (KAN-93's cross-schema `has_event`/`no_event` segment conditions, KAN-95's nested-filter UI) but
+    nothing wired the two together into an actual AI-suggested list the way every other segment
+    archetype (`High-value customers`, etc.) already is — a human could technically build the exact
+    segment by hand, but nothing proposed it.
+  - Picked as **KAN-102** at pick time (`list_pull_requests` showed only #307 open); by the time this
+    run finished implementing + locally verifying and went to mint the branch/commit, a fresh
+    `list_pull_requests` check (per this run's own collision-avoidance instructions) turned up a
+    **second** concurrent session's PR #308, which had independently claimed **KAN-102** for a
+    different story (Meta Lookalike Audience creation, KAN-73 follow-up) minutes earlier. Renumbered
+    every in-repo reference (component/test doc comments, PR title/body) from KAN-102 to **KAN-103**
+    via `sed` across the 6 touched files that named it, re-verified the two affected component test
+    files green after the rename, then proceeded — this is the second time in this repo's history a
+    session has had to renumber mid-flight for the identical reason (see KAN-100's own entry).
+  - **Delivered (PR #309, branch `kan-103-paying-no-demo-segment-suggestion`):**
+    `SegmentSuggestion` (`packages/shared/src/segment-suggestion/types.ts`) gains an optional
+    `eventConditions?: SegmentEventCondition[]` — present only on a curated suggestion, absent from
+    every plain field-heuristic one. `suggestSegments` (`segment.service.ts`) prepends a curated
+    `PAYING_NO_DEMO_SEGMENT_SUGGESTION` (`filters: [status = active]`,
+    `eventConditions: [no_event demo_event]`, `confidence: 1`) whenever the caller is browsing
+    Stripe's `stripe_subscription` entity schema and the project's `demo_event` event schema
+    (KAN-92's Sales Pipeline pack) is also registered+active — both schemas already exist today,
+    nothing new to provision. `SuggestSegmentsPanel`/`CreateSegmentForm`
+    (`apps/web/components/orgs/`) thread a suggestion's `eventConditions` through end to end into the
+    form's own event-condition rows, the same "review and submit yourself" posture every suggestion
+    already has. `demos/page.tsx`'s own doc comment updated to say the gap is closed, plus a new
+    `dashboards.write`-gated link to the Segments page. en/he translations for the new copy.
+  - Full local verification before opening the PR: `pnpm build`/`pnpm lint`/`pnpm typecheck` green
+    monorepo-wide (8 packages). `pnpm test`: `shared` 587/587, `firebase-orm-models` 1490/1490 (real
+    Firestore emulator, including 3 new `suggestSegments` cases), `api` 141/141, `dbt-transform`
+    248/248 all green on the first full run. `apps/web`'s own full run hit the well-documented
+    Firestore-emulator resource-contention flake this repo's history repeatedly names on two separate
+    full-suite attempts — a different, unrelated spec failed each time
+    (`automation/guardrail-policy/route.test.ts` first, then `onboarding/pack/route.test.ts` +
+    `rep-collections/[entryId]/route.test.ts`), none touched by this PR's diff; re-ran each failing
+    file alone against a fresh emulator and all passed cleanly (15/15, then 20/20) — this sandbox's own
+    local emulator appears to be under heavier contention this run than usual (each retry took
+    20-40+ minutes just for the `apps/web` unit+emulator phase alone, well beyond this file's own
+    historical norm).
+  - Opened PR #309, subscribed via `subscribe_pr_activity`. Re-checked `list_pull_requests` and
+    `TASKS.md`'s highest KAN number immediately before committing, per this run's own instructions —
+    confirmed `origin/main` unchanged and no third collision on KAN-103 at that point.
+- **In progress (exact stopping point):** PR #309 is open, fully implemented, fully locally verified,
+  with no known correctness issues — waiting on GitHub Actions CI (`lint · typecheck · test · build` +
+  `terraform fmt · validate`) to report a result before merge. `terraform fmt · validate` came back
+  green quickly (11s). The `lint · typecheck · test · build` job's `Lint`/`Typecheck` steps both
+  completed green in under a minute each, but its `Test` step has been stuck `in_progress` for well
+  over 100 minutes as of this entry with no further step transitions — far beyond this repo's own
+  historical CI durations. Checked a second, wholly unrelated concurrent PR's CI run (#308, KAN-102,
+  a different session, different diff) and found its own `Test` step stuck in the identical way for a
+  comparable duration, having started even earlier — strong evidence this is shared GitHub Actions
+  runner/infra contention or a stall affecting this environment broadly right now, not a hang caused
+  by this PR's own diff (which is small, fully covered by fast-passing package-level test runs, and
+  touches no infrastructure, timers, or long-lived connections). Per CLAUDE.md's own "do not merge on
+  red CI" (and, by the same reasoning, not on CI that hasn't reported yet), this run is stopping here
+  rather than merging without a CI result or force-cancelling/re-running a job that may simply need
+  more wall-clock time.
+- **Blocked + why:** blocked on GitHub Actions CI actually completing for PR #309 (`lint · typecheck ·
+  test · build`, run id `32967030840`, job id `98171723206`) — no action available from within this
+  session to speed that up; force-cancelling and retrying risks landing in the exact same contended
+  state. Not blocked on anything about the diff itself.
+- **Next step:** a future run (or this session resumed later) should re-check
+  `mcp__github__actions_list`/`pull_request_read` on PR #309 first. If CI has since completed green
+  and `mergeable_state` is `clean`, merge (squash) into `main`, delete the branch, and update
+  `TASKS.md`'s new KAN-103 row + this file per the usual pattern. If CI failed for a real reason in
+  this diff, fix and push. If CI is still stuck in the same way after a much longer wait, treat it as
+  a standing infra issue worth a human's attention (per this run's own "post a standing-down comment
+  naming the failure" convention, extended here to "CI itself appears stalled, not failing") rather
+  than repeatedly re-running blind. After PR #309 resolves either way, resume the sweep pattern for
+  the next unclaimed, buildable-today gap — re-check `list_pull_requests` first (as of this entry, #307
+  KAN-101 and #308 KAN-102 were both still open) and re-check `TASKS.md` on the freshest `main`
+  immediately before minting any new KAN number, per this run's own second-time experience of a
+  same-number collision.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - New: if GitHub Actions CI for this repo continues to stall broadly (this run observed two unrelated
+    PRs' `Test` steps both stuck `in_progress` for 100+ minutes simultaneously), a human may want to
+    check the Actions runner/queue health directly — nothing in-session here can diagnose further.
+
+---
+
+## 2026-08-26 — Merged PR #305 (KAN-100, org-person edit)
 
 - **Last completed:**
   - Picked up exactly where the previous entry left off: PR #305 (renumbered KAN-99 -> KAN-100 to
