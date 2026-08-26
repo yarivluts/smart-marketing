@@ -9,7 +9,7 @@ interface RouteParams {
 }
 
 /**
- * Edits an existing person in the org's people registry (KAN-99 —
+ * Edits an existing person in the org's people registry (KAN-100 —
  * `createOrgPerson`/`listOrgPeople` had create + list but no way to fix a
  * typo'd name or a stale email/title/photo, unlike every other
  * user-manageable entity in this codebase) — same `resources.manage` gate

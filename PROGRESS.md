@@ -17,7 +17,131 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #302 (KAN-96, board-tile batched query reads)
+## 2026-08-26 (latest) — Opened/renumbered PR #305 (KAN-100, org-person edit)
+
+- **Last completed:**
+  - Session start: `main` at 4ad2b20, `TASKS.md` fully `done` except the standing KAN-18/19/43/50/51
+    items. `list_pull_requests` showed two concurrent sessions' open PRs at pick time: #302 (KAN-96,
+    board-tile batched reads) and #304 (KAN-98, org member role change). Delegated a sweep for a third,
+    unclaimed, buildable-today gap.
+  - The sweep's candidate: CLAUDE.md's own "everything user-manageable gets an admin surface" rule
+    applied to `resource-library.service.ts`'s `createOrgPerson`/`listOrgPeople` (KAN-27) — unlike every
+    other user-manageable entity in this codebase, the org's people registry had create + list but no
+    way to fix a typo'd name or a stale email/title/photo once a person was registered, only
+    delete-and-recreate (which would orphan the `org_person_id` references goals/segments/rep-collection
+    entries hold). No ticket existed for this — minted as **KAN-99** at pick time.
+  - **Delivered (PR #305, branch `kan-99-org-person-edit`):** `updateOrgPerson()`
+    (`resource-library.service.ts`, full replace of the editable fields, sharing a new `loadOrgPerson`
+    lookup helper with `requireResourceInOrg`'s existing person branch), audit-logged as
+    `org_person.update` with before/after values. New `PATCH /api/orgs/[orgId]/resources/people/[personId]`
+    route (`resources.manage` gated, same as create). New `EditPersonForm` admin control on the org
+    Resource Library page's people section (an "Edit" toggle pre-filled with current values, only shown
+    to callers who already hold `resources.manage`). en/he translations. Full test coverage: emulator
+    tests (all-fields update + list reflects it, omitted-optional-fields clear rather than staying
+    stale, not-found, cross-org isolation, audit-log before/after), route tests (401/403/400/404/200), a
+    KAN-26 isolation-test addition, and an `EditPersonForm` component test suite.
+  - **Collision found and fixed at merge time:** by the time this PR was ready to merge, `main` had
+    advanced past a *different* concurrent session's PR #306, which had independently minted the exact
+    same number — **KAN-99**, for global omnisearch goal-indexing — and already merged. Fetched and
+    merged `main` into this branch; the only real conflict was `TASKS.md`'s own row (both PRs inserted
+    a `| KAN-99 | ... |` row). Resolved by keeping PR #306's KAN-99 row as-is (it was already merged and
+    is the earlier-numbered claim) and **renumbering this PR's story to KAN-100** everywhere it appears
+    in-repo: the `TASKS.md` row (with a note on the renumbering), this entry, the PR title, and four
+    code-level doc comments/test descriptions that named "KAN-99"
+    (`resource-library.emulator.test.ts`, `edit-person-form.tsx`, the new route's own doc comment,
+    `isolation.test.ts`) — none of these were behavioral, all comment/description text only, so no
+    logic changed. `apps/web/messages/en.json`/`he.json` and the omnisearch-touching files merged
+    cleanly with no conflict (disjoint from this PR's own diff).
+  - Re-verified `pnpm lint`/`pnpm typecheck` clean and re-ran the directly affected test files
+    (`resource-library.emulator.test.ts`, `edit-person-form.test.tsx`, `route.test.ts`, `isolation.test.ts`)
+    green against the merged state before pushing; relying on CI for the full monorepo re-verification
+    given the rename-only nature of the merge conflict resolution.
+- **In progress (exact stopping point):** merge-conflict resolution pushed to `kan-99-org-person-edit`
+  (branch name unchanged from before the renumbering — only the story's own KAN number and PR title
+  changed) as KAN-100; PR title updated on GitHub to say KAN-100. Waiting on CI to report on the merge
+  commit, then merge (squash) into `main` and update `TASKS.md`'s KAN-100 row / this entry to reflect
+  the merge, same as every prior entry in this file does.
+- **Blocked + why:** nothing blocking; waiting on CI.
+- **Next step:** on the next check, verify CI is green and `mergeable_state` is clean, merge (squash),
+  delete the branch, and record the merge in a follow-up entry. After that, resume the sweep pattern for
+  the next unclaimed, buildable-today gap (re-check `list_pull_requests` first for any other concurrent
+  session's in-flight work — this run's own experience shows collisions on both the code and the KAN
+  number itself are a live risk when multiple sessions sweep concurrently; a future improvement worth
+  considering is checking `TASKS.md` on the freshest `main` immediately before minting a new KAN number,
+  not just at pick time).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+
+---
+
+## 2026-08-26 (latest) — Merged PR #306 (KAN-99, omnisearch indexes goals)
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). `list_pull_requests` showed zero open
+    PRs, so no concurrent-session collision to route around this time. Local `main` was ~150 commits
+    stale (the shallow-clone-snapshot quirk this file's history repeatedly documents) — reset to
+    `origin/main` before branching (no unique local commits existed to lose).
+  - Delegated a scoping sweep (subagent) for a genuine, unclaimed, buildable-today follow-up per this
+    repo's established "sweep every `done` row's own doc comments" pattern. It surfaced
+    `packages/shared/src/omnisearch/types.ts`'s own doc comment, which names the omnisearch index's
+    inclusion rule verbatim: entities with "a project-scoped 'list everything' query and a stable
+    browse destination." Boards/metrics/segments/campaigns satisfy it and are indexed; goals
+    (`listGoalsForProject`, stable since KAN-64, with both a list page and a per-goal detail page)
+    satisfy the identical criterion but were simply never added — unlike customers, which the same
+    comment explicitly and deliberately excludes pending a real customer-profile page. Confirmed
+    genuinely buildable today: no infra, no credentials, no product decision, every seam additive.
+  - **Delivered (PR #306, branch `kan-99-omnisearch-goals`, filed as KAN-99):** `goal` added to
+    `OMNI_SEARCH_RESULT_TYPES`; `buildOmniSearchIndexForProject` (`apps/web/lib/orgs/omnisearch.ts`)
+    fetches a project's goals (gated on `dashboards.write`, reusing the exact permission segments
+    already use) and pushes each as a search result linking to its own `/goals/[goalId]` detail page
+    — the boards pattern, since goals (unlike metrics/segments) have a real per-item destination.
+    The omnisearch route wires `canSearchGoals: canManageBoards`; the Cmd/Ctrl-K palette
+    (`omni-search.tsx`) gained a `Target` icon and en/he `resultType` ICU branches for the new kind.
+  - Full local verification before opening the PR caught a real bug in the new tests themselves: the
+    first full `pnpm test` run failed `omnisearch.test.ts`'s pre-existing "excludes superseded metric
+    definition versions" case with `TypeError: goals is not iterable` — that test never mocked the
+    new `listGoalsForProject` call, so it resolved to `undefined` (not a promise callers can await
+    into an array) and the `for...of` over it crashed. Fixed by mocking it to `[]` like every other
+    list in that test, then re-ran the full suite from scratch.
+  - The second full run hit one unrelated failure: `onboarding/pack/route.test.ts`'s
+    `installing "saas_marketing" provisions the pack's starter boards` timed out at 60000ms under
+    the same shared-emulator resource contention this repo's history repeatedly documents (a file
+    this PR's diff never touches). Re-ran that one file alone against a fresh emulator instance —
+    passed 6/6 clean — confirming the flake and that it wasn't a regression, per this repo's
+    established one-re-run-then-proceed convention for this exact failure class.
+  - Full local verification: `pnpm build`/`pnpm lint`/`pnpm typecheck` green monorepo-wide; `pnpm
+    test` green end to end (`web` 1640/1640 unit + emulator on the clean re-run; `shared`,
+    `firebase-orm-models`, `api`, `dbt-transform` all unaffected by this diff and passed on every
+    run). Opened PR #306, watched it via `subscribe_pr_activity`; CI (`lint · typecheck · test ·
+    build`, `terraform fmt · validate`) came back green on the first run with no open review
+    threads or conflicts — merged squash into `main`. Remote branch deletion
+    (`kan-99-omnisearch-goals`) failed with the same recurring HTTP 403 this sandbox's git remote has
+    rejected throughout this file's history — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-99 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-99 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. A
+  future run should re-check `list_pull_requests` first, then resume the "sweep every `done` row's
+  own doc comments for a fresh follow-up" pattern — e.g. the sweep's own runner-up candidate (a
+  smarter, trend-fitted pace projection for `minimize`/`range` goals, replacing the `goal-progress.ts`
+  doc comment's own documented "v1 just projects the current value forward unchanged"
+  simplification) is a reasonable next pick, medium-sized.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows
+    — still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (this session's own
+    `kan-99-omnisearch-goals` included) — this session's git/GitHub tooling can't delete remote refs.
+
+---
+
+## 2026-08-26 — Merged PR #302 (KAN-96, board-tile batched query reads)
 
 - **Last completed:**
   - Session start: read `PROGRESS.md`/`TASKS.md` — every row KAN-17..KAN-94 `done` except the standing

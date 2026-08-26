@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   AutomationTargetStateModel,
   BoardModel,
+  GoalModel,
   MetricDefModel,
   SegmentModel,
 } from '@growthos/firebase-orm-models';
@@ -9,11 +10,13 @@ import type {
 const {
   listAutomationTargetStatesForProjectMock,
   listBoardsForProjectMock,
+  listGoalsForProjectMock,
   listMetricDefinitionsForProjectMock,
   listSegmentsForProjectMock,
 } = vi.hoisted(() => ({
   listAutomationTargetStatesForProjectMock: vi.fn(),
   listBoardsForProjectMock: vi.fn(),
+  listGoalsForProjectMock: vi.fn(),
   listMetricDefinitionsForProjectMock: vi.fn(),
   listSegmentsForProjectMock: vi.fn(),
 }));
@@ -21,6 +24,7 @@ const {
 vi.mock('@/lib/orgs/queries', () => ({
   listAutomationTargetStatesForProject: listAutomationTargetStatesForProjectMock,
   listBoardsForProject: listBoardsForProjectMock,
+  listGoalsForProject: listGoalsForProjectMock,
   listMetricDefinitionsForProject: listMetricDefinitionsForProjectMock,
   listSegmentsForProject: listSegmentsForProjectMock,
 }));
@@ -32,6 +36,7 @@ const ALL_ALLOWED: OmniSearchPermissions = {
   canSearchMetrics: true,
   canSearchSegments: true,
   canSearchCampaigns: true,
+  canSearchGoals: true,
 };
 
 const NONE_ALLOWED: OmniSearchPermissions = {
@@ -39,6 +44,7 @@ const NONE_ALLOWED: OmniSearchPermissions = {
   canSearchMetrics: false,
   canSearchSegments: false,
   canSearchCampaigns: false,
+  canSearchGoals: false,
 };
 
 function board(overrides: Partial<BoardModel> = {}): BoardModel {
@@ -62,10 +68,15 @@ function campaignTarget(overrides: Partial<AutomationTargetStateModel> = {}): Au
   } as unknown as AutomationTargetStateModel;
 }
 
+function goal(overrides: Partial<GoalModel> = {}): GoalModel {
+  return { id: 'goal-1', name: 'Grow MRR 20%', ...overrides } as unknown as GoalModel;
+}
+
 describe('buildOmniSearchIndexForProject', () => {
   beforeEach(() => {
     listAutomationTargetStatesForProjectMock.mockReset();
     listBoardsForProjectMock.mockReset();
+    listGoalsForProjectMock.mockReset();
     listMetricDefinitionsForProjectMock.mockReset();
     listSegmentsForProjectMock.mockReset();
   });
@@ -75,6 +86,7 @@ describe('buildOmniSearchIndexForProject', () => {
     listMetricDefinitionsForProjectMock.mockResolvedValue([metricDef()]);
     listSegmentsForProjectMock.mockResolvedValue([segment()]);
     listAutomationTargetStatesForProjectMock.mockResolvedValue([campaignTarget()]);
+    listGoalsForProjectMock.mockResolvedValue([goal()]);
 
     const items = await buildOmniSearchIndexForProject('org-1', 'project-1', ALL_ALLOWED);
 
@@ -89,6 +101,7 @@ describe('buildOmniSearchIndexForProject', () => {
         description: 'campaign',
         href: '/orgs/org-1/projects/project-1/automation',
       },
+      { id: 'goal-1', type: 'goal', label: 'Grow MRR 20%', href: '/orgs/org-1/projects/project-1/goals/goal-1' },
     ]);
   });
 
@@ -100,6 +113,7 @@ describe('buildOmniSearchIndexForProject', () => {
     ]);
     listSegmentsForProjectMock.mockResolvedValue([]);
     listAutomationTargetStatesForProjectMock.mockResolvedValue([]);
+    listGoalsForProjectMock.mockResolvedValue([]);
 
     const items = await buildOmniSearchIndexForProject('org-1', 'project-1', ALL_ALLOWED);
 
@@ -114,6 +128,7 @@ describe('buildOmniSearchIndexForProject', () => {
     expect(listMetricDefinitionsForProjectMock).not.toHaveBeenCalled();
     expect(listSegmentsForProjectMock).not.toHaveBeenCalled();
     expect(listAutomationTargetStatesForProjectMock).not.toHaveBeenCalled();
+    expect(listGoalsForProjectMock).not.toHaveBeenCalled();
   });
 
   it('only fetches the permitted types', async () => {
@@ -125,5 +140,15 @@ describe('buildOmniSearchIndexForProject', () => {
     expect(listMetricDefinitionsForProjectMock).not.toHaveBeenCalled();
     expect(listSegmentsForProjectMock).not.toHaveBeenCalled();
     expect(listAutomationTargetStatesForProjectMock).not.toHaveBeenCalled();
+    expect(listGoalsForProjectMock).not.toHaveBeenCalled();
+  });
+
+  it('fetches goals only when canSearchGoals is granted', async () => {
+    listGoalsForProjectMock.mockResolvedValue([goal()]);
+
+    await buildOmniSearchIndexForProject('org-1', 'project-1', { ...NONE_ALLOWED, canSearchGoals: true });
+
+    expect(listGoalsForProjectMock).toHaveBeenCalledWith('org-1', 'project-1');
+    expect(listBoardsForProjectMock).not.toHaveBeenCalled();
   });
 });

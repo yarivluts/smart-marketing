@@ -101,7 +101,7 @@ describe('shared credentials, templates, and people registry: create + list', ()
   });
 });
 
-describe('updateOrgPerson (KAN-99)', () => {
+describe('updateOrgPerson (KAN-100)', () => {
   it('updates a person\'s name, email, title, and photo URL, persisted for a later list', async () => {
     const { owner, organization } = await setupOrgWithOwner('People Update Org');
     const person = await createOrgPerson({

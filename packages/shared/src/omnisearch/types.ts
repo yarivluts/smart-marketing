@@ -4,10 +4,10 @@
  * "list everything" query and a stable browse destination: boards (E11.2),
  * active metric definitions (E5.1), segments (E14.x — the closest existing
  * stand-in for "customers", since there's no first-class individual-customer
- * index yet), and automation campaign targets (E21.1). A real per-customer
- * index is a documented follow-up, not built here.
+ * index yet), automation campaign targets (E21.1), and goals (E12.1). A real
+ * per-customer index is a documented follow-up, not built here.
  */
-export const OMNI_SEARCH_RESULT_TYPES = ['board', 'metric', 'segment', 'campaign'] as const;
+export const OMNI_SEARCH_RESULT_TYPES = ['board', 'metric', 'segment', 'campaign', 'goal'] as const;
 
 export type OmniSearchResultType = (typeof OMNI_SEARCH_RESULT_TYPES)[number];
 

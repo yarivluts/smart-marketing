@@ -27,6 +27,7 @@ function mockFetchOnce(items: unknown[]): void {
 
 const BOARD_ITEM = { id: 'board-1', type: 'board', label: 'Marketing Overview', href: '/orgs/org-1/projects/project-1/boards/board-1' };
 const METRIC_ITEM = { id: 'metric-1', type: 'metric', label: 'CAC', href: '/orgs/org-1/projects/project-1/metric-defs' };
+const GOAL_ITEM = { id: 'goal-1', type: 'goal', label: 'Grow MRR 20%', href: '/orgs/org-1/projects/project-1/goals/goal-1' };
 
 describe('OmniSearchTrigger', () => {
   beforeEach(() => {
@@ -159,6 +160,18 @@ describe('OmniSearchTrigger', () => {
     expect(await screen.findByText('CAC')).toBeInTheDocument();
     expect(screen.queryByText('Marketing Overview')).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/orgs/org-1/projects/project-2/omnisearch');
+  });
+
+  it('shows a goal result with its result-type label and navigates to its detail page', async () => {
+    mockFetchOnce([GOAL_ITEM]);
+    renderTrigger();
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await screen.findByRole('dialog');
+    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'mrr' } });
+
+    fireEvent.click(await screen.findByText('Grow MRR 20%'));
+
+    expect(push).toHaveBeenCalledWith(GOAL_ITEM.href);
   });
 
   it('does not refetch the index on a second open', async () => {

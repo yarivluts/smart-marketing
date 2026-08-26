@@ -15,7 +15,7 @@ export interface EditPersonFormProps {
   initialPhotoUrl?: string;
 }
 
-/** Toggles between a compact "Edit" button and an inline edit form for one person row in the org's people registry (KAN-99). */
+/** Toggles between a compact "Edit" button and an inline edit form for one person row in the org's people registry (KAN-100). */
 export function EditPersonForm({
   orgId,
   personId,

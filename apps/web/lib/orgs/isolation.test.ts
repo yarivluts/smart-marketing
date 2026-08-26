@@ -223,7 +223,7 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
     );
   });
 
-  it('PATCH /api/orgs/[orgId]/resources/people/[personId]: org caller cannot see vs. fake org id (KAN-99)', async () => {
+  it('PATCH /api/orgs/[orgId]/resources/people/[personId]: org caller cannot see vs. fake org id (KAN-100)', async () => {
     const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-person-caller'));
     const caller = await ensureUserForFirebaseSession({
       firebaseUid: callerSession.uid,

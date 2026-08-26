@@ -31,7 +31,7 @@
     "emptyPrompt": "Start typing to search this project.",
     "loading": "Loading...",
     "noResults": "No results for \"{query}\".",
-    "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} other {Result}}"
+    "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} goal {Goal} other {Result}}"
   },
   "Auth": {
     "emailLabel": "Email",
