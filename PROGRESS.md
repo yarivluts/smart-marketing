@@ -17,6 +17,120 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (KAN-95, later) — Merged PR #301 (segment event-condition nested filters)
+
+- **Last completed:**
+  - Picked up exactly where the previous entry left off: PR #301 was open, self-reviewed, and green
+    locally, with GitHub CI in progress on the doc-update commit.
+  - CI's `lint · typecheck · test · build` check failed once on that commit — the same known
+    `campaign-ops-pack.emulator.test.ts` `RESOURCE_EXHAUSTED`/120s-timeout flake this repo's history
+    repeatedly names (126/127 files, 1445/1446 tests otherwise green; this PR never touches that file,
+    and it had already passed 19/19 in an isolated local re-run earlier in this session). Posted a
+    standing-down comment on the PR naming the failure and why it wasn't this PR's, then triggered the
+    one allowed re-run (`rerun_failed_jobs`). The re-run came back fully green
+    (`lint · typecheck · test · build` + `terraform fmt · validate`, `mergeable_state: clean`).
+  - Merged (squash) into `main`. Branch deletion (`git push origin --delete
+    kan-95-segment-event-condition-nested-filters`) failed with the same recurring HTTP 403 this
+    sandbox's git remote has rejected repeatedly in this file's history — merged and dead but not
+    deleted; a human with direct repo access can delete
+    `kan-95-segment-event-condition-nested-filters`.
+  - Updated `TASKS.md`'s KAN-95 row from `in-progress` to `done`.
+- **In progress (exact stopping point):** none — KAN-95 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own row update are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable follow-up"
+  pattern for the next candidate. The prior sweep's runner-ups (a real per-customer index for
+  omnisearch — needs a new customer-detail page, not just an index; mailing-address/mobile-device-id
+  identifiers for Google Customer Match/Meta Custom Audience — an already-saturated 8+-follow-up area)
+  are still there if a fresh sweep doesn't turn up something smaller.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional: delete the merged `kan-95-segment-event-condition-nested-filters` branch on GitHub (this
+    sandbox's git remote rejected the delete with a 403).
+
+---
+
+## 2026-08-26 (KAN-95) — Opened PR #301 (segment event-condition nested filters), CI green, merging next
+
+- **Last completed:**
+  - Session start: local checkout was in a detached-HEAD state pointing at stale `main`
+    (same recurring quirk this file's history documents) — `git checkout -B main origin/main` fixed
+    it. Read `PROGRESS.md`/`TASKS.md`: every row `done` except the standing KAN-18/19 infra items and
+    KAN-43/50/51 (`needs-human`/`blocked-by`). `list_pull_requests` showed an already-open PR #300
+    (KAN-94, dunning-status feed) from a concurrent session, its own CI in progress — to avoid
+    duplicating that pick, delegated a background sweep agent (explicitly excluding the dunning-feed
+    gap and the already-flagged-too-large KAN-72/73 PMax/Lookalike items) to find a different,
+    unclaimed, infra-free follow-up.
+  - The sweep surfaced a real, small, self-contained gap: `create-segment-form.tsx`'s own
+    `EventConditionRow` doc comment (written during KAN-93) says outright "Nested per-condition field
+    filters are supported by the data model/service/MCP tool but deliberately not exposed here."
+    Verified the claim: `SegmentEventCondition.filters` (`packages/shared/src/segments/segment-filter.ts`),
+    the segments POST route, and `countSegmentMembers`/`listSegmentMembers`'s compiler all already
+    handled a condition's nested filters end to end since KAN-93 — the gap was purely the create-segment
+    form's own row editor never rendering them, so a human had to fall back to the MCP `create_segment`
+    tool to express something like "has a `demo_event` where `is_paid = true`".
+  - **Delivered (PR #301, branch `kan-95-segment-event-condition-nested-filters`, minted as KAN-95 —
+    same "no pre-existing ticket, sweep found it" pattern KAN-89..94 established):** `EventConditionRow`
+    gained a `filters: FilterRow[]` field; a nested filter sub-editor inside each event-condition row,
+    reusing the exact field/operator/value row pattern the top-level entity filters already use (its own
+    distinct `aria-label`s so it never collides with the top-level "Field"/"Operator"/"Value" queries),
+    with its own add/remove buttons. `canSubmit` and the POST body wired through — a nested filter row
+    must be fully filled to submit, and a condition's `filters` key is omitted entirely from the request
+    body when no nested filters were added, mirroring `withinDays`'s existing "omit when blank"
+    convention (every previously-passing payload-shape assertion stayed unchanged). en/he translations
+    added. No service/model/route/MCP changes needed — purely the UI catching up to functionality that
+    already existed and was already tested at every other layer.
+  - New component tests in `create-segment-form.test.tsx`: add/remove nested filter rows, submit a
+    nested filter (confirming the request body's shape, incl. omitting `filters` when none were added),
+    and the disabled-submit-until-filled rule extended to nested rows.
+  - Self-review (`/code-review`-style read of the own diff) before opening the PR found one real, if
+    minor, quality issue and fixed it: a new test's own comment describing button DOM order omitted the
+    event-condition row's own "Remove" button from the sequence, which could mislead a future reader
+    even though the test's logic (index from the end) was already correct — fixed the comment, re-ran
+    the affected test file to confirm still green, and pushed as a second commit before CI ran.
+  - Full local verification before opening the PR: `pnpm build`/`pnpm lint`/`pnpm typecheck` green
+    monorepo-wide; full `pnpm test` green (`shared` 587/587, `firebase-orm-models` 1443/1443 vs a real
+    Firestore emulator, `api` 141/141, `web` 1604/1604 unit + full sharded Playwright e2e — a dozen specs
+    unrelated to this diff hit the well-documented Firestore-emulator `RESOURCE_EXHAUSTED`
+    resource-contention flake this repo's history repeatedly names and self-healed on Playwright's own
+    retry; no segment-related test failed at any point).
+  - Opened PR #301 and subscribed to its activity. GitHub then reported `mergeable_state: dirty` —
+    PR #300 (KAN-94) had merged into `main` in the meantime. Merged `main` into the branch; the only
+    conflict was in `TASKS.md` itself (both PRs appended a new row near the same spot) — resolved by
+    keeping both rows in KAN order (KAN-94 before KAN-95). Re-verified `pnpm build`/`pnpm lint`/
+    `pnpm typecheck` green against the merged state and pushed.
+  - Re-running the full local `pnpm test` against the merged state twice both hit the same known
+    `campaign-ops-pack.emulator.test.ts` flake (this file's own doc/PROGRESS history names it
+    repeatedly) under this sandbox's resource contention when the whole monorepo suite runs
+    concurrently — confirmed it was exactly that flake, not a regression from this change, by running
+    the file alone against a fresh emulator instance (19/19 green in isolation). GitHub Actions CI
+    (a separate, unconstrained runner) came back fully green on the first attempt: `lint · typecheck ·
+    test · build` and `terraform fmt · validate` both succeeded, `mergeable_state: clean`.
+- **In progress (exact stopping point):** PR #301 is open, self-reviewed, CI-green, and mergeable —
+  about to merge (squash) and delete the branch, then update `TASKS.md`'s KAN-95 row status and this
+  entry's own "Last completed" is the final state before that merge (if this session ends before the
+  merge completes, the next run should merge PR #301 directly — CI is already green, nothing else to
+  verify).
+- **Blocked + why:** nothing blocking; the merge itself is the last remaining step.
+- **Next step:** merge PR #301 (squash), delete the branch, and continue the "sweep every `done` row's
+  own doc-comment notes for a newly-buildable follow-up" pattern for the next candidate. Runner-up
+  candidates the sweep agent found but didn't lead with: a real per-customer index for omnisearch
+  (KAN-85's own deferred note) — rejected this round since no customer-detail page exists yet to browse
+  to, so it would need a new page, not just an index; and mailing-address/mobile-device-id identifiers
+  for Google Customer Match/Meta Custom Audience (KAN-72/73) — deprioritized since that audience-sync
+  thread has already had 8+ follow-up PRs and a fresh area seemed healthier to pick.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+
+---
+
 ## 2026-08-26 (latest) — Merged PR #300 (KAN-94, billing-ops dunning-status feed)
 
 - **Last completed:**
