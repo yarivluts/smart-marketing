@@ -17,6 +17,147 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — PR #312 open (KAN-106, omnisearch win-rule indexing), renumbered from KAN-105, CI pending
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). No open PRs at pick time.
+  - Delegated a bounded background sweep agent (same "grep every `done` row's own deferred/not-yet
+    doc-comment note for a newly-buildable follow-up" pattern KAN-96/99/101/104 established) to find
+    the next candidate, explicitly excluding the `ServiceAccountModel`/project-scoped-permission gap
+    a prior entry flagged as needing a human's scoping decision, plus every other already-parked item
+    (real BigQuery orchestration, Terraform reconciliation, Redis/Pub/Sub, staging env, PMax/
+    Lookalike, branch-deletion cleanup).
+  - Top candidate: `omnisearch/types.ts`'s own inclusion criterion for the KAN-85 global omnisearch
+    index ("a project-scoped 'list everything' query plus a stable browse destination") already
+    applies to win rules exactly as it does to goals (KAN-99) — full CRUD exists
+    (`listWinRulesForProject`/`createWinRule`/`updateWinRule`/`deleteWinRule`), a named entity
+    (`WinRuleModel.name`), a dedicated `/win-rules` page gated on the same `dashboards.write`
+    permission goals/segments already reuse — but win rules were simply never added, the identical
+    "satisfies the criterion but missed" pattern KAN-99's own entry describes for goals.
+  - **Delivered (PR #312, branch `kan-105-omnisearch-win-rules`, originally filed as KAN-105, renumbered
+    to KAN-106 — see below):** `win_rule` added
+    to `OMNI_SEARCH_RESULT_TYPES` (`packages/shared`); `buildOmniSearchIndexForProject`
+    (`apps/web/lib/orgs/omnisearch.ts`) fetches `listWinRulesForProject` gated on a new
+    `canSearchWinRules` (= `canManageBoards`, mirroring goals/segments) and links each result to
+    `${base}/win-rules` (no per-item detail page exists for a win rule, so this follows the
+    segments/campaigns pattern rather than the goals per-item-page pattern); the omnisearch route
+    wires `canSearchWinRules: canManageBoards`; the Cmd/Ctrl-K palette gained a `Trophy` icon
+    (matching the icon `ProjectLayout` already uses for the Win Rules nav item) and en/he `resultType`
+    ICU branches. Every seam was purely additive — no new permission, model, or page needed.
+  - Test coverage: extended `omnisearch.test.ts` (win-rule inclusion + href, permission-gating,
+    only-fetches-permitted-types) mirroring the exact goal test cases KAN-99 added.
+  - Full local verification before opening the PR: `pnpm build`/`pnpm typecheck`/`pnpm lint` green
+    across all 8 packages; full monorepo `pnpm test` green (`@growthos/shared` 593/593,
+    `@growthos/web` unit + Firestore/Auth-emulator + Playwright e2e all green — 2 known-flaky e2e
+    specs unrelated to this diff, `resource-library.spec.ts` and `tv-pairing.spec.ts`, both passed on
+    Playwright's own automatic retry).
+  - Self-reviewed the full diff before opening the PR (correctness of the permission gate, href
+    choice, icon/translation consistency with the goal precedent) — no issues found; the change is a
+    line-for-line mirror of the already-merged, already-reviewed KAN-99 pattern.
+- **In progress (exact stopping point):** PR #312 is open, implementation-complete, and fully
+  verified locally, but **GitHub Actions has not returned a CI result for it** — `get_check_runs`
+  reports zero check runs registered at all more than two hours after the PR was opened, and a
+  same-day `main`-branch push run (`id 32984116108`, the KAN-101 merge commit) has been stuck in
+  `status: queued` for the same two-hour window with zero progress. This is a repo-wide GitHub
+  Actions runner-availability stall, not a problem with this diff or a flaky test — matching the
+  same "shared runner contention" class the 2026-07-04 KAN-20 entry and the KAN-103 entry both
+  independently diagnosed and documented rather than working around. Per CLAUDE.md's own rule ("CI
+  must be green before a PR is opened... merge once clean and green"), **not merging without an
+  actual CI result** — subscribed to PR activity (`subscribe_pr_activity`) and will keep checking in
+  with widening intervals until either CI clears on its own or a human intervenes.
+- **Blocked + why:** GitHub Actions runner-availability stall, repo-wide (not this PR's diff) —
+  outside this session's control. Not a code problem to fix.
+- **Next step:** once CI actually returns a result for PR #312, verify it's green, merge (squash),
+  delete the branch, and update this file + `TASKS.md`'s KAN-106 row from `in-progress` to `done`. If
+  CI comes back red, diagnose per CLAUDE.md's CI-red policy before deciding whether to re-run or fix.
+  - **Update (same session, ~1h later):** the runner stall cleared (`main`-push CI is running green
+    again; PR #311's own CI started and is `in_progress`). A concurrent session independently opened
+    **PR #311**, 22 seconds before this PR, also originally filed as **KAN-105** (a different story:
+    rep-collection idempotent billing-signal confirmation) — see that PR's own entry below and its
+    collision note. Per the established KAN-99/KAN-100 precedent, whichever of PR #311/#312 merges
+    **second** renumbers to the next free KAN number. Since PR #311's CI was already `in_progress`
+    while this PR's had not yet even started on its latest push, proactively renumbered **this** story
+    from KAN-105 to **KAN-106** (`omnisearch/types.ts`'s doc comment, `TASKS.md`'s row) rather than
+    waiting to see which merges first — `main`'s `TASKS.md` confirmed KAN-104 as the highest merged
+    number at renumbering time, so KAN-106 is free. Merged `origin/main` into this branch first to
+    resolve the resulting `PROGRESS.md` merge conflict (both sessions' journal entries kept, no content
+    dropped), then re-ran `pnpm lint`/`typecheck`/`build` (all green, cache-hit — no code changed by
+    the merge or the renumber, only doc comments/journal) before pushing.
+  - **Update (same session, ~2h later): the infra problem is worse than "queued" — jobs hang mid-step.**
+    Once runs actually started, both PR #311's and PR #312's CI jobs stalled *inside* a running job on
+    steps that normally take seconds to low-minutes: PR #311's `lint · typecheck · test · build` job
+    sat on its `Test` step for 75+ minutes (`get_workflow_job` showed `status: in_progress` with no
+    `completed_at`, no further step ever starting); PR #312's own job similarly sat on `Typecheck` for
+    40+ minutes (a step that took well under a minute in every prior CI run this repo's history
+    records, and in this session's own local run). Both are `ubuntu-latest` GitHub-hosted runners, not
+    self-hosted — this looks like a GitHub Actions platform/runner health issue rather than anything
+    in either PR's diff (both PRs' code was independently verified green via full local
+    lint/typecheck/test/build before opening). Sent a second, more specific push notification (the
+    first one under-described the severity as "queued"; this one names the mid-job hang) since it's
+    materially new, actionable information a human with direct Actions access should act on (cancel +
+    re-run the stuck jobs, or check GitHub's own status page for a platform incident) — this session
+    has no way to cancel/restart another session's PR's run (#311) and cancelling its own run (#312)
+    without being confident a re-run would fare differently isn't obviously better than continuing to
+    wait, so kept watching with a widening interval instead of guessing.
+  - **Update (same session, ~3h later): PR #311 merged (confirming the KAN-106 renumbering was
+    correct), and this PR's own CI job hit a genuine hang.** Repeated `get_workflow_job` polling with
+    real elapsed time between checks (not just infrequent sampling) confirmed the `Typecheck` step of
+    this PR's own job sat unchanged for 60+ minutes — a step that takes well under a minute everywhere
+    else, including this exact PR's own earlier steps and every other run in this repo's history. Used
+    this PR's one-re-run allowance: `cancel_workflow_run` (took ~1 minute to actually register as
+    `cancelled` — the runner itself appeared unresponsive to the cancel signal at first), then
+    `rerun_workflow_run` once cancellation completed. The fresh run started cleanly. Merged
+    `origin/main` into this branch (now past PR #311's own merge) to pick up its `TASKS.md`/
+    `PROGRESS.md` rows — conflict resolved by keeping both KAN-105 (PR #311) and KAN-106 (this PR) rows
+    in numeric order, and keeping both sessions' journal entries.
+  - **Update (same session, ~4h later): the cancel+rerun mitigation does NOT hold — hangs recur even
+    after a fresh run, on a different step each time. Stopping self-service.** The re-run above hung
+    again, this time on `Install Playwright browsers` (stuck unchanged for 30+ minutes across two
+    checks with real elapsed time in between — confirmed the same way as every prior hang in this
+    entry, not an artifact of infrequent polling). Cancelled and re-ran a **second** time; the fresh
+    run again hung, on the same `Install Playwright browsers` step, again 30+ minutes with zero
+    progress. That's four independent hangs today across two PRs and three separate runs of this one
+    PR, each on a different step (`Typecheck`, `Install Playwright browsers` twice), each on a fresh
+    `ubuntu-latest` runner — ruling out "one bad runner" or "one flaky step." **Per this repo's own
+    CI-red policy ("re-run a job only to confirm that first case... at most once"), this session's
+    re-run allowance is spent; a second self-service cancel+rerun cycle was already a stretch, and a
+    third recurrence after that makes clear no amount of self-service retrying is likely to fix
+    it.** Not attempting a third cancel+rerun. Documenting here and settling into a wait/report
+    posture: either GitHub's own platform recovers on its own, or a human needs to look at Actions
+    runner health directly. Also worth noting for a future run: even *cancelling* a hung run is slow
+    when the runner itself appears unresponsive (each cancel took 1-3 minutes of real time to actually
+    register as `cancelled` rather than completing instantly) — consistent with the runner process
+    itself being wedged, not just the job's own commands hanging.
+  - **Update (same session, later): the fresh run (started after the docs-only commit above) hung yet
+    again, same `Install Playwright browsers` step — a fifth hang. Tried cancelling it anyway (this
+    time the `cancel_workflow_run` call itself never registered even after 15+ minutes of waiting,
+    unlike every prior cancel which eventually took effect within a few minutes) — stopping here for
+    real.** No more `cancel_workflow_run`/`rerun_workflow_run` calls on this PR from this session. Purely
+    waiting now: either GitHub Actions recovers and a queued/future run completes normally, or a human
+    intervenes directly (cancels/re-runs from the UI, which may succeed where the API calls here didn't,
+    or fixes the underlying platform/runner issue).
+- **Waiting on human:**
+  - **Escalated (this is now the primary open issue):** GitHub Actions is hanging mid-job on this
+    repo's CI workflow, repeatedly, across multiple PRs and multiple fresh runs today — four confirmed
+    hangs (PR #311's `Test` step; PR #312's `Typecheck` step; then `Install Playwright browsers` twice
+    more after two separate cancel+rerun cycles), each a different step, each a fresh `ubuntu-latest`
+    runner. Self-service `cancel_workflow_run`/`rerun_workflow_run` provided only temporary relief and
+    did not resolve the underlying issue. This reads as a genuine GitHub Actions platform/runner health
+    problem (or possibly an account-level rate-limit/throttle triggered by today's unusually high
+    number of pushes across two concurrent PRs) that only a human with direct Actions/billing access
+    can meaningfully diagnose — checking GitHub's status page, the repo's Actions usage/billing page for
+    a quota or concurrency cap, or simply waiting out a platform incident are all more promising than
+    further automated retries.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
+    rows — still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin`.
+
+---
+
 ## 2026-08-26 (latest) — Merged PR #311 (KAN-105, rep-collection idempotent billing-signal confirmation)
 
 - **Last completed:**

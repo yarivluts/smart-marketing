@@ -6,6 +6,7 @@ import {
   listGoalsForProject,
   listMetricDefinitionsForProject,
   listSegmentsForProject,
+  listWinRulesForProject,
 } from '@/lib/orgs/queries';
 
 /**
@@ -20,15 +21,16 @@ export interface OmniSearchPermissions {
   canSearchSegments: boolean;
   canSearchCampaigns: boolean;
   canSearchGoals: boolean;
+  canSearchWinRules: boolean;
 }
 
 /**
  * Builds the KAN-85 global omnisearch index for one project: boards, active
  * metric definitions (superseded versions are excluded — a search result
  * should only ever land on the metric family's current definition), segments,
- * automation campaign targets, and goals. Each list is fetched only if the
- * caller holds the matching permission, so a lower-privileged caller never
- * pays for (or receives) data they can't see.
+ * automation campaign targets, goals, and win rules. Each list is fetched
+ * only if the caller holds the matching permission, so a lower-privileged
+ * caller never pays for (or receives) data they can't see.
  */
 export async function buildOmniSearchIndexForProject(
   organizationId: string,
@@ -37,12 +39,13 @@ export async function buildOmniSearchIndexForProject(
 ): Promise<OmniSearchItem[]> {
   const base = `/orgs/${organizationId}/projects/${projectId}`;
 
-  const [boards, metricDefs, segments, campaigns, goals] = await Promise.all([
+  const [boards, metricDefs, segments, campaigns, goals, winRules] = await Promise.all([
     permissions.canSearchBoards ? listBoardsForProject(organizationId, projectId) : Promise.resolve([]),
     permissions.canSearchMetrics ? listMetricDefinitionsForProject(organizationId, projectId) : Promise.resolve([]),
     permissions.canSearchSegments ? listSegmentsForProject(organizationId, projectId) : Promise.resolve([]),
     permissions.canSearchCampaigns ? listAutomationTargetStatesForProject(organizationId, projectId) : Promise.resolve([]),
     permissions.canSearchGoals ? listGoalsForProject(organizationId, projectId) : Promise.resolve([]),
+    permissions.canSearchWinRules ? listWinRulesForProject(organizationId, projectId) : Promise.resolve([]),
   ]);
 
   const items: OmniSearchItem[] = [];
@@ -74,6 +77,10 @@ export async function buildOmniSearchIndexForProject(
 
   for (const goal of goals) {
     items.push({ id: goal.id, type: 'goal', label: goal.name, href: `${base}/goals/${goal.id}` });
+  }
+
+  for (const winRule of winRules) {
+    items.push({ id: winRule.id, type: 'win_rule', label: winRule.name, href: `${base}/win-rules` });
   }
 
   return items;

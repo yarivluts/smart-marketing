@@ -26,12 +26,12 @@
   "OmniSearch": {
     "trigger": "Search...",
     "shortcutHint": "⌘K",
-    "dialogLabel": "Search boards, metrics, segments, and campaigns",
+    "dialogLabel": "Search boards, metrics, segments, campaigns, goals, and win rules",
     "inputPlaceholder": "Search boards, metrics, segments, campaigns...",
     "emptyPrompt": "Start typing to search this project.",
     "loading": "Loading...",
     "noResults": "No results for \"{query}\".",
-    "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} goal {Goal} other {Result}}"
+    "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} goal {Goal} win_rule {Win rule} other {Result}}"
   },
   "Auth": {
     "emailLabel": "Email",

@@ -12,16 +12,16 @@ interface RouteParams {
 
 /**
  * The KAN-85 global omnisearch index for one project — boards, active metric
- * definitions, segments, automation campaign targets, and goals. Unlike most
- * project-admin GET routes (which gate the whole endpoint on one permission),
- * this one degrades per result type instead of blanket-denying: any active
- * org member can call it, and each type is included only if the caller holds
- * the exact permission its own destination page already gates on in
- * `ProjectLayout` (`dashboards.read`/`dashboards.write` for boards,
- * `metrics.write` for metrics, `dashboards.write` for segments and goals,
- * `automation.execute` for campaigns) — so a search result never links
- * somewhere the caller couldn't otherwise reach via the nav, but a `viewer`
- * still gets a working (if narrower) search instead of a 403.
+ * definitions, segments, automation campaign targets, goals, and win rules.
+ * Unlike most project-admin GET routes (which gate the whole endpoint on one
+ * permission), this one degrades per result type instead of blanket-denying:
+ * any active org member can call it, and each type is included only if the
+ * caller holds the exact permission its own destination page already gates
+ * on in `ProjectLayout` (`dashboards.read`/`dashboards.write` for boards,
+ * `metrics.write` for metrics, `dashboards.write` for segments, goals, and
+ * win rules, `automation.execute` for campaigns) — so a search result never
+ * links somewhere the caller couldn't otherwise reach via the nav, but a
+ * `viewer` still gets a working (if narrower) search instead of a 403.
  */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
@@ -53,6 +53,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
       canSearchSegments: canManageBoards,
       canSearchCampaigns: can(bindings, principal, 'automation.execute', { orgId }),
       canSearchGoals: canManageBoards,
+      canSearchWinRules: canManageBoards,
     });
     return NextResponse.json({ items });
   } catch (err) {
