@@ -5,6 +5,7 @@ import {
   isGoalRhythm,
   MetricCompilerError,
   type GoalDirection,
+  type GoalProgressHistoryPoint,
   type GoalProgressResult,
   type GoalRhythm,
   type MetricQueryRequest,
@@ -369,12 +370,54 @@ function sumMetricRows(rows: readonly WarehouseRow[], metricName: string): numbe
 }
 
 /**
+ * Turns the same day-grain `result.series` rows `sumMetricRows` already
+ * consumes into {@link GoalProgressHistoryPoint}s for `calculateGoalProgress`'s
+ * minimize/range trend fit — each row's own `bucket_date` (the compiler's
+ * per-day `GROUP BY` column, see `metrics-compiler/compiler.ts`) maps to an
+ * `elapsedFraction` via the same {@link computeElapsedFraction} used for the
+ * goal's own current elapsed fraction. Rows with a missing/non-numeric
+ * metric value or an unparseable `bucket_date` are skipped rather than
+ * distorting the fit with a bogus point.
+ */
+function buildHistoryPoints(
+  rows: readonly WarehouseRow[],
+  metricName: string,
+  startDate: string,
+  deadline: string,
+  rhythm: GoalRhythm,
+): GoalProgressHistoryPoint[] {
+  const points: GoalProgressHistoryPoint[] = [];
+  for (const row of rows) {
+    const rawDate = row.bucket_date;
+    if (typeof rawDate !== 'string' || rawDate.length < 10) {
+      continue;
+    }
+    const rawValue = row[metricName] ?? null;
+    if (rawValue === null) {
+      continue;
+    }
+    const value = typeof rawValue === 'number' ? rawValue : Number(rawValue);
+    if (!Number.isFinite(value)) {
+      continue;
+    }
+    points.push({
+      elapsedFraction: computeElapsedFraction(startDate, deadline, rawDate.slice(0, 10), rhythm),
+      value,
+    });
+  }
+  return points;
+}
+
+/**
  * Computes a goal's current progress (KAN-64, E12.1): queries the goal's own
  * metric over `[start_date, min(asOfDate, deadline)]`, sums it into a single
- * `actualValue`, and runs it through `calculateGoalProgress`. Mirrors
- * `queryBoardTile`'s exact error-handling shape (`board.service.ts`) — a
- * goal's own progress thermometer degrades gracefully the same way a board
- * tile does, rather than failing the whole goal detail page.
+ * `actualValue`, also turns the same day-grain rows into `history` points
+ * (`buildHistoryPoints`) so `calculateGoalProgress` can fit a trend for a
+ * minimize/range goal's `projectedFinalValue` instead of a flat projection,
+ * and runs it all through `calculateGoalProgress`. Mirrors `queryBoardTile`'s
+ * exact error-handling shape (`board.service.ts`) — a goal's own progress
+ * thermometer degrades gracefully the same way a board tile does, rather
+ * than failing the whole goal detail page.
  */
 export async function queryGoalProgress(params: QueryGoalProgressParams): Promise<GoalProgressOutcome> {
   const { goal } = params;
@@ -417,6 +460,13 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
     });
     const actualValue = sumMetricRows(result.series, goal.metric_name);
     const elapsedFraction = computeElapsedFraction(goal.start_date, goal.deadline, asOfDate, goal.rhythm);
+    const history: GoalProgressHistoryPoint[] = buildHistoryPoints(
+      result.series,
+      goal.metric_name,
+      goal.start_date,
+      goal.deadline,
+      goal.rhythm,
+    );
     const progress = calculateGoalProgress({
       direction: goal.direction,
       targetValue: goal.target_value ?? undefined,
@@ -424,6 +474,7 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       rangeMax: goal.range_max ?? undefined,
       actualValue,
       elapsedFraction,
+      history,
     });
     return { ok: true, actualValue, progress };
   } catch (error) {
