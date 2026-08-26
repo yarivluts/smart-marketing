@@ -140,6 +140,20 @@ describe('calculateGoalProgress - maximize', () => {
     const result = calculateGoalProgress({ direction: 'maximize', targetValue: 100, actualValue: 30, elapsedFraction: 0.25 });
     expect(result.projectedFinalValue).toBeCloseTo(120, 10);
   });
+
+  it('ignores any supplied history — maximize always extrapolates from its own accumulated actualValue', () => {
+    const result = calculateGoalProgress({
+      direction: 'maximize',
+      targetValue: 100,
+      actualValue: 30,
+      elapsedFraction: 0.25,
+      history: [
+        { elapsedFraction: 0, value: 9999 },
+        { elapsedFraction: 0.25, value: -9999 },
+      ],
+    });
+    expect(result.projectedFinalValue).toBeCloseTo(120, 10);
+  });
 });
 
 describe('calculateGoalProgress - minimize (signup-cost AC)', () => {
@@ -201,9 +215,67 @@ describe('calculateGoalProgress - minimize (signup-cost AC)', () => {
     expect(result.isGoalMet).toBe(true);
   });
 
-  it('projects the current value forward unchanged (v1 simplification)', () => {
+  it('projects the current value forward unchanged when no history is supplied (v1 fallback)', () => {
     const result = calculateGoalProgress({ direction: 'minimize', targetValue: 50, actualValue: 42, elapsedFraction: 0.3 });
     expect(result.projectedFinalValue).toBe(42);
+  });
+
+  it('projects the current value forward unchanged when history has fewer than two points', () => {
+    const result = calculateGoalProgress({
+      direction: 'minimize',
+      targetValue: 50,
+      actualValue: 42,
+      elapsedFraction: 0.3,
+      history: [{ elapsedFraction: 0.3, value: 42 }],
+    });
+    expect(result.projectedFinalValue).toBe(42);
+  });
+
+  it('falls back to the flat projection when every history point shares the same elapsedFraction', () => {
+    const result = calculateGoalProgress({
+      direction: 'minimize',
+      targetValue: 50,
+      actualValue: 42,
+      elapsedFraction: 0.3,
+      history: [
+        { elapsedFraction: 0.2, value: 60 },
+        { elapsedFraction: 0.2, value: 44 },
+      ],
+    });
+    expect(result.projectedFinalValue).toBe(42);
+  });
+
+  it('fits a linear trend over history and extrapolates it to elapsedFraction = 1', () => {
+    // Two points: (0, 60) and (0.5, 50) => slope -20, intercept 60 =>
+    // projected value at elapsedFraction 1 is 60 + -20*1 = 40.
+    const result = calculateGoalProgress({
+      direction: 'minimize',
+      targetValue: 50,
+      actualValue: 999, // irrelevant to the trend fit itself
+      elapsedFraction: 0.5,
+      history: [
+        { elapsedFraction: 0, value: 60 },
+        { elapsedFraction: 0.5, value: 50 },
+      ],
+    });
+    expect(result.projectedFinalValue).toBeCloseTo(40, 10);
+  });
+
+  it('fits a trend over more than two points via ordinary least squares', () => {
+    // Points fall exactly on value = 100 - 40*x, so the fit should reproduce
+    // it exactly even with three observations (no residual/noise).
+    const result = calculateGoalProgress({
+      direction: 'minimize',
+      targetValue: 50,
+      actualValue: 999,
+      elapsedFraction: 0.6,
+      history: [
+        { elapsedFraction: 0, value: 100 },
+        { elapsedFraction: 0.25, value: 90 },
+        { elapsedFraction: 0.5, value: 80 },
+      ],
+    });
+    expect(result.projectedFinalValue).toBeCloseTo(60, 10); // 100 - 40*1
   });
 });
 
@@ -253,8 +325,24 @@ describe('calculateGoalProgress - range', () => {
     expect(middle.progressRatio).toBeCloseTo(0.25, 10);
   });
 
-  it('projects the current value forward unchanged (v1 simplification)', () => {
+  it('projects the current value forward unchanged when no history is supplied (v1 fallback)', () => {
     const result = calculateGoalProgress({ direction: 'range', rangeMin: 10, rangeMax: 20, actualValue: 17, elapsedFraction: 0.4 });
     expect(result.projectedFinalValue).toBe(17);
+  });
+
+  it('fits a linear trend over history and extrapolates it to elapsedFraction = 1', () => {
+    // (0, 12) and (0.5, 15) => slope 6, intercept 12 => at 1: 12 + 6 = 18.
+    const result = calculateGoalProgress({
+      direction: 'range',
+      rangeMin: 10,
+      rangeMax: 20,
+      actualValue: 17,
+      elapsedFraction: 0.5,
+      history: [
+        { elapsedFraction: 0, value: 12 },
+        { elapsedFraction: 0.5, value: 15 },
+      ],
+    });
+    expect(result.projectedFinalValue).toBeCloseTo(18, 10);
   });
 });

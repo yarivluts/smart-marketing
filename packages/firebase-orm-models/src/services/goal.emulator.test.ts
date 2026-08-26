@@ -603,6 +603,49 @@ describe('queryGoalProgress', () => {
     expect(red.progress.isGoalMet).toBe(false);
   });
 
+  it('fits a trend over the queried day-grain series for a minimize goal\'s projectedFinalValue', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Minimize Trend Org');
+    await registerCostPerSignup(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Signup cost ceiling (trending down)',
+      metricName: 'cost_per_signup',
+      direction: 'minimize',
+      targetValue: 50,
+      startDate: '2026-01-01',
+      deadline: '2026-01-11', // 10-day even-rhythm window, matches the maximize test above
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    // bucket_date 2026-01-01 => elapsedFraction 0; 2026-01-06 => elapsedFraction
+    // 0.5 (same 10-day window the maximize test above pins). Two points
+    // (0, 60) and (0.5, 50) fit an exact linear trend (slope -20, intercept
+    // 60), extrapolating to 40 at elapsedFraction 1 — below the target-value
+    // fallback (a flat 110, the two rows' sum) the pre-trend v1 behavior
+    // would have produced.
+    const executor = new FakeWarehouseQueryExecutor([
+      { bucket_date: '2026-01-01', cost_per_signup: 60 },
+      { bucket_date: '2026-01-06', cost_per_signup: 50 },
+    ]);
+
+    const outcome = await queryGoalProgress({
+      organizationId: organization.id,
+      projectId: project.id,
+      goal,
+      executor,
+      cache: new InMemoryMetricQueryResultCache(),
+      asOfDate: '2026-01-06',
+    });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    expect(outcome.progress.projectedFinalValue).toBeCloseTo(40, 10);
+  });
+
   it('degrades to a "warehouse not configured" outcome instead of throwing, using the default executor', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Goal Query Unconfigured Org');
     await registerSignups(organization.id, project.id, owner.id);

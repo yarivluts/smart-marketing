@@ -2,13 +2,14 @@
  * Pure goal-progress math for KAN-64 (E12.1, plan `04 §6`): a goal pins any
  * metric to a target/range and a deadline, and this module computes where
  * the goal stands right now (a thermometer fill + on_track/at_risk/off_track
- * pace status) and a v1 **linear** projection of where it will land by the
- * deadline — not an AI projection, a deliberately simple placeholder the plan
- * calls out as a later upgrade. Firestore-free, deterministic: every function
- * here takes its "now" as an explicit `asOfDate` parameter rather than ever
- * calling `Date.now()`/`new Date()` internally, so the whole module is
- * unit-testable without mocking the clock (mirrors `metrics-compiler/time.ts`
- * and `touchpoint-capture`'s pure-function style).
+ * pace status) and a projection of where it will land by the deadline — not
+ * an AI projection, a deliberately simple statistical one (linear
+ * extrapolation/regression, no ML). Firestore-free, deterministic: every
+ * function here takes its "now" as an explicit `asOfDate` parameter rather
+ * than ever calling `Date.now()`/`new Date()` internally, so the whole
+ * module is unit-testable without mocking the clock (mirrors
+ * `metrics-compiler/time.ts` and `touchpoint-capture`'s pure-function
+ * style).
  */
 
 export const GOAL_DIRECTIONS = ['maximize', 'minimize', 'range'] as const;
@@ -101,6 +102,13 @@ export function computeElapsedFraction(
   return Math.min(1, Math.max(0, fraction));
 }
 
+/** One historical observation of a goal's own metric, earlier in its `[start_date, deadline]` window — see {@link GoalProgressInput.history}. */
+export interface GoalProgressHistoryPoint {
+  /** 0..1, same convention as {@link GoalProgressInput.elapsedFraction}, for when this observation was taken. */
+  elapsedFraction: number;
+  value: number;
+}
+
 export interface GoalProgressInput {
   direction: GoalDirection;
   /** Required for 'maximize' | 'minimize'. */
@@ -112,6 +120,48 @@ export interface GoalProgressInput {
   actualValue: number;
   /** 0..1, from {@link computeElapsedFraction}. */
   elapsedFraction: number;
+  /**
+   * Optional historical `{ elapsedFraction, value }` observations of this
+   * goal's own metric earlier in the window, used by 'minimize'/'range' to
+   * fit a linear trend for `projectedFinalValue` (see that field) instead of
+   * projecting the current value forward unchanged. Ignored by 'maximize',
+   * which already extrapolates from its own accumulated `actualValue`.
+   * Falls back to the flat projection when omitted, or when there isn't
+   * enough signal to fit a trend (fewer than two points, or every point
+   * shares the same `elapsedFraction`).
+   */
+  history?: readonly GoalProgressHistoryPoint[];
+}
+
+/**
+ * Ordinary-least-squares linear fit `value = slope * elapsedFraction +
+ * intercept` over `points`, evaluated at `atElapsedFraction`. Returns `null`
+ * when there isn't enough signal to fit a trend — fewer than two points, or
+ * every point shares the same `elapsedFraction` (an undefined/vertical
+ * slope) — so callers can fall back to a flatter projection instead of
+ * dividing by zero.
+ */
+function fitLinearTrendProjection(points: readonly GoalProgressHistoryPoint[], atElapsedFraction: number): number | null {
+  if (points.length < 2) return null;
+
+  const n = points.length;
+  let sumX = 0;
+  let sumY = 0;
+  let sumXY = 0;
+  let sumXX = 0;
+  for (const point of points) {
+    sumX += point.elapsedFraction;
+    sumY += point.value;
+    sumXY += point.elapsedFraction * point.value;
+    sumXX += point.elapsedFraction * point.elapsedFraction;
+  }
+
+  const denominator = n * sumXX - sumX * sumX;
+  if (denominator === 0) return null;
+
+  const slope = (n * sumXY - sumX * sumY) / denominator;
+  const intercept = (sumY - slope * sumX) / n;
+  return slope * atElapsedFraction + intercept;
 }
 
 export interface GoalProgressResult {
@@ -125,15 +175,16 @@ export interface GoalProgressResult {
    */
   progressRatio: number;
   /**
-   * v1 linear projection of where this goal will land by the deadline. For
+   * A linear projection of where this goal will land by the deadline. For
    * 'maximize': `actualValue` extrapolated at its current average rate
    * (`actualValue / elapsedFraction`) out to `elapsedFraction = 1` —
    * assumes linear accumulation from a zero baseline at the goal's start.
-   * For 'minimize'/'range': goals over metrics that are already a
-   * snapshot/rate (not accumulated), so v1 just projects the current
-   * `actualValue` forward unchanged — documented here explicitly as a v1
-   * simplification (a real projection would need a trend over historical
-   * values, not just the value-to-date).
+   * For 'minimize'/'range' (metrics that are already a snapshot/rate, not
+   * accumulated): when {@link GoalProgressInput.history} has at least two
+   * observations at distinct `elapsedFraction`s, an ordinary-least-squares
+   * linear trend fit over those observations, evaluated at
+   * `elapsedFraction = 1`; otherwise (no history yet, or not enough of it)
+   * falls back to projecting the current `actualValue` forward unchanged.
    */
   projectedFinalValue: number;
   status: GoalPaceStatus;
@@ -182,10 +233,12 @@ function calculateMinimizeProgress(input: GoalProgressInput): GoalProgressResult
 
   const progressRatio = targetValue === 0 && actualValue === 0 ? 0 : actualValue / targetValue;
 
-  // v1 simplification: minimize goals track a rate/snapshot metric (e.g.
-  // cost-per-signup), not an accumulated total, so there's no meaningful
-  // "extrapolate to end of window" — project the current value forward as-is.
-  const projectedFinalValue = actualValue;
+  // Minimize goals track a rate/snapshot metric (e.g. cost-per-signup), not
+  // an accumulated total, so "extrapolate to end of window" means fitting a
+  // trend over its historical values rather than `actualValue`'s own
+  // accumulation-based extrapolation. Falls back to the flat projection when
+  // there's not yet enough history to fit one — see `fitLinearTrendProjection`.
+  const projectedFinalValue = fitLinearTrendProjection(input.history ?? [], 1) ?? actualValue;
 
   return {
     expectedAtNow,
@@ -218,10 +271,10 @@ function calculateRangeProgress(input: GoalProgressInput): GoalProgressResult {
     status = missFraction <= GOAL_AT_RISK_BUFFER ? 'at_risk' : 'off_track';
   }
 
-  // v1 simplification: same rationale as minimize — a range goal tracks a
-  // rate/snapshot metric, so the current value is the best available
-  // projection of where it will land.
-  const projectedFinalValue = actualValue;
+  // Same rationale as minimize — a range goal tracks a rate/snapshot metric,
+  // so fit a trend over its historical values when there's enough of them,
+  // else fall back to the current value as the best available projection.
+  const projectedFinalValue = fitLinearTrendProjection(input.history ?? [], 1) ?? actualValue;
 
   return {
     expectedAtNow,
