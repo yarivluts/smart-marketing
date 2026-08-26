@@ -5,7 +5,7 @@
  * active metric definitions (E5.1), segments (E14.x — the closest existing
  * stand-in for "customers", since there's no first-class individual-customer
  * index yet), automation campaign targets (E21.1), goals (E12.1), and win
- * rules (E12.2, KAN-105 — satisfied the same inclusion criterion as goals but
+ * rules (E12.2, KAN-106 — satisfied the same inclusion criterion as goals but
  * was never added when this index was first built). A real per-customer
  * index is a documented follow-up, not built here.
  */

@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — PR #312 open (KAN-105, omnisearch win-rule indexing), CI stuck
+## 2026-08-26 (latest) — PR #312 open (KAN-106, omnisearch win-rule indexing), renumbered from KAN-105, CI pending
 
 - **Last completed:**
   - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
@@ -35,7 +35,8 @@ Template for each entry:
     (`WinRuleModel.name`), a dedicated `/win-rules` page gated on the same `dashboards.write`
     permission goals/segments already reuse — but win rules were simply never added, the identical
     "satisfies the criterion but missed" pattern KAN-99's own entry describes for goals.
-  - **Delivered (PR #312, branch `kan-105-omnisearch-win-rules`, filed as KAN-105):** `win_rule` added
+  - **Delivered (PR #312, branch `kan-105-omnisearch-win-rules`, originally filed as KAN-105, renumbered
+    to KAN-106 — see below):** `win_rule` added
     to `OMNI_SEARCH_RESULT_TYPES` (`packages/shared`); `buildOmniSearchIndexForProject`
     (`apps/web/lib/orgs/omnisearch.ts`) fetches `listWinRulesForProject` gated on a new
     `canSearchWinRules` (= `canManageBoards`, mirroring goals/segments) and links each result to
@@ -67,20 +68,22 @@ Template for each entry:
   with widening intervals until either CI clears on its own or a human intervenes.
 - **Blocked + why:** GitHub Actions runner-availability stall, repo-wide (not this PR's diff) —
   outside this session's control. Not a code problem to fix.
-- **Next step:** once CI actually returns a result for PR #312 (or a human confirms the queue has
-  cleared), verify it's green, merge (squash), delete the branch, and update this file + `TASKS.md`'s
-  KAN-105 row from `in-progress` to `done`. If CI comes back red, diagnose per CLAUDE.md's CI-red
-  policy before deciding whether to re-run or fix. If the stall is still unresolved after a much
-  longer wait, a human may need to check the GitHub Actions runner/billing status directly (this
-  session has no visibility into *why* the queue isn't draining, only that it isn't).
+- **Next step:** once CI actually returns a result for PR #312, verify it's green, merge (squash),
+  delete the branch, and update this file + `TASKS.md`'s KAN-106 row from `in-progress` to `done`. If
+  CI comes back red, diagnose per CLAUDE.md's CI-red policy before deciding whether to re-run or fix.
   - **Update (same session, ~1h later):** the runner stall cleared (`main`-push CI is running green
-    again; PR #311's own CI started). A concurrent session independently opened **PR #311**, 22
-    seconds before this PR, also filed as **KAN-105** (a different story: rep-collection idempotent
-    billing-signal confirmation) — see that PR's own entry below and its collision note. Per the
-    established KAN-99/KAN-100 precedent, whichever of PR #311/#312 merges **second** renumbers to the
-    next free KAN number (re-checking a freshly-pulled `main` immediately before renumbering). Merged
-    `origin/main` into this branch to resolve the resulting merge conflict (`PROGRESS.md` only, both
-    sessions' journal entries kept) — re-running full local verification before pushing.
+    again; PR #311's own CI started and is `in_progress`). A concurrent session independently opened
+    **PR #311**, 22 seconds before this PR, also originally filed as **KAN-105** (a different story:
+    rep-collection idempotent billing-signal confirmation) — see that PR's own entry below and its
+    collision note. Per the established KAN-99/KAN-100 precedent, whichever of PR #311/#312 merges
+    **second** renumbers to the next free KAN number. Since PR #311's CI was already `in_progress`
+    while this PR's had not yet even started on its latest push, proactively renumbered **this** story
+    from KAN-105 to **KAN-106** (`omnisearch/types.ts`'s doc comment, `TASKS.md`'s row) rather than
+    waiting to see which merges first — `main`'s `TASKS.md` confirmed KAN-104 as the highest merged
+    number at renumbering time, so KAN-106 is free. Merged `origin/main` into this branch first to
+    resolve the resulting `PROGRESS.md` merge conflict (both sessions' journal entries kept, no content
+    dropped), then re-ran `pnpm lint`/`typecheck`/`build` (all green, cache-hit — no code changed by
+    the merge or the renumber, only doc comments/journal) before pushing.
 - **Waiting on human:**
   - **New:** GitHub Actions appears stalled repo-wide (a `main`-branch push run has sat `queued` for
     2+ hours with zero progress) — worth a human checking Actions runner availability/billing/
