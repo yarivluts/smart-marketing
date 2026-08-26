@@ -1,12 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireTvViewer } from '@/lib/orgs/tv-viewer-auth';
-import { getBoard, queryBoardTile } from '@/lib/orgs/queries';
+import { getBoard, queryBoardTiles } from '@/lib/orgs/queries';
 import { buildTileRenderView, toBoardView } from '@/lib/orgs/board-view';
 import { resolveBoardFreshness } from '@/lib/orgs/board-freshness';
 
 /**
- * One rotation frame's worth of board data (KAN-67): the same per-tile
- * `queryBoardTile` -> `buildTileRenderView` composition the board detail
+ * One rotation frame's worth of board data (KAN-67): the same batched
+ * `queryBoardTiles` -> `buildTileRenderView` composition the board detail
  * page (`boards/[boardId]/page.tsx`) uses, reused as-is so the TV renders
  * with `<BoardTileView>` — the exact same component an admin sees, no
  * TV-specific rendering fork to keep in sync. That includes the KAN-69
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const boardView = toBoardView(board);
-  const tileOutcomes = await Promise.all(board.tiles.map((tile) => queryBoardTile(organizationId, projectId, board, tile)));
+  const tileOutcomes = await queryBoardTiles(organizationId, projectId, board);
   const tiles = board.tiles.map((tile, index) => ({ tile, view: buildTileRenderView(tile, tileOutcomes[index], freshness) }));
 
   return NextResponse.json({ id: board.id, name: boardView.name, tiles });

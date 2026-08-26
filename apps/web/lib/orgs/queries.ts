@@ -126,6 +126,7 @@ import {
   OrganizationModel,
   proposeOnboardingFunnelSteps as proposeOnboardingFunnelStepsInOrganization,
   queryBoardTile as queryBoardTileInOrganization,
+  queryBoardTiles as queryBoardTilesInOrganization,
   queryGoalProgress as queryGoalProgressInOrganization,
   UserModel,
   verifyAuditLogChainForOrg as verifyAuditLogChainForOrgInOrganization,
@@ -719,6 +720,22 @@ export async function queryBoardTile(
 ): Promise<BoardTileQueryOutcome> {
   await ensureFirestoreOrm();
   return queryBoardTileInOrganization({ organizationId, projectId, board, tile });
+}
+
+/**
+ * The batched sibling of {@link queryBoardTile} every board-rendering call
+ * site (the board detail page, the TV rotation route) should call instead
+ * of fanning `queryBoardTile` out over `board.tiles` itself — see
+ * `queryBoardTiles`'s own doc comment (`@growthos/firebase-orm-models`) for
+ * the per-tile N+1 this closes.
+ */
+export async function queryBoardTiles(
+  organizationId: string,
+  projectId: string,
+  board: Pick<BoardModel, 'date_range' | 'compare' | 'global_filters' | 'tiles'>,
+): Promise<BoardTileQueryOutcome[]> {
+  await ensureFirestoreOrm();
+  return queryBoardTilesInOrganization({ organizationId, projectId, board });
 }
 
 export async function listGoalsForProject(organizationId: string, projectId: string): Promise<GoalModel[]> {

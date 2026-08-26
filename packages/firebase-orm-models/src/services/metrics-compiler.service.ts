@@ -116,15 +116,22 @@ interface ResolvedCatalog {
  * unregistered reference in one error instead of just the first one a
  * query happens to touch.
  */
-async function resolveCatalog(organizationId: string, projectId: string, names: readonly string[]): Promise<ResolvedCatalog> {
+async function resolveCatalog(
+  organizationId: string,
+  projectId: string,
+  names: readonly string[],
+  precomputedActiveMetricDefsByName?: ReadonlyMap<string, MetricDefModel>,
+): Promise<ResolvedCatalog> {
   const resolved = new Map<string, MetricDefModel>();
   const missing = new Set<string>();
   let frontier = [...new Set(names)];
 
   while (frontier.length > 0) {
-    const fetched = await Promise.all(
-      frontier.map(async (name) => ({ name, metricDef: await getActiveMetricDefinition(organizationId, projectId, name) })),
-    );
+    const fetched = precomputedActiveMetricDefsByName
+      ? frontier.map((name) => ({ name, metricDef: precomputedActiveMetricDefsByName.get(name) ?? null }))
+      : await Promise.all(
+          frontier.map(async (name) => ({ name, metricDef: await getActiveMetricDefinition(organizationId, projectId, name) })),
+        );
 
     const referencedNames = new Set<string>();
     for (const { name, metricDef } of fetched) {
@@ -160,6 +167,24 @@ export interface CompileMetricQueryForProjectParams {
   /** Compiled into the tenant predicate as `environment_id = @tenant_environment_id` when set — see `CompilerTenant.environmentId`'s own doc comment. Callers that resolve an environment (`queryMetrics`) always pass it; a direct caller that omits it compiles an env-unscoped query. */
   environmentId?: string;
   request: MetricQueryRequest;
+  /**
+   * Skips this call's own project existence/org-membership fetch when a
+   * caller already has the project doc (mirrors `getProjectCostQuota`'s own
+   * `precomputedProject` param — see its doc comment). Shape-checked against
+   * `organizationId`/`projectId`, not re-fetched: a mismatched project still
+   * throws {@link ProjectNotFoundError} rather than reading through.
+   */
+  precomputedProject?: ProjectModel;
+  /**
+   * Every currently-`active` metric definition in this project, keyed by
+   * name. When supplied, `resolveCatalog` reads from this map instead of
+   * issuing its own per-name (and, for a formula's transitive references,
+   * per-round) Firestore fetch — see `queryBoardTile`'s own doc comment
+   * (`board.service.ts`) for the board-tile N+1 this exists to close. A
+   * caller must ensure the map reflects the project's current active-metric
+   * state at the time it was built; this function never re-validates it.
+   */
+  precomputedActiveMetricDefsByName?: ReadonlyMap<string, MetricDefModel>;
 }
 
 export interface CompiledProjectMetricQuery extends CompiledMetricQuery {
@@ -177,9 +202,20 @@ export interface CompiledProjectMetricQuery extends CompiledMetricQuery {
  * Analyst's `query_metric` tool would call.
  */
 export async function compileMetricQueryForProject(params: CompileMetricQueryForProjectParams): Promise<CompiledProjectMetricQuery> {
-  await requireProjectInOrg(params.organizationId, params.projectId);
+  if (params.precomputedProject) {
+    if (params.precomputedProject.organization_id !== params.organizationId || params.precomputedProject.id !== params.projectId) {
+      throw new ProjectNotFoundError();
+    }
+  } else {
+    await requireProjectInOrg(params.organizationId, params.projectId);
+  }
 
-  const { catalog, definitionRefs } = await resolveCatalog(params.organizationId, params.projectId, params.request.metrics);
+  const { catalog, definitionRefs } = await resolveCatalog(
+    params.organizationId,
+    params.projectId,
+    params.request.metrics,
+    params.precomputedActiveMetricDefsByName,
+  );
   const mappedCatalog = await mapCustomSchemaTables(params.organizationId, params.projectId, catalog);
   const unbuiltWarehouseTables = collectUnbuiltWarehouseTables(mappedCatalog);
   const compiled = compileMetricQuery(mappedCatalog, params.request, {

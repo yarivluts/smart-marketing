@@ -383,6 +383,36 @@ describe('queryMetrics', () => {
     expect(entries.map((entry) => entry.outcome).sort()).toEqual(['blocked_quota_exceeded', 'executed']);
   });
 
+  it('honors a caller-supplied precomputedQuota over the project\'s real (permissive) quota config, proving it is actually consulted rather than silently ignored (board-tile-N+1 fix)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Precomputed Quota Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    // The project's real, live quota is left at its generous default (never
+    // called `setProjectCostQuota`) — a live `getProjectCostQuota` fetch
+    // would allow this call. Passing an already-exhausted `precomputedQuota`
+    // must still block it, proving `queryMetrics` threads the param through
+    // to `checkProjectQueryQuota` instead of re-fetching (or ignoring it).
+    const executor = new FakeWarehouseQueryExecutor([{ bucket_date: '2026-01-01', ad_spend: 100 }]);
+
+    await expect(
+      queryMetrics({
+        organizationId: organization.id,
+        projectId: project.id,
+        request: { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+        executor,
+        cache: new InMemoryMetricQueryResultCache(),
+        precomputedQuota: { dailyQueryLimit: 0, labels: {}, setAt: null },
+      }),
+    ).rejects.toThrow(ProjectQueryQuotaExceededError);
+    expect(executor.callCount).toBe(0);
+  });
+
   it('fails fast with MetricTargetsUnbuiltWarehouseTableError for a metric targeting a known-unbuilt table, without touching the executor, cache, or cost-quota log', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Unbuilt Table Org');
     // `KNOWN_UNBUILT_WAREHOUSE_TABLES` is empty today (see its own doc

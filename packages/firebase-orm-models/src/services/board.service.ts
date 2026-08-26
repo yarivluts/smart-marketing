@@ -12,7 +12,10 @@ import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { listMetricsCatalogForProject, queryMetrics, type MetricCatalogEntry } from './metrics-query.service';
 import { MetricNotRegisteredError, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
-import { ProjectQueryQuotaExceededError } from './cost-guardrail.service';
+import { getProjectCostQuota, ProjectQueryQuotaExceededError, type ProjectCostQuota } from './cost-guardrail.service';
+import { listMetricDefinitionsForProject } from './metric-registry.service';
+import { resolveDefaultQueryEnvironment } from './organization.service';
+import type { MetricDefModel } from '../models/metric-def.model';
 import { WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
 import type { MetricQueryResultCache } from '../warehouse/result-cache';
 
@@ -351,6 +354,12 @@ export interface QueryBoardTileParams {
   tile: BoardTile;
   executor?: WarehouseQueryExecutor;
   cache?: MetricQueryResultCache;
+  /** The environment this tile's query counts — see `QueryMetricsParams.environmentId`'s own doc comment. Omitted, `queryMetrics` resolves the project's default (`prod`) environment itself; `queryBoardTiles` resolves it once and passes it explicitly to every tile. */
+  environmentId?: string;
+  /** Precomputed shared state a batched caller (`queryBoardTiles`) already fetched once for the whole board — see that function's own doc comment. A direct caller (a single-tile render, or every existing test) omits these and gets today's per-call-fetch behavior unchanged. */
+  precomputedProject?: ProjectModel;
+  precomputedActiveMetricDefsByName?: ReadonlyMap<string, MetricDefModel>;
+  precomputedQuota?: ProjectCostQuota;
 }
 
 /**
@@ -371,17 +380,16 @@ export interface QueryBoardTileParams {
  * is about the query itself failing, not about the successfully-returned
  * data's age.
  *
- * Known, deliberately deferred inefficiency: the board detail page fans this
- * out once per tile via `Promise.all`, and each call independently re-reads
- * the project doc, the cost-quota config, and any metric definitions this
- * tile shares with a sibling tile — a board with N tiles referencing M
- * distinct metrics does more Firestore reads than the minimum (one project
- * read, one quota check, M metric reads) a batched version could. Fixing
- * this properly means threading precomputed project/quota/catalog state
- * through `queryMetrics`/`compileMetricQueryForProject`, which are also
- * `POST /v1/metrics/query`'s (KAN-42) own call path — out of scope for this
- * story to change; the same "documented, not fixed" posture `cost-guardrail.
- * service.ts`'s own non-transactional-quota-check gap already takes.
+ * Called directly, this independently re-reads the project doc, the
+ * cost-quota config, and any metric definitions this tile shares with a
+ * sibling tile — fine for a single tile, but a board with N tiles
+ * referencing M distinct metrics would do more Firestore reads than the
+ * minimum (one project read, one quota check, M metric reads) if fanned out
+ * this way. `queryBoardTiles` (below) is the batched sibling that fetches
+ * that shared state once and passes it to this function via its
+ * `precomputed*` params — every board-rendering call site (the board detail
+ * page, the TV rotation route) should call `queryBoardTiles`, not fan this
+ * function out itself.
  */
 // A `histogram` tile's source metric buckets by an "as of latest observed
 // activity date" snapshot column (e.g. `fact_engagement_depth_histogram.
@@ -433,6 +441,10 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
       request,
       ...(params.executor ? { executor: params.executor } : {}),
       ...(params.cache ? { cache: params.cache } : {}),
+      ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
+      ...(params.precomputedProject ? { precomputedProject: params.precomputedProject } : {}),
+      ...(params.precomputedActiveMetricDefsByName ? { precomputedActiveMetricDefsByName: params.precomputedActiveMetricDefsByName } : {}),
+      ...(params.precomputedQuota ? { precomputedQuota: params.precomputedQuota } : {}),
     });
     return { ok: true, series: result.series };
   } catch (error) {
@@ -475,4 +487,68 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
     }
     throw error;
   }
+}
+
+export interface QueryBoardTilesParams {
+  organizationId: string;
+  projectId: string;
+  board: Pick<BoardModel, 'date_range' | 'compare' | 'global_filters' | 'tiles'>;
+  executor?: WarehouseQueryExecutor;
+  cache?: MetricQueryResultCache;
+}
+
+/**
+ * Batched sibling of {@link queryBoardTile}, closing the N+1 that
+ * function's own doc comment names: fetches the project doc, the project's
+ * cost-quota config, its full set of currently-`active` metric definitions,
+ * and its default query environment exactly once, then runs every tile's
+ * own query against those shared values instead of letting each tile
+ * independently re-fetch them. A board with N tiles referencing M distinct
+ * metrics now does one project read, one quota-config read, and one
+ * metric-definition list read — not up to N of each. Every board-rendering
+ * call site (the board detail page, the TV rotation route) should call this
+ * instead of fanning `queryBoardTile` out itself.
+ *
+ * This only shares the quota's *config* (the `dailyQueryLimit`/`labels`
+ * doc) — each tile still independently asks `checkProjectQueryQuota` to
+ * count today's already-logged attempts, since that count is inherently a
+ * live, per-request read (see that function's own doc comment on why it
+ * isn't itself transactional/atomic across concurrent callers). Tiles
+ * within one `queryBoardTiles` call still run concurrently (`Promise.all`,
+ * same as the old per-tile fan-out), so which tile(s) win a nearly-exhausted
+ * quota's last attempt(s) is the same race as before this function existed
+ * — this closes the *redundant-fetch* inefficiency, not that separate,
+ * already-documented non-atomicity.
+ *
+ * Each tile's own outcome is otherwise unaffected byte-for-byte by this
+ * batching — `precomputedProject`/`precomputedActiveMetricDefsByName`
+ * only change how many times shared, read-only state is fetched, never
+ * what a tile's query compiles to or what it returns. Outcomes are
+ * returned in the same order as `board.tiles`.
+ */
+export async function queryBoardTiles(params: QueryBoardTilesParams): Promise<BoardTileQueryOutcome[]> {
+  const project = await requireProjectInOrg(params.organizationId, params.projectId);
+  const [quota, metricDefs, environment] = await Promise.all([
+    getProjectCostQuota(params.organizationId, params.projectId, project),
+    listMetricDefinitionsForProject(params.organizationId, params.projectId),
+    resolveDefaultQueryEnvironment(params.organizationId, params.projectId),
+  ]);
+  const precomputedActiveMetricDefsByName = new Map(metricDefs.filter((def) => def.status === 'active').map((def) => [def.name, def] as const));
+
+  return Promise.all(
+    params.board.tiles.map((tile) =>
+      queryBoardTile({
+        organizationId: params.organizationId,
+        projectId: params.projectId,
+        board: params.board,
+        tile,
+        ...(params.executor ? { executor: params.executor } : {}),
+        ...(params.cache ? { cache: params.cache } : {}),
+        ...(environment ? { environmentId: environment.id } : {}),
+        precomputedProject: project,
+        precomputedActiveMetricDefsByName,
+        precomputedQuota: quota,
+      }),
+    ),
+  );
 }

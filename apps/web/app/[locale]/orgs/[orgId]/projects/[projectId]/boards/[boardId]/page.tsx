@@ -4,7 +4,7 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTile } from '@/lib/orgs/queries';
+import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTiles } from '@/lib/orgs/queries';
 import { buildTileRenderView, toBoardView, type TileRenderView } from '@/lib/orgs/board-view';
 import { resolveBoardFreshness } from '@/lib/orgs/board-freshness';
 import { BoardSettingsForm } from '@/components/orgs/board-settings-form';
@@ -31,8 +31,9 @@ export async function generateMetadata({ params }: PageProps) {
 /**
  * One board (KAN-60): its settings (name/date range/compare/global
  * filters), and its tile grid — view mode shows every tile's already-queried
- * data (fetched here, server-side, one `queryBoardTile` call per tile, in
- * parallel), edit mode hands off to `BoardGridEditor`'s client-side
+ * data (fetched here, server-side, via one batched `queryBoardTiles` call —
+ * see its own doc comment for why this isn't a per-tile `Promise.all` fan-out
+ * any more), edit mode hands off to `BoardGridEditor`'s client-side
  * add/move/resize/remove + "Save layout". Gated on `dashboards.read` to view
  * (`viewer` included — see the boards list page's own doc comment for why);
  * the settings form, delete button, and grid editor's edit affordances are
@@ -72,7 +73,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
 
   const boardView = toBoardView(board);
 
-  const tileOutcomes = await Promise.all(board.tiles.map((tile) => queryBoardTile(orgId, projectId, board, tile)));
+  const tileOutcomes = await queryBoardTiles(orgId, projectId, board);
   const renderViews: Record<string, TileRenderView> = {};
   board.tiles.forEach((tile, index) => {
     renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index], freshness);

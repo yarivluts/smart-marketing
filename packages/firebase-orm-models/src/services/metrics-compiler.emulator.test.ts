@@ -6,7 +6,9 @@ import {
   createProject,
   ensureUserForFirebaseSession,
   KNOWN_UNBUILT_WAREHOUSE_TABLES,
+  MetricDefModel,
   MetricNotRegisteredError,
+  ProjectModel,
   ProjectNotFoundError,
   registerMetricDefinition,
 } from '../index';
@@ -229,5 +231,68 @@ describe('compileMetricQueryForProject', () => {
     });
 
     expect(compiled.unbuiltWarehouseTables).toEqual([]);
+  });
+
+  it('resolves a metric from precomputedActiveMetricDefsByName instead of fetching it from Firestore (board-tile-N+1 fix)', async () => {
+    const { organization, project } = await setupOrgWithProject('Compiler Precomputed Catalog Org');
+    // Deliberately never registered via `registerMetricDefinition` — if this
+    // compiles successfully, it can only be because `resolveCatalog` read it
+    // from the supplied map rather than issuing its own Firestore fetch
+    // (which would find nothing and throw `MetricNotRegisteredError`, as the
+    // "rejects a query naming a metric that was never registered" test above
+    // proves for the same unregistered-name case without a precomputed map).
+    const phantom = new MetricDefModel();
+    phantom.organization_id = organization.id;
+    phantom.project_id = project.id;
+    phantom.name = 'phantom_metric';
+    phantom.version = 7;
+    phantom.status = 'active';
+    phantom.definition_kind = 'aggregation';
+    phantom.aggregation = { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] };
+    phantom.dimensions = [];
+    phantom.created_by = 'test-fixture';
+    phantom.created_at = new Date().toISOString();
+
+    const compiled = await compileMetricQueryForProject({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['phantom_metric'], time: { start: '2026-01-01', end: '2026-01-07', grain: 'day' } },
+      precomputedActiveMetricDefsByName: new Map([['phantom_metric', phantom]]),
+    });
+
+    expect(compiled.sql).toContain('SUM(`reporting_spend`)');
+    // The version on the returned `definitionRefs` is the phantom's own `7`,
+    // not whatever (nonexistent) version a live Firestore fetch would have
+    // found — proving the map's own entry was actually used, not just that
+    // resolution merely "succeeded".
+    expect(compiled.definitionRefs).toEqual({ phantom_metric: 'metric:phantom_metric@v7' });
+  });
+
+  it('still rejects an unregistered metric that is absent from a supplied precomputedActiveMetricDefsByName map, rather than silently treating the map as exhaustive', async () => {
+    const { organization, project } = await setupOrgWithProject('Compiler Precomputed Catalog Miss Org');
+
+    await expect(
+      compileMetricQueryForProject({
+        organizationId: organization.id,
+        projectId: project.id,
+        request: { metrics: ['does_not_exist'], time: { start: '2026-01-01', end: '2026-01-01', grain: 'day' } },
+        precomputedActiveMetricDefsByName: new Map(),
+      }),
+    ).rejects.toThrow(MetricNotRegisteredError);
+  });
+
+  it('rejects a precomputedProject that does not match organizationId/projectId, rather than compiling against the wrong tenant', async () => {
+    const { organization, project } = await setupOrgWithProject('Compiler Precomputed Project Org');
+    const { organization: otherOrg, project: otherProject } = await setupOrgWithProject('Compiler Precomputed Project Other Org');
+    const mismatchedProject = await ProjectModel.init(otherProject.id, { organization_id: otherOrg.id });
+
+    await expect(
+      compileMetricQueryForProject({
+        organizationId: organization.id,
+        projectId: project.id,
+        request: { metrics: ['ad_spend'], time: { start: '2026-01-01', end: '2026-01-01', grain: 'day' } },
+        precomputedProject: mismatchedProject!,
+      }),
+    ).rejects.toThrow(ProjectNotFoundError);
   });
 });
