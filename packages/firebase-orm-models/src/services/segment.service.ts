@@ -587,9 +587,17 @@ export interface ListSegmentMembersParams {
   executor?: WarehouseQueryExecutor;
 }
 
-/** Mirrors `SegmentMemberCountOutcome`'s exact ok/degraded-reason split — a caller that lists members to push somewhere (e.g. `syncSegmentToCrm`) hits the same expected-not-buggy failure modes a member-count badge does, so it degrades the same honest way rather than throwing a generic error. */
+/**
+ * Mirrors `SegmentMemberCountOutcome`'s exact ok/degraded-reason split — a caller that lists
+ * members to push somewhere (e.g. `syncSegmentToCrm`) hits the same expected-not-buggy failure
+ * modes a member-count badge does, so it degrades the same honest way rather than throwing a
+ * generic error. `schemaName` rides along on the `ok` branch so a caller rendering these rows
+ * (e.g. an admin members panel redacting PII fields) can resolve the segment's own entity schema
+ * field defs without a second `loadSegment`-equivalent fetch — `listSegmentMembers` already loaded
+ * the segment internally to compile the query, so this is free.
+ */
 export type SegmentMemberListOutcome =
-  | { ok: true; members: SegmentMemberRow[] }
+  | { ok: true; schemaName: string; members: SegmentMemberRow[] }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
 
 /**
@@ -616,6 +624,7 @@ export async function listSegmentMembers(params: ListSegmentMembersParams): Prom
     );
     return {
       ok: true,
+      schemaName: segment.schema_name,
       members: rows.map((row) => ({
         entityId: String(row.entity_id ?? ''),
         properties: parseJsonColumn(row.properties),

@@ -116,6 +116,7 @@ import {
   listResourceTemplates as listResourceTemplatesInOrganization,
   listSchemaDefinitionsForProject as listSchemaDefinitionsForProjectInOrganization,
   listSegmentsForProject as listSegmentsForProjectInOrganization,
+  listSegmentMembers as listSegmentMembersInOrganization,
   listSharedCredentials as listSharedCredentialsInOrganization,
   listRepCollectionEntriesForProject as listRepCollectionEntriesForProjectInOrganization,
   getRepCollectionLeaderboardForProject as getRepCollectionLeaderboardForProjectInOrganization,
@@ -164,6 +165,7 @@ import {
   type Role,
   type SchemaDefModel,
   type SegmentMemberCountOutcome,
+  type SegmentMemberListOutcome,
   type SegmentModel,
   type SharedCredentialModel,
   type TrackingAlertModel,
@@ -811,6 +813,22 @@ export async function countSegmentMembers(
 ): Promise<SegmentMemberCountOutcome> {
   await ensureFirestoreOrm();
   return countSegmentMembersInOrganization({ organizationId, projectId, segmentId, ...options });
+}
+
+/**
+ * One segment's actual matching rows (not just a count — see `SegmentMemberListOutcome`'s own doc
+ * comment for the ok/degraded-reason split), for the Segments page's own "view members" panel
+ * (KAN-107). Bounded to `limit` — see `listSegmentMembers`'s own `MAX_SEGMENT_MEMBER_LIST_LIMIT`
+ * doc comment for why this is never an unbounded export.
+ */
+export async function listSegmentMembers(
+  organizationId: string,
+  projectId: string,
+  segmentId: string,
+  options?: { environmentId?: string; limit?: number },
+): Promise<SegmentMemberListOutcome> {
+  await ensureFirestoreOrm();
+  return listSegmentMembersInOrganization({ organizationId, projectId, segmentId, ...options });
 }
 
 export async function getGoal(organizationId: string, projectId: string, goalId: string): Promise<GoalModel | null> {

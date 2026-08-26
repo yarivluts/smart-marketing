@@ -1002,6 +1002,7 @@ describe('listSegmentMembers', () => {
 
     expect(outcome).toEqual({
       ok: true,
+      schemaName: 'customer',
       members: [
         { entityId: 'cust_1', properties: { plan: 'pro' }, lastSeenAt: '2026-08-20T00:00:00.000Z' },
         { entityId: 'cust_2', properties: { plan: 'pro' }, lastSeenAt: '2026-08-21T00:00:00.000Z' },
