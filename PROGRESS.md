@@ -17,6 +17,85 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (later still) — Merged PR #304 (KAN-98, org member role-change admin surface)
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). `list_pull_requests` showed two open
+    PRs from concurrent sessions: #302 (KAN-96, board-tile batched reads) and #303 (KAN-97, Meta
+    ad-set targeting edit). To avoid duplicating either, delegated a bounded background sweep agent
+    (explicitly excluding both, plus the already-deprioritized PMax/Lookalike/mailing-address items)
+    for a different, unclaimed, infra-free follow-up.
+  - The sweep's top candidate: `org-membership-flows.emulator.test.ts`'s own doc comment named the
+    gap verbatim — "no admin 'change role' surface exists yet — out of scope here." Confirmed real:
+    the only way to change a member's role was revoke + re-invite (`removeOrgMember` +
+    `inviteMemberToOrganization`), which loses membership history and drops access until the new
+    invite is accepted — a real gap against CLAUDE.md's own "everything user-manageable gets an
+    admin surface" rule.
+  - **Delivered (PR #304, branch `kan-98-org-member-role-change`, minted as KAN-98 — same
+    "no pre-existing ticket, sweep found it" pattern KAN-89..97 established):** `updateMemberRole()`
+    (`membership.service.ts`) moves an already-invitable member (`org_admin`/`viewer`, per
+    `INVITABLE_ROLES`) between those two roles — updates `MembershipModel.role` and, for an
+    already-`active` membership, every matching org-scope `RoleBindingModel` for that user (the
+    actual authorization source `can()` reads; `MembershipModel.role` alone has no effect on
+    permission checks). A pending `invited` membership has no role binding yet, so only the
+    membership doc updates. Refuses to touch `org_owner`/`platform_admin` (`RoleNotChangeableError`)
+    — same boundary `INVITABLE_ROLES`'s own doc comment draws, so this surface can never create or
+    remove an org_owner and can never leave an org ownerless. New `PATCH
+    /api/orgs/[orgId]/members/[membershipId]` route (gated on `members.manage`, same as the existing
+    `DELETE`) + a `ChangeRoleControl` select on the Members page, shown only for a member whose
+    current role is invitable. en/he translations added.
+  - Self-review before opening the PR found and fixed one real issue: the first draft's
+    `members-list.tsx` computed `canChangeRole = canManageMembers && isInvitableRole(member.role)` as
+    a separate boolean, which doesn't let TypeScript narrow `member.role`'s type through the
+    intermediate variable — a genuine typecheck error (`tsc` caught it), not just a style nit. Fixed
+    by narrowing into a `changeableRole: InvitableRole | null` variable directly from the type-guard
+    call, then re-verified typecheck/lint/the two affected test files green before pushing.
+  - Test coverage across every layer: new emulator tests (`org-membership-flows.emulator.test.ts`:
+    active-member role change updates both the membership and its role binding; a pending invite's
+    promised role updates without a binding; audit-logged as `membership.role_updated`;
+    `RoleNotChangeableError` for an `org_owner` target; `MembershipNotFoundError` for a missing
+    membership), new route tests (401/403/400/404/409/200), a new isolation test (KAN-26, 404-not-403
+    for a fake org id), and new component tests (`change-role-control.test.tsx`).
+  - Full local verification before opening the PR: `pnpm build`/`pnpm lint`/`pnpm typecheck` green
+    monorepo-wide; full `pnpm test` green (`shared` 587/587, `firebase-orm-models` 1451/1451 vs a real
+    Firestore emulator, `api` 141/141, `web` 1619/1619 unit + Playwright e2e — 2 specs
+    (`resource-library.spec.ts`/`tv-pairing.spec.ts`) flaky-then-passed on retry, both unrelated to
+    this diff, matching this repo's documented emulator-contention flake pattern).
+  - Opened PR #304 and subscribed to its activity. GitHub then reported `mergeable_state: dirty` —
+    PR #303 (KAN-97) had merged into `main` while this PR was being prepared. Merged `main` into the
+    branch; the only conflict was in `TASKS.md` itself (both PRs appended a new row near the same
+    spot, same collision class KAN-94/95 hit) — resolved by keeping both rows, KAN-97 before KAN-98.
+    Re-verified `pnpm build`/`pnpm lint`/`pnpm typecheck` green against the merged state plus a
+    targeted re-run of the membership and Meta-ads emulator test files (91/91), then pushed.
+  - CI (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green on the first
+    run against the merged commit (`mergeable_state: clean`, no open review threads) — merged
+    (squash). Branch deletion (`git push origin --delete kan-98-org-member-role-change`) failed with
+    the same recurring HTTP 403 this sandbox's git remote has rejected repeatedly in this file's
+    history — merged and dead but not deleted; a human with direct repo access can delete
+    `kan-98-org-member-role-change`.
+  - Updated `TASKS.md`'s KAN-98 row from `in-progress` to `done`.
+- **In progress (exact stopping point):** none — KAN-98 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own row update are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items, and
+  PR #302 (KAN-96, board-tile batched reads) is still open from a concurrent session — a future run
+  should check `list_pull_requests` first per this repo's own collision-avoidance pattern, and if #302
+  is still unmerged, either help drive it green (if it's stalled) or resume the "sweep every `done`
+  row's own doc-comment notes for a newly-buildable follow-up" pattern for a fresh, unclaimed gap.
+  PMax asset groups and Lookalike/Similar Audience expansion (KAN-72/73) remain the only
+  named-but-deferred items still flagged as needing real design work rather than a buildable-today
+  slice.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows
+    — still outstanding, unchanged by this run.
+  - Optional: delete the merged `kan-98-org-member-role-change` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403).
+
+---
+
 ## 2026-08-26 (latest) — Merged PR #303 (KAN-97, Meta ad-set targeting-spec edit)
 
 - **Last completed:**
