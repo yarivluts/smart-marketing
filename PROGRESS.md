@@ -17,6 +17,43 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (KAN-95, later) — Merged PR #301 (segment event-condition nested filters)
+
+- **Last completed:**
+  - Picked up exactly where the previous entry left off: PR #301 was open, self-reviewed, and green
+    locally, with GitHub CI in progress on the doc-update commit.
+  - CI's `lint · typecheck · test · build` check failed once on that commit — the same known
+    `campaign-ops-pack.emulator.test.ts` `RESOURCE_EXHAUSTED`/120s-timeout flake this repo's history
+    repeatedly names (126/127 files, 1445/1446 tests otherwise green; this PR never touches that file,
+    and it had already passed 19/19 in an isolated local re-run earlier in this session). Posted a
+    standing-down comment on the PR naming the failure and why it wasn't this PR's, then triggered the
+    one allowed re-run (`rerun_failed_jobs`). The re-run came back fully green
+    (`lint · typecheck · test · build` + `terraform fmt · validate`, `mergeable_state: clean`).
+  - Merged (squash) into `main`. Branch deletion (`git push origin --delete
+    kan-95-segment-event-condition-nested-filters`) failed with the same recurring HTTP 403 this
+    sandbox's git remote has rejected repeatedly in this file's history — merged and dead but not
+    deleted; a human with direct repo access can delete
+    `kan-95-segment-event-condition-nested-filters`.
+  - Updated `TASKS.md`'s KAN-95 row from `in-progress` to `done`.
+- **In progress (exact stopping point):** none — KAN-95 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own row update are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable follow-up"
+  pattern for the next candidate. The prior sweep's runner-ups (a real per-customer index for
+  omnisearch — needs a new customer-detail page, not just an index; mailing-address/mobile-device-id
+  identifiers for Google Customer Match/Meta Custom Audience — an already-saturated 8+-follow-up area)
+  are still there if a fresh sweep doesn't turn up something smaller.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional: delete the merged `kan-95-segment-event-condition-nested-filters` branch on GitHub (this
+    sandbox's git remote rejected the delete with a 403).
+
+---
+
 ## 2026-08-26 (KAN-95) — Opened PR #301 (segment event-condition nested filters), CI green, merging next
 
 - **Last completed:**
