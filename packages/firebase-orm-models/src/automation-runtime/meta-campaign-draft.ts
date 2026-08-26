@@ -36,6 +36,58 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Validates one Meta ad set's own targeting spec (age range 13-65,
+ * ISO-3166 alpha-2 country codes, `male`/`female` genders) against Meta's own
+ * real-world limits — shared by {@link validateAdSet} (a brand-new ad set's
+ * own `targeting`, nested under `adSets[i]`) and
+ * `validateMetaAdSetTargetingEditActionInput` (`campaign-draft.ts`, a
+ * `meta_ad_set_targeting_edit` action's replacement targeting spec, same
+ * shape one level up) so the two never drift, mirroring this file's own
+ * `validateMetaAdCreativeContent`/`validateMetaAdCreativeEditActionInput`
+ * pairing. `fieldPath` is the caller's own prefix (e.g. `adSets[0].targeting`
+ * or just `targeting`). Tolerates a malformed/untrusted-cast request body the
+ * same way {@link validateAdSet} does.
+ */
+export function validateMetaAdSetTargeting(targeting: Record<string, unknown>, fieldPath: string, reasons: string[]): void {
+  const countries = Array.isArray(targeting.countries) ? targeting.countries : undefined;
+  if (!countries || countries.length === 0) {
+    reasons.push(`${fieldPath}.countries must have at least one country code.`);
+  } else {
+    countries.forEach((country, countryIndex) => {
+      if (typeof country !== 'string' || !COUNTRY_CODE_PATTERN.test(country)) {
+        reasons.push(`${fieldPath}.countries[${countryIndex}] must be a two-letter ISO-3166 country code (e.g. "US").`);
+      }
+    });
+  }
+
+  const ageMin = targeting.ageMin;
+  const ageMax = targeting.ageMax;
+  const ageMinValid = typeof ageMin === 'number' && Number.isInteger(ageMin) && ageMin >= MIN_AGE && ageMin <= MAX_AGE;
+  const ageMaxValid = typeof ageMax === 'number' && Number.isInteger(ageMax) && ageMax >= MIN_AGE && ageMax <= MAX_AGE;
+  if (!ageMinValid) {
+    reasons.push(`${fieldPath}.ageMin must be an integer between ${MIN_AGE} and ${MAX_AGE}.`);
+  }
+  if (!ageMaxValid) {
+    reasons.push(`${fieldPath}.ageMax must be an integer between ${MIN_AGE} and ${MAX_AGE}.`);
+  }
+  if (ageMinValid && ageMaxValid && (ageMin as number) > (ageMax as number)) {
+    reasons.push(`${fieldPath}.ageMin must be less than or equal to ageMax.`);
+  }
+
+  if (targeting.genders !== undefined) {
+    if (!Array.isArray(targeting.genders)) {
+      reasons.push(`${fieldPath}.genders must be an array when present.`);
+    } else {
+      targeting.genders.forEach((gender, genderIndex) => {
+        if (typeof gender !== 'string' || !(GENDERS as readonly string[]).includes(gender)) {
+          reasons.push(`${fieldPath}.genders[${genderIndex}] must be one of ${GENDERS.join(', ')}.`);
+        }
+      });
+    }
+  }
+}
+
 /** `adSet` is typed as its validated shape, but at runtime this is validating an arbitrary caller-supplied JSON body cast to that type (the `campaign-drafts` route's `draft as CampaignDraft`) — every field access here must tolerate a malformed entry (a string, `null`, or an array in a spot that should be an object) without throwing, mirroring `campaign-draft.ts`'s own `validateAdGroup` posture (and the bug class a KAN-72 follow-up run found and fixed there for `negativeKeywords`: every `?.`/array access below is paired with an explicit `Array.isArray`/`isRecord` check, never a bare `?? []`). */
 function validateAdSet(adSet: MetaCampaignDraftAdSet, index: number, reasons: string[]): void {
   const fieldPath = `adSets[${index}]`;
@@ -51,42 +103,7 @@ function validateAdSet(adSet: MetaCampaignDraftAdSet, index: number, reasons: st
   if (!targeting) {
     reasons.push(`${fieldPath}.targeting must be an object.`);
   } else {
-    const countries = Array.isArray(targeting.countries) ? targeting.countries : undefined;
-    if (!countries || countries.length === 0) {
-      reasons.push(`${fieldPath}.targeting.countries must have at least one country code.`);
-    } else {
-      countries.forEach((country, countryIndex) => {
-        if (typeof country !== 'string' || !COUNTRY_CODE_PATTERN.test(country)) {
-          reasons.push(`${fieldPath}.targeting.countries[${countryIndex}] must be a two-letter ISO-3166 country code (e.g. "US").`);
-        }
-      });
-    }
-
-    const ageMin = targeting.ageMin;
-    const ageMax = targeting.ageMax;
-    const ageMinValid = typeof ageMin === 'number' && Number.isInteger(ageMin) && ageMin >= MIN_AGE && ageMin <= MAX_AGE;
-    const ageMaxValid = typeof ageMax === 'number' && Number.isInteger(ageMax) && ageMax >= MIN_AGE && ageMax <= MAX_AGE;
-    if (!ageMinValid) {
-      reasons.push(`${fieldPath}.targeting.ageMin must be an integer between ${MIN_AGE} and ${MAX_AGE}.`);
-    }
-    if (!ageMaxValid) {
-      reasons.push(`${fieldPath}.targeting.ageMax must be an integer between ${MIN_AGE} and ${MAX_AGE}.`);
-    }
-    if (ageMinValid && ageMaxValid && (ageMin as number) > (ageMax as number)) {
-      reasons.push(`${fieldPath}.targeting.ageMin must be less than or equal to ageMax.`);
-    }
-
-    if (targeting.genders !== undefined) {
-      if (!Array.isArray(targeting.genders)) {
-        reasons.push(`${fieldPath}.targeting.genders must be an array when present.`);
-      } else {
-        targeting.genders.forEach((gender, genderIndex) => {
-          if (typeof gender !== 'string' || !(GENDERS as readonly string[]).includes(gender)) {
-            reasons.push(`${fieldPath}.targeting.genders[${genderIndex}] must be one of ${GENDERS.join(', ')}.`);
-          }
-        });
-      }
-    }
+    validateMetaAdSetTargeting(targeting, `${fieldPath}.targeting`, reasons);
   }
 
   const ad = isRecord(adSet.ad) ? adSet.ad : undefined;

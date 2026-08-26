@@ -21,6 +21,9 @@ import {
   type AutomationMetaAdSetEditExecutionInput,
   type AutomationMetaAdSetEditExecutionResult,
   type AutomationMetaAdSetEditRollbackInput,
+  type AutomationMetaAdSetTargetingEditExecutionInput,
+  type AutomationMetaAdSetTargetingEditExecutionResult,
+  type AutomationMetaAdSetTargetingEditRollbackInput,
 } from '../../automation-runtime';
 import type { GoogleAdsApiClient } from './api-client';
 
@@ -38,6 +41,22 @@ export class GoogleAdsMetaAdSetEditNotSupportedError extends Error {
   constructor() {
     super('Google Ads has no ad-set concept — a meta_ad_set_edit action is not supported for a Google Ads-linked target.');
     this.name = 'GoogleAdsMetaAdSetEditNotSupportedError';
+  }
+}
+
+/**
+ * A `meta_ad_set_targeting_edit` action (KAN-73 follow-up, this story's own
+ * "ad-set targeting-spec edits" deferred bullet) reached
+ * `GoogleAdsAutomationActionExecutor` — same "Google Ads has no ad-set
+ * concept" reasoning {@link GoogleAdsMetaAdSetEditNotSupportedError}
+ * establishes one action type over (Google Ads' own targeting model —
+ * location/demographic criteria on a campaign or ad group — is structurally
+ * different from Meta's per-ad-set targeting spec and isn't modeled here).
+ */
+export class GoogleAdsMetaAdSetTargetingEditNotSupportedError extends Error {
+  constructor() {
+    super('Google Ads has no ad-set concept — a meta_ad_set_targeting_edit action is not supported for a Google Ads-linked target.');
+    this.name = 'GoogleAdsMetaAdSetTargetingEditNotSupportedError';
   }
 }
 
@@ -325,6 +344,14 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
 
   async rollbackMetaAdSetEdit(_input: AutomationMetaAdSetEditRollbackInput): Promise<void> {
     throw new GoogleAdsMetaAdSetEditNotSupportedError();
+  }
+
+  async executeMetaAdSetTargetingEdit(_input: AutomationMetaAdSetTargetingEditExecutionInput): Promise<AutomationMetaAdSetTargetingEditExecutionResult> {
+    throw new GoogleAdsMetaAdSetTargetingEditNotSupportedError();
+  }
+
+  async rollbackMetaAdSetTargetingEdit(_input: AutomationMetaAdSetTargetingEditRollbackInput): Promise<void> {
+    throw new GoogleAdsMetaAdSetTargetingEditNotSupportedError();
   }
 
   async executeMetaAdCreativeEdit(_input: AutomationMetaAdCreativeEditExecutionInput): Promise<AutomationMetaAdCreativeEditExecutionResult> {

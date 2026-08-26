@@ -154,6 +154,28 @@ describe('toAutomationActionView / formatDiffValue (KAN-73)', () => {
       after: 'creative-2',
     });
   });
+
+  it('summarizes a meta_ad_set_targeting_edit\'s targeting as "countries (age range, genders)", widened post-execution with the real pre-edit spec (KAN-73 follow-up)', () => {
+    const view = toAutomationActionView(
+      action({
+        id: 'a8',
+        action_type: 'meta_ad_set_targeting_edit',
+        before: { adSetResourceName: 'act_999/adsets/1', targeting: { countries: ['US'], ageMin: 18, ageMax: 65 } },
+        after: { adSetResourceName: 'act_999/adsets/1', targeting: { countries: ['US', 'CA'], ageMin: 21, ageMax: 45, genders: ['female'] } },
+      }),
+    );
+
+    expect(view.diffEntries.find((candidate) => candidate.key === 'targeting')).toEqual({
+      key: 'targeting',
+      before: 'US (18-65)',
+      after: 'US, CA (21-45, female)',
+    });
+    expect(view.diffEntries.find((candidate) => candidate.key === 'adSetResourceName')).toEqual({
+      key: 'adSetResourceName',
+      before: 'act_999/adsets/1',
+      after: 'act_999/adsets/1',
+    });
+  });
 });
 
 describe('toAutomationTargetView (KAN-73 follow-up)', () => {

@@ -17,6 +17,111 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — Merged PR #303 (KAN-97, Meta ad-set targeting-spec edit)
+
+- **Last completed:**
+  - Picked up exactly where the previous entry left off: PR #303 was open, self-reviewed, and green
+    locally, with GitHub CI in progress.
+  - GitHub reported `mergeable_state: dirty` shortly after opening — PR #301 (KAN-95) had merged into
+    `main` in the meantime. Merged `main` into the branch; conflicts were purely in `TASKS.md` and
+    `PROGRESS.md` (both PRs appended a new row/entry near the same spot) — resolved by keeping both
+    rows/entries in order (KAN-95 before KAN-97); `apps/web/messages/en.json`/`he.json` merged cleanly
+    with no conflict. Re-verified `pnpm lint`/`pnpm typecheck` green and re-ran the full `apps/web`
+    unit+emulator suite against the merged state (1628/1628 green, up from 1625 — the 3 new tests
+    KAN-95 added) before pushing.
+  - CI (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green on the first
+    attempt after the merge push, `mergeable_state: clean`, no review comments. Merged (squash) into
+    `main`.
+  - Local branch deleted; `git push origin --delete kan-97-meta-ad-set-targeting-edit` failed with the
+    same recurring HTTP 403 this sandbox's git remote has rejected repeatedly in this file's history —
+    merged and dead but not deleted on GitHub; a human with direct repo access can delete
+    `kan-97-meta-ad-set-targeting-edit`.
+- **In progress (exact stopping point):** none — KAN-97 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-97 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable follow-up"
+  pattern for the next candidate — first re-check `list_pull_requests` for any other concurrent
+  session's in-flight work to avoid duplicating it (this run's own KAN-96 exclusion,
+  `kan-96-board-tile-batched-reads`, may have merged or may still be open). The only named-but-deferred
+  items left on KAN-72/73's own rows are PMax asset groups and Lookalike/Similar Audience expansion,
+  both flagged as needing real design work rather than a buildable-today slice.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional: delete the merged `kan-97-meta-ad-set-targeting-edit` branch on GitHub (this sandbox's
+    git remote rejected the delete with a 403).
+
+---
+
+## 2026-08-26 — Opened PR #303 (KAN-97, Meta ad-set targeting-spec edit)
+
+- **Last completed:**
+  - Session start: local repo was on a detached `HEAD` matching `origin/main`'s tip; `git checkout -B
+    main origin/main` fixed it. Read `PROGRESS.md`/`TASKS.md`: every row KAN-17..KAN-94 `done` except
+    the standing KAN-18/19 infra items and KAN-43/50/51 (`needs-human`/`blocked-by`).
+    `list_pull_requests` showed one open PR, **#301** (KAN-95, segment event-condition nested-filter
+    UI) — a concurrent session's in-flight work. To avoid duplicating it, delegated a bounded
+    background sweep (a `general-purpose` agent) for any *other* unclaimed, buildable-today gap.
+  - The sweep's top candidate, after ruling out KAN-95 (claimed) and a second already-claimed gap it
+    found mid-search (`kan-96-board-tile-batched-reads`, a remote branch for a board-service N+1-read
+    fix — also a concurrent session's work): **Meta ad-set targeting-spec edits (countries/age
+    range/genders)**, named as still-deferred in `AutomationMetaAdSetEditExecutionInput`'s own doc
+    comment (`automation-runtime/executor.ts`) and in KAN-73's own `TASKS.md` row — the one half of
+    KAN-72/73's original "post-creation ad/keyword edits" deferred bullet still open (the ad-set
+    budget/status half shipped as `meta_ad_set_edit`, the creative half as `meta_ad_creative_edit`).
+    Confirmed no branch/PR already claimed it.
+  - **Delivered (PR #303, branch `kan-97-meta-ad-set-targeting-edit`, added as KAN-97 — no ticket
+    existed for this gap before this row):** a new `meta_ad_set_targeting_edit` automation action
+    type — the direct sibling of `meta_ad_set_edit`, but replacing an already-created Meta ad set's
+    *whole* targeting spec at once (Meta's own `targeting` field has no independently-patchable
+    sub-fields, unlike budget/status) rather than per-field-optional edits. Reused the existing
+    live-read-before-edit pattern (`MetaAutomationActionExecutor.executeMetaAdSetTargetingEdit` calls
+    a new `MetaAdsApiClient.getAdSet`/`updateAdSet` `targeting` param, backed by a shared
+    `buildMetaTargetingSpec`/`parseMetaTargetingSpec` pair also now used by `createAdSet`) and the
+    same `meta_ad_set_resource_names` ownership check. Extracted the inline targeting validation out
+    of `meta-campaign-draft.ts`'s `validateAdSet` into an exported `validateMetaAdSetTargeting`,
+    reused by both the create-time path and the new `validateMetaAdSetTargetingEditActionInput`
+    (`campaign-draft.ts`) so the two can never drift. `GoogleAdsAutomationActionExecutor` throws a
+    documented `GoogleAdsMetaAdSetTargetingEditNotSupportedError`, mirroring every other Meta-only
+    action type. New admin UI section (`AutomationProposeMetaAdSetTargetingEditForm`, reusing the
+    campaign-draft form's existing age/gender/country field patterns and translation keys) +
+    `POST .../automation/actions/meta-ad-set-targeting-edits` route, gated on `automation.execute`
+    with the existing Manage-tier requirement. en/he translations for all new UI copy.
+  - Self-review of the diff (correctness bugs, missing tests, reuse/simplification) before opening
+    the PR found no issues — the targeting build/parse round-trips cleanly, the shared validator
+    extraction preserves every existing error message exactly (confirmed no behavior change to
+    `validateMetaCampaignDraft`'s own existing test coverage), and the propose/execute/rollback wiring
+    matches `meta_ad_set_edit`'s own established shape field-for-field.
+  - Full local verification before opening the PR: `pnpm lint`/`pnpm typecheck`/`pnpm build` green
+    monorepo-wide; full `pnpm test` green (`firebase-orm-models` 1470/1470 vs a real Firestore
+    emulator — hit the well-documented, self-healing `RESOURCE_EXHAUSTED` flake this repo's history
+    repeatedly names, in unrelated spec files, confirmed self-healed by the final 1470/1470 exit-0
+    result; `web` 1625/1625 unit + emulator-backed, incl. the new route test, form component test,
+    diff-view formatter test, and an isolation 404-not-403 scenario).
+  - PR #303 opened against `main`; subscribed to its activity.
+- **In progress (exact stopping point):** PR #303 open, all local checks green, no CI result yet as
+  of this entry — next step is to watch for CI, merge once green, and update this file + `TASKS.md`'s
+  own KAN-97 row (already added as `done` in this same commit, matching the established
+  "write the row as part of the delivering commit" convention) to reflect the merge.
+- **Blocked + why:** nothing blocking; waiting on CI to report.
+- **Next step:** on the next wake (CI event or scheduled check-in), verify the PR is green and
+  mergeable, merge it (squash) into `main`, and record the merge in this file. If CI is red, diagnose
+  and fix per the standard drive-to-green loop. After that, `TASKS.md` is fully `done` again except
+  the standing KAN-18/19/43/50/51 items — resume the "sweep every `done` row's own deferred/not-yet
+  doc-comment notes" pattern for the next candidate.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Review/merge PR #303 (or let this session merge it once CI is green, per the standing autonomous
+    workflow).
+
+---
+
 ## 2026-08-26 (KAN-95, later) — Merged PR #301 (segment event-condition nested filters)
 
 - **Last completed:**
@@ -131,7 +236,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #300 (KAN-94, billing-ops dunning-status feed)
+## 2026-08-26 — Merged PR #300 (KAN-94, billing-ops dunning-status feed)
 
 - **Last completed:**
   - Session start: local repo was on a detached `HEAD` matching `origin/main`'s tip but the local

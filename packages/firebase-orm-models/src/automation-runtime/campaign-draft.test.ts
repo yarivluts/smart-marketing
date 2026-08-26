@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { CampaignDraft, CampaignDraftKeyword, GoogleAdsCampaignDraft } from './executor';
-import { InvalidCampaignDraftError, validateAdEditActionInput, validateCampaignDraft, validateKeywordEditActionInput } from './campaign-draft';
+import {
+  InvalidCampaignDraftError,
+  validateAdEditActionInput,
+  validateCampaignDraft,
+  validateKeywordEditActionInput,
+  validateMetaAdSetTargetingEditActionInput,
+} from './campaign-draft';
 
 function validDraft(overrides: Partial<GoogleAdsCampaignDraft> = {}): GoogleAdsCampaignDraft {
   return {
@@ -268,5 +274,67 @@ describe('validateAdEditActionInput (KAN-72 follow-up)', () => {
 
   it('rejects a non-object input without throwing an unhandled error', () => {
     expect(() => validateAdEditActionInput(null as unknown as { previousAdResourceName: unknown; responsiveSearchAd: unknown })).toThrow(InvalidCampaignDraftError);
+  });
+});
+
+function validTargeting(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { countries: ['US', 'CA'], ageMin: 18, ageMax: 45, genders: ['female'], ...overrides };
+}
+
+describe('validateMetaAdSetTargetingEditActionInput (KAN-73 follow-up)', () => {
+  it('accepts a well-formed targeting edit', () => {
+    expect(() => validateMetaAdSetTargetingEditActionInput({ adSetResourceName: 'act_999/adsets/1', targeting: validTargeting() })).not.toThrow();
+  });
+
+  it('accepts a targeting edit with genders omitted (all genders)', () => {
+    expect(() =>
+      validateMetaAdSetTargetingEditActionInput({ adSetResourceName: 'act_999/adsets/1', targeting: validTargeting({ genders: undefined }) }),
+    ).not.toThrow();
+  });
+
+  it('rejects a blank adSetResourceName', () => {
+    expect(() => validateMetaAdSetTargetingEditActionInput({ adSetResourceName: '  ', targeting: validTargeting() })).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a non-object targeting', () => {
+    expect(() => validateMetaAdSetTargetingEditActionInput({ adSetResourceName: 'act_999/adsets/1', targeting: 'not-an-object' })).toThrow(
+      InvalidCampaignDraftError,
+    );
+  });
+
+  it('rejects a targeting spec with no countries', () => {
+    expect(() =>
+      validateMetaAdSetTargetingEditActionInput({ adSetResourceName: 'act_999/adsets/1', targeting: validTargeting({ countries: [] }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an invalid country code', () => {
+    expect(() =>
+      validateMetaAdSetTargetingEditActionInput({ adSetResourceName: 'act_999/adsets/1', targeting: validTargeting({ countries: ['usa'] }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an age range outside 13-65', () => {
+    expect(() =>
+      validateMetaAdSetTargetingEditActionInput({ adSetResourceName: 'act_999/adsets/1', targeting: validTargeting({ ageMin: 5 }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects ageMin greater than ageMax', () => {
+    expect(() =>
+      validateMetaAdSetTargetingEditActionInput({ adSetResourceName: 'act_999/adsets/1', targeting: validTargeting({ ageMin: 50, ageMax: 30 }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects an invalid gender value', () => {
+    expect(() =>
+      validateMetaAdSetTargetingEditActionInput({ adSetResourceName: 'act_999/adsets/1', targeting: validTargeting({ genders: ['other'] }) }),
+    ).toThrow(InvalidCampaignDraftError);
+  });
+
+  it('rejects a non-object input without throwing an unhandled error', () => {
+    expect(() => validateMetaAdSetTargetingEditActionInput(null as unknown as { adSetResourceName: unknown; targeting: unknown })).toThrow(
+      InvalidCampaignDraftError,
+    );
   });
 });

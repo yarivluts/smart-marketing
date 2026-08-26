@@ -136,12 +136,26 @@ function formatCreativeDiffValue(value: unknown): unknown {
   return `"${String(creative.headline)}" (${String(creative.primaryText)})`;
 }
 
+/** A `targeting` diff value is a `MetaAdSetTargetingEdit` object (countries/ageMin/ageMax/optional genders) — `String(...)` on it would render `[object Object]`, so it gets a compact "US, CA (18-45, female)" summary instead, the same reasoning `formatCreativeDiffValue` establishes one field over. */
+function formatTargetingDiffValue(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null) {
+    return value;
+  }
+  const targeting = value as { countries?: unknown; ageMin?: unknown; ageMax?: unknown; genders?: unknown };
+  const countries = Array.isArray(targeting.countries) ? targeting.countries.join(', ') : String(targeting.countries);
+  const gendersSuffix = Array.isArray(targeting.genders) && targeting.genders.length > 0 ? `, ${targeting.genders.join('/')}` : '';
+  return `${countries} (${String(targeting.ageMin)}-${String(targeting.ageMax)}${gendersSuffix})`;
+}
+
 function formatDiffValue(key: string, value: unknown): unknown {
   if (key === 'addKeywords' || key === 'addNegativeKeywords') {
     return formatKeywordListDiffValue(value);
   }
   if (key === 'creative') {
     return formatCreativeDiffValue(value);
+  }
+  if (key === 'targeting') {
+    return formatTargetingDiffValue(value);
   }
   if (key !== 'campaignDraft' || typeof value !== 'object' || value === null) {
     return value;
@@ -175,6 +189,7 @@ const DIFF_FIELD_LABEL_KEYS: Record<string, string> = {
   adSetStatus: 'diffFieldAdSetStatus',
   adResourceName: 'diffFieldAdResourceName',
   creative: 'diffFieldCreative',
+  targeting: 'diffFieldTargeting',
   previousCreativeResourceName: 'diffFieldPreviousCreativeResourceName',
   newCreativeResourceName: 'diffFieldNewCreativeResourceName',
 };
