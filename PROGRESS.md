@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #305 (KAN-99, omnisearch indexes goals)
+## 2026-08-26 (latest) — Merged PR #306 (KAN-99, omnisearch indexes goals)
 
 - **Last completed:**
   - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
@@ -34,7 +34,7 @@ Template for each entry:
     satisfy the identical criterion but were simply never added — unlike customers, which the same
     comment explicitly and deliberately excludes pending a real customer-profile page. Confirmed
     genuinely buildable today: no infra, no credentials, no product decision, every seam additive.
-  - **Delivered (PR #305, branch `kan-99-omnisearch-goals`, filed as KAN-99):** `goal` added to
+  - **Delivered (PR #306, branch `kan-99-omnisearch-goals`, filed as KAN-99):** `goal` added to
     `OMNI_SEARCH_RESULT_TYPES`; `buildOmniSearchIndexForProject` (`apps/web/lib/orgs/omnisearch.ts`)
     fetches a project's goals (gated on `dashboards.write`, reusing the exact permission segments
     already use) and pushes each as a search result linking to its own `/goals/[goalId]` detail page
@@ -56,7 +56,7 @@ Template for each entry:
   - Full local verification: `pnpm build`/`pnpm lint`/`pnpm typecheck` green monorepo-wide; `pnpm
     test` green end to end (`web` 1640/1640 unit + emulator on the clean re-run; `shared`,
     `firebase-orm-models`, `api`, `dbt-transform` all unaffected by this diff and passed on every
-    run). Opened PR #305, watched it via `subscribe_pr_activity`; CI (`lint · typecheck · test ·
+    run). Opened PR #306, watched it via `subscribe_pr_activity`; CI (`lint · typecheck · test ·
     build`, `terraform fmt · validate`) came back green on the first run with no open review
     threads or conflicts — merged squash into `main`. Remote branch deletion
     (`kan-99-omnisearch-goals`) failed with the same recurring HTTP 403 this sandbox's git remote has
