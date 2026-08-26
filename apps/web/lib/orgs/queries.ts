@@ -97,6 +97,7 @@ import {
   listPendingAttachmentsForOrg as listPendingAttachmentsForOrgInOrganization,
   listActionPluginInstallsForProject as listActionPluginInstallsForProjectInOrganization,
   listCrmSyncRunsForSegment as listCrmSyncRunsForSegmentInOrganization,
+  listMetaLookalikeAudiencesForInstall as listMetaLookalikeAudiencesForInstallInOrganization,
   listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
@@ -145,6 +146,7 @@ import {
   type OrchestrationRunModel,
   type OrgMemberSummary,
   type OrgPersonModel,
+  type MetaLookalikeAudienceModel,
   type PipelineMessageModel,
   type PluginInstallModel,
   type PluginSinkRunModel,
@@ -693,6 +695,12 @@ export async function listActionPluginInstallsForProject(organizationId: string,
 export async function listCrmSyncRunsForSegment(organizationId: string, projectId: string, segmentId: string, limit?: number): Promise<PluginSinkRunModel[]> {
   await ensureFirestoreOrm();
   return listCrmSyncRunsForSegmentInOrganization(organizationId, projectId, segmentId, limit);
+}
+
+/** One `META_CUSTOM_AUDIENCE_PLUGIN_ID` install's own created Lookalike Audiences, newest-first (KAN-73 follow-up). */
+export async function listMetaLookalikeAudiencesForInstall(organizationId: string, projectId: string, installId: string, limit?: number): Promise<MetaLookalikeAudienceModel[]> {
+  await ensureFirestoreOrm();
+  return listMetaLookalikeAudiencesForInstallInOrganization(organizationId, projectId, installId, limit);
 }
 
 export async function listBoardsForProject(organizationId: string, projectId: string): Promise<BoardModel[]> {

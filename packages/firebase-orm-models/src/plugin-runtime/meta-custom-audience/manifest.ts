@@ -21,11 +21,15 @@ export const META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD = 'audience_name';
  * `scopes: [action:execute]`, mirroring `CRM_WEBHOOK_PLUGIN_MANIFEST_YAML`'s
  * shape exactly. Email- and phone-based Custom Audiences are both built here
  * (a record's `properties.email`/`properties.phone`, hashed per-connector —
- * see `executor.ts`'s own `extractContactMatchKey`); mailing-address and
- * mobile-device-id identifiers, plus Lookalike Audience creation from a
- * Custom Audience seed, are natural, explicitly deferred follow-ups (same
- * "documented, not built" posture KAN-73's own PMax-asset-groups/
- * post-creation-edits bullets already carry).
+ * see `executor.ts`'s own `extractContactMatchKey`). Lookalike Audience
+ * creation from this install's own Custom Audience seed is a separate,
+ * one-off action (`crm-sync.service.ts`'s `createMetaLookalikeAudience`,
+ * not part of this manifest/executor — a Lookalike expands a seed audience's
+ * membership once at creation time, unlike this connector's own repeatable
+ * "sync a segment's rows" `push()` lifecycle) — see that function's own doc
+ * comment. Mailing-address and mobile-device-id identifiers remain natural,
+ * explicitly deferred follow-ups (same "documented, not built" posture
+ * KAN-73's own PMax-asset-groups/post-creation-edits bullets already carry).
  */
 export const META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML = `
 id: ${META_CUSTOM_AUDIENCE_PLUGIN_ID}

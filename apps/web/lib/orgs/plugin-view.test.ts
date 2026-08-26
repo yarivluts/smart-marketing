@@ -98,6 +98,13 @@ describe('toPluginInstallView', () => {
     );
     expect(view.disabledAt).toBe('2026-01-02T00:00:00.000Z');
   });
+
+  it('maps a missing sink_external_ref to null, and a set one through', () => {
+    expect(toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.shopify-pack', status: 'installed' })).sinkExternalRef).toBeNull();
+    expect(
+      toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.shopify-pack', status: 'installed', sink_external_ref: 'audience-1' })).sinkExternalRef,
+    ).toBe('audience-1');
+  });
 });
 
 describe('hasActiveInstall', () => {

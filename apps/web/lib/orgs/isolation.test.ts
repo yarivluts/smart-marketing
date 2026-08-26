@@ -37,6 +37,7 @@ import { POST as proposeMetaAdSetEditRoute } from '@/app/api/orgs/[orgId]/projec
 import { POST as proposeMetaAdSetTargetingEditRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/meta-ad-set-targeting-edits/route';
 import { POST as proposeMetaAdCreativeEditRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/automation/actions/meta-ad-creative-edits/route';
 import { GET as getKillSwitchStatus, POST as toggleKillSwitchRoute } from '@/app/api/orgs/[orgId]/automation/kill-switch/route';
+import { POST as createLookalikeAudienceRoute } from '@/app/api/orgs/[orgId]/projects/[projectId]/plugins/[installId]/lookalike-audiences/route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -1040,6 +1041,32 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
     await expectIndistinguishable(
       () => toggleKillSwitchRoute(postRequestFor(orgB.id), { params: Promise.resolve({ orgId: orgB.id }) }),
       () => toggleKillSwitchRoute(postRequestFor(FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID }) }),
+    );
+  });
+
+  it('POST /api/orgs/[orgId]/projects/[projectId]/plugins/[installId]/lookalike-audiences: org caller cannot see vs. fake org id (KAN-73 follow-up)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-lookalike-caller'));
+    const caller = await ensureUserForFirebaseSession({ firebaseUid: callerSession.uid, email: callerSession.email as string });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (lookalike)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-lookalike-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (lookalike)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const postRequestFor = (orgId: string, projectId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/plugins/does-not-exist/lookalike-audiences`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Lookalike', country: 'US', ratio: 0.05 }),
+      });
+    await expectIndistinguishable(
+      () =>
+        createLookalikeAudienceRoute(postRequestFor(orgB.id, FAKE_ORG_ID), { params: Promise.resolve({ orgId: orgB.id, projectId: FAKE_ORG_ID, installId: 'does-not-exist' }) }),
+      () =>
+        createLookalikeAudienceRoute(postRequestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID, installId: 'does-not-exist' }),
+        }),
     );
   });
 });

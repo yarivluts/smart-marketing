@@ -995,7 +995,20 @@
     "builtinPackSalesTitle": "Sales Pipeline",
     "builtinPackSalesDescription": "Demo scheduling, show rate, and a per-rep breakdown.",
     "builtinPackCampaignOpsTitle": "Campaign Ops",
-    "builtinPackCampaignOpsDescription": "Fixed-window payback (7/14/30/40-day revenue collection) for customers as they're acquired."
+    "builtinPackCampaignOpsDescription": "Fixed-window payback (7/14/30/40-day revenue collection) for customers as they're acquired.",
+    "lookalikeHeading": "Lookalike Audiences",
+    "lookalikeIntro": "Create a Meta Lookalike Audience seeded from this install's own Custom Audience.",
+    "lookalikeNoSeedAudience": "Sync a segment to this plugin at least once first — a Lookalike Audience needs an existing Custom Audience to expand from.",
+    "lookalikeNameLabel": "Name",
+    "lookalikeCountryLabel": "Country",
+    "lookalikeCountryHint": "Two-letter ISO-3166 country code, e.g. \"US\".",
+    "lookalikeRatioLabel": "Similarity (%)",
+    "lookalikeRatioHint": "1-20% of the target country's population.",
+    "lookalikeCreateButton": "Create Lookalike Audience",
+    "lookalikeCreateError": "Couldn't create the Lookalike Audience. Please try again.",
+    "lookalikeListHeading": "Created Lookalike Audiences",
+    "lookalikeListEmpty": "No Lookalike Audiences created yet.",
+    "lookalikeListItem": "{name} · {ratio}% · {country} · created {createdAt}"
   },
   "Boards": {
     "metaTitle": "Boards",
