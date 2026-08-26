@@ -17,7 +17,48 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — PR #312 open (KAN-106, omnisearch win-rule indexing), renumbered from KAN-105, CI pending
+## 2026-08-26 (latest) — Merged PR #312 (KAN-106, omnisearch win-rule indexing)
+
+- **Last completed:**
+  - Resumed from the extended saga documented in the entry below: PR #312 (KAN-106, omnisearch now
+    indexes win rules alongside boards/metrics/segments/campaigns/goals) was implemented, tested, and
+    open, but GitHub Actions had hung six separate times across this PR and the concurrent PR #311
+    (on `Test`, `Typecheck`, and `Install Playwright browsers` twice more), surviving two self-service
+    `cancel_workflow_run`+`rerun_workflow_run` cycles before self-service was abandoned per policy.
+  - A `check_suite.completed` webhook fired (`subscribe_pr_activity` paid off here — no further manual
+    polling needed once it arrived): the run triggered by the last docs-only push finally completed
+    cleanly on its own — `lint · typecheck · test · build` and `terraform fmt · validate` both
+    `success`, `mergeable_state: clean`, no open review threads. The platform-level hang resolved
+    itself; no human intervention was recorded as having happened, and no code change was needed.
+  - Verified `main`'s freshest `TASKS.md` still had no real `KAN-106` row (the only match was inside
+    PR #311/KAN-105's own row text, referencing this renumbering) — confirming KAN-106 was still safe
+    to use, no further collision. Merged PR #312 (squash). Branch deletion failed with the same
+    recurring, pre-existing HTTP 403 this file has documented since 2026-07-04.
+- **In progress (exact stopping point):** none — KAN-106 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-106 row (now `done`) are the last step.
+- **Blocked + why:** nothing blocking the next code task. The GitHub Actions hang pattern from this
+  and the prior entry has not recurred since — no longer flagged as an active blocker, though worth
+  remembering if it resurfaces (six hangs in one afternoon, on `ubuntu-latest` GitHub-hosted runners,
+  each on a different workflow step, is unusual enough to be worth a human's attention if it becomes a
+  recurring pattern rather than a one-day anomaly).
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pattern for the
+  next candidate, re-checking open PRs and the freshest `main`'s highest KAN number (now 106)
+  immediately before minting a new one.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
+    rows — still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin`.
+  - If the GitHub Actions mid-job hang pattern from this run's own saga (documented in the entry
+    directly below) recurs on a future run, it's worth a human checking Actions runner health/billing
+    directly — it resolved on its own this time, but the root cause was never identified.
+
+---
+
+## 2026-08-26 — PR #312 open (KAN-106, omnisearch win-rule indexing), renumbered from KAN-105, CI pending
 
 - **Last completed:**
   - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
