@@ -31,7 +31,7 @@
     "emptyPrompt": "התחילו להקליד כדי לחפש בפרויקט זה.",
     "loading": "טוען...",
     "noResults": "אין תוצאות עבור \"{query}\".",
-    "resultType": "{type, select, board {לוח} metric {מדד} segment {פלח} campaign {קמפיין} other {תוצאה}}"
+    "resultType": "{type, select, board {לוח} metric {מדד} segment {פלח} campaign {קמפיין} goal {יעד} other {תוצאה}}"
   },
   "Auth": {
     "emailLabel": "אימייל",
