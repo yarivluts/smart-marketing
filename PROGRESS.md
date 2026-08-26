@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (later) — Merged PR #299 (KAN-27 follow-up, org-admin-pushed resource attachment)
+
+- **Last completed:**
+  - Picked up exactly where the previous entry (directly below) left off: PR #299 was open,
+    self-reviewed, and green locally, but blocked on a CI re-run — its own `lint · typecheck · test ·
+    build` check had failed twice in a row on the known Firestore-emulator `RESOURCE_EXHAUSTED` flake
+    in `campaign-ops-pack.emulator.test.ts` (unrelated to this PR's diff, 1442/1443 tests passing both
+    times), and the prior session had already spent its one re-run allowance.
+  - Subscribed to the PR's activity, confirmed the still-red run (`32913903323`) showed the identical
+    flake signature in its job logs, and — since this is a fresh session with its own re-run allowance
+    — triggered `rerun_failed_jobs` on it. Scheduled short self check-ins (`send_later`) rather than
+    polling, since the emulator test suite alone takes ~11-15 minutes.
+  - The re-run came back fully green (`lint · typecheck · test · build` + `terraform fmt · validate`,
+    `mergeable_state: clean`) after ~36 minutes (job started 01:19:28 UTC, completed 01:55:26 UTC —
+    slower than the ~13min a clean run normally takes, but no error, just a slow/contended runner).
+    Merged (squash) into `main`. Branch deletion (`git push origin --delete
+    kan-27-push-resource-attachment`) failed with the same recurring HTTP 403 this sandbox's git
+    remote has rejected repeatedly in this file's history — merged and dead but not deleted; a human
+    with direct repo access can delete `kan-27-push-resource-attachment`.
+  - Updated `TASKS.md`'s KAN-27 row with a "Follow-up delivered" note (same pattern KAN-59/72/73/80/81
+    use for a follow-up on an already-`done` story).
+- **In progress (exact stopping point):** none — KAN-27's org-admin-push follow-up is fully delivered,
+  tested, merged, and this entry + `TASKS.md`'s own KAN-27 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable follow-up"
+  pattern for the next candidate — the only named-but-deferred items left anywhere are PMax asset
+  groups and Lookalike/Similar Audience expansion on KAN-72/73's own rows (both explicitly flagged as
+  needing real design work, not a mechanical buildable-today slice) — a fresh sweep may surface
+  something smaller and more self-contained, same as this run's own KAN-27 pick did.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional: delete the merged `kan-27-push-resource-attachment` branch on GitHub (this sandbox's git
+    remote rejected the delete with a 403).
+
+---
+
 ## 2026-08-26 — Opened PR #299 (KAN-27 follow-up, org-admin-pushed resource attachment); blocked on a CI flake needing a human re-run
 
 - **Last completed:**
