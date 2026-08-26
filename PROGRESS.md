@@ -17,7 +17,46 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — KAN-107: segment live-members admin surface
+## 2026-08-26 (latest) — Merged PR #313 (KAN-107, segment live-members admin surface)
+
+- **Last completed:**
+  - This run was spawned fresh by the hourly `GrowthOS autonomous build` cron trigger while PR #313
+    (KAN-107, opened by the previous run — see entry below) was still waiting on CI. The local clone
+    started as a shallow checkout with a stale cached `main` ref (781108e, ~193 commits behind); this
+    was a shallow-clone artifact, not a real divergence — `git fetch --unshallow` + fast-forwarding
+    local `main` to `origin/main` resolved it immediately, confirmed via `merge-base --is-ancestor`.
+  - Found the previous run had already set up its own one-shot check-in trigger (bound to its own
+    session) for PR #313 at 20:33 UTC. To avoid two sessions racing to merge the same PR, subscribed
+    this session to the PR's activity instead of starting unrelated new work, and waited for the
+    `check_suite.completed` webhook rather than polling.
+  - CI finished at 20:53 UTC: `terraform fmt · validate` and `lint · typecheck · test · build` both
+    `success`, `mergeable_state: clean`, no open review threads. Merged PR #313 (squash) and
+    unsubscribed. Remote branch deletion (`kan-107-segment-members-admin-surface`) failed with the
+    same recurring HTTP 403 this file has documented since 2026-07-04 — not a new issue.
+  - Fast-forwarded local `main` to the merge commit (`18367aa`); confirmed `TASKS.md`'s KAN-107 row
+    already reads `done` (the previous run pre-wrote it).
+- **In progress (exact stopping point):** none — KAN-107 is fully delivered, tested, and merged. This
+  run has not yet picked a new task; deciding whether to do so is the next step below.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. Resume
+  the "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pattern for the
+  next candidate, re-checking open PRs and the freshest `main`'s highest KAN number (now 107)
+  immediately before minting a new one.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
+    rows — still outstanding, unchanged by this run.
+  - The `platform_admin` bootstrap gap flagged in the entry below — still outstanding, needs a human's
+    scoping decision before either dependent candidate (automation kill switch, org-ownership recovery)
+    is buildable.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an HTTP
+    403 from this sandbox's git remote).
+
+---
+
+## 2026-08-26 — KAN-107: segment live-members admin surface (opened)
 
 - **Last completed:**
   - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
