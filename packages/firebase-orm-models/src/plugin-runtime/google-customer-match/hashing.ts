@@ -40,3 +40,23 @@ export function hashPhoneForGoogleCustomerMatch(phone: string): string {
   const normalized = digitsOnly.length > 0 ? `${hasPlus ? '+' : ''}${digitsOnly}` : '';
   return createHash('sha256').update(normalized).digest('hex');
 }
+
+/**
+ * Google Ads' documented Customer Match upload format for a `mobileId` user
+ * identifier (a mobile advertiser id — Android AAID or iOS IDFA): unlike
+ * every other identifier in this file, Google's own "Formatting guidelines
+ * for offline data" spec for `UserIdentifier.mobile_id` says the raw value
+ * is uploaded as-is and must NOT be hashed — a genuine, deliberate
+ * cross-connector difference, not an oversight: Meta's own Custom Audience
+ * `MADID` schema field DOES require a SHA-256 hash (see
+ * `meta-custom-audience/hashing.ts`'s sibling `hashMobileDeviceIdForMetaCustomAudience`),
+ * while Google Ads' `UserIdentifier` proto defines `mobile_id` as a raw
+ * string field, structurally distinct from (not merely an unhashed variant
+ * of) `hashed_email`/`hashed_phone_number`. This function therefore never
+ * calls into `node:crypto` — it only trims and lowercases (a MAID is
+ * case-insensitive) so two differently-cased copies of the same id from
+ * different source systems still match.
+ */
+export function normalizeMobileIdForGoogleCustomerMatch(mobileId: string): string {
+  return mobileId.trim().toLowerCase();
+}

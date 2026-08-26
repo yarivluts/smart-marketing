@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { hashEmailForMetaCustomAudience, hashPhoneForMetaCustomAudience } from './hashing';
+import { hashEmailForMetaCustomAudience, hashMobileDeviceIdForMetaCustomAudience, hashPhoneForMetaCustomAudience } from './hashing';
 
 function sha256Hex(value: string): string {
   return createHash('sha256').update(value).digest('hex');
@@ -32,6 +32,29 @@ describe('hashPhoneForMetaCustomAudience', () => {
 
   it('produces a 64-character lowercase hex digest', () => {
     const hash = hashPhoneForMetaCustomAudience('+14155550100');
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('hashMobileDeviceIdForMetaCustomAudience', () => {
+  it('lowercases and trims the MAID before hashing, keeping internal hyphens', () => {
+    expect(hashMobileDeviceIdForMetaCustomAudience('  38400000-8CF0-11BD-B23E-10B96E4EF00D  ')).toBe(sha256Hex('38400000-8cf0-11bd-b23e-10b96e4ef00d'));
+  });
+
+  it('produces the same hash for MAIDs that only differ by case or surrounding whitespace', () => {
+    expect(hashMobileDeviceIdForMetaCustomAudience('38400000-8cf0-11bd-b23e-10b96e4ef00d')).toBe(
+      hashMobileDeviceIdForMetaCustomAudience('  38400000-8CF0-11BD-B23E-10B96E4EF00D  '),
+    );
+  });
+
+  it('does not strip internal hyphens the way hashPhoneForMetaCustomAudience strips phone punctuation', () => {
+    const withHyphens = hashMobileDeviceIdForMetaCustomAudience('38400000-8cf0-11bd-b23e-10b96e4ef00d');
+    const withoutHyphens = sha256Hex('3840000008cf011bdb23e10b96e4ef00d');
+    expect(withHyphens).not.toBe(withoutHyphens);
+  });
+
+  it('produces a 64-character lowercase hex digest', () => {
+    const hash = hashMobileDeviceIdForMetaCustomAudience('38400000-8cf0-11bd-b23e-10b96e4ef00d');
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
   });
 });

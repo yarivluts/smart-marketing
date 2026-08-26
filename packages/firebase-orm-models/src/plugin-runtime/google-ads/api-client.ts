@@ -53,9 +53,13 @@ export interface GoogleAdsCreateResponsiveSearchAdResult {
 }
 
 /**
- * One contact's already-hashed Customer Match user identifier(s) —
- * `hashedEmail` and/or `hashedPhoneNumber`, mirroring `MetaContactMatchKey`'s
- * shape for the sibling Meta connector. Both, when present, ride the same
+ * One contact's Customer Match user identifier(s) — `hashedEmail` and/or
+ * `hashedPhoneNumber` (both already SHA-256-hashed), and/or `mobileId` (a
+ * mobile advertiser id, deliberately NOT hashed — see
+ * `hashing.ts`'s own `normalizeMobileIdForGoogleCustomerMatch` doc comment
+ * for why this one field breaks the "already-hashed" pattern the other two
+ * establish), mirroring `MetaContactMatchKey`'s shape for the sibling Meta
+ * connector. Any combination, when present, rides the same
  * `userIdentifiers` array on one operation (Google's own docs: multiple
  * identifiers on one `UserData` improve match rate the same way Meta's
  * multi-key schema does).
@@ -63,6 +67,7 @@ export interface GoogleAdsCreateResponsiveSearchAdResult {
 export interface GoogleAdsContactMatchKey {
   hashedEmail?: string;
   hashedPhoneNumber?: string;
+  mobileId?: string;
 }
 
 /**
@@ -97,8 +102,10 @@ export interface GoogleAdsApiClient {
    */
   createCustomerMatchUserList(customerId: string, params: { name: string }): Promise<GoogleAdsCreateCustomerMatchUserListResult>;
   /**
-   * Uploads a batch of already-SHA-256-hashed contact match keys to an
-   * existing Customer Match user list — the Google Ads member-upload flow is
+   * Uploads a batch of contact match keys (email/phone already SHA-256-hashed,
+   * a mobile id deliberately not — see `GoogleAdsContactMatchKey`'s own doc
+   * comment) to an existing Customer Match user list — the Google Ads
+   * member-upload flow is
    * itself three sequential calls (create an `OfflineUserDataJob`, add its
    * member operations, run the job), unlike Meta's single "add hashed
    * contacts" endpoint; this method sequences all three so the executor sees
@@ -388,6 +395,7 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
           userIdentifiers: [
             ...(contact.hashedEmail !== undefined ? [{ hashedEmail: contact.hashedEmail }] : []),
             ...(contact.hashedPhoneNumber !== undefined ? [{ hashedPhoneNumber: contact.hashedPhoneNumber }] : []),
+            ...(contact.mobileId !== undefined ? [{ mobileId: contact.mobileId }] : []),
           ],
         },
       })),

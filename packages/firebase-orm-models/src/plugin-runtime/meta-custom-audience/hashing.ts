@@ -30,3 +30,21 @@ export function hashPhoneForMetaCustomAudience(phone: string): string {
   const digitsOnly = phone.trim().replace(/[^0-9]/g, '');
   return createHash('sha256').update(digitsOnly).digest('hex');
 }
+
+/**
+ * Meta's documented Custom Audience upload format for a `MADID` schema
+ * field (a mobile advertiser id — Android AAID or iOS IDFA, both
+ * UUID-shaped): a lowercase SHA-256 hex digest of it, same
+ * normalize-then-hash shape as `EMAIL` (Meta's own "Hashing and Normalizing
+ * Customer Information" spec). Unlike {@link hashPhoneForMetaCustomAudience},
+ * this does not strip any punctuation — a MAID's internal hyphens are part
+ * of its own format (the standard UUID grouping), not incidental formatting
+ * a source system added the way phone-number punctuation is, so stripping
+ * them would normalize two different-looking-but-identical-once-hyphens-removed
+ * strings that Meta's own spec treats as distinct. Only surrounding
+ * whitespace is trimmed and the value is lowercased before hashing.
+ */
+export function hashMobileDeviceIdForMetaCustomAudience(mobileDeviceId: string): string {
+  const normalized = mobileDeviceId.trim().toLowerCase();
+  return createHash('sha256').update(normalized).digest('hex');
+}

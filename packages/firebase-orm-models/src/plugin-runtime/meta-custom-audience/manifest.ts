@@ -19,17 +19,20 @@ export const META_CUSTOM_AUDIENCE_NAME_CONFIG_FIELD = 'audience_name';
  * established (`crm-sync.service.ts`'s `syncSegmentToCrm`, despite its own
  * CRM-specific name — see that file's own doc comment). `type: action` +
  * `scopes: [action:execute]`, mirroring `CRM_WEBHOOK_PLUGIN_MANIFEST_YAML`'s
- * shape exactly. Email- and phone-based Custom Audiences are both built here
- * (a record's `properties.email`/`properties.phone`, hashed per-connector —
- * see `executor.ts`'s own `extractContactMatchKey`). Lookalike Audience
- * creation from this install's own Custom Audience seed is a separate,
- * one-off action (`crm-sync.service.ts`'s `createMetaLookalikeAudience`,
- * not part of this manifest/executor — a Lookalike expands a seed audience's
- * membership once at creation time, unlike this connector's own repeatable
- * "sync a segment's rows" `push()` lifecycle) — see that function's own doc
- * comment. Mailing-address and mobile-device-id identifiers remain natural,
- * explicitly deferred follow-ups (same "documented, not built" posture
- * KAN-73's own PMax-asset-groups/post-creation-edits bullets already carry).
+ * shape exactly. Email-, phone-, and mobile-device-id-based Custom Audiences
+ * are all built here (a record's `properties.email`/`properties.phone`/
+ * `properties.device_id`, hashed per-connector — see `executor.ts`'s own
+ * `extractContactMatchKey`). Lookalike Audience creation from this install's
+ * own Custom Audience seed is a separate, one-off action
+ * (`crm-sync.service.ts`'s `createMetaLookalikeAudience`, not part of this
+ * manifest/executor — a Lookalike expands a seed audience's membership once
+ * at creation time, unlike this connector's own repeatable "sync a segment's
+ * rows" `push()` lifecycle) — see that function's own doc comment.
+ * Mailing-address remains a natural, explicitly deferred follow-up (same
+ * "documented, not built" posture KAN-73's own PMax-asset-groups/
+ * post-creation-edits bullets already carry) — Meta's own upload schema
+ * needs a different, multi-field shape for it that this connector's
+ * single-string-per-identifier scope doesn't build.
  */
 export const META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML = `
 id: ${META_CUSTOM_AUDIENCE_PLUGIN_ID}

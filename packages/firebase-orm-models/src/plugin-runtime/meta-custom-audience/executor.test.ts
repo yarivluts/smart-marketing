@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MetaAdsApiError, type MetaAdsApiClient } from '../meta-ads';
 import { SinkPluginExecutionError } from '../executor';
 import type { PluginRuntimeCredential } from '../credential';
-import { hashEmailForMetaCustomAudience, hashPhoneForMetaCustomAudience } from './hashing';
+import { hashEmailForMetaCustomAudience, hashMobileDeviceIdForMetaCustomAudience, hashPhoneForMetaCustomAudience } from './hashing';
 import { MetaCustomAudienceSinkPluginExecutor } from './executor';
 
 const CREDENTIAL: PluginRuntimeCredential = {
@@ -59,7 +59,7 @@ describe('MetaCustomAudienceSinkPluginExecutor', () => {
     expect(result).toEqual({ pushed: 1, externalRef: 'audience-existing' });
   });
 
-  it('drops records with no usable email or phone field before hashing anything', async () => {
+  it('drops records with no usable email, phone, or device id field before hashing anything', async () => {
     const apiClient = fakeApiClient({ addContactsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 1 }) });
     const executor = new MetaCustomAudienceSinkPluginExecutor({ apiClient, adAccountId: '999', audienceName: 'Warm leads', existingAudienceId: 'audience-existing' });
 
@@ -70,6 +70,8 @@ describe('MetaCustomAudienceSinkPluginExecutor', () => {
         { properties: { email: 42 } },
         { properties: { phone: '' } },
         { properties: { phone: 42 } },
+        { properties: { device_id: '' } },
+        { properties: { device_id: 42 } },
         { properties: {} },
         { properties: null },
         {},
@@ -97,6 +99,33 @@ describe('MetaCustomAudienceSinkPluginExecutor', () => {
 
     expect(apiClient.addContactsToCustomAudience).toHaveBeenCalledWith('audience-existing', [
       { emailHash: hashEmailForMetaCustomAudience('a@example.com'), phoneHash: hashPhoneForMetaCustomAudience('+14155550100') },
+    ]);
+  });
+
+  it('hashes a device-id-only record and includes it as a madidHash contact key', async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new MetaCustomAudienceSinkPluginExecutor({ apiClient, adAccountId: '999', audienceName: 'Warm leads', existingAudienceId: 'audience-existing' });
+
+    const result = await executor.push(pushParams([{ properties: { device_id: '38400000-8cf0-11bd-b23e-10b96e4ef00d' } }]));
+
+    expect(apiClient.addContactsToCustomAudience).toHaveBeenCalledWith('audience-existing', [
+      { madidHash: hashMobileDeviceIdForMetaCustomAudience('38400000-8cf0-11bd-b23e-10b96e4ef00d') },
+    ]);
+    expect(result).toEqual({ pushed: 1, externalRef: 'audience-existing' });
+  });
+
+  it('hashes email, phone, and device id onto the same contact key when a record has all three', async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new MetaCustomAudienceSinkPluginExecutor({ apiClient, adAccountId: '999', audienceName: 'Warm leads', existingAudienceId: 'audience-existing' });
+
+    await executor.push(pushParams([{ properties: { email: 'a@example.com', phone: '+14155550100', device_id: '38400000-8cf0-11bd-b23e-10b96e4ef00d' } }]));
+
+    expect(apiClient.addContactsToCustomAudience).toHaveBeenCalledWith('audience-existing', [
+      {
+        emailHash: hashEmailForMetaCustomAudience('a@example.com'),
+        phoneHash: hashPhoneForMetaCustomAudience('+14155550100'),
+        madidHash: hashMobileDeviceIdForMetaCustomAudience('38400000-8cf0-11bd-b23e-10b96e4ef00d'),
+      },
     ]);
   });
 
