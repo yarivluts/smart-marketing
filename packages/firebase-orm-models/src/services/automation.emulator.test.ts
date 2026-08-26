@@ -28,6 +28,7 @@ import {
   proposeKeywordEditAction,
   proposeMetaAdCreativeEditAction,
   proposeMetaAdSetEditAction,
+  proposeMetaAdSetTargetingEditAction,
   rejectAutomationAction,
   requestResourceAttachment,
   rollbackAutomationAction,
@@ -1708,6 +1709,206 @@ describe('proposeMetaAdSetEditAction (KAN-73 follow-up)', () => {
     // The simulated executor reports the target's own campaign-level fields as the "previous"
     // values (see `SimulatedAdAccountExecutor.executeMetaAdSetEdit`'s own doc comment).
     expect(executed.before).toEqual({ adSetResourceName, dailyBudgetUsd: 25, adSetStatus: 'paused' });
+
+    const rolledBack = await rollbackAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      reason: 'manual',
+      actorId: owner.id,
+    });
+    expect(rolledBack.status).toBe('rolled_back');
+  });
+});
+
+describe('proposeMetaAdSetTargetingEditAction (KAN-73 follow-up)', () => {
+  /** Seeds a target and executes a `campaign_draft_create` (Meta platform) against it, so `meta_ad_set_resource_names` is populated (via the simulated executor, same posture the `meta_ad_set_edit` block establishes). */
+  async function seedTargetWithCreatedCampaign(organizationId: string, projectId: string, ownerId: string) {
+    const target = await seedTarget(organizationId, projectId, ownerId, 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId,
+      projectId,
+      targetId: target.id,
+      draft: metaCampaignDraft(),
+      requestedByUserId: ownerId,
+    });
+    await approveAutomationAction({ organizationId, projectId, actionId: created.id, approverId: ownerId });
+    await executeAutomationAction({ organizationId, projectId, actionId: created.id, executedByUserId: ownerId });
+    const [reloaded] = await listAutomationTargetStatesForProject(organizationId, projectId);
+    return reloaded;
+  }
+
+  const VALID_TARGETING = { countries: ['US', 'CA'], ageMin: 21, ageMax: 45, genders: ['female' as const] };
+
+  it('proposes a clean ad set targeting edit as awaiting_approval with the dry-run diff', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Set Targeting Edit Clean Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adSetResourceName = target.meta_ad_set_resource_names?.[0] as string;
+
+    const action = await proposeMetaAdSetTargetingEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adSetResourceName,
+      targeting: VALID_TARGETING,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('awaiting_approval');
+    expect(action.action_type).toBe('meta_ad_set_targeting_edit');
+    expect(action.before).toEqual({ adSetResourceName });
+    expect(action.after).toEqual({ adSetResourceName, targeting: VALID_TARGETING });
+    expect(action.guardrail_violations).toEqual([]);
+  });
+
+  it('rejects an invalid targeting spec (age out of range) before touching guardrails', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Set Targeting Edit Invalid Age Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adSetResourceName = target.meta_ad_set_resource_names?.[0] as string;
+
+    await expect(
+      proposeMetaAdSetTargetingEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adSetResourceName,
+        targeting: { countries: ['US'], ageMin: 5, ageMax: 45 },
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('rejects a targeting spec with no countries', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Set Targeting Edit No Countries Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adSetResourceName = target.meta_ad_set_resource_names?.[0] as string;
+
+    await expect(
+      proposeMetaAdSetTargetingEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adSetResourceName,
+        targeting: { countries: [], ageMin: 18, ageMax: 45 },
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it("refuses an ad set resource name that is not one of this target's own ad sets", async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Set Targeting Edit Wrong AdSet Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeMetaAdSetTargetingEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adSetResourceName: 'act_999/adsets/not-this-targets',
+        targeting: VALID_TARGETING,
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('refuses a target with no campaign (and so no ad sets) created yet', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Set Targeting Edit No Campaign Org');
+    const target = await seedTarget(organization.id, project.id, owner.id);
+
+    await expect(
+      proposeMetaAdSetTargetingEditAction({
+        organizationId: organization.id,
+        projectId: project.id,
+        targetId: target.id,
+        adSetResourceName: 'act_999/adsets/1',
+        targeting: VALID_TARGETING,
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidAutomationActionError);
+  });
+
+  it('blocks an ad set targeting edit targeting a protected campaign', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Set Targeting Edit Protected Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adSetResourceName = target.meta_ad_set_resource_names?.[0] as string;
+    await setAutomationGuardrailPolicy({
+      organizationId: organization.id,
+      projectId: project.id,
+      maxDailyBudgetChangePct: null,
+      spendCeilingUsd: null,
+      protectedTargetIds: [target.id],
+      allowedHours: null,
+      maxActionsPerDay: null,
+      maxGuardedMetricRegressionPct: null,
+      setByUserId: owner.id,
+    });
+
+    const action = await proposeMetaAdSetTargetingEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adSetResourceName,
+      targeting: VALID_TARGETING,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual([expect.objectContaining({ type: 'protected_target' })]);
+  });
+
+  it('requires the "manage" write tier specifically — "optimize" is not enough', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Propose Meta Ad Set Targeting Edit Optimize Org');
+    const { target, attachment } = await seedTargetWithConnection(organization.id, project.id, owner.id, 'manage', 0);
+    const created = await proposeCampaignDraftCreateAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      draft: metaCampaignDraft(),
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, approverId: owner.id });
+    await executeAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: created.id, executedByUserId: owner.id });
+    await setResourceAttachmentWriteTier({ organizationId: organization.id, attachmentId: attachment.id, tier: 'optimize', actorId: owner.id });
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+
+    const action = await proposeMetaAdSetTargetingEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adSetResourceName: reloaded.meta_ad_set_resource_names?.[0] as string,
+      targeting: VALID_TARGETING,
+      requestedByUserId: owner.id,
+    });
+
+    expect(action.status).toBe('blocked');
+    expect(action.guardrail_violations).toEqual(expect.arrayContaining([expect.objectContaining({ type: 'insufficient_write_tier' })]));
+  });
+
+  it('executes an ad set targeting edit end to end, widening the diff with the real pre-edit spec, then rolls it back', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Ad Set Targeting Edit Lifecycle Org');
+    const target = await seedTargetWithCreatedCampaign(organization.id, project.id, owner.id);
+    const adSetResourceName = target.meta_ad_set_resource_names?.[0] as string;
+
+    const proposed = await proposeMetaAdSetTargetingEditAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: target.id,
+      adSetResourceName,
+      targeting: VALID_TARGETING,
+      requestedByUserId: owner.id,
+    });
+    await approveAutomationAction({ organizationId: organization.id, projectId: project.id, actionId: proposed.id, approverId: owner.id });
+    const executed = await executeAutomationAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      actionId: proposed.id,
+      executedByUserId: owner.id,
+    });
+
+    expect(executed.status).toBe('executed');
+    // The simulated executor reports a fixed plausible "previous" targeting spec (see
+    // `SimulatedAdAccountExecutor.executeMetaAdSetTargetingEdit`'s own doc comment).
+    expect(executed.before).toEqual({ adSetResourceName, targeting: { countries: ['US'], ageMin: 18, ageMax: 65 } });
 
     const rolledBack = await rollbackAutomationAction({
       organizationId: organization.id,

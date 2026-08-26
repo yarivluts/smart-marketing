@@ -16,6 +16,7 @@ import {
   GoogleAdsBudgetResourceUnknownError,
   GoogleAdsMetaAdCreativeEditNotSupportedError,
   GoogleAdsMetaAdSetEditNotSupportedError,
+  GoogleAdsMetaAdSetTargetingEditNotSupportedError,
   GoogleAdsWrongPlatformCampaignDraftError,
 } from './executor';
 
@@ -462,6 +463,38 @@ describe('GoogleAdsAutomationActionExecutor', () => {
         adSetResourceName: 'irrelevant',
       }),
     ).rejects.toBeInstanceOf(GoogleAdsMetaAdSetEditNotSupportedError);
+  });
+
+  it('throws GoogleAdsMetaAdSetTargetingEditNotSupportedError for executeMetaAdSetTargetingEdit — Google Ads has no ad-set concept (KAN-73 follow-up)', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await expect(
+      executor.executeMetaAdSetTargetingEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adSetResourceName: 'irrelevant',
+        targeting: { countries: ['US'], ageMin: 18, ageMax: 45 },
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsMetaAdSetTargetingEditNotSupportedError);
+  });
+
+  it('throws GoogleAdsMetaAdSetTargetingEditNotSupportedError for rollbackMetaAdSetTargetingEdit', async () => {
+    const apiClient = fakeApiClient();
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    await expect(
+      executor.rollbackMetaAdSetTargetingEdit({
+        organizationId: 'org-1',
+        projectId: 'project-1',
+        environmentId: 'live',
+        targetId: 'target-1',
+        adSetResourceName: 'irrelevant',
+        previousTargeting: { countries: ['US'], ageMin: 18, ageMax: 45 },
+      }),
+    ).rejects.toBeInstanceOf(GoogleAdsMetaAdSetTargetingEditNotSupportedError);
   });
 
   it('throws GoogleAdsMetaAdCreativeEditNotSupportedError for executeMetaAdCreativeEdit — Google Ads has no mutable creative concept (KAN-73 follow-up)', async () => {
