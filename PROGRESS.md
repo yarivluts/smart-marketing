@@ -17,7 +17,71 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #302 (KAN-96, board-tile batched query reads)
+## 2026-08-26 (latest) — Merged PR #305 (KAN-99, omnisearch indexes goals)
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). `list_pull_requests` showed zero open
+    PRs, so no concurrent-session collision to route around this time. Local `main` was ~150 commits
+    stale (the shallow-clone-snapshot quirk this file's history repeatedly documents) — reset to
+    `origin/main` before branching (no unique local commits existed to lose).
+  - Delegated a scoping sweep (subagent) for a genuine, unclaimed, buildable-today follow-up per this
+    repo's established "sweep every `done` row's own doc comments" pattern. It surfaced
+    `packages/shared/src/omnisearch/types.ts`'s own doc comment, which names the omnisearch index's
+    inclusion rule verbatim: entities with "a project-scoped 'list everything' query and a stable
+    browse destination." Boards/metrics/segments/campaigns satisfy it and are indexed; goals
+    (`listGoalsForProject`, stable since KAN-64, with both a list page and a per-goal detail page)
+    satisfy the identical criterion but were simply never added — unlike customers, which the same
+    comment explicitly and deliberately excludes pending a real customer-profile page. Confirmed
+    genuinely buildable today: no infra, no credentials, no product decision, every seam additive.
+  - **Delivered (PR #305, branch `kan-99-omnisearch-goals`, filed as KAN-99):** `goal` added to
+    `OMNI_SEARCH_RESULT_TYPES`; `buildOmniSearchIndexForProject` (`apps/web/lib/orgs/omnisearch.ts`)
+    fetches a project's goals (gated on `dashboards.write`, reusing the exact permission segments
+    already use) and pushes each as a search result linking to its own `/goals/[goalId]` detail page
+    — the boards pattern, since goals (unlike metrics/segments) have a real per-item destination.
+    The omnisearch route wires `canSearchGoals: canManageBoards`; the Cmd/Ctrl-K palette
+    (`omni-search.tsx`) gained a `Target` icon and en/he `resultType` ICU branches for the new kind.
+  - Full local verification before opening the PR caught a real bug in the new tests themselves: the
+    first full `pnpm test` run failed `omnisearch.test.ts`'s pre-existing "excludes superseded metric
+    definition versions" case with `TypeError: goals is not iterable` — that test never mocked the
+    new `listGoalsForProject` call, so it resolved to `undefined` (not a promise callers can await
+    into an array) and the `for...of` over it crashed. Fixed by mocking it to `[]` like every other
+    list in that test, then re-ran the full suite from scratch.
+  - The second full run hit one unrelated failure: `onboarding/pack/route.test.ts`'s
+    `installing "saas_marketing" provisions the pack's starter boards` timed out at 60000ms under
+    the same shared-emulator resource contention this repo's history repeatedly documents (a file
+    this PR's diff never touches). Re-ran that one file alone against a fresh emulator instance —
+    passed 6/6 clean — confirming the flake and that it wasn't a regression, per this repo's
+    established one-re-run-then-proceed convention for this exact failure class.
+  - Full local verification: `pnpm build`/`pnpm lint`/`pnpm typecheck` green monorepo-wide; `pnpm
+    test` green end to end (`web` 1640/1640 unit + emulator on the clean re-run; `shared`,
+    `firebase-orm-models`, `api`, `dbt-transform` all unaffected by this diff and passed on every
+    run). Opened PR #305, watched it via `subscribe_pr_activity`; CI (`lint · typecheck · test ·
+    build`, `terraform fmt · validate`) came back green on the first run with no open review
+    threads or conflicts — merged squash into `main`. Remote branch deletion
+    (`kan-99-omnisearch-goals`) failed with the same recurring HTTP 403 this sandbox's git remote has
+    rejected throughout this file's history — merged and dead but not deleted.
+- **In progress (exact stopping point):** none — KAN-99 is fully delivered, tested, merged, and this
+  entry + `TASKS.md`'s own KAN-99 row are the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items. A
+  future run should re-check `list_pull_requests` first, then resume the "sweep every `done` row's
+  own doc comments for a fresh follow-up" pattern — e.g. the sweep's own runner-up candidate (a
+  smarter, trend-fitted pace projection for `minimize`/`range` goals, replacing the `goal-progress.ts`
+  doc comment's own documented "v1 just projects the current value forward unchanged"
+  simplification) is a reasonable next pick, medium-sized.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows
+    — still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (this session's own
+    `kan-99-omnisearch-goals` included) — this session's git/GitHub tooling can't delete remote refs.
+
+---
+
+## 2026-08-26 — Merged PR #302 (KAN-96, board-tile batched query reads)
 
 - **Last completed:**
   - Session start: read `PROGRESS.md`/`TASKS.md` — every row KAN-17..KAN-94 `done` except the standing

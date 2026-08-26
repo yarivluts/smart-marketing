@@ -12,13 +12,13 @@ interface RouteParams {
 
 /**
  * The KAN-85 global omnisearch index for one project — boards, active metric
- * definitions, segments, and automation campaign targets. Unlike most
+ * definitions, segments, automation campaign targets, and goals. Unlike most
  * project-admin GET routes (which gate the whole endpoint on one permission),
  * this one degrades per result type instead of blanket-denying: any active
  * org member can call it, and each type is included only if the caller holds
  * the exact permission its own destination page already gates on in
  * `ProjectLayout` (`dashboards.read`/`dashboards.write` for boards,
- * `metrics.write` for metrics, `dashboards.write` for segments,
+ * `metrics.write` for metrics, `dashboards.write` for segments and goals,
  * `automation.execute` for campaigns) — so a search result never links
  * somewhere the caller couldn't otherwise reach via the nav, but a `viewer`
  * still gets a working (if narrower) search instead of a 403.
@@ -52,6 +52,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
       canSearchMetrics: can(bindings, principal, 'metrics.write', { orgId }),
       canSearchSegments: canManageBoards,
       canSearchCampaigns: can(bindings, principal, 'automation.execute', { orgId }),
+      canSearchGoals: canManageBoards,
     });
     return NextResponse.json({ items });
   } catch (err) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, LayoutGrid, Megaphone, Search, Users } from 'lucide-react';
+import { BarChart3, LayoutGrid, Megaphone, Search, Target, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { searchOmniSearchItems, type OmniSearchItem, type OmniSearchResultType } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
@@ -12,6 +12,7 @@ const RESULT_ICONS: Record<OmniSearchResultType, typeof Search> = {
   metric: BarChart3,
   segment: Users,
   campaign: Megaphone,
+  goal: Target,
 };
 
 interface OmniSearchTriggerProps {
@@ -21,7 +22,7 @@ interface OmniSearchTriggerProps {
 
 /**
  * KAN-85 global omnisearch: a Cmd/Ctrl-K palette jumping to a project's
- * boards, metrics, segments, and campaigns. The index is fetched lazily on
+ * boards, metrics, segments, campaigns, and goals. The index is fetched lazily on
  * first open (not on every page load — see `omnisearch.ts`'s own doc
  * comment for why an eager per-page-load fetch would be too heavy) and then
  * ranked entirely client-side via the shared `searchOmniSearchItems`
