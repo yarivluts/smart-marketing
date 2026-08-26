@@ -41,15 +41,14 @@ export async function generateMetadata({ params }: PageProps) {
  * registered event schema, browse its recent records" — this page just
  * links to it rather than duplicating that machinery.
  *
- * The AC's "paying_no_demo-style work list" is deliberately not built here:
- * KAN-76/KAN-81's saved-segment engine (`segment.service.ts`) only ever
- * filters one *entity* schema's own fields, with no cross-schema join or
- * negation — expressing "paying AND no demo" would need either a
- * denormalized demo-status field on a paying-customer entity (no connector
- * populates one yet) or a segment-engine cross-schema join feature, both
- * out of this slice's scope. Once a project's customer entity carries such
- * a field, a human can already build that exact list with the existing
- * Segments page — no code change needed here.
+ * The AC's "paying_no_demo-style work list" no longer needs a denormalized
+ * field or a connector change to build: KAN-93 (after this page's own doc
+ * comment named the gap) added cross-schema `event_conditions` to the
+ * segment engine, and KAN-103 wired the plan's own curated "paying, no
+ * demo" example into the Segments page's AI-suggested-lists panel, so a
+ * human can build that exact list there in one click (once Stripe's
+ * `stripe_subscription` schema is also registered) — see the link below,
+ * shown only to a caller who can already reach the Segments page.
  *
  * A real calendar/CRM connector (Calendly, HubSpot, Salesforce) is
  * deferred — needs a human-provisioned API key, same posture Stripe/GA4/
@@ -97,6 +96,7 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   const [funnelResult, people] = await Promise.all([getDemoFunnelForProject(orgId, projectId), listOrgPeople(orgId)]);
   const peopleById = new Map(people.map((person) => [person.id, { name: person.name, photoUrl: person.photo_url ?? null }]));
   const funnel = toDemoFunnelView(funnelResult, peopleById);
+  const canManageDashboards = can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId });
 
   const formatShowRate = (rate: number | null): string => (rate === null ? t('rowValueUnavailable') : t('showRateValue', { value: Math.round(rate * 100) }));
 
@@ -156,6 +156,15 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
           {t('recentDemosLinkLabel')}
         </Link>
       </p>
+
+      {canManageDashboards ? (
+        <p className="text-sm text-muted-foreground">
+          {t('workListIntro')}{' '}
+          <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments` }} className="underline">
+            {t('workListLinkLabel')}
+          </Link>
+        </p>
+      ) : null}
     </main>
   );
 }

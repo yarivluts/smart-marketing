@@ -125,6 +125,34 @@ describe('CreateSegmentForm', () => {
     expect(screen.getByLabelText('Name')).toHaveValue('My own name');
   });
 
+  it('applies a curated suggestion’s event conditions alongside its filters (KAN-103)', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        suggestions: [
+          {
+            name: 'Paying customers with no demo',
+            filters: [{ field: 'status', op: '=', value: 'active' }],
+            confidence: 1,
+            eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+          },
+        ],
+      }),
+    } as Response);
+    renderForm(['demo_event']);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
+    await screen.findByText('Paying customers with no demo (100% match)');
+    fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
+
+    expect(screen.getByLabelText('Name')).toHaveValue('Paying customers with no demo');
+    expect(screen.getByLabelText('Field')).toHaveValue('status');
+    expect(screen.getByLabelText('Value')).toHaveValue('active');
+    expect(screen.getByLabelText('Event')).toHaveValue('demo_event');
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+  });
+
   it('does not render the event conditions section when no event schemas are registered', () => {
     renderForm([]);
     expect(screen.queryByText('Event conditions')).not.toBeInTheDocument();

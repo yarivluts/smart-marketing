@@ -706,7 +706,9 @@
     "repBreakdownEmpty": "No held or no-show demos landed for this project yet.",
     "repRowSummary": "{held} held · {noShow} no-show · {showRate} show rate",
     "recentDemosIntro": "Browse individual demo records:",
-    "recentDemosLinkLabel": "recent demos"
+    "recentDemosLinkLabel": "recent demos",
+    "workListIntro": "Want to find paying customers who never got a demo?",
+    "workListLinkLabel": "Build that list on the Segments page"
   },
   "ChurnReasons": {
     "metaTitle": "Churn reasons",

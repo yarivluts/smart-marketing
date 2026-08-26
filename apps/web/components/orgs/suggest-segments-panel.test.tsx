@@ -71,6 +71,35 @@ describe('SuggestSegmentsPanel', () => {
     });
   });
 
+  it('applies a curated suggestion’s cross-schema event conditions too (KAN-103)', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        suggestions: [
+          {
+            name: 'Paying customers with no demo',
+            filters: [{ field: 'status', op: '=', value: 'active' }],
+            confidence: 1,
+            eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+          },
+        ],
+      }),
+    } as Response);
+    const onApplySuggestion = renderPanel();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest segments' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Suggest' }));
+    await screen.findByText('Paying customers with no demo (100% match)');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use this' }));
+
+    expect(onApplySuggestion).toHaveBeenCalledWith({
+      name: 'Paying customers with no demo',
+      filters: [{ field: 'status', op: '=', value: 'active' }],
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event', withinDays: '', filters: [] }],
+    });
+  });
+
   it('shows a message when there are no confident suggestions', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ suggestions: [] }) } as Response);
     renderPanel();
