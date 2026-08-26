@@ -83,10 +83,21 @@ Template for each entry:
     was even *created* for this PR, not merely stuck queued. Posted a status comment on PR #311 naming
     this explicitly (with the local-verification summary) rather than merging without a CI result, per
     this repo's own established convention.
+  - **KAN number collision found post-push**: a concurrent session opened PR #312 (branch
+    `kan-105-omnisearch-win-rules`, "index win rules alongside boards/metrics/segments/campaigns/goals")
+    22 seconds after this PR, also numbered KAN-105 — same collision class as the KAN-99/KAN-100
+    incident (`TASKS.md`'s own KAN-100 row tells that story). Both PRs are based on the same `main`
+    commit (`ae7f8be`) and both are equally CI-stalled. Per that prior incident's own resolution,
+    whichever of the two PRs **merges second** should renumber to the next free KAN number (checking
+    a freshly-pulled `main`'s `TASKS.md` immediately before renumbering, in case a third collision has
+    landed by then too) — every in-repo reference (branch name is cosmetic and doesn't need renaming,
+    but the PR title, `TASKS.md`/`PROGRESS.md` rows, and doc-comment/test-description mentions of
+    "KAN-105" do).
 - **In progress (exact stopping point):** PR #311 (KAN-105) is open, fully implemented, tested, and
   self-reviewed — `mergeable_state: clean`, no open review threads. Waiting on CI to actually start.
   Nothing else to do on this story until CI produces a real result (or the runner backlog visibly
-  clears and a re-check shows a fresh run in progress).
+  clears and a re-check shows a fresh run in progress). PR #312 (also KAN-105, a different story) is
+  in the identical state — see the collision note above.
 - **Blocked + why:** CI infrastructure appears stalled repo-wide (not just for this PR) — a `main`-push
   run from earlier the same day is still `queued` with no progress, and no new run has started for
   PR #311 despite `ci.yml`'s `pull_request: branches: [main]` trigger being configured correctly (same
@@ -94,12 +105,14 @@ Template for each entry:
   can fix directly — it needs either the runner backlog to clear on its own or a human to look at the
   Actions tab / re-trigger a run.
 - **Next step:** a future run (or this session resumed later) should re-check
-  `mcp__github__pull_request_read` (`get_check_runs`/`get_status`) and `actions_list` on PR #311 first.
-  If a run has since started and gone green, merge (squash) into `main`, delete the branch, and update
-  `TASKS.md`'s new KAN-105 row + this file per the usual pattern. If CI is still stuck with zero runs
-  after a much longer wait, that's worth flagging to a human as a standing infra issue (broader than
-  the "single PR stuck in-progress" pattern this file has documented before) rather than continuing to
-  poll indefinitely.
+  `mcp__github__pull_request_read` (`get_check_runs`/`get_status`) and `actions_list` on PR #311 first,
+  and also check whether PR #312 (the KAN-105 collision) has merged in the meantime — if it has, this
+  PR's own "KAN-105" needs renumbering to the next free number before merging (per the collision note
+  above). Once CI has produced a real result: if green, merge (squash) into `main`, delete the branch,
+  and update `TASKS.md`'s new KAN row + this file per the usual pattern. If CI is still stuck with zero
+  runs after a much longer wait, that's worth flagging to a human as a standing infra issue (broader
+  than the "single PR stuck in-progress" pattern this file has documented before) rather than
+  continuing to poll indefinitely.
 - **Waiting on human:**
   - **CI infra** — new: no CI run has started for PR #311 at all (not merely a slow/stuck one); if this
     persists, a human with direct GitHub Actions access should check whether the runner pool itself is
