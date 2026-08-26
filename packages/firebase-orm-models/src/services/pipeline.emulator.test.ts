@@ -16,6 +16,7 @@ import {
   listRawRecordsForBatch,
   listRecentBillingEventsForProject,
   listRecentChurnedSubscriptionsForProject,
+  listRecentDunningSubscriptionsForProject,
   listRecentRecordsForSchemas,
   ProjectNotFoundError,
   RawRecordModel,
@@ -908,5 +909,96 @@ describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
     const { project: projectB } = await setupProject('Churn Feed Org B');
 
     await expect(listRecentChurnedSubscriptionsForProject(orgA.id, projectB.id)).rejects.toBeInstanceOf(ProjectNotFoundError);
+  });
+});
+
+describe('listRecentDunningSubscriptionsForProject (KAN-94 dunning feed)', () => {
+  it('surfaces only subscriptions in dunning (past_due/unpaid), newest first, folded across every environment', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Dunning Feed Org');
+
+    // Healthy, active subscription -- no dunning signal, must never show up in the feed.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'stripe_subscription',
+      kind: 'entity',
+      landedAt: '2026-08-22T09:00:00.000Z',
+      payload: { id: 'cus_active', attributes: { customer_id: 'cus_active', status: 'active', currency: 'usd', mrr_normalized: 4900 } },
+    });
+    // Retries still in progress.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      schemaName: 'stripe_subscription',
+      kind: 'entity',
+      landedAt: '2026-08-22T10:00:00.000Z',
+      payload: { id: 'cus_past_due', attributes: { customer_id: 'cus_past_due', status: 'past_due', currency: 'usd', mrr_normalized: 2900 } },
+    });
+    // Retries exhausted, no automatic collection.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'stripe_subscription',
+      kind: 'entity',
+      landedAt: '2026-08-22T11:00:00.000Z',
+      payload: { id: 'cus_unpaid', attributes: { customer_id: 'cus_unpaid', status: 'unpaid', currency: 'usd', mrr_normalized: 1900 } },
+    });
+    // Already canceled -- a terminal status, not a dunning one, must never show up in this feed either.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'stripe_subscription',
+      kind: 'entity',
+      landedAt: '2026-08-22T12:00:00.000Z',
+      payload: { id: 'cus_canceled', attributes: { customer_id: 'cus_canceled', status: 'canceled', currency: 'usd', mrr_normalized: 0 } },
+    });
+    // A non-subscription entity must never show up in the feed either.
+    await landRawRecord({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      schemaName: 'crm_account',
+      kind: 'entity',
+      landedAt: '2026-08-22T13:00:00.000Z',
+      payload: { id: 'acct_1', attributes: { status: 'past_due' } },
+    });
+
+    const entries = await listRecentDunningSubscriptionsForProject(organization.id, project.id);
+
+    expect(entries.map((entry) => (entry.payload.attributes as Record<string, unknown>).customer_id)).toEqual(['cus_unpaid', 'cus_past_due']);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id, devEnvironment.id]);
+  });
+
+  it('bounds the merged, filtered result to `limit`', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Dunning Feed Cap Org');
+
+    for (let i = 0; i < 5; i += 1) {
+      await landRawRecord({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: prodEnvironment.id,
+        schemaName: 'stripe_subscription',
+        kind: 'entity',
+        landedAt: `2026-08-22T10:0${i}:00.000Z`,
+        payload: { id: `cus_${i}`, attributes: { customer_id: `cus_${i}`, status: 'past_due' } },
+      });
+    }
+
+    const entries = await listRecentDunningSubscriptionsForProject(organization.id, project.id, 3);
+
+    expect(entries).toHaveLength(3);
+    expect((entries[0].payload.attributes as Record<string, unknown>).customer_id).toBe('cus_4');
+    expect((entries[2].payload.attributes as Record<string, unknown>).customer_id).toBe('cus_2');
+  });
+
+  it('throws ProjectNotFoundError for a project id that does not belong to the given org', async () => {
+    const { organization: orgA } = await setupProject('Dunning Feed Org A');
+    const { project: projectB } = await setupProject('Dunning Feed Org B');
+
+    await expect(listRecentDunningSubscriptionsForProject(orgA.id, projectB.id)).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 });

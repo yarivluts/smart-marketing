@@ -607,7 +607,14 @@
     "mrrLine": "{amount} {currency} MRR",
     "canceledAtLine": "Canceled {canceledAt}",
     "cancelAtPeriodEndLine": "Scheduled to cancel at period end ({currentPeriodEnd})",
-    "churnCapNote": "Showing the {count} most recent churned or at-risk subscriptions."
+    "churnCapNote": "Showing the {count} most recent churned or at-risk subscriptions.",
+    "dunningUnknownCustomer": "Unknown customer",
+    "dunningHeading": "Subscriptions in dunning",
+    "dunningEmpty": "No subscriptions in dunning for this project yet.",
+    "statusPastDue": "Past due",
+    "statusUnpaid": "Unpaid",
+    "statusUnknown": "Unknown status",
+    "dunningCapNote": "Showing the {count} most recent subscriptions in dunning."
   },
   "RecordFeed": {
     "metaTitle": "Record feed",

@@ -440,6 +440,47 @@ export async function listRecentChurnedSubscriptionsForProject(
   return candidates.filter((record) => isChurnSignal(record)).slice(0, limit);
 }
 
+/** Same load-bounding reasoning as `DEFAULT_CHURN_FEED_LIMIT`. */
+export const DEFAULT_DUNNING_FEED_LIMIT = 100;
+
+/**
+ * A subscription entity record counts as a dunning signal once Stripe's own dunning/retry cycle is
+ * underway for it: `past_due` (still retrying the customer's card) or `unpaid` (retries exhausted, no
+ * automatic collection) — see `STRIPE_SUBSCRIPTION_STATUSES`. Closes the gap `listRecentBillingEventsForProject`'s
+ * own doc comment (KAN-80) and the billing-ops-feed page (KAN-81) both flagged as deliberately out of
+ * scope: "no subscription-lifecycle/dunning model exists yet." Distinct from, and not mutually
+ * exclusive with, `isChurnSignal`: a `past_due` subscription hasn't necessarily been canceled or
+ * scheduled to cancel yet, and a subscription's terminal `canceled` status is neither `past_due` nor
+ * `unpaid`, so the two feeds' membership only overlaps for the rare snapshot landed mid-transition.
+ */
+function isDunningSignal(record: RawRecordModel): boolean {
+  const fields = declaredFieldsForRecord(record);
+  return fields.status === 'past_due' || fields.status === 'unpaid';
+}
+
+/**
+ * The most recently landed Stripe subscriptions currently in dunning (KAN-94) — newest first, folded
+ * across every environment. Same `CHURN_FEED_ENTITY_SCHEMA_NAMES`/candidate-window/fold-across-
+ * environments posture as `listRecentChurnedSubscriptionsForProject`: a dunning subscription is just a
+ * different predicate over the same landed `stripe_subscription` snapshots, so it reuses that
+ * function's own over-fetch-before-filter reasoning rather than duplicating it.
+ */
+export async function listRecentDunningSubscriptionsForProject(
+  organizationId: string,
+  projectId: string,
+  limit: number = DEFAULT_DUNNING_FEED_LIMIT,
+): Promise<RawRecordModel[]> {
+  const candidates = await listRecentRecordsForSchemas({
+    organizationId,
+    projectId,
+    kind: 'entity',
+    schemaNames: CHURN_FEED_ENTITY_SCHEMA_NAMES,
+    limit: Math.max(limit, CHURN_FEED_CANDIDATE_WINDOW),
+  });
+
+  return candidates.filter((record) => isDunningSignal(record)).slice(0, limit);
+}
+
 /**
  * Every message still `queued` across a whole project (every environment folded together) — the
  * project-wide admin-visibility counterpart to `drainPendingPipelineMessages`'s single-environment
