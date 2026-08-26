@@ -17,6 +17,75 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — Merged PR #308 (KAN-102, Meta Lookalike Audience creation)
+
+- **Last completed:**
+  - Re-checked `list_pull_requests` before picking (per the prior run's own "re-check TASKS.md on a
+    freshly-pulled `main` immediately before minting a new KAN number" advice): PR #307
+    (`kan-101-goal-trend-projection`) was open from a concurrent session, so skipped KAN-101 and
+    swept for a different candidate.
+  - Grepped the codebase for `deliberately (not|out of scope|deferred)`/`not yet built` doc-comment
+    markers. `meta-custom-audience/manifest.ts`'s own doc comment named a concrete, still-open gap:
+    Lookalike Audience creation from an already-created Meta Custom Audience seed — the one half of
+    plan `13 §E21.3`'s "Custom/Lookalike audience creation" bullet KAN-73's own follow-up (Custom
+    Audiences themselves) had left explicitly deferred.
+  - Implemented **KAN-102**: `MetaAdsApiClient.createLookalikeAudience` (+ real
+    `MetaAdsHttpApiClient` implementation — `POST act_{adAccountId}/customaudiences`,
+    `subtype: LOOKALIKE`, `origin_audience_id`, `lookalike_spec`); `crm-sync.service.ts`'s new
+    `createMetaLookalikeAudience` (seeded from a `META_CUSTOM_AUDIENCE_PLUGIN_ID` install's own
+    `sink_external_ref`, up-front name/ISO-3166-country/ratio validation,
+    `MetaLookalikeSeedAudienceNotReadyError` if the install has never synced); a new
+    `MetaLookalikeAudienceModel` (project-scoped creation log); `POST
+    .../plugins/[installId]/lookalike-audiences` route gated on `plugin.install`; a new
+    `MetaLookalikeAudienceControls` admin section on the project Plugins page; en/he translations.
+  - Full test coverage added: `api-client.test.ts` (2 new cases), a new `meta-lookalike.emulator.test.ts`
+    (10 cases), a new route test suite (9 cases), a new KAN-26 isolation-test scenario (no exemption
+    needed — the route already gates on `requireOrgPermission`), a new component test suite (5
+    cases), plus `plugin-view.test.ts`/`plugin-install-list.test.tsx` extended for the new
+    `PluginInstallView.sinkExternalRef` field this story needed to gate the UI on.
+  - `pnpm lint`/`pnpm typecheck`/`pnpm build` all green monorepo-wide, verified locally before
+    opening the PR. A full local `pnpm test` run was attempted twice but hit this sandbox's own
+    600s/900s Bash background-task ceiling before finishing (this repo's full suite — Firestore
+    emulator across every package + sharded Playwright e2e for `apps/web` — routinely runs 10+
+    minutes, as prior entries note); every new/changed test file was instead verified green
+    individually via scoped `firebase emulators:exec ... vitest run <file>` invocations, and the full
+    suite was left to CI as the authoritative gate before merge.
+  - Opened PR #308 (branch `kan-102-meta-lookalike-audience`), subscribed to its activity, and
+    scheduled two check-ins (12 min, then 15 min) rather than polling continuously — CI's `Test` step
+    alone took ~37 minutes this run (lint/typecheck were fast; the full monorepo test suite is the
+    long pole). CI came back fully green (`lint · typecheck · test · build` + `terraform fmt ·
+    validate`), `mergeable_state: clean`, no open review threads. Merged (squash) into `main`.
+  - Local `main` fast-forwarded to the merge commit (`0329642`). While this run was in flight, a
+    concurrent session independently opened PR #309 (KAN-103) — no numbering collision since it used
+    the next number after mine, confirmed by re-checking `TASKS.md` on the freshly-pulled `main`
+    before writing this entry (no existing KAN-101/102/103 rows yet from other sessions).
+  - Remote branch deletion (`git push origin --delete kan-102-meta-lookalike-audience`) failed with
+    the same well-documented HTTP 403 from this sandbox's git remote prior entries repeatedly note
+    (not a GitHub permissions issue) — merged and dead but not deleted; a human with direct repo
+    access can delete it, or a future run can retry.
+- **In progress (exact stopping point):** none — KAN-102 is fully delivered, tested (CI-verified),
+  and merged. This entry is the last step.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items, plus
+  whatever KAN-101 (PR #307, concurrent session) and KAN-103 (PR #309, concurrent session) land as.
+  Resume the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable
+  follow-up" pattern for the next candidate — re-check `list_pull_requests` and a freshly-pulled
+  `main`'s `TASKS.md` immediately before minting a new KAN number. One real gap surfaced but
+  deliberately left untouched this run: the Google Ads side of "Lookalike/Similar Audience expansion"
+  (KAN-72/73's own long-standing deferred note) — not buildable, since Google deprecated its
+  "Similar Audiences" feature in 2023 and Customer Match has no Lookalike-equivalent API; that half
+  of the note should be read as permanently out of scope, not merely unbuilt, so a future sweep
+  shouldn't re-flag it.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows
+    — still outstanding, unchanged by this run.
+  - Optional: delete the merged `kan-102-meta-lookalike-audience` branch on GitHub (this sandbox's
+    git remote rejected the delete with a 403).
+
+---
+
 ## 2026-08-26 (latest) — Opened PR #309 (KAN-103, curated "paying, no demo" segment suggestion); waiting on CI
 
 - **Last completed:**
