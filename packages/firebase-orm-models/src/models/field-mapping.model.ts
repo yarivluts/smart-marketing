@@ -54,10 +54,15 @@ export class FieldMappingModel extends BaseModel {
   @Field({ is_required: true })
   public created_at!: string;
 
-  /** Presence alone means the mapping is retired — the same immediate-revocation posture `HookEndpointModel.disabled_at`/`ApiKeyModel.revoked_at` establish. */
+  /**
+   * Presence alone means the mapping is retired — the same immediate-revocation posture
+   * `HookEndpointModel.disabled_at`/`ApiKeyModel.revoked_at` establish. `enableFieldMapping` clears
+   * this back to `null` (never `undefined`) to resume applying it — see
+   * `HookEndpointModel.disabled_at`'s own doc comment for why `null` is required here, not `undefined`.
+   */
   @Field()
-  public disabled_at?: string;
+  public disabled_at?: string | null;
 
   @Field()
-  public disabled_by?: string;
+  public disabled_by?: string | null;
 }

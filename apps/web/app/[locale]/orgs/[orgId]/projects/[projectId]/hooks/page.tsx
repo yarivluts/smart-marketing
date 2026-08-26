@@ -9,6 +9,7 @@ import { hookApiUrl } from '@/lib/orgs/hook-api-url';
 import { hookDeliveryStatusLabelKey, hookSignatureModeLabelKey } from '@/lib/orgs/hook-view';
 import { CreateHookEndpointForm } from '@/components/orgs/create-hook-endpoint-form';
 import { DisableHookEndpointButton } from '@/components/orgs/disable-hook-endpoint-button';
+import { EnableHookEndpointButton } from '@/components/orgs/enable-hook-endpoint-button';
 import { SetHookSigningSecretForm } from '@/components/orgs/set-hook-signing-secret-form';
 import { HookReceiveUrl } from '@/components/orgs/hook-receive-url';
 import { HookDeliveryStatusButtons } from '@/components/orgs/hook-delivery-status-buttons';
@@ -90,7 +91,9 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
                     </div>
                     {!endpoint.disabled_at ? (
                       <DisableHookEndpointButton orgId={orgId} projectId={projectId} hookEndpointId={endpoint.id} />
-                    ) : null}
+                    ) : (
+                      <EnableHookEndpointButton orgId={orgId} projectId={projectId} hookEndpointId={endpoint.id} />
+                    )}
                   </div>
                   {!endpoint.disabled_at ? <HookReceiveUrl hookApiBaseUrl={hookApiBaseUrl} hookId={endpoint.hook_id} /> : null}
                   {!endpoint.disabled_at && endpoint.signature_mode === 'hmac_sha256' ? (
