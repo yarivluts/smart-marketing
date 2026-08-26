@@ -1,18 +1,20 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
-import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
+import { activeSchemaNamesForKind, buildActiveSchemaDefsByKindAndName } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   countSegmentMembers,
+  getProjectCostQuota,
   listActionPluginInstallsForProject,
   listCrmSyncRunsForSegment,
   listOrgPeople,
   listOrgProjects,
   listSchemaDefinitionsForProject,
   listSegmentsForProject,
+  resolveDefaultQueryEnvironment,
 } from '@/lib/orgs/queries';
 import { buildSegmentMemberCountView, toSegmentSummaryView, type SegmentMemberCountView } from '@/lib/orgs/segment-view';
 import { toActionPluginInstallOptionView, toCrmSyncRunView, type CrmSyncRunView } from '@/lib/orgs/crm-sync-view';
@@ -72,17 +74,31 @@ export default async function SegmentsPage({ params }: PageProps): Promise<React
   ]);
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const eventSchemaNames = activeSchemaNamesForKind(schemaDefs, 'event');
+  const activeSchemaDefsByKindAndName = buildActiveSchemaDefsByKindAndName(schemaDefs);
   const t = await getTranslations('Segments');
 
-  // Fanned out per segment via `Promise.all` — the same known, deliberately
-  // deferred "N independent queries" posture `board.service.ts`'s own doc
-  // comment documents for its per-tile fan-out, rather than a new batched
-  // execution path for this one page.
+  // Each segment's live member count still runs its own warehouse query, but
+  // the project-wide state every one of those queries needs (the default
+  // environment, the cost-quota config, the active schema defs) is fetched
+  // once here and threaded into every `countSegmentMembers` call below,
+  // rather than once per segment — the same `precomputed*` posture
+  // `board.service.ts`'s `queryBoardTiles` established for its own per-tile
+  // fan-out, closing the "N independent queries" gap this comment used to
+  // flag for this spot. `latestCrmSyncRuns` below stays a genuine per-segment
+  // fan-out — each is its own segment-scoped list query with no shared state
+  // to hoist out.
+  const [environment, quota] = await Promise.all([resolveDefaultQueryEnvironment(orgId, projectId), getProjectCostQuota(orgId, projectId)]);
   const memberCountViews = new Map<string, SegmentMemberCountView>(
     await Promise.all(
       segments.map(async (segment): Promise<[string, SegmentMemberCountView]> => [
         segment.id,
-        buildSegmentMemberCountView(await countSegmentMembers(orgId, projectId, segment.id)),
+        buildSegmentMemberCountView(
+          await countSegmentMembers(orgId, projectId, segment.id, {
+            environmentId: environment?.id,
+            precomputedQuota: quota,
+            precomputedActiveSchemaDefsByKindAndName: activeSchemaDefsByKindAndName,
+          }),
+        ),
       ]),
     ),
   );

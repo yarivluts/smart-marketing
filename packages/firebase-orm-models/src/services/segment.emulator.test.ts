@@ -9,6 +9,7 @@ import {
   createSegment,
   deleteSegment,
   ensureUserForFirebaseSession,
+  getActiveSchemaDefinition,
   InvalidSegmentError,
   listAuditLogEntriesForOrg,
   listQueryCostLogEntriesForProject,
@@ -16,12 +17,14 @@ import {
   listSegmentsForProject,
   ProjectNotFoundError,
   registerSchemaDefinition,
+  schemaDefMapKey,
   SegmentNotFoundError,
   setProjectCostQuota,
   suggestSegments,
   updateSegmentStatus,
   WarehouseNotConfiguredError,
   WarehouseQueryFailedError,
+  type SchemaDefModel,
   type SchemaFieldInput,
   type WarehouseQueryExecutor,
   type WarehouseRow,
@@ -874,6 +877,63 @@ describe('countSegmentMembers', () => {
 
     await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
     const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor });
+
+    expect(outcome).toEqual({ ok: false, reason: 'quota_exceeded', message: expect.any(String) });
+    expect(executor.calls).toHaveLength(1);
+  });
+
+  it('uses a precomputed active schema def instead of a fresh registry lookup (the segments page\'s own per-segment fan-out fix)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Precomputed Schema Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const realSchemaDef = await getActiveSchemaDefinition(organization.id, project.id, 'entity', 'customer');
+    // `plan` is really a `string` field (see `customerFieldsV1`) — overridden to `boolean` here, a
+    // change only observable in the compiled SQL if this precomputed map is actually consulted
+    // instead of a fresh (real) registry lookup.
+    const overriddenSchemaDef = {
+      ...realSchemaDef,
+      field_defs: (realSchemaDef?.field_defs ?? []).map((field) => (field.name === 'plan' ? { ...field, type: 'boolean' as const } : field)),
+    } as SchemaDefModel;
+    const precomputedActiveSchemaDefsByKindAndName = new Map([[schemaDefMapKey('entity', 'customer'), overriddenSchemaDef]]);
+    const executor = new FakeWarehouseQueryExecutor([{ member_count: 1 }]);
+
+    await countSegmentMembers({
+      organizationId: organization.id,
+      projectId: project.id,
+      segmentId: segment.id,
+      executor,
+      precomputedActiveSchemaDefsByKindAndName,
+    });
+
+    expect(executor.calls[0].sql).toContain("LAX_BOOL(properties['plan']) = SAFE_CAST(@filter_0 AS BOOL)");
+  });
+
+  it('uses a precomputed quota instead of a fresh cost-guardrail config lookup', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Count Precomputed Quota Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    // No real quota is ever set for this project — a fresh lookup would return the generous
+    // DEFAULT_DAILY_QUERY_LIMIT default, so a second call blocking proves the much stricter
+    // precomputed override below is what actually governed the check.
+    const precomputedQuota = { dailyQueryLimit: 1, labels: {}, setAt: null };
+    const executor = new FakeWarehouseQueryExecutor([{ member_count: 3 }]);
+
+    await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor, precomputedQuota });
+    const outcome = await countSegmentMembers({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, executor, precomputedQuota });
 
     expect(outcome).toEqual({ ok: false, reason: 'quota_exceeded', message: expect.any(String) });
     expect(executor.calls).toHaveLength(1);
