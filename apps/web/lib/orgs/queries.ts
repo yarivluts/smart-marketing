@@ -102,6 +102,7 @@ import {
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
   listRecentBillingEventsForProject as listRecentBillingEventsForProjectInOrganization,
   listRecentChurnedSubscriptionsForProject as listRecentChurnedSubscriptionsForProjectInOrganization,
+  listRecentDunningSubscriptionsForProject as listRecentDunningSubscriptionsForProjectInOrganization,
   listRecentRecordsForSchemas as listRecentRecordsForSchemasInOrganization,
   type RawRecordModel,
   type RecordFieldFilter,
@@ -341,6 +342,15 @@ export async function listRecentChurnedSubscriptionsForProject(
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
   return listRecentChurnedSubscriptionsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listRecentDunningSubscriptionsForProject(
+  organizationId: string,
+  projectId: string,
+  limit?: number,
+): Promise<RawRecordModel[]> {
+  await ensureFirestoreOrm();
+  return listRecentDunningSubscriptionsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 export async function listFailedPipelineMessagesForProject(
