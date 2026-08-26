@@ -17,6 +17,54 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — Merged PR #311 (KAN-105, rep-collection idempotent billing-signal confirmation)
+
+- **Last completed:**
+  - Resumed from the prior entry below: PR #311 (KAN-105) was open, fully implemented/tested, but CI
+    had never started — a repo-wide runner stall (the `main`-push run #1099 from PR #307's own merge
+    had sat `queued` with zero progress for well over an hour, and no run existed for PR #311 or the
+    concurrent KAN-105-collision PR #312 either).
+  - The stall cleared on its own: a real CI run started on PR #311 (run `32989536415`) and failed on
+    one test, `campaign-target.emulator.test.ts > getQualityCalibrationBreakdownForProject > degrades
+    to a "warehouse not configured" outcome...` (120s timeout), unrelated to this PR's diff (which only
+    touches `rep-collection.service.ts` and its own test file) — the log was full of `RESOURCE_EXHAUSTED`/
+    `CANCELLED` Firestore-emulator gRPC errors around the same timestamps, this repo's well-documented
+    emulator resource-contention flake under heavy concurrent CI load; 1506/1507 tests passed, and the
+    local pre-PR verification run had already covered this exact test green. Posted a standing-down
+    comment naming the failure and re-ran the failed job once (this PR's one-re-run budget).
+  - The re-run came back green: `lint · typecheck · test · build` + `terraform fmt · validate` both
+    `success`, `mergeable_state: clean`, no open review threads. Merged (squash) into `main` as
+    `a6022a9`. Branch deletion (`git push origin --delete kan-105-rep-collection-idempotent-confirm`)
+    failed with the same recurring, pre-existing HTTP 403 this file has documented since 2026-07-04.
+  - **KAN-105/KAN-106 collision resolution (started by the concurrent PR #312's own session, not this
+    one):** by the time PR #311 merged, PR #312 (the other KAN-105 claimant, `omnisearch: index win
+    rules`) had already renumbered itself to **KAN-106** and rebased onto the collision-note commit
+    (`d4b807e`) — following exactly the "whichever PR merges second renumbers" resolution this file's
+    prior entry called for. PR #312/KAN-106 is still open as of this entry (still needs its own rebase
+    onto this run's new `main` tip and a green CI run) — left alone since it's a different, active
+    session's own PR to finish; no action taken on it here beyond confirming the collision is being
+    handled correctly.
+- **In progress (exact stopping point):** none — KAN-105 (this story) is fully delivered, tested,
+  merged, and documented. PR #312/KAN-106 (a different, unrelated story) remains open and is that
+  session's own responsibility to land.
+- **Blocked + why:** nothing blocking the next code task. The earlier CI-runner stall has cleared (CI
+  ran and completed twice on PR #311 within this same run) — no longer flagged as an open infra issue.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51 items (KAN-106
+  is a different PR's in-flight work, not this session's). Resume the "sweep every `done` row's own
+  doc-comment notes for a newly-buildable follow-up" pattern for the next candidate, re-checking open
+  PRs and the freshest `main`'s highest KAN number (now 106, once PR #312 merges) immediately before
+  minting a new one.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion via `git push --delete`
+    keeps failing with a pre-existing HTTP 403 from inside every session).
+
+---
+
 ## 2026-08-26 (latest) — Opened PR #311 (KAN-105, rep-collection idempotent billing-signal confirmation); CI has not started
 
 - **Last completed:**
