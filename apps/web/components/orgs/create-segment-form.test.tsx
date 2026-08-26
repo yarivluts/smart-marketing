@@ -214,4 +214,68 @@ describe('CreateSegmentForm', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'Remove' }).at(-1)!);
     expect(screen.getAllByLabelText('Condition')).toHaveLength(1);
   });
+
+  it('adds and removes nested filter rows within an event condition (KAN-95)', () => {
+    renderForm(['demo_event']);
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    expect(screen.queryAllByLabelText('Event filter field')).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add event filter' }));
+    expect(screen.getAllByLabelText('Event filter field')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add event filter' }));
+    expect(screen.getAllByLabelText('Event filter field')).toHaveLength(2);
+
+    // DOM order: the top-level filter row's own "Remove", then the event
+    // condition row's own "Remove", then each nested event-filter row's
+    // "Remove" — the last one removes the second (most recently added)
+    // nested filter row.
+    const removeButtons = screen.getAllByRole('button', { name: 'Remove' });
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+    expect(screen.getAllByLabelText('Event filter field')).toHaveLength(1);
+  });
+
+  it('submits a nested event-condition filter, and omits the key entirely when no nested filters were added', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ segment: { id: 'segment-1' } }) } as Response);
+    renderForm(['demo_event']);
+
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Held a paid demo recently' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    fireEvent.change(screen.getByLabelText('Condition'), { target: { value: 'has_event' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add event filter' }));
+    fireEvent.change(screen.getByLabelText('Event filter field'), { target: { value: 'is_paid' } });
+    fireEvent.change(screen.getByLabelText('Event filter value'), { target: { value: 'true' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create segment' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/orgs/org-1/projects/project-1/segments',
+      expect.objectContaining({
+        body: JSON.stringify({
+          name: 'Held a paid demo recently',
+          schemaName: 'customer',
+          filters: [],
+          eventConditions: [{ kind: 'has_event', schemaName: 'demo_event', filters: [{ field: 'is_paid', op: '=', value: 'true' }] }],
+        }),
+      }),
+    );
+  });
+
+  it('disables submit until every nested event-condition filter row is filled', () => {
+    renderForm(['demo_event']);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'X' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Remove' })[0]);
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add event filter' }));
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Event filter field'), { target: { value: 'is_paid' } });
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Event filter value'), { target: { value: 'true' } });
+    expect(screen.getByRole('button', { name: 'Create segment' })).toBeEnabled();
+  });
 });
