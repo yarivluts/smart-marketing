@@ -46,9 +46,31 @@ export interface ProjectCostQuota {
   setByUserId?: string;
 }
 
-/** The effective quota config for a project: its newest explicit config, or the documented default when none has ever been set. */
-export async function getProjectCostQuota(organizationId: string, projectId: string): Promise<ProjectCostQuota> {
-  await requireProjectInOrg(organizationId, projectId);
+/**
+ * The effective quota config for a project: its newest explicit config, or
+ * the documented default when none has ever been set.
+ *
+ * `precomputedProject` lets a caller that already fetched the project doc
+ * for its own purposes (e.g. `board.service.ts`'s `queryBoardTiles`, which
+ * fetches it once and shares it across every tile — see `queryBoardTile`'s
+ * own doc comment for the N+1 this closes) skip this call's own redundant
+ * existence/org-membership fetch. Not re-fetched, only shape-checked against
+ * `organizationId`/`projectId` — a caller passing a project for the wrong
+ * org/id gets the same `ProjectNotFoundError` a live fetch would have
+ * produced, rather than silently reading through to a mismatched project.
+ */
+export async function getProjectCostQuota(
+  organizationId: string,
+  projectId: string,
+  precomputedProject?: ProjectModel,
+): Promise<ProjectCostQuota> {
+  if (precomputedProject) {
+    if (precomputedProject.organization_id !== organizationId || precomputedProject.id !== projectId) {
+      throw new ProjectNotFoundError();
+    }
+  } else {
+    await requireProjectInOrg(organizationId, projectId);
+  }
   const [latest] = await ProjectCostQuotaModel.initPath({ organization_id: organizationId, project_id: projectId })
     .query()
     .orderBy('set_at', 'desc')

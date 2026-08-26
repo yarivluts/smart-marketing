@@ -135,6 +135,9 @@
   },
   "Members": {
     "roleAndStatus": "{role} ({status})",
+    "statusLabel": "({status})",
+    "changeRoleLabel": "Role",
+    "changeRoleError": "Couldn't change this member's role. Please try again.",
     "inviteEmailLabel": "Email",
     "inviteRoleLabel": "Role",
     "invite": "Invite",

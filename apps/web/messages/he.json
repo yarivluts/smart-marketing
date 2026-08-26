@@ -135,6 +135,9 @@
   },
   "Members": {
     "roleAndStatus": "{role} ({status})",
+    "statusLabel": "({status})",
+    "changeRoleLabel": "תפקיד",
+    "changeRoleError": "לא ניתן היה לשנות את תפקיד החבר. נסה שוב.",
     "inviteEmailLabel": "אימייל",
     "inviteRoleLabel": "תפקיד",
     "invite": "הזמנה",
