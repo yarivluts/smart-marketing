@@ -13,6 +13,7 @@ import {
   listRepCollectionEntriesForProject,
   ProjectNotFoundError,
   RawRecordModel,
+  repCollectionEntryDocId,
   RepCollectionEntryNotFoundError,
   updateRepCollectionEntry,
 } from '../index';
@@ -242,6 +243,91 @@ describe('createRepCollectionEntry', () => {
         createdByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(InvalidRepCollectionEntryError);
+  });
+
+  it('creates two manual entries (no sourceRawRecordId) with distinct ids even when every other field is identical', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Rep Collection Manual Distinct Ids Org');
+
+    const first = await createRepCollectionEntry({
+      organizationId: organization.id,
+      projectId: project.id,
+      orgPersonId: null,
+      company: 'Acme Inc',
+      collectionType: 'upgrade',
+      amount: 100,
+      occurredAt: '2026-08-24',
+      createdByUserId: owner.id,
+    });
+    const second = await createRepCollectionEntry({
+      organizationId: organization.id,
+      projectId: project.id,
+      orgPersonId: null,
+      company: 'Acme Inc',
+      collectionType: 'upgrade',
+      amount: 100,
+      occurredAt: '2026-08-24',
+      createdByUserId: owner.id,
+    });
+
+    expect(second.id).not.toBe(first.id);
+    const entries = await listRepCollectionEntriesForProject(organization.id, project.id);
+    expect(entries).toHaveLength(2);
+  });
+
+  it('upserts a billing-signal-confirming entry by a deterministic doc id derived from sourceRawRecordId, so two racing confirmations of the same signal collapse onto one document instead of double-logging the charge', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Rep Collection Deterministic Doc Id Org');
+    const repA = await createOrgPerson({ organizationId: organization.id, name: 'Rep A', createdByUserId: owner.id });
+    const repB = await createOrgPerson({ organizationId: organization.id, name: 'Rep B', createdByUserId: owner.id });
+    const charge = await landStripeCharge({ organizationId: organization.id, projectId: project.id, environmentId, landedAt: '2026-08-24T10:00:00.000Z', amount: 5000 });
+
+    const first = await createRepCollectionEntry({
+      organizationId: organization.id,
+      projectId: project.id,
+      orgPersonId: repA.id,
+      company: 'cus_1',
+      collectionType: 'upgrade',
+      amount: 50,
+      occurredAt: '2026-08-24',
+      sourceRawRecordId: charge.id,
+      createdByUserId: owner.id,
+    });
+    expect(first.id).toBe(repCollectionEntryDocId(charge.id));
+
+    // A second, racing confirmation of the exact same signal — e.g. two admins
+    // both clicking "confirm" before either write has landed — attributing it
+    // to a different rep.
+    const second = await createRepCollectionEntry({
+      organizationId: organization.id,
+      projectId: project.id,
+      orgPersonId: repB.id,
+      company: 'cus_1',
+      collectionType: 'upgrade',
+      amount: 50,
+      occurredAt: '2026-08-24',
+      sourceRawRecordId: charge.id,
+      createdByUserId: owner.id,
+    });
+
+    // Same document, not a duplicate — the charge is only ever logged once.
+    expect(second.id).toBe(first.id);
+    const entries = await listRepCollectionEntriesForProject(organization.id, project.id);
+    expect(entries.filter((entry) => entry.source_raw_record_id === charge.id)).toHaveLength(1);
+
+    // The second (colliding) write wins on the mutable fields...
+    expect(second.org_person_id).toBe(repB.id);
+    // ...but the original create identity is preserved, not reset by the collision.
+    expect(second.created_by).toBe(first.created_by);
+    expect(second.created_at).toBe(first.created_at);
+
+    // And the leaderboard only ever counts the charge once (50, not 100).
+    const leaderboard = await getRepCollectionLeaderboardForProject({
+      organizationId: organization.id,
+      projectId: project.id,
+      period: 'month',
+      now: new Date('2026-08-24T12:00:00.000Z'),
+    });
+    const totalLogged = leaderboard.rows.reduce((sum, row) => sum + row.totalAmount, 0) + leaderboard.unattributedTotal;
+    expect(totalLogged).toBe(50);
   });
 
   it('throws ProjectNotFoundError for a project id that does not belong to the given org', async () => {

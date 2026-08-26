@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { isRepCollectionType, type RepCollectionType } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import { RepCollectionEntryModel } from '../models/rep-collection-entry.model';
@@ -60,18 +61,33 @@ export interface CreateRepCollectionEntryParams {
   note?: string | null;
   /**
    * Set when this entry is confirming a `listBillingCollectionSignalsForProject`
-   * suggestion — see `RepCollectionEntryModel.source_raw_record_id`. Not
-   * transactional: two callers confirming the same signal concurrently can
-   * both succeed, double-logging that charge. A known, documented
-   * concurrency gap — the same posture `SchemaDefModel`'s own "not
-   * transactional" doc comment takes for its own read-then-write race,
-   * deferred as bigger than this story since fixing it well needs either a
-   * Firestore transaction this ORM doesn't expose yet or a deterministic
-   * per-signal document id (which manual entries have no equivalent key
-   * for).
+   * suggestion — see `RepCollectionEntryModel.source_raw_record_id`. When
+   * set, `createRepCollectionEntry` upserts by {@link repCollectionEntryDocId}
+   * rather than always minting a fresh document id, closing the "two callers
+   * confirming the same signal concurrently both succeed, double-logging
+   * that charge" race a prior doc comment here used to document as
+   * deliberately deferred: a purely manual entry has no natural key to hash
+   * (two different manual entries can legitimately share every visible
+   * field), but a billing-signal confirmation always has one — the raw
+   * record it's confirming — the same "content-hashed key so a caller-
+   * supplied id is idempotent without a query first" posture
+   * `campaignTargetDocId` (`campaign-target.service.ts`) already
+   * establishes for its own arbitrary-string identifier.
    */
   sourceRawRecordId?: string | null;
   createdByUserId: string;
+}
+
+/**
+ * Deterministic Firestore document id for a billing-signal-confirming ledger
+ * entry, derived from the `RawRecordModel.id` it confirms — the same
+ * "hash an arbitrary id into a safe, idempotent doc id" convention
+ * `campaignTargetDocId` established, applied here so two racing
+ * confirmations of the exact same signal collapse onto one document instead
+ * of double-logging the charge (see {@link CreateRepCollectionEntryParams.sourceRawRecordId}).
+ */
+export function repCollectionEntryDocId(sourceRawRecordId: string): string {
+  return createHash('sha256').update(sourceRawRecordId).digest('hex');
 }
 
 /**
@@ -112,8 +128,17 @@ export async function createRepCollectionEntry(params: CreateRepCollectionEntryP
     await requireOrgPersonInOrg(params.organizationId, params.orgPersonId);
   }
 
+  const sourceRawRecordId = params.sourceRawRecordId?.trim() ? params.sourceRawRecordId.trim() : undefined;
+  // A billing-signal confirmation upserts by a deterministic doc id (two
+  // racing confirmations of the same signal collapse onto one document); a
+  // purely manual entry keeps today's fresh-random-id `save()` — it has no
+  // natural key to hash, see `CreateRepCollectionEntryParams.sourceRawRecordId`'s
+  // own doc comment.
+  const docId = sourceRawRecordId !== undefined ? repCollectionEntryDocId(sourceRawRecordId) : undefined;
+  const existing = docId !== undefined ? await RepCollectionEntryModel.init(docId, { organization_id: params.organizationId, project_id: params.projectId }) : null;
+
   const now = new Date().toISOString();
-  const entry = new RepCollectionEntryModel();
+  const entry = existing ?? new RepCollectionEntryModel();
   entry.organization_id = params.organizationId;
   entry.project_id = params.projectId;
   entry.org_person_id = params.orgPersonId;
@@ -124,13 +149,15 @@ export async function createRepCollectionEntry(params: CreateRepCollectionEntryP
   entry.amount = params.amount;
   entry.occurred_at = occurredAt;
   entry.note = params.note?.trim() ? params.note.trim() : undefined;
-  entry.source_raw_record_id = params.sourceRawRecordId ?? undefined;
-  entry.created_by = params.createdByUserId;
-  entry.created_at = now;
+  entry.source_raw_record_id = sourceRawRecordId;
+  if (!existing) {
+    entry.created_by = params.createdByUserId;
+    entry.created_at = now;
+  }
   entry.updated_by = params.createdByUserId;
   entry.updated_at = now;
   entry.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
-  await entry.save();
+  await entry.save(docId);
 
   try {
     await recordAuditLogEntry({
