@@ -17,7 +17,81 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — Merged PR #313 (KAN-107, segment live-members admin surface)
+## 2026-08-26 (latest) — Merged PR #314 (KAN-108, Customer 360 admin surface for MCP search_customers)
+
+- **Last completed:**
+  - Session start: `TASKS.md` fully `done` through KAN-107 except the standing blockers
+    (KAN-18/19 `in-progress`, KAN-43 `needs-human`, KAN-50/51 `blocked-by`). Zero open PRs.
+    Delegated the sweep-and-implement pass to a background agent following this file's
+    established "grep every `done` row's own deferred/not-yet doc-comment note for a
+    newly-buildable follow-up" pattern (KAN-89..KAN-107), with an explicit exclusion list
+    (real infra, staging, further Ads platform expansions, the `platform_admin` bootstrap
+    gap, KAN-43/50/51 themselves).
+  - The agent's top candidate: `mcp-tools.service.ts`'s `searchProjectCustomers` (KAN-75,
+    Customer 360 substring search over the `entities` core table) was only ever reachable
+    through the MCP server's `search_customers` tool — no `apps/web` route or page ever
+    called it, so a human operator had no way to look up a customer themselves in the web
+    app, a real gap against CLAUDE.md's "everything user-manageable gets an admin surface"
+    rule. Minted **KAN-108**.
+  - **Delivered:** `searchProjectCustomersForAdmin` wraps the existing search, degrading the
+    three expected warehouse failure modes (not configured / quota exceeded / query
+    rejected) into a typed `CustomerSearchOutcome` rather than throwing — same ok/degraded
+    posture KAN-107's `listSegmentMembers` established. New `customer-search-view.ts`
+    redacts any `is_pii`-flagged field server-side (never reads the real value into the
+    view), resolving each result row's own schema `field_defs` by its own `schemaName`
+    since one search can span multiple entity schemas. New Customers page (search box +
+    optional entity-schema filter) gated on `ingest.write`, wired into both the project
+    layout's nav list and the org page's own separately-duplicated copy of that list.
+    en/he translations added; no Hebrew in source. Full test coverage: emulator tests for
+    the outcome wrapper, `apps/web` unit tests for the view mapper, and a new
+    `customers.spec.ts` e2e spec.
+  - Self-review before opening the PR caught and fixed two real bugs: the new nav link was
+    missing from the org page's separately-duplicated nav list (a fresh project's first-ever
+    nav, landed on right after project creation, never showed Customers); and the page's own
+    "Search" submit button collided by accessible name with the always-present Cmd/Ctrl-K
+    omnisearch trigger — renamed to "Search customers" (en/he) to disambiguate.
+  - Full local `pnpm lint`/`pnpm typecheck`/`pnpm build`/`pnpm test` green across all 8
+    packages before opening PR #314 (branch `kan-108-customer-search`).
+  - **CI's first run failed** on one test: `campaign-target.emulator.test.ts`'s
+    `getCampaignPaybackBreakdownForProject` "degrades to a warehouse-not-configured outcome"
+    case timed out at 120000ms — a file this PR's diff never touches, amid the same
+    Firestore-emulator `RESOURCE_EXHAUSTED`-under-load noise this file has repeatedly
+    documented as benign. Posted one standing-down comment on the PR naming the failure and
+    the flake theory, then re-ran the failed job once (per CLAUDE.md's git-workflow spirit
+    and this project's own drive-to-green convention) — the re-run came back fully green on
+    both checks (`lint · typecheck · test · build`, `terraform fmt · validate`), confirming
+    the flake.
+  - **Merged 2026-08-26:** PR #314 squash-merged into `main` (`3c589d5`) once
+    `mergeable_state` read `clean` and both checks passed. Remote branch delete not yet
+    attempted for this branch in this entry — expect the same recurring HTTP 403 this file
+    has documented since 2026-07-04 if attempted.
+  - Coordination note: this run was driven jointly by a background agent (implementation
+    through opening the PR) and this top-level session (CI triage, re-run, and merge) after
+    the agent correctly identified it had no way to block on GitHub Actions status from a
+    plain shell loop in this sandbox (GitHub API access here is MCP-tool-only) and handed
+    off via its own PR-activity subscription instead of polling.
+- **In progress (exact stopping point):** none — KAN-108 fully delivered, tested, and
+  merged. `TASKS.md`'s KAN-108 row added and marked `done`, referencing PR #314.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md` is fully `done` again except the standing KAN-18/19/43/50/51
+  items. Resume the sweep-for-a-newly-buildable-follow-up pattern for the next candidate,
+  re-checking open PRs and the freshest `main`'s highest KAN number (now 108) immediately
+  before minting a new one.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own
+    `TASKS.md` rows — still outstanding, unchanged by this run.
+  - The `platform_admin` bootstrap gap flagged in prior entries — still outstanding, needs a
+    human's scoping decision before either dependent candidate (automation kill switch,
+    org-ownership recovery) is buildable.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large
+    pile of already-merged, undeleted feature branches on `origin` (branch deletion keeps
+    failing with an HTTP 403 from this sandbox's git remote).
+
+---
+
+## 2026-08-26 — Merged PR #313 (KAN-107, segment live-members admin surface)
 
 - **Last completed:**
   - This run was spawned fresh by the hourly `GrowthOS autonomous build` cron trigger while PR #313
