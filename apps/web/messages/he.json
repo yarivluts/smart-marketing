@@ -249,7 +249,11 @@
     "pendingRequestSummary": "{projectName} מבקש/ת {resourceKind} \"{resourceName}\"",
     "approve": "אישור",
     "reject": "דחייה",
-    "decideError": "לא ניתן היה לשמור את ההחלטה. נסה שוב."
+    "decideError": "לא ניתן היה לשמור את ההחלטה. נסה שוב.",
+    "pushToProject": "צירוף לפרויקט",
+    "pushProjectLabel": "פרויקט לצירוף",
+    "pushScopeSelectionLabel": "היקפים להענקה (מופרדים בפסיק)",
+    "pushError": "לא ניתן היה לצרף את המשאב לפרויקט זה. נסה שוב."
   },
   "ProjectResources": {
     "metaTitle": "משאבי הפרויקט",

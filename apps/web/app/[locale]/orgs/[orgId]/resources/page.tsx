@@ -7,6 +7,7 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   listOrgPeople,
+  listOrgProjects,
   listPendingAttachmentsForOrgWithDetails,
   listResourceTemplates,
   listSharedCredentials,
@@ -16,6 +17,7 @@ import { CreateTemplateForm } from '@/components/orgs/create-template-form';
 import { CreatePersonForm } from '@/components/orgs/create-person-form';
 import { PendingAttachmentRequests } from '@/components/orgs/pending-attachment-requests';
 import { SetCredentialSecretForm } from '@/components/orgs/set-credential-secret-form';
+import { PushAttachmentForm } from '@/components/orgs/push-attachment-form';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string }>;
@@ -56,12 +58,14 @@ export default async function ResourceLibraryPage({
     orgId,
   });
 
-  const [credentials, templates, people, pendingRequests] = await Promise.all([
+  const [credentials, templates, people, pendingRequests, projects] = await Promise.all([
     listSharedCredentials(orgId),
     listResourceTemplates(orgId),
     listOrgPeople(orgId),
     canManageResources ? listPendingAttachmentsForOrgWithDetails(orgId) : Promise.resolve([]),
+    canManageResources ? listOrgProjects(orgId) : Promise.resolve([]),
   ]);
+  const pushTargets = projects.map((project) => ({ id: project.id, name: project.name }));
 
   const t = await getTranslations('ResourceLibrary');
 
@@ -93,6 +97,15 @@ export default async function ResourceLibraryPage({
                       hasSecret={Boolean(credential.encrypted_secret)}
                     />
                   ) : null}
+                  {canManageResources ? (
+                    <PushAttachmentForm
+                      orgId={orgId}
+                      resourceKind="credential"
+                      resourceId={credential.id}
+                      projects={pushTargets}
+                      availableScopes={credential.available_scopes}
+                    />
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -107,12 +120,20 @@ export default async function ResourceLibraryPage({
           ) : (
             <ul className="flex flex-col gap-2">
               {templates.map((template) => (
-                <li key={template.id} className="rounded-md border border-input px-3 py-2 text-sm">
-                  {t('templateSummary', {
-                    name: template.name,
-                    type: template.type,
-                    version: template.version,
-                  })}
+                <li
+                  key={template.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm"
+                >
+                  <span>
+                    {t('templateSummary', {
+                      name: template.name,
+                      type: template.type,
+                      version: template.version,
+                    })}
+                  </span>
+                  {canManageResources ? (
+                    <PushAttachmentForm orgId={orgId} resourceKind="template" resourceId={template.id} projects={pushTargets} />
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -127,8 +148,14 @@ export default async function ResourceLibraryPage({
           ) : (
             <ul className="flex flex-col gap-2">
               {people.map((person) => (
-                <li key={person.id} className="rounded-md border border-input px-3 py-2 text-sm">
-                  {person.title ? `${person.name} — ${person.title}` : person.name}
+                <li
+                  key={person.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm"
+                >
+                  <span>{person.title ? `${person.name} — ${person.title}` : person.name}</span>
+                  {canManageResources ? (
+                    <PushAttachmentForm orgId={orgId} resourceKind="person" resourceId={person.id} projects={pushTargets} />
+                  ) : null}
                 </li>
               ))}
             </ul>

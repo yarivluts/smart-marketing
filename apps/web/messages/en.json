@@ -249,7 +249,11 @@
     "pendingRequestSummary": "{projectName} requests {resourceKind} \"{resourceName}\"",
     "approve": "Approve",
     "reject": "Reject",
-    "decideError": "Couldn't record that decision. Please try again."
+    "decideError": "Couldn't record that decision. Please try again.",
+    "pushToProject": "Push to project",
+    "pushProjectLabel": "Project to push to",
+    "pushScopeSelectionLabel": "Scopes to grant (comma-separated)",
+    "pushError": "Couldn't push this resource to that project. Please try again."
   },
   "ProjectResources": {
     "metaTitle": "Project resources",

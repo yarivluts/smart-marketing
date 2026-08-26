@@ -8,6 +8,7 @@ import { POST as sendInvite } from '@/app/api/orgs/[orgId]/invites/route';
 import { DELETE as removeMember } from '@/app/api/orgs/[orgId]/members/[membershipId]/route';
 import { POST as createCredential } from '@/app/api/orgs/[orgId]/resources/credentials/route';
 import { POST as requestAttachment } from '@/app/api/orgs/[orgId]/projects/[projectId]/resource-attachments/route';
+import { POST as pushAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/route';
 import { DELETE as detachAttachment, PATCH as decideAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/route';
 import { POST as setWriteTier } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/write-tier/route';
 import { GET as listApiKeys, POST as mintApiKey } from '@/app/api/orgs/[orgId]/projects/[projectId]/keys/route';
@@ -214,6 +215,32 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
         requestAttachment(requestFor(FAKE_ORG_ID, FAKE_ORG_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, projectId: FAKE_ORG_ID }),
         }),
+    );
+  });
+
+  it('POST /api/orgs/[orgId]/resource-attachments (push): org caller cannot see vs. fake org id (KAN-27)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-push-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (push)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-push-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (push)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const requestFor = (orgId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/resource-attachments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId: FAKE_ORG_ID, resourceKind: 'person', resourceId: 'does-not-matter' }),
+      });
+
+    await expectIndistinguishable(
+      () => pushAttachment(requestFor(orgB.id), { params: Promise.resolve({ orgId: orgB.id }) }),
+      () => pushAttachment(requestFor(FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID }) }),
     );
   });
 
