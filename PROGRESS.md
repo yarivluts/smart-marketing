@@ -17,6 +17,103 @@ Template for each entry:
 
 ---
 
+## 2026-08-26 (latest) — Opened PR #311 (KAN-105, rep-collection idempotent billing-signal confirmation); CI has not started
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md`, confirmed `origin/main` HEAD was still `ae7f8be`
+    (KAN-104's own merge-record commit) and `list_pull_requests` showed no open PRs — state matched
+    what the run brief described exactly. Resumed the "sweep every `done` row's own deferred/not-yet
+    doc-comment notes for a newly-buildable follow-up" pattern.
+  - Swept broadly for a small, concrete, infra-free gap: grepped every `deferred`/`not yet built`/
+    `TODO`/`placeholder`/`no way to`/`isn't supported` doc-comment marker across `apps/`/`packages/`.
+    Most hits were either already closed by earlier sweeps (the schema-registry per-family version
+    history function turned out to be genuinely unused dead code, not a real gap — `SchemaFamilyCard`
+    already renders every version inline), credential/infra-blocked (GA4/Google Ads/Meta/Stripe
+    connector deferrals, KAN-18-blocked warehouse items), or already explicitly ruled out by this
+    task's own brief (`ServiceAccountModel`/project-scoped-permission refactor). Confirmed the
+    Google-side "Lookalike/Similar Audience expansion" and the automation kill switch's platform-wide
+    (cross-tenant) half both remain correctly out of scope (deprecated API / no platform-admin surface
+    exists to build against, respectively).
+  - Found a real, small, buildable-today gap: `CreateRepCollectionEntryParams.sourceRawRecordId`'s own
+    doc comment (`rep-collection.service.ts`, KAN-88) named a concrete concurrency bug verbatim — two
+    callers confirming the same `listBillingCollectionSignalsForProject` billing signal concurrently
+    could both succeed, double-logging the charge on the rep leaderboard — and explicitly named a
+    buildable narrower fix the doc comment itself had left undone: "a deterministic per-signal document
+    id (which manual entries have no equivalent key for)." Confirmed by reading `createRepCollectionEntry`
+    directly: it never checked for an existing entry with the same `sourceRawRecordId` before writing;
+    every call (including a second confirmation of the same signal) always minted a fresh random
+    Firestore doc id.
+  - **Delivered (PR #311, branch `kan-105-rep-collection-idempotent-confirm`):** new
+    `repCollectionEntryDocId(sourceRawRecordId)` (sha256 hash), mirroring `campaignTargetDocId`
+    (`campaign-target.service.ts`) exactly. `createRepCollectionEntry` now upserts by that deterministic
+    id when `sourceRawRecordId` is set — `RepCollectionEntryModel.init(docId, ...)` + `save(docId)`,
+    mirroring `setCampaignTargetBudget`'s own `existing ?? new Model()` pattern — preserving the
+    original `created_by`/`created_at` on a colliding write. Manual entries (no `sourceRawRecordId`)
+    are completely unaffected — still a fresh random id per call, so two visually-identical manual
+    entries stay distinct rows, matching the doc comment's own scoping. Updated the stale doc comment
+    to describe the new behavior. No admin UI change needed (backend idempotency fix behind an
+    already-existing, already-admin-only create flow).
+  - New emulator tests (`rep-collection.emulator.test.ts`): two manual entries with identical fields
+    still get distinct ids (proves the fix is scoped to the billing-signal path only); two racing
+    confirmations of the same signal collapse onto one document (same id as `repCollectionEntryDocId`,
+    only one entry in the list for that `source_raw_record_id`, the colliding write's mutable field
+    wins while `created_by`/`created_at` are preserved, and the leaderboard sums the charge once, not
+    twice — proving the double-logging is actually closed end to end).
+  - Full local verification before opening the PR: `pnpm lint` green (6/6 packages), `pnpm typecheck`
+    green (10/10 turbo tasks), `pnpm build` green (7/7 turbo tasks), `pnpm test`: `firebase-orm-models`
+    128/128 files / 1507/1507 tests green (real Firestore emulator, includes the 2 new tests), `web`
+    unit+emulator 267/267 files / 1670/1670 tests green (unaffected — no `apps/web` files touched),
+    `api` 17/17 suites / 141/141 tests green, `shared` 44/44 files / 593/593 tests green,
+    `tracking-sdk` 3/3 files / 29/29 tests green, `mcp-headless-example` 2/2 files / 8/8 tests green.
+    `apps/web`'s sharded Playwright e2e and `packages/dbt-transform` were not re-run locally (diff
+    touches only `packages/firebase-orm-models`) — left for CI's own pipeline.
+  - Self-reviewed the diff (`git show HEAD`) before/after opening the PR: no correctness bugs found,
+    `save(docId)` with `docId: undefined` for a manual entry confirmed equivalent to the pre-existing
+    bare `save()` (test-proven — two manual entries with identical fields still get distinct ids), the
+    hash-scoping question (whether a `sourceRawRecordId` collision could ever cross projects/orgs) is a
+    non-issue since the Firestore path itself is already org/project-scoped, matching
+    `campaignTargetDocId`'s own identical posture.
+  - Opened PR #311. **CI never started**: `pull_request_read get_status` on the PR's head sha returned
+    `state: pending` with 0 statuses, and `actions_list list_workflow_runs` filtered to this branch
+    returned `total_count: 0` across many repeated checks. This wasn't specific to this PR — the most
+    recent `main`-push run (#1099, from PR #307/KAN-101's own merge) sat `queued` with zero progress
+    the entire time, and zero runs anywhere in the repo were `in_progress` at any check. This matches
+    this repo's own previously-documented shared-runner-contention pattern (see the KAN-103 PR #309
+    "CI has been stuck in-progress for 100+ minutes" entry below) — but more severe here, since no run
+    was even *created* for this PR, not merely stuck queued. Posted a status comment on PR #311 naming
+    this explicitly (with the local-verification summary) rather than merging without a CI result, per
+    this repo's own established convention.
+- **In progress (exact stopping point):** PR #311 (KAN-105) is open, fully implemented, tested, and
+  self-reviewed — `mergeable_state: clean`, no open review threads. Waiting on CI to actually start.
+  Nothing else to do on this story until CI produces a real result (or the runner backlog visibly
+  clears and a re-check shows a fresh run in progress).
+- **Blocked + why:** CI infrastructure appears stalled repo-wide (not just for this PR) — a `main`-push
+  run from earlier the same day is still `queued` with no progress, and no new run has started for
+  PR #311 despite `ci.yml`'s `pull_request: branches: [main]` trigger being configured correctly (same
+  trigger every prior successful PR run in this repo's history used). This is outside what a session
+  can fix directly — it needs either the runner backlog to clear on its own or a human to look at the
+  Actions tab / re-trigger a run.
+- **Next step:** a future run (or this session resumed later) should re-check
+  `mcp__github__pull_request_read` (`get_check_runs`/`get_status`) and `actions_list` on PR #311 first.
+  If a run has since started and gone green, merge (squash) into `main`, delete the branch, and update
+  `TASKS.md`'s new KAN-105 row + this file per the usual pattern. If CI is still stuck with zero runs
+  after a much longer wait, that's worth flagging to a human as a standing infra issue (broader than
+  the "single PR stuck in-progress" pattern this file has documented before) rather than continuing to
+  poll indefinitely.
+- **Waiting on human:**
+  - **CI infra** — new: no CI run has started for PR #311 at all (not merely a slow/stuck one); if this
+    persists, a human with direct GitHub Actions access should check whether the runner pool itself is
+    healthy (the stuck `queued` run #1099 from earlier the same day, and total silence since, both
+    point the same direction).
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md` rows —
+    still outstanding, unchanged by this run.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin`.
+
+---
+
 ## 2026-08-26 (latest) — Merged PR #310 (KAN-104, segments-page batched precompute)
 
 - **Last completed:**
