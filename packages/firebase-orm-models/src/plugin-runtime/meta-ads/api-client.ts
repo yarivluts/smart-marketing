@@ -140,15 +140,17 @@ export interface MetaCreateLookalikeAudienceResult {
 }
 
 /**
- * One contact's already-hashed Custom Audience match key(s) — `emailHash`
- * and/or `phoneHash`, matching Meta's own multi-key `users` upload schema
- * (a row can carry either or both; Meta improves match rate when both are
- * present for the same person). `MetaCustomAudienceSinkPluginExecutor`
- * builds these; this client never receives a raw email or phone number.
+ * One contact's already-hashed Custom Audience match key(s) — `emailHash`,
+ * `phoneHash`, and/or `madidHash` (mobile advertiser id), matching Meta's
+ * own multi-key `users` upload schema (a row can carry any combination;
+ * Meta improves match rate when more than one is present for the same
+ * person). `MetaCustomAudienceSinkPluginExecutor` builds these; this client
+ * never receives a raw email, phone number, or device id.
  */
 export interface MetaContactMatchKey {
   emailHash?: string;
   phoneHash?: string;
+  madidHash?: string;
 }
 
 /**
@@ -490,18 +492,29 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
 
   async addContactsToCustomAudience(audienceId: string, contacts: readonly MetaContactMatchKey[]): Promise<MetaAddHashedEmailsResult> {
     // Meta's multi-key `users` upload schema is one fixed column list for the
-    // whole payload — include EMAIL/PHONE only if at least one contact in
-    // this call actually carries it (keeps a phone-less call's payload
-    // byte-identical to the pre-phone-support `{schema: ['EMAIL'], ...}`
-    // shape), and fill a missing key with `''` per row per Meta's own spec.
-    const schema: Array<'EMAIL' | 'PHONE'> = [];
+    // whole payload — include EMAIL/PHONE/MADID only if at least one contact
+    // in this call actually carries it (keeps a call missing a given
+    // identifier's payload byte-identical to what it would have been before
+    // that identifier was supported at all — e.g. a MADID-less call's
+    // payload is byte-identical to the pre-MADID-support `{schema: ['EMAIL',
+    // 'PHONE'], ...}` shape), and fill a missing key with `''` per row per
+    // Meta's own spec.
+    const schema: Array<'EMAIL' | 'PHONE' | 'MADID'> = [];
     if (contacts.some((contact) => contact.emailHash !== undefined)) {
       schema.push('EMAIL');
     }
     if (contacts.some((contact) => contact.phoneHash !== undefined)) {
       schema.push('PHONE');
     }
-    const data = contacts.map((contact) => schema.map((key) => (key === 'EMAIL' ? (contact.emailHash ?? '') : (contact.phoneHash ?? ''))));
+    if (contacts.some((contact) => contact.madidHash !== undefined)) {
+      schema.push('MADID');
+    }
+    const columnValue: Record<'EMAIL' | 'PHONE' | 'MADID', (contact: MetaContactMatchKey) => string> = {
+      EMAIL: (contact) => contact.emailHash ?? '',
+      PHONE: (contact) => contact.phoneHash ?? '',
+      MADID: (contact) => contact.madidHash ?? '',
+    };
+    const data = contacts.map((contact) => schema.map((key) => columnValue[key](contact)));
 
     const result = await this.request<{ num_received?: number }>(`${audienceId}/users`, {
       payload: JSON.stringify({ schema, data }),
