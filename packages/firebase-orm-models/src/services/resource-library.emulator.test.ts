@@ -29,6 +29,7 @@ import {
   ResourceNotFoundError,
   setResourceAttachmentWriteTier,
   updateOrgPerson,
+  updateResourceTemplate,
   verifyAuditLogChainForOrg,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -200,6 +201,124 @@ describe('updateOrgPerson (KAN-100)', () => {
     expect(entry.target_id).toBe(person.id);
     expect(entry.before).toEqual({ name: 'Before Name', email: beforeEmail, title: null, photoUrl: null });
     expect(entry.after).toEqual({ name: 'After Name', email: null, title: 'New Title', photoUrl: null });
+
+    await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
+  });
+});
+
+describe('updateResourceTemplate (KAN-117)', () => {
+  it("updates a template's name and config, bumping version, persisted for a later list", async () => {
+    const { owner, organization } = await setupOrgWithOwner('Template Update Org');
+    const template = await createResourceTemplate({
+      organizationId: organization.id,
+      name: 'Standard SaaS Funnel',
+      type: 'metric_definition',
+      config: { steps: ['signup', 'activation'] },
+      createdByUserId: owner.id,
+    });
+    expect(template.version).toBe(1);
+
+    const updated = await updateResourceTemplate({
+      organizationId: organization.id,
+      templateId: template.id,
+      name: 'Standard SaaS Funnel v2',
+      config: { steps: ['signup', 'activation', 'conversion'] },
+      actorId: owner.id,
+    });
+
+    expect(updated.name).toBe('Standard SaaS Funnel v2');
+    expect(updated.version).toBe(2);
+    expect(updated.config).toEqual({ steps: ['signup', 'activation', 'conversion'] });
+
+    const [reloaded] = (await listResourceTemplates(organization.id)).filter((t) => t.id === template.id);
+    expect(reloaded.name).toBe('Standard SaaS Funnel v2');
+    expect(reloaded.version).toBe(2);
+  });
+
+  it('clears config when omitted, without touching the name', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Template Clear Config Org');
+    const template = await createResourceTemplate({
+      organizationId: organization.id,
+      name: 'Full Config Template',
+      type: 'dashboard',
+      config: { widgets: 3 },
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateResourceTemplate({
+      organizationId: organization.id,
+      templateId: template.id,
+      name: 'Full Config Template',
+      actorId: owner.id,
+    });
+
+    expect(updated.name).toBe('Full Config Template');
+    expect(updated.version).toBe(2);
+    expect(updated.config).toBeUndefined();
+  });
+
+  it('increments version by exactly one per edit across repeated edits', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Template Repeat Edit Org');
+    const template = await createResourceTemplate({
+      organizationId: organization.id,
+      name: 'Repeat Edit Template',
+      type: 'schema',
+      createdByUserId: owner.id,
+    });
+
+    await updateResourceTemplate({ organizationId: organization.id, templateId: template.id, name: 'Repeat Edit Template v2', actorId: owner.id });
+    const twice = await updateResourceTemplate({
+      organizationId: organization.id,
+      templateId: template.id,
+      name: 'Repeat Edit Template v3',
+      actorId: owner.id,
+    });
+
+    expect(twice.version).toBe(3);
+  });
+
+  it('rejects updating a template id that does not exist', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Template Missing Org');
+    await expect(
+      updateResourceTemplate({ organizationId: organization.id, templateId: 'does-not-exist', name: 'X', actorId: owner.id }),
+    ).rejects.toThrow(ResourceNotFoundError);
+  });
+
+  it("rejects updating another org's template, even with a real template id (isolation)", async () => {
+    const { owner: ownerA, organization: orgA } = await setupOrgWithOwner('Template Isolation Org A');
+    const { owner: ownerB, organization: orgB } = await setupOrgWithOwner('Template Isolation Org B');
+    const templateInA = await createResourceTemplate({ organizationId: orgA.id, name: 'Org A Template', type: 'schema', createdByUserId: ownerA.id });
+
+    await expect(
+      updateResourceTemplate({ organizationId: orgB.id, templateId: templateInA.id, name: 'Hijacked', actorId: ownerB.id }),
+    ).rejects.toThrow(ResourceNotFoundError);
+  });
+
+  it('records an audit log entry with before/after values, keeping the org audit-log chain valid', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Template Audit Org');
+    const template = await createResourceTemplate({
+      organizationId: organization.id,
+      name: 'Before Template',
+      type: 'guardrail_policy',
+      createdByUserId: owner.id,
+    });
+
+    await updateResourceTemplate({
+      organizationId: organization.id,
+      templateId: template.id,
+      name: 'After Template',
+      config: { max_regression_pct: 20 },
+      actorId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const [entry] = entries.filter((e) => e.action === 'resource_template.update');
+    expect(entry).toBeDefined();
+    expect(entry.actor_id).toBe(owner.id);
+    expect(entry.target_type).toBe('resource_template');
+    expect(entry.target_id).toBe(template.id);
+    expect(entry.before).toEqual({ name: 'Before Template', version: 1, config: null });
+    expect(entry.after).toEqual({ name: 'After Template', version: 2, config: { max_regression_pct: 20 } });
 
     await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
   });
@@ -385,11 +504,11 @@ describe('resource attachment lifecycle: request -> approve -> detach', () => {
     });
     expect(request.resource_version).toBe(1);
 
-    // Nothing in this codebase bumps a template's version yet (no edit
-    // surface exists) — directly mutate it to simulate a later org-admin
-    // edit and confirm the already-recorded pin doesn't silently follow it.
-    template.version = 2;
-    await template.save();
+    // A later org-admin edit (KAN-117's `updateResourceTemplate`, the real
+    // edit surface `ResourceTemplateModel`'s own doc comment always
+    // described) bumps the template to v2 — confirm the already-recorded
+    // pin doesn't silently follow it.
+    await updateResourceTemplate({ organizationId: organization.id, templateId: template.id, name: template.name, actorId: owner.id });
 
     const reloaded = await ResourceAttachmentModel.init(request.id, { organization_id: organization.id });
     expect(reloaded?.resource_version).toBe(1);

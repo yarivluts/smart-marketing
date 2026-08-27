@@ -8,6 +8,7 @@ import { POST as sendInvite } from '@/app/api/orgs/[orgId]/invites/route';
 import { DELETE as removeMember, PATCH as updateMemberRoleRoute } from '@/app/api/orgs/[orgId]/members/[membershipId]/route';
 import { POST as createCredential } from '@/app/api/orgs/[orgId]/resources/credentials/route';
 import { PATCH as editPerson } from '@/app/api/orgs/[orgId]/resources/people/[personId]/route';
+import { PATCH as editTemplate } from '@/app/api/orgs/[orgId]/resources/templates/[templateId]/route';
 import { POST as requestAttachment } from '@/app/api/orgs/[orgId]/projects/[projectId]/resource-attachments/route';
 import { POST as pushAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/route';
 import { DELETE as detachAttachment, PATCH as decideAttachment } from '@/app/api/orgs/[orgId]/resource-attachments/[attachmentId]/route';
@@ -252,6 +253,38 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
       () =>
         editPerson(patchFor(FAKE_ORG_ID, FAKE_MEMBERSHIP_ID), {
           params: Promise.resolve({ orgId: FAKE_ORG_ID, personId: FAKE_MEMBERSHIP_ID }),
+        }),
+    );
+  });
+
+  it('PATCH /api/orgs/[orgId]/resources/templates/[templateId]: org caller cannot see vs. fake org id (KAN-117)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-template-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (templates)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-template-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (templates)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const patchFor = (orgId: string, templateId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/resources/templates/${templateId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Leaked Name' }),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        editTemplate(patchFor(orgB.id, FAKE_MEMBERSHIP_ID), {
+          params: Promise.resolve({ orgId: orgB.id, templateId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        editTemplate(patchFor(FAKE_ORG_ID, FAKE_MEMBERSHIP_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, templateId: FAKE_MEMBERSHIP_ID }),
         }),
     );
   });

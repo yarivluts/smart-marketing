@@ -44,6 +44,7 @@ import {
   updateOrgPerson as updateOrgPersonInOrganization,
   createProject as createProjectInOrganization,
   createResourceTemplate as createResourceTemplateInOrganization,
+  updateResourceTemplate as updateResourceTemplateInOrganization,
   applyFieldMappingToDelivery as applyFieldMappingToDeliveryInOrganization,
   type ApplyFieldMappingToDeliveryResult,
   createFieldMapping as createFieldMappingInOrganization,
@@ -300,6 +301,19 @@ interface CreateResourceTemplateInput {
 export async function createResourceTemplate(input: CreateResourceTemplateInput): Promise<ResourceTemplateModel> {
   await ensureFirestoreOrm();
   return createResourceTemplateInOrganization(input);
+}
+
+interface UpdateResourceTemplateInput {
+  organizationId: string;
+  templateId: string;
+  name: string;
+  config?: Record<string, unknown>;
+  actorId: string;
+}
+
+export async function updateResourceTemplate(input: UpdateResourceTemplateInput): Promise<ResourceTemplateModel> {
+  await ensureFirestoreOrm();
+  return updateResourceTemplateInOrganization(input);
 }
 
 interface CreateOrgPersonInput {
