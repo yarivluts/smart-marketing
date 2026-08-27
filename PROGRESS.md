@@ -17,7 +17,49 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — KAN-116: omnisearch customer search (PR pending merge)
+## 2026-08-27 (latest) — Merged PR #321 (KAN-116, omnisearch customer search)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). Checked open PRs before starting new
+    work (established pattern) and found **PR #321** (KAN-116, `kan-116-omnisearch-customers`) —
+    implementation-complete, opened by another session (the entry below is that session's own
+    mid-run checkpoint, written before its PR was opened), base already at current `main`, CI running.
+  - Independently reviewed the diff before relying on it: the `?q=` query-time customer-search path
+    reuses the exact KAN-108 `searchProjectCustomers` outcome-wrapper posture and the same
+    `ingest.write` gate the Customers page itself requires; the client-side debounce/merge logic
+    (`OmniSearchTrigger`) uses a per-effect-run `cancelled` closure flag, so a stale in-flight fetch
+    from an earlier keystroke can't clobber a newer one; the merged-results array only ever appends
+    query-time customer matches after the client-ranked static results, with no overlap since
+    `customer` was never part of the eagerly-fetched static index. No correctness issues found.
+  - Subscribed to the PR's GitHub activity and waited for CI (~40 min, consistent with this repo's
+    full-suite duration) rather than polling continuously; both checks (`terraform fmt · validate`,
+    `lint · typecheck · test · build`) came back green, `mergeable_state: clean`, no open review
+    threads.
+  - Merged PR #321 (squash) into `main` (`1590212`) and unsubscribed from its activity. Remote branch
+    deletion for `kan-116-omnisearch-customers` failed with the same recurring HTTP 403 this file has
+    documented since 2026-07-04.
+  - Corrected the authoring session's own mid-run PROGRESS.md entry (below) and TASKS.md's KAN-116
+    row: both had been written before the PR was opened/merged, per that session's own documented
+    "commit-and-push gate before test verification finished" checkpoint — TASKS.md's row already said
+    `done` but didn't cite the PR number; added `Delivered (PR #321)` for consistency with every other
+    row's convention.
+- **In progress (exact stopping point):** none — KAN-116 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real KAN
+  number is now 116. Check for other open PRs first (established pattern) before starting new,
+  possibly-overlapping work.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-116-omnisearch-customers`.
+
+---
+
+## 2026-08-27 — KAN-116: omnisearch customer search (mid-run checkpoint, superseded by the merge above)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19
@@ -63,14 +105,10 @@ Template for each entry:
   - Committed and pushed branch `kan-116-omnisearch-customers` (commit `b5954c6`) to satisfy the
     session's own commit-and-push gate before test verification finished; tests came back green
     afterward with no follow-up fix needed.
-- **In progress (exact stopping point):** the PR for KAN-116 had not yet been opened/merged at the
-  point this entry was written (mid-run checkpoint — see the file's own instructions: update
-  `PROGRESS.md` at the end of every run, but this session opens the PR and drives it to merge in the
-  same run before stopping). If a fresh session finds `kan-116-omnisearch-customers` still open and
-  unmerged with green CI, finish that: verify CI, review, merge into `main`, delete the branch, then
-  correct this entry's own status line above (and TASKS.md's — it already recorded the row as `done`
-  in anticipation of the same-run merge; downgrade it to `in-progress` if that merge did not in fact
-  happen this run).
+- **In progress (exact stopping point):** superseded — this entry was written as a mid-run
+  checkpoint before the PR was opened; a later run (see the entry above) picked up the resulting
+  PR #321, independently reviewed it, waited for green CI, and merged it. Nothing left to finish
+  here.
 - **Blocked + why:** nothing blocking.
 - **Next step:** once KAN-116 merges, resume the sweep-for-a-newly-buildable-follow-up pattern —
   current highest real KAN number is now 116.
