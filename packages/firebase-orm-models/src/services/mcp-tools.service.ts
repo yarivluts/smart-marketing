@@ -219,6 +219,37 @@ export async function queryProjectCohortRetention(params: QueryProjectCohortRete
   return rows.map(rowToCohortRetentionRow);
 }
 
+/** Mirrors `CustomerSearchOutcome`'s exact ok/degraded shape and reason vocabulary — `queryProjectCohortRetentionForAdmin` below backs a page's own retention-matrix table, not an MCP tool call that can just error out, so the same three expected-not-buggy warehouse failure modes degrade instead of throwing. */
+export type CohortRetentionOutcome =
+  | { ok: true; rows: CohortRetentionRow[] }
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
+
+/**
+ * The admin-page counterpart of {@link queryProjectCohortRetention} (KAN-112) — same
+ * `cohort_month x period_number` retention-matrix semantics, but wraps the warehouse call the way
+ * `searchProjectCustomersForAdmin` (KAN-108) already does so a page rendering the matrix can show a
+ * typed "why not" state instead of crashing. Closes the same shape of gap KAN-108/KAN-111 already
+ * closed for `search_customers`/`query_funnel`: `query_cohort` was only ever reachable through the MCP
+ * server's own tool, with no route or page anywhere under `apps/web` ever calling it.
+ */
+export async function queryProjectCohortRetentionForAdmin(params: QueryProjectCohortRetentionParams): Promise<CohortRetentionOutcome> {
+  try {
+    const rows = await queryProjectCohortRetention(params);
+    return { ok: true, rows };
+  } catch (error) {
+    if (error instanceof WarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured', message: error.message };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    if (error instanceof WarehouseQueryFailedError) {
+      return { ok: false, reason: 'query_error', message: error.message };
+    }
+    throw error;
+  }
+}
+
 export interface QueryProjectFunnelStepsParams {
   organizationId: string;
   projectId: string;
