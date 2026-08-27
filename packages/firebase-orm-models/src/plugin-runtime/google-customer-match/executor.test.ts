@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { GoogleAdsApiError, type GoogleAdsApiClient } from '../google-ads';
 import { SinkPluginExecutionError } from '../executor';
 import type { PluginRuntimeCredential } from '../credential';
-import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch } from './hashing';
+import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch, normalizeMobileIdForGoogleCustomerMatch } from './hashing';
 import { GoogleCustomerMatchSinkPluginExecutor } from './executor';
 
 const CREDENTIAL: PluginRuntimeCredential = {
@@ -63,7 +63,7 @@ describe('GoogleCustomerMatchSinkPluginExecutor', () => {
     expect(result).toEqual({ pushed: 1, externalRef: 'customers/999/userLists/existing' });
   });
 
-  it('drops records with no usable email or phone field before hashing anything', async () => {
+  it('drops records with no usable email, phone, or device id field before hashing anything', async () => {
     const apiClient = fakeApiClient({ addContactsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 1 }) });
     const executor = new GoogleCustomerMatchSinkPluginExecutor({
       apiClient,
@@ -79,6 +79,8 @@ describe('GoogleCustomerMatchSinkPluginExecutor', () => {
         { properties: { email: 42 } },
         { properties: { phone: '' } },
         { properties: { phone: 42 } },
+        { properties: { device_id: '' } },
+        { properties: { device_id: 42 } },
         { properties: {} },
         { properties: null },
         {},
@@ -120,6 +122,43 @@ describe('GoogleCustomerMatchSinkPluginExecutor', () => {
 
     expect(apiClient.addContactsToCustomerMatchUserList).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
       { hashedEmail: hashEmailForGoogleCustomerMatch('a@example.com'), hashedPhoneNumber: hashPhoneForGoogleCustomerMatch('+14155550100') },
+    ]);
+  });
+
+  it('normalizes (but does not hash) a device-id-only record and includes it as a mobileId contact key', async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new GoogleCustomerMatchSinkPluginExecutor({
+      apiClient,
+      customerId: '999',
+      userListName: 'Warm leads',
+      existingUserListResourceName: 'customers/999/userLists/existing',
+    });
+
+    const result = await executor.push(pushParams([{ properties: { device_id: '38400000-8CF0-11BD-B23E-10B96E4EF00D' } }]));
+
+    expect(apiClient.addContactsToCustomerMatchUserList).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
+      { mobileId: normalizeMobileIdForGoogleCustomerMatch('38400000-8CF0-11BD-B23E-10B96E4EF00D') },
+    ]);
+    expect(result).toEqual({ pushed: 1, externalRef: 'customers/999/userLists/existing' });
+  });
+
+  it('combines email, phone, and device id onto the same contact key when a record has all three', async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new GoogleCustomerMatchSinkPluginExecutor({
+      apiClient,
+      customerId: '999',
+      userListName: 'Warm leads',
+      existingUserListResourceName: 'customers/999/userLists/existing',
+    });
+
+    await executor.push(pushParams([{ properties: { email: 'a@example.com', phone: '+14155550100', device_id: '38400000-8cf0-11bd-b23e-10b96e4ef00d' } }]));
+
+    expect(apiClient.addContactsToCustomerMatchUserList).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
+      {
+        hashedEmail: hashEmailForGoogleCustomerMatch('a@example.com'),
+        hashedPhoneNumber: hashPhoneForGoogleCustomerMatch('+14155550100'),
+        mobileId: normalizeMobileIdForGoogleCustomerMatch('38400000-8cf0-11bd-b23e-10b96e4ef00d'),
+      },
     ]);
   });
 

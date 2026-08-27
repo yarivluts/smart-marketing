@@ -301,6 +301,41 @@ describe('GoogleAdsHttpApiClient', () => {
     ]);
   });
 
+  it('uploads a mobileId-only contact as a raw, unhashed userIdentifiers entry', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ resourceName: 'customers/123/offlineUserDataJobs/456' }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [
+      { mobileId: '38400000-8cf0-11bd-b23e-10b96e4ef00d' },
+    ]);
+
+    expect(result).toEqual({ numReceived: 1 });
+    const addOperationsBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
+    expect(addOperationsBody.operations).toEqual([{ create: { userIdentifiers: [{ mobileId: '38400000-8cf0-11bd-b23e-10b96e4ef00d' }] } }]);
+  });
+
+  it('combines hashedEmail, hashedPhoneNumber, and mobileId onto the same userIdentifiers array when a contact carries all three', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ resourceName: 'customers/123/offlineUserDataJobs/456' }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [
+      { hashedEmail: 'hash-email-a', hashedPhoneNumber: 'hash-phone-a', mobileId: 'maid-a' },
+    ]);
+
+    const addOperationsBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
+    expect(addOperationsBody.operations).toEqual([{ create: { userIdentifiers: [{ hashedEmail: 'hash-email-a' }, { hashedPhoneNumber: 'hash-phone-a' }, { mobileId: 'maid-a' }] } }]);
+  });
+
   it('throws GoogleAdsApiError with the response status when the offline user data job create call fails', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 400));
     vi.stubGlobal('fetch', fetchMock);

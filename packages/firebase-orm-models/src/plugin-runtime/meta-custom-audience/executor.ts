@@ -1,6 +1,6 @@
 import { SinkPluginExecutionError, type SinkPluginExecutor, type SinkPluginPushParams, type SinkPluginPushResult } from '../executor';
 import { MetaAdsApiError, type MetaAdsApiClient, type MetaContactMatchKey } from '../meta-ads';
-import { hashEmailForMetaCustomAudience, hashPhoneForMetaCustomAudience } from './hashing';
+import { hashEmailForMetaCustomAudience, hashMobileDeviceIdForMetaCustomAudience, hashPhoneForMetaCustomAudience } from './hashing';
 
 export interface MetaCustomAudienceSinkPluginExecutorOptions {
   apiClient: MetaAdsApiClient;
@@ -48,16 +48,31 @@ function extractPhone(record: Record<string, unknown>): string | undefined {
   return extractProperty(record, 'phone');
 }
 
-/** Builds this record's Meta contact-match key from whichever of email/phone it has — `undefined` when neither is present, so the caller can drop the record entirely rather than pushing an empty row. */
+/**
+ * A record's `properties.device_id` field, if present (mobile-device-id
+ * follow-up — the last of the three non-email identifiers `extractPhone`'s
+ * own doc comment named as still deferred). Same "silently skip, not every
+ * row carries one" posture as {@link extractEmail}/{@link extractPhone} —
+ * `device_id` is the same property key convention `packages/dbt-transform`'s
+ * own `bridge_identity` model already establishes for a device-id identity
+ * key on an event schema, reused here for an entity/segment-member record.
+ */
+function extractDeviceId(record: Record<string, unknown>): string | undefined {
+  return extractProperty(record, 'device_id');
+}
+
+/** Builds this record's Meta contact-match key from whichever of email/phone/device id it has — `undefined` when none is present, so the caller can drop the record entirely rather than pushing an empty row. */
 function extractContactMatchKey(record: Record<string, unknown>): MetaContactMatchKey | undefined {
   const email = extractEmail(record);
   const phone = extractPhone(record);
-  if (email === undefined && phone === undefined) {
+  const deviceId = extractDeviceId(record);
+  if (email === undefined && phone === undefined && deviceId === undefined) {
     return undefined;
   }
   return {
     ...(email !== undefined ? { emailHash: hashEmailForMetaCustomAudience(email) } : {}),
     ...(phone !== undefined ? { phoneHash: hashPhoneForMetaCustomAudience(phone) } : {}),
+    ...(deviceId !== undefined ? { madidHash: hashMobileDeviceIdForMetaCustomAudience(deviceId) } : {}),
   };
 }
 
@@ -73,16 +88,16 @@ function extractContactMatchKey(record: Record<string, unknown>): MetaContactMat
  * lifecycle (there is no budget/guardrail-relevant "before/after" here to
  * diff or roll back).
  *
- * A record contributes an `EMAIL` key, a `PHONE` key, both, or (if neither
- * `properties.email` nor `properties.phone` is a usable string) is silently
- * dropped entirely (see {@link extractContactMatchKey}) — KAN-73's own
- * "non-email identifiers ... explicitly deferred" follow-up note, closed by
- * adding `phone` here rather than a separate identifier type (mailing
- * address and device id remain deferred — Meta's own upload schema needs a
- * different, multi-field shape for each that this story's phone-only scope
- * doesn't build). `pushed` counts only the contact rows Meta actually
- * received, which may therefore be smaller than the segment's own member
- * count reported elsewhere on the page.
+ * A record contributes an `EMAIL` key, a `PHONE` key, a `MADID` key, any
+ * combination, or (if none of `properties.email`/`properties.phone`/
+ * `properties.device_id` is a usable string) is silently dropped entirely
+ * (see {@link extractContactMatchKey}) — KAN-73's own "non-email identifiers
+ * ... explicitly deferred" follow-up note, closed for email/phone by an
+ * earlier follow-up and now for mobile device id too (mailing address
+ * remains deferred — Meta's own upload schema needs a different, multi-field
+ * shape for it that this story's scope doesn't build). `pushed` counts only
+ * the contact rows Meta actually received, which may therefore be smaller
+ * than the segment's own member count reported elsewhere on the page.
  *
  * `crm-sync.service.ts`'s `syncSegmentToCrm` wraps a whole `push()` call in
  * `runWithRetryBackoff`, retrying the *same* executor instance on a

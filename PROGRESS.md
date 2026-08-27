@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — KAN-111: Funnel conversion admin surface (opened)
+## 2026-08-27 — KAN-111: Funnel conversion admin surface (opened)
 
 - **Last completed:**
   - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
@@ -83,7 +83,73 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #315 (KAN-109, hook/field-mapping enable admin surface)
+## 2026-08-27 — Merged PR #316 (KAN-110, Meta/Google audience mobile-device-id identifier)
+
+- **Last completed:**
+  - Session start: fetched `origin/main` (matched local `HEAD` at `7510497`, PR #315/KAN-109
+    merged). Checked open PRs before picking new work (established pattern) and found **PR #316**
+    (`kan-110-meta-google-audience-maid`), opened by a different, now-idle/disconnected session at
+    2026-08-27T00:06 UTC — fully implemented (Meta MADID + Google Ads `mobileId` contact-match
+    identifiers, mirroring the existing email/phone-identifier follow-ups). Subscribed to its
+    activity and took over finishing it rather than starting new, possibly-overlapping backlog
+    work, same posture the KAN-109 entry below took for PR #315.
+  - `mergeable_state: dirty` — its base predated PR #315's merge. Checked out the branch and
+    merged `origin/main` in (a real merge commit, not a rebase — the branch belongs to another
+    session). Conflicts in `TASKS.md`/`PROGRESS.md` only (both append-at-top/bottom files); no
+    numbering collision this time (KAN-109 vs KAN-110 are distinct), just an interleaving
+    resolution — kept both rows/entries, origin/main's newer KAN-109 material on top. Confirmed
+    via `git diff --stat` that no source file conflicted.
+  - Verified everything green before relying on CI: `pnpm install --frozen-lockfile`, then
+    `pnpm lint`/`pnpm typecheck`/`pnpm build` all green across all 8 packages. Full `pnpm test`
+    hit one failure — `apps/api`'s `mcp.controller.e2e.spec.ts` (a KAN-76/77 act-tools/rate-limit
+    test), a 30000ms jest timeout — in a file this diff never touches. Re-ran that one spec file
+    in isolation via the proper `firebase emulators:exec --only firestore "jest ..."` wrapper:
+    still one failure, but a **different** test within the same file timed out this time (20/21
+    passed both runs) — the same non-deterministic "resource-contention flake class" this file has
+    documented since PR #173 (a pre-existing timeout in this same spec, confirmed non-reproducible
+    on retry). Two different sub-tests failing across two runs (rather than the same assertion
+    both times) is itself evidence against a real regression, so proceeded rather than spending a
+    second local re-run.
+  - Pushed the merge commit; CI on it (`lint · typecheck · test · build` + `terraform fmt ·
+    validate`) came back `success` on both checks; `mergeable_state: clean`; no open review
+    threads. Independently reviewed the diff (hashing/executor/api-client changes across both
+    Meta and Google Ads connectors) — sound, consistent with the existing phone-identifier
+    follow-up's exact posture, well-tested (byte-identical-when-absent payload tests, hash-vs-raw
+    distinction tests for Google's deliberately-unhashed `mobileId`), no UI/i18n surface needed
+    (backend-only data-shape change, confirmed no `apps/web`/`messages` files in the diff). No bugs
+    found.
+  - Merged PR #316 (squash) into `main` (`5ffac22`) and unsubscribed from its activity. Remote
+    branch deletion for `kan-110-meta-google-audience-maid` failed with the same recurring HTTP
+    403 this file has documented since 2026-07-04.
+  - **Found post-merge:** the squash-merge commit's title/body reads "...(KAN-109)..." — wrong;
+    this story is KAN-110 (PR #315 is the real KAN-109). Root cause: the *original* commit on the
+    PR branch (authored by the other session, before this run touched it) was itself titled
+    "...(KAN-109)" — a stale artifact from before that session discovered the KAN-108 collision
+    and renumbered to KAN-110 in the PR title/body/`TASKS.md` row, but never amended its own
+    initial commit message. `merge_pull_request` was called without an explicit `commit_title`, so
+    GitHub defaulted to that first commit's (wrong) message rather than the PR's (correct) title.
+    `TASKS.md`'s KAN-110 row itself is correct and is the source of truth per this file's own
+    conventions; flagging here so a future session searching history for "KAN-110" knows to also
+    match on PR #316 / commit `5ffac22`, not just the commit message text.
+- **In progress (exact stopping point):** none — KAN-110 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern for the next candidate,
+  re-checking **open PRs** (not just `TASKS.md`) immediately before minting a new ad-hoc KAN
+  number, and passing an explicit `commit_title` on any future squash-merge to avoid repeating
+  this run's commit-message mismatch — current highest real KAN number is now 110.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - The `platform_admin` bootstrap gap flagged in prior entries — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile
+    of already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with
+    an HTTP 403 from this sandbox's git remote) — now also including
+    `kan-110-meta-google-audience-maid`.
+
+---
+
+## 2026-08-27 — Merged PR #315 (KAN-109, hook/field-mapping enable admin surface)
 
 - **Last completed:**
   - Continuation of the entry below: PR #315's CI re-run (attempt 2, run #1119) came back
@@ -130,6 +196,74 @@ Template for each entry:
     of already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with
     an HTTP 403 from this sandbox's git remote) — now also including
     `kan-108-hook-field-mapping-enable`.
+
+---
+
+## 2026-08-26 — KAN-110: Meta/Google audience mobile-device-id identifier (opened)
+
+- **Last completed:**
+  - Assigned task (not a fresh sweep): add a third contact-match identifier (mobile device id /
+    MAID) to the Meta Custom Audience and Google Customer Match sync executors, closing the exact
+    gap both `meta-custom-audience/executor.ts` and `google-customer-match/executor.ts` doc
+    comments named verbatim (KAN-73/KAN-72's own "non-email identifiers ... explicitly deferred"
+    note, phone already closed by an earlier follow-up).
+  - Checked `TASKS.md`'s freshest highest row (KAN-107) and open PRs before minting a number:
+    found two concurrent sessions had independently opened PR #314 and PR #315, **both** numbered
+    "KAN-108" for unrelated work (a customer-search admin surface, and a hook/field-mapping
+    re-enable toggle). By the time this branch was created, `origin/main` had already merged
+    PR #314 as KAN-108 and PR #315's own in-flight PROGRESS.md entry had separately declared
+    intent to renumber itself to KAN-109 at merge time — so rather than risk a second collision
+    on 109, this story took **KAN-110**. No renumbering needed on either side since this story
+    never touched the same files as PR #315.
+  - Meta side: new `hashMobileDeviceIdForMetaCustomAudience` (lowercase+trim then SHA-256, but
+    unlike phone does NOT strip internal hyphens — a MAID's hyphens are its own UUID format, not
+    incidental punctuation); `MetaContactMatchKey.madidHash`; `addContactsToCustomAudience`'s
+    presence-conditional `EMAIL`/`PHONE` schema-array building extended to `MADID` the same way (a
+    MADID-less batch stays byte-identical to its pre-this-change payload); the executor reads
+    `properties.device_id` best-effort, same convention as `email`/`phone`.
+  - Google side: **implemented in full, not deferred.** Verified from real knowledge of the Google
+    Ads API's `UserIdentifier` schema that `mobileId` is a genuinely distinct, never-hashed
+    identifier field riding the exact same `userIdentifiers` array `hashedEmail`/`hashedPhoneNumber`
+    already populate — no different request shape needed, so the task's own "acceptable to scope
+    down to Meta-only if the API doesn't fit" escape hatch did not apply here. New
+    `normalizeMobileIdForGoogleCustomerMatch` (trims+lowercases, deliberately never calls
+    `node:crypto` — the one function in that file that isn't a hash, documented why); `mobileId` on
+    `GoogleAdsContactMatchKey`; `addContactsToCustomerMatchUserList` adds a `{ mobileId }` entry
+    when present; the executor reads `properties.device_id` the same way the Meta side does.
+  - Full test coverage mirroring the existing phone-identifier tests exactly: hashing/normalization
+    unit tests both sides, api-client request-shape tests (Meta's MADID-only/mixed/
+    omitted-from-schema payloads; Google's raw-mobileId and combined-identifier payloads), executor
+    tests (best-effort property read, drops-when-absent-from-all-three, combines all three onto one
+    contact key). No UI change needed — grepped for any admin-surface precedent the phone-identifier
+    follow-up might have added (none did; this is a backend-only data-shape change on both
+    connectors, same posture the phone follow-up itself established) and mirrored that exactly.
+  - Self-review pass found the diff logically sound (schema-array/`userIdentifiers` conditional
+    inclusion correctly preserves byte-identical payloads when the new identifier is absent,
+    `extractContactMatchKey`'s undefined-check correctly extended to three fields on both sides) —
+    only fixed two doc-comment line-wrap artifacts (a sentence split across two doc-comment blocks
+    by an earlier find/replace), no functional bugs found.
+  - Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck` green (all 8 packages); full `pnpm test`
+    green (exit 0, 11/11 turbo tasks) — the only failures observed were 4 pre-existing Playwright
+    e2e flakes (`experiments.spec.ts`, `ingest-health.spec.ts`, `resource-library.spec.ts`,
+    `tv-pairing.spec.ts`, none touching this diff's files) that passed on Playwright's own automatic
+    retry, consistent with this repo's long-documented e2e-flake pattern.
+- **In progress (exact stopping point):** PR not yet opened as of this entry — opening it next, then
+  polling CI to completion and merging once green (see this repo's one-flake-re-run policy).
+- **Blocked + why:** nothing blocking; proceeding to open the PR immediately after this entry.
+- **Next step:** open the PR (`kan-110-meta-google-audience-maid`), poll CI, merge squash once green,
+  delete the branch, then push a follow-up doc commit to `main` recording the merge (same two-entry
+  pattern this file already uses for KAN-107/etc.).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
+    rows — still outstanding, unchanged by this run.
+  - The `platform_admin` bootstrap gap flagged in an earlier entry — still outstanding, needs a
+    human's scoping decision before either dependent candidate (automation kill switch,
+    org-ownership recovery) is buildable.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote).
 
 ---
 

@@ -1,6 +1,6 @@
 import { SinkPluginExecutionError, type SinkPluginExecutor, type SinkPluginPushParams, type SinkPluginPushResult } from '../executor';
 import { GoogleAdsApiError, type GoogleAdsApiClient, type GoogleAdsContactMatchKey } from '../google-ads';
-import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch } from './hashing';
+import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch, normalizeMobileIdForGoogleCustomerMatch } from './hashing';
 
 export interface GoogleCustomerMatchSinkPluginExecutorOptions {
   apiClient: GoogleAdsApiClient;
@@ -50,16 +50,33 @@ function extractPhone(record: Record<string, unknown>): string | undefined {
   return extractProperty(record, 'phone');
 }
 
-/** Builds this record's Google Ads contact-match key from whichever of email/phone it has — `undefined` when neither is present, so the caller can drop the record entirely rather than pushing an identifier-less operation. */
+/**
+ * A record's `properties.device_id` field, if present (mobile-device-id
+ * follow-up — the last of the two non-email identifiers `extractPhone`'s own
+ * doc comment had named as still deferred, the direct Google Ads sibling of
+ * `MetaCustomAudienceSinkPluginExecutor`'s own `extractDeviceId`). Same
+ * "silently skip, not every row carries one" posture as
+ * {@link extractEmail}/{@link extractPhone} — `device_id` is the same
+ * property key convention `packages/dbt-transform`'s own `bridge_identity`
+ * model already establishes for a device-id identity key on an event
+ * schema.
+ */
+function extractDeviceId(record: Record<string, unknown>): string | undefined {
+  return extractProperty(record, 'device_id');
+}
+
+/** Builds this record's Google Ads contact-match key from whichever of email/phone/device id it has — `undefined` when none is present, so the caller can drop the record entirely rather than pushing an identifier-less operation. */
 function extractContactMatchKey(record: Record<string, unknown>): GoogleAdsContactMatchKey | undefined {
   const email = extractEmail(record);
   const phone = extractPhone(record);
-  if (email === undefined && phone === undefined) {
+  const deviceId = extractDeviceId(record);
+  if (email === undefined && phone === undefined && deviceId === undefined) {
     return undefined;
   }
   return {
     ...(email !== undefined ? { hashedEmail: hashEmailForGoogleCustomerMatch(email) } : {}),
     ...(phone !== undefined ? { hashedPhoneNumber: hashPhoneForGoogleCustomerMatch(phone) } : {}),
+    ...(deviceId !== undefined ? { mobileId: normalizeMobileIdForGoogleCustomerMatch(deviceId) } : {}),
   };
 }
 
@@ -73,14 +90,18 @@ function extractContactMatchKey(record: Record<string, unknown>): GoogleAdsConta
  * out").
  *
  * A record contributes a `hashedEmail` identifier, a `hashedPhoneNumber`
- * identifier, both, or (if neither `properties.email` nor `properties.phone`
- * is a usable string) is silently dropped entirely (see
- * {@link extractContactMatchKey}) — KAN-72's own "non-email identifiers ...
- * explicitly deferred" follow-up note, closed by adding `phone` here rather
- * than a separate identifier type (mailing address and mobile device id
- * remain deferred — Google's own offline-data-job schema needs a different,
- * multi-field shape for each that this story's phone-only scope doesn't
- * build). `pushed` counts only the contact rows actually submitted to
+ * identifier, a `mobileId` identifier, any combination, or (if none of
+ * `properties.email`/`properties.phone`/`properties.device_id` is a usable
+ * string) is silently dropped entirely (see {@link extractContactMatchKey})
+ * — KAN-72's own "non-email identifiers ... explicitly deferred" follow-up
+ * note, closed for email/phone by an earlier follow-up and now for mobile
+ * device id too. Unlike `hashedEmail`/`hashedPhoneNumber`, `mobileId` is
+ * never hashed (see `hashing.ts`'s own `normalizeMobileIdForGoogleCustomerMatch`
+ * doc comment for why Google's own spec requires this one raw). Mailing
+ * address remains deferred — Google's own offline-data-job schema needs a
+ * different, multi-field shape for it that this connector's
+ * single-string-per-identifier scope doesn't build. `pushed` counts only
+ * the contact rows actually submitted to
  * Google's offline user data job, which may therefore be smaller than the
  * segment's own member count reported elsewhere on the page. Unlike Meta's
  * synchronous "num received" response, Google Ads processes an offline user

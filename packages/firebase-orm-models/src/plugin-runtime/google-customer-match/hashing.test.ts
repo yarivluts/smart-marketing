@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch } from './hashing';
+import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch, normalizeMobileIdForGoogleCustomerMatch } from './hashing';
 
 describe('hashEmailForGoogleCustomerMatch', () => {
   it('trims and lowercases before hashing', () => {
@@ -36,5 +36,23 @@ describe('hashPhoneForGoogleCustomerMatch', () => {
   it('produces a 64-character lowercase hex digest', () => {
     const hash = hashPhoneForGoogleCustomerMatch('+14155550100');
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('normalizeMobileIdForGoogleCustomerMatch', () => {
+  it('trims and lowercases the MAID, but does not hash it', () => {
+    expect(normalizeMobileIdForGoogleCustomerMatch('  38400000-8CF0-11BD-B23E-10B96E4EF00D  ')).toBe('38400000-8cf0-11bd-b23e-10b96e4ef00d');
+  });
+
+  it('is not a SHA-256 hash, unlike every other identifier in this file', () => {
+    const normalized = normalizeMobileIdForGoogleCustomerMatch('38400000-8cf0-11bd-b23e-10b96e4ef00d');
+    expect(normalized).not.toMatch(/^[0-9a-f]{64}$/);
+    expect(normalized).not.toBe(createHash('sha256').update('38400000-8cf0-11bd-b23e-10b96e4ef00d').digest('hex'));
+  });
+
+  it('produces the same value for MAIDs that only differ by case or surrounding whitespace', () => {
+    expect(normalizeMobileIdForGoogleCustomerMatch('38400000-8cf0-11bd-b23e-10b96e4ef00d')).toBe(
+      normalizeMobileIdForGoogleCustomerMatch('  38400000-8CF0-11BD-B23E-10B96E4EF00D  '),
+    );
   });
 });
