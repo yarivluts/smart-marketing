@@ -7,6 +7,7 @@ import {
   createOrganizationWithOwner,
   createProject,
   disableFieldMapping,
+  enableFieldMapping,
   ensureUserForFirebaseSession,
   EnvironmentNotFoundError,
   FieldMappingDisabledError,
@@ -16,6 +17,7 @@ import {
   HookDeliveryDiscardedError,
   InvalidFieldMappingError,
   InvalidSamplePayloadError,
+  listAuditLogEntriesForOrg,
   listFieldMappingsForProject,
   listHookDeliveriesForProject,
   ProjectNotFoundError,
@@ -233,6 +235,109 @@ describe('listFieldMappingsForProject / disableFieldMapping', () => {
         projectId: project.id,
         fieldMappingId: 'does-not-exist',
         disabledByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(FieldMappingNotFoundError);
+  });
+});
+
+describe('enableFieldMapping', () => {
+  it('clears disabled_at/disabled_by and lets a disabled mapping apply again', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Mapping Enable Org');
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    const mapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'A',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+    await disableFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      disabledByUserId: owner.id,
+    });
+
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'x',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+    const delivery = await receiveHookPayload({ hookId: endpoint.hook_id, rawBody: SAMPLE_SHOPIFY_PAYLOAD, headers: {} });
+    if (!delivery.ok) throw new Error('expected delivery to be accepted');
+
+    await expect(
+      applyFieldMappingToDelivery({
+        organizationId: organization.id,
+        projectId: project.id,
+        fieldMappingId: mapping.id,
+        hookDeliveryId: delivery.value.delivery.id,
+        actorId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(FieldMappingDisabledError);
+
+    const enabled = await enableFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      enabledByUserId: owner.id,
+    });
+    expect(enabled.disabled_at).toBeFalsy();
+    expect(enabled.disabled_by).toBeFalsy();
+
+    const result = await applyFieldMappingToDelivery({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      hookDeliveryId: delivery.value.delivery.id,
+      actorId: owner.id,
+    });
+    expect(result.applied).toBe(true);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const enableEntry = entries.find((entry) => entry.action === 'field_mapping.enable' && entry.target_id === mapping.id);
+    expect(enableEntry).toBeTruthy();
+    expect(enableEntry?.actor_id).toBe(owner.id);
+  });
+
+  it('is a safe no-op on a mapping that was never disabled', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Mapping Enable Never Disabled Org');
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    const mapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'A',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+
+    const enabled = await enableFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      enabledByUserId: owner.id,
+    });
+    expect(enabled.disabled_at).toBeFalsy();
+  });
+
+  it('rejects enabling a mapping that does not exist in this project', async () => {
+    const { owner, organization, project } = await setupProject('Mapping Enable Missing Org');
+
+    await expect(
+      enableFieldMapping({
+        organizationId: organization.id,
+        projectId: project.id,
+        fieldMappingId: 'does-not-exist',
+        enabledByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(FieldMappingNotFoundError);
   });

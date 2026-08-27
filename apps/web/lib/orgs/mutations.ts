@@ -56,6 +56,8 @@ import {
   type DrainPipelineResult,
   detachResource as detachResourceInOrganization,
   disableFieldMapping as disableFieldMappingInOrganization,
+  enableFieldMapping as enableFieldMappingInOrganization,
+  enableHookEndpoint as enableHookEndpointInOrganization,
   enablePlugin as enablePluginInOrganization,
   type EnsureTouchpointSchemaRegisteredResult,
   ensureTouchpointSchemaRegistered as ensureTouchpointSchemaRegisteredInOrganization,
@@ -484,6 +486,18 @@ export async function disableHookEndpoint(input: DisableHookEndpointInput): Prom
   return disableHookEndpointInOrganization(input);
 }
 
+interface EnableHookEndpointInput {
+  organizationId: string;
+  projectId: string;
+  hookEndpointId: string;
+  enabledByUserId: string;
+}
+
+export async function enableHookEndpoint(input: EnableHookEndpointInput): Promise<HookEndpointModel> {
+  await ensureFirestoreOrm();
+  return enableHookEndpointInOrganization(input);
+}
+
 interface SetHookEndpointSigningSecretInput {
   organizationId: string;
   projectId: string;
@@ -538,6 +552,18 @@ interface DisableFieldMappingInput {
 export async function disableFieldMapping(input: DisableFieldMappingInput): Promise<FieldMappingModel> {
   await ensureFirestoreOrm();
   return disableFieldMappingInOrganization(input);
+}
+
+interface EnableFieldMappingInput {
+  organizationId: string;
+  projectId: string;
+  fieldMappingId: string;
+  enabledByUserId: string;
+}
+
+export async function enableFieldMapping(input: EnableFieldMappingInput): Promise<FieldMappingModel> {
+  await ensureFirestoreOrm();
+  return enableFieldMappingInOrganization(input);
 }
 
 interface TestRunFieldMappingInput {

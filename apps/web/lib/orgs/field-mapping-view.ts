@@ -19,7 +19,7 @@ export interface FieldMappingView {
   rules: FieldMappingRuleView[];
   createdBy: string;
   createdAt: string;
-  disabledAt?: string;
+  disabledAt?: string | null;
 }
 
 /** A `FieldMappingModel` instance doesn't serialize cleanly through `NextResponse.json` — same reasoning `toSchemaDefView` documents. */

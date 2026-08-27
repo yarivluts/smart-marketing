@@ -6,6 +6,7 @@ import {
   createOrganizationWithOwner,
   createProject,
   disableHookEndpoint,
+  enableHookEndpoint,
   EnvironmentNotFoundError,
   ensureUserForFirebaseSession,
   generateLocalKmsKeyRing,
@@ -241,6 +242,78 @@ describe('disableHookEndpoint', () => {
         projectId: project.id,
         hookEndpointId: 'does-not-exist',
         disabledByUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(HookEndpointNotFoundError);
+  });
+});
+
+describe('enableHookEndpoint', () => {
+  it('clears disabled_at/disabled_by and lets the endpoint receive payloads again', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Enable Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'x',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+    await disableHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      disabledByUserId: owner.id,
+    });
+    const disabledDelivery = await receiveHookPayload({ hookId: endpoint.hook_id, rawBody: '{}', headers: {} });
+    expect(disabledDelivery.ok).toBe(false);
+
+    const enabled = await enableHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      enabledByUserId: owner.id,
+    });
+    expect(enabled.disabled_at).toBeFalsy();
+    expect(enabled.disabled_by).toBeFalsy();
+
+    const enabledDelivery = await receiveHookPayload({ hookId: endpoint.hook_id, rawBody: '{}', headers: {} });
+    expect(enabledDelivery.ok).toBe(true);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const enableEntry = entries.find((entry) => entry.action === 'hook_endpoint.enable' && entry.target_id === endpoint.id);
+    expect(enableEntry).toBeTruthy();
+    expect(enableEntry?.actor_id).toBe(owner.id);
+  });
+
+  it('is a safe no-op on an endpoint that was never disabled', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Enable Never Disabled Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'x',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+
+    const enabled = await enableHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      enabledByUserId: owner.id,
+    });
+    expect(enabled.disabled_at).toBeFalsy();
+  });
+
+  it('rejects enabling an endpoint that does not exist in this project', async () => {
+    const { owner, organization, project } = await setupProject('Hook Enable Missing Org');
+
+    await expect(
+      enableHookEndpoint({
+        organizationId: organization.id,
+        projectId: project.id,
+        hookEndpointId: 'does-not-exist',
+        enabledByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(HookEndpointNotFoundError);
   });

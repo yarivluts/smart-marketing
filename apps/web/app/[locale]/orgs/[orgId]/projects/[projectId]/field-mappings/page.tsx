@@ -14,6 +14,7 @@ import {
 } from '@/lib/orgs/queries';
 import { CreateFieldMappingForm } from '@/components/orgs/create-field-mapping-form';
 import { DisableFieldMappingButton } from '@/components/orgs/disable-field-mapping-button';
+import { EnableFieldMappingButton } from '@/components/orgs/enable-field-mapping-button';
 import { TestRunFieldMappingPanel } from '@/components/orgs/test-run-field-mapping-panel';
 
 type PageProps = Readonly<{
@@ -113,7 +114,9 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
                     </div>
                     {!mapping.disabled_at ? (
                       <DisableFieldMappingButton orgId={orgId} projectId={projectId} fieldMappingId={mapping.id} />
-                    ) : null}
+                    ) : (
+                      <EnableFieldMappingButton orgId={orgId} projectId={projectId} fieldMappingId={mapping.id} />
+                    )}
                   </div>
                   <TestRunFieldMappingPanel
                     orgId={orgId}
