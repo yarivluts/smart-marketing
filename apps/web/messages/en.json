@@ -123,7 +123,8 @@
     "projectTvLink": "War-room TV",
     "projectSessionReplayLink": "Session replay",
     "projectCampaignOpsLink": "Campaign ops",
-    "projectRepCollectionsLink": "Rep collections"
+    "projectRepCollectionsLink": "Rep collections",
+    "projectFunnelLink": "Funnel"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -669,6 +670,18 @@
     "resultLastSeenLine": "Last seen {lastSeenAt}",
     "resultFieldLine": "{name}: {value}",
     "capNote": "Showing the {count} most recent matches."
+  },
+  "Funnel": {
+    "metaTitle": "Funnel",
+    "title": "Funnel for {projectName}",
+    "description": "How customers move through this project's confirmed funnel, stage by stage, and each stage's conversion off the first step.",
+    "noFunnel": "No funnel confirmed yet for this project. Confirm a funnel mapping during onboarding to see conversion here.",
+    "notConfigured": "Funnel conversion unavailable (warehouse not configured yet)",
+    "quotaExceeded": "Funnel conversion unavailable (daily query quota reached)",
+    "queryError": "Funnel conversion unavailable",
+    "stepHeading": "{order}. {stage}",
+    "stepConversion": "{percent}% of step 1",
+    "stepCustomerCount": "{count} customers reached this stage"
   },
   "Feedback": {
     "metaTitle": "Feedback & NPS",
