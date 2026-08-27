@@ -17,6 +17,73 @@ Template for each entry:
 
 ---
 
+## 2026-08-27 (latest) — Merged PR #325 (KAN-120, segment definition edit)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. Local `main` was at `cb45df3` (behind by then); `TASKS.md` was
+    entirely `done` except the standing KAN-18/19 infra items and KAN-43/50/51
+    (`needs-human`/`blocked-by`). Checked open PRs first (established pattern) and found two already
+    in flight from concurrent sessions: PR #323 (KAN-118, cohort conversion-event parameterization)
+    and PR #324 (KAN-119, shared-credential edit) — both implementation-complete, CI running, not
+    picked up (nothing actionable to add, and picking up an in-flight PR mid-CI without a concrete
+    reason just adds noise).
+  - Delegated a research sweep (Explore agent) across `apps/`/`packages/`/`docs/plan/` for a
+    still-genuinely-open, buildable-today (no new infra/credentials) gap not already claimed by
+    KAN-118/119. It ranked candidates and recommended: `segment.service.ts`'s `createSegment`/
+    `listSegmentsForProject` had create + list only, and KAN-81 later added owner/status updates, but
+    a segment's own definition (name/schema/filters/event conditions) never got an update path — the
+    same "create + list only, no way to fix a typo" gap KAN-100 (`updateOrgPerson`) and KAN-117
+    (`updateResourceTemplate`) already closed for their own sibling registries. Confirmed the gap was
+    real by reading `segment.service.ts` directly (only `assignSegmentOwner`/`updateSegmentStatus`
+    exist) before committing to it.
+  - Implemented **KAN-120** (minted fresh — no number collision with KAN-118/119 checked before and
+    after implementing): extracted `createSegment`'s validation into a shared `validateSegmentDefinition`
+    helper reused by a new `updateSegmentDefinition` (full replace, audit-logged `segment.update`);
+    the existing `PATCH .../segments/[segmentId]` route now dispatches on which fields the body names
+    (KAN-81's worklist fields vs. this story's definition fields), rejecting a body mixing both as
+    `mixed_update_fields` (a single body-parse, since a `NextRequest` body can only be read once); new
+    `EditSegmentForm` admin control (collapsed "Edit" button, filters/event-conditions as pretty-printed
+    JSON — mirroring `EditTemplateForm`'s own JSON-textarea convention for a complex nested field
+    rather than re-implementing `CreateSegmentForm`'s row editor a second time); `SegmentSummaryView`
+    widened to carry a segment's raw `filters`/`eventConditions` (its own definition, not member data,
+    so no PII concern) so the form pre-fills without a second fetch.
+  - Full test coverage added: `packages/firebase-orm-models` emulator tests for `updateSegmentDefinition`
+    (full replace, event-condition clearing, id/owner/status preservation across a definition edit,
+    validation-failure atomicity via a reload-from-Firestore check, not-found, audit log before/after
+    — 59/59 green in `segment.emulator.test.ts`); `apps/web` unit tests for the new combined
+    `parseUpdateSegmentRequestBody` parser, emulator-backed PATCH route tests, an updated
+    `segment-view.test.ts` for the widened view shape, and a new `EditSegmentForm` component test
+    suite. One real bug caught and fixed during test-writing (not a design mistake, an ICU escaping
+    gap): the new inline-error translation strings contained literal `{`/`}` characters, which
+    next-intl's ICU parser tried to interpret as argument placeholders — fixed with the `'{'.../'}'`
+    escaping convention `messages/en.json` already establishes elsewhere (`samplePayloadPlaceholder`).
+  - Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck` green; `pnpm test` green (11/11 turbo
+    tasks, exit 0 — two pre-existing, documented Playwright e2e flakes in files this diff never
+    touches, both passed on retry) before opening PR #325.
+  - Opened PR #325, subscribed to its activity, and waited for CI (~40 min) rather than polling
+    continuously. Noticed mid-wait that PR #323 (KAN-118) had merged, moving `main` forward — GitHub's
+    own `base.sha` already reflected the new tip and `mergeable_state` stayed `unstable`→`clean`
+    (never `dirty`), so no rebase was needed. Both checks (`terraform fmt · validate`,
+    `lint · typecheck · test · build`) came back green, `mergeable_state: clean`, no open review
+    threads. Merged PR #325 (squash) into `main` and unsubscribed. Remote branch deletion for
+    `kan-120-segment-definition-edit` failed with the same recurring HTTP 403 this file has
+    documented since 2026-07-04.
+  - Added the KAN-120 row to `TASKS.md`.
+- **In progress (exact stopping point):** none — KAN-120 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real KAN
+  number is 120 (KAN-119/PR #324 was still open, not yet merged, as of this entry — check its status
+  first). Check for other open PRs before starting new, possibly-overlapping work.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-120-segment-definition-edit`.
+
+---
+
 ## 2026-08-27 (latest) — KAN-118: cohort retention parameterized by a specific conversion event (PR #323)
 
 - **Last completed:**
