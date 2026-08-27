@@ -206,6 +206,12 @@ export async function listOrgMembers(organizationId: string): Promise<OrgMemberS
   return listOrgMembersWithProfiles(organizationId);
 }
 
+/** Loads one org's own record (name/slug/billing_email) for the org settings page, or `null` if it doesn't exist. */
+export async function getOrganization(organizationId: string): Promise<OrganizationModel | null> {
+  await ensureFirestoreOrm();
+  return OrganizationModel.init(organizationId);
+}
+
 /**
  * Wrapped in React's `cache()` — the project-level nav shell's `layout.tsx`
  * and every project `page.tsx` it wraps each call this independently for the

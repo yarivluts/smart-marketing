@@ -68,3 +68,72 @@ export async function setProjectSessionReplayUrlTemplate(
 
   return project;
 }
+
+export class InvalidProjectNameError extends Error {
+  constructor() {
+    super('Project name is required.');
+    this.name = 'InvalidProjectNameError';
+  }
+}
+
+export interface UpdateProjectDetailsParams {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  /** Omit (or pass an empty string) to clear the vertical. */
+  vertical?: string;
+  actorUserId: string;
+}
+
+/**
+ * Corrects a project's own `name`/`vertical` — the same "create + list
+ * only, no way to fix a typo'd definition" gap KAN-100/117/119/120/121
+ * already closed for their own sibling registries, except this is the
+ * project record itself: until now a project's name (set once at
+ * `createProject` time) could never be corrected, only left as-is forever.
+ * `organization_id` stays immutable — moving a project to a different org
+ * isn't a correction, it's a different tenancy structure entirely, the same
+ * "structural fact, not a fixable typo" posture `updateFieldMapping` applies
+ * to `kind`/`environmentId`. `session_replay_url_template` is edited via its
+ * own dedicated {@link setProjectSessionReplayUrlTemplate}, not here.
+ *
+ * Gated at the route layer on `project.manage`, the same per-project
+ * admin-config permission the session-replay and cost-guardrail routes use.
+ */
+export async function updateProjectDetails(params: UpdateProjectDetailsParams): Promise<ProjectModel> {
+  const project = await ProjectModel.init(params.projectId, { organization_id: params.organizationId });
+  if (!project || project.organization_id !== params.organizationId) {
+    throw new ProjectNotFoundError();
+  }
+
+  const trimmedName = params.name.trim();
+  if (!trimmedName) {
+    throw new InvalidProjectNameError();
+  }
+
+  const before = { name: project.name, vertical: project.vertical ?? '' };
+
+  project.name = trimmedName;
+  project.vertical = params.vertical?.trim() ?? '';
+  project.setPathParams({ organization_id: params.organizationId });
+  await project.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'project.update',
+      targetType: 'project',
+      targetId: params.projectId,
+      summary: `Updated project "${project.name}"`,
+      before,
+      after: { name: project.name, vertical: project.vertical ?? '' },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful save into a failure for the caller.
+  }
+
+  return project;
+}

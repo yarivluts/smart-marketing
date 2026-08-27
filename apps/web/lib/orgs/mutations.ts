@@ -40,6 +40,8 @@ import {
   confirmOnboardingFunnelSteps as confirmOnboardingFunnelStepsInOrganization,
   createBoard as createBoardInOrganization,
   createOrganizationWithOwner,
+  type OrganizationModel,
+  updateOrganization as updateOrganizationInOrganization,
   createOrgPerson as createOrgPersonInOrganization,
   updateOrgPerson as updateOrgPersonInOrganization,
   createProject as createProjectInOrganization,
@@ -141,6 +143,7 @@ import {
   updateHookEndpoint as updateHookEndpointInOrganization,
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setProjectSessionReplayUrlTemplate as setProjectSessionReplayUrlTemplateInOrganization,
+  updateProjectDetails as updateProjectDetailsInOrganization,
   type ProjectModel,
   setSharedCredentialSecret as setSharedCredentialSecretInOrganization,
   type MappingSuggestion,
@@ -193,6 +196,19 @@ export async function createOrganization(input: CreateOrganizationInput): Promis
   return createOrganizationWithOwner(input);
 }
 
+interface UpdateOrganizationInput {
+  organizationId: string;
+  name: string;
+  slug?: string;
+  billingEmail?: string;
+  actorUserId: string;
+}
+
+export async function updateOrganization(input: UpdateOrganizationInput): Promise<OrganizationModel> {
+  await ensureFirestoreOrm();
+  return updateOrganizationInOrganization(input);
+}
+
 interface CreateProjectInput {
   organizationId: string;
   name: string;
@@ -203,6 +219,19 @@ interface CreateProjectInput {
 export async function createProject(input: CreateProjectInput): Promise<CreateProjectResult> {
   await ensureFirestoreOrm();
   return createProjectInOrganization(input);
+}
+
+interface UpdateProjectDetailsInput {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  vertical?: string;
+  actorUserId: string;
+}
+
+export async function updateProjectDetails(input: UpdateProjectDetailsInput): Promise<ProjectModel> {
+  await ensureFirestoreOrm();
+  return updateProjectDetailsInOrganization(input);
 }
 
 interface InviteMemberInput {

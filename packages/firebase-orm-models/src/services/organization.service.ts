@@ -6,6 +6,7 @@ import { ProjectModel } from '../models/project.model';
 import { RoleBindingModel } from '../models/role-binding.model';
 import { UserModel } from '../models/user.model';
 import { recordAuditLogEntry } from './audit-log.service';
+import { OrganizationNotFoundError } from './automation-kill-switch.service';
 
 export interface CreateOrganizationParams {
   name: string;
@@ -74,6 +75,83 @@ export async function createOrganizationWithOwner(
   }
 
   return { organization, membership, roleBinding };
+}
+
+export class InvalidOrganizationNameError extends Error {
+  constructor() {
+    super('Organization name is required.');
+    this.name = 'InvalidOrganizationNameError';
+  }
+}
+
+export interface UpdateOrganizationParams {
+  organizationId: string;
+  name: string;
+  /** Omit (or pass an empty string) to clear the slug. */
+  slug?: string;
+  /** Omit (or pass an empty string) to clear the billing contact. */
+  billingEmail?: string;
+  actorUserId: string;
+}
+
+/**
+ * Corrects an org's own identity/billing-contact fields — `name`, `slug`,
+ * `billing_email` — the same "create + list only, no way to fix a typo'd
+ * definition" gap KAN-100/117/119/120/121 already closed for their own
+ * sibling registries, except this one is the tenancy root itself: until now
+ * an org's name (set once at `createOrganizationWithOwner` time, from
+ * whatever the creator typed) could never be corrected at all, by any path.
+ *
+ * Gated at the route layer on `billing.manage` (org-owner-only, withheld
+ * from `org_admin` per `ROLE_PERMISSIONS`'s own doc comment) rather than the
+ * more permissive `project.manage` an `org_admin`/`project_admin` also
+ * holds — this is the first real route `billing.manage` gates in this
+ * codebase (previously declared in the permission catalog but never wired
+ * to an actual surface), and editing the org's own billing contact is
+ * exactly the "Owner, not Admin" split that permission exists to enforce.
+ *
+ * Trims and stores `slug`/`billing_email` as an empty string rather than
+ * `undefined` when cleared — never a bare `undefined` — since the ORM's
+ * `getDocumentData()` drops an `undefined` field from `updateDoc()`
+ * entirely, which would silently leave the old value in Firestore forever
+ * (same fix `setProjectSessionReplayUrlTemplate`/`updateResourceTemplate`
+ * already apply to their own optional fields).
+ */
+export async function updateOrganization(params: UpdateOrganizationParams): Promise<OrganizationModel> {
+  const organization = await OrganizationModel.init(params.organizationId);
+  if (!organization) {
+    throw new OrganizationNotFoundError();
+  }
+
+  const trimmedName = params.name.trim();
+  if (!trimmedName) {
+    throw new InvalidOrganizationNameError();
+  }
+
+  const before = { name: organization.name, slug: organization.slug ?? '', billingEmail: organization.billing_email ?? '' };
+
+  organization.name = trimmedName;
+  organization.slug = params.slug?.trim() ?? '';
+  organization.billing_email = params.billingEmail?.trim() ?? '';
+  await organization.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: organization.id,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'organization.update',
+      targetType: 'organization',
+      targetId: organization.id,
+      summary: `Updated organization "${organization.name}"`,
+      before,
+      after: { name: organization.name, slug: organization.slug ?? '', billingEmail: organization.billing_email ?? '' },
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+  }
+
+  return organization;
 }
 
 export interface CreateProjectParams {

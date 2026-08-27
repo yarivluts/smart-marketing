@@ -126,7 +126,9 @@
     "projectCampaignOpsLink": "Campaign ops",
     "projectRepCollectionsLink": "Rep collections",
     "projectFunnelLink": "Conversion",
-    "projectInsightsLink": "Insights"
+    "projectInsightsLink": "Insights",
+    "orgSettingsLink": "Organization settings",
+    "projectSettingsLink": "Project settings"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -1665,6 +1667,32 @@
     "save": "Save",
     "saved": "Saved.",
     "saveError": "Could not save the template. Check that it is an http(s) URL."
+  },
+  "OrganizationSettings": {
+    "metaTitle": "Organization settings",
+    "title": "Settings — {orgName}",
+    "intro": "Correct this organization's name, slug, or billing contact.",
+    "nameLabel": "Organization name",
+    "slugLabel": "Slug",
+    "slugHelp": "An optional short identifier for this organization. Leave empty to clear it.",
+    "billingEmailLabel": "Billing contact email",
+    "billingEmailHelp": "Where billing-related notices for this organization are sent. Leave empty to clear it.",
+    "nameRequiredError": "Organization name is required.",
+    "save": "Save",
+    "saved": "Saved.",
+    "saveError": "Could not save these settings. Please try again."
+  },
+  "ProjectSettings": {
+    "metaTitle": "Project settings",
+    "title": "Settings — {projectName}",
+    "intro": "Correct this project's name or vertical.",
+    "nameLabel": "Project name",
+    "verticalLabel": "Vertical",
+    "verticalHelp": "An optional label for this project's industry or vertical. Leave empty to clear it.",
+    "nameRequiredError": "Project name is required.",
+    "save": "Save",
+    "saved": "Saved.",
+    "saveError": "Could not save these settings. Please try again."
   },
   "RepCollections": {
     "metaTitle": "Rep collections",
