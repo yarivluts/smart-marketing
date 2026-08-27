@@ -15,6 +15,7 @@ import {
 import { CreateCredentialForm } from '@/components/orgs/create-credential-form';
 import { CreateTemplateForm } from '@/components/orgs/create-template-form';
 import { CreatePersonForm } from '@/components/orgs/create-person-form';
+import { EditCredentialForm } from '@/components/orgs/edit-credential-form';
 import { EditPersonForm } from '@/components/orgs/edit-person-form';
 import { EditTemplateForm } from '@/components/orgs/edit-template-form';
 import { PendingAttachmentRequests } from '@/components/orgs/pending-attachment-requests';
@@ -92,6 +93,14 @@ export default async function ResourceLibraryPage({
                     provider: credential.provider,
                     scopeCount: credential.available_scopes?.length ?? 0,
                   })}
+                  {canManageResources ? (
+                    <EditCredentialForm
+                      orgId={orgId}
+                      credentialId={credential.id}
+                      initialName={credential.name}
+                      initialAvailableScopes={credential.available_scopes ?? []}
+                    />
+                  ) : null}
                   {canManageResources ? (
                     <SetCredentialSecretForm
                       orgId={orgId}

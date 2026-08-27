@@ -7,6 +7,7 @@ import { POST as createProject } from '@/app/api/orgs/[orgId]/projects/route';
 import { POST as sendInvite } from '@/app/api/orgs/[orgId]/invites/route';
 import { DELETE as removeMember, PATCH as updateMemberRoleRoute } from '@/app/api/orgs/[orgId]/members/[membershipId]/route';
 import { POST as createCredential } from '@/app/api/orgs/[orgId]/resources/credentials/route';
+import { PATCH as editCredential } from '@/app/api/orgs/[orgId]/resources/credentials/[credentialId]/route';
 import { PATCH as editPerson } from '@/app/api/orgs/[orgId]/resources/people/[personId]/route';
 import { PATCH as editTemplate } from '@/app/api/orgs/[orgId]/resources/templates/[templateId]/route';
 import { POST as requestAttachment } from '@/app/api/orgs/[orgId]/projects/[projectId]/resource-attachments/route';
@@ -222,6 +223,38 @@ describe('org-scoped route isolation across two real orgs (KAN-26 non-enumeratio
     await expectIndistinguishable(
       () => createCredential(requestFor(orgB.id), { params: Promise.resolve({ orgId: orgB.id }) }),
       () => createCredential(requestFor(FAKE_ORG_ID), { params: Promise.resolve({ orgId: FAKE_ORG_ID }) }),
+    );
+  });
+
+  it('PATCH /api/orgs/[orgId]/resources/credentials/[credentialId]: org caller cannot see vs. fake org id (KAN-119)', async () => {
+    const callerSession = await sessionFor(unique('uid'), uniqueEmail('iso-edit-cred-caller'));
+    const caller = await ensureUserForFirebaseSession({
+      firebaseUid: callerSession.uid,
+      email: callerSession.email as string,
+    });
+    await createOrganizationWithOwner({ name: 'Isolation Org A (edit credentials)', ownerUserId: caller.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('iso-edit-cred-b-owner') });
+    const { organization: orgB } = await createOrganizationWithOwner({ name: 'Isolation Org B (edit credentials)', ownerUserId: otherOwner.id });
+
+    getServerSessionMock.mockResolvedValue(callerSession);
+
+    const patchFor = (orgId: string, credentialId: string) =>
+      new NextRequest(`https://growthos.test/api/orgs/${orgId}/resources/credentials/${credentialId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Leaked Name', availableScopes: [] }),
+      });
+
+    await expectIndistinguishable(
+      () =>
+        editCredential(patchFor(orgB.id, FAKE_MEMBERSHIP_ID), {
+          params: Promise.resolve({ orgId: orgB.id, credentialId: FAKE_MEMBERSHIP_ID }),
+        }),
+      () =>
+        editCredential(patchFor(FAKE_ORG_ID, FAKE_MEMBERSHIP_ID), {
+          params: Promise.resolve({ orgId: FAKE_ORG_ID, credentialId: FAKE_MEMBERSHIP_ID }),
+        }),
     );
   });
 

@@ -101,6 +101,72 @@ export async function listSharedCredentials(organizationId: string): Promise<Sha
     .get();
 }
 
+/** Loads one org shared credential and confirms it actually belongs to `organizationId` (never trust a caller-supplied id blindly). Shared by {@link requireResourceInOrg} and {@link updateSharedCredential}, mirroring {@link loadOrgPerson}/{@link loadResourceTemplate}. */
+async function loadSharedCredential(organizationId: string, credentialId: string): Promise<SharedCredentialModel> {
+  const credential = await SharedCredentialModel.init(credentialId, { organization_id: organizationId });
+  if (!credential || credential.organization_id !== organizationId) {
+    throw new ResourceNotFoundError();
+  }
+  return credential;
+}
+
+export interface UpdateSharedCredentialParams {
+  organizationId: string;
+  credentialId: string;
+  name: string;
+  /** Always a full replace of the credential's whole scope slice, not a sparse patch — same posture `updateOrgPerson`/`updateResourceTemplate` use for their own optional fields, but required here (never omitted) since `available_scopes` is itself always an array (possibly empty), never absent, from `createSharedCredential` onward. */
+  availableScopes: readonly string[];
+  actorId: string;
+}
+
+/**
+ * Corrects an existing shared credential's own name/available-scope slice.
+ * Unlike `createOrgPerson`/`createResourceTemplate` (both closed by
+ * KAN-100/KAN-117), `createSharedCredential`/`listSharedCredentials` had
+ * create + list only, the same "everything user-manageable gets an admin
+ * surface" gap — a credential's name (e.g. fixing a typo) or its
+ * `available_scopes` slice (e.g. a new ad account becomes available under
+ * the same Google Ads MCC login) could never be changed once registered,
+ * only replaced by delete-and-recreate, which would orphan any project's
+ * already-approved {@link ResourceAttachmentModel} pointing at the old
+ * credential id. `provider` is deliberately not editable here, the same way
+ * `updateResourceTemplate` leaves `ResourceTemplateModel.type` immutable —
+ * changing what a credential authenticates against isn't a correction, it's
+ * a different credential. Narrowing `available_scopes` never retroactively
+ * invalidates an already-approved attachment's own `scope_selection` copy —
+ * same "the attachment keeps whatever it was granted" posture
+ * `updateResourceTemplate`'s own doc comment documents for `resource_version`.
+ * The credential's secret is untouched here; it's set separately via
+ * `vault.service.ts`'s `setSharedCredentialSecret` (KAN-29).
+ */
+export async function updateSharedCredential(params: UpdateSharedCredentialParams): Promise<SharedCredentialModel> {
+  const credential = await loadSharedCredential(params.organizationId, params.credentialId);
+
+  const before = { name: credential.name, availableScopes: credential.available_scopes ?? [] };
+
+  credential.name = params.name;
+  credential.available_scopes = [...params.availableScopes];
+  await credential.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'shared_credential.update',
+      targetType: 'shared_credential',
+      targetId: credential.id,
+      summary: `Updated credential "${credential.name}"`,
+      before,
+      after: { name: credential.name, availableScopes: credential.available_scopes ?? [] },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return credential;
+}
+
 export interface CreateResourceTemplateParams {
   organizationId: string;
   name: string;
@@ -295,16 +361,10 @@ async function requireResourceInOrg(
   if (resourceKind === 'person') {
     return loadOrgPerson(organizationId, resourceId);
   }
-
-  const resource =
-    resourceKind === 'credential'
-      ? await SharedCredentialModel.init(resourceId, { organization_id: organizationId })
-      : await ResourceTemplateModel.init(resourceId, { organization_id: organizationId });
-
-  if (!resource || resource.organization_id !== organizationId) {
-    throw new ResourceNotFoundError();
+  if (resourceKind === 'credential') {
+    return loadSharedCredential(organizationId, resourceId);
   }
-  return resource;
+  return loadResourceTemplate(organizationId, resourceId);
 }
 
 export interface RequestResourceAttachmentParams {
