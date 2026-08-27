@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { PluginInstallList } from './plugin-install-list';
-import type { PluginInstallView } from '@/lib/orgs/plugin-view';
+import type { PluginInstallView, PluginManifestView } from '@/lib/orgs/plugin-view';
 import messages from '../../messages/en.json';
 
 const refresh = vi.fn();
@@ -28,10 +28,25 @@ function install(overrides: Partial<PluginInstallView> = {}): PluginInstallView 
   };
 }
 
-function renderList(installs: readonly PluginInstallView[]): void {
+function manifestWithConfig(overrides: Partial<PluginManifestView> = {}): PluginManifestView {
+  return {
+    id: 'manifest-1',
+    pluginId: 'com.example.shopify-pack',
+    version: '1.0.0',
+    type: 'source',
+    displayName: 'Shopify Commerce Pack',
+    scopes: ['ingest:write'],
+    configSchema: { shop_domain: { type: 'string', required: true } },
+    registers: { entities: [], events: [], metrics: [] },
+    registeredAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function renderList(installs: readonly PluginInstallView[], manifests: readonly PluginManifestView[] = []): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <PluginInstallList orgId="org-1" projectId="project-1" installs={installs} />
+      <PluginInstallList orgId="org-1" projectId="project-1" installs={installs} manifests={manifests} />
     </NextIntlClientProvider>,
   );
 }
@@ -74,10 +89,21 @@ describe('PluginInstallList', () => {
   });
 
   it('offers no actions for an uninstalled plugin', () => {
-    renderList([install({ status: 'uninstalled', uninstalledAt: '2026-01-03T00:00:00.000Z' })]);
+    renderList([install({ status: 'uninstalled', uninstalledAt: '2026-01-03T00:00:00.000Z' })], [manifestWithConfig()]);
     expect(screen.queryByRole('button', { name: 'Disable' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enable' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Uninstall' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit config' })).not.toBeInTheDocument();
+  });
+
+  it('offers an "Edit config" control for an installed plugin whose manifest declares config fields', () => {
+    renderList([install({ status: 'installed', config: { shop_domain: 'x.myshopify.com' } })], [manifestWithConfig()]);
+    expect(screen.getByRole('button', { name: 'Edit config' })).toBeInTheDocument();
+  });
+
+  it('offers no "Edit config" control when the pinned manifest version declares no config fields', () => {
+    renderList([install({ status: 'installed' })], [manifestWithConfig({ configSchema: {} })]);
+    expect(screen.queryByRole('button', { name: 'Edit config' })).not.toBeInTheDocument();
   });
 
   it('shows an inline error and does not refresh when the action request fails', async () => {

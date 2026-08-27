@@ -111,6 +111,7 @@ import {
   type HookSignatureMode,
   installBuiltinMetricPack as installBuiltinMetricPackInOrganization,
   installPluginAndProvisionBuiltins as installPluginInOrganization,
+  updatePluginInstallConfig as updatePluginInstallConfigInOrganization,
   saveBoardTiles as saveBoardTilesInOrganization,
   updateBoardSettings as updateBoardSettingsInOrganization,
   processStripeWebhookEvent as processStripeWebhookEventInOrganization,
@@ -977,6 +978,19 @@ export async function enablePlugin(input: PluginInstallLifecycleInput): Promise<
 export async function uninstallPlugin(input: PluginInstallLifecycleInput): Promise<PluginInstallModel> {
   await ensureFirestoreOrm();
   return uninstallPluginInOrganization(input);
+}
+
+interface UpdatePluginInstallConfigInput {
+  organizationId: string;
+  projectId: string;
+  installId: string;
+  config: Record<string, unknown>;
+  performedByUserId: string;
+}
+
+export async function updatePluginInstallConfig(input: UpdatePluginInstallConfigInput): Promise<PluginInstallModel> {
+  await ensureFirestoreOrm();
+  return updatePluginInstallConfigInOrganization(input);
 }
 
 interface RunSourcePluginInstallInput {

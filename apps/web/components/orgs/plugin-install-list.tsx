@@ -4,12 +4,15 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
-import type { PluginInstallView } from '@/lib/orgs/plugin-view';
+import { configSchemaForInstall, type PluginInstallView, type PluginManifestView } from '@/lib/orgs/plugin-view';
+import { EditPluginInstallConfigForm } from '@/components/orgs/edit-plugin-install-config-form';
 
 export interface PluginInstallListProps {
   orgId: string;
   projectId: string;
   installs: readonly PluginInstallView[];
+  /** Every registered manifest version in the org — resolves each install's own pinned `config_schema` for the inline config editor (KAN-124). */
+  manifests: readonly PluginManifestView[];
 }
 
 const STATUS_LABEL_KEYS = {
@@ -19,7 +22,7 @@ const STATUS_LABEL_KEYS = {
 } as const;
 
 /** Lists a project's plugin installs with enable/disable/uninstall actions (KAN-46 AC: "Install/uninstall/disable lifecycle"). */
-export function PluginInstallList({ orgId, projectId, installs }: PluginInstallListProps): React.ReactElement {
+export function PluginInstallList({ orgId, projectId, installs, manifests }: PluginInstallListProps): React.ReactElement {
   const t = useTranslations('ProjectPlugins');
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -93,6 +96,15 @@ export function PluginInstallList({ orgId, projectId, installs }: PluginInstallL
                 </Button>
               ) : null}
             </div>
+            {install.status !== 'uninstalled' ? (
+              <EditPluginInstallConfigForm
+                orgId={orgId}
+                projectId={projectId}
+                installId={install.id}
+                configSchema={configSchemaForInstall(install, manifests) ?? {}}
+                initialConfig={install.config}
+              />
+            ) : null}
           </li>
         ))}
       </ul>
