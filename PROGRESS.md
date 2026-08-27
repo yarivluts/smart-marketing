@@ -17,6 +17,81 @@ Template for each entry:
 
 ---
 
+## 2026-08-27 (latest) — KAN-118: cohort retention parameterized by a specific conversion event (PR #323)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`, continuing after merging PR #322 above. This container's local
+    `main` had been stale (see that entry's own "note for the next run") — already reconciled before
+    this story started. No open PRs at the time (checked first, established pattern), and `TASKS.md`
+    had no remaining unblocked `todo` row, so resumed the "sweep every `done` row's own deferred/
+    not-yet doc-comment notes for a newly-buildable follow-up" pattern via a research-only subagent
+    (kept separate from implementation, so its findings could be verified against the real current
+    code before committing to one). It surfaced three candidates, ranked; picked the strongest
+    (`fact_cohort_retention`'s own KAN-62 v1 doc comment: "a conversion cohort parameterized by a
+    specific event name ... not built here") — confirmed still genuinely missing by reading the model
+    directly, not trusting the comment alone. Passed on a platform-wide automation kill switch (real
+    gap, but would need inventing this app's first non-org-scoped URL/layout convention — more
+    structural than a narrow follow-up) and a TV-pairing browse UI (the sweep's own read: not a real
+    gap, a deliberately-accepted "buildable-today, not garbage-collected" posture, low user value).
+  - Delivered **KAN-118**: `fact_cohort_retention` gained a `conversion_event` dimension — a
+    `__any__` row per `cohort_month x period_number` preserving the exact original "any activity
+    counts" behavior, plus one row per event label actually observed anywhere in that
+    (org, project, environment), derived the same way `fact_attribution.conversion_event` already
+    does (payload's own `event_name`, falling back to `event_type` — never hard-coded). Cohort
+    *assignment* is unchanged. Threaded an optional `conversionEvent` through
+    `queryProjectCohortRetention` (new `ANY_COHORT_CONVERSION_EVENT` export, defaults applied so
+    every existing caller's behavior/SQL is unchanged beyond the new always-present filter clause),
+    the `query_cohort` MCP tool's new `conversion_event` input, and a new `?conversionEvent=` filter
+    form on the KAN-113 Cohort Retention admin page (same `<form method="get">` pattern the Customers
+    page's `?q=` already establishes). en/he translations.
+  - **Two real, previously-invisible bugs found and fixed** while touching the fixture test (own
+    diff, per CLAUDE.md's self-review rule — not a pre-existing-codebase sweep, found because
+    landing my own new fixture assertion next to it required actually trusting the existing one
+    first): `assert_fact_cohort_retention_fixture_matches_expected.sql` chained
+    `EXCEPT`/`UNION ALL`/`EXCEPT` with no parentheses — SQL's left-to-right operator precedence
+    silently parsed it as `((actual except expected) union all expected) except actual`, not the
+    intended `(actual except expected) union all (expected except actual)`, so the test always
+    returned zero rows and passed regardless of whether the data actually matched (verified by hand
+    against the real built DuckDB table — the unparenthesized query genuinely returned `[]` while the
+    correctly-parenthesized one surfaced 4 real discrepancies). Once fixed, those 4 discrepancies
+    turned out to be the test's own expected values going stale: a later PR's `proj_11` fixture
+    (shared across four different tests, a known/documented convention) added `2026-05-01` events
+    re-firing `signup` for the same customers this cohort scenario covers, which genuinely extends
+    both cohorts' observable periods (the model keys "elapsed periods" off the *project's* latest
+    activity month, not one fixture's own slice of it) — the model's own output was already correct;
+    only the test's hand-computed expectations hadn't been updated when that later PR landed. Fixed
+    by hand-recomputing the correct 9-row expected set (was 5) and adding a fuller comment explaining
+    the non-isolation. Also updated `board.emulator.test.ts`'s `registerCohortRetention` metric-defs
+    test helper to filter `conversion_event = '__any__'` — a real (currently-unshipped) metric reading
+    this table would otherwise average across every event label's rows too once BigQuery is live.
+  - Verified locally before opening the PR (this container had no dependencies installed yet — ran a
+    fresh `pnpm install` first): a real `dbt build` against DuckDB (250/250, up from 248, including
+    the new `conversion_event`-specific hand-computed fixture), `packages/firebase-orm-models`'s full
+    suite (1575/1575, 128 files, including `local-dbt-executor.test.ts`'s own real `dbt build` run),
+    `apps/api`'s full Jest suite (141/141), `apps/web`'s full Vitest suite (1739/1739, 277 files) plus
+    the extended `e2e/cohorts.spec.ts` (1 flaky cold-start retry, this repo's own documented pattern,
+    passed on retry), and a full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck`.
+  - **Merged 2026-08-27:** PR #323 (`kan-118-cohort-conversion-event`) merged into `main` (`191d3ce`)
+    after both checks (`lint · typecheck · test · build`, `terraform fmt · validate`) passed clean,
+    `mergeable_state: clean`, no review threads. Remote branch deletion failed with the same
+    recurring HTTP 403 this file has documented since 2026-07-04.
+- **In progress (exact stopping point):** none — #323 fully landed, `main` green.
+- **Blocked + why:** nothing.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real KAN
+  number is now 118. Check for other open PRs first (established pattern) before starting new,
+  possibly-overlapping work. The platform-wide automation kill switch and configurable-cohort-grain
+  candidates this run's own sweep surfaced but didn't pick are documented above as options for a
+  future run, not claimed by anyone.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-118-cohort-conversion-event`.
+
+---
+
 ## 2026-08-27 (latest) — Merged PR #322 (KAN-117, resource-template edit)
 
 - **Last completed:**
