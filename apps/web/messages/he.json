@@ -118,6 +118,7 @@
     "projectCostGuardrailsLink": "בקרות עלות",
     "projectPluginsLink": "תוספים",
     "projectBoardsLink": "לוחות מחוונים",
+    "projectInsightsLink": "תובנות",
     "projectGoalsLink": "יעדים",
     "projectSegmentsLink": "פלחים",
     "projectTvLink": "טלוויזיית חדר מלחמה",
@@ -1283,6 +1284,19 @@
     "crmSyncLastRunSucceeded": "סונכרנו לאחרונה {count, plural, one {רשומה #} other {# רשומות}}",
     "crmSyncLastRunFailed": "הסנכרון האחרון נכשל",
     "crmSyncLastRunRunning": "סנכרון בתהליך…"
+  },
+  "Insights": {
+    "metaTitle": "תובנות",
+    "title": "תובנות עבור {projectName}",
+    "description": "כל מה שראוי לציון בפרויקט הזה: מעקב שאולי לא תקין, וניצחונות ברגע שהם מתרחשים.",
+    "empty": "אין עדיין שום דבר ראוי לציון — אין התראות מעקב פעילות ולא נרשמו ניצחונות.",
+    "alertTitle": "ייתכן שהמעקב מקולקל: \"{schemaName}\" השתתק",
+    "alertDetail": "לא התקבלו רשומות \"{schemaName}\" חדשות מאז {lastSeenAt}.",
+    "winTitle": "ניצחון: {winRuleName}",
+    "winDetail": "רשומת \"{schemaName}\" תאמה לכלל הניצחון \"{winRuleName}\".",
+    "severityWarning": "אזהרה",
+    "severityInfo": "מידע",
+    "occurredAtLine": "התרחש {occurredAt}"
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

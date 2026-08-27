@@ -111,6 +111,7 @@ export default async function ProjectLayout({
     ...(canViewBoards ? [{ href: `${base}/boards`, label: t('projectBoardsLink'), icon: 'LayoutGrid' as const }] : []),
     ...(canManageBoards
       ? [
+          { href: `${base}/insights`, label: t('projectInsightsLink'), icon: 'Lightbulb' as const },
           { href: `${base}/goals`, label: t('projectGoalsLink'), icon: 'Target' as const },
           { href: `${base}/segments`, label: t('projectSegmentsLink'), icon: 'Users' as const },
           { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },

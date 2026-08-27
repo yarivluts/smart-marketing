@@ -118,6 +118,7 @@
     "projectCostGuardrailsLink": "Cost guardrails",
     "projectPluginsLink": "Plugins",
     "projectBoardsLink": "Boards",
+    "projectInsightsLink": "Insights",
     "projectGoalsLink": "Goals",
     "projectSegmentsLink": "Segments",
     "projectTvLink": "War-room TV",
@@ -1283,6 +1284,19 @@
     "crmSyncLastRunSucceeded": "Last synced {count, plural, one {# record} other {# records}}",
     "crmSyncLastRunFailed": "Last sync failed",
     "crmSyncLastRunRunning": "Sync in progress…"
+  },
+  "Insights": {
+    "metaTitle": "Insights",
+    "title": "Insights for {projectName}",
+    "description": "Everything noteworthy across this project: tracking that may be broken, and wins as they fire.",
+    "empty": "Nothing noteworthy yet — no active tracking alerts and no wins recorded.",
+    "alertTitle": "Tracking may be broken: \"{schemaName}\" has gone silent",
+    "alertDetail": "No new \"{schemaName}\" records landed since {lastSeenAt}.",
+    "winTitle": "Win: {winRuleName}",
+    "winDetail": "A \"{schemaName}\" record matched the \"{winRuleName}\" win rule.",
+    "severityWarning": "Warning",
+    "severityInfo": "Info",
+    "occurredAtLine": "Occurred {occurredAt}"
   },
   "WinRules": {
     "metaTitle": "Win rules",

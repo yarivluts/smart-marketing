@@ -59,6 +59,7 @@ import {
   getProjectCostQuota as getProjectCostQuotaInOrganization,
   getTrialPipelineSummary as getTrialPipelineSummaryInOrganization,
   listTrackingAlertsForProject as listTrackingAlertsForProjectInOrganization,
+  listActiveTrackingAlertsForProject as listActiveTrackingAlertsForProjectInOrganization,
   type ApiKeySummary,
   type McpOAuthGrantSummary,
   type BoardModel,
@@ -638,6 +639,11 @@ export async function getExperimentResultsForProject(organizationId: string, pro
 export async function listTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
   await ensureFirestoreOrm();
   return listTrackingAlertsForProjectInOrganization(organizationId, projectId);
+}
+
+export async function listActiveTrackingAlertsForProject(organizationId: string, projectId: string): Promise<TrackingAlertModel[]> {
+  await ensureFirestoreOrm();
+  return listActiveTrackingAlertsForProjectInOrganization(organizationId, projectId);
 }
 
 export async function getActiveAutomationGuardrailPolicy(organizationId: string, projectId: string): Promise<AutomationGuardrailPolicyConfig> {
