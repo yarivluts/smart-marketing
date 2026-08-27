@@ -116,6 +116,7 @@ export default async function ProjectLayout({
           { href: `${base}/win-rules`, label: tWinRules('metaTitle'), icon: 'Trophy' as const },
           { href: `${base}/funnel`, label: t('projectFunnelLink'), icon: 'Filter' as const },
           { href: `${base}/cohorts`, label: t('projectCohortsLink'), icon: 'Grid3x3' as const },
+          { href: `${base}/insights`, label: t('projectInsightsLink'), icon: 'Bell' as const },
           { href: `${base}/tv`, label: t('projectTvLink'), icon: 'Tv' as const },
           { href: `${base}/campaign-ops`, label: t('projectCampaignOpsLink'), icon: 'TrendingUp' as const },
           { href: `${base}/rep-collections`, label: t('projectRepCollectionsLink'), icon: 'Award' as const },

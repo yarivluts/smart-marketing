@@ -133,6 +133,8 @@ import {
   queryGoalProgress as queryGoalProgressInOrganization,
   queryProjectFunnelStepsForAdmin as queryProjectFunnelStepsForAdminInOrganization,
   type FunnelStepsOutcome,
+  listProjectInsights as listProjectInsightsInOrganization,
+  type ProjectInsight,
   UserModel,
   verifyAuditLogChainForOrg as verifyAuditLogChainForOrgInOrganization,
   type AuditLogChainVerification,
@@ -896,6 +898,15 @@ export async function queryProjectFunnelSteps(
 ): Promise<FunnelStepsOutcome> {
   await ensureFirestoreOrm();
   return queryProjectFunnelStepsForAdminInOrganization({ organizationId, projectId, ...options });
+}
+
+/**
+ * Recent noteworthy findings for a project (active tracking-broke alerts + fired win-rule events,
+ * newest first) — the `list_insights` MCP tool's web admin counterpart, for the Insights page.
+ */
+export async function listProjectInsights(organizationId: string, projectId: string): Promise<ProjectInsight[]> {
+  await ensureFirestoreOrm();
+  return listProjectInsightsInOrganization({ organizationId, projectId });
 }
 
 export async function listWinRulesForProject(organizationId: string, projectId: string): Promise<WinRuleModel[]> {

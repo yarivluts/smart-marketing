@@ -125,7 +125,8 @@
     "projectSessionReplayLink": "Session replay",
     "projectCampaignOpsLink": "Campaign ops",
     "projectRepCollectionsLink": "Rep collections",
-    "projectFunnelLink": "Conversion"
+    "projectFunnelLink": "Conversion",
+    "projectInsightsLink": "Insights"
   },
   "ProjectSwitcher": {
     "label": "Project"
@@ -696,6 +697,20 @@
     "stepHeading": "{order}. {stage}",
     "stepConversion": "{percent}% of step 1",
     "stepCustomerCount": "{count} customers reached this stage"
+  },
+  "Insights": {
+    "metaTitle": "Insights",
+    "title": "Insights for {projectName}",
+    "description": "Recent noteworthy findings for this project: tracking that may be broken and wins your win rules just caught.",
+    "empty": "No insights yet. This fills in once a tracking alert fires or a win rule matches.",
+    "trackingAlertTitle": "Tracking may be broken: \"{schemaName}\" has gone silent",
+    "trackingAlertDetail": "No new \"{schemaName}\" records landed since {lastSeenAt}.",
+    "winEventTitle": "Win: {winRuleName}",
+    "winEventDetail": "A \"{schemaName}\" record ({clientId}) matched the \"{winRuleName}\" win rule.",
+    "severityLabel": {
+      "info": "Info",
+      "warning": "Warning"
+    }
   },
   "Feedback": {
     "metaTitle": "Feedback & NPS",

@@ -125,7 +125,8 @@
     "projectSessionReplayLink": "הקלטות סשן",
     "projectCampaignOpsLink": "תפעול קמפיינים",
     "projectRepCollectionsLink": "גבייה לפי נציג",
-    "projectFunnelLink": "משפך המרות"
+    "projectFunnelLink": "משפך המרות",
+    "projectInsightsLink": "תובנות"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -696,6 +697,20 @@
     "stepHeading": "{order}. {stage}",
     "stepConversion": "{percent}% משלב 1",
     "stepCustomerCount": "{count} לקוחות הגיעו לשלב זה"
+  },
+  "Insights": {
+    "metaTitle": "תובנות",
+    "title": "תובנות עבור {projectName}",
+    "description": "ממצאים בולטים ואחרונים עבור פרויקט זה: מעקב שעלול להיות תקול ונצחונות שכללי הניצחון שלך זיהו זה עתה.",
+    "empty": "אין עדיין תובנות. הרשימה תתמלא ברגע שתתריע התראת מעקב או שכלל ניצחון יתאים.",
+    "trackingAlertTitle": "המעקב עלול להיות תקול: \"{schemaName}\" השתתק",
+    "trackingAlertDetail": "לא נקלטו רשומות \"{schemaName}\" חדשות מאז {lastSeenAt}.",
+    "winEventTitle": "ניצחון: {winRuleName}",
+    "winEventDetail": "רשומת \"{schemaName}\" ({clientId}) התאימה לכלל הניצחון \"{winRuleName}\".",
+    "severityLabel": {
+      "info": "מידע",
+      "warning": "אזהרה"
+    }
   },
   "Feedback": {
     "metaTitle": "משוב ו-NPS",
