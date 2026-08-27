@@ -45,6 +45,77 @@ async function requireProjectInOrg(organizationId: string, projectId: string): P
   return project;
 }
 
+interface SegmentDefinitionInput {
+  organizationId: string;
+  projectId: string;
+  name: string;
+  schemaName: string;
+  filters: readonly unknown[];
+  eventConditions?: readonly unknown[];
+}
+
+interface ValidatedSegmentDefinition {
+  name: string;
+  schemaName: string;
+  filters: SegmentFilterCondition[];
+  eventConditions: SegmentEventCondition[];
+}
+
+/**
+ * Validates a segment's own definition fields (name, entity `schemaName`,
+ * `filters`, cross-schema `eventConditions`) — shared by {@link createSegment}
+ * and {@link updateSegmentDefinition} (KAN-120) so the two can never drift on
+ * what makes a segment definition valid. Collects every problem before
+ * throwing, mirroring `createGoal`'s own "collect all reasons, don't fail
+ * fast" convention.
+ */
+async function validateSegmentDefinition(input: SegmentDefinitionInput): Promise<ValidatedSegmentDefinition> {
+  const reasons: string[] = [];
+
+  const name = input.name.trim();
+  if (name.length === 0) {
+    reasons.push('A segment must have a non-empty name.');
+  }
+
+  const eventConditionInputs = input.eventConditions ?? [];
+  if (input.filters.length === 0 && eventConditionInputs.length === 0) {
+    reasons.push('A segment requires at least one filter condition or event condition.');
+  }
+  const validFilters: SegmentFilterCondition[] = [];
+  input.filters.forEach((filter, index) => {
+    if (isValidSegmentFilterCondition(filter)) {
+      validFilters.push(filter);
+    } else {
+      reasons.push(`Filter at index ${index} is invalid — expected { field: string, op: one of ${['=', '!=', '>', '>=', '<', '<=', 'contains'].join(', ')}, value: string|number|boolean }.`);
+    }
+  });
+
+  const validEventConditions: SegmentEventCondition[] = [];
+  for (const [index, condition] of eventConditionInputs.entries()) {
+    if (!isValidSegmentEventCondition(condition)) {
+      reasons.push(`Event condition at index ${index} is invalid — expected { kind: "has_event"|"no_event", schemaName: string, filters?: [...], withinDays?: number }.`);
+      continue;
+    }
+    const eventSchemaDef = await getActiveSchemaDefinition(input.organizationId, input.projectId, 'event', condition.schemaName);
+    if (!eventSchemaDef) {
+      reasons.push(`Event schema "${condition.schemaName}" (event condition at index ${index}) is not registered (or not active) in this project.`);
+      continue;
+    }
+    validEventConditions.push(condition);
+  }
+
+  const schemaDef = await getActiveSchemaDefinition(input.organizationId, input.projectId, 'entity', input.schemaName);
+  if (!schemaDef) {
+    reasons.push(`Entity schema "${input.schemaName}" is not registered (or not active) in this project.`);
+  }
+
+  if (reasons.length > 0) {
+    throw new InvalidSegmentError(reasons);
+  }
+
+  return { name, schemaName: input.schemaName, filters: validFilters, eventConditions: validEventConditions };
+}
+
 export interface CreateSegmentParams {
   organizationId: string;
   projectId: string;
@@ -68,64 +139,21 @@ export interface CreateSegmentParams {
  * KAN-93): validates the name, that `schemaName` is a registered+active
  * `entity`-kind schema in this project, every filter condition's shape, and
  * every event condition's shape + that its own `schemaName` is a
- * registered+active `event`-kind schema — collecting every problem before
- * throwing, mirroring `createGoal`'s own "collect all reasons, don't fail
- * fast" convention.
+ * registered+active `event`-kind schema — see {@link validateSegmentDefinition}.
  */
 export async function createSegment(params: CreateSegmentParams): Promise<SegmentModel> {
   await requireProjectInOrg(params.organizationId, params.projectId);
 
-  const reasons: string[] = [];
-
-  const name = params.name.trim();
-  if (name.length === 0) {
-    reasons.push('A segment must have a non-empty name.');
-  }
-
-  const eventConditionInputs = params.eventConditions ?? [];
-  if (params.filters.length === 0 && eventConditionInputs.length === 0) {
-    reasons.push('A segment requires at least one filter condition or event condition.');
-  }
-  const validFilters: SegmentFilterCondition[] = [];
-  params.filters.forEach((filter, index) => {
-    if (isValidSegmentFilterCondition(filter)) {
-      validFilters.push(filter);
-    } else {
-      reasons.push(`Filter at index ${index} is invalid — expected { field: string, op: one of ${['=', '!=', '>', '>=', '<', '<=', 'contains'].join(', ')}, value: string|number|boolean }.`);
-    }
-  });
-
-  const validEventConditions: SegmentEventCondition[] = [];
-  for (const [index, condition] of eventConditionInputs.entries()) {
-    if (!isValidSegmentEventCondition(condition)) {
-      reasons.push(`Event condition at index ${index} is invalid — expected { kind: "has_event"|"no_event", schemaName: string, filters?: [...], withinDays?: number }.`);
-      continue;
-    }
-    const eventSchemaDef = await getActiveSchemaDefinition(params.organizationId, params.projectId, 'event', condition.schemaName);
-    if (!eventSchemaDef) {
-      reasons.push(`Event schema "${condition.schemaName}" (event condition at index ${index}) is not registered (or not active) in this project.`);
-      continue;
-    }
-    validEventConditions.push(condition);
-  }
-
-  const schemaDef = await getActiveSchemaDefinition(params.organizationId, params.projectId, 'entity', params.schemaName);
-  if (!schemaDef) {
-    reasons.push(`Entity schema "${params.schemaName}" is not registered (or not active) in this project.`);
-  }
-
-  if (reasons.length > 0) {
-    throw new InvalidSegmentError(reasons);
-  }
+  const validated = await validateSegmentDefinition(params);
 
   const now = new Date().toISOString();
   const segment = new SegmentModel();
   segment.organization_id = params.organizationId;
   segment.project_id = params.projectId;
-  segment.name = name;
-  segment.schema_name = params.schemaName;
-  segment.filters = validFilters;
-  segment.event_conditions = validEventConditions;
+  segment.name = validated.name;
+  segment.schema_name = validated.schemaName;
+  segment.filters = validated.filters;
+  segment.event_conditions = validated.eventConditions;
   segment.created_by = params.createdByUserId;
   segment.created_at = now;
   segment.owner_person_id = null;
@@ -347,6 +375,61 @@ export async function updateSegmentStatus(params: UpdateSegmentStatusParams): Pr
       summary: `Updated segment "${segment.name}" status to "${params.status}"`,
       before: { status: previousStatus },
       after: { status: params.status },
+    });
+  } catch {
+    // Best-effort — audit logging must never turn a successful update into a failure for the caller.
+  }
+
+  return segment;
+}
+
+export interface UpdateSegmentDefinitionParams {
+  organizationId: string;
+  projectId: string;
+  segmentId: string;
+  name: string;
+  schemaName: string;
+  filters: readonly unknown[];
+  eventConditions?: readonly unknown[];
+  actorUserId: string;
+}
+
+/**
+ * Edits an existing segment's own definition — name, entity `schemaName`,
+ * `filters`, and cross-schema `eventConditions` — always a full replace,
+ * never a sparse patch, the same posture `updateOrgPerson` (KAN-100) and
+ * `updateResourceTemplate` (KAN-117) establish for their own sibling
+ * project/org registries. Until now a saved segment's own definition could
+ * only be fixed by delete-and-recreate, which orphans its id — breaking any
+ * CRM-sync run history (`listCrmSyncRunsForSegment`), omnisearch links, or
+ * anything else that references this segment by id. Reuses
+ * {@link validateSegmentDefinition} directly so create and update can never
+ * validate a definition differently.
+ */
+export async function updateSegmentDefinition(params: UpdateSegmentDefinitionParams): Promise<SegmentModel> {
+  const segment = await loadSegment(params.organizationId, params.projectId, params.segmentId);
+  const validated = await validateSegmentDefinition(params);
+
+  const before = { name: segment.name, schemaName: segment.schema_name, filters: segment.filters, eventConditions: segment.event_conditions ?? [] };
+
+  segment.name = validated.name;
+  segment.schema_name = validated.schemaName;
+  segment.filters = validated.filters;
+  segment.event_conditions = validated.eventConditions;
+  await segment.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'segment.update',
+      targetType: 'segment',
+      targetId: segment.id,
+      summary: `Updated segment "${segment.name}" definition`,
+      before,
+      after: { name: segment.name, schemaName: segment.schema_name, filters: segment.filters, eventConditions: segment.event_conditions },
     });
   } catch {
     // Best-effort — audit logging must never turn a successful update into a failure for the caller.

@@ -1339,7 +1339,15 @@
     "crmSyncError": "לא ניתן היה לסנכרן את הפלח. נסה שוב.",
     "crmSyncLastRunSucceeded": "סונכרנו לאחרונה {count, plural, one {רשומה #} other {# רשומות}}",
     "crmSyncLastRunFailed": "הסנכרון האחרון נכשל",
-    "crmSyncLastRunRunning": "סנכרון בתהליך…"
+    "crmSyncLastRunRunning": "סנכרון בתהליך…",
+    "editSegment": "ערוך",
+    "editFiltersJsonLabel": "מסננים (JSON)",
+    "editEventConditionsJsonLabel": "תנאי אירועים (JSON)",
+    "editFiltersInvalid": "המסננים חייבים להיות מערך JSON תקין של תנאים בצורת '{'field, op, value'}'.",
+    "editEventConditionsInvalid": "תנאי האירועים חייבים להיות מערך JSON תקין של תנאים בצורת '{'kind, schemaName, ...'}'.",
+    "saveSegment": "שמור",
+    "cancelEditSegment": "ביטול",
+    "editSegmentError": "לא ניתן היה לעדכן את הפלח. נסה שוב."
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",

@@ -18,9 +18,11 @@ import {
   ProjectNotFoundError,
   registerSchemaDefinition,
   schemaDefMapKey,
+  SegmentModel,
   SegmentNotFoundError,
   setProjectCostQuota,
   suggestSegments,
+  updateSegmentDefinition,
   updateSegmentStatus,
   WarehouseNotConfiguredError,
   WarehouseQueryFailedError,
@@ -605,6 +607,193 @@ describe('updateSegmentStatus', () => {
     expect(entry?.actor_id).toBe(owner.id);
     expect(entry?.before).toEqual({ status: 'open' });
     expect(entry?.after).toEqual({ status: 'done' });
+  });
+});
+
+describe('updateSegmentDefinition', () => {
+  it('full-replaces name/schema/filters, preserving the segment id', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Definition Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateSegmentDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      segmentId: segment.id,
+      name: 'Pro customers, high MRR',
+      schemaName: 'customer',
+      filters: [
+        { field: 'plan', op: '=', value: 'pro' },
+        { field: 'mrr_usd', op: '>', value: 200 },
+      ],
+      actorUserId: owner.id,
+    });
+
+    expect(updated.id).toBe(segment.id);
+    expect(updated.name).toBe('Pro customers, high MRR');
+    expect(updated.filters).toEqual([
+      { field: 'plan', op: '=', value: 'pro' },
+      { field: 'mrr_usd', op: '>', value: 200 },
+    ]);
+
+    // Reload fresh from Firestore rather than trusting the in-memory return
+    // value — the same regression guard `updateResourceTemplate`'s (KAN-117)
+    // own test suite establishes for this exact bug class.
+    const reloaded = await SegmentModel.init(segment.id, { organization_id: organization.id, project_id: project.id });
+    expect(reloaded?.name).toBe('Pro customers, high MRR');
+    expect(reloaded?.filters).toEqual([
+      { field: 'plan', op: '=', value: 'pro' },
+      { field: 'mrr_usd', op: '>', value: 200 },
+    ]);
+  });
+
+  it('replaces event conditions too, clearing them when omitted', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Definition Event Conditions Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    await registerDemoEventSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Paying, no demo',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
+      createdByUserId: owner.id,
+    });
+    expect(segment.event_conditions).toHaveLength(1);
+
+    const updated = await updateSegmentDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      segmentId: segment.id,
+      name: segment.name,
+      schemaName: segment.schema_name,
+      filters: segment.filters,
+      actorUserId: owner.id,
+    });
+
+    expect(updated.event_conditions).toEqual([]);
+  });
+
+  it('preserves the segment id and any owner/status already set on it', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Definition Preserves Worklist Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Alex Rep', createdByUserId: owner.id });
+    await assignSegmentOwner({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, ownerPersonId: person.id, actorUserId: owner.id });
+    await updateSegmentStatus({ organizationId: organization.id, projectId: project.id, segmentId: segment.id, status: 'in_progress', actorUserId: owner.id });
+
+    const updated = await updateSegmentDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      segmentId: segment.id,
+      name: 'Renamed',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      actorUserId: owner.id,
+    });
+
+    expect(updated.owner_person_id).toBe(person.id);
+    expect(updated.status).toBe('in_progress');
+  });
+
+  it('collects every validation failure into one InvalidSegmentError rather than failing fast', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Definition Invalid Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    let caught: unknown;
+    try {
+      await updateSegmentDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        segmentId: segment.id,
+        name: '   ',
+        schemaName: 'does_not_exist',
+        filters: [{ field: 'plan', op: 'like', value: 'pro' }],
+        actorUserId: owner.id,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(InvalidSegmentError);
+    const reasons = (caught as InstanceType<typeof InvalidSegmentError>).reasons;
+    expect(reasons.some((reason) => reason.includes('non-empty name'))).toBe(true);
+    expect(reasons.some((reason) => reason.includes('Filter at index 0 is invalid'))).toBe(true);
+    expect(reasons.some((reason) => reason.includes('is not registered'))).toBe(true);
+
+    // A rejected update must never partially apply — reload and confirm the
+    // segment's original definition is untouched.
+    const reloaded = await SegmentModel.init(segment.id, { organization_id: organization.id, project_id: project.id });
+    expect(reloaded?.name).toBe('Pro customers');
+    expect(reloaded?.schema_name).toBe('customer');
+  });
+
+  it('throws SegmentNotFoundError for a segment that does not exist', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Definition Missing Org');
+
+    await expect(
+      updateSegmentDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        segmentId: 'does-not-exist',
+        name: 'X',
+        schemaName: 'customer',
+        filters: [{ field: 'plan', op: '=', value: 'pro' }],
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(SegmentNotFoundError);
+  });
+
+  it('records a segment.update audit log entry with before/after definition', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Segment Update Definition Audit Org');
+    await registerCustomerSchema(organization.id, project.id, owner.id);
+    const segment = await createSegment({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      createdByUserId: owner.id,
+    });
+
+    await updateSegmentDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      segmentId: segment.id,
+      name: 'Pro customers renamed',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'enterprise' }],
+      actorUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'segment.update' && candidate.target_id === segment.id);
+    expect(entry?.actor_id).toBe(owner.id);
+    expect(entry?.before).toEqual({ name: 'Pro customers', schemaName: 'customer', filters: [{ field: 'plan', op: '=', value: 'pro' }], eventConditions: [] });
+    expect(entry?.after).toEqual({ name: 'Pro customers renamed', schemaName: 'customer', filters: [{ field: 'plan', op: '=', value: 'enterprise' }], eventConditions: [] });
   });
 });
 
