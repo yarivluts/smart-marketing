@@ -18,10 +18,18 @@ function renderTrigger(): ReturnType<typeof render> {
   );
 }
 
-function mockFetchOnce(items: unknown[]): void {
+// Every fetch after the initial (no-`q`) index fetch is a KAN-116 customer search; keeping those
+// distinct from `items` here means an existing test that types a query doesn't also start
+// asserting on/being polluted by unrelated customer matches it never set up.
+function mockFetchOnce(items: unknown[], customerItems: unknown[] = []): void {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue({ ok: true, json: async () => ({ items }) }),
+    vi.fn().mockImplementation((url: string) =>
+      Promise.resolve({
+        ok: true,
+        json: async () => ({ items: url.includes('?q=') ? customerItems : items }),
+      }),
+    ),
   );
 }
 
@@ -172,6 +180,56 @@ describe('OmniSearchTrigger', () => {
     fireEvent.click(await screen.findByText('Grow MRR 20%'));
 
     expect(push).toHaveBeenCalledWith(GOAL_ITEM.href);
+  });
+
+  it('merges live customer search results (KAN-116) into the palette as the user types', async () => {
+    const customerItem = {
+      id: 'customer:cust_1',
+      type: 'customer',
+      label: 'cust_1',
+      description: 'customer',
+      href: '/orgs/org-1/projects/project-1/customers?q=cust_1&schema=customer',
+    };
+    mockFetchOnce([BOARD_ITEM], [customerItem]);
+    renderTrigger();
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await screen.findByRole('dialog');
+
+    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cust' } });
+
+    expect(await screen.findByText('cust_1')).toBeInTheDocument();
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/omnisearch?q=cust'));
+  });
+
+  it('navigates to a customer result on click', async () => {
+    const customerItem = {
+      id: 'customer:cust_1',
+      type: 'customer',
+      label: 'cust_1',
+      description: 'customer',
+      href: '/orgs/org-1/projects/project-1/customers?q=cust_1&schema=customer',
+    };
+    mockFetchOnce([], [customerItem]);
+    renderTrigger();
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await screen.findByRole('dialog');
+    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cust' } });
+
+    fireEvent.click(await screen.findByText('cust_1'));
+
+    expect(push).toHaveBeenCalledWith(customerItem.href);
+  });
+
+  it('does not search customers for a query below the minimum length', async () => {
+    mockFetchOnce([BOARD_ITEM]);
+    renderTrigger();
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await screen.findByRole('dialog');
+
+    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'a' } });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('does not refetch the index on a second open', async () => {

@@ -15,6 +15,7 @@ const {
   listMetricDefinitionsForProjectMock,
   listSegmentsForProjectMock,
   listWinRulesForProjectMock,
+  searchProjectCustomersMock,
 } = vi.hoisted(() => ({
   listAutomationTargetStatesForProjectMock: vi.fn(),
   listBoardsForProjectMock: vi.fn(),
@@ -22,6 +23,7 @@ const {
   listMetricDefinitionsForProjectMock: vi.fn(),
   listSegmentsForProjectMock: vi.fn(),
   listWinRulesForProjectMock: vi.fn(),
+  searchProjectCustomersMock: vi.fn(),
 }));
 
 vi.mock('@/lib/orgs/queries', () => ({
@@ -31,9 +33,10 @@ vi.mock('@/lib/orgs/queries', () => ({
   listMetricDefinitionsForProject: listMetricDefinitionsForProjectMock,
   listSegmentsForProject: listSegmentsForProjectMock,
   listWinRulesForProject: listWinRulesForProjectMock,
+  searchProjectCustomers: searchProjectCustomersMock,
 }));
 
-import { buildOmniSearchIndexForProject, type OmniSearchPermissions } from './omnisearch';
+import { buildOmniSearchCustomerItems, buildOmniSearchIndexForProject, type OmniSearchPermissions } from './omnisearch';
 
 const ALL_ALLOWED: OmniSearchPermissions = {
   canSearchBoards: true,
@@ -175,5 +178,63 @@ describe('buildOmniSearchIndexForProject', () => {
 
     expect(listWinRulesForProjectMock).toHaveBeenCalledWith('org-1', 'project-1');
     expect(listBoardsForProjectMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildOmniSearchCustomerItems', () => {
+  beforeEach(() => {
+    searchProjectCustomersMock.mockReset();
+  });
+
+  it('never calls the warehouse when the caller lacks the customer-search permission', async () => {
+    const items = await buildOmniSearchCustomerItems('org-1', 'project-1', 'jane', false);
+
+    expect(items).toEqual([]);
+    expect(searchProjectCustomersMock).not.toHaveBeenCalled();
+  });
+
+  it('never calls the warehouse for a blank or whitespace-only query', async () => {
+    const items = await buildOmniSearchCustomerItems('org-1', 'project-1', '   ', true);
+
+    expect(items).toEqual([]);
+    expect(searchProjectCustomersMock).not.toHaveBeenCalled();
+  });
+
+  it('maps matching customers into OmniSearchItems linking to the Customer 360 page', async () => {
+    searchProjectCustomersMock.mockResolvedValue({
+      ok: true,
+      results: [
+        { entityId: 'cust_1', schemaName: 'customer', properties: {}, lastSeenAt: '2026-08-01T00:00:00.000Z' },
+        { entityId: 'cust_2', schemaName: 'lead', properties: {}, lastSeenAt: '2026-08-02T00:00:00.000Z' },
+      ],
+    });
+
+    const items = await buildOmniSearchCustomerItems('org-1', 'project-1', ' jane ', true);
+
+    expect(searchProjectCustomersMock).toHaveBeenCalledWith('org-1', 'project-1', 'jane', { limit: 5 });
+    expect(items).toEqual([
+      {
+        id: 'customer:cust_1',
+        type: 'customer',
+        label: 'cust_1',
+        description: 'customer',
+        href: '/orgs/org-1/projects/project-1/customers?q=cust_1&schema=customer',
+      },
+      {
+        id: 'lead:cust_2',
+        type: 'customer',
+        label: 'cust_2',
+        description: 'lead',
+        href: '/orgs/org-1/projects/project-1/customers?q=cust_2&schema=lead',
+      },
+    ]);
+  });
+
+  it('returns no results for a degraded (warehouse not configured / quota exceeded / query error) outcome', async () => {
+    searchProjectCustomersMock.mockResolvedValue({ ok: false, reason: 'warehouse_not_configured', message: 'nope' });
+
+    const items = await buildOmniSearchCustomerItems('org-1', 'project-1', 'jane', true);
+
+    expect(items).toEqual([]);
   });
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, LayoutGrid, Megaphone, Search, Target, Trophy, Users } from 'lucide-react';
+import { BarChart3, LayoutGrid, Megaphone, Search, Target, Trophy, User, Users } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { searchOmniSearchItems, type OmniSearchItem, type OmniSearchResultType } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
@@ -14,7 +14,12 @@ const RESULT_ICONS: Record<OmniSearchResultType, typeof Search> = {
   campaign: Megaphone,
   goal: Target,
   win_rule: Trophy,
+  customer: User,
 };
+
+/** A customer match only ever comes from a live server-side substring search (KAN-116, unlike every other result type's eagerly-cached, client-ranked index) — short enough not to spend a warehouse query on every keystroke, but not so long the palette feels unresponsive. */
+const CUSTOMER_SEARCH_MIN_QUERY_LENGTH = 2;
+const CUSTOMER_SEARCH_DEBOUNCE_MS = 200;
 
 interface OmniSearchTriggerProps {
   orgId: string;
@@ -28,7 +33,9 @@ interface OmniSearchTriggerProps {
  * comment for why an eager per-page-load fetch would be too heavy) and then
  * ranked entirely client-side via the shared `searchOmniSearchItems`
  * heuristic as the user types, so results feel instant after that first
- * fetch.
+ * fetch. Customers (KAN-116) are the one exception: a debounced live
+ * server-side search runs as the query changes and its matches are merged
+ * in alongside the client-ranked results — see the effect below.
  */
 export function OmniSearchTrigger({ orgId, projectId }: OmniSearchTriggerProps): React.ReactElement {
   const t = useTranslations('OmniSearch');
@@ -37,6 +44,7 @@ export function OmniSearchTrigger({ orgId, projectId }: OmniSearchTriggerProps):
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<OmniSearchItem[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [customerItems, setCustomerItems] = useState<OmniSearchItem[]>([]);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
   const close = useCallback(() => {
@@ -50,6 +58,7 @@ export function OmniSearchTrigger({ orgId, projectId }: OmniSearchTriggerProps):
   // showing the previous project's boards/metrics/segments/campaigns).
   useEffect(() => {
     setItems(null);
+    setCustomerItems([]);
   }, [orgId, projectId]);
 
   useEffect(() => {
@@ -93,7 +102,41 @@ export function OmniSearchTrigger({ orgId, projectId }: OmniSearchTriggerProps):
     };
   }, [open, items, orgId, projectId]);
 
-  const results = useMemo(() => searchOmniSearchItems(items ?? [], query), [items, query]);
+  // Customer results (KAN-116) never come from the eagerly-fetched, client-ranked `items` index
+  // above — there is no bounded "list every customer" query to prefetch — so this debounces a
+  // separate, targeted server request per query change instead, merging whatever it returns
+  // alongside the client-ranked static results rather than re-filtering them through
+  // `searchOmniSearchItems` (a customer can match on a property `searchOmniSearchItems` never
+  // sees, since its own label is just the entity id, not the matched field).
+  useEffect(() => {
+    const trimmedQuery = query.trim();
+    if (!open || trimmedQuery.length < CUSTOMER_SEARCH_MIN_QUERY_LENGTH) {
+      setCustomerItems([]);
+      return;
+    }
+    let cancelled = false;
+    const timeoutId = window.setTimeout(() => {
+      fetch(`/api/orgs/${orgId}/projects/${projectId}/omnisearch?q=${encodeURIComponent(trimmedQuery)}`)
+        .then((response) => (response.ok ? (response.json() as Promise<{ items?: OmniSearchItem[] }>) : { items: [] }))
+        .then((data) => {
+          if (!cancelled) {
+            setCustomerItems(data.items ?? []);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setCustomerItems([]);
+          }
+        });
+    }, CUSTOMER_SEARCH_DEBOUNCE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [open, query, orgId, projectId]);
+
+  const staticResults = useMemo(() => searchOmniSearchItems(items ?? [], query), [items, query]);
+  const results = useMemo(() => [...staticResults, ...customerItems], [staticResults, customerItems]);
 
   useEffect(() => {
     setHighlightedIndex(0);
