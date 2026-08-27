@@ -140,6 +140,7 @@ import {
   type HookDeliveryModel,
   type HookDeliveryStatus,
   setHookEndpointSigningSecret as setHookEndpointSigningSecretInOrganization,
+  updateHookEndpoint as updateHookEndpointInOrganization,
   setProjectCostQuota as setProjectCostQuotaInOrganization,
   setProjectSessionReplayUrlTemplate as setProjectSessionReplayUrlTemplateInOrganization,
   updateProjectDetails as updateProjectDetailsInOrganization,
@@ -555,6 +556,20 @@ interface EnableHookEndpointInput {
 export async function enableHookEndpoint(input: EnableHookEndpointInput): Promise<HookEndpointModel> {
   await ensureFirestoreOrm();
   return enableHookEndpointInOrganization(input);
+}
+
+interface UpdateHookEndpointInput {
+  organizationId: string;
+  projectId: string;
+  hookEndpointId: string;
+  name: string;
+  signatureHeaderName?: string;
+  actorUserId: string;
+}
+
+export async function updateHookEndpoint(input: UpdateHookEndpointInput): Promise<HookEndpointModel> {
+  await ensureFirestoreOrm();
+  return updateHookEndpointInOrganization(input);
 }
 
 interface SetHookEndpointSigningSecretInput {
