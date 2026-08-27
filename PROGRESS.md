@@ -17,7 +17,62 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #317 (KAN-111, funnel conversion admin surface)
+## 2026-08-27 (latest) — Merged PR #319 (KAN-113, cohort retention admin surface)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). Checked open PRs before starting new
+    work (established pattern) and found **PR #319** (KAN-113, `kan-113-cohort-retention-admin-
+    surface`) — implementation-complete, opened by another session, but `mergeable_state: dirty`
+    (main had advanced past its base). Took over finishing it rather than starting new,
+    possibly-overlapping backlog work, same posture prior entries establish for PR #315-317.
+  - Merged `origin/main` into the branch: real conflicts this time (not just the usual
+    `TASKS.md`/`PROGRESS.md` append-only collisions) — PR #317 (KAN-111, funnel) had added its own
+    nav-list entries and en/he message sections in the same files this PR touches
+    (`orgs/[orgId]/page.tsx`, the project layout's nav list, `messages/{en,he}.json`). Resolved by
+    keeping both features' entries (funnel before cohorts, matching each nav list's existing order)
+    rather than picking one side. `TASKS.md`/`PROGRESS.md` themselves auto-merged cleanly as usual.
+  - Verified everything green locally before relying on CI: `pnpm install --frozen-lockfile`, then
+    `pnpm lint`/`pnpm typecheck`/`pnpm build` all green across all 8 packages.
+  - First CI run on the merge commit failed: `campaign-ops-pack.emulator.test.ts`'s "reuses the
+    SaaS pack's own ad_spend metric" test hit a 120s timeout, a file this diff never touches. Posted
+    a standing-down comment naming the failure and the repo's well-documented Firestore-emulator
+    resource-contention pattern, then re-ran the failed job once (per the CI-red rules' one-flake-
+    reconfirmation allowance). While that re-run was in flight, this run's own full local `pnpm test`
+    hit the *exact same test* with the *exact same timeout* — initially concerning, since two
+    independent environments failing identically looks like a real regression, not a coincidence.
+    Investigated properly instead of trusting the "flake" label on faith: ran that one test file in
+    isolation (`firebase emulators:exec ... vitest run .../campaign-ops-pack.emulator.test.ts`,
+    no other test files competing for the emulator) — passed cleanly, 19/19, the specific "reuses...
+    ad_spend metric" test finishing in 612ms. The file's own tests are simply slow against the
+    emulator even in isolation (one sibling test took 66s alone), so under the full suite's
+    additional parallel Firestore load the next test in sequence tips over the 120s vitest timeout —
+    confirms genuine environmental resource contention, not a logic bug from this PR's merge. The
+    CI re-run came back green shortly after (both checks `success`, `mergeable_state: clean`, no
+    open review threads).
+  - Independently reviewed the diff before merging (`cohort-retention-view.ts`'s grouping/rounding,
+    the new page's permission gating (`dashboards.write`) and degraded-state handling, dual nav-list
+    wiring, en/he translations) — sound, consistent with the established KAN-108/KAN-111
+    admin-surface-follow-up pattern, well-tested. No bugs found.
+  - Merged PR #319 (squash) into `main` (`6b0009b`) and unsubscribed from its activity. Remote
+    branch deletion for `kan-113-cohort-retention-admin-surface` failed with the same recurring
+    HTTP 403 this file has documented since 2026-07-04.
+- **In progress (exact stopping point):** none — KAN-113 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern for the next candidate,
+  re-checking open PRs first — current highest real KAN number is now 113.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including
+    `kan-113-cohort-retention-admin-surface`.
+
+---
+
+## 2026-08-27 — Merged PR #317 (KAN-111, funnel conversion admin surface)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19
