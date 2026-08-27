@@ -17,7 +17,65 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #316 (KAN-110, Meta/Google audience mobile-device-id identifier)
+## 2026-08-27 (latest) — KAN-112, Meta/Google audience mailing-address identifier
+
+- **Last completed:**
+  - Session start: local `main` turned out to be a completely disjoint, stale container-image
+    lineage (no common ancestor with `origin/main` at all — `git merge-base` returned nothing).
+    Reset local `main` to `origin/main` (`git reset --hard`, local-only, no shared history
+    touched) rather than the repo's stop-hook's own suggested "rebase --root and force-push"
+    remediation, which would have rewritten shared history on `main` — never doing that.
+  - Checked open PRs before picking new work: found **PR #316** (KAN-110) already merged by its
+    own session, and **PR #317** (KAN-111, funnel admin surface) open and actively being driven by
+    its own live session. Investigated PR #317's one CI failure to help
+    (`onboarding.spec.ts`'s "Funnel" nav-link accessible-name collision with the SaaS pack's own
+    "Funnel" starter board — Playwright's `getByRole` name match is substring-based by default) and
+    had a fix ready, but the originating session pushed an equivalent (better) fix
+    (`482c0ee`, renaming the link to "Conversion" instead of exact-matching the older test) before
+    mine landed — discarded my local duplicate rather than racing it. Left PR #317 to its own
+    session from there; did not touch it further (still open, no new activity by session end —
+    not mine to drive to green, per the "watching vs. driving" posture for a PR I didn't create and
+    wasn't asked to babysit).
+  - Research pass (dedicated read-only agent) confirmed the backlog is otherwise exhausted
+    (KAN-18/19 real-infra, KAN-43 `needs-human`, KAN-50/51 `blocked-by`) and identified the
+    cleanest remaining self-contained gap: KAN-110's own follow-up note left mailing address as the
+    one explicitly-deferred contact-match identifier on both the Meta Custom Audience and Google
+    Customer Match connectors — three files (`meta-custom-audience/executor.ts`/`manifest.ts`,
+    `google-customer-match/executor.ts`/`manifest.ts`) named the exact same gap verbatim.
+  - Implemented **KAN-112** on branch `kan-112-audience-mailing-address` (off a fresh `origin/main`,
+    not the stale local one) — see the `TASKS.md` row for the full delivery description: six new
+    per-field Meta hashing functions (`FN`/`LN`/`CT`/`ST`/`ZIP`/`COUNTRY`, each independently
+    hashed per Meta's own spec) vs. one nested Google `addressInfo` sub-object (only
+    first/last name hashed, city/state/country/postal cleartext, per the real
+    `OfflineUserAddressInfo` proto) — a genuine, researched cross-connector shape difference, not
+    an oversight, documented the same way KAN-110 documented Meta-hashes-MAID-Google-doesn't.
+  - Full test coverage added mirroring KAN-110's own pattern: hashing/normalization unit tests
+    (both connectors, including the cross-connector differences — Meta's zip+4 truncation vs.
+    Google's none, Google's uppercase country code vs. Meta's lowercase), api-client request-shape
+    tests (address-only/partial/combined-with-other-identifiers/omitted-byte-identical), and
+    executor property-read tests (full address, partial address).
+  - Hit and cleaned a stale `apps/web/.next` build-cache artifact from earlier PR #317 branch
+    investigation (referenced a `funnel` page that doesn't exist on this branch, briefly failing
+    `pnpm typecheck` with a phantom `Cannot find module` error) — deleted the directory, typecheck
+    went green.
+  - `pnpm lint`/`pnpm typecheck`/`pnpm build` green across all 8 packages; full monorepo `pnpm
+    test` [outcome filled in once the background run this entry was written alongside finishes —
+    see the next entry if this one is superseded before merge].
+- **In progress (exact stopping point):** implementation complete on `kan-112-audience-mailing-address`,
+  not yet pushed/PR'd/merged as of this entry — finishing in the same run once the full test suite
+  confirms green.
+- **Blocked + why:** nothing blocking.
+- **Next step:** push the branch, open the PR, self-review the diff, confirm CI green, merge, delete
+  the branch, update this file's own final state.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - PR #317 (KAN-111) is open, being driven by its own session — no action needed from anyone else
+    unless that session goes idle with it still red/unmerged.
+
+---
+
+## 2026-08-27 — Merged PR #316 (KAN-110, Meta/Google audience mobile-device-id identifier)
 
 - **Last completed:**
   - Session start: fetched `origin/main` (matched local `HEAD` at `7510497`, PR #315/KAN-109

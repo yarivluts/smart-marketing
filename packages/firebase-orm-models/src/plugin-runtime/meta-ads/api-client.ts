@@ -141,16 +141,24 @@ export interface MetaCreateLookalikeAudienceResult {
 
 /**
  * One contact's already-hashed Custom Audience match key(s) — `emailHash`,
- * `phoneHash`, and/or `madidHash` (mobile advertiser id), matching Meta's
- * own multi-key `users` upload schema (a row can carry any combination;
- * Meta improves match rate when more than one is present for the same
- * person). `MetaCustomAudienceSinkPluginExecutor` builds these; this client
- * never receives a raw email, phone number, or device id.
+ * `phoneHash`, `madidHash` (mobile advertiser id), and/or the mailing-address
+ * fields `firstNameHash`/`lastNameHash`/`cityHash`/`stateHash`/`zipHash`/
+ * `countryHash`, matching Meta's own multi-key `users` upload schema (a row
+ * can carry any combination; Meta improves match rate when more than one is
+ * present for the same person). `MetaCustomAudienceSinkPluginExecutor`
+ * builds these; this client never receives a raw email, phone number,
+ * device id, or address field.
  */
 export interface MetaContactMatchKey {
   emailHash?: string;
   phoneHash?: string;
   madidHash?: string;
+  firstNameHash?: string;
+  lastNameHash?: string;
+  cityHash?: string;
+  stateHash?: string;
+  zipHash?: string;
+  countryHash?: string;
 }
 
 /**
@@ -492,14 +500,14 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
 
   async addContactsToCustomAudience(audienceId: string, contacts: readonly MetaContactMatchKey[]): Promise<MetaAddHashedEmailsResult> {
     // Meta's multi-key `users` upload schema is one fixed column list for the
-    // whole payload — include EMAIL/PHONE/MADID only if at least one contact
-    // in this call actually carries it (keeps a call missing a given
-    // identifier's payload byte-identical to what it would have been before
-    // that identifier was supported at all — e.g. a MADID-less call's
-    // payload is byte-identical to the pre-MADID-support `{schema: ['EMAIL',
-    // 'PHONE'], ...}` shape), and fill a missing key with `''` per row per
-    // Meta's own spec.
-    const schema: Array<'EMAIL' | 'PHONE' | 'MADID'> = [];
+    // whole payload — include a column only if at least one contact in this
+    // call actually carries it (keeps a call missing a given identifier's
+    // payload byte-identical to what it would have been before that
+    // identifier was supported at all — e.g. a MADID-less call's payload is
+    // byte-identical to the pre-MADID-support `{schema: ['EMAIL', 'PHONE'],
+    // ...}` shape), and fill a missing key with `''` per row per Meta's own
+    // spec.
+    const schema: Array<'EMAIL' | 'PHONE' | 'MADID' | 'FN' | 'LN' | 'CT' | 'ST' | 'ZIP' | 'COUNTRY'> = [];
     if (contacts.some((contact) => contact.emailHash !== undefined)) {
       schema.push('EMAIL');
     }
@@ -509,10 +517,34 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
     if (contacts.some((contact) => contact.madidHash !== undefined)) {
       schema.push('MADID');
     }
-    const columnValue: Record<'EMAIL' | 'PHONE' | 'MADID', (contact: MetaContactMatchKey) => string> = {
+    if (contacts.some((contact) => contact.firstNameHash !== undefined)) {
+      schema.push('FN');
+    }
+    if (contacts.some((contact) => contact.lastNameHash !== undefined)) {
+      schema.push('LN');
+    }
+    if (contacts.some((contact) => contact.cityHash !== undefined)) {
+      schema.push('CT');
+    }
+    if (contacts.some((contact) => contact.stateHash !== undefined)) {
+      schema.push('ST');
+    }
+    if (contacts.some((contact) => contact.zipHash !== undefined)) {
+      schema.push('ZIP');
+    }
+    if (contacts.some((contact) => contact.countryHash !== undefined)) {
+      schema.push('COUNTRY');
+    }
+    const columnValue: Record<'EMAIL' | 'PHONE' | 'MADID' | 'FN' | 'LN' | 'CT' | 'ST' | 'ZIP' | 'COUNTRY', (contact: MetaContactMatchKey) => string> = {
       EMAIL: (contact) => contact.emailHash ?? '',
       PHONE: (contact) => contact.phoneHash ?? '',
       MADID: (contact) => contact.madidHash ?? '',
+      FN: (contact) => contact.firstNameHash ?? '',
+      LN: (contact) => contact.lastNameHash ?? '',
+      CT: (contact) => contact.cityHash ?? '',
+      ST: (contact) => contact.stateHash ?? '',
+      ZIP: (contact) => contact.zipHash ?? '',
+      COUNTRY: (contact) => contact.countryHash ?? '',
     };
     const data = contacts.map((contact) => schema.map((key) => columnValue[key](contact)));
 
