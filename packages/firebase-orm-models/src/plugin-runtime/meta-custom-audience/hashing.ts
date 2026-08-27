@@ -48,3 +48,72 @@ export function hashMobileDeviceIdForMetaCustomAudience(mobileDeviceId: string):
   const normalized = mobileDeviceId.trim().toLowerCase();
   return createHash('sha256').update(normalized).digest('hex');
 }
+
+/**
+ * Meta's documented Custom Audience upload format for `FN`/`LN` (first/last
+ * name) schema fields: trim surrounding whitespace, lowercase, then SHA-256
+ * hash — the same normalize-then-hash shape as `EMAIL`/`MADID` (Meta's own
+ * "Hashing and Normalizing Customer Information" spec). Unlike
+ * {@link hashCityForMetaCustomAudience}, Meta's spec does not call for
+ * stripping internal whitespace/punctuation from a name.
+ */
+export function hashNameForMetaCustomAudience(name: string): string {
+  const normalized = name.trim().toLowerCase();
+  return createHash('sha256').update(normalized).digest('hex');
+}
+
+/**
+ * Meta's documented Custom Audience upload format for a `CT` (city) schema
+ * field: lowercase, with *all* whitespace and punctuation removed (Meta's
+ * own spec example: "St. Louis" becomes "stlouis") before hashing — unlike
+ * {@link hashNameForMetaCustomAudience}, which only trims surrounding
+ * whitespace.
+ */
+export function hashCityForMetaCustomAudience(city: string): string {
+  const normalized = city.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return createHash('sha256').update(normalized).digest('hex');
+}
+
+/**
+ * Meta's documented Custom Audience upload format for an `ST` (state)
+ * schema field: the two-letter ANSI abbreviation, lowercased, with all
+ * whitespace/punctuation stripped before hashing — same normalization
+ * shape as {@link hashCityForMetaCustomAudience}. This function does not
+ * itself validate that `state` is really a two-letter code (same "best
+ * effort, not every row is eligible" posture every other function in this
+ * file establishes).
+ */
+export function hashStateForMetaCustomAudience(state: string): string {
+  const normalized = state.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return createHash('sha256').update(normalized).digest('hex');
+}
+
+/**
+ * Meta's documented Custom Audience upload format for a `ZIP` schema field:
+ * strip whitespace/punctuation, lowercase (Meta's spec: some countries'
+ * postal codes include letters), then keep only the first 5 characters —
+ * Meta's own spec: "Remove any characters after the first 5 digits for
+ * United States zip codes" (a `zip+4` value like `94103-1234` hashes the
+ * same as `94103`).
+ */
+export function hashZipForMetaCustomAudience(zip: string): string {
+  const normalized = zip
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+    .slice(0, 5);
+  return createHash('sha256').update(normalized).digest('hex');
+}
+
+/**
+ * Meta's documented Custom Audience upload format for a `COUNTRY` schema
+ * field: the two-letter ISO 3166-1 alpha-2 country code, lowercased, with
+ * whitespace/punctuation stripped before hashing — same normalization shape
+ * as {@link hashStateForMetaCustomAudience}. This function does not itself
+ * validate that `country` is really a two-letter code (same "best effort"
+ * posture every other function in this file establishes).
+ */
+export function hashCountryForMetaCustomAudience(country: string): string {
+  const normalized = country.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return createHash('sha256').update(normalized).digest('hex');
+}

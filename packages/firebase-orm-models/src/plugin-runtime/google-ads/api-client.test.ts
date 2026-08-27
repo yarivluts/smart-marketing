@@ -336,6 +336,64 @@ describe('GoogleAdsHttpApiClient', () => {
     expect(addOperationsBody.operations).toEqual([{ create: { userIdentifiers: [{ hashedEmail: 'hash-email-a' }, { hashedPhoneNumber: 'hash-phone-a' }, { mobileId: 'maid-a' }] } }]);
   });
 
+  it('uploads a mailing-address-only contact as a single addressInfo userIdentifiers entry', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ resourceName: 'customers/123/offlineUserDataJobs/456' }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [
+      { addressInfo: { hashedFirstName: 'hash-fn', hashedLastName: 'hash-ln', city: 'Mountain View', state: 'CA', countryCode: 'US', postalCode: '94043' } },
+    ]);
+
+    expect(result).toEqual({ numReceived: 1 });
+    const addOperationsBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
+    expect(addOperationsBody.operations).toEqual([
+      {
+        create: {
+          userIdentifiers: [
+            { addressInfo: { hashedFirstName: 'hash-fn', hashedLastName: 'hash-ln', city: 'Mountain View', state: 'CA', countryCode: 'US', postalCode: '94043' } },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it('combines hashedEmail and addressInfo onto the same userIdentifiers array when a contact carries both', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ resourceName: 'customers/123/offlineUserDataJobs/456' }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [
+      { hashedEmail: 'hash-email-a', addressInfo: { city: 'Mountain View' } },
+    ]);
+
+    const addOperationsBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
+    expect(addOperationsBody.operations).toEqual([{ create: { userIdentifiers: [{ hashedEmail: 'hash-email-a' }, { addressInfo: { city: 'Mountain View' } }] } }]);
+  });
+
+  it('omits the addressInfo entry entirely when a contact has none, keeping the payload byte-identical to before mailing-address support', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ resourceName: 'customers/123/offlineUserDataJobs/456' }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({}));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [{ hashedEmail: 'hash-a' }]);
+
+    const addOperationsBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
+    expect(addOperationsBody.operations).toEqual([{ create: { userIdentifiers: [{ hashedEmail: 'hash-a' }] } }]);
+  });
+
   it('throws GoogleAdsApiError with the response status when the offline user data job create call fails', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE)).mockResolvedValueOnce(jsonResponse({ error: 'nope' }, false, 400));
     vi.stubGlobal('fetch', fetchMock);

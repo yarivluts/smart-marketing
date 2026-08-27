@@ -2,7 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { MetaAdsApiError, type MetaAdsApiClient } from '../meta-ads';
 import { SinkPluginExecutionError } from '../executor';
 import type { PluginRuntimeCredential } from '../credential';
-import { hashEmailForMetaCustomAudience, hashMobileDeviceIdForMetaCustomAudience, hashPhoneForMetaCustomAudience } from './hashing';
+import {
+  hashCityForMetaCustomAudience,
+  hashCountryForMetaCustomAudience,
+  hashEmailForMetaCustomAudience,
+  hashMobileDeviceIdForMetaCustomAudience,
+  hashNameForMetaCustomAudience,
+  hashPhoneForMetaCustomAudience,
+  hashStateForMetaCustomAudience,
+  hashZipForMetaCustomAudience,
+} from './hashing';
 import { MetaCustomAudienceSinkPluginExecutor } from './executor';
 
 const CREDENTIAL: PluginRuntimeCredential = {
@@ -126,6 +135,38 @@ describe('MetaCustomAudienceSinkPluginExecutor', () => {
         phoneHash: hashPhoneForMetaCustomAudience('+14155550100'),
         madidHash: hashMobileDeviceIdForMetaCustomAudience('38400000-8cf0-11bd-b23e-10b96e4ef00d'),
       },
+    ]);
+  });
+
+  it('hashes a mailing-address-only record and includes it as FN/LN/CT/ST/ZIP/COUNTRY contact keys', async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new MetaCustomAudienceSinkPluginExecutor({ apiClient, adAccountId: '999', audienceName: 'Warm leads', existingAudienceId: 'audience-existing' });
+
+    const result = await executor.push(
+      pushParams([{ properties: { first_name: 'Jane', last_name: 'Doe', city: 'St. Louis', state: 'MO', zip: '63101-1234', country: 'US' } }]),
+    );
+
+    expect(apiClient.addContactsToCustomAudience).toHaveBeenCalledWith('audience-existing', [
+      {
+        firstNameHash: hashNameForMetaCustomAudience('Jane'),
+        lastNameHash: hashNameForMetaCustomAudience('Doe'),
+        cityHash: hashCityForMetaCustomAudience('St. Louis'),
+        stateHash: hashStateForMetaCustomAudience('MO'),
+        zipHash: hashZipForMetaCustomAudience('63101-1234'),
+        countryHash: hashCountryForMetaCustomAudience('US'),
+      },
+    ]);
+    expect(result).toEqual({ pushed: 1, externalRef: 'audience-existing' });
+  });
+
+  it('hashes a partial mailing address (only city and state present) without requiring every address field', async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomAudience: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new MetaCustomAudienceSinkPluginExecutor({ apiClient, adAccountId: '999', audienceName: 'Warm leads', existingAudienceId: 'audience-existing' });
+
+    await executor.push(pushParams([{ properties: { city: 'Austin', state: 'TX' } }]));
+
+    expect(apiClient.addContactsToCustomAudience).toHaveBeenCalledWith('audience-existing', [
+      { cityHash: hashCityForMetaCustomAudience('Austin'), stateHash: hashStateForMetaCustomAudience('TX') },
     ]);
   });
 
