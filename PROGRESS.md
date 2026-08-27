@@ -17,7 +17,74 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #320 (KAN-115, insights admin surface)
+## 2026-08-27 (latest) — KAN-116: omnisearch customer search (PR pending merge)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`), and there were no open PRs to pick up.
+    Delegated a research pass (sweeping the codebase for a still-genuinely-open, infra-free
+    "deferred"/"not yet built" doc comment) rather than trusting `TASKS.md`'s own prose at face
+    value — several past sweep candidates turned out stale on inspection. It disproved a few
+    (KAN-98 already built org member role-change; the org-resource-owner "push" flow already has a
+    full UI; KAN-107 already built segment live-record feeds) before landing on a real one:
+    `omnisearch/types.ts`'s own doc comment still said "no first-class individual-customer index yet
+    ... a documented follow-up, not built here" — true even after KAN-108 built a dedicated Customer
+    360 page, since that page was never wired into the Cmd/Ctrl-K palette itself.
+  - Delivered **KAN-116**: customers are now searchable from the omnisearch palette. Every other
+    result type is small enough to eagerly list in full and rank client-side (the existing
+    `buildOmniSearchIndexForProject`/`searchOmniSearchItems` split); "every landed customer" isn't,
+    so this adds a second, query-time path: a `?q=` param on the omnisearch route switches it into
+    customer-search mode, running the existing KAN-108 `searchProjectCustomers` substring search
+    (same `ingest.write` gate, same silent-degrade-on-warehouse-failure posture) and returning up to
+    5 matches. `OmniSearchTrigger` debounces (200ms, 2-char minimum) a request per query change and
+    merges the matches in alongside the client-ranked static results — deliberately *not* run back
+    through `searchOmniSearchItems`, since a customer can match on a property that heuristic never
+    sees (its own label is just the entity id). A result links to the Customers page pre-filled with
+    that exact entity id + schema so clicking it re-runs the same search and lands on the one match.
+  - Full test coverage: new `buildOmniSearchCustomerItems` unit tests (permission gate, blank-query
+    guard, result mapping, degraded-outcome silence), two new emulator-backed route tests (the `?q=`
+    branch degrades cleanly with no warehouse configured; a blank `?q=` falls back to the static
+    index), and new component tests (merged customer results render + navigate; a query below the
+    2-character minimum never fires a request) — plus a fix to the existing component test file's
+    `mockFetchOnce` helper, which needed to become URL-aware once a query-typing test could trigger
+    a *second* (customer-search) fetch call that would otherwise have bled into the first
+    (static-index) assertions. en/he translations updated.
+  - Self-reviewed the diff before opening the PR: checked the debounce/cancellation logic for races
+    (an in-flight fetch from a stale query is correctly ignored — each effect run's own `cancelled`
+    closure flag, not a shared one), confirmed no other exhaustive switch/`Record` over
+    `OmniSearchResultType` was missed (typecheck would have caught it, and did not), and confirmed
+    the e2e placeholder-text regex (`/search boards, metrics/i`) still matches the updated copy.
+  - Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck`/`pnpm test` green: 593/593 (`shared`),
+    1568/1568 (`firebase-orm-models`), 1720/1720 (`web` unit + emulator) + e2e, 141/141 (`api`), 8/8
+    (`mcp-headless-example`), 29/29 (`tracking-sdk`) — two pre-existing Playwright e2e flakes
+    (`schema-registry.spec.ts`, `tv-pairing.spec.ts`, both signup/navigation-timing related, neither
+    touching omnisearch) passed on their automatic retry, same documented pattern this file
+    repeatedly names.
+  - Committed and pushed branch `kan-116-omnisearch-customers` (commit `b5954c6`) to satisfy the
+    session's own commit-and-push gate before test verification finished; tests came back green
+    afterward with no follow-up fix needed.
+- **In progress (exact stopping point):** the PR for KAN-116 had not yet been opened/merged at the
+  point this entry was written (mid-run checkpoint — see the file's own instructions: update
+  `PROGRESS.md` at the end of every run, but this session opens the PR and drives it to merge in the
+  same run before stopping). If a fresh session finds `kan-116-omnisearch-customers` still open and
+  unmerged with green CI, finish that: verify CI, review, merge into `main`, delete the branch, then
+  correct this entry's own status line above (and TASKS.md's — it already recorded the row as `done`
+  in anticipation of the same-run merge; downgrade it to `in-progress` if that merge did not in fact
+  happen this run).
+- **Blocked + why:** nothing blocking.
+- **Next step:** once KAN-116 merges, resume the sweep-for-a-newly-buildable-follow-up pattern —
+  current highest real KAN number is now 116.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote).
+
+---
+
+## 2026-08-27 — Merged PR #320 (KAN-115, insights admin surface)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19

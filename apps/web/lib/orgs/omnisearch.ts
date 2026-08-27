@@ -7,6 +7,7 @@ import {
   listMetricDefinitionsForProject,
   listSegmentsForProject,
   listWinRulesForProject,
+  searchProjectCustomers,
 } from '@/lib/orgs/queries';
 
 /**
@@ -84,4 +85,44 @@ export async function buildOmniSearchIndexForProject(
   }
 
   return items;
+}
+
+/** Capped well below the Customer 360 page's own `DEFAULT_CUSTOMER_SEARCH_LIMIT` (20) — the palette shows a handful of jump-to targets, not a full results page. */
+const OMNI_SEARCH_CUSTOMER_RESULT_LIMIT = 5;
+
+/**
+ * The query-time customer half of the omnisearch index (KAN-116). Every other result type is small
+ * enough to eagerly list in full via `buildOmniSearchIndexForProject` and rank client-side as the
+ * user types; "every landed customer" is neither small nor rankable without a query (see
+ * `OMNI_SEARCH_RESULT_TYPES`'s own doc comment), so this instead runs the exact KAN-108
+ * `searchProjectCustomers` substring search fresh on each call, gated on the same `ingest.write`
+ * permission the Customers page itself requires. A degraded warehouse outcome (not configured,
+ * quota exceeded, or a query error) returns no customer results rather than surfacing an error in a
+ * "jump to X" palette — the same silent-degrade posture the static index already applies to a
+ * permission the caller lacks.
+ */
+export async function buildOmniSearchCustomerItems(
+  organizationId: string,
+  projectId: string,
+  query: string,
+  canSearchCustomers: boolean,
+): Promise<OmniSearchItem[]> {
+  const trimmedQuery = query.trim();
+  if (!canSearchCustomers || trimmedQuery.length === 0) {
+    return [];
+  }
+
+  const outcome = await searchProjectCustomers(organizationId, projectId, trimmedQuery, { limit: OMNI_SEARCH_CUSTOMER_RESULT_LIMIT });
+  if (!outcome.ok) {
+    return [];
+  }
+
+  const base = `/orgs/${organizationId}/projects/${projectId}`;
+  return outcome.results.map((result) => ({
+    id: `${result.schemaName}:${result.entityId}`,
+    type: 'customer' as const,
+    label: result.entityId,
+    description: result.schemaName,
+    href: `${base}/customers?q=${encodeURIComponent(result.entityId)}&schema=${encodeURIComponent(result.schemaName)}`,
+  }));
 }

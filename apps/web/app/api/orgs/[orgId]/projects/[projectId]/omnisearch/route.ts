@@ -3,7 +3,7 @@ import { ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { requireOrgMembership } from '@/lib/orgs/access';
-import { buildOmniSearchIndexForProject } from '@/lib/orgs/omnisearch';
+import { buildOmniSearchCustomerItems, buildOmniSearchIndexForProject } from '@/lib/orgs/omnisearch';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 
 interface RouteParams {
@@ -19,11 +19,21 @@ interface RouteParams {
  * caller holds the exact permission its own destination page already gates
  * on in `ProjectLayout` (`dashboards.read`/`dashboards.write` for boards,
  * `metrics.write` for metrics, `dashboards.write` for segments, goals, and
- * win rules, `automation.execute` for campaigns) — so a search result never
- * links somewhere the caller couldn't otherwise reach via the nav, but a
- * `viewer` still gets a working (if narrower) search instead of a 403.
+ * win rules, `automation.execute` for campaigns, `ingest.write` for
+ * customers — the same permission the KAN-108 Customers page itself gates
+ * on) — so a search result never links somewhere the caller couldn't
+ * otherwise reach via the nav, but a `viewer` still gets a working (if
+ * narrower) search instead of a 403.
+ *
+ * A `?q=` query param switches this into customer-search mode (KAN-116):
+ * unlike every other result type, customers can't be eagerly listed in full
+ * for client-side ranking (see `OMNI_SEARCH_RESULT_TYPES`'s own doc
+ * comment), so a non-empty `q` returns only the live KAN-108 substring-search
+ * matches for that query instead of the static index — the caller (the
+ * omnisearch palette) already has the static index cached from its initial
+ * fetch and re-queries this endpoint with `q` as the user types.
  */
-export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
+export async function GET(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
 
   const { user, error } = await requireOrgMembership(orgId);
@@ -45,8 +55,15 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 
   const principal = { type: 'user' as const, id: user.id };
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canSearchCustomers = can(bindings, principal, 'ingest.write', { orgId });
+  const query = request.nextUrl.searchParams.get('q');
 
   try {
+    if (query && query.trim().length > 0) {
+      const items = await buildOmniSearchCustomerItems(orgId, projectId, query, canSearchCustomers);
+      return NextResponse.json({ items });
+    }
+
     const items = await buildOmniSearchIndexForProject(orgId, projectId, {
       canSearchBoards: canManageBoards || can(bindings, principal, 'dashboards.read', { orgId }),
       canSearchMetrics: can(bindings, principal, 'metrics.write', { orgId }),

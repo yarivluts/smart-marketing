@@ -49,9 +49,14 @@ async function setupOrgProject(orgName: string) {
 function omniSearchRequest(
   orgId: string,
   projectId: string,
+  query?: string,
 ): { request: NextRequest; params: Promise<{ orgId: string; projectId: string }> } {
+  const url = new URL(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/omnisearch`);
+  if (query !== undefined) {
+    url.searchParams.set('q', query);
+  }
   return {
-    request: new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/omnisearch`),
+    request: new NextRequest(url),
     params: Promise.resolve({ orgId, projectId }),
   };
 }
@@ -125,6 +130,30 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/omnisearch', () => {
 
     getServerSessionMock.mockResolvedValue(viewerSession);
     const { request, params } = omniSearchRequest(organization.id, project.id);
+    const response = await GET(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { items: Array<{ id: string; type: string }> };
+    expect(body.items).toEqual([expect.objectContaining({ id: board.id, type: 'board' })]);
+  });
+
+  it('degrades to no customer results (rather than erroring) for a `?q=` search with no warehouse configured', async () => {
+    // KAN-116: an org_owner holds `ingest.write`, so the permission gate itself passes — this
+    // exercises the customer-search branch end to end and confirms it degrades honestly instead of
+    // 500ing, the same posture the Customers page's own `searchProjectCustomersForAdmin` establishes.
+    const { ownerSession, organization, project } = await setupOrgProject('Omnisearch Customer Query Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = omniSearchRequest(organization.id, project.id, 'jane');
+    const response = await GET(request, { params });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ items: [] });
+  });
+
+  it('ignores a blank `?q=` and returns the static index instead', async () => {
+    const { ownerSession, owner, organization, project } = await setupOrgProject('Omnisearch Blank Query Org');
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = omniSearchRequest(organization.id, project.id, '   ');
     const response = await GET(request, { params });
     expect(response.status).toBe(200);
     const body = (await response.json()) as { items: Array<{ id: string; type: string }> };
