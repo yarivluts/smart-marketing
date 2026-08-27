@@ -74,7 +74,7 @@ export async function parseCreateRepCollectionEntryRequestBody(request: NextRequ
 }
 
 export interface ParsedUpdateRepCollectionEntryFields {
-  /** `undefined` when the request didn't touch the rep at all — distinct from `null`, which explicitly unassigns it. Same convention `parseUpdateSegmentWorkListRequestBody` uses for `ownerPersonId`. */
+  /** `undefined` when the request didn't touch the rep at all — distinct from `null`, which explicitly unassigns it. Same convention `parseUpdateSegmentRequestBody`'s worklist branch uses for `ownerPersonId`. */
   orgPersonId?: string | null;
   amount?: number;
 }
@@ -86,7 +86,7 @@ interface RawUpdateRepCollectionEntryBody {
   amount?: unknown;
 }
 
-/** At least one of `orgPersonId`/`amount` must be present so a no-op PATCH is rejected rather than silently doing nothing — same convention `parseUpdateSegmentWorkListRequestBody` establishes. */
+/** At least one of `orgPersonId`/`amount` must be present so a no-op PATCH is rejected rather than silently doing nothing — same convention `parseUpdateSegmentRequestBody`'s worklist branch establishes. */
 export async function parseUpdateRepCollectionEntryRequestBody(request: NextRequest): Promise<ParsedUpdateRepCollectionEntryRequest> {
   const parsed = await parseJsonBody<RawUpdateRepCollectionEntryBody>(request);
   if (parsed.error) {

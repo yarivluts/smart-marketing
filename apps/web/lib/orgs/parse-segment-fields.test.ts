@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
-import { parseCreateSegmentRequestBody } from './parse-segment-fields';
+import { parseCreateSegmentRequestBody, parseUpdateSegmentRequestBody } from './parse-segment-fields';
 
 function request(body?: unknown): NextRequest {
   return new NextRequest('https://growthos.test/x', {
@@ -109,5 +109,57 @@ describe('parseCreateSegmentRequestBody', () => {
       (await parseCreateSegmentRequestBody(request({ ...validBody, eventConditions: [{ kind: 'no_event', schemaName: 'demo_event', withinDays: 2.5 }] })))
         .error?.status,
     ).toBe(400);
+  });
+});
+
+function patchRequest(body?: unknown): NextRequest {
+  return new NextRequest('https://growthos.test/x', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
+describe('parseUpdateSegmentRequestBody', () => {
+  it('dispatches a definition-shaped body to the "definition" branch (KAN-120)', async () => {
+    const parsed = await parseUpdateSegmentRequestBody(patchRequest(validBody));
+    expect(parsed).toEqual({ kind: 'definition', ...validBody, eventConditions: [] });
+  });
+
+  it('dispatches an owner/status-shaped body to the "worklist" branch (KAN-81)', async () => {
+    expect(await parseUpdateSegmentRequestBody(patchRequest({ status: 'done' }))).toEqual({ kind: 'worklist', status: 'done' });
+    expect(await parseUpdateSegmentRequestBody(patchRequest({ ownerPersonId: 'person-1' }))).toEqual({ kind: 'worklist', ownerPersonId: 'person-1' });
+    expect(await parseUpdateSegmentRequestBody(patchRequest({ ownerPersonId: 'person-1', status: 'done' }))).toEqual({
+      kind: 'worklist',
+      ownerPersonId: 'person-1',
+      status: 'done',
+    });
+  });
+
+  it('re-validates a definition body with the same rules parseCreateSegmentRequestBody applies', async () => {
+    const parsed = await parseUpdateSegmentRequestBody(patchRequest({ ...validBody, name: '  ' }));
+    expect(parsed.error?.status).toBe(400);
+  });
+
+  it('re-validates a worklist body with the same rules the standalone worklist parser applied', async () => {
+    expect((await parseUpdateSegmentRequestBody(patchRequest({ status: 'archived' }))).error?.status).toBe(400);
+    expect((await parseUpdateSegmentRequestBody(patchRequest({ ownerPersonId: '  ' }))).error?.status).toBe(400);
+  });
+
+  it('rejects a body naming both definition and worklist fields as ambiguous', async () => {
+    const parsed = await parseUpdateSegmentRequestBody(patchRequest({ ...validBody, status: 'done' }));
+    expect(parsed.error?.status).toBe(400);
+    expect((await (parsed.error as Response).json()).error).toBe('mixed_update_fields');
+  });
+
+  it('rejects a body with neither definition nor worklist fields', async () => {
+    const parsed = await parseUpdateSegmentRequestBody(patchRequest({}));
+    expect(parsed.error?.status).toBe(400);
+    expect((await (parsed.error as Response).json()).error).toBe('no_fields_to_update');
+  });
+
+  it('rejects invalid JSON', async () => {
+    const badRequest = new NextRequest('https://growthos.test/x', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{not json' });
+    expect((await parseUpdateSegmentRequestBody(badRequest)).error?.status).toBe(400);
   });
 });

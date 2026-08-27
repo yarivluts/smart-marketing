@@ -86,6 +86,7 @@ import {
   deleteSegment as deleteSegmentInOrganization,
   assignSegmentOwner as assignSegmentOwnerInOrganization,
   updateSegmentStatus as updateSegmentStatusInOrganization,
+  updateSegmentDefinition as updateSegmentDefinitionInOrganization,
   suggestSegments as suggestSegmentsInOrganization,
   syncSegmentToCrm as syncSegmentToCrmInOrganization,
   createMetaLookalikeAudience as createMetaLookalikeAudienceInOrganization,
@@ -1114,6 +1115,25 @@ export async function updateSegmentStatus(
 ): Promise<SegmentModel> {
   await ensureFirestoreOrm();
   return updateSegmentStatusInOrganization({ organizationId, projectId, segmentId, status, actorUserId });
+}
+
+interface UpdateSegmentDefinitionFields {
+  name: string;
+  schemaName: string;
+  filters: readonly unknown[];
+  eventConditions?: readonly unknown[];
+}
+
+/** Full-replaces a segment's own definition — name/schema/filters/event conditions (KAN-120). */
+export async function updateSegmentDefinition(
+  organizationId: string,
+  projectId: string,
+  segmentId: string,
+  fields: UpdateSegmentDefinitionFields,
+  actorUserId: string,
+): Promise<SegmentModel> {
+  await ensureFirestoreOrm();
+  return updateSegmentDefinitionInOrganization({ organizationId, projectId, segmentId, ...fields, actorUserId });
 }
 
 interface CreateRepCollectionEntryInput {

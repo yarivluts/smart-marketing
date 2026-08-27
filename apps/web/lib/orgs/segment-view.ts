@@ -1,5 +1,5 @@
 import { schemaDefMapKey, type SchemaDefModel, type SegmentMemberCountOutcome, type SegmentMemberListOutcome, type SegmentMemberRow, type SegmentModel, type SchemaFieldDef } from '@growthos/firebase-orm-models';
-import type { SegmentWorkListStatus } from '@growthos/shared';
+import type { SegmentEventCondition, SegmentFilterCondition, SegmentWorkListStatus } from '@growthos/shared';
 
 /** A redaction placeholder standing in for any `is_pii` field's value — same fixed placeholder `record-feed-view.ts` uses for the same reason (never actually read the real value into a view that reaches the client). */
 const REDACTED_VALUE = '••••••';
@@ -17,14 +17,25 @@ function stringifyPropertyValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-/** A segment's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
+/**
+ * A segment's own list-page card — never sends the full
+ * `@arbel/firebase-orm` model instance to a client component. `filters`/
+ * `eventConditions` (KAN-120) are a segment's own *definition* (field names,
+ * operators, comparison values a human already typed into the create-segment
+ * form) — not member data, so no PII-redaction concern applies the way it
+ * does for `SegmentMemberListView`'s actual matching rows; exposed here
+ * purely so `EditSegmentForm` can pre-fill from the segment's current
+ * definition without a second fetch.
+ */
 export interface SegmentSummaryView {
   id: string;
   name: string;
   schemaName: string;
   filterCount: number;
+  filters: SegmentFilterCondition[];
   /** KAN-93 — count of cross-schema `has_event`/`no_event` conditions ANDed alongside `filters`. */
   eventConditionCount: number;
+  eventConditions: SegmentEventCondition[];
   createdAt: string;
   ownerPersonId: string | null;
   status: SegmentWorkListStatus;
@@ -37,7 +48,9 @@ export function toSegmentSummaryView(segment: SegmentModel): SegmentSummaryView 
     name: segment.name,
     schemaName: segment.schema_name,
     filterCount: segment.filters.length,
+    filters: segment.filters,
     eventConditionCount: (segment.event_conditions ?? []).length,
+    eventConditions: segment.event_conditions ?? [],
     createdAt: segment.created_at,
     ownerPersonId: segment.owner_person_id ?? null,
     status: segment.status ?? 'open',

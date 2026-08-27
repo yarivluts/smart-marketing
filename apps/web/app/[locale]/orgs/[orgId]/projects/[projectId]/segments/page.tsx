@@ -20,6 +20,7 @@ import {
 import { buildSegmentMemberCountView, buildSegmentMemberListView, toSegmentSummaryView, type SegmentMemberCountView, type SegmentMemberListView } from '@/lib/orgs/segment-view';
 import { toActionPluginInstallOptionView, toCrmSyncRunView, type CrmSyncRunView } from '@/lib/orgs/crm-sync-view';
 import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
+import { EditSegmentForm } from '@/components/orgs/edit-segment-form';
 import { DeleteSegmentButton } from '@/components/orgs/delete-segment-button';
 import { SegmentWorkListControls } from '@/components/orgs/segment-work-list-controls';
 import { SegmentCrmSyncControls } from '@/components/orgs/segment-crm-sync-controls';
@@ -168,6 +169,16 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
                           ? t('memberCountQuotaExceeded')
                           : t('memberCountError')}
                   </div>
+                  <EditSegmentForm
+                    orgId={orgId}
+                    projectId={projectId}
+                    segmentId={segment.id}
+                    entitySchemaNames={entitySchemaNames}
+                    initialName={segment.name}
+                    initialSchemaName={segment.schemaName}
+                    initialFilters={segment.filters}
+                    initialEventConditions={segment.eventConditions}
+                  />
                   <SegmentWorkListControls
                     orgId={orgId}
                     projectId={projectId}
