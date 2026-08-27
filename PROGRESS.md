@@ -17,7 +17,77 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #316 (KAN-110, Meta/Google audience mobile-device-id identifier)
+## 2026-08-27 (latest) — KAN-112, Meta/Google audience mailing-address identifier
+
+- **Last completed:**
+  - Session start: local `main` turned out to be a completely disjoint, stale container-image
+    lineage (no common ancestor with `origin/main` at all — `git merge-base` returned nothing).
+    Reset local `main` to `origin/main` (`git reset --hard`, local-only, no shared history
+    touched) rather than the repo's stop-hook's own suggested "rebase --root and force-push"
+    remediation, which would have rewritten shared history on `main` — never doing that.
+  - Checked open PRs before picking new work: found **PR #316** (KAN-110) already merged by its
+    own session, and **PR #317** (KAN-111, funnel admin surface) open and actively being driven by
+    its own live session. Investigated PR #317's one CI failure to help
+    (`onboarding.spec.ts`'s "Funnel" nav-link accessible-name collision with the SaaS pack's own
+    "Funnel" starter board — Playwright's `getByRole` name match is substring-based by default) and
+    had a fix ready, but the originating session pushed an equivalent (better) fix
+    (`482c0ee`, renaming the link to "Conversion" instead of exact-matching the older test) before
+    mine landed — discarded my local duplicate rather than racing it. Left PR #317 to its own
+    session from there; did not touch it further (still open, no new activity by session end —
+    not mine to drive to green, per the "watching vs. driving" posture for a PR I didn't create and
+    wasn't asked to babysit).
+  - Research pass (dedicated read-only agent) confirmed the backlog is otherwise exhausted
+    (KAN-18/19 real-infra, KAN-43 `needs-human`, KAN-50/51 `blocked-by`) and identified the
+    cleanest remaining self-contained gap: KAN-110's own follow-up note left mailing address as the
+    one explicitly-deferred contact-match identifier on both the Meta Custom Audience and Google
+    Customer Match connectors — three files (`meta-custom-audience/executor.ts`/`manifest.ts`,
+    `google-customer-match/executor.ts`/`manifest.ts`) named the exact same gap verbatim.
+  - Implemented **KAN-112** on branch `kan-112-audience-mailing-address` (off a fresh `origin/main`,
+    not the stale local one) — see the `TASKS.md` row for the full delivery description: six new
+    per-field Meta hashing functions (`FN`/`LN`/`CT`/`ST`/`ZIP`/`COUNTRY`, each independently
+    hashed per Meta's own spec) vs. one nested Google `addressInfo` sub-object (only
+    first/last name hashed, city/state/country/postal cleartext, per the real
+    `OfflineUserAddressInfo` proto) — a genuine, researched cross-connector shape difference, not
+    an oversight, documented the same way KAN-110 documented Meta-hashes-MAID-Google-doesn't.
+  - Full test coverage added mirroring KAN-110's own pattern: hashing/normalization unit tests
+    (both connectors, including the cross-connector differences — Meta's zip+4 truncation vs.
+    Google's none, Google's uppercase country code vs. Meta's lowercase), api-client request-shape
+    tests (address-only/partial/combined-with-other-identifiers/omitted-byte-identical), and
+    executor property-read tests (full address, partial address).
+  - Hit and cleaned a stale `apps/web/.next` build-cache artifact from earlier PR #317 branch
+    investigation (referenced a `funnel` page that doesn't exist on this branch, briefly failing
+    `pnpm typecheck` with a phantom `Cannot find module` error) — deleted the directory, typecheck
+    went green.
+  - `pnpm lint`/`pnpm typecheck`/`pnpm build` green across all 8 packages. First full monorepo
+    `pnpm test` hit exactly one failure: `campaign-target.emulator.test.ts` (7 tests, unrelated to
+    this diff — no campaign-target code touched) with the repo's well-documented Firestore-emulator
+    `RESOURCE_EXHAUSTED`/internal-assertion-under-load flake. Confirmed as a flake via an isolated
+    re-run (`firebase emulators:exec ... "vitest run src/services/campaign-target.emulator.test.ts"`,
+    16/16 passed clean). Re-ran the full `pnpm test` a second time end to end: all 11 turbo tasks
+    green.
+  - Pushed `kan-112-audience-mailing-address`, opened **PR #318**, subscribed to its activity. CI
+    (`terraform fmt · validate` + `lint · typecheck · test · build`) came back green
+    (`mergeable_state: clean`, no open review threads). Merged (squash) into `main`
+    (`5f8703f`) and unsubscribed. Remote branch deletion for `kan-112-audience-mailing-address`
+    failed with the same recurring HTTP 403 this file has documented since 2026-07-04 — not a new
+    issue.
+- **In progress (exact stopping point):** none — KAN-112 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern for the next candidate,
+  re-checking open PRs first — current highest real KAN number is now 112. PR #317 (KAN-111) was
+  still open at this entry's writing; re-check its status before picking a new KAN number in case
+  it needs taking over.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including
+    `kan-112-audience-mailing-address`.
+
+---
+
+## 2026-08-27 — Merged PR #316 (KAN-110, Meta/Google audience mobile-device-id identifier)
 
 - **Last completed:**
   - Session start: fetched `origin/main` (matched local `HEAD` at `7510497`, PR #315/KAN-109

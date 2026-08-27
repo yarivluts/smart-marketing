@@ -54,20 +54,41 @@ export interface GoogleAdsCreateResponsiveSearchAdResult {
 
 /**
  * One contact's Customer Match user identifier(s) — `hashedEmail` and/or
- * `hashedPhoneNumber` (both already SHA-256-hashed), and/or `mobileId` (a
- * mobile advertiser id, deliberately NOT hashed — see
- * `hashing.ts`'s own `normalizeMobileIdForGoogleCustomerMatch` doc comment
- * for why this one field breaks the "already-hashed" pattern the other two
- * establish), mirroring `MetaContactMatchKey`'s shape for the sibling Meta
- * connector. Any combination, when present, rides the same
- * `userIdentifiers` array on one operation (Google's own docs: multiple
- * identifiers on one `UserData` improve match rate the same way Meta's
- * multi-key schema does).
+ * `hashedPhoneNumber` (both already SHA-256-hashed), `mobileId` (a mobile
+ * advertiser id, deliberately NOT hashed — see `hashing.ts`'s own
+ * `normalizeMobileIdForGoogleCustomerMatch` doc comment for why this one
+ * field breaks the "already-hashed" pattern the other two establish), and/or
+ * `addressInfo` (a mailing address — Google's real `UserIdentifier` proto
+ * nests these under their own sub-object, unlike Meta's flat per-field
+ * schema columns, see `addressInfo`'s own doc comment below), mirroring
+ * `MetaContactMatchKey`'s shape for the sibling Meta connector. Any
+ * combination, when present, rides the same `userIdentifiers` array on one
+ * operation (Google's own docs: multiple identifiers on one `UserData`
+ * improve match rate the same way Meta's multi-key schema does).
  */
 export interface GoogleAdsContactMatchKey {
   hashedEmail?: string;
   hashedPhoneNumber?: string;
   mobileId?: string;
+  addressInfo?: GoogleAdsAddressMatchInfo;
+}
+
+/**
+ * A mailing address's own Customer Match identifier fields, matching
+ * Google's real `OfflineUserAddressInfo` proto shape (`UserIdentifier.address_info`).
+ * Only `hashedFirstName`/`hashedLastName` are hashed — `city`/`state`/
+ * `countryCode`/`postalCode` are sent as cleartext, a genuine Google-side
+ * difference from Meta's own `CT`/`ST`/`ZIP`/`COUNTRY` schema columns, which
+ * hash every field (see `google-customer-match/hashing.ts`'s own
+ * `hashNameForGoogleCustomerMatch` doc comment).
+ */
+export interface GoogleAdsAddressMatchInfo {
+  hashedFirstName?: string;
+  hashedLastName?: string;
+  city?: string;
+  state?: string;
+  countryCode?: string;
+  postalCode?: string;
 }
 
 /**
@@ -396,6 +417,7 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
             ...(contact.hashedEmail !== undefined ? [{ hashedEmail: contact.hashedEmail }] : []),
             ...(contact.hashedPhoneNumber !== undefined ? [{ hashedPhoneNumber: contact.hashedPhoneNumber }] : []),
             ...(contact.mobileId !== undefined ? [{ mobileId: contact.mobileId }] : []),
+            ...(contact.addressInfo !== undefined ? [{ addressInfo: contact.addressInfo }] : []),
           ],
         },
       })),

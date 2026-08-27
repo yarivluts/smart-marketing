@@ -21,12 +21,14 @@ export const GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD = 'user_list_name';
  * already established (`crm-sync.service.ts`'s `syncSegmentToCrm`).
  * `type: action` + `scopes: [action:execute]`, mirroring
  * `META_CUSTOM_AUDIENCE_PLUGIN_MANIFEST_YAML`'s shape exactly. A
- * contact-info Customer Match list is built here from email, phone, and
- * mobile device id (a record's `properties.email`/`properties.phone`/
- * `properties.device_id` — email/phone hashed, device id sent raw per
- * Google's own spec — see `executor.ts`'s own `extractContactMatchKey`) —
- * Similar Audience expansion from a Customer Match seed and the remaining
- * non-email/phone/device-id identifier (mailing address) are explicitly
+ * contact-info Customer Match list is built here from email, phone, mobile
+ * device id, and mailing address (a record's `properties.email`/
+ * `properties.phone`/`properties.device_id`/`properties.first_name`/
+ * `properties.last_name`/`properties.city`/`properties.state`/
+ * `properties.zip`/`properties.country` — email/phone/first/last name
+ * hashed, device id and the remaining address fields sent raw/cleartext per
+ * Google's own spec — see `executor.ts`'s own `extractContactMatchKey`).
+ * Similar Audience expansion from a Customer Match seed is explicitly
  * deferred, same "documented, not built" posture KAN-72's own
  * PMax-asset-groups/post-creation-edits bullets already carry.
  */

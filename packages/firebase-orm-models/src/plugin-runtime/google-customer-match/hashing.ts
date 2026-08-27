@@ -60,3 +60,67 @@ export function hashPhoneForGoogleCustomerMatch(phone: string): string {
 export function normalizeMobileIdForGoogleCustomerMatch(mobileId: string): string {
   return mobileId.trim().toLowerCase();
 }
+
+/**
+ * Google Ads' documented Customer Match upload format for
+ * `addressInfo.hashedFirstName`/`addressInfo.hashedLastName`: trim
+ * surrounding whitespace, lowercase, then SHA-256 hash — the same
+ * normalize-then-hash shape as `hashEmailForGoogleCustomerMatch` (Google's
+ * own "Formatting guidelines for offline data" spec). Unlike
+ * `hashNameForMetaCustomAudience`, which this mirrors on the Meta side, this
+ * is only ever combined with the *unhashed* `normalizeCityForGoogleCustomerMatch`/
+ * `normalizeStateForGoogleCustomerMatch`/`normalizeCountryCodeForGoogleCustomerMatch`/
+ * `normalizePostalCodeForGoogleCustomerMatch` fields below on the same
+ * `addressInfo` object — Google's own spec hashes only the name portion of
+ * an address, unlike Meta's spec which hashes every `CT`/`ST`/`ZIP`/`COUNTRY`
+ * field independently too.
+ */
+export function hashNameForGoogleCustomerMatch(name: string): string {
+  const normalized = name.trim().toLowerCase();
+  return createHash('sha256').update(normalized).digest('hex');
+}
+
+/**
+ * Google Ads' `addressInfo.city` field: sent as cleartext (not hashed —
+ * see `hashNameForGoogleCustomerMatch`'s own doc comment for why only the
+ * name fields are hashed), only trimmed of surrounding whitespace.
+ */
+export function normalizeCityForGoogleCustomerMatch(city: string): string {
+  return city.trim();
+}
+
+/**
+ * Google Ads' `addressInfo.state` field: the ANSI state abbreviation, sent
+ * as cleartext (see `hashNameForGoogleCustomerMatch`'s own doc comment),
+ * only trimmed of surrounding whitespace. This function does not itself
+ * validate that `state` is really a two-letter code (same "best effort, not
+ * every row is eligible" posture every hashing/normalizing function in this
+ * connector establishes).
+ */
+export function normalizeStateForGoogleCustomerMatch(state: string): string {
+  return state.trim();
+}
+
+/**
+ * Google Ads' `addressInfo.countryCode` field: the two-letter ISO 3166-1
+ * alpha-2 country code, sent as cleartext, trimmed and **uppercased** —
+ * Google's own "Formatting guidelines for offline data" spec expects an
+ * uppercase code here (e.g. `US`), unlike Meta's own `COUNTRY` schema field
+ * which is lowercased before hashing (see
+ * `meta-custom-audience/hashing.ts`'s `hashCountryForMetaCustomAudience`) —
+ * a genuine, deliberate cross-connector casing difference, not an
+ * oversight.
+ */
+export function normalizeCountryCodeForGoogleCustomerMatch(countryCode: string): string {
+  return countryCode.trim().toUpperCase();
+}
+
+/**
+ * Google Ads' `addressInfo.postalCode` field: sent as cleartext (see
+ * `hashNameForGoogleCustomerMatch`'s own doc comment), only trimmed of
+ * surrounding whitespace — unlike Meta's own `ZIP` schema field, Google's
+ * spec does not truncate a US `zip+4` value to 5 digits before sending it.
+ */
+export function normalizePostalCodeForGoogleCustomerMatch(postalCode: string): string {
+  return postalCode.trim();
+}
