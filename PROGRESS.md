@@ -17,6 +17,58 @@ Template for each entry:
 
 ---
 
+## 2026-08-27 (latest) — Merged PR #317 (KAN-111, funnel conversion admin surface)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). Checked open PRs before starting new
+    work (established pattern) and found **PR #317** (KAN-111, `kan-111-funnel-admin-surface`) —
+    implementation-complete, opened by another session, with its own CI-failure already diagnosed
+    and fixed (a Playwright accessible-name collision between the new "Funnel" nav link and the
+    pre-existing SaaS-pack board-list "Funnel" link, renamed to "Conversion"), but the fix commit
+    had sat unpushed-to-CI for 55+ minutes (no workflow run had triggered) and the branch was stale
+    against `main` (`mergeable_state: dirty`, two merges behind). Took over finishing it rather than
+    starting new, possibly-overlapping backlog work, same posture prior entries establish for PR
+    #315/#316.
+  - Merged `origin/main` into the branch twice (the branch fell one merge further behind — PR #318,
+    KAN-112 — while the first round's CI was running): both times a real merge commit (not a
+    rebase — the branch belongs to another session), conflicts only in `PROGRESS.md`/`TASKS.md`
+    (both append-at-top/bottom files, no numbering collision — KAN-111/KAN-112 are distinct),
+    resolved by keeping both rows/entries. `git diff --stat` confirmed no source file conflicted
+    either time.
+  - Verified everything green locally before relying on CI: `pnpm install --frozen-lockfile`, then
+    `pnpm lint`/`pnpm typecheck`/`pnpm build` all green across all 8 packages. Full `pnpm test`
+    green end to end (exit 0, all 11 turbo tasks, ~31.5 minutes) — no failures at all this run,
+    including the new `funnel-view.test.ts` (6 tests) and `funnel.spec.ts` e2e spec, both passing
+    on the first attempt.
+  - Independently reviewed the diff before pushing (`queryProjectFunnelStepsForAdmin`'s ok/degraded
+    wrapper mirroring `searchProjectCustomersForAdmin` exactly, `funnel-view.ts`'s rounding, the new
+    page's permission gating and dual nav-list wiring, en/he translations) — sound, consistent with
+    the established KAN-108/KAN-110 admin-surface-follow-up pattern, well-tested. No bugs found.
+  - Pushed both merge commits; each triggered a fresh CI run. The first (post-first-merge) came back
+    green (`lint · typecheck · test · build` + `terraform fmt · validate`) but by the time it
+    finished, `main` had advanced again (PR #318/KAN-112), so pushed the second merge and waited for
+    a second full CI run — also fully green. The PR **auto-merged itself** the moment that second
+    run went green (this repo has PR auto-merge enabled; no manual `merge_pull_request` call was
+    needed) — merged into `main` as `6140e9e`. Remote branch deletion for
+    `kan-111-funnel-admin-surface` failed with the same recurring HTTP 403 this file has documented
+    since 2026-07-04.
+- **In progress (exact stopping point):** none — KAN-111 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** **PR #319** (KAN-113, `query_cohort` MCP-tool admin surface) is open from a
+  concurrent session — check its state (CI status, mergeable_state, whether the originating session
+  is still active) before starting any new sweep work, same posture this run itself took for #317.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Review and merge PR #319 (KAN-113) if this or a later run doesn't get to it first.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-111-funnel-admin-surface`.
+
+---
+
 ## 2026-08-27 — KAN-111: Funnel conversion admin surface (opened)
 
 - **Last completed:**
