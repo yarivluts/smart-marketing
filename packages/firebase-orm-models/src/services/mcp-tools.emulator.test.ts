@@ -12,6 +12,7 @@ import {
   queryProjectCohortRetention,
   queryProjectCohortRetentionForAdmin,
   queryProjectFunnelSteps,
+  queryProjectFunnelStepsForAdmin,
   searchProjectCustomers,
   searchProjectCustomersForAdmin,
   setProjectCostQuota,
@@ -321,6 +322,79 @@ describe('queryProjectFunnelSteps', () => {
 
     expect(rows).toEqual([]);
     expect(executor.calls).toHaveLength(0);
+  });
+});
+
+describe('queryProjectFunnelStepsForAdmin', () => {
+  async function confirmFunnel(organizationId: string, projectId: string, userId: string) {
+    await confirmOnboardingFunnelSteps({
+      organizationId,
+      projectId,
+      userId,
+      steps: [
+        { eventSchemaName: 'signup', stageKey: 'signup', order: 0 },
+        { eventSchemaName: 'activated', stageKey: 'activation', order: 1 },
+      ],
+    });
+  }
+
+  it('returns an "ok" outcome wrapping the same steps queryProjectFunnelSteps returns', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Admin Ok Org');
+    await confirmFunnel(organization.id, project.id, owner.id);
+    const executor = new FakeWarehouseQueryExecutor([
+      { event_type: 'signup', customer_count: 10 },
+      { event_type: 'activated', customer_count: 5 },
+    ]);
+
+    const outcome = await queryProjectFunnelStepsForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(outcome).toEqual({
+      ok: true,
+      steps: [
+        { stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 },
+        { stageKey: 'activation', stepOrder: 1, customerCount: 5, conversionRateFromFirst: 0.5 },
+      ],
+    });
+  });
+
+  it('returns an "ok" outcome with an empty steps array (not a degraded outcome) when no funnel is confirmed', async () => {
+    const { organization, project } = await setupOrgWithProject('Funnel Admin No Funnel Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    const outcome = await queryProjectFunnelStepsForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(outcome).toEqual({ ok: true, steps: [] });
+    expect(executor.calls).toHaveLength(0);
+  });
+
+  it('degrades to a "warehouse_not_configured" outcome instead of throwing', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Admin Not Configured Org');
+    await confirmFunnel(organization.id, project.id, owner.id);
+    const executor: WarehouseQueryExecutor = { execute: () => Promise.reject(new WarehouseNotConfiguredError()) };
+
+    const outcome = await queryProjectFunnelStepsForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+    expect(outcome).toEqual({ ok: false, reason: 'warehouse_not_configured', message: expect.any(String) });
+  });
+
+  it('degrades to a "query_error" outcome when the warehouse rejects the query', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Admin Query Error Org');
+    await confirmFunnel(organization.id, project.id, owner.id);
+    const executor: WarehouseQueryExecutor = { execute: () => Promise.reject(new WarehouseQueryFailedError('table not found')) };
+
+    const outcome = await queryProjectFunnelStepsForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+    expect(outcome).toEqual({ ok: false, reason: 'query_error', message: 'table not found' });
+  });
+
+  it('degrades to a "quota_exceeded" outcome instead of throwing once the project has spent its daily quota', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Admin Quota Blocked Org');
+    await confirmFunnel(organization.id, project.id, owner.id);
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await queryProjectFunnelStepsForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+    const outcome = await queryProjectFunnelStepsForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(outcome).toEqual({ ok: false, reason: 'quota_exceeded', message: expect.any(String) });
   });
 });
 

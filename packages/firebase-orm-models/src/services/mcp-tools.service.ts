@@ -350,6 +350,38 @@ export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsPar
   });
 }
 
+/** Mirrors {@link CustomerSearchOutcome}'s exact ok/degraded shape and reason vocabulary — `queryProjectFunnelStepsForAdmin` below backs a page render, not an MCP tool call that can just error out, so the same three expected-not-buggy warehouse failure modes degrade instead of throwing. */
+export type FunnelStepsOutcome =
+  | { ok: true; steps: FunnelStepResult[] }
+  | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
+
+/**
+ * The admin-page counterpart of {@link queryProjectFunnelSteps} (the `query_funnel` MCP tool) — same
+ * "confirmed funnel from Firestore, distinct-customer counts from the warehouse" semantics, but wraps
+ * the warehouse call the same way {@link searchProjectCustomersForAdmin} does so a page rendering the
+ * funnel can show a typed "why not" state instead of crashing. Closes the admin-surface gap this MCP
+ * tool never got a human-facing home for: the onboarding wizard lets a human confirm a funnel mapping
+ * (KAN-68), but until now had no way to see how that funnel actually converts without asking an
+ * MCP-connected agent to run `query_funnel` on their behalf.
+ */
+export async function queryProjectFunnelStepsForAdmin(params: QueryProjectFunnelStepsParams): Promise<FunnelStepsOutcome> {
+  try {
+    const steps = await queryProjectFunnelSteps(params);
+    return { ok: true, steps };
+  } catch (error) {
+    if (error instanceof WarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured', message: error.message };
+    }
+    if (error instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded', message: error.message };
+    }
+    if (error instanceof WarehouseQueryFailedError) {
+      return { ok: false, reason: 'query_error', message: error.message };
+    }
+    throw error;
+  }
+}
+
 export type ProjectInsightKind = 'tracking_alert' | 'win_event';
 export type ProjectInsightSeverity = 'info' | 'warning';
 

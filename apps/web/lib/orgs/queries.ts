@@ -131,6 +131,8 @@ import {
   queryBoardTile as queryBoardTileInOrganization,
   queryBoardTiles as queryBoardTilesInOrganization,
   queryGoalProgress as queryGoalProgressInOrganization,
+  queryProjectFunnelStepsForAdmin as queryProjectFunnelStepsForAdminInOrganization,
+  type FunnelStepsOutcome,
   UserModel,
   verifyAuditLogChainForOrg as verifyAuditLogChainForOrgInOrganization,
   type AuditLogChainVerification,
@@ -880,6 +882,20 @@ export async function queryGoalProgress(
 ): Promise<GoalProgressOutcome> {
   await ensureFirestoreOrm();
   return queryGoalProgressInOrganization({ organizationId, projectId, goal });
+}
+
+/**
+ * A project's confirmed funnel, per-stage distinct-customer counts and conversion off the first step
+ * (or a typed, renderable "why not" outcome — see `FunnelStepsOutcome`'s own doc comment) for the
+ * Funnel page. Same environment-scoping convention as `searchProjectCustomers`/`queryGoalProgress`.
+ */
+export async function queryProjectFunnelSteps(
+  organizationId: string,
+  projectId: string,
+  options?: { environmentId?: string },
+): Promise<FunnelStepsOutcome> {
+  await ensureFirestoreOrm();
+  return queryProjectFunnelStepsForAdminInOrganization({ organizationId, projectId, ...options });
 }
 
 export async function listWinRulesForProject(organizationId: string, projectId: string): Promise<WinRuleModel[]> {

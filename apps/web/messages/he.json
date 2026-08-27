@@ -124,7 +124,8 @@
     "projectTvLink": "טלוויזיית חדר מלחמה",
     "projectSessionReplayLink": "הקלטות סשן",
     "projectCampaignOpsLink": "תפעול קמפיינים",
-    "projectRepCollectionsLink": "גבייה לפי נציג"
+    "projectRepCollectionsLink": "גבייה לפי נציג",
+    "projectFunnelLink": "משפך המרות"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -683,6 +684,18 @@
     "cohortSizeColumnHeading": "גודל",
     "periodColumnHeading": "תקופה {periodNumber}",
     "retentionCell": "{percent}%"
+  },
+  "Funnel": {
+    "metaTitle": "משפך המרות",
+    "title": "משפך ההמרות עבור {projectName}",
+    "description": "כיצד לקוחות עוברים במשפך ההמרות המאושר של הפרויקט, שלב אחר שלב, ושיעור ההמרה של כל שלב ביחס לשלב הראשון.",
+    "noFunnel": "טרם אושר משפך המרות עבור פרויקט זה. אשר מיפוי משפך בתהליך ההקמה כדי לראות כאן את נתוני ההמרה.",
+    "notConfigured": "נתוני משפך ההמרות אינם זמינים (מחסן הנתונים טרם הוגדר)",
+    "quotaExceeded": "נתוני משפך ההמרות אינם זמינים (מכסת השאילתות היומית מוצתה)",
+    "queryError": "נתוני משפך ההמרות אינם זמינים",
+    "stepHeading": "{order}. {stage}",
+    "stepConversion": "{percent}% משלב 1",
+    "stepCustomerCount": "{count} לקוחות הגיעו לשלב זה"
   },
   "Feedback": {
     "metaTitle": "משוב ו-NPS",
