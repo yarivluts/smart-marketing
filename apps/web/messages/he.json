@@ -1345,10 +1345,6 @@
     "crmSyncLastRunFailed": "הסנכרון האחרון נכשל",
     "crmSyncLastRunRunning": "סנכרון בתהליך…",
     "editSegment": "ערוך",
-    "editFiltersJsonLabel": "מסננים (JSON)",
-    "editEventConditionsJsonLabel": "תנאי אירועים (JSON)",
-    "editFiltersInvalid": "המסננים חייבים להיות מערך JSON תקין של תנאים בצורת '{'field, op, value'}'.",
-    "editEventConditionsInvalid": "תנאי האירועים חייבים להיות מערך JSON תקין של תנאים בצורת '{'kind, schemaName, ...'}'.",
     "saveSegment": "שמור",
     "cancelEditSegment": "ביטול",
     "editSegmentError": "לא ניתן היה לעדכן את הפלח. נסה שוב."

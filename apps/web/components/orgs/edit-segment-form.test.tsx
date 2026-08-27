@@ -11,7 +11,7 @@ vi.mock('@/i18n/navigation', () => ({
 }));
 
 function renderForm(
-  overrides: Partial<{ initialFilters: unknown[]; initialEventConditions: unknown[] }> = {},
+  overrides: Partial<{ eventSchemaNames: string[]; initialFilters: unknown[]; initialEventConditions: unknown[] }> = {},
 ): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -20,6 +20,7 @@ function renderForm(
         projectId="project-1"
         segmentId="segment-1"
         entitySchemaNames={['customer', 'stripe_subscription']}
+        eventSchemaNames={overrides.eventSchemaNames ?? []}
         initialName="Pro customers"
         initialSchemaName="customer"
         initialFilters={(overrides.initialFilters as never) ?? [{ field: 'plan', op: '=', value: 'pro' }]}
@@ -41,21 +42,30 @@ describe('EditSegmentForm', () => {
     expect(screen.queryByLabelText('Name')).not.toBeInTheDocument();
   });
 
-  it('reveals the fields pre-filled with the current definition', () => {
+  it('reveals the fields pre-filled with the current definition as row-editor state', () => {
     renderForm();
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
     expect(screen.getByLabelText('Name')).toHaveValue('Pro customers');
     expect(screen.getByLabelText('Entity')).toHaveValue('customer');
-    expect(screen.getByLabelText('Filters (JSON)')).toHaveValue(JSON.stringify([{ field: 'plan', op: '=', value: 'pro' }], null, 2));
-    expect(screen.getByLabelText('Event conditions (JSON)')).toHaveValue('[]');
+    expect(screen.getByLabelText('Field')).toHaveValue('plan');
+    expect(screen.getByLabelText('Value')).toHaveValue('pro');
   });
 
-  it('pre-fills event conditions as pretty-printed JSON when present', () => {
-    renderForm({ initialEventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }] });
+  it('pre-fills a numeric/boolean filter value as its string form (same posture CreateSegmentForm submits with)', () => {
+    renderForm({ initialFilters: [{ field: 'mrr_usd', op: '>=', value: 100 }] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
-    expect(screen.getByLabelText('Event conditions (JSON)')).toHaveValue(JSON.stringify([{ kind: 'no_event', schemaName: 'demo_event' }], null, 2));
+    expect(screen.getByLabelText('Value')).toHaveValue('100');
+  });
+
+  it('pre-fills event conditions as rows when present', () => {
+    renderForm({ eventSchemaNames: ['demo_event'], initialEventConditions: [{ kind: 'no_event', schemaName: 'demo_event', withinDays: 30 }] });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+
+    expect(screen.getByLabelText('Condition')).toHaveValue('no_event');
+    expect(screen.getByLabelText('Event')).toHaveValue('demo_event');
+    expect(screen.getByLabelText('Within days')).toHaveValue(30);
   });
 
   it('submits the edited definition via PATCH, then collapses back and refreshes', async () => {
@@ -65,7 +75,8 @@ describe('EditSegmentForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Pro customers, renamed' } });
     fireEvent.change(screen.getByLabelText('Entity'), { target: { value: 'stripe_subscription' } });
-    fireEvent.change(screen.getByLabelText('Filters (JSON)'), { target: { value: '[{"field": "status", "op": "=", "value": "active"}]' } });
+    fireEvent.change(screen.getByLabelText('Field'), { target: { value: 'status' } });
+    fireEvent.change(screen.getByLabelText('Value'), { target: { value: 'active' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -84,12 +95,12 @@ describe('EditSegmentForm', () => {
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 
-  it('treats a blank filters/event-conditions textarea as an empty array', async () => {
+  it('lets every filter row be removed, saving an empty filters array (no minimum, unlike CreateSegmentForm)', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ segment: { id: 'segment-1' } }) } as Response);
     renderForm();
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.change(screen.getByLabelText('Filters (JSON)'), { target: { value: '   ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -99,35 +110,50 @@ describe('EditSegmentForm', () => {
     );
   });
 
-  it('shows an inline error and never calls fetch for malformed filters JSON', async () => {
-    renderForm();
+  it('adds and edits an event condition row, submitting it alongside the existing filter', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ segment: { id: 'segment-1' } }) } as Response);
+    renderForm({ eventSchemaNames: ['demo_event'] });
+
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.change(screen.getByLabelText('Filters (JSON)'), { target: { value: '{not valid json' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    fireEvent.change(screen.getByLabelText('Condition'), { target: { value: 'has_event' } });
+    fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '30' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Filters must be a valid JSON array of {field, op, value} conditions.');
-    expect(fetch).not.toHaveBeenCalled();
-    expect(refresh).not.toHaveBeenCalled();
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/orgs/org-1/projects/project-1/segments/segment-1',
+      expect.objectContaining({
+        body: JSON.stringify({
+          name: 'Pro customers',
+          schemaName: 'customer',
+          filters: [{ field: 'plan', op: '=', value: 'pro' }],
+          eventConditions: [{ kind: 'has_event', schemaName: 'demo_event', withinDays: 30 }],
+        }),
+      }),
+    );
   });
 
-  it('shows an inline error for filters JSON containing a structurally invalid condition', async () => {
+  it('disables Save until every filter row is filled', () => {
     renderForm();
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.change(screen.getByLabelText('Filters (JSON)'), { target: { value: '[{"field": "plan"}]' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Filters must be a valid JSON array of {field, op, value} conditions.');
-    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Field'), { target: { value: '' } });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
   });
 
-  it('shows an inline error for malformed event-conditions JSON', async () => {
-    renderForm();
+  it('disables Save until every event condition row has a valid withinDays', () => {
+    renderForm({ eventSchemaNames: ['demo_event'] });
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.change(screen.getByLabelText('Event conditions (JSON)'), { target: { value: '[{"kind": "sometimes_event", "schemaName": "x"}]' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add event condition' }));
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Event conditions must be a valid JSON array of {kind, schemaName, ...} conditions.');
-    expect(fetch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '-5' } });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Within days'), { target: { value: '10' } });
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled();
   });
 
   it('cancels back to the Edit button without submitting, discarding edits', () => {

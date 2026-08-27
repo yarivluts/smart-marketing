@@ -174,6 +174,7 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
                     projectId={projectId}
                     segmentId={segment.id}
                     entitySchemaNames={entitySchemaNames}
+                    eventSchemaNames={eventSchemaNames}
                     initialName={segment.name}
                     initialSchemaName={segment.schemaName}
                     initialFilters={segment.filters}
