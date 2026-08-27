@@ -124,7 +124,7 @@
     "projectSessionReplayLink": "Session replay",
     "projectCampaignOpsLink": "Campaign ops",
     "projectRepCollectionsLink": "Rep collections",
-    "projectFunnelLink": "Funnel"
+    "projectFunnelLink": "Conversion"
   },
   "ProjectSwitcher": {
     "label": "Project"

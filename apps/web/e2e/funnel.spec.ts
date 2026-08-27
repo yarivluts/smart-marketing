@@ -37,7 +37,7 @@ test.describe('Funnel conversion (query_funnel admin surface)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Funnel' }).click();
+    await page.getByRole('link', { name: 'Conversion', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/funnel$`));
     await expect(page.getByRole('heading', { name: 'Funnel for Client Theta' })).toBeVisible();
     await expect(page.getByText('No funnel confirmed yet for this project.', { exact: false })).toBeVisible();
