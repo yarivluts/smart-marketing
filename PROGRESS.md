@@ -58,20 +58,32 @@ Template for each entry:
     investigation (referenced a `funnel` page that doesn't exist on this branch, briefly failing
     `pnpm typecheck` with a phantom `Cannot find module` error) — deleted the directory, typecheck
     went green.
-  - `pnpm lint`/`pnpm typecheck`/`pnpm build` green across all 8 packages; full monorepo `pnpm
-    test` [outcome filled in once the background run this entry was written alongside finishes —
-    see the next entry if this one is superseded before merge].
-- **In progress (exact stopping point):** implementation complete on `kan-112-audience-mailing-address`,
-  not yet pushed/PR'd/merged as of this entry — finishing in the same run once the full test suite
-  confirms green.
-- **Blocked + why:** nothing blocking.
-- **Next step:** push the branch, open the PR, self-review the diff, confirm CI green, merge, delete
-  the branch, update this file's own final state.
+  - `pnpm lint`/`pnpm typecheck`/`pnpm build` green across all 8 packages. First full monorepo
+    `pnpm test` hit exactly one failure: `campaign-target.emulator.test.ts` (7 tests, unrelated to
+    this diff — no campaign-target code touched) with the repo's well-documented Firestore-emulator
+    `RESOURCE_EXHAUSTED`/internal-assertion-under-load flake. Confirmed as a flake via an isolated
+    re-run (`firebase emulators:exec ... "vitest run src/services/campaign-target.emulator.test.ts"`,
+    16/16 passed clean). Re-ran the full `pnpm test` a second time end to end: all 11 turbo tasks
+    green.
+  - Pushed `kan-112-audience-mailing-address`, opened **PR #318**, subscribed to its activity. CI
+    (`terraform fmt · validate` + `lint · typecheck · test · build`) came back green
+    (`mergeable_state: clean`, no open review threads). Merged (squash) into `main`
+    (`5f8703f`) and unsubscribed. Remote branch deletion for `kan-112-audience-mailing-address`
+    failed with the same recurring HTTP 403 this file has documented since 2026-07-04 — not a new
+    issue.
+- **In progress (exact stopping point):** none — KAN-112 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern for the next candidate,
+  re-checking open PRs first — current highest real KAN number is now 112. PR #317 (KAN-111) was
+  still open at this entry's writing; re-check its status before picking a new KAN number in case
+  it needs taking over.
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - PR #317 (KAN-111) is open, being driven by its own session — no action needed from anyone else
-    unless that session goes idle with it still red/unmerged.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including
+    `kan-112-audience-mailing-address`.
 
 ---
 
