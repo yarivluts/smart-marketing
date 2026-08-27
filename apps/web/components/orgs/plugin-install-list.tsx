@@ -11,7 +11,7 @@ export interface PluginInstallListProps {
   orgId: string;
   projectId: string;
   installs: readonly PluginInstallView[];
-  /** Every registered manifest version in the org — resolves each install's own pinned `config_schema` for the inline config editor (KAN-124). */
+  /** Every registered manifest version in the org — resolves each install's own pinned `config_schema` for the inline config editor (KAN-125). */
   manifests: readonly PluginManifestView[];
 }
 
