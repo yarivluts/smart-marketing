@@ -10,6 +10,7 @@ import {
   listQueryCostLogEntriesForProject,
   ProjectQueryQuotaExceededError,
   queryProjectCohortRetention,
+  queryProjectCohortRetentionForAdmin,
   queryProjectFunnelSteps,
   searchProjectCustomers,
   searchProjectCustomersForAdmin,
@@ -195,6 +196,49 @@ describe('queryProjectCohortRetention', () => {
 
     expect(executor.calls[0].sql).toContain('cohort_month = @cohortMonth');
     expect(executor.calls[0].params.cohortMonth).toBe('2026-02-01');
+  });
+});
+
+describe('queryProjectCohortRetentionForAdmin (KAN-113)', () => {
+  it('returns an "ok" outcome wrapping the same rows queryProjectCohortRetention returns', async () => {
+    const { organization, project } = await setupOrgWithProject('Cohort Admin Ok Org');
+    const executor = new FakeWarehouseQueryExecutor([
+      { cohort_month: '2026-01-01', period_number: 0, cohort_size: 100, retained_count: 100, retention_rate: 1 },
+    ]);
+
+    const outcome = await queryProjectCohortRetentionForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(outcome).toEqual({
+      ok: true,
+      rows: [{ cohortMonth: '2026-01-01', periodNumber: 0, cohortSize: 100, retainedCount: 100, retentionRate: 1 }],
+    });
+  });
+
+  it('degrades to a "warehouse_not_configured" outcome instead of throwing', async () => {
+    const { organization, project } = await setupOrgWithProject('Cohort Admin Not Configured Org');
+    const executor: WarehouseQueryExecutor = { execute: () => Promise.reject(new WarehouseNotConfiguredError()) };
+
+    const outcome = await queryProjectCohortRetentionForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+    expect(outcome).toEqual({ ok: false, reason: 'warehouse_not_configured', message: expect.any(String) });
+  });
+
+  it('degrades to a "query_error" outcome when the warehouse rejects the query', async () => {
+    const { organization, project } = await setupOrgWithProject('Cohort Admin Query Error Org');
+    const executor: WarehouseQueryExecutor = { execute: () => Promise.reject(new WarehouseQueryFailedError('table not found')) };
+
+    const outcome = await queryProjectCohortRetentionForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+    expect(outcome).toEqual({ ok: false, reason: 'query_error', message: 'table not found' });
+  });
+
+  it('degrades to a "quota_exceeded" outcome instead of throwing once the project has spent its daily quota', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Cohort Admin Quota Blocked Org');
+    await setProjectCostQuota({ organizationId: organization.id, projectId: project.id, dailyQueryLimit: 1, labels: {}, setByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await queryProjectCohortRetentionForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+    const outcome = await queryProjectCohortRetentionForAdmin({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(outcome).toEqual({ ok: false, reason: 'quota_exceeded', message: expect.any(String) });
   });
 });
 

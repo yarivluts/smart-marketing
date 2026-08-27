@@ -262,6 +262,14 @@ export default async function OrgDetailPage({
                   {canManageBoards ? (
                     <Link
                       className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/cohorts`}
+                    >
+                      {t('projectCohortsLink')}
+                    </Link>
+                  ) : null}
+                  {canManageBoards ? (
+                    <Link
+                      className="text-sm underline"
                       href={`/orgs/${orgId}/projects/${currentProjectId}/tv`}
                     >
                       {t('projectTvLink')}
