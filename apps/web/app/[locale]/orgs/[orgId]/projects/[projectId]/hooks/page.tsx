@@ -10,6 +10,7 @@ import { hookDeliveryStatusLabelKey, hookSignatureModeLabelKey } from '@/lib/org
 import { CreateHookEndpointForm } from '@/components/orgs/create-hook-endpoint-form';
 import { DisableHookEndpointButton } from '@/components/orgs/disable-hook-endpoint-button';
 import { EnableHookEndpointButton } from '@/components/orgs/enable-hook-endpoint-button';
+import { EditHookEndpointForm } from '@/components/orgs/edit-hook-endpoint-form';
 import { SetHookSigningSecretForm } from '@/components/orgs/set-hook-signing-secret-form';
 import { HookReceiveUrl } from '@/components/orgs/hook-receive-url';
 import { HookDeliveryStatusButtons } from '@/components/orgs/hook-delivery-status-buttons';
@@ -95,6 +96,13 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
                       <EnableHookEndpointButton orgId={orgId} projectId={projectId} hookEndpointId={endpoint.id} />
                     )}
                   </div>
+                  <EditHookEndpointForm
+                    orgId={orgId}
+                    projectId={projectId}
+                    hookEndpointId={endpoint.id}
+                    initialName={endpoint.name}
+                    initialSignatureHeaderName={endpoint.signature_mode === 'hmac_sha256' ? endpoint.signature_header_name : undefined}
+                  />
                   {!endpoint.disabled_at ? <HookReceiveUrl hookApiBaseUrl={hookApiBaseUrl} hookId={endpoint.hook_id} /> : null}
                   {!endpoint.disabled_at && endpoint.signature_mode === 'hmac_sha256' ? (
                     <>

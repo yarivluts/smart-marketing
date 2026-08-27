@@ -69,6 +69,47 @@ function endpointBindingId(organizationId: string, hookEndpointId: string): stri
   return `${organizationId}:${hookEndpointId}`;
 }
 
+interface HookEndpointDefinitionInput {
+  name: string;
+  signatureMode: HookSignatureMode;
+  signatureHeaderName?: string;
+}
+
+interface ValidatedHookEndpointDefinition {
+  name: string;
+  signatureHeaderName?: string;
+}
+
+/**
+ * Validates a hook endpoint's own editable definition — name and (when
+ * `signatureMode` is `hmac_sha256`) signatureHeaderName — shared by
+ * {@link createHookEndpoint} and {@link updateHookEndpoint} (KAN-123) so the
+ * two can never validate a definition differently. `signatureMode` itself is
+ * immutable once an endpoint exists (mirrors `updateFieldMapping`'s `kind`
+ * immutability posture, KAN-121 — a different signature mode is a different
+ * endpoint, not a correction), so it's supplied by each caller rather than
+ * accepted as new user input on update.
+ */
+function validateHookEndpointDefinition(input: HookEndpointDefinitionInput): ValidatedHookEndpointDefinition {
+  if (input.signatureMode === 'hmac_sha256' && !input.signatureHeaderName?.trim()) {
+    throw new MissingSignatureHeaderNameError();
+  }
+  return {
+    name: input.name,
+    signatureHeaderName: input.signatureMode === 'hmac_sha256' ? input.signatureHeaderName!.trim() : undefined,
+  };
+}
+
+/**
+ * {@link updateHookEndpoint}'s own audit-log `before`/`after` shape — omits
+ * `signatureHeaderName` entirely rather than setting it to `undefined` when
+ * absent, since Firestore's `setDoc()` (which `recordAuditLogEntry` calls)
+ * rejects an `undefined` field value outright.
+ */
+function describeHookEndpointDefinition(name: string, signatureHeaderName: string | undefined): Record<string, unknown> {
+  return signatureHeaderName === undefined ? { name } : { name, signatureHeaderName };
+}
+
 export interface CreateHookEndpointParams {
   organizationId: string;
   projectId: string;
@@ -94,19 +135,21 @@ export async function createHookEndpoint(params: CreateHookEndpointParams): Prom
   await requireProjectInOrg(params.organizationId, params.projectId);
   await requireEnvironmentInProject(params.organizationId, params.projectId, params.environmentId);
 
-  if (params.signatureMode === 'hmac_sha256' && !params.signatureHeaderName?.trim()) {
-    throw new MissingSignatureHeaderNameError();
-  }
+  const validated = validateHookEndpointDefinition({
+    name: params.name,
+    signatureMode: params.signatureMode,
+    signatureHeaderName: params.signatureHeaderName,
+  });
 
   const endpoint = new HookEndpointModel();
-  endpoint.name = params.name;
+  endpoint.name = validated.name;
   endpoint.organization_id = params.organizationId;
   endpoint.project_id = params.projectId;
   endpoint.environment_id = params.environmentId;
   endpoint.hook_id = randomBytes(HOOK_ID_BYTES).toString('base64url');
   endpoint.signature_mode = params.signatureMode;
-  if (params.signatureMode === 'hmac_sha256') {
-    endpoint.signature_header_name = params.signatureHeaderName!.trim();
+  if (validated.signatureHeaderName !== undefined) {
+    endpoint.signature_header_name = validated.signatureHeaderName;
   }
   endpoint.created_by = params.createdByUserId;
   endpoint.created_at = new Date().toISOString();
@@ -205,6 +248,70 @@ export async function enableHookEndpoint(params: EnableHookEndpointParams): Prom
       targetType: 'hook_endpoint',
       targetId: endpoint.id,
       summary: `Enabled hook endpoint "${endpoint.name}"`,
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+  }
+
+  return endpoint;
+}
+
+export interface UpdateHookEndpointParams {
+  organizationId: string;
+  projectId: string;
+  hookEndpointId: string;
+  name: string;
+  signatureHeaderName?: string;
+  actorUserId: string;
+}
+
+/**
+ * Edits an existing hook endpoint's own definition — name and (in
+ * `hmac_sha256` mode) signatureHeaderName — always a full replace, never a
+ * sparse patch, the same posture `updateFieldMapping` (KAN-121) and its own
+ * sibling registries establish. `signatureMode`/`environmentId`/`hookId`
+ * stay immutable: `hookId` is embedded in the endpoint's own public receive
+ * URL, so recreating it would break the sending SaaS's already-configured
+ * webhook — exactly the problem this story closes (previously the only way
+ * to fix a typo'd name or a wrong signatureHeaderName provider guess was
+ * delete-and-recreate, which loses that URL and any signing-secret
+ * history). Reuses {@link validateHookEndpointDefinition} directly so
+ * create and update can never validate a definition differently.
+ */
+export async function updateHookEndpoint(params: UpdateHookEndpointParams): Promise<HookEndpointModel> {
+  const endpoint = await loadHookEndpoint(params.organizationId, params.projectId, params.hookEndpointId);
+
+  const validated = validateHookEndpointDefinition({
+    name: params.name,
+    signatureMode: endpoint.signature_mode,
+    signatureHeaderName: params.signatureHeaderName,
+  });
+
+  // `signatureHeaderName` is only ever set in `hmac_sha256` mode — omitted entirely (never an
+  // explicit `undefined` value) for a `none`-mode endpoint, since Firestore's `setDoc()` rejects
+  // an `undefined` field value outright and would otherwise silently drop this whole audit entry
+  // (`recordAuditLogEntry`'s own call is best-effort/swallowed below).
+  const before = describeHookEndpointDefinition(endpoint.name, endpoint.signature_header_name);
+
+  endpoint.name = validated.name;
+  if (endpoint.signature_mode === 'hmac_sha256') {
+    endpoint.signature_header_name = validated.signatureHeaderName;
+  }
+  await endpoint.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: endpoint.environment_id,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'hook_endpoint.update',
+      targetType: 'hook_endpoint',
+      targetId: endpoint.id,
+      summary: `Updated hook endpoint "${endpoint.name}" definition`,
+      before,
+      after: describeHookEndpointDefinition(endpoint.name, endpoint.signature_header_name),
     });
   } catch {
     // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
