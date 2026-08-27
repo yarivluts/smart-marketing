@@ -136,7 +136,7 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('installsHeading')}</h2>
-        <PluginInstallList orgId={orgId} projectId={projectId} installs={installViews} />
+        <PluginInstallList orgId={orgId} projectId={projectId} installs={installViews} manifests={manifestViews} />
       </section>
 
       {activeSourceInstalls.length > 0 ? (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  configSchemaForInstall,
   groupManifestsByPluginId,
   hasActiveInstall,
   pluginInstallHealth,
@@ -146,6 +147,37 @@ describe('pluginTypeForInstall', () => {
   it('is undefined when no manifest matches', () => {
     const view = toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.does-not-exist', status: 'installed', version: '9.9.9' }));
     expect(pluginTypeForInstall(view, manifests)).toBeUndefined();
+  });
+});
+
+describe('configSchemaForInstall', () => {
+  const manifests: PluginManifestView[] = [
+    toPluginManifestView(
+      manifest({
+        id: 'm1',
+        plugin_id: 'com.example.shopify-pack',
+        version: '1.0.0',
+        config_schema: { shop_domain: { type: 'string', required: true } },
+      }),
+    ),
+    toPluginManifestView(
+      manifest({
+        id: 'm2',
+        plugin_id: 'com.example.shopify-pack',
+        version: '2.0.0',
+        config_schema: { shop_domain: { type: 'string', required: true }, sandbox_mode: { type: 'boolean', required: false } },
+      }),
+    ),
+  ];
+
+  it("resolves an install's pinned manifest version's own config_schema, not the newest one for that plugin id", () => {
+    const view = toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.shopify-pack', status: 'installed', version: '1.0.0' }));
+    expect(configSchemaForInstall(view, manifests)).toEqual({ shop_domain: { type: 'string', required: true } });
+  });
+
+  it('is undefined when no manifest matches', () => {
+    const view = toPluginInstallView(install({ id: 'i1', plugin_id: 'com.example.does-not-exist', status: 'installed', version: '9.9.9' }));
+    expect(configSchemaForInstall(view, manifests)).toBeUndefined();
   });
 });
 

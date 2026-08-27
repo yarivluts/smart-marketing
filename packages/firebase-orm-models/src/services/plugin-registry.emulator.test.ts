@@ -24,6 +24,7 @@ import {
   ProjectNotFoundError,
   registerPluginManifest,
   uninstallPlugin,
+  updatePluginInstallConfig,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -435,5 +436,104 @@ describe('disablePlugin / enablePlugin / uninstallPlugin', () => {
 
     const installs = await listPluginInstallsForProject(organization.id, project.id);
     expect(installs).toHaveLength(0);
+  });
+});
+
+describe('updatePluginInstallConfig', () => {
+  async function installedPlugin(orgName: string) {
+    const { owner, organization, project } = await setupOrgWithProject(orgName);
+    await registerPluginManifest({ organizationId: organization.id, manifestYaml: manifestYaml(), registeredByUserId: owner.id });
+    const install = await installPlugin({
+      organizationId: organization.id,
+      projectId: project.id,
+      pluginId: 'com.example.shopify-pack',
+      version: '1.0.0',
+      consentedScopes: ['ingest:write', 'schema:write'],
+      config: { shop_domain: 'old-shop.myshopify.com' },
+      installedByUserId: owner.id,
+    });
+    return { owner, organization, project, install };
+  }
+
+  it('replaces an installed install’s config and persists it', async () => {
+    const { owner, organization, project, install } = await installedPlugin('Plugin Config Update Org');
+
+    const updated = await updatePluginInstallConfig({
+      organizationId: organization.id,
+      projectId: project.id,
+      installId: install.id,
+      config: { shop_domain: 'new-shop.myshopify.com' },
+      performedByUserId: owner.id,
+    });
+    expect(updated.config).toEqual({ shop_domain: 'new-shop.myshopify.com' });
+    // Not just the in-memory return value — guard against `updateDoc()` dropping the write.
+    const reloaded = await getPluginInstall(organization.id, project.id, install.id);
+    expect(reloaded?.config).toEqual({ shop_domain: 'new-shop.myshopify.com' });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'plugin.config_update');
+    expect(entry?.before).toEqual({ config: { shop_domain: 'old-shop.myshopify.com' } });
+    expect(entry?.after).toEqual({ config: { shop_domain: 'new-shop.myshopify.com' } });
+  });
+
+  it('replaces a disabled install’s config too', async () => {
+    const { owner, organization, project, install } = await installedPlugin('Plugin Config Update Disabled Org');
+    await disablePlugin({ organizationId: organization.id, projectId: project.id, installId: install.id, performedByUserId: owner.id });
+
+    const updated = await updatePluginInstallConfig({
+      organizationId: organization.id,
+      projectId: project.id,
+      installId: install.id,
+      config: { shop_domain: 'new-shop.myshopify.com' },
+      performedByUserId: owner.id,
+    });
+    expect(updated.status).toBe('disabled');
+    expect(updated.config).toEqual({ shop_domain: 'new-shop.myshopify.com' });
+  });
+
+  it('rejects updating the config of an uninstalled install', async () => {
+    const { owner, organization, project, install } = await installedPlugin('Plugin Config Update Uninstalled Org');
+    await uninstallPlugin({ organizationId: organization.id, projectId: project.id, installId: install.id, performedByUserId: owner.id });
+
+    await expect(
+      updatePluginInstallConfig({
+        organizationId: organization.id,
+        projectId: project.id,
+        installId: install.id,
+        config: { shop_domain: 'new-shop.myshopify.com' },
+        performedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidPluginInstallStateError);
+  });
+
+  it('rejects a config that no longer satisfies the pinned manifest version’s schema, leaving the old config untouched', async () => {
+    const { owner, organization, project, install } = await installedPlugin('Plugin Config Update Invalid Org');
+
+    await expect(
+      updatePluginInstallConfig({
+        organizationId: organization.id,
+        projectId: project.id,
+        installId: install.id,
+        config: {},
+        performedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidPluginConfigError);
+
+    const reloaded = await getPluginInstall(organization.id, project.id, install.id);
+    expect(reloaded?.config).toEqual({ shop_domain: 'old-shop.myshopify.com' });
+  });
+
+  it('rejects an install id from a different project (KAN-26 non-enumeration)', async () => {
+    const { organization, install } = await installedPlugin('Plugin Config Update Cross Project Org A');
+    const other = await setupOrgWithProject('Plugin Config Update Cross Project Org B');
+    await expect(
+      updatePluginInstallConfig({
+        organizationId: organization.id,
+        projectId: other.project.id,
+        installId: install.id,
+        config: { shop_domain: 'new-shop.myshopify.com' },
+        performedByUserId: other.owner.id,
+      }),
+    ).rejects.toThrow(PluginInstallNotFoundError);
   });
 });

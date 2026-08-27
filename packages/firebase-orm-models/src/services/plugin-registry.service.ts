@@ -318,6 +318,70 @@ export async function getPluginInstall(organizationId: string, projectId: string
   return install;
 }
 
+export interface UpdatePluginInstallConfigParams {
+  organizationId: string;
+  projectId: string;
+  installId: string;
+  config: Record<string, unknown>;
+  performedByUserId: string;
+}
+
+/**
+ * Edits an already-installed plugin's own `config` values (KAN-124 — the
+ * same "create + list only, no way to fix a typo'd definition" gap
+ * KAN-100/KAN-109/KAN-117/KAN-119/KAN-120/KAN-121/KAN-123 already closed for
+ * their own sibling registries). `pluginId`/`version`/`granted_scopes` stay
+ * immutable here — a different plugin or manifest version is a different
+ * install, not a config correction, and re-granting scopes needs its own
+ * consent screen (`installPlugin`'s own exact-match check), not a silent
+ * PATCH. Re-validates the new config against the install's own pinned
+ * manifest version's `config_schema` the same way `installPlugin` validates
+ * it at install time, so an edit can never leave an install holding a
+ * config that no longer satisfies its own schema. Allowed while `installed`
+ * or `disabled` (disabling a plugin doesn't lose its config today, and
+ * fixing a typo while paused shouldn't require re-enabling first); rejected
+ * once `uninstalled` (terminal, per `PluginInstallModel`'s own doc comment).
+ */
+export async function updatePluginInstallConfig(params: UpdatePluginInstallConfigParams): Promise<PluginInstallModel> {
+  const install = await requireInstallInProject(params.organizationId, params.projectId, params.installId);
+  if (install.status === 'uninstalled') {
+    throw new InvalidPluginInstallStateError('update the config of', install.status);
+  }
+
+  const manifest = await getPluginManifestVersion(params.organizationId, install.plugin_id, install.version);
+  if (!manifest) {
+    throw new PluginManifestNotFoundError();
+  }
+
+  const configReasons = validatePluginConfig(manifest.config_schema, params.config);
+  if (configReasons.length > 0) {
+    throw new InvalidPluginConfigError(configReasons);
+  }
+
+  const before = install.config;
+  install.config = params.config;
+  await install.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.performedByUserId,
+      action: 'plugin.config_update',
+      targetType: 'plugin_install',
+      targetId: install.id,
+      summary: `Updated plugin "${install.plugin_id}" install config`,
+      before: { config: before },
+      after: { config: install.config },
+    });
+  } catch {
+    // Best-effort — see registerPluginManifest's own comment above.
+  }
+
+  return install;
+}
+
 interface PluginInstallLifecycleParams {
   organizationId: string;
   projectId: string;

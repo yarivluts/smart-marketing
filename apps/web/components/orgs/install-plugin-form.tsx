@@ -4,8 +4,8 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { groupManifestsByPluginId, type PluginFamilyView, type PluginManifestView } from '@/lib/orgs/plugin-view';
+import { parsePluginConfigFieldValues, PluginConfigFields, type PluginConfigFieldValue } from '@/components/orgs/plugin-config-fields';
 
 export interface InstallPluginFormProps {
   orgId: string;
@@ -14,7 +14,7 @@ export interface InstallPluginFormProps {
   manifests: readonly PluginManifestView[];
 }
 
-type ConfigValue = string | boolean;
+type ConfigValue = PluginConfigFieldValue;
 
 function newestVersion(family: PluginFamilyView): PluginManifestView {
   return family.versions[family.versions.length - 1];
@@ -88,22 +88,7 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
       return;
     }
 
-    const nextFieldErrors: Record<string, string> = {};
-    const parsedConfig: Record<string, unknown> = {};
-    for (const [name, field] of Object.entries(selected.configSchema)) {
-      const raw = config[name];
-      if (field.type === 'boolean') {
-        parsedConfig[name] = raw === true;
-        continue;
-      }
-      if (raw === undefined || raw === '') {
-        if (field.required) {
-          nextFieldErrors[name] = t('configFieldRequiredError');
-        }
-        continue;
-      }
-      parsedConfig[name] = field.type === 'number' ? Number(raw) : raw;
-    }
+    const { parsedConfig, fieldErrors: nextFieldErrors } = parsePluginConfigFieldValues(selected.configSchema, config, t('configFieldRequiredError'));
     if (Object.keys(nextFieldErrors).length > 0) {
       setFieldErrors(nextFieldErrors);
       return;
@@ -215,49 +200,13 @@ export function InstallPluginForm({ orgId, projectId, manifests }: InstallPlugin
             </label>
           </div>
 
-          {Object.keys(selected.configSchema).length > 0 ? (
-            <div className="flex flex-col gap-3">
-              <span className="text-sm font-medium">{t('configHeading')}</span>
-              {Object.entries(selected.configSchema).map(([name, field]) => (
-                <div key={name} className="flex flex-col gap-1.5">
-                  {field.type === 'boolean' ? (
-                    <label className="flex items-center gap-2 text-sm font-medium" htmlFor={`install-plugin-config-${name}`}>
-                      <input
-                        id={`install-plugin-config-${name}`}
-                        type="checkbox"
-                        checked={config[name] === true}
-                        onChange={(event) => setConfig((prev) => ({ ...prev, [name]: event.target.checked }))}
-                      />
-                      <span>
-                        {name}
-                        {field.required ? <span className="text-destructive"> {t('configFieldRequiredMarker')}</span> : null}
-                      </span>
-                    </label>
-                  ) : (
-                    <>
-                      <label className="text-sm font-medium" htmlFor={`install-plugin-config-${name}`}>
-                        {name}
-                        {field.required ? <span className="text-destructive"> {t('configFieldRequiredMarker')}</span> : null}
-                      </label>
-                      <Input
-                        id={`install-plugin-config-${name}`}
-                        type={field.type === 'number' ? 'number' : 'text'}
-                        required={field.required}
-                        aria-invalid={Boolean(fieldErrors[name])}
-                        value={typeof config[name] === 'string' ? (config[name] as string) : ''}
-                        onChange={(event) => setConfig((prev) => ({ ...prev, [name]: event.target.value }))}
-                      />
-                    </>
-                  )}
-                  {fieldErrors[name] ? (
-                    <p role="alert" className="text-xs text-destructive">
-                      {fieldErrors[name]}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : null}
+          <PluginConfigFields
+            idPrefix="install-plugin-config"
+            configSchema={selected.configSchema}
+            values={config}
+            fieldErrors={fieldErrors}
+            onChange={(name, value) => setConfig((prev) => ({ ...prev, [name]: value }))}
+          />
 
           {error ? (
             <p role="alert" className="text-sm text-destructive">
