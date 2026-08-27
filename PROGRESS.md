@@ -17,7 +17,98 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #328 (renumbered KAN-121 → KAN-122, segment row editor)
+## 2026-08-27 (latest) — Merged PR #329 (KAN-122 renumbering) and PR #330 (KAN-123, hook endpoint edit)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `main` was at `6e44de3` (KAN-121/PR #328 merged) at pick time;
+    `TASKS.md` had zero `todo` rows left. Checked open PRs first (established pattern) and found
+    two: **PR #329** (`kan-122-renumber-segment-row-editor`, a small docs-only chore from an
+    earlier run, recording PR #328's own KAN-121→KAN-122 renumbering + its merge) and **PR #327**
+    (`feature/easysign-schemaregistry-integration`) — the latter reuses already-`done` KAN-80/81/82
+    numbers for something called "EasySign" that has no trace anywhere else in this repo or its
+    plan docs, previously flagged by concurrent sessions as possibly the wrong repo. Checked its
+    commit authorship this run: every commit is authored by `yarivluts <yariv.luts@gmail.com>` —
+    the actual repo owner, not another automated session — so this is very likely the human owner's
+    own manual work on a side branch, not a stray/misdirected agent. Left it untouched (not this
+    run's PR, no action needed) rather than re-flagging a concern that commit authorship already
+    answers.
+  - PR #329 had no CI reported yet at pick time; waited for it (~40 min, the suite's usual
+    runtime), independently confirmed both checks green (`lint · typecheck · test · build`,
+    `terraform fmt · validate`) with no open review threads and a clean `mergeable_state`, and
+    merged it (squash, `e62d651`). Remote branch deletion failed with the same recurring HTTP 403
+    this file has documented since 2026-07-04.
+  - Delegated a research sweep (general-purpose agent) for a still-genuinely-open, buildable-today
+    gap, explicitly told to avoid KAN-117 through KAN-122's already-delivered scope. It found:
+    `hook.service.ts`'s `createHookEndpoint`/`listHookEndpointsForProject`/`disableHookEndpoint`/
+    `enableHookEndpoint`/`setHookEndpointSigningSecret` had create + list (+ enable/disable) only —
+    no way to fix a typo'd endpoint name or a wrong `signature_header_name` provider guess (e.g.
+    GitHub's `X-Hub-Signature-256` vs. Shopify's `X-Shopify-Hmac-Sha256`) once created, the same
+    gap KAN-100/KAN-109/KAN-117/KAN-119/KAN-120/KAN-121 already closed for their own sibling
+    registries — confirmed directly by reading `hook.service.ts` and the Hooks admin page (only
+    Disable/Enable/Set-secret controls existed) before committing to it. Unlike those siblings,
+    delete-and-recreate isn't even a safe workaround here: it changes the endpoint's `hook_id`
+    (embedded in the public receive URL), breaking the sending SaaS's already-configured webhook.
+  - Implemented **KAN-123** (minted after confirming KAN-122 was PR #329's, already merged, and no
+    other open PR claimed KAN-123): extracted `createHookEndpoint`'s inline
+    signature-header-required-when-hmac check into a shared `validateHookEndpointDefinition`
+    helper, reused by both `createHookEndpoint` and a new `updateHookEndpoint` (full replace of
+    name + signatureHeaderName, audit-logged `hook_endpoint.update`); `signatureMode`/
+    `environmentId`/`hookId` stay immutable, mirroring `updateFieldMapping`'s (KAN-121) `kind`/
+    `environmentId` immutability posture. New `PATCH /api/orgs/[orgId]/projects/[projectId]/
+    hook-endpoints/[hookEndpointId]` route (`ingest.write` gated) and a new `EditHookEndpointForm`
+    admin control on the Hooks page, placed as its own row below the header per
+    `EditFieldMappingForm`'s established page-layout convention (not crowded into the
+    enable/disable button row, an initial draft this run's own self-review moved before opening
+    the PR). en/he translations.
+  - **Found and fixed a real bug during emulator testing, before merge**: the audit-log
+    `before`/`after` payload set `signatureHeaderName` to an explicit `undefined` for a
+    `none`-mode endpoint, which Firestore's `setDoc()` rejects outright — `recordAuditLogEntry`'s
+    own call is best-effort/swallowed, so every `none`-mode endpoint's update audit entry was
+    silently dropped entirely (confirmed by the emulator test's own stderr before the fix). Fixed
+    with a `describeHookEndpointDefinition` helper that omits the key rather than nulling it,
+    with a regression test proving the entry now actually gets written.
+  - Full test coverage added: `packages/firebase-orm-models` emulator tests for `updateHookEndpoint`
+    (name-only replace, hmac name+header replace, header trimming, header ignored in `none` mode,
+    missing-header rejection with atomicity, not-found rejection, audit log before/after for both
+    modes incl. the `none`-mode regression case — 30/30 green in `hook.emulator.test.ts`);
+    `apps/web` emulator-backed route tests (401/400 invalid body incl. non-string header/200/400
+    missing-header/404) and a new `EditHookEndpointForm` component test suite (collapsed by
+    default, pre-fills per signature mode, submits via PATCH and collapses back, specific vs.
+    generic error handling, cancel discards edits).
+  - Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck` green. Full `pnpm test` (~40 min)
+    surfaced one failure — `apps/api`'s `mcp.controller.e2e.spec.ts`, 15 tests timing out at
+    30000ms, a file this diff never touches — diagnosed as resource-contention flake (this run was
+    also mid-`pnpm install`/build/multiple-emulator-instance load at the time) and confirmed by
+    re-running that one file alone: 21/21 green in 87s (vs. the ~1845s Jest reported it was
+    allotted under the earlier concurrent load). Self-reviewed the full diff before opening the PR
+    (correctness, reuse, test coverage, page-layout consistency with sibling edit forms) — moved
+    `EditHookEndpointForm` out of the button row into its own row as the one fix from that pass.
+  - Opened PR #330, subscribed to its activity, and checked in via `send_later` (~30min, then
+    ~15min) rather than polling continuously — CI took ~47 minutes end to end. Both checks came
+    back green (`lint · typecheck · test · build`, `terraform fmt · validate`), `mergeable_state:
+    clean`, no open review threads. Merged PR #330 (squash, `ddf3ddb`) into `main` and unsubscribed.
+    Remote branch deletion for `kan-123-hook-endpoint-edit` failed with the same recurring HTTP 403.
+  - Added the KAN-123 row to `TASKS.md` (as part of PR #330's own diff, resolving a rebase conflict
+    against PR #329's KAN-122 row cleanly — kept both rows, KAN-122 before KAN-123).
+- **In progress (exact stopping point):** none — both PR #329 and PR #330 (KAN-123) are fully
+  delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real
+  KAN number is 123. Check for other open PRs first (established pattern) before starting new work.
+  PR #327 (EasySign) remains open on `main`'s history but is confirmed to be the repo owner's own
+  work (commit authorship), not this automation's concern — no action needed on it.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-122-renumber-segment-row-editor`
+    and `kan-123-hook-endpoint-edit`.
+
+---
+
+## 2026-08-27 — Merged PR #328 (renumbered KAN-121 → KAN-122, segment row editor)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `main` was at `d271d97` (KAN-119 merged) at pick time;
