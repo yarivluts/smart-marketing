@@ -220,6 +220,10 @@ const metricQueryInputShape = {
 
 const cohortInputShape = {
   cohort_month: z.string().optional().describe('Restrict to one cohort, e.g. "2026-01-01" (first-of-month). Omit for every cohort, newest first.'),
+  conversion_event: z
+    .string()
+    .optional()
+    .describe('Which event must fire again for a customer to count as "retained" in a later period. Omit for "any activity that period" (the default).'),
   limit: z.number().int().positive().optional(),
 };
 
@@ -313,13 +317,25 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     'query_cohort',
     {
       title: 'Query cohort retention',
-      description: 'Query the signup-month x period-number retention matrix (cohort engine v1). Omit cohort_month to get every cohort, newest first.',
+      description:
+        'Query the signup-month x period-number retention matrix (cohort engine v1). Omit cohort_month to get every cohort, newest first. Omit conversion_event to count a customer as retained on any activity that period; pass a specific event name to require that exact event instead.',
       inputSchema: toolInputSchema(cohortInputShape),
     },
     auditedToolHandler(auth, 'query_cohort', async (args: any) => {
-      const { cohort_month: cohortMonth, limit } = args as { cohort_month?: string; limit?: number };
+      const { cohort_month: cohortMonth, conversion_event: conversionEvent, limit } = args as {
+        cohort_month?: string;
+        conversion_event?: string;
+        limit?: number;
+      };
       try {
-        const rows = await queryProjectCohortRetention({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), cohortMonth, limit });
+        const rows = await queryProjectCohortRetention({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
+          cohortMonth,
+          conversionEvent,
+          limit,
+        });
         return textResult({ rows });
       } catch (error) {
         return errorResult(describeMetricsError(error));
