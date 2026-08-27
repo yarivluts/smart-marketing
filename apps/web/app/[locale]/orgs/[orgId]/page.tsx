@@ -63,13 +63,21 @@ export default async function OrgDetailPage({
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
   const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
+  const canManageBilling = can(bindings, principal, 'billing.manage', { orgId });
 
   const t = await getTranslations('OrgDetailPage');
 
   return (
     <OrgShell locale={locale} orgId={orgId}>
       <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{membership.organizationName}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold tracking-tight">{membership.organizationName}</h1>
+          {canManageBilling ? (
+            <Link className="text-sm underline" href={`/orgs/${orgId}/settings`}>
+              {t('orgSettingsLink')}
+            </Link>
+          ) : null}
+        </div>
 
         <section className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
@@ -225,6 +233,14 @@ export default async function OrgDetailPage({
                       href={`/orgs/${orgId}/projects/${currentProjectId}/session-replay`}
                     >
                       {t('projectSessionReplayLink')}
+                    </Link>
+                  ) : null}
+                  {canManageProjects ? (
+                    <Link
+                      className="text-sm underline"
+                      href={`/orgs/${orgId}/projects/${currentProjectId}/settings`}
+                    >
+                      {t('projectSettingsLink')}
                     </Link>
                   ) : null}
                   {canManagePlugins ? (

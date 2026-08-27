@@ -126,7 +126,9 @@
     "projectCampaignOpsLink": "תפעול קמפיינים",
     "projectRepCollectionsLink": "גבייה לפי נציג",
     "projectFunnelLink": "משפך המרות",
-    "projectInsightsLink": "תובנות"
+    "projectInsightsLink": "תובנות",
+    "orgSettingsLink": "הגדרות ארגון",
+    "projectSettingsLink": "הגדרות פרויקט"
   },
   "ProjectSwitcher": {
     "label": "פרויקט"
@@ -1660,6 +1662,32 @@
     "save": "שמירה",
     "saved": "נשמר.",
     "saveError": "שמירת התבנית נכשלה. ודאו שזו כתובת http(s) תקינה."
+  },
+  "OrganizationSettings": {
+    "metaTitle": "הגדרות ארגון",
+    "title": "הגדרות — {orgName}",
+    "intro": "תקנו את שם הארגון, המזהה הקצר (slug) או איש הקשר לחיוב.",
+    "nameLabel": "שם הארגון",
+    "slugLabel": "מזהה קצר (slug)",
+    "slugHelp": "מזהה קצר אופציונלי לארגון זה. השאירו ריק כדי לנקות אותו.",
+    "billingEmailLabel": "אימייל איש קשר לחיוב",
+    "billingEmailHelp": "לאן יישלחו הודעות הקשורות לחיוב עבור ארגון זה. השאירו ריק כדי לנקות אותו.",
+    "nameRequiredError": "שם הארגון הוא שדה חובה.",
+    "save": "שמירה",
+    "saved": "נשמר.",
+    "saveError": "שמירת ההגדרות נכשלה. נסו שוב."
+  },
+  "ProjectSettings": {
+    "metaTitle": "הגדרות פרויקט",
+    "title": "הגדרות — {projectName}",
+    "intro": "תקנו את שם הפרויקט או את התחום שלו.",
+    "nameLabel": "שם הפרויקט",
+    "verticalLabel": "תחום",
+    "verticalHelp": "תווית אופציונלית לתחום או לענף של פרויקט זה. השאירו ריק כדי לנקות אותה.",
+    "nameRequiredError": "שם הפרויקט הוא שדה חובה.",
+    "save": "שמירה",
+    "saved": "נשמר.",
+    "saveError": "שמירת ההגדרות נכשלה. נסו שוב."
   },
   "RepCollections": {
     "metaTitle": "גבייה לפי נציג",
