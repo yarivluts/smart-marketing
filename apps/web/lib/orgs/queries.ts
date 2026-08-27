@@ -168,6 +168,8 @@ import {
   type SchemaDefModel,
   searchProjectCustomersForAdmin as searchProjectCustomersForAdminInOrganization,
   type CustomerSearchOutcome,
+  queryProjectCohortRetentionForAdmin as queryProjectCohortRetentionForAdminInOrganization,
+  type CohortRetentionOutcome,
   type SegmentMemberCountOutcome,
   type SegmentMemberListOutcome,
   type SegmentModel,
@@ -851,6 +853,20 @@ export async function searchProjectCustomers(
 ): Promise<CustomerSearchOutcome> {
   await ensureFirestoreOrm();
   return searchProjectCustomersForAdminInOrganization({ organizationId, projectId, query, ...options });
+}
+
+/**
+ * A project's `cohort_month x period_number` retention matrix (KAN-113, the web admin counterpart of
+ * the MCP `query_cohort` tool) — or a typed, renderable "why not" outcome (see `CohortRetentionOutcome`'s
+ * own doc comment) for the Cohort Retention page.
+ */
+export async function queryCohortRetention(
+  organizationId: string,
+  projectId: string,
+  options?: { cohortMonth?: string; limit?: number },
+): Promise<CohortRetentionOutcome> {
+  await ensureFirestoreOrm();
+  return queryProjectCohortRetentionForAdminInOrganization({ organizationId, projectId, ...options });
 }
 
 export async function getGoal(organizationId: string, projectId: string, goalId: string): Promise<GoalModel | null> {

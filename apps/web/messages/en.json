@@ -120,6 +120,7 @@
     "projectBoardsLink": "Boards",
     "projectGoalsLink": "Goals",
     "projectSegmentsLink": "Segments",
+    "projectCohortsLink": "Cohort retention",
     "projectTvLink": "War-room TV",
     "projectSessionReplayLink": "Session replay",
     "projectCampaignOpsLink": "Campaign ops",
@@ -670,6 +671,19 @@
     "resultLastSeenLine": "Last seen {lastSeenAt}",
     "resultFieldLine": "{name}: {value}",
     "capNote": "Showing the {count} most recent matches."
+  },
+  "CohortRetention": {
+    "metaTitle": "Cohort retention",
+    "title": "Cohort retention for {projectName}",
+    "description": "Monthly signup cohorts and what share of each stuck around period over period.",
+    "notConfigured": "Cohort retention unavailable (warehouse not configured yet)",
+    "quotaExceeded": "Cohort retention unavailable (daily query quota reached)",
+    "queryError": "Cohort retention unavailable",
+    "empty": "No cohort data yet.",
+    "cohortColumnHeading": "Cohort",
+    "cohortSizeColumnHeading": "Size",
+    "periodColumnHeading": "Period {periodNumber}",
+    "retentionCell": "{percent}%"
   },
   "Funnel": {
     "metaTitle": "Funnel",

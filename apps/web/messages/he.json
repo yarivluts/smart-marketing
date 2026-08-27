@@ -120,6 +120,7 @@
     "projectBoardsLink": "לוחות מחוונים",
     "projectGoalsLink": "יעדים",
     "projectSegmentsLink": "פלחים",
+    "projectCohortsLink": "שימור קבוצות",
     "projectTvLink": "טלוויזיית חדר מלחמה",
     "projectSessionReplayLink": "הקלטות סשן",
     "projectCampaignOpsLink": "תפעול קמפיינים",
@@ -670,6 +671,19 @@
     "resultLastSeenLine": "נראה לאחרונה {lastSeenAt}",
     "resultFieldLine": "{name}: {value}",
     "capNote": "מוצגות {count} ההתאמות העדכניות ביותר."
+  },
+  "CohortRetention": {
+    "metaTitle": "שימור קבוצות",
+    "title": "שימור קבוצות עבור {projectName}",
+    "description": "קבוצות הרשמה חודשיות ואיזה חלק מהן נשאר פעיל תקופה אחר תקופה.",
+    "notConfigured": "שימור קבוצות אינו זמין (מחסן הנתונים טרם הוגדר)",
+    "quotaExceeded": "שימור קבוצות אינו זמין (מכסת השאילתות היומית מוצתה)",
+    "queryError": "שימור קבוצות אינו זמין",
+    "empty": "אין עדיין נתוני קבוצות.",
+    "cohortColumnHeading": "קבוצה",
+    "cohortSizeColumnHeading": "גודל",
+    "periodColumnHeading": "תקופה {periodNumber}",
+    "retentionCell": "{percent}%"
   },
   "Funnel": {
     "metaTitle": "משפך המרות",
