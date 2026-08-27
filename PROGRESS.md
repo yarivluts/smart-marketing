@@ -17,7 +17,59 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #329 (KAN-122 renumbering) and PR #330 (KAN-123, hook endpoint edit)
+## 2026-08-27 (latest) — Merged PR #333 (plugin install config edit) and PR #335 (KAN-124→125 renumbering)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` had zero `todo` rows left at pick time. Checked open
+    PRs first (established pattern) and found two: **PR #333** (`kan-124-plugin-install-config-edit`,
+    already implemented, tested, and opened by an earlier run today) and **PR #327** (EasySign) —
+    the latter re-confirmed as the repo owner's own manual work (all commits authored by
+    `yarivluts <yariv.luts@gmail.com>`), left untouched per the standing note from prior runs.
+  - PR #333's CI had one comment from an earlier run diagnosing a real e2e-shard flake (Firestore
+    emulator `RESOURCE_EXHAUSTED` cascading into unrelated specs, none touched by this diff) and
+    had already re-triggered the failed check once. This run subscribed to the PR's activity,
+    waited for that re-run to finish, confirmed both checks green with `mergeable_state: clean`
+    and no open review threads, and merged (squash, `5351516`). Branch deletion failed with the
+    same recurring HTTP 403 this file has documented since 2026-07-04.
+  - **Found a real KAN-number collision on merge**: `main` already carried **PR #332**
+    (`kan-124-org-project-settings-edit`, org/project settings edit) merged at `8a1cc6f` just
+    before PR #333 — both branches started from the same base commit and independently claimed
+    **KAN-124**. Per the established "second-to-merge renumbers" convention, started building a
+    follow-up fix (renumber PR #333's own doc-comment/`TASKS.md` references to KAN-125, backfill
+    the `TASKS.md` row PR #332 never added) — but on `git push` (itself blocked by the usual 403,
+    then a "fetch first" rejection) discovered **a concurrent session had independently found and
+    already pushed/opened the identical fix as PR #335** roughly the same minute. Rather than
+    duplicate it, discarded this run's local branch/commit unpushed and instead validated and
+    merged **PR #335** directly (CI green — `lint · typecheck · test · build` +
+    `terraform fmt · validate` — `mergeable_state: clean`, no review threads; squash-merged as
+    `ef03142`). Its branch deletion also failed with the same 403.
+  - `main` is now caught up through **KAN-125** (`ef03142`); `TASKS.md` has both the KAN-124 (org/
+    project settings edit) and KAN-125 (plugin install config edit, ex-KAN-124) rows.
+- **In progress (exact stopping point):** none — both PRs fully merged, `TASKS.md`/history
+  consistent, no known gaps.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real
+  KAN number is 125. Check for other open PRs first (established pattern; this run has seen two
+  independent concurrent-session collisions today alone — KAN-124 twice and this renumbering fix
+  itself — so that check is worth doing carefully). PR #327 (EasySign) remains open on `main`'s
+  history but is confirmed to be the repo owner's own work, not this automation's concern.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-124-plugin-install-config-edit`,
+    `kan-124-org-project-settings-edit`, and `kan-125-renumber-plugin-config-edit`.
+  - Consider whether the scheduled-run cadence needs adjusting: two independent KAN-124 collisions
+    plus a third independent race to fix the first (this run's own renumbering PR vs. PR #335)
+    happened within about an hour today — more concurrent sessions are picking up work before
+    others' PRs merge than this repo's existing renumbering convention was designed to absorb
+    gracefully at scale.
+
+---
+
+## 2026-08-27 — Merged PR #329 (KAN-122 renumbering) and PR #330 (KAN-123, hook endpoint edit)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `main` was at `6e44de3` (KAN-121/PR #328 merged) at pick time;
