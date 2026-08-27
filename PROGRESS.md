@@ -17,7 +17,67 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #324 (KAN-119, shared credential edit)
+## 2026-08-27 (latest) — Stood down: 3 concurrent PRs already in flight, incl. a real KAN-121 collision
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. Local `main` was at `d271d97` (KAN-119/KAN-120 merged).
+    `TASKS.md` had zero `todo` rows left — every story is `done` except the standing
+    KAN-18/KAN-19 infra items and KAN-43/50/51 (`needs-human`/`blocked-by`), so this run's
+    starting point was the "check open PRs first" step of the sweep-for-a-follow-up pattern.
+  - Found **three** PRs already open, all created by concurrent sessions in the ~25 minutes
+    immediately before this run started, none with CI checks reported yet
+    (`get_status` → `state: pending`, `total_count: 0` on all three):
+    - **PR #326** `kan-121-field-mapping-edit` — "edit a saved field mapping's name/schema/rules",
+      titled **KAN-121**.
+    - **PR #327** `feature/easysign-schemaregistry-integration` — registers lifecycle event
+      schemas for something called "EasySign" (document e-signature platform: `document_created`/
+      `signing_viewed`/`document_signed`/`document_declined`), titled **KAN-81, KAN-80, KAN-82**.
+    - **PR #328** `kan-121-segment-edit-row-editor` — "row editor for editing a saved segment's
+      definition", also titled **KAN-121**.
+  - Two real numbering problems found, neither fixed by this run (not this run's PRs to edit —
+    see below):
+    1. **PR #326 and PR #328 both mint KAN-121** for two unrelated stories. Whichever merges
+       second will need renumbering to KAN-122 (or later) before/at merge time, and `TASKS.md`
+       must only gain one KAN-121 row.
+    2. **PR #327 reuses KAN-80/81/82**, which are already `done` in `TASKS.md` today (Billing-ops
+       feeds / Ops Lists & Feeds / Feedback & NPS — see those rows above) and have nothing to do
+       with "EasySign". A repo-wide search (`git log --all`, `find . -iname '*easysign*'`) found
+       zero prior trace of EasySign anywhere in this codebase or its history — this looks like a
+       session that either grabbed stale ticket numbers or is working an unrelated product against
+       the wrong repo. This is flagged, not fixed: not this run's PR, and picking a number for
+       someone else's in-flight work would just create a third collision. Whoever merges #327
+       needs a real, unused KAN number before it lands (122+, whatever's free after #326/#328
+       settle) and should double check EasySign is actually meant to be part of GrowthOS before
+       merging schemas for it into this shared registry.
+  - Decided **not** to start a fourth sweep-for-a-follow-up task this run: with three concurrent
+    sessions already racing the same "find a newly-buildable gap" pattern and two live collisions
+    from just the last 25 minutes, a fourth candidate right now has a high chance of either
+    duplicating one of #326/#327/#328's actual scope or minting yet another colliding KAN number.
+    Nothing else in `TASKS.md`/the codebase looked both genuinely new and clearly non-overlapping
+    with what's already claimed. Checked all three PRs' CI status once more before standing down
+    (still `pending`/`total_count: 0` on all three, ~12 minutes after first checking) — nothing
+    actionable yet on any of them either.
+- **In progress (exact stopping point):** none — this run made no code changes, opened no PR.
+- **Blocked + why:** not blocked; deliberately deferred to avoid duplicating in-flight work.
+- **Next step:** the next run should first check the current state of PRs #326/#327/#328 (merged?
+  closed? CI green?). If any merged since this entry, reconcile `TASKS.md` KAN numbers as needed
+  (renumber the second KAN-121 landed, confirm #327's real number and that EasySign belongs in
+  this repo at all). Only after that, resume the sweep-for-a-newly-buildable-follow-up pattern —
+  current highest real KAN number is 120 until #326/#327/#328 land (this run intentionally did
+  not mint a new number).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Worth a human's attention if EasySign is *not* actually a GrowthOS product: PR #327 is adding
+    schemas for it against this repo's shared SchemaRegistry under recycled KAN-80/81/82 numbers.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote).
+
+---
+
+## 2026-08-27 — Merged PR #324 (KAN-119, shared credential edit)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. Found **PR #324** (KAN-119, `kan-119-shared-credential-edit`)
