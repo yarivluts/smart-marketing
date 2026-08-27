@@ -10,12 +10,12 @@ export interface EditTemplateFormProps {
   orgId: string;
   templateId: string;
   initialName: string;
-  initialConfig?: Record<string, unknown>;
+  initialConfig?: Record<string, unknown> | null;
 }
 
-/** Pretty-prints `config` for the textarea, or an empty string when unset — mirrors `EditPersonForm`'s "blank means clear" convention for its own optional fields. */
-function configToText(config: Record<string, unknown> | undefined): string {
-  return config === undefined ? '' : JSON.stringify(config, null, 2);
+/** Pretty-prints `config` for the textarea, or an empty string when unset (`null` or `undefined`) — mirrors `EditPersonForm`'s "blank means clear" convention for its own optional fields. */
+function configToText(config: Record<string, unknown> | null | undefined): string {
+  return config == null ? '' : JSON.stringify(config, null, 2);
 }
 
 /**

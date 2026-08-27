@@ -10,7 +10,7 @@ vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ refresh }),
 }));
 
-function renderForm(initialConfig?: Record<string, unknown>): void {
+function renderForm(initialConfig?: Record<string, unknown> | null): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
       <EditTemplateForm orgId="org-1" templateId="template-1" initialName="Standard SaaS Funnel" initialConfig={initialConfig} />
@@ -35,6 +35,13 @@ describe('EditTemplateForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
     expect(screen.getByLabelText('Name')).toHaveValue('Standard SaaS Funnel');
+    expect(screen.getByLabelText('Config (JSON)')).toHaveValue('');
+  });
+
+  it('treats an explicit null config the same as unset (a previously cleared config)', () => {
+    renderForm(null);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+
     expect(screen.getByLabelText('Config (JSON)')).toHaveValue('');
   });
 

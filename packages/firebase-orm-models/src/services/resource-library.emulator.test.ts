@@ -254,7 +254,14 @@ describe('updateResourceTemplate (KAN-117)', () => {
 
     expect(updated.name).toBe('Full Config Template');
     expect(updated.version).toBe(2);
-    expect(updated.config).toBeUndefined();
+    expect(updated.config).toBeNull();
+
+    // Reload from Firestore rather than trusting the returned in-memory object alone: this is the
+    // exact bug class `HookEndpointModel.disabled_at`'s own doc comment warns about — `updateDoc()`
+    // drops an `undefined` field instead of clearing it, so a fix that merely sets `config =
+    // undefined` in memory would pass the assertions above while leaving the old config persisted.
+    const [reloaded] = (await listResourceTemplates(organization.id)).filter((t) => t.id === template.id);
+    expect(reloaded.config).toBeFalsy();
   });
 
   it('increments version by exactly one per edit across repeated edits', async () => {

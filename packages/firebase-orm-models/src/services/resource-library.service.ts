@@ -165,7 +165,10 @@ export async function updateResourceTemplate(params: UpdateResourceTemplateParam
   const before = { name: template.name, version: template.version, config: template.config ?? null };
 
   template.name = params.name;
-  template.config = params.config;
+  // `?? null` (never a bare `undefined`) — see `ResourceTemplateModel.config`'s own doc comment:
+  // `updateDoc()` drops an `undefined` field entirely instead of clearing it, so omitting `config`
+  // here would silently leave the template's previous config in place.
+  template.config = params.config ?? null;
   template.version += 1;
   await template.save();
 

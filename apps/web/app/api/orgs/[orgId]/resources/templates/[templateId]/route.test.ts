@@ -122,18 +122,25 @@ describe('PATCH /api/orgs/[orgId]/resources/templates/[templateId]', () => {
     expect((await PATCH(request, { params })).status).toBe(404);
   });
 
-  it('lets an org_owner edit a template, bumping its version, clearing config when omitted', async () => {
+  it('lets an org_owner edit a template, bumping its version, clearing a previously-set config when omitted', async () => {
     const { organization, templateId } = await setupOrgWithTemplate('Edit Template Happy Org');
+
+    // Set a config first, so clearing it on the next edit is a real assertion, not one that would
+    // pass trivially against a template that never had a config to begin with.
+    const setConfig = patchRequest(organization.id, templateId, { name: 'Original Template', config: { steps: ['signup'] } });
+    await PATCH(setConfig.request, { params: setConfig.params });
 
     const { request, params } = patchRequest(organization.id, templateId, {
       name: 'Updated Template',
-      // config intentionally omitted — should clear any prior value
+      // config intentionally omitted — should clear the value set above
     });
     const response = await PATCH(request, { params });
     expect(response.status).toBe(200);
     const body = (await response.json()) as { template: { id: string; name: string; version: number; config?: unknown } };
-    expect(body.template).toMatchObject({ id: templateId, name: 'Updated Template', version: 2 });
-    expect(body.template.config).toBeUndefined();
+    expect(body.template).toMatchObject({ id: templateId, name: 'Updated Template', version: 3 });
+    // `null`, never `undefined` — see `ResourceTemplateModel.config`'s own doc comment: `updateDoc()`
+    // drops an `undefined` field instead of clearing it, so this also guards against that regression.
+    expect(body.template.config).toBeNull();
   });
 
   it('persists an edited config object', async () => {
