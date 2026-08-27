@@ -128,6 +128,69 @@ export async function listResourceTemplates(organizationId: string): Promise<Res
     .get();
 }
 
+/** Loads one org resource template and confirms it actually belongs to `organizationId` (never trust a caller-supplied id blindly). Shared by {@link updateResourceTemplate}, mirroring {@link loadOrgPerson}. */
+async function loadResourceTemplate(organizationId: string, templateId: string): Promise<ResourceTemplateModel> {
+  const template = await ResourceTemplateModel.init(templateId, { organization_id: organizationId });
+  if (!template || template.organization_id !== organizationId) {
+    throw new ResourceNotFoundError();
+  }
+  return template;
+}
+
+export interface UpdateResourceTemplateParams {
+  organizationId: string;
+  templateId: string;
+  name: string;
+  /** Omit (or pass `undefined`) to clear the template's config — a full replace of the editable fields, the same "not a sparse patch" posture {@link updateOrgPerson} establishes. */
+  config?: Record<string, unknown>;
+  actorId: string;
+}
+
+/**
+ * Edits an existing org-standard template's name/config, bumping `version` —
+ * `ResourceTemplateModel`'s own doc comment ("`version` increments only
+ * when the org resource owner edits the template here") describes exactly
+ * this function, but until now nothing implemented it: `createResourceTemplate`/
+ * `listResourceTemplates` had create + list only, the same gap
+ * `updateOrgPerson` (KAN-100) closed for the people registry. A project's
+ * already-approved attachment keeps whatever `resource_version` it was
+ * granted at (`ResourceAttachmentModel.resource_version`) — "copy-with-link
+ * + version pin" per plan 08 §1.2 — so bumping the template here never
+ * silently changes what an already-approved project sees; a project only
+ * picks up the new version by requesting/being pushed a fresh attachment.
+ */
+export async function updateResourceTemplate(params: UpdateResourceTemplateParams): Promise<ResourceTemplateModel> {
+  const template = await loadResourceTemplate(params.organizationId, params.templateId);
+
+  const before = { name: template.name, version: template.version, config: template.config ?? null };
+
+  template.name = params.name;
+  // `?? null` (never a bare `undefined`) — see `ResourceTemplateModel.config`'s own doc comment:
+  // `updateDoc()` drops an `undefined` field entirely instead of clearing it, so omitting `config`
+  // here would silently leave the template's previous config in place.
+  template.config = params.config ?? null;
+  template.version += 1;
+  await template.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'resource_template.update',
+      targetType: 'resource_template',
+      targetId: template.id,
+      summary: `Updated template "${template.name}" to v${template.version}`,
+      before,
+      after: { name: template.name, version: template.version, config: template.config ?? null },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return template;
+}
+
 export interface CreateOrgPersonParams {
   organizationId: string;
   name: string;

@@ -16,6 +16,7 @@ import { CreateCredentialForm } from '@/components/orgs/create-credential-form';
 import { CreateTemplateForm } from '@/components/orgs/create-template-form';
 import { CreatePersonForm } from '@/components/orgs/create-person-form';
 import { EditPersonForm } from '@/components/orgs/edit-person-form';
+import { EditTemplateForm } from '@/components/orgs/edit-template-form';
 import { PendingAttachmentRequests } from '@/components/orgs/pending-attachment-requests';
 import { SetCredentialSecretForm } from '@/components/orgs/set-credential-secret-form';
 import { PushAttachmentForm } from '@/components/orgs/push-attachment-form';
@@ -133,7 +134,15 @@ export default async function ResourceLibraryPage({
                     })}
                   </span>
                   {canManageResources ? (
-                    <PushAttachmentForm orgId={orgId} resourceKind="template" resourceId={template.id} projects={pushTargets} />
+                    <div className="flex w-full flex-wrap items-center gap-2">
+                      <EditTemplateForm
+                        orgId={orgId}
+                        templateId={template.id}
+                        initialName={template.name}
+                        initialConfig={template.config}
+                      />
+                      <PushAttachmentForm orgId={orgId} resourceKind="template" resourceId={template.id} projects={pushTargets} />
+                    </div>
                   ) : null}
                 </li>
               ))}

@@ -39,9 +39,16 @@ export class ResourceTemplateModel extends BaseModel {
   @Field({ is_required: true })
   public version!: number;
 
-  /** Opaque template payload — shape is owned by whichever later story consumes this `type`. */
+  /**
+   * Opaque template payload — shape is owned by whichever later story consumes this `type`.
+   * `null` (never `undefined`) is how `updateResourceTemplate` clears a previously-set config —
+   * same reasoning `HookEndpointModel.disabled_at`'s own doc comment documents:
+   * `@arbel/firebase-orm`'s `getDocumentData()` omits an `undefined` field from `updateDoc()`
+   * entirely, leaving the previously stored value untouched, where an explicit `null` is a real
+   * value that overwrites it.
+   */
   @Field()
-  public config?: Record<string, unknown>;
+  public config?: Record<string, unknown> | null;
 
   @Field({ is_required: true })
   public created_by!: string;
