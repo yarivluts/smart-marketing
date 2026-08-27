@@ -160,11 +160,16 @@ export async function searchProjectCustomersForAdmin(params: SearchProjectCustom
   }
 }
 
+/** `fact_cohort_retention`'s own sentinel row for "retained if the customer had any activity at all that period" (KAN-118's original v1 behavior, still the default). */
+export const ANY_COHORT_CONVERSION_EVENT = '__any__';
+
 export interface QueryProjectCohortRetentionParams {
   organizationId: string;
   projectId: string;
   /** Restricts to one cohort's rows (`YYYY-MM-01`, matching `fact_cohort_retention.cohort_month`'s own `date_trunc('month', ...)` grain) — omit to return every cohort's rows, newest cohort first. */
   cohortMonth?: string;
+  /** Which event must fire again for a customer to count as "retained" in a later period (KAN-118) — omit for {@link ANY_COHORT_CONVERSION_EVENT} (the original "any activity counts" rule). Matched against `fact_cohort_retention.conversion_event`, the same event-label vocabulary `fact_attribution.conversion_event` already establishes (the payload's own `event_name`, falling back to the schema's `event_type`). */
+  conversionEvent?: string;
   limit?: number;
   /** Same semantics as `SearchProjectCustomersParams.environmentId`. */
   environmentId?: string;
@@ -198,10 +203,11 @@ export async function queryProjectCohortRetention(params: QueryProjectCohortRete
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
   const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
 
-  const filters = ['organization_id = @organizationId', 'project_id = @projectId'];
+  const filters = ['organization_id = @organizationId', 'project_id = @projectId', 'conversion_event = @conversionEvent'];
   const queryParams: Record<string, string> = {
     organizationId: params.organizationId,
     projectId: params.projectId,
+    conversionEvent: params.conversionEvent ?? ANY_COHORT_CONVERSION_EVENT,
   };
   if (environmentId !== undefined) {
     filters.push('environment_id = @environmentId');

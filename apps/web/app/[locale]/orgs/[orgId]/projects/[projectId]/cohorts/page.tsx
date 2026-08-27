@@ -6,9 +6,11 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, queryCohortRetention } from '@/lib/orgs/queries';
 import { buildCohortRetentionView } from '@/lib/orgs/cohort-retention-view';
+import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
+  searchParams: Promise<{ conversionEvent?: string }>;
 }>;
 
 export async function generateMetadata({ params }: PageProps) {
@@ -28,9 +30,16 @@ export async function generateMetadata({ params }: PageProps) {
  * this page's table the same honest way the Customers/Funnel pages already degrade theirs, rather than
  * crashing. Gated on `dashboards.write`, the same "whole feature is admin-only" posture Segments/Goals/
  * Win rules already use for this kind of analytics view.
+ *
+ * KAN-118: a `?conversionEvent=` query param (the same `<form method="get">` pattern the Customers
+ * page's `?q=` already establishes) narrows "retained" from "any activity that period" (the default,
+ * `fact_cohort_retention`'s own `__any__` row) to a specific named event — the "conversion cohort"
+ * half of plan `04 §5`'s "signup-month x conversion/retention" this model's own v1 doc comment named
+ * as a deliberately-deferred follow-on.
  */
-export default async function CohortRetentionPage({ params }: PageProps): Promise<React.ReactElement> {
+export default async function CohortRetentionPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
+  const { conversionEvent: conversionEventParam } = await searchParams;
   setRequestLocale(locale);
 
   const session = await getServerSession();
@@ -50,13 +59,42 @@ export default async function CohortRetentionPage({ params }: PageProps): Promis
     notFound();
   }
 
-  const view = buildCohortRetentionView(await queryCohortRetention(orgId, projectId));
+  const trimmedConversionEvent = conversionEventParam?.trim();
+  const view = buildCohortRetentionView(
+    await queryCohortRetention(orgId, projectId, trimmedConversionEvent ? { conversionEvent: trimmedConversionEvent } : undefined),
+  );
   const t = await getTranslations('CohortRetention');
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
       <p className="text-sm text-muted-foreground">{t('description')}</p>
+
+      <form method="get" className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1">
+          <label htmlFor="cohort-conversion-event" className="text-xs text-muted-foreground">
+            {t('conversionEventLabel')}
+          </label>
+          <input
+            id="cohort-conversion-event"
+            name="conversionEvent"
+            defaultValue={conversionEventParam ?? ''}
+            placeholder={t('conversionEventPlaceholder')}
+            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+          />
+        </div>
+        <button type="submit" className="rounded-md border border-input px-3 py-1 text-sm hover:bg-accent">
+          {t('conversionEventApplyButton')}
+        </button>
+        {trimmedConversionEvent ? (
+          <Link
+            href={{ pathname: `/orgs/${orgId}/projects/${projectId}/cohorts` }}
+            className="text-xs text-muted-foreground underline"
+          >
+            {t('conversionEventClear')}
+          </Link>
+        ) : null}
+      </form>
 
       {view.kind === 'warehouse_not_configured' ? (
         <p className="text-muted-foreground">{t('notConfigured')}</p>

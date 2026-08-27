@@ -865,7 +865,7 @@ export async function searchProjectCustomers(
 export async function queryCohortRetention(
   organizationId: string,
   projectId: string,
-  options?: { cohortMonth?: string; limit?: number },
+  options?: { cohortMonth?: string; conversionEvent?: string; limit?: number },
 ): Promise<CohortRetentionOutcome> {
   await ensureFirestoreOrm();
   return queryProjectCohortRetentionForAdminInOrganization({ organizationId, projectId, ...options });

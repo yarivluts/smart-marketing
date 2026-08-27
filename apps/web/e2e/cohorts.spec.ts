@@ -41,5 +41,15 @@ test.describe('Cohort retention (KAN-113)', () => {
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/cohorts$`));
     await expect(page.getByRole('heading', { name: `Cohort retention for Client Theta` })).toBeVisible();
     await expect(page.getByText('Cohort retention unavailable (warehouse not configured yet)')).toBeVisible();
+
+    // KAN-118: the conversion-event filter renders and round-trips through the URL, even though
+    // there's no warehouse here to actually change what renders once submitted.
+    const conversionEventInput = page.getByLabel('Conversion event');
+    await expect(conversionEventInput).toBeVisible();
+    await conversionEventInput.fill('purchase');
+    await page.getByRole('button', { name: 'Apply' }).click();
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/cohorts\\?conversionEvent=purchase$`));
+    await expect(conversionEventInput).toHaveValue('purchase');
+    await expect(page.getByRole('link', { name: 'Clear' })).toBeVisible();
   });
 });
