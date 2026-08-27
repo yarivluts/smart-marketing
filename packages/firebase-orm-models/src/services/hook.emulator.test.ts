@@ -22,6 +22,7 @@ import {
   receiveHookPayload,
   setHookDeliveryStatus,
   setHookEndpointSigningSecret,
+  updateHookEndpoint,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -316,6 +317,218 @@ describe('enableHookEndpoint', () => {
         enabledByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(HookEndpointNotFoundError);
+  });
+});
+
+describe('updateHookEndpoint', () => {
+  it('replaces a "none"-mode endpoint\'s name — persisted to Firestore, structural fields untouched', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Update None Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      name: 'Updated name',
+      actorUserId: owner.id,
+    });
+
+    expect(updated.name).toBe('Updated name');
+    // Structural fields stay untouched by a definition edit.
+    expect(updated.id).toBe(endpoint.id);
+    expect(updated.hook_id).toBe(endpoint.hook_id);
+    expect(updated.signature_mode).toBe('none');
+    expect(updated.environment_id).toBe(prodEnvironment.id);
+    expect(updated.created_by).toBe(owner.id);
+    expect(updated.signature_header_name).toBeUndefined();
+
+    const [reloaded] = (await listHookEndpointsForProject(organization.id, project.id)).filter((e) => e.id === endpoint.id);
+    expect(reloaded.name).toBe('Updated name');
+  });
+
+  it('replaces an hmac_sha256-mode endpoint\'s name and signatureHeaderName', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Update Hmac Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Hub-Signature-256',
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      name: 'Updated name',
+      signatureHeaderName: 'X-Shopify-Hmac-Sha256',
+      actorUserId: owner.id,
+    });
+
+    expect(updated.name).toBe('Updated name');
+    expect(updated.signature_header_name).toBe('X-Shopify-Hmac-Sha256');
+    expect(updated.signature_mode).toBe('hmac_sha256');
+
+    const [reloaded] = (await listHookEndpointsForProject(organization.id, project.id)).filter((e) => e.id === endpoint.id);
+    expect(reloaded.signature_header_name).toBe('X-Shopify-Hmac-Sha256');
+  });
+
+  it('trims a leading/trailing-whitespace signatureHeaderName the same way create does', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Update Trim Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'x',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Hub-Signature-256',
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      name: 'x',
+      signatureHeaderName: '  X-Shopify-Hmac-Sha256  ',
+      actorUserId: owner.id,
+    });
+
+    expect(updated.signature_header_name).toBe('X-Shopify-Hmac-Sha256');
+  });
+
+  it('ignores a signatureHeaderName in "none" mode — signature_mode is immutable on update', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Update Ignore Header Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'x',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      name: 'Updated name',
+      signatureHeaderName: 'X-Hub-Signature-256',
+      actorUserId: owner.id,
+    });
+
+    expect(updated.signature_mode).toBe('none');
+    expect(updated.signature_header_name).toBeUndefined();
+  });
+
+  it('rejects clearing signatureHeaderName on an hmac_sha256 endpoint without persisting any change (atomicity)', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Update Missing Header Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Hub-Signature-256',
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      updateHookEndpoint({
+        organizationId: organization.id,
+        projectId: project.id,
+        hookEndpointId: endpoint.id,
+        name: 'Should not stick',
+        signatureHeaderName: '   ',
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(MissingSignatureHeaderNameError);
+
+    const [reloaded] = (await listHookEndpointsForProject(organization.id, project.id)).filter((e) => e.id === endpoint.id);
+    expect(reloaded.name).toBe('Original name');
+    expect(reloaded.signature_header_name).toBe('X-Hub-Signature-256');
+  });
+
+  it('rejects updating an endpoint that does not exist in this project', async () => {
+    const { owner, organization, project } = await setupProject('Hook Update Missing Org');
+
+    await expect(
+      updateHookEndpoint({
+        organizationId: organization.id,
+        projectId: project.id,
+        hookEndpointId: 'does-not-exist',
+        name: 'x',
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(HookEndpointNotFoundError);
+  });
+
+  it('records an audit log entry with before/after values', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Update Audit Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      signatureMode: 'hmac_sha256',
+      signatureHeaderName: 'X-Hub-Signature-256',
+      createdByUserId: owner.id,
+    });
+
+    await updateHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      name: 'Updated name',
+      signatureHeaderName: 'X-Shopify-Hmac-Sha256',
+      actorUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const updateEntry = entries.find((entry) => entry.action === 'hook_endpoint.update' && entry.target_id === endpoint.id);
+    expect(updateEntry).toBeTruthy();
+    expect(updateEntry?.actor_id).toBe(owner.id);
+    expect(updateEntry?.before).toEqual({ name: 'Original name', signatureHeaderName: 'X-Hub-Signature-256' });
+    expect(updateEntry?.after).toEqual({ name: 'Updated name', signatureHeaderName: 'X-Shopify-Hmac-Sha256' });
+  });
+
+  it('records an audit log entry for a "none"-mode endpoint update (regression: an undefined signatureHeaderName must never reach Firestore)', async () => {
+    // Firestore's `setDoc()` rejects an `undefined` field value outright — a "none"-mode
+    // endpoint's `before`/`after` audit payload must omit `signatureHeaderName` entirely
+    // rather than setting it to `undefined`, or `recordAuditLogEntry`'s own write throws and
+    // is silently swallowed by this function's best-effort `catch`, losing the entry.
+    const { owner, organization, project, prodEnvironment } = await setupProject('Hook Update None Audit Org');
+    const endpoint = await createHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      signatureMode: 'none',
+      createdByUserId: owner.id,
+    });
+
+    await updateHookEndpoint({
+      organizationId: organization.id,
+      projectId: project.id,
+      hookEndpointId: endpoint.id,
+      name: 'Updated name',
+      actorUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const updateEntry = entries.find((entry) => entry.action === 'hook_endpoint.update' && entry.target_id === endpoint.id);
+    expect(updateEntry).toBeTruthy();
+    expect(updateEntry?.before).toEqual({ name: 'Original name' });
+    expect(updateEntry?.after).toEqual({ name: 'Updated name' });
   });
 });
 
