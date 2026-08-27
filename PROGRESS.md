@@ -17,7 +17,75 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #326 (KAN-121, field-mapping edit)
+## 2026-08-27 (latest) — Merged PR #328 (renumbered KAN-121 → KAN-122, segment row editor)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `main` was at `d271d97` (KAN-119 merged) at pick time;
+    `TASKS.md` had zero `todo` rows left. Checked open PRs first (established pattern) and found
+    none in flight yet.
+  - Delegated a research sweep (Explore agent) for a still-genuinely-open, buildable-today gap. It
+    recommended `edit-segment-form.tsx`'s own doc comment (from the KAN-120 PR): filters/event
+    conditions were edited as pretty-printed JSON, explicitly naming "a fuller inline row editor
+    for this form is a possible follow-up, not required to close this gap" as unclosed.
+  - Implemented the fix: extracted `CreateSegmentForm`'s row editor into a shared
+    `SegmentConditionEditor` component (`apps/web/components/orgs/segment-condition-editor.tsx`,
+    with pure row↔`SegmentFilterCondition`/`SegmentEventCondition` conversion helpers);
+    `CreateSegmentForm` now consumes it (no behavior change); `EditSegmentForm` now uses the same
+    row editor instead of JSON textareas (gained an `eventSchemaNames` prop, dropped its
+    JSON-parse validation path). Removed the 4 now-unused JSON-textarea translation keys from
+    en/he — no new i18n keys needed, every string was already shared with `CreateSegmentForm`.
+    Rewrote `edit-segment-form.test.tsx` for the row-editor UI (11 tests); `create-segment-form
+    .test.tsx` unchanged and still green (15 tests). No backend/service/model change.
+  - Minted this as **KAN-121** at the time (checked for collisions before starting — none found).
+    Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck` green; full `pnpm test` green across
+    all 11 turbo tasks (one pre-existing, unrelated `tv-pairing.spec.ts` e2e flake passed on
+    retry). Self-reviewed the full diff before opening the PR — no issues found. Opened **PR
+    #328** (`kan-121-segment-edit-row-editor`), subscribed to its activity. CI came back green
+    (`lint · typecheck · test · build`, `terraform fmt · validate`), no reviews/review threads,
+    `mergeable_state` computed clean against the still-current `main`. Merged (squash) and
+    unsubscribed. Remote branch deletion failed with the same recurring HTTP 403 this file has
+    documented since 2026-07-04.
+  - **Collision discovered post-merge:** pulling fresh `main` after merging revealed a concurrent
+    session's **PR #326** had independently claimed **KAN-121** for an unrelated story
+    (field-mapping edit) and merged first, *while this run's own PR #328 CI was already running* —
+    PR #326's own PROGRESS.md/TASKS.md entries (written before this run rebased) explicitly flagged
+    this exact collision and named the fix: per this repo's established "second-to-merge
+    renumbers" convention (KAN-99→100, KAN-105→106, KAN-108-110, KAN-116→117, etc.), PR #328 takes
+    the next free number. Confirmed **KAN-122** was free (`grep -n "KAN-122" TASKS.md`, no hits
+    before this fix). Opened a small follow-up PR (`kan-122-renumber-segment-row-editor`) that: (1)
+    renamed the one in-code doc-comment reference from "KAN-121" to "KAN-122"
+    (`edit-segment-form.tsx`), (2) added the KAN-122 `TASKS.md` row (referencing PR #328, noting
+    the renumbering and why it happened post-merge rather than pre-merge — this run's CI simply
+    finished and merged before it had a chance to see PR #326's own collision note), and (3) this
+    entry. Verified `pnpm lint`/`pnpm typecheck`/`pnpm build` green before opening it.
+  - **Process note for future runs:** the "check for collisions right before opening the PR"
+    practice PR #326's own entry describes (checking twice) doesn't fully close this race — two
+    PRs can still both pass their own pre-open check if they're worked concurrently close enough
+    together, as happened here. The real backstop is what already exists: whichever PR *merges
+    second* renumbers, checked against a **freshly-pulled** `main` immediately after merging (not
+    just before opening), since another PR can land in the gap between your own PR's CI starting
+    and it finishing. This run's own mistake was not re-checking `TASKS.md` on `main` again right
+    before merging PR #328 — doing so would have caught PR #326's collision note before merge
+    rather than after, avoiding the extra follow-up PR.
+- **In progress (exact stopping point):** none — both PR #328 and its KAN-122 renumbering
+  follow-up are fully delivered, tested, and merged (pending this follow-up's own CI/merge, which
+  this same run will complete before finishing).
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real
+  KAN number is 122. Re-check `TASKS.md` on a **freshly-pulled** `main` for other concurrent PRs
+  before minting a new number, per this entry's own process note.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-121-segment-edit-row-editor`
+    and `kan-122-renumber-segment-row-editor`.
+
+---
+
+## 2026-08-27 — Merged PR #326 (KAN-121, field-mapping edit)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. Local `main` was at `64ae027` (KAN-120 merged); `TASKS.md` had

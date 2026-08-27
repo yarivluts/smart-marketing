@@ -34,7 +34,7 @@ export interface EditSegmentFormProps {
 /**
  * Toggles between a compact "Edit" button and an inline full-definition edit
  * form for one segment row on the Segments page (KAN-120, row-editor
- * follow-up KAN-121) — the same "create + owner/status update only, no way
+ * follow-up KAN-122) — the same "create + owner/status update only, no way
  * to fix the definition itself" gap KAN-100/KAN-117 already closed for the
  * org people registry and resource templates. `filters`/`eventConditions`
  * are edited with the same validated row editor `CreateSegmentForm` uses
