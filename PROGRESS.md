@@ -17,6 +17,89 @@ Template for each entry:
 
 ---
 
+## 2026-08-27 (latest) — Merged PR #326 (KAN-121, field-mapping edit)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. Local `main` was at `64ae027` (KAN-120 merged); `TASKS.md` had
+    zero `todo` rows left (every story `done` except the standing KAN-18/KAN-19 infra items and
+    KAN-43/50/51 `needs-human`/`blocked-by`). Checked open PRs first (established pattern) and
+    found none in flight yet at pick time.
+  - Delegated a research sweep (Explore agent) across `apps/`/`packages/`/`docs/plan/` for a
+    still-genuinely-open, buildable-today gap. It recommended: `field-mapping.service.ts`'s
+    `createFieldMapping`/`listFieldMappingsForProject` had create + list only, no way to fix a
+    typo'd mapping name or a wrong JSONPath rule once saved — the same "create + list only, no
+    way to fix a typo'd definition" gap KAN-100 (people)/KAN-117 (templates)/KAN-119 (credentials,
+    then in flight)/KAN-120 (segments) already closed for their own sibling registries. Confirmed
+    by reading `field-mapping.service.ts` and the Field Mappings admin page directly (only
+    Disable/Enable/Test-run controls existed) before committing to it.
+  - Implemented **KAN-121** (minted fresh — checked for number collisions before and again right
+    before opening the PR; none found at either check): extracted `createFieldMapping`'s
+    name/schemaName/rules validation into a shared `validateFieldMappingDefinition` helper, reused
+    by both `createFieldMapping` and a new `updateFieldMapping` (full replace, audit-logged
+    `field_mapping.update`); `kind`/`environmentId` stay immutable (mirrors
+    `updateSharedCredential`'s `provider` immutability posture — a different record shape or
+    landing environment is a different mapping, not a correction). New `PATCH
+    /api/orgs/[orgId]/projects/[projectId]/field-mappings/[fieldMappingId]` route (`ingest.write`
+    gated, same as every other mutation on this route) and a new `EditFieldMappingForm` admin
+    control — reuses the exact `FieldMappingRuleEditor` the create-mapping form already uses for
+    its own rule rows, rather than re-implementing a second rule editor (a stronger reuse posture
+    than KAN-120's own JSON-textarea fallback, since this component was already standalone). en/he
+    translations added; no Hebrew in source.
+  - Full test coverage added: `packages/firebase-orm-models` emulator tests for
+    `updateFieldMapping` (full replace persisted to Firestore and reloaded fresh — not just the
+    in-memory return value; structural fields `kind`/`environmentId`/`id`/`createdBy` untouched;
+    validation-failure atomicity via a reload check; target-schema-not-registered and not-found
+    rejections; an audit-log entry with before/after values — 32/32 green in
+    `field-mapping.emulator.test.ts`); `apps/web` unit tests for the new
+    `parseUpdateFieldMappingRequestBody` parser, emulator-backed PATCH route tests, and a new
+    `EditFieldMappingForm` component test suite (collapsed by default, pre-fills name/schema/rules,
+    keeps the current schema selectable even if it fell out of the active set, submits via PATCH
+    and collapses back, specific vs. generic error handling, cancel discards edits, falls back to
+    one blank rule row when a mapping somehow has none).
+  - Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck` green. `pnpm test`: verified every
+    touched suite directly green (`field-mapping.emulator.test.ts` 32/32, the new/updated
+    `apps/web` unit + emulator tests all green) before opening the PR; the full monorepo `pnpm
+    test` run separately hit 2 failed + 3 flaky Playwright e2e specs, all in files this diff never
+    touches (`resource-library.spec.ts`, `tv-pairing.spec.ts`, `orgs.spec.ts`, `plugins.spec.ts`,
+    `schema-registry.spec.ts`) — the well-documented signup/redirect timing flakiness under load
+    this repo's history repeatedly names. Self-reviewed the full diff before opening the PR
+    (correctness, reuse, test coverage) — no issues found.
+  - Opened PR #326, subscribed to its activity, and checked in periodically rather than polling
+    continuously (CI took ~38 minutes end to end, consistent with this suite's usual runtime).
+    Both checks (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green,
+    `mergeable_state: clean`, no open review threads. Merged PR #326 (squash) into `main` and
+    unsubscribed. Remote branch deletion for `kan-121-field-mapping-edit` failed with the same
+    recurring HTTP 403 this file has documented since 2026-07-04.
+  - Added the KAN-121 row to `TASKS.md`.
+  - **Note for the next run:** while this PR was in flight, a concurrent session's own stand-down
+    entry (see the entry immediately below, "Stood down: 3 concurrent PRs already in flight")
+    flagged that **PR #328** (`kan-121-segment-edit-row-editor`) independently also claims
+    **KAN-121** for an unrelated story (a row editor for editing a saved segment's definition) and
+    was still open/unmerged as of this entry. Since this run's PR #326 merged first, PR #328 will
+    need to renumber to KAN-122 (or the next free number) before/at its own merge, per this repo's
+    established "second-to-merge renumbers" convention (KAN-99/100, KAN-105/106, KAN-108-110,
+    KAN-116/117, etc.) — not fixed here since this run doesn't own PR #328. That same stand-down
+    entry also flagged **PR #327** (EasySign schemas reusing already-`done` KAN-80/81/82) as
+    still open and needing a real unused KAN number before it merges — also not this run's PR to
+    fix. The next run should check both PRs' current state before resuming the
+    sweep-for-a-newly-buildable-follow-up pattern.
+- **In progress (exact stopping point):** none — KAN-121 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** check the current state of PR #327 (EasySign) and PR #328 (KAN-121 collision,
+  needs renumbering to KAN-122+) before starting new work. Current highest confirmed-merged KAN
+  number is 121.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Worth a human's attention if EasySign is *not* actually a GrowthOS product (see PR #327,
+    flagged by a concurrent session, not yet resolved).
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-121-field-mapping-edit`.
+
+---
+
 ## 2026-08-27 (latest) — Stood down: 3 concurrent PRs already in flight, incl. a real KAN-121 collision
 
 - **Last completed:**
