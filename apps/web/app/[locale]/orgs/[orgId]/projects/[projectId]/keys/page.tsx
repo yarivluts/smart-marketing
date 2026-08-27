@@ -8,6 +8,7 @@ import { listApiKeysForProject, listEnvironmentsForProject, listMcpOAuthGrantsFo
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
 import { mcpApiUrl } from '@/lib/orgs/mcp-api-url';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
+import { EditApiKeyNameForm } from '@/components/orgs/edit-api-key-name-form';
 import { RevokeApiKeyButton } from '@/components/orgs/revoke-api-key-button';
 import { RevokeMcpConnectionButton } from '@/components/orgs/revoke-mcp-connection-button';
 
@@ -99,9 +100,12 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
                           : t('neverUsedLabel')}
                     </span>
                   </div>
-                  {!apiKey.revokedAt ? (
-                    <RevokeApiKeyButton orgId={orgId} projectId={projectId} apiKeyId={apiKey.id} />
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    <EditApiKeyNameForm orgId={orgId} projectId={projectId} apiKeyId={apiKey.id} initialName={apiKey.name} />
+                    {!apiKey.revokedAt ? (
+                      <RevokeApiKeyButton orgId={orgId} projectId={projectId} apiKeyId={apiKey.id} />
+                    ) : null}
+                  </div>
                 </li>
               );
             })}

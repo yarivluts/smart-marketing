@@ -119,6 +119,7 @@ import {
   inviteMemberToOrganization,
   mintApiKey as mintApiKeyInOrganization,
   type MintApiKeyResult,
+  renameApiKey as renameApiKeyInOrganization,
   type OrchestrationRunModel,
   type PluginInstallModel,
   type PluginManifestModel,
@@ -487,6 +488,19 @@ interface RevokeApiKeyInput {
 export async function revokeApiKey(input: RevokeApiKeyInput): Promise<ApiKeyModel> {
   await ensureFirestoreOrm();
   return revokeApiKeyInOrganization(input);
+}
+
+interface RenameApiKeyInput {
+  organizationId: string;
+  projectId: string;
+  apiKeyId: string;
+  name: string;
+  actorUserId: string;
+}
+
+export async function renameApiKey(input: RenameApiKeyInput): Promise<ApiKeyModel> {
+  await ensureFirestoreOrm();
+  return renameApiKeyInOrganization(input);
 }
 
 interface IssueMcpAuthorizationCodeInput {
