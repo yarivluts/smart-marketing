@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  ANY_COHORT_CONVERSION_EVENT,
   BoardNotFoundError,
   createBoard,
   createOrganizationWithOwner,
@@ -67,7 +68,10 @@ async function registerSignups(organizationId: string, projectId: string, create
   });
 }
 
-/** KAN-62's cohort engine, registered the same way any other `fact_*` table is (see `BOARD_TILE_TYPES`'s own doc comment on `board.model.ts` for why `cohort_month` as `timeColumn` gives a `heatmap` tile its matrix's row axis "for free" via the existing time-bucketing path). */
+/**
+ * KAN-62's cohort engine, registered the same way any other `fact_*` table is (see `BOARD_TILE_TYPES`'s own doc comment on `board.model.ts` for why `cohort_month` as `timeColumn` gives a `heatmap` tile its matrix's row axis "for free" via the existing time-bucketing path).
+ * Since KAN-118 added a `conversion_event` dimension to `fact_cohort_retention` (one `__any__` row plus one row per specific event label per cohort_month x period_number), any real registration against this table needs a `conversion_event` filter — otherwise `avg(retention_rate)` averages across every event label too, not just the intended one. This mirrors `queryProjectCohortRetention`'s own `ANY_COHORT_CONVERSION_EVENT` default.
+ */
 async function registerCohortRetention(organizationId: string, projectId: string, createdByUserId: string, dimensions: string[] = ['period_number']) {
   return registerMetricDefinition({
     organizationId,
@@ -75,7 +79,13 @@ async function registerCohortRetention(organizationId: string, projectId: string
     name: 'cohort_retention_rate',
     definition: {
       kind: 'aggregation',
-      aggregation: { function: 'avg', table: 'fact_cohort_retention', column: 'retention_rate', timeColumn: 'cohort_month', filters: [] },
+      aggregation: {
+        function: 'avg',
+        table: 'fact_cohort_retention',
+        column: 'retention_rate',
+        timeColumn: 'cohort_month',
+        filters: [{ field: 'conversion_event', operator: '=', value: ANY_COHORT_CONVERSION_EVENT }],
+      },
     },
     dimensions,
     createdByUserId,

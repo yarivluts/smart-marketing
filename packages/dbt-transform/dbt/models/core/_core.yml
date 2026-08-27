@@ -117,15 +117,17 @@ models:
 
   - name: fact_cohort_retention
     description: >
-      Generic cohort engine v1 (plan `04 §5`, KAN-62): one row per
-      (cohort_month, period_number) — every customer's cohort is the
-      calendar month of their first customer-side event; `retention_rate`
-      is the fraction of that cohort still active `period_number` months
-      later. Feeds the KAN-60 `heatmap` board tile. See the model's own doc
-      comment for the full periods/observability rule.
+      Generic cohort engine v1 + KAN-118's conversion-event parameter (plan
+      `04 §5`, KAN-62): one row per (cohort_month, period_number,
+      conversion_event) — every customer's cohort is the calendar month of
+      their first customer-side event; `retention_rate` is the fraction of
+      that cohort that fired `conversion_event` again `period_number`
+      months later (`__any__` for the original "any activity counts" rule).
+      Feeds the KAN-60 `heatmap` board tile. See the model's own doc comment
+      for the full periods/observability rule.
     columns:
       - name: cohort_retention_key
-        description: Composite (project_id, environment_id, cohort_month, period_number) uniqueness key.
+        description: Composite (project_id, environment_id, cohort_month, period_number, conversion_event) uniqueness key.
         tests:
           - not_null
           - unique
@@ -133,6 +135,10 @@ models:
         tests:
           - not_null
       - name: period_number
+        tests:
+          - not_null
+      - name: conversion_event
+        description: "'__any__' (any activity that period) or a specific event label — see the model's own doc comment."
         tests:
           - not_null
       - name: cohort_size

@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  ANY_COHORT_CONVERSION_EVENT,
   confirmOnboardingFunnelSteps,
   createOrganizationWithOwner,
   createProject,
@@ -187,6 +188,8 @@ describe('queryProjectCohortRetention', () => {
     ]);
     expect(executor.calls[0].sql).toContain('FROM fact_cohort_retention');
     expect(executor.calls[0].params).not.toHaveProperty('cohortMonth');
+    expect(executor.calls[0].sql).toContain('conversion_event = @conversionEvent');
+    expect(executor.calls[0].params.conversionEvent).toBe(ANY_COHORT_CONVERSION_EVENT);
   });
 
   it('adds a cohort_month filter when provided', async () => {
@@ -197,6 +200,16 @@ describe('queryProjectCohortRetention', () => {
 
     expect(executor.calls[0].sql).toContain('cohort_month = @cohortMonth');
     expect(executor.calls[0].params.cohortMonth).toBe('2026-02-01');
+  });
+
+  it('filters to a specific conversion_event when provided (KAN-118), instead of the __any__ default', async () => {
+    const { organization, project } = await setupOrgWithProject('Cohort Conversion Event Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await queryProjectCohortRetention({ organizationId: organization.id, projectId: project.id, conversionEvent: 'purchase', executor });
+
+    expect(executor.calls[0].sql).toContain('conversion_event = @conversionEvent');
+    expect(executor.calls[0].params.conversionEvent).toBe('purchase');
   });
 });
 
