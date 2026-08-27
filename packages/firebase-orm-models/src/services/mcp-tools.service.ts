@@ -385,14 +385,23 @@ export async function queryProjectFunnelStepsForAdmin(params: QueryProjectFunnel
 export type ProjectInsightKind = 'tracking_alert' | 'win_event';
 export type ProjectInsightSeverity = 'info' | 'warning';
 
-export interface ProjectInsight {
-  kind: ProjectInsightKind;
+interface ProjectInsightBase {
   id: string;
   title: string;
   detail: string;
   occurredAt: string;
   severity: ProjectInsightSeverity;
 }
+
+/**
+ * `title`/`detail` are plain English text meant for an MCP-connected AI agent to read, not for
+ * rendering as web UI (CLAUDE.md's "no hard-coded UI strings" rule doesn't apply to a tool-call
+ * response). The Insights admin page (the web counterpart of `list_insights`) instead renders its
+ * own `next-intl`-translated copy built from each kind's structured fields below.
+ */
+export type ProjectInsight =
+  | (ProjectInsightBase & { kind: 'tracking_alert'; schemaName: string; lastSeenAt: string })
+  | (ProjectInsightBase & { kind: 'win_event'; winRuleName: string; schemaName: string; clientId: string });
 
 export interface ListProjectInsightsParams {
   organizationId: string;
@@ -426,6 +435,8 @@ export async function listProjectInsights(params: ListProjectInsightsParams): Pr
     detail: `No new "${alert.schema_name}" records landed since ${alert.last_seen_at}.`,
     occurredAt: alert.detected_at,
     severity: 'warning',
+    schemaName: alert.schema_name,
+    lastSeenAt: alert.last_seen_at,
   }));
 
   const winInsights: ProjectInsight[] = wins.map((win) => ({
@@ -435,6 +446,9 @@ export async function listProjectInsights(params: ListProjectInsightsParams): Pr
     detail: `A "${win.schema_name}" record matched the "${win.win_rule_name}" win rule.`,
     occurredAt: win.occurred_at,
     severity: 'info',
+    winRuleName: win.win_rule_name,
+    schemaName: win.schema_name,
+    clientId: win.client_id,
   }));
 
   return [...alertInsights, ...winInsights]
