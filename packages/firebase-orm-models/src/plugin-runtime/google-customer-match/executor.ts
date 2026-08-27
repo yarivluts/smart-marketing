@@ -1,6 +1,15 @@
 import { SinkPluginExecutionError, type SinkPluginExecutor, type SinkPluginPushParams, type SinkPluginPushResult } from '../executor';
 import { GoogleAdsApiError, type GoogleAdsApiClient, type GoogleAdsContactMatchKey } from '../google-ads';
-import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch, normalizeMobileIdForGoogleCustomerMatch } from './hashing';
+import {
+  hashEmailForGoogleCustomerMatch,
+  hashNameForGoogleCustomerMatch,
+  hashPhoneForGoogleCustomerMatch,
+  normalizeCityForGoogleCustomerMatch,
+  normalizeCountryCodeForGoogleCustomerMatch,
+  normalizeMobileIdForGoogleCustomerMatch,
+  normalizePostalCodeForGoogleCustomerMatch,
+  normalizeStateForGoogleCustomerMatch,
+} from './hashing';
 
 export interface GoogleCustomerMatchSinkPluginExecutorOptions {
   apiClient: GoogleAdsApiClient;
@@ -65,18 +74,58 @@ function extractDeviceId(record: Record<string, unknown>): string | undefined {
   return extractProperty(record, 'device_id');
 }
 
-/** Builds this record's Google Ads contact-match key from whichever of email/phone/device id it has — `undefined` when none is present, so the caller can drop the record entirely rather than pushing an identifier-less operation. */
+/**
+ * A record's `properties.first_name`/`last_name`/`city`/`state`/`zip`/
+ * `country` fields, if present (mailing-address follow-up — the last of the
+ * non-email identifiers this connector's own doc comment had named as still
+ * deferred, the direct Google Ads sibling of `MetaCustomAudienceSinkPluginExecutor`'s
+ * own `extractAddressFields`). Same "silently skip, not every row carries
+ * one" posture as {@link extractEmail}/{@link extractPhone}/{@link extractDeviceId}.
+ */
+function extractAddressFields(record: Record<string, unknown>): {
+  firstName?: string;
+  lastName?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+} {
+  return {
+    firstName: extractProperty(record, 'first_name'),
+    lastName: extractProperty(record, 'last_name'),
+    city: extractProperty(record, 'city'),
+    state: extractProperty(record, 'state'),
+    zip: extractProperty(record, 'zip'),
+    country: extractProperty(record, 'country'),
+  };
+}
+
+/** Builds this record's Google Ads contact-match key from whichever of email/phone/device id/address fields it has — `undefined` when none is present, so the caller can drop the record entirely rather than pushing an identifier-less operation. */
 function extractContactMatchKey(record: Record<string, unknown>): GoogleAdsContactMatchKey | undefined {
   const email = extractEmail(record);
   const phone = extractPhone(record);
   const deviceId = extractDeviceId(record);
-  if (email === undefined && phone === undefined && deviceId === undefined) {
+  const { firstName, lastName, city, state, zip, country } = extractAddressFields(record);
+  const hasAddressField =
+    firstName !== undefined || lastName !== undefined || city !== undefined || state !== undefined || zip !== undefined || country !== undefined;
+  if (email === undefined && phone === undefined && deviceId === undefined && !hasAddressField) {
     return undefined;
   }
+  const addressInfo = hasAddressField
+    ? {
+        ...(firstName !== undefined ? { hashedFirstName: hashNameForGoogleCustomerMatch(firstName) } : {}),
+        ...(lastName !== undefined ? { hashedLastName: hashNameForGoogleCustomerMatch(lastName) } : {}),
+        ...(city !== undefined ? { city: normalizeCityForGoogleCustomerMatch(city) } : {}),
+        ...(state !== undefined ? { state: normalizeStateForGoogleCustomerMatch(state) } : {}),
+        ...(country !== undefined ? { countryCode: normalizeCountryCodeForGoogleCustomerMatch(country) } : {}),
+        ...(zip !== undefined ? { postalCode: normalizePostalCodeForGoogleCustomerMatch(zip) } : {}),
+      }
+    : undefined;
   return {
     ...(email !== undefined ? { hashedEmail: hashEmailForGoogleCustomerMatch(email) } : {}),
     ...(phone !== undefined ? { hashedPhoneNumber: hashPhoneForGoogleCustomerMatch(phone) } : {}),
     ...(deviceId !== undefined ? { mobileId: normalizeMobileIdForGoogleCustomerMatch(deviceId) } : {}),
+    ...(addressInfo !== undefined ? { addressInfo } : {}),
   };
 }
 
@@ -90,18 +139,20 @@ function extractContactMatchKey(record: Record<string, unknown>): GoogleAdsConta
  * out").
  *
  * A record contributes a `hashedEmail` identifier, a `hashedPhoneNumber`
- * identifier, a `mobileId` identifier, any combination, or (if none of
- * `properties.email`/`properties.phone`/`properties.device_id` is a usable
- * string) is silently dropped entirely (see {@link extractContactMatchKey})
- * — KAN-72's own "non-email identifiers ... explicitly deferred" follow-up
- * note, closed for email/phone by an earlier follow-up and now for mobile
- * device id too. Unlike `hashedEmail`/`hashedPhoneNumber`, `mobileId` is
- * never hashed (see `hashing.ts`'s own `normalizeMobileIdForGoogleCustomerMatch`
- * doc comment for why Google's own spec requires this one raw). Mailing
- * address remains deferred — Google's own offline-data-job schema needs a
- * different, multi-field shape for it that this connector's
- * single-string-per-identifier scope doesn't build. `pushed` counts only
- * the contact rows actually submitted to
+ * identifier, a `mobileId` identifier, an `addressInfo` identifier (mailing
+ * address), any combination, or (if none of `properties.email`/
+ * `properties.phone`/`properties.device_id`/`properties.first_name`/
+ * `properties.last_name`/`properties.city`/`properties.state`/
+ * `properties.zip`/`properties.country` is a usable string) is silently
+ * dropped entirely (see {@link extractContactMatchKey}) — KAN-72's own
+ * "non-email identifiers ... explicitly deferred" follow-up note, now fully
+ * closed (email, phone, mobile device id, and mailing address). Unlike
+ * `hashedEmail`/`hashedPhoneNumber`, `mobileId` is never hashed (see
+ * `hashing.ts`'s own `normalizeMobileIdForGoogleCustomerMatch` doc comment
+ * for why Google's own spec requires this one raw); `addressInfo` only
+ * hashes its first/last name fields (see `hashNameForGoogleCustomerMatch`'s
+ * own doc comment). `pushed` counts only the contact rows actually
+ * submitted to
  * Google's offline user data job, which may therefore be smaller than the
  * segment's own member count reported elsewhere on the page. Unlike Meta's
  * synchronous "num received" response, Google Ads processes an offline user

@@ -477,6 +477,54 @@ describe('MetaAdsHttpApiClient', () => {
     expect(JSON.parse(body.get('payload') as string)).toEqual({ schema: ['EMAIL'], data: [['hash-a']] });
   });
 
+  it('adds already-hashed mailing-address-only contacts to a Custom Audience as an FN+LN+CT+ST+ZIP+COUNTRY-schema payload', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ num_received: 1, num_invalid_entries: 0 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [
+      { firstNameHash: 'hash-fn', lastNameHash: 'hash-ln', cityHash: 'hash-ct', stateHash: 'hash-st', zipHash: 'hash-zip', countryHash: 'hash-country' },
+    ]);
+
+    expect(result).toEqual({ numReceived: 1 });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    expect(JSON.parse(body.get('payload') as string)).toEqual({
+      schema: ['FN', 'LN', 'CT', 'ST', 'ZIP', 'COUNTRY'],
+      data: [['hash-fn', 'hash-ln', 'hash-ct', 'hash-st', 'hash-zip', 'hash-country']],
+    });
+  });
+
+  it('only includes an address-field column for fields at least one contact actually carries, filling the rest with an empty string', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ num_received: 2, num_invalid_entries: 0 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [
+      { cityHash: 'hash-ct-a', stateHash: 'hash-st-a' },
+      { cityHash: 'hash-ct-b' },
+    ]);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    expect(JSON.parse(body.get('payload') as string)).toEqual({
+      schema: ['CT', 'ST'],
+      data: [
+        ['hash-ct-a', 'hash-st-a'],
+        ['hash-ct-b', ''],
+      ],
+    });
+  });
+
+  it('omits every address column entirely when no contact in the call carries one, keeping the payload byte-identical to before mailing-address support', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ num_received: 1, num_invalid_entries: 0 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [{ emailHash: 'hash-a' }]);
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(String(init.body));
+    expect(JSON.parse(body.get('payload') as string)).toEqual({ schema: ['EMAIL'], data: [['hash-a']] });
+  });
+
   it('uploads an ad image as base64 bytes via a plain POST and returns its hash', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ images: { 'image.png': { hash: 'hash-abc', url: 'https://example.com/image.png' } } }));
     vi.stubGlobal('fetch', fetchMock);

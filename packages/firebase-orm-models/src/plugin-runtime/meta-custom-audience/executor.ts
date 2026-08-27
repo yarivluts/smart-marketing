@@ -1,6 +1,15 @@
 import { SinkPluginExecutionError, type SinkPluginExecutor, type SinkPluginPushParams, type SinkPluginPushResult } from '../executor';
 import { MetaAdsApiError, type MetaAdsApiClient, type MetaContactMatchKey } from '../meta-ads';
-import { hashEmailForMetaCustomAudience, hashMobileDeviceIdForMetaCustomAudience, hashPhoneForMetaCustomAudience } from './hashing';
+import {
+  hashCityForMetaCustomAudience,
+  hashCountryForMetaCustomAudience,
+  hashEmailForMetaCustomAudience,
+  hashMobileDeviceIdForMetaCustomAudience,
+  hashNameForMetaCustomAudience,
+  hashPhoneForMetaCustomAudience,
+  hashStateForMetaCustomAudience,
+  hashZipForMetaCustomAudience,
+} from './hashing';
 
 export interface MetaCustomAudienceSinkPluginExecutorOptions {
   apiClient: MetaAdsApiClient;
@@ -61,18 +70,63 @@ function extractDeviceId(record: Record<string, unknown>): string | undefined {
   return extractProperty(record, 'device_id');
 }
 
-/** Builds this record's Meta contact-match key from whichever of email/phone/device id it has — `undefined` when none is present, so the caller can drop the record entirely rather than pushing an empty row. */
+/**
+ * A record's `properties.first_name`/`last_name`/`city`/`state`/`zip`/
+ * `country` fields, if present (mailing-address follow-up — the last of the
+ * non-email identifiers this connector's own doc comment had named as still
+ * deferred). Same "silently skip, not every row carries one" posture as
+ * {@link extractEmail}/{@link extractPhone}/{@link extractDeviceId} — each
+ * of the six is read and hashed independently, so a record with only some
+ * of them (e.g. city + state but no zip) still contributes whichever it has,
+ * matching Meta's own per-field `CT`/`ST`/`ZIP`/`COUNTRY` schema columns.
+ */
+function extractAddressFields(record: Record<string, unknown>): {
+  firstName?: string;
+  lastName?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+} {
+  return {
+    firstName: extractProperty(record, 'first_name'),
+    lastName: extractProperty(record, 'last_name'),
+    city: extractProperty(record, 'city'),
+    state: extractProperty(record, 'state'),
+    zip: extractProperty(record, 'zip'),
+    country: extractProperty(record, 'country'),
+  };
+}
+
+/** Builds this record's Meta contact-match key from whichever of email/phone/device id/address fields it has — `undefined` when none is present, so the caller can drop the record entirely rather than pushing an empty row. */
 function extractContactMatchKey(record: Record<string, unknown>): MetaContactMatchKey | undefined {
   const email = extractEmail(record);
   const phone = extractPhone(record);
   const deviceId = extractDeviceId(record);
-  if (email === undefined && phone === undefined && deviceId === undefined) {
+  const { firstName, lastName, city, state, zip, country } = extractAddressFields(record);
+  if (
+    email === undefined &&
+    phone === undefined &&
+    deviceId === undefined &&
+    firstName === undefined &&
+    lastName === undefined &&
+    city === undefined &&
+    state === undefined &&
+    zip === undefined &&
+    country === undefined
+  ) {
     return undefined;
   }
   return {
     ...(email !== undefined ? { emailHash: hashEmailForMetaCustomAudience(email) } : {}),
     ...(phone !== undefined ? { phoneHash: hashPhoneForMetaCustomAudience(phone) } : {}),
     ...(deviceId !== undefined ? { madidHash: hashMobileDeviceIdForMetaCustomAudience(deviceId) } : {}),
+    ...(firstName !== undefined ? { firstNameHash: hashNameForMetaCustomAudience(firstName) } : {}),
+    ...(lastName !== undefined ? { lastNameHash: hashNameForMetaCustomAudience(lastName) } : {}),
+    ...(city !== undefined ? { cityHash: hashCityForMetaCustomAudience(city) } : {}),
+    ...(state !== undefined ? { stateHash: hashStateForMetaCustomAudience(state) } : {}),
+    ...(zip !== undefined ? { zipHash: hashZipForMetaCustomAudience(zip) } : {}),
+    ...(country !== undefined ? { countryHash: hashCountryForMetaCustomAudience(country) } : {}),
   };
 }
 
@@ -88,16 +142,17 @@ function extractContactMatchKey(record: Record<string, unknown>): MetaContactMat
  * lifecycle (there is no budget/guardrail-relevant "before/after" here to
  * diff or roll back).
  *
- * A record contributes an `EMAIL` key, a `PHONE` key, a `MADID` key, any
+ * A record contributes an `EMAIL` key, a `PHONE` key, a `MADID` key, any of
+ * the six mailing-address keys (`FN`/`LN`/`CT`/`ST`/`ZIP`/`COUNTRY`), any
  * combination, or (if none of `properties.email`/`properties.phone`/
- * `properties.device_id` is a usable string) is silently dropped entirely
- * (see {@link extractContactMatchKey}) — KAN-73's own "non-email identifiers
- * ... explicitly deferred" follow-up note, closed for email/phone by an
- * earlier follow-up and now for mobile device id too (mailing address
- * remains deferred — Meta's own upload schema needs a different, multi-field
- * shape for it that this story's scope doesn't build). `pushed` counts only
- * the contact rows Meta actually received, which may therefore be smaller
- * than the segment's own member count reported elsewhere on the page.
+ * `properties.device_id`/`properties.first_name`/`properties.last_name`/
+ * `properties.city`/`properties.state`/`properties.zip`/`properties.country`
+ * is a usable string) is silently dropped entirely (see
+ * {@link extractContactMatchKey}) — KAN-73's own "non-email identifiers ...
+ * explicitly deferred" follow-up note, now fully closed (email, phone,
+ * mobile device id, and mailing address). `pushed` counts only the contact
+ * rows Meta actually received, which may therefore be smaller than the
+ * segment's own member count reported elsewhere on the page.
  *
  * `crm-sync.service.ts`'s `syncSegmentToCrm` wraps a whole `push()` call in
  * `runWithRetryBackoff`, retrying the *same* executor instance on a

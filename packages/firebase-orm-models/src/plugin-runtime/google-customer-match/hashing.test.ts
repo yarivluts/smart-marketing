@@ -1,6 +1,15 @@
 import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch, normalizeMobileIdForGoogleCustomerMatch } from './hashing';
+import {
+  hashEmailForGoogleCustomerMatch,
+  hashNameForGoogleCustomerMatch,
+  hashPhoneForGoogleCustomerMatch,
+  normalizeCityForGoogleCustomerMatch,
+  normalizeCountryCodeForGoogleCustomerMatch,
+  normalizeMobileIdForGoogleCustomerMatch,
+  normalizePostalCodeForGoogleCustomerMatch,
+  normalizeStateForGoogleCustomerMatch,
+} from './hashing';
 
 describe('hashEmailForGoogleCustomerMatch', () => {
   it('trims and lowercases before hashing', () => {
@@ -54,5 +63,41 @@ describe('normalizeMobileIdForGoogleCustomerMatch', () => {
     expect(normalizeMobileIdForGoogleCustomerMatch('38400000-8cf0-11bd-b23e-10b96e4ef00d')).toBe(
       normalizeMobileIdForGoogleCustomerMatch('  38400000-8CF0-11BD-B23E-10B96E4EF00D  '),
     );
+  });
+});
+
+describe('hashNameForGoogleCustomerMatch', () => {
+  it('trims and lowercases before hashing', () => {
+    expect(hashNameForGoogleCustomerMatch('  Ada  ')).toBe(createHash('sha256').update('ada').digest('hex'));
+  });
+
+  it('produces the same hash for names that only differ by case or surrounding whitespace', () => {
+    expect(hashNameForGoogleCustomerMatch('Ada')).toBe(hashNameForGoogleCustomerMatch(' ADA '));
+  });
+});
+
+describe('normalizeCityForGoogleCustomerMatch', () => {
+  it('only trims surrounding whitespace and does not hash', () => {
+    const normalized = normalizeCityForGoogleCustomerMatch('  New York  ');
+    expect(normalized).toBe('New York');
+    expect(normalized).not.toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('normalizeStateForGoogleCustomerMatch', () => {
+  it('only trims surrounding whitespace and does not hash', () => {
+    expect(normalizeStateForGoogleCustomerMatch('  CA  ')).toBe('CA');
+  });
+});
+
+describe('normalizeCountryCodeForGoogleCustomerMatch', () => {
+  it('trims and uppercases, unlike Meta which lowercases its COUNTRY field', () => {
+    expect(normalizeCountryCodeForGoogleCustomerMatch('  us  ')).toBe('US');
+  });
+});
+
+describe('normalizePostalCodeForGoogleCustomerMatch', () => {
+  it('only trims surrounding whitespace and does not truncate a zip+4 value, unlike Meta', () => {
+    expect(normalizePostalCodeForGoogleCustomerMatch('  94103-1234  ')).toBe('94103-1234');
   });
 });

@@ -2,7 +2,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { GoogleAdsApiError, type GoogleAdsApiClient } from '../google-ads';
 import { SinkPluginExecutionError } from '../executor';
 import type { PluginRuntimeCredential } from '../credential';
-import { hashEmailForGoogleCustomerMatch, hashPhoneForGoogleCustomerMatch, normalizeMobileIdForGoogleCustomerMatch } from './hashing';
+import {
+  hashEmailForGoogleCustomerMatch,
+  hashNameForGoogleCustomerMatch,
+  hashPhoneForGoogleCustomerMatch,
+  normalizeCityForGoogleCustomerMatch,
+  normalizeCountryCodeForGoogleCustomerMatch,
+  normalizeMobileIdForGoogleCustomerMatch,
+  normalizePostalCodeForGoogleCustomerMatch,
+  normalizeStateForGoogleCustomerMatch,
+} from './hashing';
 import { GoogleCustomerMatchSinkPluginExecutor } from './executor';
 
 const CREDENTIAL: PluginRuntimeCredential = {
@@ -159,6 +168,40 @@ describe('GoogleCustomerMatchSinkPluginExecutor', () => {
         hashedPhoneNumber: hashPhoneForGoogleCustomerMatch('+14155550100'),
         mobileId: normalizeMobileIdForGoogleCustomerMatch('38400000-8cf0-11bd-b23e-10b96e4ef00d'),
       },
+    ]);
+  });
+
+  it('hashes/normalizes a mailing-address-only record into a single addressInfo contact key', async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new GoogleCustomerMatchSinkPluginExecutor({ apiClient, customerId: '999', userListName: 'Warm leads', existingUserListResourceName: 'customers/999/userLists/existing' });
+
+    const result = await executor.push(
+      pushParams([{ properties: { first_name: 'Ada', last_name: 'Lovelace', city: 'Mountain View', state: 'CA', zip: '94043', country: 'us' } }]),
+    );
+
+    expect(apiClient.addContactsToCustomerMatchUserList).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
+      {
+        addressInfo: {
+          hashedFirstName: hashNameForGoogleCustomerMatch('Ada'),
+          hashedLastName: hashNameForGoogleCustomerMatch('Lovelace'),
+          city: normalizeCityForGoogleCustomerMatch('Mountain View'),
+          state: normalizeStateForGoogleCustomerMatch('CA'),
+          countryCode: normalizeCountryCodeForGoogleCustomerMatch('us'),
+          postalCode: normalizePostalCodeForGoogleCustomerMatch('94043'),
+        },
+      },
+    ]);
+    expect(result).toEqual({ pushed: 1, externalRef: 'customers/999/userLists/existing' });
+  });
+
+  it('hashes a partial mailing address (only city and state present) without requiring every address field', async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new GoogleCustomerMatchSinkPluginExecutor({ apiClient, customerId: '999', userListName: 'Warm leads', existingUserListResourceName: 'customers/999/userLists/existing' });
+
+    await executor.push(pushParams([{ properties: { city: 'Austin', state: 'TX' } }]));
+
+    expect(apiClient.addContactsToCustomerMatchUserList).toHaveBeenCalledWith('999', 'customers/999/userLists/existing', [
+      { addressInfo: { city: normalizeCityForGoogleCustomerMatch('Austin'), state: normalizeStateForGoogleCustomerMatch('TX') } },
     ]);
   });
 
