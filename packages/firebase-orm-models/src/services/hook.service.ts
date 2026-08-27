@@ -173,6 +173,46 @@ export async function disableHookEndpoint(params: DisableHookEndpointParams): Pr
   return endpoint;
 }
 
+export interface EnableHookEndpointParams {
+  organizationId: string;
+  projectId: string;
+  hookEndpointId: string;
+  enabledByUserId: string;
+}
+
+/**
+ * Resumes a disabled endpoint's receive URL (the human-facing "Enable" counterpart {@link disableHookEndpoint}
+ * never got — a mistakenly-disabled endpoint was previously stuck disabled forever, the only way back
+ * being to delete-and-recreate it and lose its signing-secret history). Idempotent the same way
+ * `disableHookEndpoint` is: enabling an already-enabled endpoint just clears already-empty fields and
+ * logs again, rather than erroring — the "safe to retry" posture that function's own doc comment
+ * establishes, kept symmetric here.
+ */
+export async function enableHookEndpoint(params: EnableHookEndpointParams): Promise<HookEndpointModel> {
+  const endpoint = await loadHookEndpoint(params.organizationId, params.projectId, params.hookEndpointId);
+  endpoint.disabled_at = null;
+  endpoint.disabled_by = null;
+  await endpoint.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: endpoint.environment_id,
+      actorType: 'user',
+      actorId: params.enabledByUserId,
+      action: 'hook_endpoint.enable',
+      targetType: 'hook_endpoint',
+      targetId: endpoint.id,
+      summary: `Enabled hook endpoint "${endpoint.name}"`,
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+  }
+
+  return endpoint;
+}
+
 export interface SetHookEndpointSigningSecretParams {
   organizationId: string;
   projectId: string;

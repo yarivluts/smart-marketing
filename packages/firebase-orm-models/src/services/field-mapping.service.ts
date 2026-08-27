@@ -232,6 +232,46 @@ export async function disableFieldMapping(params: DisableFieldMappingParams): Pr
   return mapping;
 }
 
+export interface EnableFieldMappingParams {
+  organizationId: string;
+  projectId: string;
+  fieldMappingId: string;
+  enabledByUserId: string;
+}
+
+/**
+ * Resumes a retired mapping (the human-facing "Enable" counterpart {@link disableFieldMapping} never
+ * got — a mistakenly-disabled mapping was previously stuck disabled forever, the only way back being
+ * to recreate it and re-enter every rule by hand). Idempotent the same way `disableFieldMapping` is:
+ * enabling an already-enabled mapping just clears already-empty fields and logs again, rather than
+ * erroring — the "safe to retry" posture that function's own doc comment establishes, kept symmetric
+ * here.
+ */
+export async function enableFieldMapping(params: EnableFieldMappingParams): Promise<FieldMappingModel> {
+  const mapping = await loadFieldMapping(params.organizationId, params.projectId, params.fieldMappingId);
+  mapping.disabled_at = null;
+  mapping.disabled_by = null;
+  await mapping.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: mapping.environment_id,
+      actorType: 'user',
+      actorId: params.enabledByUserId,
+      action: 'field_mapping.enable',
+      targetType: 'field_mapping',
+      targetId: mapping.id,
+      summary: `Enabled field mapping "${mapping.name}"`,
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+  }
+
+  return mapping;
+}
+
 export interface TestRunFieldMappingParams {
   organizationId: string;
   projectId: string;

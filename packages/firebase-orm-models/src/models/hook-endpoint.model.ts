@@ -86,10 +86,16 @@ export class HookEndpointModel extends BaseModel {
   @Field({ is_required: true })
   public created_at!: string;
 
-  /** Presence alone means the endpoint is dead — a disabled endpoint's receive URL 404s, the same immediate-revocation posture `ApiKeyModel.revoked_at` establishes. */
+  /**
+   * Presence alone means the endpoint is dead — a disabled endpoint's receive URL 404s, the same
+   * immediate-revocation posture `ApiKeyModel.revoked_at` establishes. `enableHookEndpoint` clears
+   * this back to `null` (never `undefined`) to resume receiving — the same "an explicit `null`
+   * overwrites, `undefined` is dropped by `updateDoc()`" reasoning `previous_signing_secret_encrypted`'s
+   * own doc comment documents.
+   */
   @Field()
-  public disabled_at?: string;
+  public disabled_at?: string | null;
 
   @Field()
-  public disabled_by?: string;
+  public disabled_by?: string | null;
 }

@@ -17,7 +17,57 @@ Template for each entry:
 
 ---
 
-## 2026-08-26 (latest) — KAN-110: Meta/Google audience mobile-device-id identifier (opened)
+## 2026-08-27 (latest) — Merged PR #315 (KAN-109, hook/field-mapping enable admin surface)
+
+- **Last completed:**
+  - Continuation of the entry below: PR #315's CI re-run (attempt 2, run #1119) came back
+    `success`, confirming the earlier failure was the Firestore-emulator flake its own
+    standing-down comment suspected. Its originating session stayed idle/disconnected, so this
+    session took over finishing it rather than starting new, possibly-overlapping backlog work.
+  - Locally test-merged `origin/main` into PR #315's branch (a real merge commit, not a rebase —
+    the branch belongs to another session) to check mergeability ahead of GitHub's own
+    async computation. Hit the anticipated conflict: both PR #314 and PR #315 had appended a row
+    to `TASKS.md`'s Stories table using the same ad-hoc **KAN-108** number (each opened before
+    either could see the other's in-flight work). Resolved by keeping PR #314's KAN-108 row as-is
+    and **renumbering PR #315's story to KAN-109** (PR #314 merged first, so per this repo's
+    established "second-to-merge renumbers" precedent — KAN-99/105/106 — PR #315 takes the next
+    free number). Confirmed via `grep` that none of PR #315's own source files (only its
+    `TASKS.md` row and PR title/body) ever referenced "KAN-108", so no code needed touching.
+  - `en.json`/`he.json` auto-merged cleanly (no overlapping keys). Pushed the merge commit
+    (`aa3f8cf`) to `kan-108-hook-field-mapping-enable`; the PR's title/body updated to reflect the
+    KAN-109 renumbering.
+  - Verified everything green **before** relying on CI: `pnpm install --frozen-lockfile`, then
+    `pnpm lint`/`pnpm typecheck`/`pnpm build` all green across all 8 packages. Full `pnpm test`
+    hit exactly one failure — `quality-score-pack.emulator.test.ts`'s "a metric pre-registered by
+    a human... is left alone" case timed out at 120000ms — the same class of Firestore-emulator
+    `RESOURCE_EXHAUSTED`-under-load flake this file has repeatedly documented. Confirmed as a
+    flake by re-running that one file in isolation (properly, via
+    `firebase emulators:exec --only firestore "..."` after an initial mistaken attempt that
+    bypassed the emulator wrapper entirely and therefore failed everything): all 11 tests passed
+    green, ~176s.
+  - CI on the merge commit (run #1123) came back `success`; `mergeable_state: clean`; no open
+    review threads. Merged PR #315 (squash) into `main` (`a9ecba6`) and unsubscribed from its
+    activity. Remote branch deletion for `kan-108-hook-field-mapping-enable` failed with the same
+    recurring HTTP 403 this file has documented since 2026-07-04 — not a new issue.
+- **In progress (exact stopping point):** none — KAN-109 is fully delivered, tested, and merged.
+  `TASKS.md`'s KAN-108/KAN-109 rows are both correct and non-colliding.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern for the next candidate,
+  re-checking **open PRs** (not just `TASKS.md`) immediately before minting a new ad-hoc KAN
+  number — current highest real KAN number is now 109.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - The `platform_admin` bootstrap gap flagged in prior entries — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile
+    of already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with
+    an HTTP 403 from this sandbox's git remote) — now also including
+    `kan-108-hook-field-mapping-enable`.
+
+---
+
+## 2026-08-26 — KAN-110: Meta/Google audience mobile-device-id identifier (opened)
 
 - **Last completed:**
   - Assigned task (not a fresh sweep): add a third contact-match identifier (mobile device id /
