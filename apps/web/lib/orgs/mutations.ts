@@ -50,6 +50,7 @@ import {
   createFieldMapping as createFieldMappingInOrganization,
   createHookEndpoint as createHookEndpointInOrganization,
   createSharedCredential as createSharedCredentialInOrganization,
+  updateSharedCredential as updateSharedCredentialInOrganization,
   decideResourceAttachment as decideResourceAttachmentInOrganization,
   deleteBoard as deleteBoardInOrganization,
   disableHookEndpoint as disableHookEndpointInOrganization,
@@ -261,6 +262,19 @@ interface CreateSharedCredentialInput {
 export async function createSharedCredential(input: CreateSharedCredentialInput): Promise<SharedCredentialModel> {
   await ensureFirestoreOrm();
   return createSharedCredentialInOrganization(input);
+}
+
+interface UpdateSharedCredentialInput {
+  organizationId: string;
+  credentialId: string;
+  name: string;
+  availableScopes: readonly string[];
+  actorId: string;
+}
+
+export async function updateSharedCredential(input: UpdateSharedCredentialInput): Promise<SharedCredentialModel> {
+  await ensureFirestoreOrm();
+  return updateSharedCredentialInOrganization(input);
 }
 
 interface SetSharedCredentialSecretInput {

@@ -30,6 +30,7 @@ import {
   setResourceAttachmentWriteTier,
   updateOrgPerson,
   updateResourceTemplate,
+  updateSharedCredential,
   verifyAuditLogChainForOrg,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -326,6 +327,126 @@ describe('updateResourceTemplate (KAN-117)', () => {
     expect(entry.target_id).toBe(template.id);
     expect(entry.before).toEqual({ name: 'Before Template', version: 1, config: null });
     expect(entry.after).toEqual({ name: 'After Template', version: 2, config: { max_regression_pct: 20 } });
+
+    await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
+  });
+});
+
+describe('updateSharedCredential (KAN-119)', () => {
+  it("updates a credential's name and available scopes, persisted for a later list, without touching provider", async () => {
+    const { owner, organization } = await setupOrgWithOwner('Credential Update Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Agency Meta MCC',
+      provider: 'meta_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateSharedCredential({
+      organizationId: organization.id,
+      credentialId: credential.id,
+      name: 'Agency Meta MCC (renamed)',
+      availableScopes: ['act_1', 'act_2'],
+      actorId: owner.id,
+    });
+
+    expect(updated.name).toBe('Agency Meta MCC (renamed)');
+    expect(updated.provider).toBe('meta_ads');
+    expect(updated.available_scopes).toEqual(['act_1', 'act_2']);
+
+    // Reload from Firestore rather than trusting the returned in-memory object alone — the exact
+    // bug class `HookEndpointModel.disabled_at`'s/`updateResourceTemplate`'s own doc comments warn
+    // about: `updateDoc()` drops an `undefined` field instead of clearing it, so a fix that merely
+    // sets a field in memory would pass an in-memory-only assertion while leaving Firestore stale.
+    const [reloaded] = (await listSharedCredentials(organization.id)).filter((c) => c.id === credential.id);
+    expect(reloaded.name).toBe('Agency Meta MCC (renamed)');
+    expect(reloaded.available_scopes).toEqual(['act_1', 'act_2']);
+  });
+
+  it('replaces the scope list wholesale, clearing to an empty array when none are sent, persisted in Firestore', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Credential Clear Scopes Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Full Scopes Credential',
+      provider: 'google_ads',
+      availableScopes: ['act_1', 'act_2'],
+      createdByUserId: owner.id,
+    });
+
+    await updateSharedCredential({
+      organizationId: organization.id,
+      credentialId: credential.id,
+      name: 'Full Scopes Credential',
+      availableScopes: [],
+      actorId: owner.id,
+    });
+
+    const [reloaded] = (await listSharedCredentials(organization.id)).filter((c) => c.id === credential.id);
+    expect(reloaded.available_scopes).toEqual([]);
+  });
+
+  it('rejects updating a credential id that does not exist', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Credential Missing Org');
+    await expect(
+      updateSharedCredential({
+        organizationId: organization.id,
+        credentialId: 'does-not-exist',
+        name: 'X',
+        availableScopes: [],
+        actorId: owner.id,
+      }),
+    ).rejects.toThrow(ResourceNotFoundError);
+  });
+
+  it("rejects updating another org's credential, even with a real credential id (isolation)", async () => {
+    const { owner: ownerA, organization: orgA } = await setupOrgWithOwner('Credential Isolation Org A');
+    const { owner: ownerB, organization: orgB } = await setupOrgWithOwner('Credential Isolation Org B');
+    const credentialInA = await createSharedCredential({
+      organizationId: orgA.id,
+      name: 'Org A Credential',
+      provider: 'generic',
+      availableScopes: [],
+      createdByUserId: ownerA.id,
+    });
+
+    await expect(
+      updateSharedCredential({
+        organizationId: orgB.id,
+        credentialId: credentialInA.id,
+        name: 'Hijacked',
+        availableScopes: [],
+        actorId: ownerB.id,
+      }),
+    ).rejects.toThrow(ResourceNotFoundError);
+  });
+
+  it('records an audit log entry with before/after values, keeping the org audit-log chain valid', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Credential Audit Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Before Credential',
+      provider: 'stripe',
+      availableScopes: ['acct_1'],
+      createdByUserId: owner.id,
+    });
+
+    await updateSharedCredential({
+      organizationId: organization.id,
+      credentialId: credential.id,
+      name: 'After Credential',
+      availableScopes: ['acct_1', 'acct_2'],
+      actorId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const [entry] = entries.filter((e) => e.action === 'shared_credential.update');
+    expect(entry).toBeDefined();
+    expect(entry.actor_id).toBe(owner.id);
+    expect(entry.target_type).toBe('shared_credential');
+    expect(entry.target_id).toBe(credential.id);
+    expect(entry.before).toEqual({ name: 'Before Credential', availableScopes: ['acct_1'] });
+    expect(entry.after).toEqual({ name: 'After Credential', availableScopes: ['acct_1', 'acct_2'] });
 
     await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
   });
