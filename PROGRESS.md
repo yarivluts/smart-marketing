@@ -17,7 +17,48 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #319 (KAN-113, cohort retention admin surface)
+## 2026-08-27 (latest) — Merged PR #320 (KAN-115, insights admin surface)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). Checked open PRs before starting new
+    work (established pattern) and found **PR #320** (KAN-115, `kan-115-insights-admin-surface`) —
+    implementation-complete, opened moments earlier by a concurrent/prior session, base already at
+    current `main` (not stale), with CI's `lint · typecheck · test · build` job re-running after that
+    session had already diagnosed its first failure as the documented Firestore-emulator
+    resource-contention flake (two unrelated emulator test files timing out under full-suite
+    parallel load) and posted a standing-down comment. Took over watching it to merge rather than
+    start new, possibly-overlapping backlog work, same posture prior entries establish for
+    PR #315-319.
+  - Subscribed to the PR's GitHub activity and waited for the in-flight CI re-run rather than polling
+    continuously; the re-run (~47 minutes, consistent with this repo's full-suite duration) came back
+    green on both checks (`terraform fmt · validate`, `lint · typecheck · test · build`), confirming
+    the flake diagnosis. `mergeable_state: clean`, no open review threads/comments needing a reply.
+  - Merged PR #320 (squash) into `main` (`8a138a6`) and unsubscribed from its activity. Remote branch
+    deletion for `kan-115-insights-admin-surface` failed with the same recurring HTTP 403 this file
+    has documented since 2026-07-04.
+  - Recorded the story as **KAN-115** in `TASKS.md` (the PR's own body already explains the KAN-114
+    renumbering: a concurrent session independently claimed the same `list_insights` admin-surface
+    gap as KAN-114, branch `kan-114-insights-admin-surface`, pushed as a WIP checkpoint but not yet
+    PR'd — this story took the next free number rather than overwrite their in-flight work).
+- **In progress (exact stopping point):** none — KAN-115 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** a concurrent session's WIP branch `kan-114-insights-admin-surface` may still be
+  in-flight (unclear if abandoned once KAN-115 covered the same gap, or still being pushed toward a
+  PR) — check for it before starting new sweep work; if it opens a PR for the same already-closed gap,
+  it likely needs to be closed as superseded rather than merged. Otherwise resume the sweep-for-a-
+  newly-buildable-follow-up pattern — current highest real KAN number is now 115.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-115-insights-admin-surface`.
+
+---
+
+## 2026-08-27 — Merged PR #319 (KAN-113, cohort retention admin surface)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `TASKS.md` was entirely `done` except the standing KAN-18/19
