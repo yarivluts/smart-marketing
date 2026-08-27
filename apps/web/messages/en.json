@@ -1341,10 +1341,6 @@
     "crmSyncLastRunFailed": "Last sync failed",
     "crmSyncLastRunRunning": "Sync in progress…",
     "editSegment": "Edit",
-    "editFiltersJsonLabel": "Filters (JSON)",
-    "editEventConditionsJsonLabel": "Event conditions (JSON)",
-    "editFiltersInvalid": "Filters must be a valid JSON array of '{'field, op, value'}' conditions.",
-    "editEventConditionsInvalid": "Event conditions must be a valid JSON array of '{'kind, schemaName, ...'}' conditions.",
     "saveSegment": "Save",
     "cancelEditSegment": "Cancel",
     "editSegmentError": "Could not update the segment. Please try again."

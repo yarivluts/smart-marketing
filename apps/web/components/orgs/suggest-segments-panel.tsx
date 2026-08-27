@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import type { SegmentEventConditionKind, SegmentFilterOperator } from '@growthos/shared';
 import { Button } from '@/components/ui/button';
-import type { EventConditionRow, FilterRow } from './create-segment-form';
+import type { EventConditionRow, FilterRow } from './segment-condition-editor';
 
 interface SegmentSuggestionEventCondition {
   kind: SegmentEventConditionKind;
