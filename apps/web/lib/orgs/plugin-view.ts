@@ -115,7 +115,7 @@ export function pluginTypeForInstall(install: PluginInstallView, manifests: read
 
 /**
  * The `config_schema` an install's own pinned manifest version declares
- * (KAN-124) — resolved the same "match by `pluginId`+`version`" way
+ * (KAN-125) — resolved the same "match by `pluginId`+`version`" way
  * {@link pluginTypeForInstall} does, since `PluginInstallView` itself only
  * carries the install's current `config` values, not the schema that shaped
  * them. `undefined` in the same rare "manifest version somehow deregistered"

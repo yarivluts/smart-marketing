@@ -26,7 +26,7 @@ function toFieldValues(configSchema: Record<string, PluginConfigFieldSchema>, co
 
 /**
  * Toggles between a compact "Edit config" button and an inline edit form
- * for one plugin install row on the Plugins admin page (KAN-124 — the same
+ * for one plugin install row on the Plugins admin page (KAN-125 — the same
  * "create + list only, no way to fix a typo'd definition" gap KAN-100/
  * KAN-109/KAN-117/KAN-119/KAN-120/KAN-121/KAN-123 already closed for their
  * own sibling registries). Reuses `PluginConfigFields`/

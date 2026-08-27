@@ -19,7 +19,7 @@ export interface PluginConfigFieldsProps {
  * One typed widget per `config_schema` entry — a checkbox bound to an
  * actual boolean for `boolean` fields, typed text/number inputs otherwise
  * — with inline required-field validation feedback. Extracted out of
- * `InstallPluginForm` (KAN-48) so `EditPluginInstallConfigForm` (KAN-124)
+ * `InstallPluginForm` (KAN-48) so `EditPluginInstallConfigForm` (KAN-125)
  * can render an already-installed plugin's config through the exact same
  * widgets rather than a second, easy-to-drift copy.
  */

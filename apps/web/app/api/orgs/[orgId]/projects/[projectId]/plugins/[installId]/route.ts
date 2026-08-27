@@ -10,7 +10,7 @@ interface RouteParams {
 }
 
 /**
- * Edits an already-installed plugin's own `config` values (KAN-124 — the
+ * Edits an already-installed plugin's own `config` values (KAN-125 — the
  * same "create + list only, no way to fix a typo'd definition" gap
  * KAN-100/KAN-109/KAN-117/KAN-119/KAN-120/KAN-121/KAN-123 already closed for
  * their own sibling registries). Gated on `plugin.install`, same as every
