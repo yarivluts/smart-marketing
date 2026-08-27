@@ -17,6 +17,52 @@ Template for each entry:
 
 ---
 
+## 2026-08-27 (latest) — Merged PR #322 (KAN-117, resource-template edit)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. This container's local `main` was stale (last synced 2026-08-21,
+    50 commits behind `origin/main`, diverged after a squash-merge history rewrite upstream) —
+    reconciled by resetting local `main` to `origin/main` (`git checkout -B main origin/main`; working
+    tree was clean, no local work to lose) before doing anything else. `TASKS.md`/`PROGRESS.md` were
+    then re-read at their real current state: entirely `done` through KAN-116 except the standing
+    KAN-18/19 infra items and KAN-43/50/51 (`needs-human`/`blocked-by`).
+  - Checked open PRs before starting new work (established pattern) and found **PR #322** (KAN-117,
+    `kan-117-resource-template-edit`) — implementation-complete, opened by another session ~2h before
+    this run started, CI in progress. Independently reviewed the diff before relying on it:
+    `updateResourceTemplate` is a straightforward full-replace-name/config + version-bump + audit-log,
+    matching the exact pattern `updateOrgPerson` (KAN-100) established for the sibling people-registry
+    edit path; the `config: params.config ?? null` handling correctly works around
+    `@arbel/firebase-orm`'s documented `updateDoc()`-drops-`undefined` behavior (verified via the
+    model's own doc comment and a dedicated regression test that reloads from Firestore rather than
+    trusting the in-memory return value); the route's auth/permission/validation/404 handling and the
+    new KAN-26 isolation test case all follow existing conventions. No correctness issues found.
+  - Subscribed to the PR's GitHub activity and waited for CI (~40 min, consistent with this repo's
+    full-suite duration) rather than polling continuously; both checks (`terraform fmt · validate`,
+    `lint · typecheck · test · build`) came back green, `mergeable_state: clean`, no open review
+    threads.
+  - Merged PR #322 (squash) into `main` (`7dc6c30`) and unsubscribed from its activity. Remote branch
+    deletion for `kan-117-resource-template-edit` failed with the same recurring HTTP 403 this file has
+    documented since 2026-07-04.
+  - Added the missing `KAN-117` row to `TASKS.md` (the authoring session's own PR description
+    self-assigned the number but never added a table row).
+- **In progress (exact stopping point):** none — KAN-117 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real KAN
+  number is now 117. Check for other open PRs first (established pattern) before starting new,
+  possibly-overlapping work. **Note for the next run:** if this container's local `main` is ever more
+  than a few commits behind `origin/main`, `git status`/`git log` alone won't show it once you're on a
+  detached-HEAD or stale local branch — always `git fetch origin main` and compare against
+  `origin/main` explicitly before trusting `TASKS.md`/`PROGRESS.md` as read from disk.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-117-resource-template-edit`.
+
+---
+
 ## 2026-08-27 (latest) — Merged PR #321 (KAN-116, omnisearch customer search)
 
 - **Last completed:**
