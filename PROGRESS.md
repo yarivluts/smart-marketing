@@ -17,6 +17,72 @@ Template for each entry:
 
 ---
 
+## 2026-08-27 (latest) — KAN-111: Funnel conversion admin surface (opened)
+
+- **Last completed:**
+  - Session start: read `PROGRESS.md`/`TASKS.md` — every row `done` except the standing KAN-18/19
+    infra items and KAN-43/50/51 (`needs-human`/`blocked-by`). Checked open PRs before minting a
+    number: PR #316 (KAN-110, meta/google-ads MAID identifier) was already open, so KAN-111 was the
+    next free number.
+  - Used the "sweep every `done` row's own deferred/not-yet doc-comment notes for a newly-buildable
+    follow-up" pattern. `mcp-tools.service.ts`'s own module doc comment named `queryProjectFunnelSteps`
+    (the `query_funnel` MCP tool, plan `12 §6.2`) as one of three read-only adapters backing MCP tools
+    with no existing web-facing wrapper — the same shape `searchProjectCustomers` had before KAN-108
+    closed it. Confirmed via grep that no route or page anywhere under `apps/web` ever called it: the
+    onboarding wizard (KAN-68) lets a human confirm a funnel mapping, but there was no way to see how
+    that funnel actually converts without an MCP-connected agent, a gap against CLAUDE.md's
+    "everything user-manageable gets an admin surface" rule.
+  - **Delivered (KAN-111, branch `kan-111-funnel-admin-surface`):**
+    - `queryProjectFunnelStepsForAdmin` (`mcp-tools.service.ts`) wraps `queryProjectFunnelSteps`,
+      degrading the three expected warehouse failure modes into a typed `FunnelStepsOutcome` —
+      mirrors `searchProjectCustomersForAdmin`'s exact ok/degraded posture (KAN-108). A project with
+      no confirmed funnel returns `{ ok: true, steps: [] }` (no warehouse call at all, same as the
+      underlying tool), which the page renders as a distinct "no funnel confirmed" state, not a
+      degraded/error state.
+    - New `apps/web/lib/orgs/funnel-view.ts` (`buildFunnelView`/`toFunnelStepView`) maps the outcome
+      into a render-ready view, rounding each stage's conversion fraction to a whole-number percentage.
+    - New Funnel page (`orgs/[orgId]/projects/[projectId]/funnel`): per-stage customer count and
+      conversion off the first step, reusing the onboarding wizard's own `Onboarding.funnelStage`
+      translations for stage labels rather than duplicating them. Gated on `dashboards.write`, added
+      to **both** the project layout's nav list and the org page's own separately-duplicated nav list
+      from the start (a self-review pass caught that the initial draft linked to onboarding from the
+      "no funnel confirmed" empty state gated on a different, stricter permission — `project.manage`
+      — than the page itself; removed the link and made it plain text instead, since a `dashboards.write`
+      editor without `project.manage` would otherwise hit a 404 clicking it).
+    - en/he translations under a new `Funnel` namespace plus one new `projectFunnelLink` nav-label key.
+    - Test coverage: `packages/firebase-orm-models` emulator tests for the outcome wrapper (ok with
+      steps, ok with an empty array for "no funnel confirmed", all three degraded reasons); `apps/web`
+      unit tests for `funnel-view.ts`; a new `funnel.spec.ts` e2e spec (nav link → no-funnel-confirmed
+      state), which passed on its first attempt.
+  - Full local verification before opening the PR: `pnpm build`/`pnpm lint`/`pnpm typecheck` green
+    across all 8 packages. Full monorepo `pnpm test`: `packages/firebase-orm-models` 128/128 files
+    (1523/1523 tests), `apps/web` unit 273/273 files (1701/1701 tests), `apps/api` 141/141 tests, all
+    green. Hit two instances of the well-documented Firestore-emulator `RESOURCE_EXHAUSTED` flake
+    under concurrency during the full-suite run (`src/models.emulator.test.ts` and
+    `src/services/mcp-oauth.emulator.test.ts`, both unrelated to this diff — one hit it badly enough
+    that the whole emulator process degraded and had to be killed and restarted mid-session, a
+    JVM-level "IllegalStateException: knownLengthPendingAllocation reached 0" internal error visible
+    in `firestore-debug.log`, not just backoff) — confirmed as flakes via two full clean re-runs of
+    `packages/firebase-orm-models` in isolation immediately after (128/128, 1523/1523, exit 0 both
+    times). Two pre-existing, unrelated Playwright e2e flakes (`boards.spec.ts`, `experiments.spec.ts`)
+    recovered on Playwright's own automatic retry, the same long-documented pattern this file's own
+    history repeatedly names.
+- **In progress (exact stopping point):** PR #317 opened against `main`, implementation-complete and
+  fully verified locally (see above). Per this run's own instructions, did **not** merge and did
+  **not** wait for CI — a separate top-level session handles CI triage/review/merge.
+- **Blocked + why:** nothing blocking — waiting on a human or a later run to review/merge PR #317.
+- **Next step:** once CI is green, merge PR #317 (squash), delete the branch, and confirm `TASKS.md`'s
+  KAN-111 row still reads `done` with the right PR number (already set to #317 in this run).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items listed in their own `TASKS.md`
+    rows — still outstanding, unchanged by this run.
+  - Review and merge PR #317 (and PR #316, KAN-110, still open from a concurrent session at the time
+    this run started).
+
+---
+
 ## 2026-08-27 (latest) — Merged PR #315 (KAN-109, hook/field-mapping enable admin surface)
 
 - **Last completed:**
