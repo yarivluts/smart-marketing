@@ -68,24 +68,22 @@ function parseFilterCondition(rawFilter: RawSegmentFilterCondition): ParsedSegme
 }
 
 /**
- * Field-*shape* validation only — the same "shape here, business rules in
- * the service" split `parseCreateGoalRequestBody`'s own doc comment
- * describes. `createSegment` (`segment.service.ts`) is the one that checks
+ * Field-*shape* validation for a segment's own definition — shared by both
+ * `parseCreateSegmentRequestBody` (POST, new segment) and
+ * `parseUpdateSegmentRequestBody`'s definition branch (PATCH, KAN-120's
+ * full-replace edit), since the two accept an identical body shape. The
+ * same "shape here, business rules in the service" split
+ * `parseCreateGoalRequestBody`'s own doc comment describes: `createSegment`/
+ * `updateSegmentDefinition` (`segment.service.ts`) are the ones that check
  * `schemaName` (and each event condition's own `schemaName`) is
- * registered+active and re-validates every filter/event condition against
+ * registered+active and re-validate every filter/event condition against
  * `isValidSegmentFilterCondition`/`isValidSegmentEventCondition`; this only
- * makes sure the request is well-formed enough to hand off to it (an array
+ * makes sure the request is well-formed enough to hand off to them (an array
  * of plain objects with the right field names/types). `eventConditions`
  * (KAN-93) is optional — omitted or `[]` when a segment only ever needs
  * entity filters, same as before this field existed.
  */
-export async function parseCreateSegmentRequestBody(request: NextRequest): Promise<ParsedCreateSegmentRequest> {
-  const parsed = await parseJsonBody<RawCreateSegmentBody>(request);
-  if (parsed.error) {
-    return { error: parsed.error };
-  }
-  const body = parsed.body;
-
+function parseSegmentDefinitionFields(body: RawCreateSegmentBody): ParsedCreateSegmentRequest {
   if (typeof body.name !== 'string' || body.name.trim().length === 0) {
     return invalid('name_required');
   }
@@ -155,6 +153,14 @@ export async function parseCreateSegmentRequestBody(request: NextRequest): Promi
   return { name: body.name, schemaName: body.schemaName, filters, eventConditions };
 }
 
+export async function parseCreateSegmentRequestBody(request: NextRequest): Promise<ParsedCreateSegmentRequest> {
+  const parsed = await parseJsonBody<RawCreateSegmentBody>(request);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+  return parseSegmentDefinitionFields(parsed.body);
+}
+
 export interface ParsedUpdateSegmentWorkListFields {
   /** `undefined` when the request didn't touch the owner at all — distinct from `null`, which explicitly unassigns it. */
   ownerPersonId?: string | null;
@@ -170,18 +176,12 @@ interface RawUpdateSegmentWorkListBody {
 
 /**
  * Field-*shape* validation for the KAN-81 "assign owner / tick status"
- * PATCH — same "shape here, business rules (owner-exists check) in the
- * service" split `parseCreateSegmentRequestBody` documents for its own
+ * update — same "shape here, business rules (owner-exists check) in the
+ * service" split `parseSegmentDefinitionFields` documents for its own
  * sibling. At least one of `ownerPersonId`/`status` must be present so a
- * no-op PATCH is rejected rather than silently doing nothing.
+ * no-op update is rejected rather than silently doing nothing.
  */
-export async function parseUpdateSegmentWorkListRequestBody(request: NextRequest): Promise<ParsedUpdateSegmentWorkListRequest> {
-  const parsed = await parseJsonBody<RawUpdateSegmentWorkListBody>(request);
-  if (parsed.error) {
-    return { error: parsed.error };
-  }
-  const body = parsed.body;
-
+function parseSegmentWorkListFields(body: RawUpdateSegmentWorkListBody): ParsedUpdateSegmentWorkListRequest {
   const hasOwner = Object.prototype.hasOwnProperty.call(body, 'ownerPersonId');
   const hasStatus = Object.prototype.hasOwnProperty.call(body, 'status');
   if (!hasOwner && !hasStatus) {
@@ -205,4 +205,58 @@ export async function parseUpdateSegmentWorkListRequestBody(request: NextRequest
   }
 
   return result;
+}
+
+const SEGMENT_DEFINITION_FIELD_KEYS = ['name', 'schemaName', 'filters', 'eventConditions'] as const;
+const SEGMENT_WORK_LIST_FIELD_KEYS = ['ownerPersonId', 'status'] as const;
+
+function hasAnyOwnProperty(body: object, keys: readonly string[]): boolean {
+  return keys.some((key) => Object.prototype.hasOwnProperty.call(body, key));
+}
+
+export type ParsedUpdateSegmentRequest =
+  | ({ kind: 'definition' } & ParsedCreateSegmentFields & { error?: undefined })
+  | ({ kind: 'worklist' } & ParsedUpdateSegmentWorkListFields & { error?: undefined })
+  | { kind?: undefined; error: NextResponse };
+
+/**
+ * One PATCH body dispatches to exactly one of two independent segment
+ * update surfaces on the same route: KAN-81's work-list owner/status
+ * ticking, or KAN-120's full-definition edit (name/schema/filters/event
+ * conditions). The two admin-page controls that drive them
+ * (`SegmentWorkListControls`, `EditSegmentForm`) never submit both kinds of
+ * fields together, so a body naming fields from both is rejected outright
+ * as ambiguous rather than silently picking one. Reads the request body
+ * exactly once (a `NextRequest` body can only be consumed once) and
+ * inspects which keys are present before delegating to the matching
+ * shape-validator.
+ */
+export async function parseUpdateSegmentRequestBody(request: NextRequest): Promise<ParsedUpdateSegmentRequest> {
+  const parsed = await parseJsonBody<RawCreateSegmentBody & RawUpdateSegmentWorkListBody>(request);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+  const body = parsed.body;
+
+  const hasDefinitionField = hasAnyOwnProperty(body, SEGMENT_DEFINITION_FIELD_KEYS);
+  const hasWorkListField = hasAnyOwnProperty(body, SEGMENT_WORK_LIST_FIELD_KEYS);
+
+  if (hasDefinitionField && hasWorkListField) {
+    return invalid('mixed_update_fields');
+  }
+  if (hasDefinitionField) {
+    const result = parseSegmentDefinitionFields(body);
+    if (result.error) {
+      return { error: result.error };
+    }
+    return { kind: 'definition', ...result };
+  }
+  if (hasWorkListField) {
+    const result = parseSegmentWorkListFields(body);
+    if (result.error) {
+      return { error: result.error };
+    }
+    return { kind: 'worklist', ...result };
+  }
+  return invalid('no_fields_to_update');
 }

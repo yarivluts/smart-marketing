@@ -225,4 +225,63 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/segments/[segmentId]', ()
     expect(body.ownerPersonId).toBe(person.id);
     expect(body.status).toBe('done');
   });
+
+  it('full-replaces the segment definition (KAN-120) and preserves its id', async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Definition Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, {
+      name: 'Pro customers, renamed',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'enterprise' }],
+    });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()).segment;
+    expect(body.id).toBe(segment.id);
+    expect(body.name).toBe('Pro customers, renamed');
+    expect(body.filters).toEqual([{ field: 'plan', op: '=', value: 'enterprise' }]);
+  });
+
+  it('rejects an invalid definition update with invalid_segment', async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Definition Invalid Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, {
+      name: 'X',
+      schemaName: 'does_not_exist',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+    });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('invalid_segment');
+  });
+
+  it('rejects a body mixing definition fields with worklist fields', async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Mixed Fields Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, {
+      name: 'Pro customers',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+      status: 'done',
+    });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toBe('mixed_update_fields');
+  });
+
+  it('returns 404 for a definition update on a segment id that does not exist', async () => {
+    const { ownerSession, organization, project } = await setupOrgProjectSegment('Segment Patch Definition Missing Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = patchRequest(organization.id, project.id, 'does-not-exist', {
+      name: 'X',
+      schemaName: 'customer',
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
+    });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(404);
+  });
 });

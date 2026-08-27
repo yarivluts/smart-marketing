@@ -28,18 +28,21 @@ describe('toSegmentSummaryView', () => {
       name: 'Paying, no demo',
       schemaName: 'customer',
       filterCount: 1,
+      filters: [{ field: 'plan', op: '=', value: 'pro' }],
       eventConditionCount: 1,
+      eventConditions: [{ kind: 'no_event', schemaName: 'demo_event' }],
       createdAt: '2026-08-01T00:00:00.000Z',
       ownerPersonId: 'person-1',
       status: 'in_progress',
     });
   });
 
-  it('defaults owner to null, status to "open", and eventConditionCount to 0 for a segment saved before KAN-81/KAN-93 added those fields', () => {
+  it('defaults owner to null, status to "open", and eventConditions to [] for a segment saved before KAN-81/KAN-93 added those fields', () => {
     const view: SegmentSummaryView = toSegmentSummaryView(segment({ id: 'segment-1' }));
     expect(view.ownerPersonId).toBeNull();
     expect(view.status).toBe('open');
     expect(view.eventConditionCount).toBe(0);
+    expect(view.eventConditions).toEqual([]);
   });
 });
 
