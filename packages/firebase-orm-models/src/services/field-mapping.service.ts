@@ -102,6 +102,59 @@ function requireMappingKind(kind: string): SchemaDefKind & MappingRecordKind {
   return kind;
 }
 
+interface FieldMappingDefinitionInput {
+  organizationId: string;
+  projectId: string;
+  kind: SchemaDefKind & MappingRecordKind;
+  name: string;
+  schemaName: string;
+  rules: readonly MappingRuleInput[];
+}
+
+interface ValidatedFieldMappingDefinition {
+  name: string;
+  schemaName: string;
+  rules: MappingRule[];
+}
+
+/**
+ * Validates a field mapping's own definition — name, target schemaName
+ * (must be a registered+active schema of this mapping's `kind`), and rules
+ * — shared by {@link createFieldMapping} and {@link updateFieldMapping}
+ * (KAN-121) so the two can never validate a definition differently. `kind`
+ * itself is immutable once a mapping exists (mirrors `updateSharedCredential`'s
+ * (KAN-119) `provider` immutability posture — changing what shape of record
+ * a mapping produces isn't a correction, it's a different mapping), so it's
+ * supplied already-resolved by each caller rather than accepted as raw user
+ * input here.
+ */
+async function validateFieldMappingDefinition(input: FieldMappingDefinitionInput): Promise<ValidatedFieldMappingDefinition> {
+  const reasons: string[] = [];
+
+  const name = input.name.trim();
+  if (name.length === 0) {
+    reasons.push('A mapping must have a non-empty name.');
+  }
+  const schemaName = input.schemaName.trim();
+  if (schemaName.length === 0) {
+    reasons.push('A mapping must target a non-empty schema name.');
+  }
+
+  const { rules, reasons: ruleReasons } = validateMappingRules(input.kind, input.rules);
+  reasons.push(...ruleReasons);
+
+  if (reasons.length > 0) {
+    throw new InvalidFieldMappingError(reasons);
+  }
+
+  const activeSchema = await getActiveSchemaDefinition(input.organizationId, input.projectId, input.kind, schemaName);
+  if (!activeSchema) {
+    throw new TargetSchemaNotRegisteredError();
+  }
+
+  return { name, schemaName, rules };
+}
+
 export interface CreateFieldMappingParams {
   organizationId: string;
   projectId: string;
@@ -127,19 +180,6 @@ export async function createFieldMapping(params: CreateFieldMappingParams): Prom
   await requireEnvironmentInProject(params.organizationId, params.projectId, params.environmentId);
 
   const kind = requireMappingKind(params.kind);
-  const name = params.name.trim();
-  const schemaName = params.schemaName.trim();
-  if (name.length === 0) {
-    throw new InvalidFieldMappingError(['A mapping must have a non-empty name.']);
-  }
-  if (schemaName.length === 0) {
-    throw new InvalidFieldMappingError(['A mapping must target a non-empty schema name.']);
-  }
-
-  const { rules, reasons } = validateMappingRules(kind, params.rules);
-  if (reasons.length > 0) {
-    throw new InvalidFieldMappingError(reasons);
-  }
 
   if (params.hookEndpointId) {
     const endpoint = await HookEndpointModel.init(params.hookEndpointId, {
@@ -151,10 +191,14 @@ export async function createFieldMapping(params: CreateFieldMappingParams): Prom
     }
   }
 
-  const activeSchema = await getActiveSchemaDefinition(params.organizationId, params.projectId, kind, schemaName);
-  if (!activeSchema) {
-    throw new TargetSchemaNotRegisteredError();
-  }
+  const validated = await validateFieldMappingDefinition({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    kind,
+    name: params.name,
+    schemaName: params.schemaName,
+    rules: params.rules,
+  });
 
   const mapping = new FieldMappingModel();
   mapping.organization_id = params.organizationId;
@@ -163,10 +207,10 @@ export async function createFieldMapping(params: CreateFieldMappingParams): Prom
   if (params.hookEndpointId) {
     mapping.hook_endpoint_id = params.hookEndpointId;
   }
-  mapping.name = name;
+  mapping.name = validated.name;
   mapping.kind = kind;
-  mapping.schema_name = schemaName;
-  mapping.rules = rules;
+  mapping.schema_name = validated.schemaName;
+  mapping.rules = validated.rules;
   mapping.created_by = params.createdByUserId;
   mapping.created_at = new Date().toISOString();
   mapping.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
@@ -264,6 +308,73 @@ export async function enableFieldMapping(params: EnableFieldMappingParams): Prom
       targetType: 'field_mapping',
       targetId: mapping.id,
       summary: `Enabled field mapping "${mapping.name}"`,
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.
+  }
+
+  return mapping;
+}
+
+export interface UpdateFieldMappingParams {
+  organizationId: string;
+  projectId: string;
+  fieldMappingId: string;
+  name: string;
+  schemaName: string;
+  rules: readonly MappingRuleInput[];
+  actorUserId: string;
+}
+
+/**
+ * Edits an existing field mapping's own definition — name, target
+ * schemaName, and rules — always a full replace, never a sparse patch, the
+ * same posture `updateSegmentDefinition` (KAN-120), `updateResourceTemplate`
+ * (KAN-117), and `updateOrgPerson` (KAN-100) establish for their own sibling
+ * registries. `kind` and `environmentId` stay immutable: `kind` decides the
+ * shape of record this mapping produces (see {@link validateFieldMappingDefinition}'s
+ * own doc comment), and `environmentId` decides which environment a mapped
+ * record lands in — both structural facts about the mapping, not something
+ * to "fix". Until now a saved mapping's own definition could only be
+ * corrected by disable-and-recreate, which orphans its id — breaking any
+ * `HookDeliveryModel.applied_field_mapping_id` reference from a delivery
+ * already applied through it (KAN-54's own follow-up). Reuses
+ * {@link validateFieldMappingDefinition} directly so create and update can
+ * never validate a definition differently.
+ */
+export async function updateFieldMapping(params: UpdateFieldMappingParams): Promise<FieldMappingModel> {
+  const mapping = await loadFieldMapping(params.organizationId, params.projectId, params.fieldMappingId);
+  const kind = requireMappingKind(mapping.kind);
+
+  const validated = await validateFieldMappingDefinition({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    kind,
+    name: params.name,
+    schemaName: params.schemaName,
+    rules: params.rules,
+  });
+
+  const before = { name: mapping.name, schemaName: mapping.schema_name, rules: mapping.rules };
+
+  mapping.name = validated.name;
+  mapping.schema_name = validated.schemaName;
+  mapping.rules = validated.rules;
+  await mapping.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: mapping.environment_id,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'field_mapping.update',
+      targetType: 'field_mapping',
+      targetId: mapping.id,
+      summary: `Updated field mapping "${mapping.name}" definition`,
+      before,
+      after: { name: mapping.name, schemaName: mapping.schema_name, rules: mapping.rules },
     });
   } catch {
     // Best-effort — see the equivalent comment in `key.service.ts`'s `mintApiKey`.

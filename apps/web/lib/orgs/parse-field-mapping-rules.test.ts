@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NextRequest } from 'next/server';
-import { parseCreateFieldMappingRequestBody, parseFieldMappingRulesBody } from './parse-field-mapping-rules';
+import { parseCreateFieldMappingRequestBody, parseFieldMappingRulesBody, parseUpdateFieldMappingRequestBody } from './parse-field-mapping-rules';
 
 function request(body?: unknown): NextRequest {
   return new NextRequest('https://growthos.test/x', {
@@ -87,5 +87,36 @@ describe('parseCreateFieldMappingRequestBody', () => {
   it('propagates a rules-shape error from parseFieldMappingRulesBody', async () => {
     expect((await parseCreateFieldMappingRequestBody(request({ ...validCreateBody, rules: [] }))).error?.status).toBe(400);
     expect((await parseCreateFieldMappingRequestBody(request({ ...validCreateBody, rules: [{ targetField: 'x' }] }))).error?.status).toBe(400);
+  });
+});
+
+const validUpdateBody = { name: 'Signup mapping v2', schemaName: 'signup', rules: [renameRule] };
+
+describe('parseUpdateFieldMappingRequestBody', () => {
+  it('accepts a well-formed request — kind/environmentId/hookEndpointId are never read', async () => {
+    const parsed = await parseUpdateFieldMappingRequestBody(request(validUpdateBody));
+    expect(parsed.error).toBeUndefined();
+    expect(parsed).toEqual({
+      name: 'Signup mapping v2',
+      schemaName: 'signup',
+      rules: [{ ...renameRule, castType: undefined, template: undefined, staticValue: undefined }],
+    });
+  });
+
+  it('rejects invalid JSON', async () => {
+    const badRequest = new NextRequest('https://growthos.test/x', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{not json' });
+    expect((await parseUpdateFieldMappingRequestBody(badRequest)).error?.status).toBe(400);
+  });
+
+  it('rejects a missing or blank name/schemaName', async () => {
+    expect((await parseUpdateFieldMappingRequestBody(request({ ...validUpdateBody, name: undefined }))).error?.status).toBe(400);
+    expect((await parseUpdateFieldMappingRequestBody(request({ ...validUpdateBody, name: '  ' }))).error?.status).toBe(400);
+    expect((await parseUpdateFieldMappingRequestBody(request({ ...validUpdateBody, schemaName: undefined }))).error?.status).toBe(400);
+    expect((await parseUpdateFieldMappingRequestBody(request({ ...validUpdateBody, schemaName: '  ' }))).error?.status).toBe(400);
+  });
+
+  it('propagates a rules-shape error from parseFieldMappingRulesBody', async () => {
+    expect((await parseUpdateFieldMappingRequestBody(request({ ...validUpdateBody, rules: [] }))).error?.status).toBe(400);
+    expect((await parseUpdateFieldMappingRequestBody(request({ ...validUpdateBody, rules: [{ targetField: 'x' }] }))).error?.status).toBe(400);
   });
 });

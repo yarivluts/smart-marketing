@@ -27,6 +27,7 @@ import {
   suggestFieldMappingRules,
   TargetSchemaNotRegisteredError,
   testRunFieldMapping,
+  updateFieldMapping,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -67,6 +68,17 @@ async function registerOrderCompletedSchema(organizationId: string, projectId: s
   });
 }
 
+async function registerOrderRefundedSchema(organizationId: string, projectId: string, createdByUserId: string) {
+  return registerSchemaDefinition({
+    organizationId,
+    projectId,
+    kind: 'event',
+    name: 'order_refunded',
+    fields: [{ name: 'refund_id', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+    createdByUserId,
+  });
+}
+
 const VALID_EVENT_RULES = [
   { targetField: 'event_id', transform: 'template', template: 'shopify-order-{{id}}' },
   { targetField: 'event', transform: 'static', staticValue: 'order_completed' },
@@ -74,6 +86,12 @@ const VALID_EVENT_RULES = [
   { targetField: 'properties.order_id', transform: 'cast', sourcePath: 'id', castType: 'string' },
   { targetField: 'properties.total_price', transform: 'cast', sourcePath: 'total_price', castType: 'number' },
   { targetField: 'properties.email', transform: 'rename', sourcePath: 'customer.email' },
+];
+
+const VALID_EVENT_RULES_V2 = [
+  { targetField: 'event_id', transform: 'rename', sourcePath: 'id' },
+  { targetField: 'event', transform: 'static', staticValue: 'order_refunded' },
+  { targetField: 'ts', transform: 'rename', sourcePath: 'refunded_at' },
 ];
 
 const SAMPLE_SHOPIFY_PAYLOAD = JSON.stringify({
@@ -340,6 +358,155 @@ describe('enableFieldMapping', () => {
         enabledByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(FieldMappingNotFoundError);
+  });
+});
+
+describe('updateFieldMapping', () => {
+  it('replaces name, target schema, and rules — persisted to Firestore', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Mapping Update Org');
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    await registerOrderRefundedSchema(organization.id, project.id, owner.id);
+    const mapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      name: 'Updated name',
+      schemaName: 'order_refunded',
+      rules: VALID_EVENT_RULES_V2,
+      actorUserId: owner.id,
+    });
+
+    expect(updated.name).toBe('Updated name');
+    expect(updated.schema_name).toBe('order_refunded');
+    expect(updated.rules).toHaveLength(VALID_EVENT_RULES_V2.length);
+    // Structural fields stay untouched by a definition edit.
+    expect(updated.id).toBe(mapping.id);
+    expect(updated.kind).toBe('event');
+    expect(updated.environment_id).toBe(prodEnvironment.id);
+    expect(updated.created_by).toBe(owner.id);
+
+    const [reloaded] = (await listFieldMappingsForProject(organization.id, project.id)).filter((m) => m.id === mapping.id);
+    expect(reloaded.name).toBe('Updated name');
+    expect(reloaded.schema_name).toBe('order_refunded');
+    expect(reloaded.rules).toHaveLength(VALID_EVENT_RULES_V2.length);
+  });
+
+  it('rejects an invalid rule set without persisting any change (atomicity)', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Mapping Update Invalid Org');
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    const mapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      updateFieldMapping({
+        organizationId: organization.id,
+        projectId: project.id,
+        fieldMappingId: mapping.id,
+        name: 'Should not stick',
+        schemaName: 'order_completed',
+        rules: VALID_EVENT_RULES.filter((rule) => rule.targetField !== 'ts'),
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(InvalidFieldMappingError);
+
+    const [reloaded] = (await listFieldMappingsForProject(organization.id, project.id)).filter((m) => m.id === mapping.id);
+    expect(reloaded.name).toBe('Original name');
+    expect(reloaded.rules).toHaveLength(VALID_EVENT_RULES.length);
+  });
+
+  it('rejects a target schema with no active version', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Mapping Update No Schema Org');
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    const mapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      updateFieldMapping({
+        organizationId: organization.id,
+        projectId: project.id,
+        fieldMappingId: mapping.id,
+        name: 'Original name',
+        schemaName: 'not_registered_schema',
+        rules: VALID_EVENT_RULES,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(TargetSchemaNotRegisteredError);
+  });
+
+  it('rejects updating a mapping that does not exist in this project', async () => {
+    const { owner, organization, project } = await setupProject('Mapping Update Missing Org');
+
+    await expect(
+      updateFieldMapping({
+        organizationId: organization.id,
+        projectId: project.id,
+        fieldMappingId: 'does-not-exist',
+        name: 'x',
+        schemaName: 'order_completed',
+        rules: VALID_EVENT_RULES,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toBeInstanceOf(FieldMappingNotFoundError);
+  });
+
+  it('records an audit log entry with before/after values', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Mapping Update Audit Org');
+    await registerOrderCompletedSchema(organization.id, project.id, owner.id);
+    const mapping = await createFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      kind: 'event',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      createdByUserId: owner.id,
+    });
+    const originalRules = mapping.rules;
+
+    const updated = await updateFieldMapping({
+      organizationId: organization.id,
+      projectId: project.id,
+      fieldMappingId: mapping.id,
+      name: 'Updated name',
+      schemaName: 'order_completed',
+      rules: VALID_EVENT_RULES,
+      actorUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const updateEntry = entries.find((entry) => entry.action === 'field_mapping.update' && entry.target_id === mapping.id);
+    expect(updateEntry).toBeTruthy();
+    expect(updateEntry?.actor_id).toBe(owner.id);
+    expect(updateEntry?.before).toEqual({ name: 'Original name', schemaName: 'order_completed', rules: originalRules });
+    expect(updateEntry?.after).toEqual({ name: 'Updated name', schemaName: 'order_completed', rules: updated.rules });
   });
 });
 

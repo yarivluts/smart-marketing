@@ -58,6 +58,7 @@ import {
   detachResource as detachResourceInOrganization,
   disableFieldMapping as disableFieldMappingInOrganization,
   enableFieldMapping as enableFieldMappingInOrganization,
+  updateFieldMapping as updateFieldMappingInOrganization,
   enableHookEndpoint as enableHookEndpointInOrganization,
   enablePlugin as enablePluginInOrganization,
   type EnsureTouchpointSchemaRegisteredResult,
@@ -579,6 +580,21 @@ interface EnableFieldMappingInput {
 export async function enableFieldMapping(input: EnableFieldMappingInput): Promise<FieldMappingModel> {
   await ensureFirestoreOrm();
   return enableFieldMappingInOrganization(input);
+}
+
+interface UpdateFieldMappingInput {
+  organizationId: string;
+  projectId: string;
+  fieldMappingId: string;
+  name: string;
+  schemaName: string;
+  rules: readonly MappingRuleInput[];
+  actorUserId: string;
+}
+
+export async function updateFieldMapping(input: UpdateFieldMappingInput): Promise<FieldMappingModel> {
+  await ensureFirestoreOrm();
+  return updateFieldMappingInOrganization(input);
 }
 
 interface TestRunFieldMappingInput {

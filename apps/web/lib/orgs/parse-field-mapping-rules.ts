@@ -87,3 +87,33 @@ export async function parseCreateFieldMappingRequestBody(request: NextRequest): 
     rules: parsedRules.rules,
   };
 }
+
+export type ParsedUpdateFieldMappingRequest =
+  | { name: string; schemaName: string; rules: MappingRuleInput[]; error?: undefined }
+  | { error: NextResponse };
+
+/** JSON-body parsing + validation for `PATCH /field-mappings/[fieldMappingId]` (KAN-121) — `kind`/`environmentId`/`hookEndpointId` are immutable on update, so unlike {@link parseCreateFieldMappingRequestBody} this never reads them from the body. */
+export async function parseUpdateFieldMappingRequestBody(request: NextRequest): Promise<ParsedUpdateFieldMappingRequest> {
+  const parsed = await parseJsonBody<{
+    name?: unknown;
+    schemaName?: unknown;
+    rules?: unknown;
+  }>(request);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+
+  const { name, schemaName, rules: rawRules } = parsed.body;
+  if (typeof name !== 'string' || name.trim().length === 0) {
+    return { error: NextResponse.json({ error: 'name_required' }, { status: 400 }) };
+  }
+  if (typeof schemaName !== 'string' || schemaName.trim().length === 0) {
+    return { error: NextResponse.json({ error: 'schema_name_required' }, { status: 400 }) };
+  }
+  const parsedRules = parseFieldMappingRulesBody(rawRules);
+  if (parsedRules.error) {
+    return { error: parsedRules.error };
+  }
+
+  return { name, schemaName, rules: parsedRules.rules };
+}
