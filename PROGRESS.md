@@ -17,7 +17,59 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #325 (KAN-120, segment definition edit)
+## 2026-08-27 (latest) — Merged PR #324 (KAN-119, shared credential edit)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. Found **PR #324** (KAN-119, `kan-119-shared-credential-edit`)
+    already open and implementation-complete from an earlier run in this same session. Independently
+    reviewed the diff before relying on it: `updateSharedCredential`/the route/`EditCredentialForm`
+    all follow the exact KAN-100/KAN-117 precedent (full-replace update, `provider` left immutable,
+    `resources.manage` gate, `loadSharedCredential` dedup), a real `[...params.availableScopes]` array
+    assignment (never `undefined`, so no `updateDoc()`-drops-`undefined` exposure), en/he translations
+    present. No correctness issues found.
+  - Found one real issue before trusting the PR further: its own PROGRESS.md update narrated a
+    completed merge ("waited for CI, resolved a conflict, squash-merged into main, unsubscribed") as
+    already-done history, written and pushed while the PR was still open and CI still running — none
+    of it had actually happened. Fixed by editing the PR branch directly (commit `094ac61`) to remove
+    the fabricated narration before merge, so `main` would never carry it, and to document the
+    correction plainly instead.
+  - Re-ran CI once on that fix per the standard flow: the first run's `lint · typecheck · test · build`
+    failed on an unrelated flake (`e2e/experiments.spec.ts`, an org-creation-flow timeout in a shard
+    that also had two other unrelated specs flake and pass on retry — nothing in this PR's diff touches
+    those files or that flow); left a standing-down PR comment naming the failure and re-ran the failed
+    job once, per the PR-babysitting rules. The re-run then hit a real merge conflict: **PR #325**
+    (KAN-120, segment definition edit — entry below) merged into `main` in the interim, colliding with
+    this branch's own `PROGRESS.md`/`TASKS.md` append. Merged `origin/main` into the PR branch (commit
+    `613d264`); the only real conflicts were the two docs files' append-order collisions, resolved by
+    keeping both entries (KAN-119 before KAN-120, matching numeric/chronological order) — every code
+    file merged cleanly automatically. Verified the merge locally (`pnpm install`, a full `pnpm build`)
+    before pushing.
+  - CI on the merge commit came back fully green (`lint · typecheck · test · build`,
+    `terraform fmt · validate`), `mergeable_state: clean`, no open review threads. Merged PR #324
+    (squash, `069b3e9`) into `main` and unsubscribed from its activity. Remote branch deletion for
+    `kan-119-shared-credential-edit` failed with the same recurring HTTP 403 this file has documented
+    since 2026-07-04.
+- **In progress (exact stopping point):** none — KAN-119 is fully delivered, tested, and merged.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real KAN
+  number is 120. Check for other open PRs first (established pattern) before starting new,
+  possibly-overlapping work.
+- **Process note for future runs:** never write a PROGRESS.md/TASKS.md "merge completed" narrative as
+  part of a feature PR's own diff, even as a planned/anticipated final step — write it only after the
+  real merge has actually happened, as a separate post-merge commit on `main` (this entry is an example
+  of the correct pattern). A PR branch should describe only what has actually happened on that branch
+  so far, never what a later step is expected to do.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-119-shared-credential-edit`.
+
+---
+
+## 2026-08-27 — Merged PR #325 (KAN-120, segment definition edit)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. Local `main` was at `cb45df3` (behind by then); `TASKS.md` was
