@@ -17,6 +17,107 @@ Template for each entry:
 
 ---
 
+## 2026-08-27 (latest) — Merged PR #332 (KAN-124, org/project settings edit)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `main` was at `4e61226` (KAN-122/KAN-123 merges recorded) at
+    pick time; `TASKS.md` had zero `todo` rows left. Checked open PRs first (established pattern)
+    and found none in flight yet.
+  - Also found and fixed a real environment problem before starting real work: this session's
+    local `main` was pinned to a stale, unrelated shallow-clone ancestor (`781108e`, ~50 commits
+    behind `origin/main`'s `8a1cc6f`, no common `git merge-base` — the "shallow-clone quirk" prior
+    entries (e.g. KAN-73's PR #294) document, apparently able to affect a whole local `main` ref,
+    not just a single feature branch snapshot). `git status` confirmed no uncommitted work sat on
+    it before fixing via `git checkout -B main origin/main` — safe since nothing local was based
+    on the stale ref; all real work for this run happened on a fresh feature branch cut from a
+    freshly-fetched `origin/main` anyway, so this was cosmetic cleanup, not a blocker.
+  - Delegated a research sweep (Explore agent) for a still-genuinely-open, buildable-today gap. It
+    found: `OrganizationModel`/`ProjectModel` (KAN-25, the tenancy root itself) had create + list
+    only — an org's `name`/`slug`/`billing_email` or a project's `name`/`vertical`, set once at
+    creation, could never be corrected. Same "create + list only, no way to fix a typo'd
+    definition" gap KAN-100/117/119/120/121/123 already closed for their own sibling registries,
+    confirmed via a direct create/list/update audit across every `.service.ts` in
+    `packages/firebase-orm-models` (only `organization.service.ts` — and `hook.service.ts`, closed
+    by KAN-123 the same day — lacked an `update*` function among the simple name/config
+    registries).
+  - Implemented **KAN-124**: `updateOrganization` (`organization.service.ts`) corrects
+    `name`/`slug`/`billing_email`, gated at the route layer on **`billing.manage`** — a permission
+    that existed in the catalog since KAN-23 (org-owner-only, deliberately withheld from
+    `org_admin`) but had never gated any real route until this PR. `updateProjectDetails`
+    (`project-settings.service.ts`) corrects `name`/`vertical`, gated on `project.manage`, same as
+    the session-replay/cost-guardrail routes; `session_replay_url_template` keeps its own dedicated
+    route/page, untouched. Both optional fields clear via an empty string (never `undefined`),
+    reusing the same ORM-`updateDoc()`-drops-`undefined` fix `setProjectSessionReplayUrlTemplate`/
+    `updateResourceTemplate` already established — verified with an explicit "clears rather than
+    leaves the old value" emulator test for each, same posture as those two stories' own regression
+    tests. New `PATCH /api/orgs/[orgId]` and `PATCH /api/orgs/[orgId]/projects/[projectId]` routes
+    + `orgs/[orgId]/settings`/`orgs/[orgId]/projects/[projectId]/settings` admin pages, linked from
+    the org detail page (gated the same way as their routes). Every mutation audit-logs
+    (`organization.update`/`project.update`) with before/after values.
+  - Full test coverage added: `organization.service.emulator.test.ts` (5 tests: update, clear
+    optional fields, blank-name rejection, not-found, audit log entry) and
+    `project-settings.emulator.test.ts` (6 tests: same coverage plus cross-org isolation), both
+    against a real Firestore emulator; route tests for both `PATCH` handlers (auth,
+    non-enumeration — 404 not 403 — permission denial for an `org_admin` lacking `billing.manage`
+    and a `viewer` lacking `project.manage`, validation, happy path); component tests for both new
+    settings forms (prefill, submit, client-side validation, server-error handling).
+  - Checked for KAN number collisions before starting (none) and again right before opening the
+    PR — caught that PR #330 (hook-endpoint edit) had already claimed **KAN-123** moments earlier,
+    so this took **KAN-124** directly rather than needing a post-merge renumbering follow-up (the
+    KAN-121/122 collision two runs ago cost exactly that avoidable extra PR).
+  - Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck` green; `pnpm test` green across all 11
+    turbo tasks both before and after merging a since-advanced `main` into the branch (2-4 flaky
+    e2e specs each run — `orgs.spec.ts`, `resource-library.spec.ts`, `schema-registry.spec.ts`,
+    `onboarding.spec.ts`, `plugins.spec.ts`, etc. — all recovered on retry, the well-documented
+    sandboxed-load flakiness this file has repeatedly named since 2026-07-04, none touching this
+    diff's files). Self-reviewed the full diff before opening the PR — no issues found.
+  - Opened **PR #332** (`kan-124-org-project-settings-edit`), subscribed to its activity. First CI
+    run (against the `main` at pick time) came back green
+    (`lint · typecheck · test · build`, `terraform fmt · validate`); since `main` had advanced
+    meanwhile (KAN-123 merged), merged `origin/main` into the branch, re-verified the full local
+    suite green, and pushed — the resulting CI run also came back fully green. The PR was merged
+    (by the repo owner, ahead of this run's own scheduled 35-minute CI check-in) before this run
+    got to merge it itself — confirmed via a fresh `pull_request_read` showing `merged: true`. No
+    open review threads at any point. Unsubscribed once confirmed merged. Remote branch deletion
+    for `kan-124-org-project-settings-edit` failed with the same recurring HTTP 403.
+  - **Collision found post-merge (not this run's to fix):** pulling fresh `main` revealed
+    **PR #333** (`kan-124-plugin-install-config-edit`, unrelated: editing an installed plugin's own
+    config values) independently also claims **KAN-124**, still open as of this entry. Since
+    PR #332 merged first, PR #333 will need to renumber to KAN-125+ before/at its own merge, per
+    this repo's established "second-to-merge renumbers" convention.
+  - Also sent a push notification flagging **PR #327** (`feature/easysign-schemaregistry-integration`,
+    titled as resolving already-`done` KAN-80/81/82 but actually introducing an unrelated "EasySign"
+    e-signature product — 68 files, +7255/-771, including `infra/terraform/cloud_run.tf` changes)
+    since it has now sat open and unresolved across at least three scheduled runs (see the two
+    entries below) without any human decision — this run did not touch it, per the same "not this
+    run's PR to fix" posture the prior two entries already established.
+- **In progress (exact stopping point):** none — KAN-124 is fully delivered, tested, and merged.
+  This entry's own TASKS.md/PROGRESS.md updates are being committed directly to `main` per this
+  repo's established convention (a separate small chore commit/PR after the feature PR merges,
+  same as the KAN-121/122/123 entries below did), not stacked onto PR #332 itself.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest
+  confirmed-merged KAN number is 124 (KAN-125 is the next free number once PR #333 renumbers).
+  Check the current state of PR #327 and PR #333 before minting a new number, per this entry's own
+  and prior entries' process notes: re-check `TASKS.md` on a **freshly-pulled** `main` immediately
+  before merging, not just before opening.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - **PR #327** (EasySign) — flagged via push notification this run; still needs a human decision
+    on whether it belongs in this repo at all (see the two entries below for the original
+    findings — no prior trace of "EasySign" anywhere in this repo's history, and it touches core
+    layout files + `infra/terraform/cloud_run.tf`).
+  - **PR #333** — will need to renumber off KAN-124 before/at its own merge (not urgent — a normal
+    part of this repo's established collision-handling convention, just flagging for the next run
+    that picks it up).
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote) — now also including `kan-124-org-project-settings-edit`.
+
+---
+
 ## 2026-08-27 (latest) — Merged PR #329 (KAN-122 renumbering) and PR #330 (KAN-123, hook endpoint edit)
 
 - **Last completed:**
