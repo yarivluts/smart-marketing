@@ -37,14 +37,30 @@ Template for each entry:
     (squash, `e81ca2a`). Branch deletion not attempted (no branch-delete tool available in this
     session's GitHub MCP toolset; prior runs hit a persistent HTTP 403 on this anyway).
   - `main` is now caught up through **KAN-127**.
-- **In progress (exact stopping point):** none — the PR-merge housekeeping is a clean stopping
-  point. Did not additionally attempt a fresh sweep-and-implement cycle for a new follow-up task
-  this run, to avoid colliding with other concurrent sessions immediately after just resolving one
-  such collision pattern (same caution noted in the 2026-08-27 entry below).
-- **Blocked + why:** nothing blocking the next code task.
-- **Next step:** next run checks open PRs first (as always), then — since the primary backlog
-  (KAN-17..KAN-127) is exhausted except `needs-human`/`blocked-by` rows — resumes the
-  "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pattern that
+  - Opened **PR #341** to record the above in this file. Its `lint · typecheck · test · build`
+    check failed twice in a row (the second after this run's one allowed re-run) with the exact
+    same `FIRESTORE (11.10.0) INTERNAL ASSERTION FAILED: Unexpected state (ID: 27ce)` unhandled-
+    rejection crash both times, but hitting two different, unrelated emulator test files
+    (`quality-score-pack.emulator.test.ts` then `campaign-ops-pack.emulator.test.ts`) — confirmed
+    unrelated to this PR's diff (`PROGRESS.md` only, zero code touched). Root-caused it to the
+    same upstream Firestore-emulator bug `packages/firebase-orm-models/vitest.config.ts` already
+    documents (firebase/firebase-tools#8654, corrupted oversized Listen-stream messages) — but a
+    different symptom of it: an **unhandled promise rejection** during stream deserialization,
+    which crashes the whole `vitest run` process before that file's existing `retry: 1`
+    mitigation (which only catches thrown test-body failures) can apply. Posted a comment on
+    PR #341 with this root cause, spent the one-re-run budget, and left it CI-red rather than
+    re-running a third time or widening the docs PR with an improvised test-harness fix. Scheduled
+    a self check-in.
+- **In progress (exact stopping point):** **PR #341** open, CI red on the unhandled-rejection
+  variant of the known emulator bug described above — not a real defect in the PR, just needs CI
+  to come back clean (possibly on a natural future run, since this bug is intermittent) before
+  merging. A scheduled check-in will retry passively (no more re-runs) and merge once green.
+- **Blocked + why:** PR #341 (docs-only PROGRESS.md update) blocked on CI flake, not code — see
+  above; nothing blocking real code work.
+- **Next step:** next run checks open PRs first (as always, including finishing off PR #341 once
+  its CI clears), then — since the primary backlog (KAN-17..KAN-127) is exhausted except
+  `needs-human`/`blocked-by` rows — resumes the "sweep every `done` row's own doc-comment notes for
+  a newly-buildable follow-up" pattern that
   produced KAN-100 through KAN-127.
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
@@ -52,6 +68,16 @@ Template for each entry:
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
   - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
     on `origin` (branch deletion keeps failing / has no available tool from this sandbox).
+  - Worth a look: the known Firestore-emulator bug (firebase/firebase-tools#8654,
+    `packages/firebase-orm-models/vitest.config.ts`'s own doc comment) has an **unhandled-
+    rejection variant** not covered by that file's existing `retry: 1`/timeout mitigation — it
+    crashes the whole `vitest run` process (not just one test) and can land on any emulator test
+    file, as seen twice on PR #341. A process-level `unhandledRejection` handler scoped to this
+    exact known corrupted-message signature (to soft-retry or otherwise not hard-crash the whole
+    suite) would remove a recurring cause of otherwise-unrelated PRs (including trivial docs-only
+    ones) needing a human's attention or a lucky re-run to get green. Flagged as a real
+    engineering task, not attempted this run (didn't want to improvise a test-harness fix inside
+    an unrelated docs PR — see PR #341's own comment thread for the full root-cause writeup).
 
 ---
 
