@@ -17,6 +17,51 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 (later) — Checked state again: KAN-129 merged, KAN-130 + a progress-journal PR both already in flight from concurrent sessions
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` still has zero `todo` rows (only `needs-human`
+    KAN-43 and `blocked-by` KAN-50/51); confirmed **KAN-129** (resource-library archive/unarchive)
+    is now `done` in `TASKS.md` — the two PRs (#344/#345) the previous run found mid-CI have since
+    merged.
+  - Checked open PRs before starting anything new (established collision-avoidance pattern) and
+    found three:
+    - **PR #348** (`kan-129-win-rule-edit`, titled for **KAN-130**: editing an already-created win
+      rule's own definition) — opened by a concurrent session continuing the "sweep every `done`
+      row for a newly-buildable follow-up" pattern (KAN-100 through KAN-129). CI
+      (`lint · typecheck · test · build`) was `in_progress` at check time, `terraform fmt ·
+      validate` already green.
+    - **PR #347** (`chore/progress-2026-08-28-kan129`) — a concurrent session's own PROGRESS.md
+      journal update recording the PR #342/KAN-129 merges. Also mid-CI, no failure yet.
+    - **PR #327** (EasySign, `feature/easysign-schemaregistry-integration`) — still the repo
+      owner's own manual work per every prior run's confirmation; `mergeable_state: dirty`
+      (conflicts with `main`), left untouched again since it isn't this agent's to resolve.
+  - Neither #348 nor #347 had a CI failure, review comment, or merge-conflict signal to act on, so
+    this run did not duplicate their work. Subscribed this session to both (`subscribe_pr_activity`)
+    so a CI failure or review lands here and gets driven to green if no other session gets there
+    first — same "no action lost" posture as every prior multi-session collision in this repo.
+- **In progress (exact stopping point):** watching PR #348 and PR #347 for CI completion / review
+  activity. Once #348 merges, `TASKS.md` will need its KAN-130 row (the PR itself should add it,
+  matching every prior KAN-100+ follow-up's own convention).
+- **Blocked + why:** nothing blocking new code work in the sense of a missing task — the primary
+  backlog is exhausted and the two live candidates for "next work" (KAN-130, the progress-journal
+  update) are already claimed by concurrent sessions. Once either lands, the next natural task is
+  resuming the sweep pattern from wherever KAN-130 leaves off, or continuing the campaign-pages
+  goal's own noted "next slices" (real GAQL/Meta live-state reads once KAN-43 lands; per-ad
+  performance tiles off `ad_performance_daily`).
+- **Next step:** next run (or this session, if a webhook event fires first) checks PR #348/#347
+  status; if both already merged/closed by the time it runs, resume the sweep pattern past KAN-130
+  or pick up the campaign-pages goal's next slice.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature
+    branches on `origin` (branch deletion has consistently failed / had no available tool from
+    this sandbox in prior runs).
+
+---
+
 ## 2026-08-28 — Campaigns & Ads pages shipped AND validated live on EasySign (Yariv's new goal, slice 1)
 
 - **Last completed:** Yariv's directive (set as a session goal): pages to view the actual ads from
