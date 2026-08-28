@@ -1834,7 +1834,7 @@
       "metric_not_registered": "The ad_spend metric is not registered in this project - install the SaaS marketing metric pack to enable spend tracking.",
       "not_yet_backed": "The spend table has not been built in the warehouse yet.",
       "quota_exceeded": "This project's query quota is exhausted - spend will render again when the quota resets.",
-      "query_error": "The spend query failed - the last recorded campaign state is unaffected."
+      "query_error": "Spend is not available for this campaign yet - the warehouse has no spend table provisioned for this project. The campaign state above is unaffected."
     },
     "platform": {
       "google_ads": "Google Ads",

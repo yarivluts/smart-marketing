@@ -240,6 +240,13 @@ describe('toAutomationTargetView (KAN-73 follow-up)', () => {
     expect(view.importedObjective).toBeUndefined();
   });
 
+  it('normalizes the ORM-written epoch updated_at into an ISO timestamp, and leaves an ISO string as-is', () => {
+    const epochView = toAutomationTargetView(target({ id: 't7', updated_at: 1787941740032 as unknown as string }));
+    expect(epochView.updatedAt).toBe('2026-08-28T18:29:00.032Z');
+    const isoView = toAutomationTargetView(target({ id: 't8', last_read_state_at: '2026-08-28T18:29:00.032Z' }));
+    expect(isoView.lastReadStateAt).toBe('2026-08-28T18:29:00.032Z');
+  });
+
   it('omits the imported/synced fields entirely for a target that was never imported', () => {
     const view = toAutomationTargetView(target({ id: 't6' }));
     expect(view.externalPlatform).toBeUndefined();

@@ -94,12 +94,31 @@ function parseImportedAds(raw: string | undefined): { ads?: ImportedAdView[]; ob
   }
 }
 
+/**
+ * `updated_at` is one of @arbel/firebase-orm's reserved `BaseModel` fields:
+ * every `.save()` overwrites it with `Date.getTime()` (a number), regardless
+ * of the ISO string the service assigned — so a target row read back carries
+ * an epoch number there while the fields this codebase owns outright (e.g.
+ * `last_read_state_at`) keep their ISO string. Normalizing here keeps the
+ * pages from rendering a raw epoch at the reader.
+ */
+function toIsoTimestamp(value: string | number | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'number') {
+    return new Date(value).toISOString();
+  }
+  const asNumber = Number(value);
+  return Number.isFinite(asNumber) && value.trim() !== '' && !value.includes('-') ? new Date(asNumber).toISOString() : value;
+}
+
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
   const imported = parseImportedAds(target.imported_ads_json);
   return {
     ...(imported.ads !== undefined ? { importedAds: imported.ads } : {}),
     ...(imported.objective !== undefined ? { importedObjective: imported.objective } : {}),
-    ...(target.last_read_state_at !== undefined ? { lastReadStateAt: target.last_read_state_at } : {}),
+    ...(target.last_read_state_at !== undefined ? { lastReadStateAt: toIsoTimestamp(target.last_read_state_at) } : {}),
     ...(target.external_platform !== undefined ? { externalPlatform: target.external_platform } : {}),
     id: target.id,
     targetType: target.target_type,
@@ -110,7 +129,7 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     ...(target.campaign_resource_name !== undefined ? { campaignResourceName: target.campaign_resource_name } : {}),
     ...(target.campaign_budget_resource_name !== undefined ? { campaignBudgetResourceName: target.campaign_budget_resource_name } : {}),
     ...(target.campaign_status !== undefined ? { campaignStatus: target.campaign_status } : {}),
-    ...(target.updated_at !== undefined ? { updatedAt: target.updated_at } : {}),
+    ...(target.updated_at !== undefined ? { updatedAt: toIsoTimestamp(target.updated_at) } : {}),
     ...(target.ad_group_resource_names !== undefined ? { adGroupResourceNames: target.ad_group_resource_names } : {}),
     ...(target.ad_resource_names !== undefined ? { adResourceNames: target.ad_resource_names } : {}),
     ...(target.meta_ad_set_resource_names !== undefined ? { metaAdSetResourceNames: target.meta_ad_set_resource_names } : {}),
