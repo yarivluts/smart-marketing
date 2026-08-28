@@ -1441,6 +1441,8 @@
     "saveSettings": "שמור הגדרות",
     "cancelEditSettings": "בטל",
     "editSettingsError": "לא ניתן היה לשמור את ההגדרות. נסה שוב.",
+    "editSettingsErrorInvalidBoards": "אחד הלוחות שנבחרו כבר לא קיים בפרויקט זה. רענן את הדף ונסה שוב.",
+    "editSettingsErrorRevoked": "צימוד הטלוויזיה בוטל ולא ניתן עוד לערוך אותה. רענן את הדף כדי לראות את המצב העדכני.",
     "pairHeading": "צמד טלוויזיה חדשה",
     "noBoards": "צור לוח קודם כדי לצמד טלוויזיה.",
     "codeLabel": "קוד צימוד",

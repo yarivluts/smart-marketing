@@ -85,7 +85,7 @@ describe('EditTvPairingSettingsForm', () => {
     expect(screen.getByRole('button', { name: 'Save settings' })).toBeDisabled();
   });
 
-  it('shows an inline error and stays open when saving fails', async () => {
+  it('shows a generic inline error and stays open when saving fails without a known error code', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({}) } as Response);
     renderForm();
 
@@ -95,6 +95,26 @@ describe('EditTvPairingSettingsForm', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not save these settings. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
     expect(screen.getByLabelText('TV label')).toBeInTheDocument();
+  });
+
+  it('shows a specific error when a board no longer exists in the project', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({ error: 'invalid_tv_pairing', reasons: ['Board "board-1" does not exist in this project.'] }) } as Response);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('One of the selected boards no longer exists in this project. Refresh the page and try again.');
+  });
+
+  it('shows a specific error when the pairing has been revoked', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false, json: async () => ({ error: 'revoked' }) } as Response);
+    renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save settings' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This TV has been unpaired and can no longer be edited. Refresh the page to see its current status.');
   });
 
   it('cancels back to the Edit button without submitting, discarding edits', () => {

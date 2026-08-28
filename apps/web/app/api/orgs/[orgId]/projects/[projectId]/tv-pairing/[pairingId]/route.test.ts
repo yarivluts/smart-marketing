@@ -8,6 +8,7 @@ import {
   createProject,
   ensureUserForFirebaseSession,
   requestTvPairing,
+  revokeTvPairing,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { DELETE, PATCH } from './route';
@@ -186,6 +187,37 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/tv-pairing/[pairingId]', 
     const body = (await response.json()) as { error: string; reasons: string[] };
     expect(body.error).toBe('invalid_tv_pairing');
     expect(body.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('returns 409 when editing an already-revoked pairing', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('update-tv-revoked-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Update TV Revoked Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+    const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'War room', createdByUserId: owner.id });
+    const { code } = await requestTvPairing();
+    const pairing = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 30,
+      reducedMotion: false,
+      label: 'Doomed TV',
+      claimedByUserId: owner.id,
+    });
+    await revokeTvPairing({ organizationId: organization.id, projectId: project.id, pairingId: pairing.id, revokedByUserId: owner.id });
+
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = updateSettingsRequest(organization.id, project.id, pairing.id, {
+      label: 'Should not apply',
+      boardIds: [board.id],
+      rotationSeconds: 30,
+      reducedMotion: false,
+    });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: 'revoked' });
   });
 
   it('edits a paired TV\'s settings and returns the updated summary view', async () => {

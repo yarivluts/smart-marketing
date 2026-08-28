@@ -20,6 +20,13 @@ export class TvPairingNotFoundError extends Error {
   }
 }
 
+export class TvPairingRevokedError extends Error {
+  constructor() {
+    super('This TV pairing has been revoked and can no longer be edited.');
+    this.name = 'TvPairingRevokedError';
+  }
+}
+
 /** How long a freshly requested pairing code stays redeemable before the TV must request a new one — long enough for a human to walk over and type it, short enough that a code left on screen isn't a standing liability. */
 const CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -386,10 +393,18 @@ export interface UpdateTvPairingSettingsParams {
  * to a different org/project would be a different pairing, not a
  * correction. Reuses {@link validateTvPairingSettingsFields} and
  * {@link validateBoardsExistInProject} directly so claim and update can
- * never validate settings differently.
+ * never validate settings differently. Rejected once the pairing is
+ * `revoked_at` — the same terminal-state posture `updatePluginInstallConfig`
+ * (KAN-125) takes once a plugin install is `uninstalled` — since revocation
+ * has no reverse here (unlike `disableHookEndpoint`'s own enable/disable
+ * pair), so a settings edit past that point could never take visible effect
+ * and would only leave a misleading `tv_pairing.update` audit entry behind.
  */
 export async function updateTvPairingSettings(params: UpdateTvPairingSettingsParams): Promise<TvPairingModel> {
   const pairing = await loadTvPairingInProject(params.organizationId, params.projectId, params.pairingId);
+  if (isRevoked(pairing)) {
+    throw new TvPairingRevokedError();
+  }
 
   const reasons: string[] = [];
   validateTvPairingSettingsFields(params, reasons);

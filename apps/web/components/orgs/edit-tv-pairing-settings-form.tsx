@@ -87,7 +87,26 @@ export function EditTvPairingSettingsForm({
         body: JSON.stringify({ label, boardIds, rotationSeconds, reducedMotion }),
       });
       if (!response.ok) {
-        setError(t('editSettingsError'));
+        // 'invalid_tv_pairing' realistically only fires from a race (a board
+        // removed from the project between page load and submit) since
+        // `canSubmit` already blocks the other `InvalidTvPairingError`
+        // reasons (empty board list, out-of-range rotation, empty label)
+        // client-side — the same "don't surface hard-coded English service
+        // reasons raw" posture `ClaimTvPairingForm`'s own doc comment
+        // explains for its sibling `claimErrorInvalidCode` case.
+        let errorCode: string | undefined;
+        try {
+          errorCode = ((await response.json()) as { error?: string }).error;
+        } catch {
+          // Response body wasn't JSON (or was empty) — fall through to the generic message.
+        }
+        if (errorCode === 'invalid_tv_pairing') {
+          setError(t('editSettingsErrorInvalidBoards'));
+        } else if (errorCode === 'revoked') {
+          setError(t('editSettingsErrorRevoked'));
+        } else {
+          setError(t('editSettingsError'));
+        }
         return;
       }
       setEditing(false);

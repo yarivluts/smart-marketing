@@ -15,6 +15,7 @@ import {
   revokeTvPairing,
   TvPairingModel,
   TvPairingNotFoundError,
+  TvPairingRevokedError,
   updateTvPairingSettings,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -452,5 +453,38 @@ describe('updateTvPairingSettings (KAN-127)', () => {
       reducedMotion: true,
       label: 'Rotating TV',
     });
+  });
+
+  it('rejects editing a revoked pairing, leaving its settings untouched', async () => {
+    const { owner, organization, project, board } = await setupOrgWithProjectAndBoard('TV settings edit org (revoked)');
+    const { code } = await requestTvPairing();
+    const claimed = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 20,
+      reducedMotion: false,
+      label: 'Doomed TV',
+      claimedByUserId: owner.id,
+    });
+    await revokeTvPairing({ organizationId: organization.id, projectId: project.id, pairingId: claimed.id, revokedByUserId: owner.id });
+
+    await expect(
+      updateTvPairingSettings({
+        organizationId: organization.id,
+        projectId: project.id,
+        pairingId: claimed.id,
+        label: 'Should not apply',
+        boardIds: [board.id],
+        rotationSeconds: 20,
+        reducedMotion: true,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toThrow(TvPairingRevokedError);
+
+    const [reloaded] = (await listTvPairingsForProject(organization.id, project.id)).filter((pairing) => pairing.id === claimed.id);
+    expect(reloaded.label).toBe('Doomed TV');
+    expect(reloaded.reduced_motion).toBe(false);
   });
 });
