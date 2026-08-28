@@ -77,7 +77,7 @@ describe('resolveOrgSessionContext', () => {
     expect(bindings.some((binding) => binding.scopeId === organization.id)).toBe(false);
   });
 
-  it('excludes role bindings for a suspended member — the KAN-131 gap membership.model.ts flagged (status alone never affected permission checks before this)', async () => {
+  it('excludes role bindings for a suspended member — the KAN-132 gap membership.model.ts flagged (status alone never affected permission checks before this)', async () => {
     const ownerSession = fakeSession();
     const { user: owner } = await resolveOrgSessionContext(ownerSession);
     const { organization } = await createOrganizationWithOwner({ name: 'Suspend Ctx Org', ownerUserId: owner.id });

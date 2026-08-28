@@ -540,7 +540,7 @@ describe('updateMemberRole', () => {
   });
 });
 
-describe('suspendOrgMember / reactivateOrgMember (KAN-131)', () => {
+describe('suspendOrgMember / reactivateOrgMember (KAN-132)', () => {
   it('removes an active member\'s role binding without removing the membership, then restores it on reactivation', async () => {
     const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-owner') });
     const { organization } = await createOrganizationWithOwner({ name: 'Suspend Org', ownerUserId: owner.id });

@@ -11,7 +11,7 @@ export interface SuspendMemberButtonProps {
 }
 
 /**
- * Pauses an active member's access without removing their membership (KAN-131)
+ * Pauses an active member's access without removing their membership (KAN-132)
  * — the "suspend" counterpart to `RemoveMemberButton`'s permanent removal.
  * Same fetch/error/`router.refresh()` shape as `RemoveMemberButton` and
  * `ChangeRoleControl`, hitting the new `POST .../suspend` sub-route rather

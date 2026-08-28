@@ -8,7 +8,7 @@ interface RouteParams {
 }
 
 /**
- * Pauses an active member's access without removing their membership (KAN-131
+ * Pauses an active member's access without removing their membership (KAN-132
  * — `MembershipModel`'s own doc comment named `suspended` as a status the
  * codebase carried since KAN-25 but never actually wrote or enforced). Same
  * `members.manage` gate as `DELETE`/`PATCH` on this resource, and the same

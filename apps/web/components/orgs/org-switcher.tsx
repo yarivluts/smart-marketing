@@ -11,7 +11,7 @@ export interface OrgSwitcherProps {
 
 /**
  * Lists only the orgs the signed-in user is an active member of (KAN-25 AC —
- * never pending invites; KAN-131 — nor a suspended membership, since
+ * never pending invites; KAN-132 — nor a suspended membership, since
  * `findActiveMembership` would 404 the org page it links to anyway).
  */
 export function OrgSwitcher({ memberships, currentOrgId }: OrgSwitcherProps): React.ReactElement {
