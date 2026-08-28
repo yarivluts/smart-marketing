@@ -17,7 +17,49 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #332 (KAN-124) and PR #333 (KAN-124 collision), fixed via PR #335 (KAN-125)
+## 2026-08-27 (latest) — Merged PR #338 (KAN-126, API key rename)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. Picked up mid-flight behind heavy same-hour concurrent-session
+    activity: this run's own PR #336 (a PROGRESS.md entry recording the PR #333/#335 outcome) was
+    closed as superseded by a concurrent session's consolidated PR #337 — no work lost, this
+    repo's established collision-resolution convention (see PR #337's own entry above) working as
+    intended. Merged PR #337 once its CI came back green.
+  - After PR #337 merged (`main` at `8645024`), found **PR #338** (`kan-126-api-key-rename`)
+    already open from another concurrent session — `key.service.ts`'s `mintApiKey`/
+    `listApiKeysForProject`/`revokeApiKey` (KAN-28/KAN-30) had no way to fix a typo'd key name once
+    minted, the same "create + list only" gap KAN-100 through KAN-125 already closed for their own
+    sibling registries. Correctly numbered KAN-126 with no collision this time (based on the
+    post-KAN-125 `main`). Waited for its CI (`lint · typecheck · test · build`, `terraform fmt ·
+    validate`), confirmed both green with `mergeable_state: clean` and no open review threads, and
+    merged (squash, `22a76ac`). Branch deletion failed with the same recurring HTTP 403.
+  - `main` is now caught up through **KAN-126**. Checked for further open PRs: only #327 (EasySign)
+    remains, previously confirmed the repo owner's own manual work — left untouched.
+- **In progress (exact stopping point):** none — stopping here deliberately rather than starting a
+  new speculative "sweep for a buildable follow-up," since at least 3 other sessions were active
+  against this repo within the same ~2-hour window (this run alone observed KAN-124 claimed twice,
+  independently duplicated PR #336/#337, and PR #338 landing from yet another session). Starting a
+  fourth concurrent sweep right now has a real chance of colliding with one already in flight.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next run checks open PRs first (as always), then resumes the sweep-for-a-
+  newly-buildable-follow-up pattern from **KAN-127** if none are pending.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion keeps failing with an HTTP 403 from this sandbox's git remote).
+  - Worth a look: **scheduled-run cadence/concurrency.** In roughly two hours today, at least four
+    independent sessions were active on this repo simultaneously — two separate KAN-124 claims
+    (PR #332 vs #333), two independent fixes for that same collision (this run's PR #336 vs a
+    concurrent PR #337), and a fresh PR #338 landing mid-cleanup. The repo's renumbering/supersede
+    conventions absorbed all of it without losing work, but a meaningful fraction of each run's
+    effort is going into resolving collisions rather than new work. If the schedule allows it,
+    spacing runs further apart (or capping concurrent runs) would cut the rework rate.
+
+---
+
+## 2026-08-27 — Merged PR #332 (KAN-124) and PR #333 (KAN-124 collision), fixed via PR #335 (KAN-125)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `main` was at `4e61226` (KAN-123/PR #330 merged) at pick time;
