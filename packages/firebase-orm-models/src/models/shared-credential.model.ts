@@ -50,9 +50,14 @@ export class SharedCredentialModel extends BaseModel {
   @Field({ is_required: true })
   public created_by!: string;
 
-  /** Envelope-encrypted secret (OAuth token, API key, etc.) — see the class doc comment. Absent until `setSharedCredentialSecret` is called. */
+  /**
+   * Envelope-encrypted secret (OAuth token, API key, etc.) — see the class doc comment. Absent
+   * (`undefined`) until `setSharedCredentialSecret` is first called; explicit `null` (never
+   * `undefined` — see `archived_at`'s own doc comment for why) once `clearSharedCredentialSecret`
+   * removes it again without touching the rest of the credential record.
+   */
   @Field()
-  public encrypted_secret?: SecretEnvelope;
+  public encrypted_secret?: SecretEnvelope | null;
 
   /**
    * Presence alone means this credential is retired from the library — the same immediate-effect
