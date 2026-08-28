@@ -138,6 +138,8 @@ import {
   registerSchemaDefinition as registerSchemaDefinitionInOrganization,
   removeOrgMember,
   updateMemberRole as updateMemberRoleInOrganization,
+  suspendOrgMember as suspendOrgMemberInOrganization,
+  reactivateOrgMember as reactivateOrgMemberInOrganization,
   replayFailedPipelineMessagesForProject as replayFailedPipelineMessagesForProjectInOrganization,
   sweepQueuedPipelineMessagesForProject as sweepQueuedPipelineMessagesForProjectInOrganization,
   replayQuarantinedRecord as replayQuarantinedRecordInOrganization,
@@ -293,6 +295,30 @@ interface UpdateMemberRoleInput {
 export async function updateMemberRole(input: UpdateMemberRoleInput): Promise<MembershipModel> {
   await ensureFirestoreOrm();
   return updateMemberRoleInOrganization(input.organizationId, input.membershipId, input.role, input.performedByUserId);
+}
+
+interface SuspendMemberInput {
+  organizationId: string;
+  membershipId: string;
+  performedByUserId: string;
+}
+
+/** Pauses an active member's access without removing their membership — see `suspendOrgMember`'s doc comment. */
+export async function suspendMember(input: SuspendMemberInput): Promise<MembershipModel> {
+  await ensureFirestoreOrm();
+  return suspendOrgMemberInOrganization(input.organizationId, input.membershipId, input.performedByUserId);
+}
+
+interface ReactivateMemberInput {
+  organizationId: string;
+  membershipId: string;
+  performedByUserId: string;
+}
+
+/** Restores a suspended member's access — see `reactivateOrgMember`'s doc comment. */
+export async function reactivateMember(input: ReactivateMemberInput): Promise<MembershipModel> {
+  await ensureFirestoreOrm();
+  return reactivateOrgMemberInOrganization(input.organizationId, input.membershipId, input.performedByUserId);
 }
 
 interface CreateSharedCredentialInput {

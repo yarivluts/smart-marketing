@@ -11,6 +11,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import type { PolicyBinding } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 
 export interface OrgSessionContext {
   user: UserModel;
@@ -67,7 +68,7 @@ export const resolveOrgSessionContext = cache(async (session: DecodedIdToken): P
 
   const memberships = await listMembershipsWithOrganizations(user.id);
   const activeOrgIds = memberships
-    .filter((membership) => membership.status !== 'invited')
+    .filter((membership) => isActiveMembershipStatus(membership.status))
     .map((membership) => membership.organizationId);
   const roleBindings = await listRoleBindingsForUser(user.id, activeOrgIds);
   const bindings = toPolicyBindings(roleBindings);
