@@ -30,6 +30,7 @@ import {
   toOrchestrationRunView,
   type OrchestrationRunView,
 } from '@/lib/orgs/orchestration-view';
+import { DismissQuarantinedRecordButton } from '@/components/orgs/dismiss-quarantined-record-button';
 import { ReplayQuarantinedRecordButton } from '@/components/orgs/replay-quarantined-record-button';
 import { RetryFailedPipelineMessagesButton } from '@/components/orgs/retry-failed-pipeline-messages-button';
 import { SweepQueuedPipelineMessagesButton } from '@/components/orgs/sweep-queued-pipeline-messages-button';
@@ -164,7 +165,10 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
                     </span>
                     <span className="text-muted-foreground">{t('reasonsLabel', { reasons: record.reasons.join(', ') })}</span>
                   </div>
-                  <ReplayQuarantinedRecordButton orgId={orgId} projectId={projectId} quarantinedRecordId={record.id} />
+                  <div className="flex items-start gap-2">
+                    <ReplayQuarantinedRecordButton orgId={orgId} projectId={projectId} quarantinedRecordId={record.id} />
+                    <DismissQuarantinedRecordButton orgId={orgId} projectId={projectId} quarantinedRecordId={record.id} />
+                  </div>
                 </div>
               </li>
             ))}

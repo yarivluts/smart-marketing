@@ -144,6 +144,8 @@ import {
   sweepQueuedPipelineMessagesForProject as sweepQueuedPipelineMessagesForProjectInOrganization,
   replayQuarantinedRecord as replayQuarantinedRecordInOrganization,
   type ReplayQuarantinedRecordResult,
+  dismissQuarantinedRecord as dismissQuarantinedRecordInOrganization,
+  type DismissQuarantinedRecordResult,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
   rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
@@ -878,6 +880,23 @@ interface ReplayQuarantinedRecordInput {
 export async function replayQuarantinedRecord(input: ReplayQuarantinedRecordInput): Promise<ReplayQuarantinedRecordResult> {
   await ensureFirestoreOrm();
   return replayQuarantinedRecordInOrganization(
+    input.organizationId,
+    input.projectId,
+    input.quarantinedRecordId,
+    input.performedByUserId,
+  );
+}
+
+interface DismissQuarantinedRecordInput {
+  organizationId: string;
+  projectId: string;
+  quarantinedRecordId: string;
+  performedByUserId: string;
+}
+
+export async function dismissQuarantinedRecord(input: DismissQuarantinedRecordInput): Promise<DismissQuarantinedRecordResult> {
+  await ensureFirestoreOrm();
+  return dismissQuarantinedRecordInOrganization(
     input.organizationId,
     input.projectId,
     input.quarantinedRecordId,

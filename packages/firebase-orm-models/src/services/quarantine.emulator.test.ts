@@ -3,12 +3,14 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import {
   createOrganizationWithOwner,
   createProject,
+  dismissQuarantinedRecord,
   ensureUserForFirebaseSession,
   evolveSchemaDefinition,
   getIngestBatch,
   ingestBatch,
   listQuarantinedRecordsForProject,
   listRawRecordsForBatch,
+  QuarantinedRecordNotActionableError,
   QuarantinedRecordNotFoundError,
   registerSchemaDefinition,
   replayQuarantinedRecord,
@@ -290,6 +292,106 @@ describe('replayQuarantinedRecord', () => {
     const { owner, organization, project } = await setupProject('Unknown Id Org');
     await expect(
       replayQuarantinedRecord(organization.id, project.id, 'does-not-exist', owner.id),
+    ).rejects.toBeInstanceOf(QuarantinedRecordNotFoundError);
+  });
+});
+
+describe('dismissQuarantinedRecord', () => {
+  it('permanently discards a quarantined record without attempting to replay it', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Dismiss Success Org');
+    await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: 'e-abandoned', event: 'signup', ts: '2026-07-07T10:00:00Z' }] },
+    });
+    const [quarantined] = await listQuarantinedRecordsForProject(organization.id, project.id);
+
+    const result = await dismissQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id);
+    expect(result).toEqual({ outcome: 'dismissed' });
+
+    // Drops out of the "still needs action" list — same posture as a replayed record.
+    const stillListed = await listQuarantinedRecordsForProject(organization.id, project.id);
+    expect(stillListed).toHaveLength(0);
+  });
+
+  it('throws QuarantinedRecordNotActionableError for a record that has already been replayed', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Dismiss After Replay Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'signup',
+      fields: [{ name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+    await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: {
+        kind: 'event',
+        records: [{ event_id: 'e-already-replayed', event: 'signup', ts: '2026-07-07T10:00:00Z', properties: { plan: 'pro', referrer: 'x' } }],
+      },
+    });
+    const [quarantined] = await listQuarantinedRecordsForProject(organization.id, project.id);
+    expect(quarantined.reasons).toEqual(['unregistered_field:referrer']);
+
+    await evolveSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'signup',
+      fields: [
+        { name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
+        { name: 'referrer', type: 'string', isRequired: false, isPii: false, isIdentityKey: false },
+      ],
+      createdByUserId: owner.id,
+    });
+    const replayResult = await replayQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id);
+    expect(replayResult).toEqual({ outcome: 'accepted' });
+
+    await expect(
+      dismissQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id),
+    ).rejects.toBeInstanceOf(QuarantinedRecordNotActionableError);
+  });
+
+  it('throws QuarantinedRecordNotActionableError for a record that has already been dismissed', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Dismiss Twice Org');
+    await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: 'e-dismiss-twice', event: 'signup', ts: '2026-07-07T10:00:00Z' }] },
+    });
+    const [quarantined] = await listQuarantinedRecordsForProject(organization.id, project.id);
+    await dismissQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id);
+
+    await expect(
+      dismissQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id),
+    ).rejects.toBeInstanceOf(QuarantinedRecordNotActionableError);
+  });
+
+  it('throws QuarantinedRecordNotFoundError for an id from a sibling project', async () => {
+    const { organization, project, prodEnvironment } = await setupProject('Dismiss Isolation Org A');
+    const other = await setupProject('Dismiss Isolation Org B');
+    await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: 'e1', event: 'signup', ts: '2026-07-07T10:00:00Z' }] },
+    });
+    const [quarantined] = await listQuarantinedRecordsForProject(organization.id, project.id);
+
+    await expect(
+      dismissQuarantinedRecord(other.organization.id, other.project.id, quarantined.id, other.owner.id),
+    ).rejects.toBeInstanceOf(QuarantinedRecordNotFoundError);
+  });
+
+  it('throws QuarantinedRecordNotFoundError for an unknown id', async () => {
+    const { owner, organization, project } = await setupProject('Dismiss Unknown Id Org');
+    await expect(
+      dismissQuarantinedRecord(organization.id, project.id, 'does-not-exist', owner.id),
     ).rejects.toBeInstanceOf(QuarantinedRecordNotFoundError);
   });
 });
