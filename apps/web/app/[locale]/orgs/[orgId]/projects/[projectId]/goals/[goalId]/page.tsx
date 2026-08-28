@@ -4,10 +4,11 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { getGoal, listOrgPeople, listOrgProjects, queryGoalProgress } from '@/lib/orgs/queries';
+import { getGoal, listMetricsCatalogForProject, listOrgPeople, listOrgProjects, queryGoalProgress } from '@/lib/orgs/queries';
 import { buildGoalThermometerView } from '@/lib/orgs/goal-view';
 import { GoalThermometer } from '@/components/orgs/goal-thermometer';
 import { DeleteGoalButton } from '@/components/orgs/delete-goal-button';
+import { EditGoalForm } from '@/components/orgs/edit-goal-form';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string; goalId: string }>;
@@ -44,7 +45,12 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
     notFound();
   }
 
-  const [projects, goal, people] = await Promise.all([listOrgProjects(orgId), getGoal(orgId, projectId, goalId), listOrgPeople(orgId)]);
+  const [projects, goal, people, metricCatalog] = await Promise.all([
+    listOrgProjects(orgId),
+    getGoal(orgId, projectId, goalId),
+    listOrgPeople(orgId),
+    listMetricsCatalogForProject(orgId, projectId),
+  ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project || !goal) {
     notFound();
@@ -52,7 +58,8 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
 
   const outcome = await queryGoalProgress(orgId, projectId, goal);
   const thermometerView = buildGoalThermometerView(outcome);
-  const ownerName = people.find((person) => person.id === goal.owner_person_id)?.name ?? goal.owner_person_id;
+  const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
+  const ownerName = peopleRows.find((person) => person.id === goal.owner_person_id)?.name ?? goal.owner_person_id;
 
   const t = await getTranslations('Goals');
 
@@ -108,6 +115,25 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
             <dd className="font-medium">{ownerName}</dd>
           </div>
         </dl>
+        {metricCatalog.length > 0 && peopleRows.length > 0 ? (
+          <EditGoalForm
+            orgId={orgId}
+            projectId={projectId}
+            goalId={goalId}
+            metricCatalog={metricCatalog}
+            people={peopleRows}
+            initialName={goal.name}
+            initialMetricName={goal.metric_name}
+            initialDirection={goal.direction}
+            initialTargetValue={goal.target_value}
+            initialRangeMin={goal.range_min}
+            initialRangeMax={goal.range_max}
+            initialStartDate={goal.start_date}
+            initialDeadline={goal.deadline}
+            initialRhythm={goal.rhythm}
+            initialOwnerPersonId={goal.owner_person_id}
+          />
+        ) : null}
       </section>
 
       <section className="flex flex-col gap-3">

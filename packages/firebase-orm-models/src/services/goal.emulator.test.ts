@@ -19,6 +19,7 @@ import {
   registerMetricDefinition,
   setProjectCostQuota,
   updateGoal,
+  updateGoalDefinition,
   type WarehouseQueryExecutor,
   type WarehouseRow,
 } from '../index';
@@ -510,6 +511,216 @@ describe('updateGoal', () => {
     const { owner, organization, project } = await setupOrgWithProject('Goal Update Missing Org');
     await expect(
       updateGoal({ organizationId: organization.id, projectId: project.id, goalId: 'does-not-exist', targetValue: 100, updatedByUserId: owner.id }),
+    ).rejects.toBeInstanceOf(GoalNotFoundError);
+  });
+});
+
+describe('updateGoalDefinition', () => {
+  it('replaces every field of a maximize goal and reloads with the new values', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Definition Update Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    await registerCostPerSignup(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const newOwner = await createOrgPerson({ organizationId: organization.id, name: 'New Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Q3 sgnups', // typo, corrected below
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateGoalDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      goalId: goal.id,
+      name: 'Q3 signups',
+      metricName: 'cost_per_signup',
+      direction: 'minimize',
+      targetValue: 40,
+      startDate: '2026-08-01',
+      deadline: '2026-10-31',
+      rhythm: 'work_week_weekend',
+      ownerPersonId: newOwner.id,
+      updatedByUserId: owner.id,
+    });
+
+    expect(updated.name).toBe('Q3 signups');
+    expect(updated.metric_name).toBe('cost_per_signup');
+    expect(updated.direction).toBe('minimize');
+    expect(updated.target_value).toBe(40);
+    expect(updated.range_min).toBeNull();
+    expect(updated.range_max).toBeNull();
+    expect(updated.start_date).toBe('2026-08-01');
+    expect(updated.deadline).toBe('2026-10-31');
+    expect(updated.rhythm).toBe('work_week_weekend');
+    expect(updated.owner_person_id).toBe(newOwner.id);
+    expect(updated.updated_by).toBe(owner.id);
+
+    const reloaded = await getGoal(organization.id, project.id, goal.id);
+    expect(reloaded).toMatchObject({
+      name: 'Q3 signups',
+      metric_name: 'cost_per_signup',
+      direction: 'minimize',
+      target_value: 40,
+      owner_person_id: newOwner.id,
+    });
+    // Structural/identity fields never change.
+    expect(reloaded?.organization_id).toBe(organization.id);
+    expect(reloaded?.project_id).toBe(project.id);
+    expect(reloaded?.created_by).toBe(owner.id);
+  });
+
+  it('switches a maximize goal to a range goal, clearing target_value and setting range_min/range_max', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Definition Switch Direction Org');
+    await registerCostPerSignup(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Signup cost ceiling',
+      metricName: 'cost_per_signup',
+      direction: 'minimize',
+      targetValue: 50,
+      startDate: '2026-01-01',
+      deadline: '2026-01-31',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    const updated = await updateGoalDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      goalId: goal.id,
+      name: 'Signup cost band',
+      metricName: 'cost_per_signup',
+      direction: 'range',
+      rangeMin: 20,
+      rangeMax: 40,
+      startDate: '2026-01-01',
+      deadline: '2026-01-31',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      updatedByUserId: owner.id,
+    });
+
+    expect(updated.direction).toBe('range');
+    expect(updated.target_value).toBeNull();
+    expect(updated.range_min).toBe(20);
+    expect(updated.range_max).toBe(40);
+  });
+
+  it('records an audit-log entry with before/after values', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Definition Audit Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Q3 signups',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    await updateGoalDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      goalId: goal.id,
+      name: 'Q3 signups (revised)',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1200,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      updatedByUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.target_id === goal.id && candidate.action === 'goal.update_definition');
+    expect(entry).toBeDefined();
+    expect(entry?.before).toMatchObject({ name: 'Q3 signups', target_value: 1000 });
+    expect(entry?.after).toMatchObject({ name: 'Q3 signups (revised)', target_value: 1200 });
+  });
+
+  it('collects every validation reason and leaves the goal unchanged (unknown metric, unknown owner, bad dates)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Definition Invalid Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Q3 signups',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    let caught: InvalidGoalError | undefined;
+    try {
+      await updateGoalDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        goalId: goal.id,
+        name: '   ',
+        metricName: 'does-not-exist',
+        direction: 'maximize',
+        targetValue: 1000,
+        startDate: '2026-09-30',
+        deadline: '2026-07-01', // before startDate
+        rhythm: 'even',
+        ownerPersonId: 'does-not-exist',
+        updatedByUserId: owner.id,
+      });
+    } catch (error) {
+      caught = error as InvalidGoalError;
+    }
+    expect(caught).toBeInstanceOf(InvalidGoalError);
+    expect(caught?.reasons.length).toBeGreaterThanOrEqual(3);
+
+    const reloaded = await getGoal(organization.id, project.id, goal.id);
+    expect(reloaded?.name).toBe('Q3 signups');
+    expect(reloaded?.metric_name).toBe('signups');
+  });
+
+  it('throws GoalNotFoundError for a goal that does not belong to this org+project', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Definition Update Missing Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    await expect(
+      updateGoalDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        goalId: 'does-not-exist',
+        name: 'Q3 signups',
+        metricName: 'signups',
+        direction: 'maximize',
+        targetValue: 1000,
+        startDate: '2026-07-01',
+        deadline: '2026-09-30',
+        rhythm: 'even',
+        ownerPersonId: person.id,
+        updatedByUserId: owner.id,
+      }),
     ).rejects.toBeInstanceOf(GoalNotFoundError);
   });
 });

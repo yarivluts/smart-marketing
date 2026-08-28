@@ -214,4 +214,68 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]', () => {
     const getBody = (await getResult.json()) as { goal: { targetValue: number | null } };
     expect(getBody.goal.targetValue).toBe(1500);
   });
+
+  it('returns 404 for a definition update against a goal id that does not exist', async () => {
+    const { ownerSession, organization, project } = await setupOrgProjectGoal('Goal Patch Definition Missing Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, 'does-not-exist', {
+      name: 'Q3 signups',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: 'does-not-matter',
+    });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(404);
+  });
+
+  it('rejects a definition update naming an unregistered metric, with the service’s reasons', async () => {
+    const { ownerSession, organization, project, goal } = await setupOrgProjectGoal('Goal Patch Definition Invalid Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = patchRequest(organization.id, project.id, goal.id, {
+      name: 'Q3 signups',
+      metricName: 'does-not-exist',
+      direction: 'maximize',
+      targetValue: 1000,
+      startDate: '2026-07-01',
+      deadline: '2026-09-30',
+      rhythm: 'even',
+      ownerPersonId: 'does-not-exist',
+    });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { error: string; reasons: string[] };
+    expect(body.error).toBe('invalid_goal');
+    expect(body.reasons.length).toBeGreaterThan(0);
+  });
+
+  it('replaces the full definition (name/metric/direction/dates/rhythm/owner) and returns the updated summary', async () => {
+    const { ownerSession, organization, project, goal, owner } = await setupOrgProjectGoal('Goal Patch Definition Happy Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const newPerson = await createOrgPerson({ organizationId: organization.id, name: 'New Owner', createdByUserId: owner.id });
+
+    const { request, params } = patchRequest(organization.id, project.id, goal.id, {
+      name: 'Q3 signups (revised)',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 1200,
+      startDate: '2026-07-15',
+      deadline: '2026-10-15',
+      rhythm: 'work_week_weekend',
+      ownerPersonId: newPerson.id,
+    });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { goal: { name: string; targetValue: number | null; ownerPersonId: string } };
+    expect(body.goal.name).toBe('Q3 signups (revised)');
+    expect(body.goal.targetValue).toBe(1200);
+    expect(body.goal.ownerPersonId).toBe(newPerson.id);
+
+    const getResult = await GET(getRequest(organization.id, project.id, goal.id).request, { params: getRequest(organization.id, project.id, goal.id).params });
+    const getBody = (await getResult.json()) as { goal: { name: string; startDate: string; rhythm: string } };
+    expect(getBody.goal).toMatchObject({ name: 'Q3 signups (revised)', startDate: '2026-07-15', rhythm: 'work_week_weekend' });
+  });
 });
