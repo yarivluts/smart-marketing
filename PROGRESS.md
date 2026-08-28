@@ -17,49 +17,6 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (later still) — Drove PR #347's CI flake, merged it and PR #348 (KAN-130); KAN-131 already picked up by another session
-
-- **Last completed:**
-  - Continuation of this run's own PROGRESS-check pass. **PR #348** (KAN-130, win-rule edit) went
-    green (`lint · typecheck · test · build` + `terraform fmt · validate` both `success`, clean
-    merge state, no reviews outstanding) and was merged (squash).
-  - **PR #349** (this run's own journal update recording the KAN-130/#347 in-flight check) also
-    went green and was merged (squash).
-  - **PR #347** (a concurrent session's own progress-journal chore) failed
-    `lint · typecheck · test · build` on `src/services/automation.emulator.test.ts` — the repo's
-    long-documented Firestore-emulator `RESOURCE_EXHAUSTED`-class flake (`FIRESTORE INTERNAL
-    ASSERTION FAILED: Unexpected state`), same class as PR #340/#333/#330. The PR's diff is
-    `PROGRESS.md`-only, so it couldn't be the cause. Posted a standing-down comment naming the
-    failure and re-ran the failed job once. Before that re-run's result came back, #347's owning
-    session pushed its own new commit (rebasing onto the post-#349 base) and CI ran fresh on the
-    new head; that fresh run came back green and #347's owning session merged it directly — no
-    action lost, matching this repo's established multi-session collision pattern.
-  - Checked open PRs again after all three cleared: found **PR #350** (`kan-131-quarantine-dismiss`,
-    a concurrent session already continuing the "sweep every `done` row for a newly-buildable
-    follow-up" pattern into **KAN-131** — permanently dismissing a quarantined ingest record).
-    Mid-CI, no failure yet. Subscribed rather than starting a duplicate KAN-131/132 implementation,
-    same collision-avoidance posture as every prior check in this run.
-  - **PR #327** (EasySign) still open, still the repo owner's own manual work per every prior
-    check, `mergeable_state: dirty` — left untouched again.
-- **In progress (exact stopping point):** watching PR #350 for CI completion / review activity.
-  This PROGRESS.md entry is itself opened as its own small PR, same pattern as #347/#349.
-- **Blocked + why:** nothing blocking new code work in the sense of a missing task — KAN-131 (the
-  next natural sweep pick) is already claimed by a concurrent session's PR #350.
-- **Next step:** next check-in (or this session, if a webhook event fires first) verifies PR #350's
-  outcome; if merged/closed with no other PR in flight, resume the sweep pattern from KAN-132, or
-  the campaign-pages goal's next slice (real GAQL/Meta live-state reads once KAN-43 lands; per-ad
-  performance tiles off `ad_performance_daily`), per this file's own 2026-08-28 "Campaigns & Ads
-  pages" entry.
-- **Waiting on human:**
-  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
-    outstanding, long-standing.
-  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature
-    branches on `origin` (branch deletion has consistently failed / had no available tool from
-    this sandbox in prior runs).
-
----
-
 ## 2026-08-28 (latest) — Merged PR #345 (verified clean CI); drove PR #347 through three PROGRESS.md conflicts and a real CI flake to merge
 
 - **Last completed:**
@@ -107,6 +64,15 @@ Template for each entry:
   - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature
     branches on `origin` (branch deletion has consistently failed / had no available tool from
     this sandbox in prior runs).
+
+---
+
+## 2026-08-28 (later still) — Drove PR #347's CI flake, merged it and PR #348 (KAN-130); KAN-131 already picked up by another session
+
+**Superseded by the entry above** — a concurrent session's own record of this same window (PR #348/
+#349 merges, PR #347's flake/re-run/merge, and finding PR #350/KAN-131). The entry above captures
+the fuller outcome, including this session's own resolution of PR #350's subsequent merge conflict.
+Kept here as the as-run record of what that session observed.
 
 ---
 
