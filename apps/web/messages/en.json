@@ -277,7 +277,12 @@
     "pushToProject": "Push to project",
     "pushProjectLabel": "Project to push to",
     "pushScopeSelectionLabel": "Scopes to grant (comma-separated)",
-    "pushError": "Couldn't push this resource to that project. Please try again."
+    "pushError": "Couldn't push this resource to that project. Please try again.",
+    "archivedBadge": "Archived",
+    "archive": "Archive",
+    "unarchive": "Restore",
+    "archiveError": "Couldn't archive this resource. Please try again.",
+    "unarchiveError": "Couldn't restore this resource. Please try again."
   },
   "ProjectResources": {
     "metaTitle": "Project resources",

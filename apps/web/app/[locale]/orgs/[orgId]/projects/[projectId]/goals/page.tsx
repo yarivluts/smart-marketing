@@ -58,8 +58,10 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
     listOrgPeople(orgId),
   ]);
   const goalViews = goals.map(toGoalSummaryView);
-  const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
-  const personNameById = new Map(peopleRows.map((person) => [person.id, person.name]));
+  // Every registered person's name still resolves for an existing goal's own owner label — an
+  // archived person (KAN-129) isn't erased, only hidden from picking a *new* owner below.
+  const personNameById = new Map(people.map((person) => [person.id, person.name]));
+  const peopleRows = people.filter((person) => !person.archived_at).map((person) => ({ id: person.id, name: person.name }));
   const t = await getTranslations('Goals');
 
   return (

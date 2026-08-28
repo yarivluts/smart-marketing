@@ -83,6 +83,17 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const eventSchemaNames = activeSchemaNamesForKind(schemaDefs, 'event');
   const activeSchemaDefsByKindAndName = buildActiveSchemaDefsByKindAndName(schemaDefs);
+  // An archived person (KAN-129) drops out of the owner picker's own options — except a segment
+  // already assigned to one keeps that option available too, so the picker still renders the
+  // segment's real current owner instead of silently falling back to "Unassigned" in the UI.
+  const activePeople = people.filter((person) => !person.archived_at).map((person) => ({ id: person.id, name: person.name }));
+  function ownerPickerOptions(ownerPersonId: string | null) {
+    if (!ownerPersonId || activePeople.some((person) => person.id === ownerPersonId)) {
+      return activePeople;
+    }
+    const archivedOwner = people.find((person) => person.id === ownerPersonId);
+    return archivedOwner ? [...activePeople, { id: archivedOwner.id, name: archivedOwner.name }] : activePeople;
+  }
   const t = await getTranslations('Segments');
 
   // Each segment's live member count still runs its own warehouse query, but
@@ -186,7 +197,7 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
                     segmentId={segment.id}
                     ownerPersonId={segment.ownerPersonId}
                     status={segment.status}
-                    people={people.map((person) => ({ id: person.id, name: person.name }))}
+                    people={ownerPickerOptions(segment.ownerPersonId)}
                   />
                   <SegmentCrmSyncControls
                     orgId={orgId}

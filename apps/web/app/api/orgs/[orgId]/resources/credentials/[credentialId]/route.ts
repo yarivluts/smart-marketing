@@ -1,11 +1,30 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { ResourceNotFoundError } from '@growthos/firebase-orm-models';
-import { updateSharedCredential } from '@/lib/orgs/mutations';
+import { archiveSharedCredential, updateSharedCredential } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
   params: Promise<{ orgId: string; credentialId: string }>;
+}
+
+/** Archives a shared credential out of the library (KAN-129) — gated on `resources.manage`, same as editing one. Never deletes the document or its secret; see `archiveSharedCredential`'s own doc comment. */
+export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
+  const { orgId, credentialId } = await params;
+  const { user, error } = await requireOrgPermission(orgId, 'resources.manage');
+  if (error) {
+    return error;
+  }
+
+  try {
+    await archiveSharedCredential({ organizationId: orgId, credentialId, archivedByUserId: user.id });
+    return NextResponse.json({ status: 'archived' });
+  } catch (err) {
+    if (err instanceof ResourceNotFoundError) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    throw err;
+  }
 }
 
 /**

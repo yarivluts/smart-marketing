@@ -78,8 +78,19 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
 
   const t = await getTranslations('ProjectResources');
 
-  function renderRow(resourceKind: ResourceKind, resourceId: string, label: string, availableScopes?: readonly string[]) {
+  function renderRow(
+    resourceKind: ResourceKind,
+    resourceId: string,
+    label: string,
+    archived: boolean,
+    availableScopes?: readonly string[],
+  ) {
     const attachment = findAttachment(attachments, resourceId);
+    // An archived resource (KAN-129) with nothing already attached has nothing useful to show a
+    // project here — it can no longer be requested, and there's no existing attachment to manage.
+    if (archived && !attachment) {
+      return null;
+    }
     return (
       <li key={resourceId} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm">
         <span>{label}</span>
@@ -122,7 +133,7 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
         ) : (
           <ul className="flex flex-col gap-2">
             {credentials.map((credential) =>
-              renderRow('credential', credential.id, credential.name, credential.available_scopes),
+              renderRow('credential', credential.id, credential.name, Boolean(credential.archived_at), credential.available_scopes),
             )}
           </ul>
         )}
@@ -133,7 +144,7 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
         {templates.length === 0 ? (
           <p className="text-muted-foreground">{t('noTemplates')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">{templates.map((template) => renderRow('template', template.id, template.name))}</ul>
+          <ul className="flex flex-col gap-2">{templates.map((template) => renderRow('template', template.id, template.name, Boolean(template.archived_at)))}</ul>
         )}
       </section>
 
@@ -142,7 +153,7 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
         {people.length === 0 ? (
           <p className="text-muted-foreground">{t('noPeople')}</p>
         ) : (
-          <ul className="flex flex-col gap-2">{people.map((person) => renderRow('person', person.id, person.name))}</ul>
+          <ul className="flex flex-col gap-2">{people.map((person) => renderRow('person', person.id, person.name, Boolean(person.archived_at)))}</ul>
         )}
       </section>
     </main>
