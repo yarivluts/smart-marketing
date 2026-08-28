@@ -3,6 +3,7 @@ import { getApp } from 'firebase/app';
 import { doc, getDoc, getFirestore } from 'firebase/firestore';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  clearSharedCredentialSecret,
   createOrganizationWithOwner,
   createSharedCredential,
   CredentialSecretNotSetError,
@@ -160,6 +161,72 @@ describe('rotateSharedCredentialSecretKey', () => {
   });
 });
 
+describe('clearSharedCredentialSecret', () => {
+  it('removes the stored secret so reveal throws CredentialSecretNotSetError again, while the rest of the credential record survives untouched', async () => {
+    const { owner, organization, credential } = await setupOrgWithCredential('Vault Clear Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: 'clear-me', kms, actorId: owner.id });
+
+    const cleared = await clearSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, actorId: owner.id });
+    expect(cleared.encrypted_secret ?? null).toBeNull();
+    expect(cleared.name).toBe(credential.name);
+    expect(cleared.provider).toBe(credential.provider);
+    expect(cleared.available_scopes).toEqual(credential.available_scopes);
+
+    await expect(
+      revealSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, kms }),
+    ).rejects.toBeInstanceOf(CredentialSecretNotSetError);
+
+    const raw = await readRawCredentialDoc(organization.id, credential.id);
+    expect(raw.encrypted_secret).toBeNull();
+  });
+
+  it('a fresh secret can be set again after clearing', async () => {
+    const { owner, organization, credential } = await setupOrgWithCredential('Vault Clear Then Set Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: 'first', kms, actorId: owner.id });
+    await clearSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, actorId: owner.id });
+
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: 'second', kms, actorId: owner.id });
+    const revealed = await revealSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, kms });
+    expect(revealed).toBe('second');
+  });
+
+  it('throws CredentialSecretNotSetError when no secret has ever been set', async () => {
+    const { owner, organization, credential } = await setupOrgWithCredential('Vault Clear Unset Org');
+
+    await expect(
+      clearSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, actorId: owner.id }),
+    ).rejects.toBeInstanceOf(CredentialSecretNotSetError);
+  });
+
+  it('throws CredentialSecretNotSetError on a second clear (already cleared)', async () => {
+    const { owner, organization, credential } = await setupOrgWithCredential('Vault Double Clear Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    await setSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, secret: 'once', kms, actorId: owner.id });
+    await clearSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, actorId: owner.id });
+
+    await expect(
+      clearSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, actorId: owner.id }),
+    ).rejects.toBeInstanceOf(CredentialSecretNotSetError);
+  });
+
+  it('rejects a credential id that does not belong to this organization', async () => {
+    const first = await setupOrgWithCredential('Vault Clear Owner Org');
+    const second = await setupOrgWithCredential('Vault Clear Other Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    await setSharedCredentialSecret({ organizationId: first.organization.id, credentialId: first.credential.id, secret: 'x', kms, actorId: first.owner.id });
+
+    await expect(
+      clearSharedCredentialSecret({ organizationId: second.organization.id, credentialId: first.credential.id, actorId: second.owner.id }),
+    ).rejects.toBeInstanceOf(SharedCredentialNotFoundError);
+  });
+});
+
 /**
  * KAN-44 AC ("every config/key change" is audited) for the vault surface: a
  * stored secret is the most sensitive thing an org admin can change, so
@@ -282,7 +349,50 @@ describe('vault audit logging (KAN-44)', () => {
       actorId: owner.id,
     });
     await rotateSharedCredentialSecretKey({ organizationId: organization.id, credentialId: credential.id, kms, actorId: owner.id });
+    await clearSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, actorId: owner.id });
 
     await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
+  });
+
+  it('records who cleared a credential secret, and never writes the secret or its ciphertext into the audit entry', async () => {
+    const { owner, organization, credential } = await setupOrgWithCredential('Vault Audit Clear Org');
+    const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+    const kms = new LocalKmsProvider(keyRing, currentKeyId);
+    const plaintextSecret = 'sk_live_clear-must-not-leak-me';
+    const stored = await setSharedCredentialSecret({
+      organizationId: organization.id,
+      credentialId: credential.id,
+      secret: plaintextSecret,
+      kms,
+      actorId: owner.id,
+    });
+
+    await clearSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, actorId: owner.id });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'credential.secret_clear');
+    expect(entry).toBeDefined();
+    expect(entry!.actor_type).toBe('user');
+    expect(entry!.actor_id).toBe(owner.id);
+    expect(entry!.target_type).toBe('shared_credential');
+    expect(entry!.target_id).toBe(credential.id);
+    expect(entry!.before).toEqual({ hasSecret: true });
+    expect(entry!.after).toEqual({ hasSecret: false });
+
+    const serializedEntry = JSON.stringify(entry);
+    expect(serializedEntry).not.toContain(plaintextSecret);
+    expect(serializedEntry).not.toContain(stored.encrypted_secret!.ciphertext);
+    expect(serializedEntry).not.toContain(stored.encrypted_secret!.wrappedDek);
+  });
+
+  it('records nothing when clear is rejected by its own guard (no secret ever set)', async () => {
+    const { owner, organization, credential } = await setupOrgWithCredential('Vault Clear Guard Audit Org');
+
+    await expect(
+      clearSharedCredentialSecret({ organizationId: organization.id, credentialId: credential.id, actorId: owner.id }),
+    ).rejects.toBeInstanceOf(CredentialSecretNotSetError);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.filter((entry) => entry.action === 'credential.secret_clear')).toHaveLength(0);
   });
 });

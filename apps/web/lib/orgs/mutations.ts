@@ -152,6 +152,7 @@ import {
   type DismissQuarantinedRecordResult,
   requestResourceAttachment as requestResourceAttachmentInOrganization,
   revokeApiKey as revokeApiKeyInOrganization,
+  clearSharedCredentialSecret as clearSharedCredentialSecretInOrganization,
   rotateSharedCredentialSecretKey as rotateSharedCredentialSecretKeyInOrganization,
   setHookDeliveryStatus as setHookDeliveryStatusInOrganization,
   type HookDeliveryModel,
@@ -384,6 +385,17 @@ interface SetSharedCredentialSecretInput {
 export async function setSharedCredentialSecret(input: SetSharedCredentialSecretInput): Promise<SharedCredentialModel> {
   await ensureFirestoreOrm();
   return setSharedCredentialSecretInOrganization(input);
+}
+
+interface ClearSharedCredentialSecretInput {
+  organizationId: string;
+  credentialId: string;
+  actorId: string;
+}
+
+export async function clearSharedCredentialSecret(input: ClearSharedCredentialSecretInput): Promise<SharedCredentialModel> {
+  await ensureFirestoreOrm();
+  return clearSharedCredentialSecretInOrganization(input);
 }
 
 interface RotateSharedCredentialSecretKeyInput {

@@ -22,6 +22,7 @@ describe('SetCredentialSecretForm', () => {
   beforeEach(() => {
     refresh.mockClear();
     vi.stubGlobal('fetch', vi.fn());
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
   });
 
   it('shows "no secret set" and a "Set secret" button before any secret exists', () => {
@@ -90,6 +91,41 @@ describe('SetCredentialSecretForm', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rotate key' }));
 
     expect(await screen.findByText("Couldn't rotate this secret's key. Please try again.")).toBeInTheDocument();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('has no "Clear secret" button before a secret is set', () => {
+    renderForm(false);
+    expect(screen.queryByRole('button', { name: 'Clear secret' })).not.toBeInTheDocument();
+  });
+
+  it('does nothing when the clear-secret confirm dialog is declined', async () => {
+    vi.mocked(window.confirm).mockReturnValue(false);
+    renderForm(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear secret' }));
+
+    expect(fetch).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('DELETEs the secret and refreshes on success once confirmed', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ status: 'cleared' }) } as Response);
+    renderForm(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear secret' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/resources/credentials/cred-1/secret', { method: 'DELETE' });
+  });
+
+  it('shows an inline error when clearing fails', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
+    renderForm(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear secret' }));
+
+    expect(await screen.findByText("Couldn't clear this secret. Please try again.")).toBeInTheDocument();
     expect(refresh).not.toHaveBeenCalled();
   });
 });
