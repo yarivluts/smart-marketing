@@ -12,6 +12,14 @@ export class QuarantinedRecordNotFoundError extends Error {
   }
 }
 
+/** Thrown by {@link dismissQuarantinedRecord} for a record that has already left the `quarantined` state (already replayed, or already dismissed) — same "already been decided" posture as `AttachmentNotPendingError`. */
+export class QuarantinedRecordNotActionableError extends Error {
+  constructor() {
+    super('This quarantined record has already been resolved and can no longer be dismissed.');
+    this.name = 'QuarantinedRecordNotActionableError';
+  }
+}
+
 /** Same cap as `listRecentIngestBatchesForProject` (KAN-35) — bounds query cost until a real aggregation store exists. */
 export const DEFAULT_QUARANTINED_RECORD_LIST_LIMIT = 200;
 
@@ -163,4 +171,67 @@ async function recordReplayAudit(
   } catch {
     // Best-effort — see the comment on `recordAuditLogEntry`.
   }
+}
+
+export interface DismissQuarantinedRecordResult {
+  outcome: 'dismissed';
+}
+
+/**
+ * Permanently discards one quarantined record without attempting to replay it (KAN-131, a follow-up
+ * to KAN-34's replay-only quarantine browser). `replayQuarantinedRecord` covers "the schema/payload
+ * got fixed, try again" — but nothing covered "this will never validate and isn't worth a schema
+ * change" (an abandoned integration's payload, a one-off malformed test event). Before this, such a
+ * record just sat in `listQuarantinedRecordsForProject`'s bounded, `status == 'quarantined'` list
+ * forever, presenting as actionable and crowding out records an operator could actually still act on
+ * — the same "sits forever, forces itself into an admin's attention" problem KAN-127/KAN-129 already
+ * closed for TV pairings and shared credentials/templates/people, just for a different registry.
+ *
+ * Scoped to the caller's own org/project via a 404-not-403 lookup, the same posture as
+ * `replayQuarantinedRecord`. Only a record still in `quarantined` can be dismissed — one already
+ * `replayed` succeeded into the pipeline and dismissing it after the fact would misrepresent what
+ * happened, and one already `dismissed` has nothing left to do; both throw
+ * {@link QuarantinedRecordNotActionableError}. Terminal and one-way, same as `replayed` — there is no
+ * `undismiss`.
+ */
+export async function dismissQuarantinedRecord(
+  organizationId: string,
+  projectId: string,
+  quarantinedRecordId: string,
+  performedByUserId: string,
+): Promise<DismissQuarantinedRecordResult> {
+  const record = await QuarantinedRecordModel.init(quarantinedRecordId, {
+    organization_id: organizationId,
+    project_id: projectId,
+  });
+  if (!record || record.organization_id !== organizationId || record.project_id !== projectId) {
+    throw new QuarantinedRecordNotFoundError();
+  }
+  if (record.status !== 'quarantined') {
+    throw new QuarantinedRecordNotActionableError();
+  }
+
+  record.status = 'dismissed';
+  record.dismissed_at = new Date().toISOString();
+  record.dismissed_by_user_id = performedByUserId;
+  await record.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      projectId,
+      environmentId: record.environment_id,
+      actorType: 'user',
+      actorId: performedByUserId,
+      action: 'quarantined_record.dismiss',
+      targetType: 'quarantined_record',
+      targetId: record.id,
+      summary: `Dismissed quarantined record "${record.client_id}" (${record.kind}:${record.schema_name}) without replay`,
+      after: { reasons: record.reasons },
+    });
+  } catch {
+    // Best-effort — see the comment on `recordAuditLogEntry`.
+  }
+
+  return { outcome: 'dismissed' };
 }
