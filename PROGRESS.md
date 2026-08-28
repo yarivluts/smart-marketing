@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 — Campaigns & Ads pages shipped AND validated live on EasySign (Yariv's new goal, slice 1)
+
+- **Last completed:** Yariv's directive (set as a session goal): pages to view the actual ads from
+  the platforms (live + history) + full campaign management through GrowthOS, validated on the
+  EasySign project.
+  - **PR #345 (merged + deployed to web-dev):** `/campaigns` (one row per automation target:
+    platform badge from the connection credential's provider, status badge, budget, last action) and
+    `/campaigns/[targetId]` (state header with the honest KAN-43 stand-in note, creatives panel
+    rendering the campaign's ACTUAL ads derived from its one `campaign_draft_create` action's
+    draft, activate/pause riding the existing propose→approve→execute queue — pause = rollback of
+    the executed activation — and the full per-target history timeline via the existing
+    `AutomationActionList`). No new data model, no new mutation path, by design. New
+    `listAutomationActionsForTarget` compound query with its composite index declared in
+    `firestore.indexes.json` AND created live BEFORE first traffic (the standing rule, finally
+    exercised in the right order).
+  - **Validation executed directly (Playwright on web-dev, EasySign QA org), not just assigned:**
+    session B had gone silent (its session restarted mid-window), so per the goal's own bar the
+    validation ran from this session — after creating org-scoped validation users
+    (`campaigns-validation-admin/viewer@growthos-qa.example`, via Admin SDK + the ORM's own
+    membership/role-binding shapes). **10/10 on the decisive arc:** target seeded through
+    GrowthOS's own routes → draft with real RSA content → approved + executed via the UI timeline
+    buttons → simulated executor created the campaign (Paused) → the actual ad content renders on
+    the page → Paused→Active through the queue → Active→Paused via the audited rollback → whole
+    arc recorded in the per-campaign history. Plus 11/12 page-level sweep (list, platform badges,
+    nav item, KAN-43 note, viewer-role 404; the one "miss" was clicking a draftless target — not a
+    bug). Screenshots: `val-*.png` in the campaigns worktree.
+  - CI note: the PR's first run failed on the known Firestore-emulator RESOURCE_EXHAUSTED flake
+    (main itself was red with the same class in packs untouched by the diff); rerun green.
+  - Session B is back online (post-restart), briefed, and running an optional independent
+    confirmation pass; it also surfaced a real Google Ads MCP connector with 8 customer accounts —
+    identifying EasySign's with Yariv, to become ground truth for the read-seam slice.
+- **In progress (exact stopping point):** goal slice 1 complete and validated. Next slices scoped
+  but not started: executor `readCampaignState` read seam (real GAQL/Meta reads when KAN-43 lands,
+  cross-checked against the MCP connector's ground truth) and per-ad performance tiles off the
+  `ad_performance_daily` mart.
+- **Blocked + why:** real platform reads still gated on KAN-43 (Yariv's applications).
+- **Next step:** read-seam slice, or whatever Yariv/session B surfaces.
+- **Waiting on human:** standing (KAN-43; the parked token-minting IAM grant).
+
+
 ## 2026-08-28 (latest) — Checked open PRs: two concurrent sessions already in flight (KAN-129, campaign pages), nothing to pick up
 
 - **Last completed:**
