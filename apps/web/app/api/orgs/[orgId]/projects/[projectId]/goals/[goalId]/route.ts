@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { GoalNotFoundError, InvalidGoalError } from '@growthos/firebase-orm-models';
-import { deleteGoal, updateGoal } from '@/lib/orgs/mutations';
+import { GoalNotFoundError, InvalidGoalError, type GoalModel } from '@growthos/firebase-orm-models';
+import { deleteGoal, updateGoal, updateGoalDefinition } from '@/lib/orgs/mutations';
 import { getGoal, queryGoalProgress } from '@/lib/orgs/queries';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseUpdateGoalRequestBody } from '@/lib/orgs/parse-goal-fields';
@@ -35,10 +35,14 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 }
 
 /**
- * Updates a goal's own target value (or range) (KAN-85, plan `14 §Gap 15`'s
- * "inline editing... of targets/values directly in report tables") — the
- * PATCH commit path the goals table's inline target cell (`GoalTargetInput`)
- * fires on blur. Gated on the same `dashboards.write` permission every other
+ * Updates a goal in one of two mutually-exclusive ways (KAN-85, KAN-128),
+ * dispatching on which fields the body names: the inline target/range cell
+ * (`GoalTargetInput`) committing on blur, or a full replace of the goal's
+ * own definition — name, metric, direction, target-or-range, dates,
+ * rhythm, and owner (KAN-128, the same "create + list only, no way to fix
+ * a typo'd definition" gap KAN-100/117/119/120/121 already closed for the
+ * people registry, resource templates, credentials, segments, and field
+ * mappings). Gated on the same `dashboards.write` permission every other
  * mutation on this route uses.
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
@@ -54,7 +58,29 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
   }
 
   try {
-    const goal = await updateGoal(orgId, projectId, goalId, parsed, user.id);
+    let goal: GoalModel;
+    if (parsed.kind === 'definition') {
+      goal = await updateGoalDefinition(
+        orgId,
+        projectId,
+        goalId,
+        {
+          name: parsed.name,
+          metricName: parsed.metricName,
+          direction: parsed.direction,
+          targetValue: parsed.targetValue,
+          rangeMin: parsed.rangeMin,
+          rangeMax: parsed.rangeMax,
+          startDate: parsed.startDate,
+          deadline: parsed.deadline,
+          rhythm: parsed.rhythm,
+          ownerPersonId: parsed.ownerPersonId,
+        },
+        user.id,
+      );
+    } else {
+      goal = await updateGoal(orgId, projectId, goalId, { targetValue: parsed.targetValue, rangeMin: parsed.rangeMin, rangeMax: parsed.rangeMax }, user.id);
+    }
     return NextResponse.json({ goal: toGoalSummaryView(goal) });
   } catch (err) {
     if (err instanceof GoalNotFoundError) {

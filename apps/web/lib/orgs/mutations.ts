@@ -87,6 +87,7 @@ import {
   type OnboardingStateModel,
   createGoal as createGoalInOrganization,
   updateGoal as updateGoalInOrganization,
+  updateGoalDefinition as updateGoalDefinitionInOrganization,
   deleteGoal as deleteGoalInOrganization,
   type GoalModel,
   setCampaignTargetBudget as setCampaignTargetBudgetInOrganization,
@@ -1235,6 +1236,31 @@ export async function updateGoal(
 ): Promise<GoalModel> {
   await ensureFirestoreOrm();
   return updateGoalInOrganization({ organizationId, projectId, goalId, ...fields, updatedByUserId });
+}
+
+interface UpdateGoalDefinitionFields {
+  name: string;
+  metricName: string;
+  direction: string;
+  targetValue?: number;
+  rangeMin?: number;
+  rangeMax?: number;
+  startDate: string;
+  deadline: string;
+  rhythm: string;
+  ownerPersonId: string;
+}
+
+/** Full replace of a goal's own definition (KAN-128) — the PATCH commit path `EditGoalForm` submits. */
+export async function updateGoalDefinition(
+  organizationId: string,
+  projectId: string,
+  goalId: string,
+  fields: UpdateGoalDefinitionFields,
+  updatedByUserId: string,
+): Promise<GoalModel> {
+  await ensureFirestoreOrm();
+  return updateGoalDefinitionInOrganization({ organizationId, projectId, goalId, ...fields, updatedByUserId });
 }
 
 export async function deleteGoal(

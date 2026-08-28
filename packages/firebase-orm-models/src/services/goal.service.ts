@@ -81,16 +81,38 @@ interface ValidatedGoalFields {
 }
 
 /**
- * Validates every field of a create request, pushing **all** failures onto
- * the caller's shared `reasons` array rather than failing fast on the first
- * one — the same multi-reason-array convention `validateAggregation`/
- * `validateDefinitionBody` (`metric-registry.service.ts`) and `validateTiles`
- * (`board.service.ts`) already use, so a caller's form can surface every
- * problem in one round trip instead of one-at-a-time. Returns `undefined` if
- * any reason was pushed — callers must not use the return value without also
- * checking `reasons`, mirroring `validateAggregation`'s own contract.
+ * The subset of {@link CreateGoalParams} `validateGoalFields` actually
+ * reads — narrowed out into its own interface so {@link updateGoalDefinition}
+ * (KAN-128) can reuse the exact same validation without also having to
+ * satisfy `CreateGoalParams`'s create-only fields (`metricName`,
+ * `ownerPersonId`, `createdByUserId`), the same "extract the shared
+ * validation, both callers pass their own params shape" posture
+ * `validateFieldMappingDefinition` (KAN-121) and `validateSegmentDefinition`
+ * (KAN-120) already establish for their own sibling registries.
  */
-function validateGoalFields(params: CreateGoalParams, reasons: string[]): ValidatedGoalFields | undefined {
+interface GoalFieldsInput {
+  name: string;
+  direction: string;
+  targetValue?: number;
+  rangeMin?: number;
+  rangeMax?: number;
+  startDate: string;
+  deadline: string;
+  rhythm: string;
+}
+
+/**
+ * Validates every field of a create (or full-definition-update) request,
+ * pushing **all** failures onto the caller's shared `reasons` array rather
+ * than failing fast on the first one — the same multi-reason-array
+ * convention `validateAggregation`/`validateDefinitionBody`
+ * (`metric-registry.service.ts`) and `validateTiles` (`board.service.ts`)
+ * already use, so a caller's form can surface every problem in one round
+ * trip instead of one-at-a-time. Returns `undefined` if any reason was
+ * pushed — callers must not use the return value without also checking
+ * `reasons`, mirroring `validateAggregation`'s own contract.
+ */
+function validateGoalFields(params: GoalFieldsInput, reasons: string[]): ValidatedGoalFields | undefined {
   const reasonsBefore = reasons.length;
 
   const name = params.name.trim();
@@ -289,6 +311,117 @@ export async function updateGoal(params: UpdateGoalParams): Promise<GoalModel> {
       summary: `Updated goal "${goal.name}" target`,
       before,
       after: { target_value: goal.target_value, range_min: goal.range_min, range_max: goal.range_max },
+    });
+  } catch {
+    // Best-effort — see the comment in createGoal above.
+  }
+
+  return goal;
+}
+
+export interface UpdateGoalDefinitionParams {
+  organizationId: string;
+  projectId: string;
+  goalId: string;
+  name: string;
+  metricName: string;
+  direction: string;
+  targetValue?: number;
+  rangeMin?: number;
+  rangeMax?: number;
+  startDate: string;
+  deadline: string;
+  rhythm: string;
+  ownerPersonId: string;
+  updatedByUserId: string;
+}
+
+/**
+ * Edits an existing goal's own definition — name, metric, direction,
+ * target-or-range, dates, rhythm, and owner (KAN-128). Until now a goal
+ * had create + list + delete, plus KAN-85's narrow `updateGoal` (target/
+ * range only, for the goals table's inline cell) — every other field set
+ * once at creation (a typo'd name, the wrong owner, a metric picked by
+ * mistake, a deadline that needs to move) could only be fixed by
+ * delete-and-recreate, which orphans the goal's id (any dashboard link or
+ * audit-log `target_id` pointing at it) — the same "create + list only, no
+ * way to fix a typo'd definition" gap KAN-100/117/119/120/121/123/124/125/
+ * 126/127 already closed for their own sibling registries. Always a full
+ * replace, never a sparse patch, the same posture `updateSegmentDefinition`
+ * (KAN-120) establishes for its own sibling. `organizationId`/`projectId`/
+ * `id`/`createdBy`/`createdAt` stay immutable — reassigning a goal to a
+ * different project would be a different goal, not a correction. Reuses
+ * {@link validateGoalFields} directly so create and this update can never
+ * validate a definition differently, and {@link validateOrgPersonInOrg} for
+ * the same owner-exists check `createGoal` performs.
+ */
+export async function updateGoalDefinition(params: UpdateGoalDefinitionParams): Promise<GoalModel> {
+  const goal = await loadGoal(params.organizationId, params.projectId, params.goalId);
+
+  const reasons: string[] = [];
+  const fields = validateGoalFields(params, reasons);
+
+  const metricDef = await getActiveMetricDefinition(params.organizationId, params.projectId, params.metricName);
+  if (!metricDef) {
+    reasons.push(`Metric "${params.metricName}" is not registered (or not active) in this project.`);
+  }
+
+  await validateOrgPersonInOrg(params.organizationId, params.ownerPersonId, reasons);
+
+  if (reasons.length > 0 || !fields) {
+    throw new InvalidGoalError(reasons);
+  }
+
+  const before = {
+    name: goal.name,
+    metric_name: goal.metric_name,
+    direction: goal.direction,
+    target_value: goal.target_value,
+    range_min: goal.range_min,
+    range_max: goal.range_max,
+    start_date: goal.start_date,
+    deadline: goal.deadline,
+    rhythm: goal.rhythm,
+    owner_person_id: goal.owner_person_id,
+  };
+
+  goal.name = fields.name;
+  goal.metric_name = params.metricName;
+  goal.direction = fields.direction;
+  goal.target_value = fields.targetValue;
+  goal.range_min = fields.rangeMin;
+  goal.range_max = fields.rangeMax;
+  goal.start_date = params.startDate;
+  goal.deadline = params.deadline;
+  goal.rhythm = fields.rhythm;
+  goal.owner_person_id = params.ownerPersonId;
+  goal.updated_by = params.updatedByUserId;
+  goal.updated_at = new Date().toISOString();
+  await goal.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.updatedByUserId,
+      action: 'goal.update_definition',
+      targetType: 'goal',
+      targetId: goal.id,
+      summary: `Updated goal "${goal.name}" definition`,
+      before,
+      after: {
+        name: goal.name,
+        metric_name: goal.metric_name,
+        direction: goal.direction,
+        target_value: goal.target_value,
+        range_min: goal.range_min,
+        range_max: goal.range_max,
+        start_date: goal.start_date,
+        deadline: goal.deadline,
+        rhythm: goal.rhythm,
+        owner_person_id: goal.owner_person_id,
+      },
     });
   } catch {
     // Best-effort — see the comment in createGoal above.
