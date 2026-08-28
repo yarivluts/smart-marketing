@@ -17,6 +17,73 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 (latest) — Delivered KAN-133 (identity-merge hardening), opened PR
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` confirmed zero `todo` rows. Checked open PRs first
+    (established pattern) and found only **PR #353** (docs-only PROGRESS.md check-in, untouched —
+    no CI failure or review comment to act on) and **PR #327** (EasySign, still the repo owner's
+    own manual work). Delegated a background agent to sweep for the next genuine gap since the
+    primary numbered backlog and every prior "create + list only" registry sweep (KAN-100 through
+    KAN-132) were exhausted; it surfaced two candidates and this run picked the higher-priority one:
+    **KAN-133**, a real, still-open security gap explicitly flagged (but deliberately not fixed) in
+    KAN-25's own review — `ensureUserForFirebaseSession` links a session to an existing placeholder
+    `UserModel` purely by email match with no email-verification check, so an attacker who signs up
+    with a target's email before the target does gets merged into that identity on their very first
+    request (the second candidate, making `project_admin`/`editor`/`operator` roles actually
+    invitable via a project-scoped invite flow, is noted below as the next pick).
+  - Investigated the "obvious" fix (gate the identity bind itself on `emailVerified`) and rejected
+    it after finding it would orphan the *legitimate* case too: a real invitee's own first Firebase
+    sign-in is also unverified, and `ensureUserForFirebaseSession`'s `byFirebaseUid` lookup
+    short-circuits past the email-merge branch on every later call — a delayed bind would never
+    happen at all, confirmed against the existing "invites someone by email before they have signed
+    up" test in `org-membership-flows.emulator.test.ts`, which relies on exactly that first-sign-in
+    merge succeeding while unverified. This exact risk was the reason KAN-25's review left the gap
+    open rather than rushing a fix.
+  - Delivered the narrower, safe fix instead: `ensureUserForFirebaseSession` still always binds
+    `firebaseUid` (no orphan risk) but only writes an unverified caller's claimed `display_name`/
+    `photo_url` onto the placeholder once `emailVerified` is true; `resolveOrgSessionContext`
+    (`apps/web/lib/orgs/session-context.ts`) now hides `invited`-status memberships from an
+    unverified session, closing the "attacker can see the placeholder's pending invites" leak.
+    First pass over-scoped the `resolveOrgSessionContext` filter to hide *any* non-active
+    membership, which broke an existing KAN-132 regression test (a real member's own `suspended`
+    membership is already-vetted, not attacker-plantable placeholder data, so it must stay visible
+    regardless of verification) — caught by running the actual test suite rather than reasoning
+    about it, then narrowed to `status === 'invited'` specifically. Also caught and fixed a bug in
+    this run's own new test (reused the attacker's already-bound `firebaseUid` on a "later, verified
+    sign-in" case, which short-circuits past the email-merge branch entirely and never exercises the
+    code under test — fixed by using a fresh uid). Also fixed a stale `MembershipModel` doc comment
+    left over from before KAN-132 shipped suspend/reactivate ("nothing in this codebase writes it
+    yet" — false since KAN-132).
+  - Full monorepo `pnpm lint`/`pnpm typecheck`/`pnpm build` green; `pnpm test` green across every
+    package (`firebase-orm-models` 1657/1657 incl. 3 new KAN-133 cases, `apps/web` unit 1959/1959
+    incl. 2 new/updated KAN-133 cases, `packages/shared` 593/593, `apps/api` 141/141).
+  - Branch `kan-133-identity-merge-hardening`, PR opened against `main`.
+- **In progress (exact stopping point):** PR open, CI not yet confirmed by this run — next step for
+  whichever session picks this up is to verify CI green, review the diff once more, then merge and
+  delete the branch per `CLAUDE.md`.
+- **Blocked + why:** nothing blocking; PR just needs CI confirmation and merge.
+- **Next step:** once KAN-133 merges, the background sweep's second candidate is the natural pick:
+  make `project_admin`/`editor`/`operator` roles actually grantable via a project-scoped invite flow
+  (`INVITABLE_ROLES` in `packages/shared/src/policy/roles.ts` only contains `org_admin`/`viewer`
+  today; `inviteMemberToOrganization`/`acceptInvite` unconditionally mint org-scope bindings) —
+  flagged as a real, still-not-built gap by `INVITABLE_ROLES`'s own doc comment and independently by
+  KAN-132's `reactivateOrgMember` doc comment. Scope: add an optional `projectId` to invite params/
+  route/form, widen invitable roles for project scope, store the intended scope on `MembershipModel`
+  so `acceptInvite` mints a `scope_level: 'project'` binding instead of always `'org'`, gate the
+  project picker to projects the inviter administers.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion has consistently failed / had no available tool from this sandbox
+    in prior runs).
+
+---
+
+---
+
 ## 2026-08-28 (latest) — Merged PR #344 (KAN-129) + #346; delegated and drove KAN-131 (quarantine dismiss) through two merge conflicts to green and merge
 
 - **Last completed:**

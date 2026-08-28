@@ -45,12 +45,16 @@ export async function ensureUserForSession(session: DecodedIdToken): Promise<Use
   // not (Firebase never verifies it on its own — see auth-context.tsx's
   // sendEmailVerification call). Callers that grant privileges based on
   // identity (e.g. accepting an org invite) must check `session.email_verified`
-  // themselves — see EmailNotVerifiedError's doc comment for why.
+  // themselves — see EmailNotVerifiedError's doc comment for why. Passing it
+  // through here too gates whether an unverified sign-in can overwrite a
+  // placeholder's display name/photo — see ensureUserForFirebaseSession's own
+  // doc comment.
   return ensureUserForFirebaseSession({
     firebaseUid: session.uid,
     email: session.email as string,
     displayName: session.name as string | undefined,
     photoUrl: session.picture as string | undefined,
+    emailVerified: session.email_verified === true,
   });
 }
 
@@ -66,12 +70,28 @@ export async function ensureUserForSession(session: DecodedIdToken): Promise<Use
 export const resolveOrgSessionContext = cache(async (session: DecodedIdToken): Promise<OrgSessionContext> => {
   const user = await ensureUserForSession(session);
 
-  const memberships = await listMembershipsWithOrganizations(user.id);
-  const activeOrgIds = memberships
+  const allMemberships = await listMembershipsWithOrganizations(user.id);
+  const activeOrgIds = allMemberships
     .filter((membership) => isActiveMembershipStatus(membership.status))
     .map((membership) => membership.organizationId);
   const roleBindings = await listRoleBindingsForUser(user.id, activeOrgIds);
   const bindings = toPolicyBindings(roleBindings);
+
+  // A pending `invited` membership row lives on `user`'s id even before
+  // `emailVerified` is true (see ensureUserForFirebaseSession's doc comment —
+  // the firebaseUid bind can't wait on verification without risking an
+  // orphaned invite). Without this filter, an attacker who signs up with a
+  // target's email before the target does would see every org the target was
+  // invited to the moment they load any org page, even though `acceptInvite`
+  // itself still refuses to let them act on it. Scoped to `invited`
+  // specifically (not "any non-active status"): an `active`-then-`suspended`
+  // membership belongs to a real, already-vetted member, not attacker-
+  // plantable placeholder data, so it stays visible regardless of
+  // verification — hiding it would just be a confusing UX regression for a
+  // real member whose own session happens to report unverified.
+  const memberships = session.email_verified
+    ? allMemberships
+    : allMemberships.filter((membership) => membership.status !== 'invited');
 
   return { user, memberships, bindings };
 });
