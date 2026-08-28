@@ -94,14 +94,14 @@ describe('parseCreateGoalRequestBody', () => {
 });
 
 describe('parseUpdateGoalRequestBody', () => {
-  it('accepts a targetValue-only update', async () => {
+  it('accepts a targetValue-only update, dispatched as kind "target"', async () => {
     const parsed = await parseUpdateGoalRequestBody(request({ targetValue: 1500 }, 'PATCH'));
-    expect(parsed).toEqual({ targetValue: 1500 });
+    expect(parsed).toEqual({ kind: 'target', targetValue: 1500 });
   });
 
-  it('accepts a rangeMin/rangeMax update', async () => {
+  it('accepts a rangeMin/rangeMax update, dispatched as kind "target"', async () => {
     const parsed = await parseUpdateGoalRequestBody(request({ rangeMin: 10, rangeMax: 30 }, 'PATCH'));
-    expect(parsed).toEqual({ rangeMin: 10, rangeMax: 30 });
+    expect(parsed).toEqual({ kind: 'target', rangeMin: 10, rangeMax: 30 });
   });
 
   it('omits fields the request never sent, rather than including them as undefined', async () => {
@@ -128,6 +128,26 @@ describe('parseUpdateGoalRequestBody', () => {
 
   it('does not itself reject rangeMin >= rangeMax or a direction mismatch — that is the service layer’s job', async () => {
     const parsed = await parseUpdateGoalRequestBody(request({ rangeMin: 40, rangeMax: 20 }, 'PATCH'));
+    expect(parsed.error).toBeUndefined();
+  });
+
+  it('dispatches a body naming any definition-only field as kind "definition", validated the same way as create', async () => {
+    const parsed = await parseUpdateGoalRequestBody(request(validMaximizeGoal, 'PATCH'));
+    expect(parsed).toEqual({ kind: 'definition', ...validMaximizeGoal });
+  });
+
+  it('lets a definition update also carry targetValue/rangeMin/rangeMax alongside the definition fields', async () => {
+    const parsed = await parseUpdateGoalRequestBody(request({ ...validMaximizeGoal, targetValue: 1500 }, 'PATCH'));
+    expect(parsed).toEqual({ kind: 'definition', ...validMaximizeGoal, targetValue: 1500 });
+  });
+
+  it('rejects a definition update missing a required field, with the same reasons as create', async () => {
+    const parsed = await parseUpdateGoalRequestBody(request({ ...validMaximizeGoal, name: undefined }, 'PATCH'));
+    expect(parsed.error?.status).toBe(400);
+  });
+
+  it('does not itself reject a definition update naming an unknown metric/owner — that is the service layer’s job', async () => {
+    const parsed = await parseUpdateGoalRequestBody(request({ ...validMaximizeGoal, metricName: 'does-not-exist', ownerPersonId: 'does-not-exist' }, 'PATCH'));
     expect(parsed.error).toBeUndefined();
   });
 });
