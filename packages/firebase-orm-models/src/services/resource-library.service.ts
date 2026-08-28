@@ -66,6 +66,13 @@ export class InvalidWriteTierError extends Error {
   }
 }
 
+export class ResourceArchivedError extends Error {
+  constructor() {
+    super('This resource has been archived and can no longer be attached to a project.');
+    this.name = 'ResourceArchivedError';
+  }
+}
+
 async function requireProjectInOrg(organizationId: string, projectId: string): Promise<ProjectModel> {
   const project = await ProjectModel.init(projectId, { organization_id: organizationId });
   if (!project || project.organization_id !== organizationId) {
@@ -167,6 +174,78 @@ export async function updateSharedCredential(params: UpdateSharedCredentialParam
   return credential;
 }
 
+export interface ArchiveSharedCredentialParams {
+  organizationId: string;
+  credentialId: string;
+  archivedByUserId: string;
+}
+
+/**
+ * Retires a shared credential from the library (KAN-129 — `createSharedCredential`/
+ * `listSharedCredentials`/`updateSharedCredential` had no removal path at all; a credential no
+ * longer in use stayed visible forever in every attach picker with no way to retire it, the same
+ * "everything user-manageable gets an admin surface" gap `disableHookEndpoint` closed for hook
+ * endpoints). A hard delete would orphan any project's already-approved
+ * {@link ResourceAttachmentModel} still pointing at this credential's id, so this only hides it from
+ * future attach requests/pushes ({@link validateAttachmentTarget}) — an already-approved attachment
+ * keeps working. Idempotent — re-archiving an already-archived credential just refreshes
+ * `archived_at`/`archived_by`, the same "safe to retry" posture `disableHookEndpoint` establishes.
+ */
+export async function archiveSharedCredential(params: ArchiveSharedCredentialParams): Promise<SharedCredentialModel> {
+  const credential = await loadSharedCredential(params.organizationId, params.credentialId);
+  credential.archived_at = new Date().toISOString();
+  credential.archived_by = params.archivedByUserId;
+  await credential.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.archivedByUserId,
+      action: 'shared_credential.archive',
+      targetType: 'shared_credential',
+      targetId: credential.id,
+      summary: `Archived credential "${credential.name}"`,
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return credential;
+}
+
+export interface UnarchiveSharedCredentialParams {
+  organizationId: string;
+  credentialId: string;
+  unarchivedByUserId: string;
+}
+
+/** Resumes an archived credential's pickability (the counterpart {@link archiveSharedCredential} never got — see `enableHookEndpoint`'s own doc comment for why that gap matters). Idempotent, same posture as `archiveSharedCredential`. */
+export async function unarchiveSharedCredential(
+  params: UnarchiveSharedCredentialParams,
+): Promise<SharedCredentialModel> {
+  const credential = await loadSharedCredential(params.organizationId, params.credentialId);
+  credential.archived_at = null;
+  credential.archived_by = null;
+  await credential.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.unarchivedByUserId,
+      action: 'shared_credential.unarchive',
+      targetType: 'shared_credential',
+      targetId: credential.id,
+      summary: `Unarchived credential "${credential.name}"`,
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return credential;
+}
+
 export interface CreateResourceTemplateParams {
   organizationId: string;
   name: string;
@@ -249,6 +328,75 @@ export async function updateResourceTemplate(params: UpdateResourceTemplateParam
       summary: `Updated template "${template.name}" to v${template.version}`,
       before,
       after: { name: template.name, version: template.version, config: template.config ?? null },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return template;
+}
+
+export interface ArchiveResourceTemplateParams {
+  organizationId: string;
+  templateId: string;
+  archivedByUserId: string;
+}
+
+/**
+ * Retires an org-standard template from the library (KAN-129 — same "create + list + update but no
+ * removal path" gap {@link archiveSharedCredential}'s own doc comment describes for credentials). A
+ * project's already-approved attachment keeps whatever `resource_version` it was granted at
+ * regardless (per `updateResourceTemplate`'s own doc comment); archiving only hides the template
+ * from future attach requests/pushes ({@link validateAttachmentTarget}). Idempotent, same posture as
+ * `disableHookEndpoint`.
+ */
+export async function archiveResourceTemplate(params: ArchiveResourceTemplateParams): Promise<ResourceTemplateModel> {
+  const template = await loadResourceTemplate(params.organizationId, params.templateId);
+  template.archived_at = new Date().toISOString();
+  template.archived_by = params.archivedByUserId;
+  await template.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.archivedByUserId,
+      action: 'resource_template.archive',
+      targetType: 'resource_template',
+      targetId: template.id,
+      summary: `Archived template "${template.name}"`,
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return template;
+}
+
+export interface UnarchiveResourceTemplateParams {
+  organizationId: string;
+  templateId: string;
+  unarchivedByUserId: string;
+}
+
+/** Resumes an archived template's pickability. Idempotent, same posture as `archiveResourceTemplate`. */
+export async function unarchiveResourceTemplate(
+  params: UnarchiveResourceTemplateParams,
+): Promise<ResourceTemplateModel> {
+  const template = await loadResourceTemplate(params.organizationId, params.templateId);
+  template.archived_at = null;
+  template.archived_by = null;
+  await template.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.unarchivedByUserId,
+      action: 'resource_template.unarchive',
+      targetType: 'resource_template',
+      targetId: template.id,
+      summary: `Unarchived template "${template.name}"`,
     });
   } catch {
     // Best-effort — see recordAuditLogEntry's own doc comment.
@@ -352,6 +500,74 @@ export async function updateOrgPerson(params: UpdateOrgPersonParams): Promise<Or
   return person;
 }
 
+export interface ArchiveOrgPersonParams {
+  organizationId: string;
+  personId: string;
+  archivedByUserId: string;
+}
+
+/**
+ * Retires a person from the org's people registry (KAN-129 — same "create + list + update but no
+ * removal path" gap {@link archiveSharedCredential}'s own doc comment describes for credentials).
+ * Never deletes the document — a goal/segment/rep-collection entry may still reference this id
+ * (per `updateOrgPerson`'s own doc comment), so a rename/lookup keeps resolving normally; archiving
+ * only hides the person from future attach requests/pushes ({@link validateAttachmentTarget}) and
+ * from create-time owner/rep pickers elsewhere in the app. Idempotent, same posture as
+ * `disableHookEndpoint`.
+ */
+export async function archiveOrgPerson(params: ArchiveOrgPersonParams): Promise<OrgPersonModel> {
+  const person = await loadOrgPerson(params.organizationId, params.personId);
+  person.archived_at = new Date().toISOString();
+  person.archived_by = params.archivedByUserId;
+  await person.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.archivedByUserId,
+      action: 'org_person.archive',
+      targetType: 'org_person',
+      targetId: person.id,
+      summary: `Archived person "${person.name}"`,
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return person;
+}
+
+export interface UnarchiveOrgPersonParams {
+  organizationId: string;
+  personId: string;
+  unarchivedByUserId: string;
+}
+
+/** Resumes an archived person's pickability. Idempotent, same posture as `archiveOrgPerson`. */
+export async function unarchiveOrgPerson(params: UnarchiveOrgPersonParams): Promise<OrgPersonModel> {
+  const person = await loadOrgPerson(params.organizationId, params.personId);
+  person.archived_at = null;
+  person.archived_by = null;
+  await person.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.unarchivedByUserId,
+      action: 'org_person.unarchive',
+      targetType: 'org_person',
+      targetId: person.id,
+      summary: `Unarchived person "${person.name}"`,
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return person;
+}
+
 /** Loads the named resource by kind and confirms it actually belongs to `organizationId` (never trust a caller-supplied id blindly). */
 async function requireResourceInOrg(
   organizationId: string,
@@ -387,6 +603,12 @@ async function validateAttachmentTarget(
 ): Promise<SharedCredentialModel | ResourceTemplateModel | OrgPersonModel> {
   await requireProjectInOrg(organizationId, projectId);
   const resource = await requireResourceInOrg(organizationId, resourceKind, resourceId);
+
+  // An archived resource stays valid for an already-approved attachment (see `archiveOrgPerson`'s
+  // own doc comment) but can never start a *new* attachment — KAN-129.
+  if (resource.archived_at) {
+    throw new ResourceArchivedError();
+  }
 
   if (resourceKind === 'credential') {
     const available = new Set((resource as SharedCredentialModel).available_scopes ?? []);

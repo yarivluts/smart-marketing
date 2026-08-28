@@ -1,11 +1,30 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { ResourceNotFoundError } from '@growthos/firebase-orm-models';
-import { updateOrgPerson } from '@/lib/orgs/mutations';
+import { archiveOrgPerson, updateOrgPerson } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
   params: Promise<{ orgId: string; personId: string }>;
+}
+
+/** Archives a person out of the org's people registry (KAN-129) — gated on `resources.manage`, same as editing one. Never deletes the document; see `archiveOrgPerson`'s own doc comment. */
+export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
+  const { orgId, personId } = await params;
+  const { user, error } = await requireOrgPermission(orgId, 'resources.manage');
+  if (error) {
+    return error;
+  }
+
+  try {
+    await archiveOrgPerson({ organizationId: orgId, personId, archivedByUserId: user.id });
+    return NextResponse.json({ status: 'archived' });
+  } catch (err) {
+    if (err instanceof ResourceNotFoundError) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    throw err;
+  }
 }
 
 /**

@@ -56,8 +56,19 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
   const [rawEntries, people] = await Promise.all([listRepCollectionEntriesForProject(orgId, projectId), listOrgPeople(orgId)]);
   const billingSignals = (await listBillingCollectionSignalsForProject(orgId, projectId, rawEntries)).map(toRepCollectionBillingSignalRow);
   const entries = rawEntries.map(toRepCollectionEntryRow);
-  const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
-  const peopleById = new Map(peopleRows.map((person) => [person.id, person.name]));
+  const peopleById = new Map(people.map((person) => [person.id, person.name]));
+  // An archived person (KAN-129) drops out of the rep picker below — except an entry already
+  // attributed to one keeps that option available too, so the picker still renders the entry's
+  // real current rep instead of silently falling back to unattributed in the UI.
+  const activePeople = people.filter((person) => !person.archived_at).map((person) => ({ id: person.id, name: person.name }));
+  const peopleRows = activePeople;
+  function repPickerOptions(orgPersonId: string | null) {
+    if (!orgPersonId || activePeople.some((person) => person.id === orgPersonId)) {
+      return activePeople;
+    }
+    const archivedRep = people.find((person) => person.id === orgPersonId);
+    return archivedRep ? [...activePeople, { id: archivedRep.id, name: archivedRep.name }] : activePeople;
+  }
   const weekView = toRepCollectionLeaderboardView(aggregateRepCollectionLeaderboard(rawEntries, 'week'), peopleById);
   const monthView = toRepCollectionLeaderboardView(aggregateRepCollectionLeaderboard(rawEntries, 'month'), peopleById);
   const t = await getTranslations('RepCollections');
@@ -145,7 +156,7 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
                     <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.occurredAt}</td>
                     <td className="py-2 pe-3 text-xs text-muted-foreground">{entry.note ?? ''}</td>
                     <td className="py-2">
-                      <RepCollectionEntryControls orgId={orgId} projectId={projectId} entryId={entry.id} orgPersonId={entry.orgPersonId} amount={entry.amount} people={peopleRows} />
+                      <RepCollectionEntryControls orgId={orgId} projectId={projectId} entryId={entry.id} orgPersonId={entry.orgPersonId} amount={entry.amount} people={repPickerOptions(entry.orgPersonId)} />
                     </td>
                   </tr>
                 ))}

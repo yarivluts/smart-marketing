@@ -277,7 +277,12 @@
     "pushToProject": "צירוף לפרויקט",
     "pushProjectLabel": "פרויקט לצירוף",
     "pushScopeSelectionLabel": "היקפים להענקה (מופרדים בפסיק)",
-    "pushError": "לא ניתן היה לצרף את המשאב לפרויקט זה. נסה שוב."
+    "pushError": "לא ניתן היה לצרף את המשאב לפרויקט זה. נסה שוב.",
+    "archivedBadge": "בארכיון",
+    "archive": "העברה לארכיון",
+    "unarchive": "שחזור",
+    "archiveError": "לא ניתן היה להעביר את המשאב לארכיון. נסה שוב.",
+    "unarchiveError": "לא ניתן היה לשחזר את המשאב. נסה שוב."
   },
   "ProjectResources": {
     "metaTitle": "משאבי הפרויקט",

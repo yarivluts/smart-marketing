@@ -1,11 +1,30 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { ResourceNotFoundError } from '@growthos/firebase-orm-models';
-import { updateResourceTemplate } from '@/lib/orgs/mutations';
+import { archiveResourceTemplate, updateResourceTemplate } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
   params: Promise<{ orgId: string; templateId: string }>;
+}
+
+/** Archives a template out of the library (KAN-129) — gated on `resources.manage`, same as editing one. Never deletes the document; already-approved attachments keep their own version pin regardless — see `archiveResourceTemplate`'s own doc comment. */
+export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
+  const { orgId, templateId } = await params;
+  const { user, error } = await requireOrgPermission(orgId, 'resources.manage');
+  if (error) {
+    return error;
+  }
+
+  try {
+    await archiveResourceTemplate({ organizationId: orgId, templateId, archivedByUserId: user.id });
+    return NextResponse.json({ status: 'archived' });
+  } catch (err) {
+    if (err instanceof ResourceNotFoundError) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+    throw err;
+  }
 }
 
 /**

@@ -53,4 +53,19 @@ export class SharedCredentialModel extends BaseModel {
   /** Envelope-encrypted secret (OAuth token, API key, etc.) — see the class doc comment. Absent until `setSharedCredentialSecret` is called. */
   @Field()
   public encrypted_secret?: SecretEnvelope;
+
+  /**
+   * Presence alone means this credential is retired from the library — the same immediate-effect
+   * posture `HookEndpointModel.disabled_at` establishes. Archiving never deletes the document or its
+   * secret (a project's already-approved attachment keeps working, per that model's own class doc
+   * comment), it only hides the credential from future attach-request/push pickers;
+   * `unarchiveSharedCredential` clears this back to `null` (never `undefined`) to make it pickable
+   * again — same "an explicit `null` overwrites, `undefined` is dropped by `updateDoc()`" reasoning
+   * `disabled_at`'s own doc comment documents.
+   */
+  @Field()
+  public archived_at?: string | null;
+
+  @Field()
+  public archived_by?: string | null;
 }

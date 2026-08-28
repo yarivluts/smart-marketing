@@ -52,4 +52,19 @@ export class ResourceTemplateModel extends BaseModel {
 
   @Field({ is_required: true })
   public created_by!: string;
+
+  /**
+   * Presence alone means this template is retired from the library — the same immediate-effect
+   * posture `HookEndpointModel.disabled_at` establishes. Archiving never deletes the document (a
+   * project's already-approved attachment keeps its own `resource_version` pin regardless, per this
+   * model's own class doc comment), it only hides the template from future attach-request/push
+   * pickers; `unarchiveResourceTemplate` clears this back to `null` (never `undefined`) to make it
+   * pickable again — same "an explicit `null` overwrites, `undefined` is dropped by `updateDoc()`"
+   * reasoning `disabled_at`'s own doc comment documents.
+   */
+  @Field()
+  public archived_at?: string | null;
+
+  @Field()
+  public archived_by?: string | null;
 }
