@@ -368,8 +368,13 @@ describe('ensureUserForFirebaseSession identity merge (KAN-133)', () => {
     expect(attacker.display_name).toBeFalsy();
     expect(attacker.photo_url).toBeFalsy();
 
+    // A later, verified sign-in against the same email (a different
+    // firebaseUid — ensureUserForFirebaseSession's `byFirebaseUid` lookup
+    // would otherwise short-circuit past the email-merge branch entirely for
+    // the attacker's own uid) still gets to set the profile fields once
+    // verified — the gate lifts, it isn't a permanent lockout.
     const verifiedLater = await ensureUserForFirebaseSession({
-      firebaseUid: attacker.firebaseUid!,
+      firebaseUid: unique('firebase-uid'),
       email: inviteeEmail,
       displayName: 'Real Name',
       photoUrl: 'https://example.com/real.png',

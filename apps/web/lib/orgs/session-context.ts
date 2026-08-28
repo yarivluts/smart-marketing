@@ -77,17 +77,21 @@ export const resolveOrgSessionContext = cache(async (session: DecodedIdToken): P
   const roleBindings = await listRoleBindingsForUser(user.id, activeOrgIds);
   const bindings = toPolicyBindings(roleBindings);
 
-  // A pending (non-active) membership row lives on `user`'s id even before
+  // A pending `invited` membership row lives on `user`'s id even before
   // `emailVerified` is true (see ensureUserForFirebaseSession's doc comment —
   // the firebaseUid bind can't wait on verification without risking an
   // orphaned invite). Without this filter, an attacker who signs up with a
   // target's email before the target does would see every org the target was
   // invited to the moment they load any org page, even though `acceptInvite`
-  // itself still refuses to let them act on it. Once a real member's
-  // membership goes `active`, this stops applying regardless of verification.
+  // itself still refuses to let them act on it. Scoped to `invited`
+  // specifically (not "any non-active status"): an `active`-then-`suspended`
+  // membership belongs to a real, already-vetted member, not attacker-
+  // plantable placeholder data, so it stays visible regardless of
+  // verification — hiding it would just be a confusing UX regression for a
+  // real member whose own session happens to report unverified.
   const memberships = session.email_verified
     ? allMemberships
-    : allMemberships.filter((membership) => isActiveMembershipStatus(membership.status));
+    : allMemberships.filter((membership) => membership.status !== 'invited');
 
   return { user, memberships, bindings };
 });
