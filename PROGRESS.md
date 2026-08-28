@@ -75,10 +75,11 @@ Template for each entry:
   anything else, same as every other open PR.
 - **Blocked + why:** nothing blocking the next code task once this PR lands — KAN-130 (PR #348) and
   this run's own KAN-131 will both be new merged stories to check for on the next pass.
-- **Next step:** next run checks open PRs first (as always): this run's own new PR, PR #348
-  (KAN-130), and PR #347 (docs-only), merging or fixing whichever needs it; once all three are
-  settled, resume the "sweep every `done` row's own doc-comment notes for a newly-buildable
-  follow-up" pattern from **KAN-132**.
+- **Next step:** next run checks open PRs first (as always): this run's own new PR #350, merging or
+  fixing it if it needs it (note: KAN-130 already merged as PR #348 by the time this entry was
+  written — resolved as a merge conflict against this PR's branch); once settled, resume the
+  "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pattern from
+  **KAN-132**.
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
     outstanding, long-standing.
