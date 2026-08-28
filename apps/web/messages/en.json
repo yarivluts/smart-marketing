@@ -1801,6 +1801,7 @@
     "automationQueueLink": "Automation queue",
     "backToCampaigns": "Back to campaigns",
     "noCampaigns": "No campaigns yet. Seed a target below to get started.",
+    "seedTargetHeading": "Track another campaign",
     "newCampaignHeading": "New campaign draft",
     "creativesHeading": "Ads & creatives",
     "historyHeading": "Action history",
