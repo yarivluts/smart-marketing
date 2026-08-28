@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useOrgContext } from '@/lib/orgs/org-context';
+import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
@@ -32,7 +33,7 @@ export function DashboardContent(): React.ReactElement | null {
     return null;
   }
 
-  const activeMemberships = memberships.filter((membership) => (membership.status ?? 'active') === 'active');
+  const activeMemberships = memberships.filter((membership) => isActiveMembershipStatus(membership.status));
   const pendingInvites = memberships.filter((membership) => membership.status === 'invited');
 
   return (

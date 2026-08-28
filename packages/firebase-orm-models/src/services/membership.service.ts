@@ -252,9 +252,10 @@ export async function suspendOrgMember(
     throw new MembershipNotActiveError();
   }
 
-  await assertNotLastActiveOwner(organizationId, membership);
-
-  const bindings = await listUserBindingsInOrg(organizationId, membership.user_id);
+  const [, bindings] = await Promise.all([
+    assertNotLastActiveOwner(organizationId, membership),
+    listUserBindingsInOrg(organizationId, membership.user_id),
+  ]);
   await Promise.all(bindings.map((binding) => binding.remove()));
 
   membership.status = 'suspended';
@@ -308,9 +309,6 @@ export async function reactivateOrgMember(
     throw new MembershipNotSuspendedError();
   }
 
-  membership.status = 'active';
-  await membership.save();
-
   const roleBinding = new RoleBindingModel();
   roleBinding.principal_type = 'user';
   roleBinding.principal_id = membership.user_id;
@@ -319,6 +317,9 @@ export async function reactivateOrgMember(
   roleBinding.scope_id = organizationId;
   roleBinding.setPathParams({ organization_id: organizationId });
   await roleBinding.save();
+
+  membership.status = 'active';
+  await membership.save();
 
   try {
     await recordAuditLogEntry({

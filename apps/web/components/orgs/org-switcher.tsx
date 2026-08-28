@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import type { UserOrgMembership } from '@growthos/firebase-orm-models';
 import { useRouter } from '@/i18n/navigation';
+import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 
 export interface OrgSwitcherProps {
   memberships: UserOrgMembership[];
@@ -17,7 +18,7 @@ export interface OrgSwitcherProps {
 export function OrgSwitcher({ memberships, currentOrgId }: OrgSwitcherProps): React.ReactElement {
   const t = useTranslations('OrgSwitcher');
   const router = useRouter();
-  const activeMemberships = memberships.filter((membership) => (membership.status ?? 'active') === 'active');
+  const activeMemberships = memberships.filter((membership) => isActiveMembershipStatus(membership.status));
 
   function handleChange(event: React.ChangeEvent<HTMLSelectElement>): void {
     router.push(`/orgs/${event.target.value}`);

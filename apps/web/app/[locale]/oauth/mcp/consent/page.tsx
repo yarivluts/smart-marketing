@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
+import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { listOrgProjects } from '@/lib/orgs/queries';
 import { Button } from '@/components/ui/button';
@@ -68,7 +69,7 @@ export default async function McpConsentPage({ params, searchParams }: PageProps
   }
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
-  const activeMemberships = memberships.filter((membership) => (membership.status ?? 'active') === 'active');
+  const activeMemberships = memberships.filter((membership) => isActiveMembershipStatus(membership.status));
   const eligibleMemberships = activeMemberships.filter((membership) =>
     can(bindings, { type: 'user', id: user.id }, 'mcp.read', { orgId: membership.organizationId }),
   );

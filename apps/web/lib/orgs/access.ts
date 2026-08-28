@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { UserModel, UserOrgMembership } from '@growthos/firebase-orm-models';
 import { can, type Permission } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
+import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 
 /**
@@ -28,7 +29,7 @@ export function findActiveMembership(
   organizationId: string,
 ): UserOrgMembership | undefined {
   return memberships.find(
-    (membership) => membership.organizationId === organizationId && (membership.status ?? 'active') === 'active',
+    (membership) => membership.organizationId === organizationId && isActiveMembershipStatus(membership.status),
   );
 }
 
