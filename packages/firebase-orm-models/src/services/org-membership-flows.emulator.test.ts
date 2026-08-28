@@ -339,6 +339,64 @@ describe('invite -> accept flow', () => {
   });
 });
 
+describe('ensureUserForFirebaseSession identity merge (KAN-133)', () => {
+  it('still binds firebaseUid to the placeholder on an unverified first sign-in — gating the bind itself would orphan the invite forever', async () => {
+    const inviteeEmail = uniqueEmail('unverified-bind-invitee');
+    const placeholder = await ensureUserByEmail(inviteeEmail);
+
+    const invitee = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: inviteeEmail,
+      emailVerified: false,
+    });
+
+    expect(invitee.id).toBe(placeholder.id);
+    expect(invitee.firebaseUid).toBeTruthy();
+  });
+
+  it('does not let an unverified sign-in overwrite the placeholder\'s display name/photo — closes the profile-planting half of the placeholder-hijack path', async () => {
+    const inviteeEmail = uniqueEmail('unverified-profile-invitee');
+    await ensureUserByEmail(inviteeEmail);
+
+    const attacker = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: inviteeEmail,
+      displayName: 'Attacker Name',
+      photoUrl: 'https://example.com/attacker.png',
+      emailVerified: false,
+    });
+    expect(attacker.display_name).toBeFalsy();
+    expect(attacker.photo_url).toBeFalsy();
+
+    const verifiedLater = await ensureUserForFirebaseSession({
+      firebaseUid: attacker.firebaseUid!,
+      email: inviteeEmail,
+      displayName: 'Real Name',
+      photoUrl: 'https://example.com/real.png',
+      emailVerified: true,
+    });
+    expect(verifiedLater.id).toBe(attacker.id);
+    expect(verifiedLater.display_name).toBe('Real Name');
+    expect(verifiedLater.photo_url).toBe('https://example.com/real.png');
+  });
+
+  it('still writes display name/photo on a verified first sign-in (unchanged legitimate behavior)', async () => {
+    const inviteeEmail = uniqueEmail('verified-profile-invitee');
+    await ensureUserByEmail(inviteeEmail);
+
+    const invitee = await ensureUserForFirebaseSession({
+      firebaseUid: unique('firebase-uid'),
+      email: inviteeEmail,
+      displayName: 'Verified Name',
+      photoUrl: 'https://example.com/verified.png',
+      emailVerified: true,
+    });
+
+    expect(invitee.display_name).toBe('Verified Name');
+    expect(invitee.photo_url).toBe('https://example.com/verified.png');
+  });
+});
+
 describe('removeOrgMember', () => {
   it('revokes a pending invite, cascading away its (nonexistent yet) bindings with no error', async () => {
     const owner = await ensureUserForFirebaseSession({

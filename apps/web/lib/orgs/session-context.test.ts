@@ -69,12 +69,34 @@ describe('resolveOrgSessionContext', () => {
       invitedByUserId: owner.id,
     });
 
-    const inviteeSession = fakeSession({ email: inviteeEmail });
+    // A real, verified invitee still sees their own pending invite.
+    const inviteeSession = fakeSession({ email: inviteeEmail, email_verified: true });
     const { bindings, memberships } = await resolveOrgSessionContext(inviteeSession);
     expect(memberships).toContainEqual(
       expect.objectContaining({ organizationId: organization.id, status: 'invited' }),
     );
     expect(bindings.some((binding) => binding.scopeId === organization.id)).toBe(false);
+  });
+
+  it('hides a pending invite from an unverified session — closes the placeholder-hijack info leak where an attacker signs up with the invitee\'s email first', async () => {
+    const ownerSession = fakeSession();
+    const { user: owner } = await resolveOrgSessionContext(ownerSession);
+    const { organization } = await createOrganizationWithOwner({ name: 'Unverified Ctx Org', ownerUserId: owner.id });
+
+    const inviteeEmail = `unverified-invitee-${Math.random().toString(36).slice(2)}@example.com`;
+    await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: inviteeEmail,
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+
+    // Same email, but the session's own emailVerified claim is false (the
+    // default for a brand-new Firebase email/password sign-up, and exactly
+    // what an attacker who registered the invitee's email first would have).
+    const attackerSession = fakeSession({ email: inviteeEmail, email_verified: false });
+    const { memberships } = await resolveOrgSessionContext(attackerSession);
+    expect(memberships).toHaveLength(0);
   });
 
   it('excludes role bindings for a suspended member — the KAN-132 gap membership.model.ts flagged (status alone never affected permission checks before this)', async () => {
