@@ -17,7 +17,86 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (latest) — Drove PR #340's CI flake to green, merged PR #342 (KAN-128, goal definition edit)
+## 2026-08-28 (latest) — Merged PR #342 (KAN-128), delivered + merged KAN-129 (resource-library archive/unarchive)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `main` was at `e81ca2a` (KAN-127/PR #340 merge) at pick time.
+    Checked open PRs first (established pattern) and found two: **PR #342**
+    (`kan-128-goal-definition-edit`, a concurrent session's KAN-128 work, mid-CI) and **PR #341**
+    (a docs-only PROGRESS.md chore PR, already red on the known unrelated Firestore-emulator flake
+    with its re-run budget already spent by that session) — plus the long-standing **PR #327**
+    (EasySign, previously confirmed the repo owner's own manual work, left untouched).
+  - Subscribed to PR #342 and waited out its CI (~48 min — full-suite CI incl. sharded Playwright
+    e2e routinely runs long in this repo). Confirmed green (`lint · typecheck · test · build` +
+    `terraform fmt · validate`, `mergeable_state: clean`, no open review threads) and merged it
+    (squash, `d08c2b1`). PR #341 resolved on its own (merged by the owning session) while waiting,
+    so no action was needed there.
+  - While waiting on #342's CI, dispatched a research subagent to scan the codebase for the next
+    self-contained, no-live-infra-required follow-up (this repo's established "sweep every `done`
+    row's own doc-comment notes for a newly-buildable follow-up" pattern, since `TASKS.md` has zero
+    `todo` rows and the primary backlog is otherwise exhausted). It found a real gap: the Org
+    Resource Library's three registries (`SharedCredentialModel`/`ResourceTemplateModel`/
+    `OrgPersonModel`, KAN-27) had create + list + update (KAN-100/117/119) but **no removal path at
+    all** — no `delete*`/`archive*`/`disable*` function or status field on any of the three models,
+    unlike every sibling registry (`revokeApiKey`, `uninstallPlugin`, `revokeTvPairing`,
+    `disableHookEndpoint`/`enableHookEndpoint`).
+  - Delivered **KAN-129**: new `archived_at`/`archived_by` fields on all three models (`null` until
+    archived, same `HookEndpointModel.disabled_at` immediate-effect posture — a hard delete would've
+    orphaned an already-approved `ResourceAttachmentModel` or a goal/segment/rep-collection entry
+    referencing a person id); `archiveSharedCredential`/`unarchiveSharedCredential`,
+    `archiveResourceTemplate`/`unarchiveResourceTemplate`, `archiveOrgPerson`/`unarchiveOrgPerson`
+    in `resource-library.service.ts` (idempotent, audit-logged); a new `ResourceArchivedError`
+    thrown by `validateAttachmentTarget` so a *new* attach request/push against an archived resource
+    is rejected while an already-approved attachment keeps working; new `DELETE`/`POST .../unarchive`
+    routes mirroring `disableHookEndpoint`/`enableHookEndpoint`'s convention; one shared
+    `ArchiveToggleButton` component (rather than six near-identical per-kind copies) wired onto the
+    org Resource Library page with an "Archived" badge; the project Resource Library page hides an
+    archived resource's request-to-attach row once nothing is already attached to it; every
+    create-time person picker elsewhere (goal owners, rep-collection attribution) now excludes
+    archived people, while every *reassignment* picker for an already-attributed record (segment
+    owner, rep-collection entry) keeps that record's current — even if since-archived — person
+    selectable, so it never silently renders as "unassigned". en/he translations.
+  - Full test coverage: 48/48 green in `resource-library.emulator.test.ts` (incl. the new archive/
+    unarchive suite: persisted fields, idempotency, cross-org isolation, not-found, audit log, and
+    the full attach-rejection/still-works-when-approved/restores-on-unarchive scenario across all
+    three kinds); 66/66 green across the six new/touched `apps/web` route test files; a new
+    `ArchiveToggleButton` component test suite. Self-reviewed via the `code-review` skill (medium
+    effort) before opening the PR — no findings. `pnpm build`/`pnpm lint`/`pnpm typecheck` green;
+    full monorepo `pnpm test` green (a first full run hit 2 failures in
+    `saas-metric-pack/schemas.emulator.test.ts`, a file this diff never touches — reproduced as the
+    well-documented Firestore-emulator resource-contention flake under full-suite load, confirmed by
+    a clean isolated re-run and a clean full re-run of the whole `firebase-orm-models` package,
+    1639/1639). Branch `kan-129-resource-library-archive` merged onto `main` at `d08c2b1`
+    (goal-definition-edit + `TASKS.md`/`mutations.ts`/en/he auto-merged cleanly; one conflict in
+    `TASKS.md`'s own appended row, resolved by keeping both KAN-128 and KAN-129 in order).
+  - PR #344 opened, subscribed, waited out CI (~41 min) — came back green and clean. By the time
+    this run checked back, **PR #344 was already merged** (`7229b79`) — a concurrent session (which
+    had also subscribed to it, per its own PR #346's doc comment) merged it first. No action lost;
+    same "whoever gets there first" convention this repo has relied on throughout.
+  - `main` is now caught up through **KAN-129**. Checked open PRs again before writing this entry:
+    found **PR #345** (`feat/campaign-ads-pages`, a concurrent session's work, mid-CI) and **PR
+    #346** (`chore/progress-2026-08-28-check-open-prs`, another concurrent session's own
+    PROGRESS.md entry, based on `main` *before* this run's KAN-129 merge — left untouched rather
+    than risk a duplicate/conflicting PROGRESS.md edit; it documents a different slice of this same
+    window and will reconcile via this repo's established renumbering/supersede convention if
+    needed) — plus the long-standing PR #327 (EasySign), left untouched.
+- **In progress (exact stopping point):** none — KAN-129 is fully delivered, tested, and merged.
+  Stopping here deliberately rather than starting a new sweep: at least two other sessions (PR #345,
+  PR #346) are active against this repo in the same window, and the established pattern from prior
+  entries is to avoid adding a third concurrent sweep when that risk is live.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next run checks open PRs first (as always — #345/#346/#327 in particular), then
+  resumes the sweep-for-a-newly-buildable-follow-up pattern from **KAN-129** if none are pending.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion keeps failing with an HTTP 403 from this sandbox's git remote).
+
+---
+
+## 2026-08-28 — Drove PR #340's CI flake to green, merged PR #342 (KAN-128, goal definition edit)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `TASKS.md` had zero `todo` rows left (only `needs-human` KAN-43
