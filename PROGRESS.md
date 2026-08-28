@@ -17,7 +17,87 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (latest) — Merged PR #342 (KAN-128), delivered + merged KAN-129 (resource-library archive/unarchive)
+## 2026-08-28 (latest) — Merged PR #345 (verified clean CI), resolved a PROGRESS.md conflict on PR #347, merged it
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` still had zero `todo` rows; checked open PRs first
+    and found **PR #345** (campaign/ads pages) and **PR #347** (a docs-only PROGRESS.md chore),
+    both mid-CI from concurrent sessions, plus the long-standing **PR #327** (EasySign, still the
+    owner's own manual work, untouched). Subscribed to both.
+  - **PR #345:** its first two CI attempts had each failed on a different, unrelated spec file
+    (`mcp-oauth.controller.e2e.spec.ts`, then `campaign-ops-pack.emulator.test.ts`), both showing
+    this repo's long-documented Firestore-emulator `RESOURCE_EXHAUSTED` flake — confirmed not a
+    regression from the PR's own diff (which only touches campaign/ads page code) by reading both
+    failure logs directly. A third attempt (already running when this session picked it up) came
+    back fully green; another concurrent session merged it moments later. No action needed here
+    beyond confirming and unsubscribing.
+  - **PR #347:** CI went green after a concurrent session rebased it onto main to resolve an
+    earlier PROGRESS.md conflict with PR #346. When this session went to merge it, `main` had
+    already advanced again (a direct push, `aa71f3a`, adding the "Campaigns & Ads pages shipped AND
+    validated live on EasySign" entry below) — a second PROGRESS.md conflict. Per the merge-conflict
+    rule (merge the base in, resolve, never rewrite someone else's branch history), merged `origin/
+    main` into `chore/progress-2026-08-28-kan129` locally and resolved by keeping all three
+    overlapping entries in true chronological order: the EasySign-validation entry (newest) on top,
+    then this run's own KAN-129/KAN-128 merge entry, then the pre-existing superseded stub — no
+    content was dropped, only reordered (the stub's own full duplicate, which `main`'s direct push
+    had re-introduced verbatim, was removed a second time since the KAN-129 entry above it already
+    is that record). Verified no leftover conflict markers, pushed, CI came back green, no open
+    review threads, merged (squash).
+- **In progress (exact stopping point):** none — both PRs are merged and `main` is caught up
+  through this reconciliation.
+- **Blocked + why:** nothing blocking.
+- **Next step:** next run checks open PRs (PR #348, `kan-129-win-rule-edit`/KAN-130, was already
+  open from a concurrent session at the time of this entry — resume the sweep from **KAN-131** if
+  it's landed by then), then falls back to the sweep pattern.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+
+---
+
+## 2026-08-28 — Campaigns & Ads pages shipped AND validated live on EasySign (Yariv's new goal, slice 1)
+
+- **Last completed:** Yariv's directive (set as a session goal): pages to view the actual ads from
+  the platforms (live + history) + full campaign management through GrowthOS, validated on the
+  EasySign project.
+  - **PR #345 (merged + deployed to web-dev):** `/campaigns` (one row per automation target:
+    platform badge from the connection credential's provider, status badge, budget, last action) and
+    `/campaigns/[targetId]` (state header with the honest KAN-43 stand-in note, creatives panel
+    rendering the campaign's ACTUAL ads derived from its one `campaign_draft_create` action's
+    draft, activate/pause riding the existing propose→approve→execute queue — pause = rollback of
+    the executed activation — and the full per-target history timeline via the existing
+    `AutomationActionList`). No new data model, no new mutation path, by design. New
+    `listAutomationActionsForTarget` compound query with its composite index declared in
+    `firestore.indexes.json` AND created live BEFORE first traffic (the standing rule, finally
+    exercised in the right order).
+  - **Validation executed directly (Playwright on web-dev, EasySign QA org), not just assigned:**
+    session B had gone silent (its session restarted mid-window), so per the goal's own bar the
+    validation ran from this session — after creating org-scoped validation users
+    (`campaigns-validation-admin/viewer@growthos-qa.example`, via Admin SDK + the ORM's own
+    membership/role-binding shapes). **10/10 on the decisive arc:** target seeded through
+    GrowthOS's own routes → draft with real RSA content → approved + executed via the UI timeline
+    buttons → simulated executor created the campaign (Paused) → the actual ad content renders on
+    the page → Paused→Active through the queue → Active→Paused via the audited rollback → whole
+    arc recorded in the per-campaign history. Plus 11/12 page-level sweep (list, platform badges,
+    nav item, KAN-43 note, viewer-role 404; the one "miss" was clicking a draftless target — not a
+    bug). Screenshots: `val-*.png` in the campaigns worktree.
+  - CI note: the PR's first run failed on the known Firestore-emulator RESOURCE_EXHAUSTED flake
+    (main itself was red with the same class in packs untouched by the diff); rerun green.
+  - Session B is back online (post-restart), briefed, and running an optional independent
+    confirmation pass; it also surfaced a real Google Ads MCP connector with 8 customer accounts —
+    identifying EasySign's with Yariv, to become ground truth for the read-seam slice.
+- **In progress (exact stopping point):** goal slice 1 complete and validated. Next slices scoped
+  but not started: executor `readCampaignState` read seam (real GAQL/Meta reads when KAN-43 lands,
+  cross-checked against the MCP connector's ground truth) and per-ad performance tiles off the
+  `ad_performance_daily` mart.
+- **Blocked + why:** real platform reads still gated on KAN-43 (Yariv's applications).
+- **Next step:** read-seam slice, or whatever Yariv/session B surfaces.
+- **Waiting on human:** standing (KAN-43; the parked token-minting IAM grant).
+
+---
+
+## 2026-08-28 — Merged PR #342 (KAN-128), delivered + merged KAN-129 (resource-library archive/unarchive)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `main` was at `e81ca2a` (KAN-127/PR #340 merge) at pick time.
@@ -102,53 +182,6 @@ Template for each entry:
 **Superseded by the entry above** — PR #344 (KAN-129) merged and this same window's follow-on
 PROGRESS.md entry captured the full outcome. Kept here as the as-run record of what this session
 observed before that resolved.
-
-- **Last completed:**
-  - Scheduled run per `CLAUDE.md`. `TASKS.md` confirmed zero `todo` rows (only `needs-human`
-    KAN-43 and `blocked-by` KAN-50/51) — same state as the prior run. Checked open PRs first
-    (established pattern) before starting a new "sweep" pass.
-  - Found **two** PRs already open, both agent-authored (Claude Code footer) by concurrent
-    sessions, both created within the hour and both still mid-CI at pick time:
-    - **PR #344** (`kan-129-resource-library-archive`) — a concurrent session already ran the
-      "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pass and
-      minted **KAN-129** (archive/unarchive for `SharedCredentialModel`/`ResourceTemplateModel`/
-      `OrgPersonModel` — the one sibling registry pattern from KAN-100..128 that hadn't been
-      closed yet: create+list+update but no removal path). Its own PR body reports full local
-      validation green (emulator + route + component suites, `pnpm build/lint/typecheck`); CI
-      (`lint · typecheck · test · build`) was `in_progress` at check time.
-    - **PR #345** (`feat/campaign-ads-pages`) — a new campaign/ads viewing+management surface
-      (not a `TASKS.md`/KAN row; PR body frames it as "first slice of Yariv's new goal", derived
-      entirely from existing automation-target/action-queue data, no new model). CI was
-      `in_progress` at check time; its own test-plan checklist has unchecked "CI green" and
-      "post-deploy manual validation" boxes, i.e. it isn't claiming to be finish-ready yet.
-    - **PR #327** (EasySign) — still the repo owner's own manual work per prior runs'
-      confirmation; left untouched again.
-  - Since both #344 and #345 were mid-CI with no failure, review comment, or merge-conflict signal
-    to act on, and both already have an owning session's context behind them, this run did not
-    duplicate their work or force a merge decision on an unfinished CI run. Subscribed this
-    session to both PRs' activity (`subscribe_pr_activity`) so CI failures, reviews, or
-    merge-conflict transitions on either land here and get driven to green/merged if no other
-    session gets there first — matching this repo's established multi-session collision pattern
-    ("no action lost" — see 2026-08-28 entries above).
-- **In progress (exact stopping point):** watching PR #344 and PR #345 for CI completion / review
-  activity; will merge (or fix and re-push) whichever finishes first that this session ends up
-  driving. This PROGRESS.md entry is its own small PR, opened the same way as PR #341/#343.
-- **Blocked + why:** nothing blocking new code work in the sense of a missing task — the primary
-  backlog is exhausted (see above) and the two live candidates for "next work" are already claimed
-  by other sessions. Once either #344 or #345 lands, the next natural task is either resuming the
-  KAN-129-adjacent sweep from **KAN-130**, or continuing PR #345's own noted "next slices"
-  (real GAQL/Meta live-state reads once KAN-43 lands; per-ad performance tiles off
-  `ad_performance_daily`).
-- **Next step:** next run (or this session, if a webhook event fires first) checks PR #344/#345
-  status; if both already merged/closed by the time it runs, resume the sweep pattern from
-  KAN-130.
-- **Waiting on human:**
-  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
-    outstanding, long-standing.
-  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature
-    branches on `origin` (branch deletion has consistently failed / had no available tool from
-    this sandbox in prior runs).
 
 ---
 

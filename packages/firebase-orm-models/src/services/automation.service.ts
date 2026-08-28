@@ -1686,3 +1686,27 @@ export async function listAutomationActionsForProject(
     .limit(limit)
     .get();
 }
+
+/**
+ * One target's full action history, newest first — the campaign detail
+ * page's timeline (every budget change / draft / activation / rollback that
+ * ever touched this campaign, with its before/after diff). Compound query
+ * (`target_id` equality + `proposed_at` order): needs the composite index
+ * declared in `firestore.indexes.json` (added in the same PR, per the
+ * standing rule there — the emulator does not enforce composite indexes,
+ * so only that file and the live project know about it).
+ */
+export async function listAutomationActionsForTarget(
+  organizationId: string,
+  projectId: string,
+  targetId: string,
+  limit: number = DEFAULT_ACTION_LIST_LIMIT,
+): Promise<AutomationActionModel[]> {
+  await requireProjectInOrg(organizationId, projectId);
+  return AutomationActionModel.initPath({ organization_id: organizationId, project_id: projectId })
+    .query()
+    .where('target_id', '==', targetId)
+    .orderBy('proposed_at', 'desc')
+    .limit(limit)
+    .get();
+}

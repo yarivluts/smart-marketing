@@ -1779,5 +1779,43 @@
     "rank": "{rank}. {name}",
     "rowSummary": "{amount} ({count, plural, one {# entry} other {# entries}})",
     "unattributed": "Plus {amount} not yet attributed ({count, plural, one {# entry} other {# entries}})"
+  },
+  "Campaigns": {
+    "metaTitle": "Campaigns",
+    "title": "Campaigns for {projectName}",
+    "automationQueueLink": "Automation queue",
+    "backToCampaigns": "Back to campaigns",
+    "noCampaigns": "No campaigns yet. Seed a target below to get started.",
+    "newCampaignHeading": "New campaign draft",
+    "creativesHeading": "Ads & creatives",
+    "historyHeading": "Action history",
+    "noHistory": "No actions have touched this campaign yet.",
+    "noCreativesYet": "No campaign draft exists for this target yet - create one from the campaigns page.",
+    "platformLabel": "Platform",
+    "statusLabel": "Status",
+    "budgetLabel": "Daily budget",
+    "connectionLabel": "Connection",
+    "dailyBudget": "${amount}/day",
+    "lastActionAt": "Last action: {at}",
+    "lastKnownStateAt": "Last known state as of {at}",
+    "stateSourceNote": "State reflects executed GrowthOS actions. Live reads from the ad platform arrive once the platform API access (KAN-43) is approved.",
+    "pauseButton": "Pause campaign",
+    "pauseError": "Could not pause the campaign. Please try again.",
+    "keywordsLine": "Keywords: {keywords}",
+    "metaTargetingSummary": "{countries}, ages {ageMin}-{ageMax}",
+    "platform": {
+      "google_ads": "Google Ads",
+      "meta_ads": "Meta",
+      "stripe": "Stripe",
+      "ga4": "GA4",
+      "generic": "Generic",
+      "simulated": "Simulated"
+    },
+    "status": {
+      "enabled": "Active",
+      "paused": "Paused",
+      "removed": "Removed",
+      "none": "No campaign yet"
+    }
   }
 }
