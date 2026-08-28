@@ -17,7 +17,62 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (latest) — Merged PR #345 (verified clean CI); drove PR #347 through three PROGRESS.md conflicts and a real CI flake to merge
+## 2026-08-28 (latest) — Merged PR #344 (KAN-129) + #346; delegated and drove KAN-131 (quarantine dismiss) through two merge conflicts to green and merge
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` had zero `todo` rows at pick time; checked open PRs
+    first (established pattern) and found **PR #344** (KAN-129, resource-library archive/unarchive)
+    and **PR #345** (campaign & ads pages, Yariv's own goal) both open from concurrent sessions,
+    both mid-CI. Subscribed to both rather than duplicating work.
+  - **PR #344**: CI came back green with no open review threads — merged (squash) and unsubscribed.
+  - Opened **PR #346** (this run's own PROGRESS.md check-in record) — CI green, merged (squash).
+  - **PR #345**: re-ran one CI failure that was the known, unrelated Firestore-emulator flake
+    (`campaign-ops-pack.emulator.test.ts`, a file this PR never touches); a second, different
+    unrelated-file flake followed — since this run's one-re-run budget was spent and the PR wasn't
+    this session's own, left it to the owning session per this repo's collision pattern. It merged
+    on its own shortly after (by the repo owner's account, i.e. another session), plus a follow-up
+    commit landed directly on `main` recording live EasySign validation of that feature.
+  - With the primary backlog exhausted (`TASKS.md`: only `needs-human` KAN-43 and `blocked-by`
+    KAN-50/51 remain) and the campaign-pages goal's own next slices blocked on KAN-43 too,
+    delegated a background agent to resume the "sweep every `done` row's own doc-comment notes for
+    a newly-buildable follow-up" pattern. It found and delivered **KAN-131**: `quarantine.service.ts`
+    (KAN-34) covered "the schema/payload got fixed, try again" (`replayQuarantinedRecord`) but had
+    no path for "this will never validate" — such records sat in the admin quarantine list forever.
+    Delivered `dismissQuarantinedRecord` (new `dismissed` terminal status, `QuarantinedRecordNotActionableError`
+    guard), a new `POST .../dismiss` route, and a `DismissQuarantinedRecordButton` on the
+    ingest-health page, full test coverage, en/he translations, opened as **PR #350**.
+  - PR #350 landed with `mergeable_state: dirty` against the fast-moving `main` (a concurrent
+    session had merged KAN-130/PR #348 in the meantime) — resolved the merge conflict directly
+    (both `TASKS.md` and `PROGRESS.md` needed manual reconciliation; translation JSON auto-merged
+    cleanly), validated with `pnpm lint`/`pnpm typecheck` plus every directly-touched test file
+    (`quarantine.emulator.test.ts`, `audit-log.emulator.test.ts`, `win-rule.emulator.test.ts`, the
+    new `dismiss` route/component tests — all green) before pushing, rather than running the full
+    suite again given the change was docs + an already-validated merge. `main` moved again during
+    CI (`mergeable_state` briefly `dirty` again) and self-resolved via a second automatic merge with
+    no new conflicts. CI then hit the known cross-file Firestore-emulator flake once more (root-
+    caused and re-run by a concurrent session watching the same PR — this repo now has enough
+    concurrent scheduled sessions that PRs sometimes get more than one set of eyes, which is fine
+    per the established "no action lost" posture). CI came back green and the PR merged.
+- **In progress (exact stopping point):** none — KAN-129, KAN-131, and this run's own docs PR are
+  all merged. **PR #352** (KAN-132, member suspend/reactivate — `MembershipModel`'s own doc comment
+  named this gap verbatim since KAN-25) and **PR #353** (a concurrent session's own docs check-in)
+  are open and mid-CI from concurrent sessions at the time this entry was written; left untouched,
+  no failure or blocker observed on either.
+- **Blocked + why:** nothing blocking new code work; PR #352/#353 are already claimed and healthy.
+- **Next step:** next run checks open PRs first (as always: #352, #353, and `#327` EasySign — still
+  the repo owner's own manual work, leave untouched); once settled, resume the sweep pattern from
+  **KAN-133**.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion has consistently failed / had no available tool from this sandbox
+    in prior runs).
+
+---
+
+## 2026-08-28 — Merged PR #345 (verified clean CI); drove PR #347 through three PROGRESS.md conflicts and a real CI flake to merge
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `TASKS.md` still had zero `todo` rows; checked open PRs first
