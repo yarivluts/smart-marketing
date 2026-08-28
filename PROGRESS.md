@@ -17,6 +17,69 @@ Template for each entry:
 
 ---
 
+## 2026-08-27 (latest) — Merged PR #332 (KAN-124) and PR #333 (KAN-124 collision), fixed via PR #335 (KAN-125)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `main` was at `4e61226` (KAN-123/PR #330 merged) at pick time;
+    `TASKS.md` had zero `todo` rows left. Checked open PRs first (established pattern) and found
+    three: **PR #332** (`kan-124-org-project-settings-edit`), **PR #333**
+    (`kan-124-plugin-install-config-edit`) — both independently filed as **KAN-124**, a numbering
+    collision — and **PR #327** (`feature/easysign-schemaregistry-integration`, previously
+    confirmed to be the repo owner's own manual work by commit authorship, left untouched).
+  - Subscribed to PR activity on #332 and #333, waited for their CI (both were mid-run at pick
+    time). #332 came back green first (`lint · typecheck · test · build`, `terraform fmt ·
+    validate`, `mergeable_state: clean`, no review threads) — merged it (squash, `8a1cc6f`),
+    keeping **KAN-124** per its own PR body's numbering note (it had already caught and avoided a
+    collision with KAN-123/PR #330 before opening).
+  - #333's first CI run failed — `lint · typecheck · test · build`, shard 2/3 of the Playwright e2e
+    suite. Pulled the job log: every failure was in files this PR's diff never touches
+    (`intent-quality.spec.ts` KAN-83, `experiments.spec.ts` KAN-89, `keys.spec.ts` KAN-30), root
+    caused to a real Firestore-emulator `RESOURCE_EXHAUSTED: Received message larger than max`
+    error cascading into org-creation timeouts — this repo's long-documented resource-contention
+    flake, not a defect in the plugin-install-config-edit diff. Posted a standing-down comment
+    naming the failure and re-ran the failed jobs once (this PR's one-re-run budget) rather than
+    guessing further. The re-run came back green ~45 minutes later.
+  - Went to renumber #333 to **KAN-125** before merging (per the established "second-to-merge
+    renumbers" convention) but found it had already been merged (squash, `5351516`) — by the
+    repo owner directly, ahead of this run's own renumbering step — still carrying its original
+    KAN-124 title/`TASKS.md` row. `main` now had two KAN-124 rows in spirit: #333's own new row,
+    and a gap where #332's row should have been (its diff never added one at all, a real miss
+    against this repo's "every `done` story gets a `TASKS.md` row" convention).
+  - Fixed both gaps in one follow-up: branched `kan-125-renumber-plugin-config-edit` from the new
+    `main`, added the missing KAN-124 `TASKS.md` row documenting PR #332's actual work (org/project
+    settings edit), and renumbered PR #333's own row plus every in-code `KAN-124` doc-comment
+    reference its diff touched (`plugin-registry.service.ts`, `edit-plugin-install-config-form.tsx`,
+    `plugin-config-fields.tsx`, `plugin-install-list.tsx`, the plugin-install `PATCH` route,
+    `plugin-view.ts`) to **KAN-125**. Doc-comment/markdown text only, no behavior change — verified
+    with `pnpm lint`/`pnpm typecheck`/`pnpm build` (green across all packages) plus the directly
+    relevant test files run against the real Firestore/Auth emulators
+    (`plugin-registry.emulator.test.ts` 30/30, `lib/orgs/plugin-view.test.ts` 26/26,
+    `edit-plugin-install-config-form.test.tsx`/`install-plugin-form.test.tsx`/
+    `plugin-install-list.test.tsx`/the plugins `PATCH` route test 32/32) rather than the full
+    ~40-minute suite, since the change touches no runtime logic. Opened PR #335, which the repo
+    owner also merged directly once CI came back green (`lint · typecheck · test · build`,
+    `terraform fmt · validate`) with no open review threads.
+  - `main` is now at `ef03142`: KAN-124 = org/project settings edit (PR #332), KAN-125 = plugin
+    install config edit (PR #333), both documented correctly in `TASKS.md`.
+- **In progress (exact stopping point):** none — all three PRs (#332, #333, #335) are merged,
+  tested, and `TASKS.md`/code doc comments are internally consistent.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** resume the sweep-for-a-newly-buildable-follow-up pattern — current highest real
+  KAN number is **125**. Check for other open PRs first (established pattern) before starting new
+  work. No new substantive feature work was started this run beyond the numbering/documentation
+  fix — the next run should still do a full "sweep every `done` row's own doc-comment notes for a
+  newly-buildable follow-up" pass. PR #327 (EasySign) remains open on `main`'s history but is
+  confirmed to be the repo owner's own work (commit authorship), not this automation's concern.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: someone with full repo-admin access could bulk-delete the large pile of
+    already-merged, undeleted feature branches on `origin` (branch deletion keeps failing with an
+    HTTP 403 from this sandbox's git remote).
+
+---
+
 ## 2026-08-27 (latest) — Merged PR #329 (KAN-122 renumbering) and PR #330 (KAN-123, hook endpoint edit)
 
 - **Last completed:**
