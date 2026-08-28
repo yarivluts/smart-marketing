@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 (later) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
+
+- **Last completed:** the three follow-ups #345 named, plus two real bugs the rendered pages
+  exposed. PR #358 (`feat/campaign-live-state`), deployed to web-dev (`web-dev-00033-lcb`).
+  - **Read seam:** `readCampaignState` on `AutomationActionExecutor`, implemented by all three
+    executors (simulated reports the target row; Google Ads adds a `lookupCampaignState` GAQL read
+    of `campaign.status` + `campaign_budget.amount_micros`; Meta adds a `getCampaignState` Graph
+    read). New `last_read_state_at` field - deliberately NOT overloading `updated_at` - so the page
+    distinguishes "synced from the platform as of X" from the executed-actions stand-in note. New
+    `POST .../automation/targets/[targetId]/refresh` route + Refresh-from-platform button. This is
+    the one executor write that needs no approved action, legal because it only records observed
+    state.
+  - **Campaign discovery/sync:** `importExternalCampaignSnapshots` + `POST .../targets/import`
+    upserts one target row per observed live campaign (platform, status, budget, objective, and a
+    verbatim ads snapshot incl. image URLs), with validation and size caps. The creatives panel
+    renders those platform ads for campaigns GrowthOS did not create - the read-direction sibling of
+    the propose->approve->execute write path.
+  - **Per-campaign spend panel:** `queryCampaignSpend` over the `ad_spend` measure filtered by the
+    campaign's platform id, 28-day window, `BoardTileQueryOutcome`-style graceful degradation.
+  - **Real EasySign data, end to end:** pulled the 20 live campaigns + 75 ads from the Easy Event
+    Meta ad account through the Meta Ads connector and imported them into the EasySign Growth
+    project (`LYierelkF0eKnLmIrS9u`, prod env). The pages now show real Hebrew ad copy, headlines,
+    CTAs and images. Validation: **18/18** (import 201, re-import upserts in place, refresh route
+    200 with a fresh stamp, list badges, four detail pages, Hebrew creative + images present).
+  - **Two bugs found only by looking at the rendered page:** the state timestamp printed a raw epoch
+    (`@arbel/firebase-orm` overwrites the reserved `updated_at` with `Date.getTime()` on every
+    save - now normalized in the view layer, worth remembering for any page rendering a model's
+    `updated_at`), and the campaigns list rendered the literal key `Automation.seedTargetHeading`,
+    which never existed.
+  - Local verification: `pnpm lint`, `pnpm typecheck` green; 1659 package tests and 1973 web tests
+    green (needed a portable Temurin JRE - no Java on this machine's PATH, which is why
+    `pnpm test` had been failing locally rather than for any code reason).
+- **In progress (exact stopping point):** PR #358 open, CI running, awaiting green before merge.
+- **Blocked + why:** the spend panel degrades honestly on these campaigns - the project has
+  `ad_spend` registered but no mart view provisioned in BigQuery (only tenant hash `f663ed62f33a`
+  has one). Provisioning a live view is infra left untouched.
+- **Next step:** merge once CI is green; then real Google Ads reads when KAN-43 lands.
+- **Waiting on human:** KAN-43 applications; the parked token-minting IAM grant.
+
+
 ## 2026-08-28 (latest) — Delivered KAN-133 (identity-merge hardening), opened PR
 
 - **Last completed:**
