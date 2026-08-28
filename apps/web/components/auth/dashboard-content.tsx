@@ -32,7 +32,7 @@ export function DashboardContent(): React.ReactElement | null {
     return null;
   }
 
-  const activeMemberships = memberships.filter((membership) => membership.status !== 'invited');
+  const activeMemberships = memberships.filter((membership) => (membership.status ?? 'active') === 'active');
   const pendingInvites = memberships.filter((membership) => membership.status === 'invited');
 
   return (

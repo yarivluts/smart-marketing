@@ -22,9 +22,13 @@ import {
   listRoleBindingsForUser,
   MembershipAlreadyExistsError,
   MembershipModel,
+  MembershipNotActiveError,
   MembershipNotFoundError,
+  MembershipNotSuspendedError,
+  reactivateOrgMember,
   removeOrgMember,
   RoleNotChangeableError,
+  suspendOrgMember,
   updateMemberRole,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
@@ -533,5 +537,169 @@ describe('updateMemberRole', () => {
     const { organization } = await createOrganizationWithOwner({ name: 'Role Update 404 Org', ownerUserId: owner.id });
 
     await expect(updateMemberRole(organization.id, 'does-not-exist', 'viewer', owner.id)).rejects.toThrow(MembershipNotFoundError);
+  });
+});
+
+describe('suspendOrgMember / reactivateOrgMember (KAN-131)', () => {
+  it('removes an active member\'s role binding without removing the membership, then restores it on reactivation', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Suspend Org', ownerUserId: owner.id });
+
+    const memberEmail = uniqueEmail('suspend-member');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: memberEmail,
+      role: 'org_admin',
+      invitedByUserId: owner.id,
+    });
+    const member = await ensureUserByEmail(memberEmail);
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: member.id,
+      callerEmailVerified: true,
+    });
+    expect(await listRoleBindingsForUser(member.id, [organization.id])).toHaveLength(1);
+
+    const suspended = await suspendOrgMember(organization.id, invitation.id, owner.id);
+    expect(suspended.status).toBe('suspended');
+    expect(suspended.role).toBe('org_admin');
+
+    // Membership survives (with its role, invited_by, accepted_at intact) — only the binding is gone.
+    const stillThere = await MembershipModel.init(invitation.id, { organization_id: organization.id });
+    expect(stillThere?.status).toBe('suspended');
+    expect(stillThere?.role).toBe('org_admin');
+    expect(stillThere?.accepted_at).toBeTruthy();
+    expect(await listRoleBindingsForUser(member.id, [organization.id])).toHaveLength(0);
+
+    const reactivated = await reactivateOrgMember(organization.id, invitation.id, owner.id);
+    expect(reactivated.status).toBe('active');
+
+    const bindingsAfter = await listRoleBindingsForUser(member.id, [organization.id]);
+    expect(bindingsAfter).toHaveLength(1);
+    expect(bindingsAfter[0].role).toBe('org_admin');
+    expect(bindingsAfter[0].scope_level).toBe('org');
+    expect(bindingsAfter[0].scope_id).toBe(organization.id);
+  });
+
+  it('records audit log entries for both suspension and reactivation', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-audit-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Suspend Audit Org', ownerUserId: owner.id });
+
+    const memberEmail = uniqueEmail('suspend-audit-member');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: memberEmail,
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+    const member = await ensureUserByEmail(memberEmail);
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: member.id,
+      callerEmailVerified: true,
+    });
+
+    await suspendOrgMember(organization.id, invitation.id, owner.id);
+    await reactivateOrgMember(organization.id, invitation.id, owner.id);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries).toContainEqual(expect.objectContaining({ action: 'membership.suspended', target_id: invitation.id }));
+    expect(entries).toContainEqual(expect.objectContaining({ action: 'membership.reactivated', target_id: invitation.id }));
+  });
+
+  it('rejects suspending a pending invite (nothing active to pause)', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-pending-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Suspend Pending Org', ownerUserId: owner.id });
+
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: uniqueEmail('suspend-pending-invitee'),
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+
+    await expect(suspendOrgMember(organization.id, invitation.id, owner.id)).rejects.toThrow(MembershipNotActiveError);
+  });
+
+  it('rejects suspending an already-suspended member', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-twice-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Suspend Twice Org', ownerUserId: owner.id });
+
+    const memberEmail = uniqueEmail('suspend-twice-member');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: memberEmail,
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+    const member = await ensureUserByEmail(memberEmail);
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: member.id,
+      callerEmailVerified: true,
+    });
+
+    await suspendOrgMember(organization.id, invitation.id, owner.id);
+    await expect(suspendOrgMember(organization.id, invitation.id, owner.id)).rejects.toThrow(MembershipNotActiveError);
+  });
+
+  it('rejects reactivating a member that is not suspended', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('reactivate-not-owner') });
+    const { organization, membership } = await createOrganizationWithOwner({ name: 'Reactivate Not Org', ownerUserId: owner.id });
+
+    await expect(reactivateOrgMember(organization.id, membership.id, owner.id)).rejects.toThrow(MembershipNotSuspendedError);
+  });
+
+  it('throws MembershipNotFoundError for suspend/reactivate on a membership that does not exist', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-404-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Suspend 404 Org', ownerUserId: owner.id });
+
+    await expect(suspendOrgMember(organization.id, 'does-not-exist', owner.id)).rejects.toThrow(MembershipNotFoundError);
+    await expect(reactivateOrgMember(organization.id, 'does-not-exist', owner.id)).rejects.toThrow(MembershipNotFoundError);
+  });
+
+  it('refuses to suspend the last active org_owner, leaving the org manageable', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-sole-owner') });
+    const { organization, membership } = await createOrganizationWithOwner({ name: 'Suspend Sole Owner Org', ownerUserId: owner.id });
+
+    await expect(suspendOrgMember(organization.id, membership.id, owner.id)).rejects.toThrow(LastOwnerError);
+
+    const bindings = await listRoleBindingsForUser(owner.id, [organization.id]);
+    expect(bindings).toHaveLength(1);
+  });
+
+  it('allows suspending an org_owner as long as another active org_owner remains', async () => {
+    const ownerA = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-co-owner-a') });
+    const { organization, membership: ownerAMembership } = await createOrganizationWithOwner({
+      name: 'Suspend Co-Owned Org',
+      ownerUserId: ownerA.id,
+    });
+
+    const ownerBEmail = uniqueEmail('suspend-co-owner-b');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: ownerBEmail,
+      role: 'org_admin',
+      invitedByUserId: ownerA.id,
+    });
+    const ownerB = await ensureUserByEmail(ownerBEmail);
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: ownerB.id,
+      callerEmailVerified: true,
+    });
+
+    const promoted = await MembershipModel.init(invitation.id, { organization_id: organization.id });
+    promoted!.role = 'org_owner';
+    await promoted!.save();
+
+    await suspendOrgMember(organization.id, ownerAMembership.id, ownerA.id);
+
+    const reloaded = await MembershipModel.init(ownerAMembership.id, { organization_id: organization.id });
+    expect(reloaded?.status).toBe('suspended');
   });
 });
