@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
+import { EditWinRuleForm } from '@/components/orgs/edit-win-rule-form';
 import type { WinRuleSummaryView } from '@/lib/orgs/win-rule-view';
 
 export interface WinRuleListProps {
@@ -19,7 +20,7 @@ function describeFilters(rule: WinRuleSummaryView, t: (key: string) => string): 
   return rule.filters.map((filter) => `${filter.field} ${filter.operator} ${filter.value}`).join(` ${t('filterJoiner')} `);
 }
 
-/** One win rule's row: schema + filter summary, an active/disabled toggle, and a delete button (KAN-65). */
+/** One win rule's row: schema + filter summary, an active/disabled toggle, a delete button (KAN-65), and an inline edit form for the rule's own name/filters/win-type (KAN-130). */
 function WinRuleRow({ orgId, projectId, rule }: { orgId: string; projectId: string; rule: WinRuleSummaryView }): React.ReactElement {
   const t = useTranslations('WinRules');
   const router = useRouter();
@@ -88,6 +89,14 @@ function WinRuleRow({ orgId, projectId, rule }: { orgId: string; projectId: stri
           </Button>
         </div>
       </div>
+      <EditWinRuleForm
+        orgId={orgId}
+        projectId={projectId}
+        winRuleId={rule.id}
+        initialName={rule.name}
+        initialFilters={rule.filters}
+        initialWinType={rule.winType}
+      />
       {error ? (
         <p role="alert" className="text-xs text-destructive">
           {t('actionError')}

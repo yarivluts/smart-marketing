@@ -94,6 +94,11 @@ describe('WinRuleList', () => {
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1/win-rules/rule-1', { method: 'DELETE' });
   });
 
+  it('renders an Edit control for each rule (KAN-130)', () => {
+    renderList([activeRule]);
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+  });
+
   it('shows an inline error when an action fails', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     renderList([activeRule]);
