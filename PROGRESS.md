@@ -17,7 +17,71 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (latest) — Merged PR #340 (KAN-127, TV pairing settings edit)
+## 2026-08-28 (latest) — Drove PR #340's CI flake to green, merged PR #342 (KAN-128, goal definition edit)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` had zero `todo` rows left (only `needs-human` KAN-43
+    and `blocked-by` KAN-50/51) at pick time; checked open PRs first (established pattern) and found
+    **PR #340** (`kan-127-tv-pairing-settings-edit`) already open from a concurrent session, CI
+    in-progress, and **PR #327** (EasySign, still confirmed the repo owner's own manual work,
+    untouched). Subscribed to PR #340's activity rather than starting duplicate work.
+  - PR #340's first CI run failed on `lint · typecheck · test · build` — pulled the job log and
+    confirmed the failures were all in `src/plugin-runtime/saas-metric-pack/default-boards
+    .emulator.test.ts`, a file this PR's diff never touches (it only changes TV-pairing files),
+    root-caused to this repo's long-documented Firestore-emulator `RESOURCE_EXHAUSTED: Received
+    message larger than max` flake cascading into `FIRESTORE INTERNAL ASSERTION FAILED` across the
+    rest of that suite (same pattern as PR #333/#330). Posted a standing-down comment naming the
+    failure and re-ran the failed job once (this PR's one-re-run budget) rather than guessing
+    further. The re-run came back green ~44 minutes later; another concurrent session merged PR #340
+    (squash, `e81ca2a`) before this run's own scheduled check-in fired — no action lost, matching
+    this repo's established multi-session collision pattern. Unsubscribed once confirmed merged.
+  - With `main` caught up through KAN-127 and no other open PRs (besides EasySign), delegated a
+    background agent to continue the "sweep every `done` row's own doc-comment notes for a
+    newly-buildable follow-up" pattern that produced KAN-100 through KAN-127. It found a narrower,
+    still-real gap: `goal.service.ts`'s existing `updateGoal` (KAN-85) only ever covers
+    `target_value`/`range_min`/`range_max` (the inline goals-table cell) — every other field a goal
+    is created with (`name`/`metric_name`/`direction`/`start_date`/`deadline`/`rhythm`/
+    `owner_person_id`) had no update path at all, confirmed by reading `goal.service.ts` and the
+    goal detail page directly (read-only plus only a Delete button). Minted **KAN-128**, implemented
+    a new `updateGoalDefinition` (full replace, audit-logged as `goal.update_definition`, reusing a
+    newly-extracted `GoalFieldsInput`/`validateGoalFields` shared with `createGoal`, correctly
+    clearing/setting target-vs-range fields on a direction change), a two-kind-PATCH-on-one-route
+    dispatch on the existing route (mirroring KAN-120's `updateSegmentDefinition`/
+    `updateSegmentStatus` shape), and a new `EditGoalForm` admin control on the goal detail page.
+    en/he translations, `TASKS.md` row. Full local validation before opening the PR: 31/31 in
+    `goal.emulator.test.ts`, 23/23 in `parse-goal-fields.test.ts`, 14/14 route tests, 7/7
+    `EditGoalForm` component tests, full monorepo `pnpm build`/`lint`/`typecheck` green, full
+    `pnpm test` 1885/1886 green (the one failure, `onboarding/pack/route.test.ts`, confirmed this
+    repo's known emulator-contention flake by re-running it alone in 1.1s).
+  - The background agent opened **PR #342** and (correctly, per its own note) handed off CI-watching
+    to this session once it realized GitHub webhook events for subscribed PRs land in the main
+    session's conversation, not in a background subagent that has already gone idle — a real gap in
+    that delegation pattern worth remembering for future runs: **a subagent should not be the one to
+    subscribe to PR activity; the parent session should drive CI-to-merge for any PR a delegated
+    agent opens.** This run took over, waited out the ~62-minute CI run (green on the first attempt,
+    no re-run needed), confirmed `mergeable_state: clean` and no open review threads, and merged PR
+    #342 (squash, `d08c2b1`) — again, a moment ahead of another concurrent session, consistent with
+    how active this repo's automation currently is.
+  - `main` is now caught up through **KAN-128**.
+- **In progress (exact stopping point):** none — this PROGRESS.md update itself is the only
+  remaining artifact of this run; opening it as its own small PR now.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next run checks open PRs first (as always), then resumes the "sweep every `done`
+  row's own doc-comment notes for a newly-buildable follow-up" pattern from **KAN-129** if none are
+  pending. Worth reusing: delegating implementation to a background agent worked well for throughput
+  (two full stories advanced in parallel this run), but the parent session must retain and drive any
+  PR-activity subscription for agent-opened PRs itself, per the gap noted above.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion keeps failing with an HTTP 403 from this sandbox's git remote; this
+    session's GitHub MCP toolset also had no branch-delete tool available at all).
+
+---
+
+## 2026-08-28 — Merged PR #340 (KAN-127, TV pairing settings edit)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. Local container's cached `main` ref was stale (diverged at
