@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { getServerSession } from '@/lib/auth/get-server-session';
+import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 
 type PageProps = Readonly<{
@@ -26,7 +27,7 @@ export default async function OrgsPage({ params }: PageProps): Promise<React.Rea
   }
 
   const { memberships } = await resolveOrgSessionContext(session);
-  const active = memberships.filter((membership) => membership.status !== 'invited');
+  const active = memberships.filter((membership) => isActiveMembershipStatus(membership.status));
   const pending = memberships.filter((membership) => membership.status === 'invited');
   const t = await getTranslations('OrgsPage');
 

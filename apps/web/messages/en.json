@@ -150,7 +150,12 @@
     "inviteError": "Couldn't send that invite. They may already be a member.",
     "remove": "Remove",
     "removeError": "Couldn't remove this member. Please try again.",
-    "removeLastOwnerError": "An organization must always have at least one owner."
+    "removeLastOwnerError": "An organization must always have at least one owner.",
+    "suspend": "Suspend",
+    "suspendError": "Couldn't suspend this member. Please try again.",
+    "suspendLastOwnerError": "An organization must always have at least one owner.",
+    "reactivate": "Reactivate",
+    "reactivateError": "Couldn't reactivate this member. Please try again."
   },
   "NewProjectPage": {
     "title": "Create a project",

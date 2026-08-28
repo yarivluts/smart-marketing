@@ -3,6 +3,8 @@ import type { OrgMemberSummary } from '@growthos/firebase-orm-models';
 import { isInvitableRole } from '@growthos/shared';
 import { RemoveMemberButton } from './remove-member-button';
 import { ChangeRoleControl } from './change-role-control';
+import { SuspendMemberButton } from './suspend-member-button';
+import { ReactivateMemberButton } from './reactivate-member-button';
 
 export interface MembersListProps {
   orgId: string;
@@ -35,6 +37,12 @@ export async function MembersList({ orgId, members, canManageMembers }: MembersL
                   {t('roleAndStatus', { role: member.role, status: member.status })}
                 </span>
               )}
+              {canManageMembers && member.status === 'active' ? (
+                <SuspendMemberButton orgId={orgId} membershipId={member.membershipId} />
+              ) : null}
+              {canManageMembers && member.status === 'suspended' ? (
+                <ReactivateMemberButton orgId={orgId} membershipId={member.membershipId} />
+              ) : null}
               {canManageMembers ? <RemoveMemberButton orgId={orgId} membershipId={member.membershipId} /> : null}
             </div>
           </li>
