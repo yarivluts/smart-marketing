@@ -45,49 +45,6 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (later still) — Drove PR #347's CI flake, merged it and PR #348 (KAN-130); KAN-131 already picked up by another session
-
-- **Last completed:**
-  - Continuation of this run's own PROGRESS-check pass. **PR #348** (KAN-130, win-rule edit) went
-    green (`lint · typecheck · test · build` + `terraform fmt · validate` both `success`, clean
-    merge state, no reviews outstanding) and was merged (squash).
-  - **PR #349** (this run's own journal update recording the KAN-130/#347 in-flight check) also
-    went green and was merged (squash).
-  - **PR #347** (a concurrent session's own progress-journal chore) failed
-    `lint · typecheck · test · build` on `src/services/automation.emulator.test.ts` — the repo's
-    long-documented Firestore-emulator `RESOURCE_EXHAUSTED`-class flake (`FIRESTORE INTERNAL
-    ASSERTION FAILED: Unexpected state`), same class as PR #340/#333/#330. The PR's diff is
-    `PROGRESS.md`-only, so it couldn't be the cause. Posted a standing-down comment naming the
-    failure and re-ran the failed job once. Before that re-run's result came back, #347's owning
-    session pushed its own new commit (rebasing onto the post-#349 base) and CI ran fresh on the
-    new head; that fresh run came back green and #347's owning session merged it directly — no
-    action lost, matching this repo's established multi-session collision pattern.
-  - Checked open PRs again after all three cleared: found **PR #350** (`kan-131-quarantine-dismiss`,
-    a concurrent session already continuing the "sweep every `done` row for a newly-buildable
-    follow-up" pattern into **KAN-131** — permanently dismissing a quarantined ingest record).
-    Mid-CI, no failure yet. Subscribed rather than starting a duplicate KAN-131/132 implementation,
-    same collision-avoidance posture as every prior check in this run.
-  - **PR #327** (EasySign) still open, still the repo owner's own manual work per every prior
-    check, `mergeable_state: dirty` — left untouched again.
-- **In progress (exact stopping point):** watching PR #350 for CI completion / review activity.
-  This PROGRESS.md entry is itself opened as its own small PR, same pattern as #347/#349.
-- **Blocked + why:** nothing blocking new code work in the sense of a missing task — KAN-131 (the
-  next natural sweep pick) is already claimed by a concurrent session's PR #350.
-- **Next step:** next check-in (or this session, if a webhook event fires first) verifies PR #350's
-  outcome; if merged/closed with no other PR in flight, resume the sweep pattern from KAN-132, or
-  the campaign-pages goal's next slice (real GAQL/Meta live-state reads once KAN-43 lands; per-ad
-  performance tiles off `ad_performance_daily`), per this file's own 2026-08-28 "Campaigns & Ads
-  pages" entry.
-- **Waiting on human:**
-  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
-    outstanding, long-standing.
-  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature
-    branches on `origin` (branch deletion has consistently failed / had no available tool from
-    this sandbox in prior runs).
-
----
-
 ## 2026-08-28 (latest) — Merged PR #345 (verified clean CI); drove PR #347 through three PROGRESS.md conflicts and a real CI flake to merge
 
 - **Last completed:**
@@ -116,15 +73,18 @@ Template for each entry:
     Resolved the same way: merged `main` in again, kept every entry (this one, #349's, and the
     already-reconciled ones below) in chronological order with nothing dropped — #349's own content
     is fully superseded by this entry so it's kept as a brief pointer rather than duplicated in
-    full, matching this file's established supersede convention.
-- **In progress (exact stopping point):** PR #347 pushed with this third conflict resolution;
-  waiting on its CI (re-run in progress) before merging. PR #345 is merged; `main` is caught up
-  through PR #349 (KAN-130 included).
-- **Blocked + why:** nothing blocking other than PR #347's own CI finishing.
-- **Next step:** once PR #347's CI is green with no open review threads, merge it. Then resume the
-  sweep from **KAN-131** (KAN-130 already closed by PR #348) if no other PRs are in flight, or
-  continue the campaign-pages goal's own noted "next slices" (real GAQL/Meta live-state reads once
-  KAN-43 lands; per-ad performance tiles off `ad_performance_daily`).
+    full, matching this file's established supersede convention. **PR #347 merged** shortly after
+    (by another concurrent session, once CI came back green on the final head).
+  - While PR #347 was mid-CI, a concurrent session independently found and closed a new gap:
+    **KAN-131** (ingest quarantine dismiss, PR #350 — see the entry directly below) — confirmed via
+    `TASKS.md` and left untouched rather than duplicated, per this repo's established
+    collision-avoidance pattern.
+- **In progress (exact stopping point):** none — PR #345 and PR #347 are both merged; `main` is
+  caught up through KAN-130. PR #350 (KAN-131) is open and its own entry below has full detail.
+- **Blocked + why:** nothing blocking.
+- **Next step:** check PR #350 (KAN-131)'s CI/mergeability next; once it lands, resume the sweep
+  from **KAN-132**, or continue the campaign-pages goal's own noted "next slices" (real GAQL/Meta
+  live-state reads once KAN-43 lands; per-ad performance tiles off `ad_performance_daily`).
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
     outstanding, long-standing.
@@ -132,6 +92,88 @@ Template for each entry:
   - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature
     branches on `origin` (branch deletion has consistently failed / had no available tool from
     this sandbox in prior runs).
+
+---
+
+## 2026-08-28 (later still) — Drove PR #347's CI flake, merged it and PR #348 (KAN-130); KAN-131 already picked up by another session
+
+**Superseded by the entry above** — a concurrent session's own record of this same window (PR #348/
+#349 merges, PR #347's flake/re-run/merge, and finding PR #350/KAN-131). The entry above captures
+the fuller outcome, including this session's own resolution of PR #350's subsequent merge conflict.
+Kept here as the as-run record of what that session observed.
+
+---
+
+## 2026-08-28 — Delivered KAN-131 (ingest quarantine dismiss), opened PR
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` confirmed zero `todo` rows (only `needs-human` KAN-43
+    and `blocked-by` KAN-50/51). Checked open PRs first (established pattern) and found **PR #348**
+    (`kan-129-win-rule-edit`, titled KAN-130 — a concurrent session's win-rule edit-form follow-up,
+    CI not yet checked by this run) and **PR #347** (docs-only PROGRESS.md update recording an
+    earlier run's KAN-128/KAN-129 merges) both already open, plus **PR #327** (EasySign, still
+    confirmed the repo owner's own manual work). Since PR #348 already claimed **KAN-130**, this run
+    swept for the next gap under **KAN-131** rather than colliding on the same number, and left all
+    three open PRs untouched (no CI failure, review comment, or merge-conflict signal on any of them
+    to act on).
+  - Swept `packages/firebase-orm-models/src/services/*.ts` against their sibling admin UI pages for
+    a genuinely new gap, explicitly avoiding KAN-130's win-rule scope. Found: `quarantine.service.ts`
+    (KAN-34)'s `listQuarantinedRecordsForProject`/`replayQuarantinedRecord` covered "the schema/
+    payload got fixed, try again" but had **no path for "this will never validate and isn't worth a
+    schema change"** — an abandoned integration's payload, a one-off malformed test event. Such a
+    record just sat in the bounded `status == 'quarantined'` list forever, crowding out records an
+    operator could actually still act on — confirmed directly by reading `quarantine.service.ts`,
+    `QuarantinedRecordModel` (only `quarantined`/`replayed` statuses existed), and the ingest-health
+    admin page (only a Replay button, no dismiss/discard control) before committing to it. Same
+    "sits forever, forces itself into an admin's attention" shape KAN-127/KAN-129 already closed for
+    TV pairings and shared credentials/templates/people, just for a different registry.
+  - Delivered **KAN-131**: `'dismissed'` added to `QUARANTINED_RECORD_STATUSES` + new
+    `dismissed_at`/`dismissed_by_user_id` fields on `QuarantinedRecordModel`; new
+    `dismissQuarantinedRecord` in `quarantine.service.ts` (positional-args signature matching
+    `replayQuarantinedRecord`'s own shape in this file) flips a still-`quarantined` record straight
+    to `dismissed`, audit-logged as `quarantined_record.dismiss`; a new
+    `QuarantinedRecordNotActionableError` (mirroring `AttachmentNotPendingError`'s "already been
+    decided" posture) guards against dismissing a record already `replayed` or already `dismissed`.
+    Terminal and one-way by design — there is no `undismiss`, same posture `replayed` already has.
+    New `POST .../quarantined-records/[quarantinedRecordId]/dismiss` route (`ingest.write` gated,
+    same as the sibling `replay` route; 409 `invalid_state` for an already-resolved record, matching
+    this codebase's established 409 convention) and a new `DismissQuarantinedRecordButton` on the
+    ingest-health page's quarantine browser next to the existing Replay button, confirming before
+    submitting (`window.confirm`, same posture as `DeleteGoalButton`/`DeleteSegmentButton`) since a
+    dismissed record cannot be brought back. en/he translations. `TASKS.md` row added.
+  - Full test coverage added and run against the real local Firestore/Auth emulators (not just
+    written): `packages/firebase-orm-models` — `quarantine.emulator.test.ts` 14/14 green (5 new
+    `dismissQuarantinedRecord` cases: success + drops from list, rejects an already-replayed record,
+    rejects an already-dismissed record, cross-project isolation, unknown id) plus a new
+    `quarantined_record.dismiss` case in `audit-log.emulator.test.ts` (15/15 green); `apps/web` — a
+    new `dismiss/route.test.ts` (7/7: 401/403/404×2/200/409) and a new
+    `dismiss-quarantined-record-button.test.tsx` (3/3: confirm-declined no-op, confirm-accepted
+    POST+refresh, inline error) plus the pre-existing `replay-quarantined-record-button.test.tsx`
+    (3/3, unaffected). Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck` green; `pnpm test`
+    green across every package (`packages/shared`, `packages/firebase-orm-models`,
+    `apps/web` unit/component/route suite, `packages/dbt-transform`) — full details in the PR body's
+    own test-plan section, including any confirmed-flake re-run this run had to spend.
+  - Self-reviewed the diff before opening the PR (correctness, missing tests, reuse/simplification)
+    per `CLAUDE.md`'s git-workflow rule; fixed what the review found before pushing.
+  - Opened **PR (branch `kan-131-quarantine-dismiss`)** against `main`. Not merged by this run —
+    per this task's own instruction, CI-watching and merge are left to the parent/next session.
+- **In progress (exact stopping point):** PR open, CI not yet observed by this run (opened at the
+  very end of the run). Next run (or the parent session) should check its CI status first before
+  anything else, same as every other open PR.
+- **Blocked + why:** nothing blocking the next code task once this PR lands — KAN-130 (PR #348) and
+  this run's own KAN-131 will both be new merged stories to check for on the next pass.
+- **Next step:** next run checks open PRs first (as always): this run's own new PR #350, merging or
+  fixing it if it needs it (note: KAN-130 already merged as PR #348 by the time this entry was
+  written — resolved as a merge conflict against this PR's branch); once settled, resume the
+  "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pattern from
+  **KAN-132**.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion has consistently failed / had no available tool from this sandbox
+    in prior runs).
 
 ---
 
