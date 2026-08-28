@@ -85,14 +85,70 @@ Template for each entry:
   PR #346) are active against this repo in the same window, and the established pattern from prior
   entries is to avoid adding a third concurrent sweep when that risk is live.
 - **Blocked + why:** nothing blocking the next code task.
-- **Next step:** next run checks open PRs first (as always — #345/#346/#327 in particular), then
+- **Next step:** next run checks open PRs first (as always — #345/#327 in particular), then
   resumes the sweep-for-a-newly-buildable-follow-up pattern from **KAN-129** if none are pending.
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
     outstanding, long-standing.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
   - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
-    on `origin` (branch deletion keeps failing with an HTTP 403 from this sandbox's git remote).
+    on `origin` (branch deletion keeps failing with an HTTP 403 from this sandbox's git remote, or
+    had no available tool in some prior runs).
+
+---
+
+## 2026-08-28 — Checked open PRs: two concurrent sessions already in flight (KAN-129, campaign pages), nothing to pick up
+
+**Superseded by the entry above** — PR #344 (KAN-129) merged and this same window's follow-on
+PROGRESS.md entry captured the full outcome. Kept here as the as-run record of what this session
+observed before that resolved.
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` confirmed zero `todo` rows (only `needs-human`
+    KAN-43 and `blocked-by` KAN-50/51) — same state as the prior run. Checked open PRs first
+    (established pattern) before starting a new "sweep" pass.
+  - Found **two** PRs already open, both agent-authored (Claude Code footer) by concurrent
+    sessions, both created within the hour and both still mid-CI at pick time:
+    - **PR #344** (`kan-129-resource-library-archive`) — a concurrent session already ran the
+      "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pass and
+      minted **KAN-129** (archive/unarchive for `SharedCredentialModel`/`ResourceTemplateModel`/
+      `OrgPersonModel` — the one sibling registry pattern from KAN-100..128 that hadn't been
+      closed yet: create+list+update but no removal path). Its own PR body reports full local
+      validation green (emulator + route + component suites, `pnpm build/lint/typecheck`); CI
+      (`lint · typecheck · test · build`) was `in_progress` at check time.
+    - **PR #345** (`feat/campaign-ads-pages`) — a new campaign/ads viewing+management surface
+      (not a `TASKS.md`/KAN row; PR body frames it as "first slice of Yariv's new goal", derived
+      entirely from existing automation-target/action-queue data, no new model). CI was
+      `in_progress` at check time; its own test-plan checklist has unchecked "CI green" and
+      "post-deploy manual validation" boxes, i.e. it isn't claiming to be finish-ready yet.
+    - **PR #327** (EasySign) — still the repo owner's own manual work per prior runs'
+      confirmation; left untouched again.
+  - Since both #344 and #345 were mid-CI with no failure, review comment, or merge-conflict signal
+    to act on, and both already have an owning session's context behind them, this run did not
+    duplicate their work or force a merge decision on an unfinished CI run. Subscribed this
+    session to both PRs' activity (`subscribe_pr_activity`) so CI failures, reviews, or
+    merge-conflict transitions on either land here and get driven to green/merged if no other
+    session gets there first — matching this repo's established multi-session collision pattern
+    ("no action lost" — see 2026-08-28 entries above).
+- **In progress (exact stopping point):** watching PR #344 and PR #345 for CI completion / review
+  activity; will merge (or fix and re-push) whichever finishes first that this session ends up
+  driving. This PROGRESS.md entry is its own small PR, opened the same way as PR #341/#343.
+- **Blocked + why:** nothing blocking new code work in the sense of a missing task — the primary
+  backlog is exhausted (see above) and the two live candidates for "next work" are already claimed
+  by other sessions. Once either #344 or #345 lands, the next natural task is either resuming the
+  KAN-129-adjacent sweep from **KAN-130**, or continuing PR #345's own noted "next slices"
+  (real GAQL/Meta live-state reads once KAN-43 lands; per-ad performance tiles off
+  `ad_performance_daily`).
+- **Next step:** next run (or this session, if a webhook event fires first) checks PR #344/#345
+  status; if both already merged/closed by the time it runs, resume the sweep pattern from
+  KAN-130.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature
+    branches on `origin` (branch deletion has consistently failed / had no available tool from
+    this sandbox in prior runs).
 
 ---
 
