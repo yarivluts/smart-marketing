@@ -11,7 +11,7 @@ import {
   listAuditLogEntriesForOrg,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
-import { PUT } from './route';
+import { DELETE, PUT } from './route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -160,5 +160,123 @@ describe('PUT /api/orgs/[orgId]/resources/credentials/[credentialId]/secret', ()
     } finally {
       process.env.GROWTHOS_VAULT_KEYS = previousVaultKeys;
     }
+  });
+});
+
+function deleteSecretRequest(
+  orgId: string,
+  credentialId: string,
+): { request: NextRequest; params: Promise<{ orgId: string; credentialId: string }> } {
+  return {
+    request: new NextRequest(`https://growthos.test/api/orgs/${orgId}/resources/credentials/${credentialId}/secret`, {
+      method: 'DELETE',
+    }),
+    params: Promise.resolve({ orgId, credentialId }),
+  };
+}
+
+describe('DELETE /api/orgs/[orgId]/resources/credentials/[credentialId]/secret', () => {
+  it('rejects an unauthenticated caller', async () => {
+    getServerSessionMock.mockResolvedValue(null);
+    const { request, params } = deleteSecretRequest('org-1', 'cred-1');
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects a member whose role doesn't hold resources.manage (viewer)", async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('clear-secret-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Clear Secret Route Org', ownerUserId: owner.id });
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Agency Meta MCC',
+      provider: 'meta_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+
+    const viewerEmail = uniqueEmail('clear-secret-viewer');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: viewerEmail,
+      role: 'viewer',
+      invitedByUserId: owner.id,
+    });
+    const viewerSession = await sessionFor(unique('uid'), viewerEmail);
+    const viewer = await ensureUserForFirebaseSession({ firebaseUid: viewerSession.uid, email: viewerEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: viewer.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(viewerSession);
+    const { request, params } = deleteSecretRequest(organization.id, credential.id);
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(403);
+  });
+
+  it('rejects a credential id that does not belong to the org', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('clear-secret-missing-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Missing Cred Clear Secret Org', ownerUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = deleteSecretRequest(organization.id, 'does-not-exist');
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(404);
+  });
+
+  it('returns 409 when the credential has no secret set yet', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('clear-secret-unset-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Clear Secret Unset Org', ownerUserId: owner.id });
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Agency Meta MCC',
+      provider: 'meta_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = deleteSecretRequest(organization.id, credential.id);
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(409);
+  });
+
+  it('lets an org_owner clear an already-set secret without needing the vault/KMS configured', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('clear-secret-happy-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Happy Clear Secret Org', ownerUserId: owner.id });
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Agency Meta MCC',
+      provider: 'meta_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const setRequest = secretRequest(organization.id, credential.id);
+    expect((await PUT(setRequest.request, { params: setRequest.params })).status).toBe(200);
+
+    const previousVaultKeys = process.env.GROWTHOS_VAULT_KEYS;
+    delete process.env.GROWTHOS_VAULT_KEYS;
+    let response: Response;
+    try {
+      // Clearing must not require the vault/KMS to be configured, unlike setting/rotating
+      // (see the sibling PUT test's own 500-on-unconfigured case) — it never touches ciphertext.
+      const { request, params } = deleteSecretRequest(organization.id, credential.id);
+      response = await DELETE(request, { params });
+    } finally {
+      process.env.GROWTHOS_VAULT_KEYS = previousVaultKeys;
+    }
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'cleared' });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const entry = entries.find((candidate) => candidate.action === 'credential.secret_clear');
+    expect(entry?.actor_id).toBe(owner.id);
+
+    // Clearing again now that there's nothing left to clear reports the same 409 as never having set one.
+    const second = deleteSecretRequest(organization.id, credential.id);
+    expect((await DELETE(second.request, { params: second.params })).status).toBe(409);
   });
 });
