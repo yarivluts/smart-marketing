@@ -143,6 +143,19 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 (even later) — Checked state: both KAN-131 (#350) and KAN-132 (#352) already in flight from concurrent sessions, both mid-CI, nothing broken
+
+**Superseded by the entry above** — this session's own record of the same window, written before
+PR #350's and PR #352's merges (and PR #344/#346) landed. The entry above (from a concurrent
+session) captures the fuller, more current outcome. Kept here as the as-run record of what this
+session observed at check-in time: `TASKS.md` had zero `todo` rows; PR #350 (KAN-131) and PR #352
+(KAN-132) were both open and mid-CI with no failures; PR #327 (EasySign) was unchanged, still the
+owner's own manual work. This run took no code action to avoid duplicating work already in flight,
+opened this docs-only PROGRESS.md entry as its own small PR (#353), and drove that PR through two
+subsequent merge-conflict resolutions as `main` kept advancing from concurrent sessions.
+
+---
+
 ## 2026-08-28 — Merged PR #345 (verified clean CI); drove PR #347 through three PROGRESS.md conflicts and a real CI flake to merge
 
 - **Last completed:**
