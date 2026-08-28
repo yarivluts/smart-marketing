@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (later) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
+## 2026-08-28 (latest) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
 
 - **Last completed:** the three follow-ups #345 named, plus two real bugs the rendered pages
   exposed. PR #358 (`feat/campaign-live-state`), deployed to web-dev (`web-dev-00033-lcb`).
@@ -56,8 +56,48 @@ Template for each entry:
 - **Next step:** merge once CI is green; then real Google Ads reads when KAN-43 lands.
 - **Waiting on human:** KAN-43 applications; the parked token-minting IAM grant.
 
+---
 
-## 2026-08-28 (latest) — Delivered KAN-133 (identity-merge hardening), opened PR
+## 2026-08-28 — Drove PR #353 through three PROGRESS.md conflicts to merge; KAN-133/#355 and KAN-134/#356 already picked up by concurrent sessions
+
+- **Last completed:**
+  - Continuation of this run's own check-in pass (the entry two below is this run's original
+    check-in; the entry directly above, KAN-133, and the current KAN-134/#356 were all delivered by
+    concurrent sessions while this run was busy driving its own docs PR to green).
+  - **PR #353** (this run's own PROGRESS.md check-in) went through three separate merge conflicts as
+    `main` kept advancing from concurrent sessions (PR #350/KAN-131, then PR #352/KAN-132, then
+    PR #354's own journal entry) — resolved each the same way: merged `main` in locally, verified no
+    code diff outside `PROGRESS.md` after each resolution, kept every entry in chronological order
+    with nothing dropped, used the established supersede-pointer convention for entries a concurrent
+    session's own entry already covered more fully. One CI failure along the way was a concurrent
+    session's own diagnosis (this repo's known Firestore-emulator resource-contention flake,
+    unrelated to the `PROGRESS.md`-only diff) and re-run — not this run's own action, just observed.
+    CI came back green and **PR #353 merged** (by another session, once green).
+  - Checked open PRs again after #353 cleared: **PR #355** (KAN-133, identity-merge hardening — a
+    real security-gap fix, see the entry above) and **PR #356** (KAN-134, vault clear-credential-
+    secret) had both already landed/opened from concurrent sessions during this window. **PR #327**
+    (EasySign) unchanged, still the owner's own manual work.
+- **In progress (exact stopping point):** none — this run's own PR (#353) is merged. PR #356
+  (KAN-134) is open and mid-CI from a concurrent session at the time this entry was written; no
+  failure observed, left untouched to avoid duplicating supervision.
+- **Blocked + why:** nothing blocking; the next sweep number (KAN-135) hasn't been claimed yet as of
+  this entry, but given the pace of concurrent sessions in this repo, the next run should check open
+  PRs first before picking a number.
+- **Next step:** next run checks open PRs first (as always: PR #356/KAN-134 and `#327` EasySign);
+  once settled, resume the sweep pattern from **KAN-135**, or continue the campaign-pages goal's own
+  noted next slices (real GAQL/Meta live-state reads once KAN-43 lands; per-ad performance tiles off
+  `ad_performance_daily`).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion has consistently failed / had no available tool from this sandbox
+    in prior runs — confirmed again this run, HTTP 403 on `git push --delete`).
+
+---
+
+## 2026-08-28 — Delivered KAN-133 (identity-merge hardening), opened PR
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `TASKS.md` confirmed zero `todo` rows. Checked open PRs first
