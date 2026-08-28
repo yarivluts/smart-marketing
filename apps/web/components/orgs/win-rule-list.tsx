@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import type { WinRuleSummaryView } from '@/lib/orgs/win-rule-view';
+import { EditWinRuleForm } from './edit-win-rule-form';
 
 export interface WinRuleListProps {
   orgId: string;
@@ -93,6 +94,15 @@ function WinRuleRow({ orgId, projectId, rule }: { orgId: string; projectId: stri
           {t('actionError')}
         </p>
       ) : null}
+      <EditWinRuleForm
+        orgId={orgId}
+        projectId={projectId}
+        winRuleId={rule.id}
+        initialName={rule.name}
+        schemaName={rule.schemaName}
+        initialFilters={rule.filters}
+        initialWinType={rule.winType}
+      />
     </li>
   );
 }

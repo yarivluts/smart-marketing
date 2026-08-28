@@ -103,4 +103,13 @@ describe('WinRuleList', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not update this win rule. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('renders an Edit control per rule that reveals a pre-filled edit form', () => {
+    renderList([activeRule]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+
+    expect(screen.getByLabelText('Name')).toHaveValue('Big order');
+    expect(screen.getByText('order_completed')).toBeInTheDocument();
+  });
 });

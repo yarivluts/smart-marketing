@@ -2,25 +2,16 @@
 
 import { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
-import { WIN_RULE_FILTER_OPERATORS, WIN_TYPES, type WinRuleFilterOperator, type WinType } from '@growthos/shared';
+import { WIN_TYPES, type WinType } from '@growthos/shared';
 import { useRouter } from '@/i18n/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { WinRuleFilterEditor, type WinRuleFilterRow } from './win-rule-filter-editor';
 
 export interface CreateWinRuleFormProps {
   orgId: string;
   projectId: string;
   eventSchemaNames: string[];
-}
-
-interface FilterRow {
-  field: string;
-  operator: WinRuleFilterOperator;
-  value: string;
-}
-
-function emptyFilterRow(): FilterRow {
-  return { field: '', operator: '>', value: '' };
 }
 
 /** Creates a win rule (KAN-65, E12.2): a name, an event schema, and zero or more filter clauses (all must match). An empty filter list means "any occurrence of this event is a win", e.g. `first_charge`. */
@@ -30,19 +21,11 @@ export function CreateWinRuleForm({ orgId, projectId, eventSchemaNames }: Create
   const [name, setName] = useState('');
   const [schemaName, setSchemaName] = useState(eventSchemaNames[0] ?? '');
   const [winType, setWinType] = useState<WinType>('generic');
-  const [filters, setFilters] = useState<FilterRow[]>([]);
+  const [filters, setFilters] = useState<WinRuleFilterRow[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canSubmit = name.trim().length > 0 && schemaName.length > 0 && filters.every((filter) => filter.field.trim().length > 0 && filter.value.trim().length > 0);
-
-  function updateFilter(index: number, patch: Partial<FilterRow>): void {
-    setFilters((current) => current.map((filter, filterIndex) => (filterIndex === index ? { ...filter, ...patch } : filter)));
-  }
-
-  function removeFilter(index: number): void {
-    setFilters((current) => current.filter((_, filterIndex) => filterIndex !== index));
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -121,46 +104,7 @@ export function CreateWinRuleForm({ orgId, projectId, eventSchemaNames }: Create
       </div>
       {winType !== 'generic' ? <p className="text-xs text-muted-foreground">{t(`winTypeHint.${winType}`)}</p> : null}
 
-      <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium">{t('filtersLabel')}</span>
-        {filters.length === 0 ? <p className="text-xs text-muted-foreground">{t('noFilters')}</p> : null}
-        {filters.map((filter, index) => (
-          <div key={index} className="flex flex-wrap items-center gap-2">
-            <Input
-              aria-label={t('filterFieldLabel')}
-              placeholder={t('filterFieldPlaceholder')}
-              value={filter.field}
-              onChange={(event) => updateFilter(index, { field: event.target.value })}
-              className="w-48"
-            />
-            <select
-              aria-label={t('filterOperatorLabel')}
-              value={filter.operator}
-              onChange={(event) => updateFilter(index, { operator: event.target.value as WinRuleFilterOperator })}
-              className="h-10 rounded-md border border-input bg-background px-2 text-sm"
-            >
-              {WIN_RULE_FILTER_OPERATORS.map((operator) => (
-                <option key={operator} value={operator}>
-                  {operator}
-                </option>
-              ))}
-            </select>
-            <Input
-              aria-label={t('filterValueLabel')}
-              placeholder={t('filterValuePlaceholder')}
-              value={filter.value}
-              onChange={(event) => updateFilter(index, { value: event.target.value })}
-              className="w-32"
-            />
-            <Button type="button" variant="ghost" size="sm" onClick={() => removeFilter(index)}>
-              {t('removeFilter')}
-            </Button>
-          </div>
-        ))}
-        <Button type="button" variant="outline" size="sm" className="self-start" onClick={() => setFilters((current) => [...current, emptyFilterRow()])}>
-          {t('addFilter')}
-        </Button>
-      </div>
+      <WinRuleFilterEditor filters={filters} onChange={setFilters} />
 
       {error ? (
         <p role="alert" className="text-sm text-destructive">
