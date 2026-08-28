@@ -15,6 +15,8 @@ import {
   revokeTvPairing,
   TvPairingModel,
   TvPairingNotFoundError,
+  TvPairingRevokedError,
+  updateTvPairingSettings,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -278,5 +280,211 @@ describe('tv-pairing.service (KAN-67)', () => {
     const list = await listTvPairingsForProject(organization.id, project.id);
     expect(list.map((pairing) => pairing.label).sort()).toEqual(['First TV', 'Second TV']);
     expect(list[0].id).toBe(secondClaimed.id);
+  });
+});
+
+describe('updateTvPairingSettings (KAN-127)', () => {
+  it('replaces label/boardIds/rotationSeconds/reducedMotion, persisted to Firestore, structural fields untouched', async () => {
+    const { owner, organization, project, board } = await setupOrgWithProjectAndBoard('TV settings edit org (happy path)');
+    const secondBoard = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Second board', createdByUserId: owner.id });
+    const { code } = await requestTvPairing();
+    const claimed = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 20,
+      reducedMotion: false,
+      label: 'Original label',
+      claimedByUserId: owner.id,
+    });
+
+    const updated = await updateTvPairingSettings({
+      organizationId: organization.id,
+      projectId: project.id,
+      pairingId: claimed.id,
+      label: 'Updated label',
+      boardIds: [secondBoard.id],
+      rotationSeconds: 45,
+      reducedMotion: true,
+      actorUserId: owner.id,
+    });
+
+    expect(updated.label).toBe('Updated label');
+    expect(updated.board_ids).toEqual([secondBoard.id]);
+    expect(updated.rotation_seconds).toBe(45);
+    expect(updated.reduced_motion).toBe(true);
+    // Structural/identity fields stay untouched by a settings edit.
+    expect(updated.id).toBe(claimed.id);
+    expect(updated.device_token_hash).toBe(claimed.device_token_hash);
+    expect(updated.code_hash).toBe(claimed.code_hash);
+    expect(updated.claimed).toBe(true);
+    expect(updated.claimed_at).toBe(claimed.claimed_at);
+    expect(updated.claimed_by).toBe(claimed.claimed_by);
+    expect(updated.organization_id).toBe(organization.id);
+    expect(updated.project_id).toBe(project.id);
+
+    const [reloaded] = (await listTvPairingsForProject(organization.id, project.id)).filter((pairing) => pairing.id === claimed.id);
+    expect(reloaded.label).toBe('Updated label');
+    expect(reloaded.board_ids).toEqual([secondBoard.id]);
+  });
+
+  it('rejects an empty board list, an out-of-range rotation, and an empty label, collecting every reason', async () => {
+    const { owner, organization, project, board } = await setupOrgWithProjectAndBoard('TV settings edit org (invalid fields)');
+    const { code } = await requestTvPairing();
+    const claimed = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 20,
+      reducedMotion: false,
+      label: 'Original label',
+      claimedByUserId: owner.id,
+    });
+
+    await expect(
+      updateTvPairingSettings({
+        organizationId: organization.id,
+        projectId: project.id,
+        pairingId: claimed.id,
+        label: '   ',
+        boardIds: [],
+        rotationSeconds: 999,
+        reducedMotion: false,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidTvPairingError);
+  });
+
+  it('rejects a board id that does not belong to the project', async () => {
+    const { owner, organization, project, board } = await setupOrgWithProjectAndBoard('TV settings edit org (bad board)');
+    const { code } = await requestTvPairing();
+    const claimed = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 20,
+      reducedMotion: false,
+      label: 'Original label',
+      claimedByUserId: owner.id,
+    });
+
+    await expect(
+      updateTvPairingSettings({
+        organizationId: organization.id,
+        projectId: project.id,
+        pairingId: claimed.id,
+        label: 'Original label',
+        boardIds: ['does-not-exist-board'],
+        rotationSeconds: 20,
+        reducedMotion: false,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toThrow(InvalidTvPairingError);
+
+    const [reloaded] = (await listTvPairingsForProject(organization.id, project.id)).filter((pairing) => pairing.id === claimed.id);
+    expect(reloaded.board_ids).toEqual([board.id]);
+  });
+
+  it('throws TvPairingNotFoundError for a pairing that does not belong to this org/project', async () => {
+    const { owner, organization, project, board } = await setupOrgWithProjectAndBoard('TV settings edit org (isolation A)');
+    const { organization: otherOrg, project: otherProject, board: otherBoard } = await setupOrgWithProjectAndBoard('TV settings edit org (isolation B)');
+    const { code } = await requestTvPairing();
+    const claimed = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 20,
+      reducedMotion: false,
+      label: 'Org A TV',
+      claimedByUserId: owner.id,
+    });
+
+    await expect(
+      updateTvPairingSettings({
+        organizationId: otherOrg.id,
+        projectId: otherProject.id,
+        pairingId: claimed.id,
+        label: 'Hijacked label',
+        boardIds: [otherBoard.id],
+        rotationSeconds: 20,
+        reducedMotion: false,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toThrow(TvPairingNotFoundError);
+  });
+
+  it('an updated board list is reflected in a subsequent status poll', async () => {
+    const { owner, organization, project, board } = await setupOrgWithProjectAndBoard('TV settings edit org (status poll)');
+    const secondBoard = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Second board', createdByUserId: owner.id });
+    const { deviceToken, code } = await requestTvPairing();
+    const claimed = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 20,
+      reducedMotion: false,
+      label: 'Rotating TV',
+      claimedByUserId: owner.id,
+    });
+
+    await updateTvPairingSettings({
+      organizationId: organization.id,
+      projectId: project.id,
+      pairingId: claimed.id,
+      label: 'Rotating TV',
+      boardIds: [board.id, secondBoard.id],
+      rotationSeconds: 60,
+      reducedMotion: true,
+      actorUserId: owner.id,
+    });
+
+    const status = await getTvPairingStatus(deviceToken);
+    expect(status).toEqual({
+      status: 'claimed',
+      organizationId: organization.id,
+      projectId: project.id,
+      boardIds: [board.id, secondBoard.id],
+      rotationSeconds: 60,
+      reducedMotion: true,
+      label: 'Rotating TV',
+    });
+  });
+
+  it('rejects editing a revoked pairing, leaving its settings untouched', async () => {
+    const { owner, organization, project, board } = await setupOrgWithProjectAndBoard('TV settings edit org (revoked)');
+    const { code } = await requestTvPairing();
+    const claimed = await claimTvPairing({
+      organizationId: organization.id,
+      projectId: project.id,
+      code,
+      boardIds: [board.id],
+      rotationSeconds: 20,
+      reducedMotion: false,
+      label: 'Doomed TV',
+      claimedByUserId: owner.id,
+    });
+    await revokeTvPairing({ organizationId: organization.id, projectId: project.id, pairingId: claimed.id, revokedByUserId: owner.id });
+
+    await expect(
+      updateTvPairingSettings({
+        organizationId: organization.id,
+        projectId: project.id,
+        pairingId: claimed.id,
+        label: 'Should not apply',
+        boardIds: [board.id],
+        rotationSeconds: 20,
+        reducedMotion: true,
+        actorUserId: owner.id,
+      }),
+    ).rejects.toThrow(TvPairingRevokedError);
+
+    const [reloaded] = (await listTvPairingsForProject(organization.id, project.id)).filter((pairing) => pairing.id === claimed.id);
+    expect(reloaded.label).toBe('Doomed TV');
+    expect(reloaded.reduced_motion).toBe(false);
   });
 });

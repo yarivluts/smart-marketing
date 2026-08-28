@@ -58,19 +58,19 @@ export class TvPairingModel extends BaseModel {
   @Field()
   public project_id?: string;
 
-  /** `BoardModel.id`s this TV rotates through, in rotation order. Set once, at claim time — a re-pair (new code, new pairing doc) is how an admin changes a TV's board list, the same "config in Firestore, immutable once claimed" posture `ResourceAttachmentModel`'s own decided-state fields take. */
+  /** `BoardModel.id`s this TV rotates through, in rotation order. Set at claim time and editable afterward via `updateTvPairingSettings` (KAN-127) — an admin no longer has to revoke and re-pair a TV from a brand-new code just to swap one board out of its rotation. */
   @Field()
   public board_ids?: string[];
 
-  /** Seconds each board (or the goals frame) stays on screen before rotating to the next — admin-configurable at claim time. */
+  /** Seconds each board (or the goals frame) stays on screen before rotating to the next — admin-configurable at claim time and editable afterward via `updateTvPairingSettings` (KAN-127). */
   @Field()
   public rotation_seconds?: number;
 
-  /** Disables confetti's own falling-particle animation when `true` (plan `10 §4`: "reduced-motion mode (confetti off)") — the celebration sound and win-feed toast still fire; only the vestibular-triggering motion is suppressed, per WCAG's own scope for this setting. */
+  /** Disables confetti's own falling-particle animation when `true` (plan `10 §4`: "reduced-motion mode (confetti off)") — the celebration sound and win-feed toast still fire; only the vestibular-triggering motion is suppressed, per WCAG's own scope for this setting. Admin-configurable at claim time and editable afterward via `updateTvPairingSettings` (KAN-127). */
   @Field()
   public reduced_motion?: boolean;
 
-  /** Admin-assigned display name for this TV (e.g. "Office lobby") — shown in the pairing admin list so more than one paired TV stays distinguishable. */
+  /** Admin-assigned display name for this TV (e.g. "Office lobby") — shown in the pairing admin list so more than one paired TV stays distinguishable. Editable after claiming via `updateTvPairingSettings` (KAN-127). */
   @Field()
   public label?: string;
 

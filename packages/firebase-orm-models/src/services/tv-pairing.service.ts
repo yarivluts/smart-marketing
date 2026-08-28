@@ -20,6 +20,13 @@ export class TvPairingNotFoundError extends Error {
   }
 }
 
+export class TvPairingRevokedError extends Error {
+  constructor() {
+    super('This TV pairing has been revoked and can no longer be edited.');
+    this.name = 'TvPairingRevokedError';
+  }
+}
+
 /** How long a freshly requested pairing code stays redeemable before the TV must request a new one — long enough for a human to walk over and type it, short enough that a code left on screen isn't a standing liability. */
 const CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -227,18 +234,21 @@ export async function requireClaimedTvPairing(deviceToken: string): Promise<Resu
   return ok(pairing);
 }
 
-export interface ClaimTvPairingParams {
-  organizationId: string;
-  projectId: string;
-  code: string;
+interface TvPairingSettingsFields {
   boardIds: string[];
   rotationSeconds: number;
-  reducedMotion: boolean;
   label: string;
-  claimedByUserId: string;
 }
 
-function validateClaimFields(params: ClaimTvPairingParams, reasons: string[]): void {
+/**
+ * Validates a pairing's own editable settings fields (board list shape,
+ * rotation range, non-empty label) — shared by {@link claimTvPairing} and
+ * {@link updateTvPairingSettings} (KAN-127) so the two can never validate the
+ * same fields differently. Board *existence* in the project is a separate,
+ * async check (see {@link validateBoardsExistInProject}) since it needs a
+ * Firestore read this synchronous function can't do.
+ */
+function validateTvPairingSettingsFields(params: TvPairingSettingsFields, reasons: string[]): void {
   if (params.boardIds.length === 0) {
     reasons.push('A paired TV must rotate through at least one board.');
   }
@@ -248,6 +258,40 @@ function validateClaimFields(params: ClaimTvPairingParams, reasons: string[]): v
   if (params.label.trim().length === 0) {
     reasons.push('A paired TV must have a non-empty label.');
   }
+}
+
+/**
+ * Confirms every board id actually belongs to this project — per-id lookups
+ * (mirroring `getBoard`'s own `.init` + org/project-match pattern in
+ * `board.service.ts`) rather than a full collection scan of every board the
+ * project has ever had. Shared by {@link claimTvPairing} and
+ * {@link updateTvPairingSettings} so a board removed from one project can
+ * never be silently accepted by the other's own copy of this check.
+ */
+async function validateBoardsExistInProject(organizationId: string, projectId: string, boardIds: string[], reasons: string[]): Promise<void> {
+  const uniqueBoardIds = [...new Set(boardIds)];
+  const boardLookups = await Promise.all(
+    uniqueBoardIds.map(async (boardId) => {
+      const board = await BoardModel.init(boardId, { organization_id: organizationId, project_id: projectId });
+      return { boardId, exists: board !== null && board.project_id === projectId };
+    }),
+  );
+  for (const { boardId, exists } of boardLookups) {
+    if (!exists) {
+      reasons.push(`Board "${boardId}" does not exist in this project.`);
+    }
+  }
+}
+
+export interface ClaimTvPairingParams {
+  organizationId: string;
+  projectId: string;
+  code: string;
+  boardIds: string[];
+  rotationSeconds: number;
+  reducedMotion: boolean;
+  label: string;
+  claimedByUserId: string;
 }
 
 /**
@@ -278,24 +322,8 @@ export async function claimTvPairing(params: ClaimTvPairingParams): Promise<TvPa
   await requireProjectInOrg(params.organizationId, params.projectId);
 
   const reasons: string[] = [];
-  validateClaimFields(params, reasons);
-
-  // Per-id lookups (mirroring `getBoard`'s own `.init` + org/project-match
-  // pattern in `board.service.ts`) rather than a full collection scan of
-  // every board in the project — this only reads the handful of boards
-  // actually being claimed, not every board the project has ever had.
-  const uniqueBoardIds = [...new Set(params.boardIds)];
-  const boardLookups = await Promise.all(
-    uniqueBoardIds.map(async (boardId) => {
-      const board = await BoardModel.init(boardId, { organization_id: params.organizationId, project_id: params.projectId });
-      return { boardId, exists: board !== null && board.project_id === params.projectId };
-    }),
-  );
-  for (const { boardId, exists } of boardLookups) {
-    if (!exists) {
-      reasons.push(`Board "${boardId}" does not exist in this project.`);
-    }
-  }
+  validateTvPairingSettingsFields(params, reasons);
+  await validateBoardsExistInProject(params.organizationId, params.projectId, params.boardIds, reasons);
 
   if (reasons.length > 0) {
     throw new InvalidTvPairingError(reasons);
@@ -335,6 +363,84 @@ export async function claimTvPairing(params: ClaimTvPairingParams): Promise<TvPa
     });
   } catch {
     // Best-effort — audit logging must never turn a successful claim into a failure for the caller.
+  }
+
+  return pairing;
+}
+
+export interface UpdateTvPairingSettingsParams {
+  organizationId: string;
+  projectId: string;
+  pairingId: string;
+  label: string;
+  boardIds: string[];
+  rotationSeconds: number;
+  reducedMotion: boolean;
+  actorUserId: string;
+}
+
+/**
+ * Edits an already-claimed TV's own settings — label, board rotation,
+ * interval, and reduced-motion (KAN-127, the same "create + list only, no
+ * way to fix a typo'd definition" gap KAN-100/117/119/120/121/123/124/125/126
+ * already closed for their own sibling registries). Previously the only way
+ * to relabel a TV or swap one board out of its rotation was to revoke it and
+ * walk over to physically re-pair it from a brand-new code — this model's
+ * own doc comment even named that as the deliberate design, which this story
+ * corrects the same way `updateHookEndpoint` corrected `hook_endpoint`'s
+ * equivalent gap. `device_token_hash`/`code_hash`/`claimed`/
+ * `organization_id`/`project_id` all stay immutable: reassigning a pairing
+ * to a different org/project would be a different pairing, not a
+ * correction. Reuses {@link validateTvPairingSettingsFields} and
+ * {@link validateBoardsExistInProject} directly so claim and update can
+ * never validate settings differently. Rejected once the pairing is
+ * `revoked_at` — the same terminal-state posture `updatePluginInstallConfig`
+ * (KAN-125) takes once a plugin install is `uninstalled` — since revocation
+ * has no reverse here (unlike `disableHookEndpoint`'s own enable/disable
+ * pair), so a settings edit past that point could never take visible effect
+ * and would only leave a misleading `tv_pairing.update` audit entry behind.
+ */
+export async function updateTvPairingSettings(params: UpdateTvPairingSettingsParams): Promise<TvPairingModel> {
+  const pairing = await loadTvPairingInProject(params.organizationId, params.projectId, params.pairingId);
+  if (isRevoked(pairing)) {
+    throw new TvPairingRevokedError();
+  }
+
+  const reasons: string[] = [];
+  validateTvPairingSettingsFields(params, reasons);
+  await validateBoardsExistInProject(params.organizationId, params.projectId, params.boardIds, reasons);
+  if (reasons.length > 0) {
+    throw new InvalidTvPairingError(reasons);
+  }
+
+  const before = {
+    label: pairing.label,
+    boardIds: pairing.board_ids,
+    rotationSeconds: pairing.rotation_seconds,
+    reducedMotion: pairing.reduced_motion,
+  };
+
+  pairing.label = params.label.trim();
+  pairing.board_ids = params.boardIds;
+  pairing.rotation_seconds = params.rotationSeconds;
+  pairing.reduced_motion = params.reducedMotion;
+  await pairing.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'tv_pairing.update',
+      targetType: 'tv_pairing',
+      targetId: pairing.id,
+      summary: `Updated settings for paired TV "${pairing.label}"`,
+      before,
+      after: { label: pairing.label, boardIds: pairing.board_ids, rotationSeconds: pairing.rotation_seconds, reducedMotion: pairing.reduced_motion },
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in claimTvPairing above.
   }
 
   return pairing;

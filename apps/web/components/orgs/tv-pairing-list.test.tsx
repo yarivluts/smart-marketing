@@ -39,6 +39,11 @@ describe('TvPairingList', () => {
     expect(screen.getByText('Marketing')).toBeInTheDocument();
   });
 
+  it('renders an Edit button for each pairing (KAN-127 settings editor)', () => {
+    renderList();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+  });
+
   it('DELETEs the pairing and refreshes on unpair', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ status: 'revoked' }) } as Response);
     renderList();

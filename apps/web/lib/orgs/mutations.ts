@@ -182,6 +182,7 @@ import {
   claimTvPairing as claimTvPairingInOrganization,
   requestTvPairing as requestTvPairingInOrganization,
   revokeTvPairing as revokeTvPairingInOrganization,
+  updateTvPairingSettings as updateTvPairingSettingsInOrganization,
   type RequestTvPairingResult,
   type TvPairingModel,
 } from '@growthos/firebase-orm-models';
@@ -1378,6 +1379,22 @@ export async function revokeTvPairing(
 ): Promise<TvPairingModel> {
   await ensureFirestoreOrm();
   return revokeTvPairingInOrganization({ organizationId, projectId, pairingId, revokedByUserId });
+}
+
+export interface UpdateTvPairingSettingsInput {
+  organizationId: string;
+  projectId: string;
+  pairingId: string;
+  label: string;
+  boardIds: string[];
+  rotationSeconds: number;
+  reducedMotion: boolean;
+  actorUserId: string;
+}
+
+export async function updateTvPairingSettings(input: UpdateTvPairingSettingsInput): Promise<TvPairingModel> {
+  await ensureFirestoreOrm();
+  return updateTvPairingSettingsInOrganization(input);
 }
 
 /** Starts (or resumes) a project's onboarding wizard (KAN-68) — creates the singleton state doc on first visit. */
