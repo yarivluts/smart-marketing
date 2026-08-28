@@ -58,12 +58,16 @@ Template for each entry:
   - Full monorepo `pnpm lint`/`pnpm typecheck`/`pnpm build` green; `pnpm test` green across every
     package (`firebase-orm-models` 1657/1657 incl. 3 new KAN-133 cases, `apps/web` unit 1959/1959
     incl. 2 new/updated KAN-133 cases, `packages/shared` 593/593, `apps/api` 141/141).
-  - Branch `kan-133-identity-merge-hardening`, PR opened against `main`.
-- **In progress (exact stopping point):** PR open, CI not yet confirmed by this run — next step for
-  whichever session picks this up is to verify CI green, review the diff once more, then merge and
-  delete the branch per `CLAUDE.md`.
-- **Blocked + why:** nothing blocking; PR just needs CI confirmation and merge.
-- **Next step:** once KAN-133 merges, the background sweep's second candidate is the natural pick:
+  - Branch `kan-133-identity-merge-hardening`, PR #355 opened against `main`, subscribed to its CI/
+    review activity, then confirmed CI green (both `lint · typecheck · test · build` and
+    `terraform fmt · validate` checks passed, `mergeable_state: clean`, no review comments) and
+    merged (squash). Remote branch deletion failed with the same HTTP 403 from this sandbox's git
+    remote recorded in every prior run's entry (not a GitHub permissions issue) — merged and dead
+    but not deleted; a human with direct repo access can delete `kan-133-identity-merge-hardening`.
+- **In progress (exact stopping point):** none — KAN-133 is fully delivered, tested, reviewed, and
+  merged into `main`.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the background sweep's second candidate is the natural pick:
   make `project_admin`/`editor`/`operator` roles actually grantable via a project-scoped invite flow
   (`INVITABLE_ROLES` in `packages/shared/src/policy/roles.ts` only contains `org_admin`/`viewer`
   today; `inviteMemberToOrganization`/`acceptInvite` unconditionally mint org-scope bindings) —
