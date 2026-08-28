@@ -1,6 +1,9 @@
 import 'reflect-metadata';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  archiveOrgPerson,
+  archiveResourceTemplate,
+  archiveSharedCredential,
   AttachmentNotApprovedError,
   AttachmentNotCredentialError,
   AttachmentNotFoundError,
@@ -25,9 +28,13 @@ import {
   ProjectNotFoundError,
   pushResourceAttachment,
   requestResourceAttachment,
+  ResourceArchivedError,
   ResourceAttachmentModel,
   ResourceNotFoundError,
   setResourceAttachmentWriteTier,
+  unarchiveOrgPerson,
+  unarchiveResourceTemplate,
+  unarchiveSharedCredential,
   updateOrgPerson,
   updateResourceTemplate,
   updateSharedCredential,
@@ -449,6 +456,238 @@ describe('updateSharedCredential (KAN-119)', () => {
     expect(entry.after).toEqual({ name: 'After Credential', availableScopes: ['acct_1', 'acct_2'] });
 
     await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
+  });
+});
+
+describe('archive / unarchive (KAN-129)', () => {
+  it('archives and unarchives a shared credential, persisted for a later list, without touching name/provider/scopes', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Credential Archive Org');
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Agency Google MCC',
+      provider: 'google_ads',
+      availableScopes: ['act_1'],
+      createdByUserId: owner.id,
+    });
+
+    const archived = await archiveSharedCredential({
+      organizationId: organization.id,
+      credentialId: credential.id,
+      archivedByUserId: owner.id,
+    });
+    expect(archived.archived_at).toBeTruthy();
+    expect(archived.archived_by).toBe(owner.id);
+    expect(archived.name).toBe('Agency Google MCC');
+    expect(archived.available_scopes).toEqual(['act_1']);
+
+    let [reloaded] = (await listSharedCredentials(organization.id)).filter((c) => c.id === credential.id);
+    expect(reloaded.archived_at).toBeTruthy();
+
+    const unarchived = await unarchiveSharedCredential({
+      organizationId: organization.id,
+      credentialId: credential.id,
+      unarchivedByUserId: owner.id,
+    });
+    expect(unarchived.archived_at).toBeFalsy();
+    expect(unarchived.archived_by).toBeFalsy();
+
+    [reloaded] = (await listSharedCredentials(organization.id)).filter((c) => c.id === credential.id);
+    expect(reloaded.archived_at).toBeFalsy();
+  });
+
+  it('archives and unarchives a resource template, without touching name/type/config/version', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Template Archive Org');
+    const template = await createResourceTemplate({
+      organizationId: organization.id,
+      name: 'Standard MRR Dashboard',
+      type: 'dashboard',
+      config: { layout: 'grid' },
+      createdByUserId: owner.id,
+    });
+
+    const archived = await archiveResourceTemplate({
+      organizationId: organization.id,
+      templateId: template.id,
+      archivedByUserId: owner.id,
+    });
+    expect(archived.archived_at).toBeTruthy();
+    expect(archived.version).toBe(1);
+    expect(archived.config).toEqual({ layout: 'grid' });
+
+    const unarchived = await unarchiveResourceTemplate({
+      organizationId: organization.id,
+      templateId: template.id,
+      unarchivedByUserId: owner.id,
+    });
+    expect(unarchived.archived_at).toBeFalsy();
+    expect(unarchived.archived_by).toBeFalsy();
+  });
+
+  it('archives and unarchives an org person, without touching name/email/title', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Person Archive Org');
+    const person = await createOrgPerson({
+      organizationId: organization.id,
+      name: 'Departed Rep',
+      email: uniqueEmail('departed'),
+      title: 'Account Manager',
+      createdByUserId: owner.id,
+    });
+
+    const archived = await archiveOrgPerson({
+      organizationId: organization.id,
+      personId: person.id,
+      archivedByUserId: owner.id,
+    });
+    expect(archived.archived_at).toBeTruthy();
+    expect(archived.archived_by).toBe(owner.id);
+    expect(archived.name).toBe('Departed Rep');
+
+    const [reloaded] = (await listOrgPeople(organization.id)).filter((p) => p.id === person.id);
+    expect(reloaded.archived_at).toBeTruthy();
+    expect(reloaded.name).toBe('Departed Rep');
+
+    const unarchived = await unarchiveOrgPerson({
+      organizationId: organization.id,
+      personId: person.id,
+      unarchivedByUserId: owner.id,
+    });
+    expect(unarchived.archived_at).toBeFalsy();
+    expect(unarchived.archived_by).toBeFalsy();
+  });
+
+  it('is idempotent: re-archiving an already-archived resource just refreshes archived_at/archived_by', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Idempotent Archive Org');
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Repeat Archive Rep', createdByUserId: owner.id });
+
+    await archiveOrgPerson({ organizationId: organization.id, personId: person.id, archivedByUserId: owner.id });
+    const secondActor = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('second-actor') });
+    const twice = await archiveOrgPerson({ organizationId: organization.id, personId: person.id, archivedByUserId: secondActor.id });
+
+    expect(twice.archived_at).toBeTruthy();
+    expect(twice.archived_by).toBe(secondActor.id);
+  });
+
+  it('is idempotent: unarchiving an already-active resource is a no-op that still succeeds', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Idempotent Unarchive Org');
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Never Archived Rep', createdByUserId: owner.id });
+
+    const unarchived = await unarchiveOrgPerson({ organizationId: organization.id, personId: person.id, unarchivedByUserId: owner.id });
+    expect(unarchived.archived_at).toBeFalsy();
+  });
+
+  it('rejects archiving/unarchiving a resource id that does not exist, for every kind', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Archive Missing Org');
+    await expect(
+      archiveOrgPerson({ organizationId: organization.id, personId: 'does-not-exist', archivedByUserId: owner.id }),
+    ).rejects.toThrow(ResourceNotFoundError);
+    await expect(
+      archiveResourceTemplate({ organizationId: organization.id, templateId: 'does-not-exist', archivedByUserId: owner.id }),
+    ).rejects.toThrow(ResourceNotFoundError);
+    await expect(
+      archiveSharedCredential({ organizationId: organization.id, credentialId: 'does-not-exist', archivedByUserId: owner.id }),
+    ).rejects.toThrow(ResourceNotFoundError);
+  });
+
+  it("rejects archiving another org's person, even with a real person id (isolation)", async () => {
+    const { owner: ownerA, organization: orgA } = await setupOrgWithOwner('Archive Isolation Org A');
+    const { owner: ownerB, organization: orgB } = await setupOrgWithOwner('Archive Isolation Org B');
+    const personInA = await createOrgPerson({ organizationId: orgA.id, name: 'Org A Rep', createdByUserId: ownerA.id });
+
+    await expect(
+      archiveOrgPerson({ organizationId: orgB.id, personId: personInA.id, archivedByUserId: ownerB.id }),
+    ).rejects.toThrow(ResourceNotFoundError);
+  });
+
+  it('records archive/unarchive audit log entries, keeping the org audit-log chain valid', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Archive Audit Org');
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Audited Rep', createdByUserId: owner.id });
+
+    await archiveOrgPerson({ organizationId: organization.id, personId: person.id, archivedByUserId: owner.id });
+    await unarchiveOrgPerson({ organizationId: organization.id, personId: person.id, unarchivedByUserId: owner.id });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    expect(entries.some((e) => e.action === 'org_person.archive' && e.target_id === person.id)).toBe(true);
+    expect(entries.some((e) => e.action === 'org_person.unarchive' && e.target_id === person.id)).toBe(true);
+
+    await expect(verifyAuditLogChainForOrg(organization.id)).resolves.toMatchObject({ valid: true });
+  });
+
+  it('rejects a new attachment request/push for an archived resource of every kind, but leaves an already-approved attachment untouched', async () => {
+    const { owner, organization } = await setupOrgWithOwner('Archive Attach Org');
+    const { project } = await createProject({ organizationId: organization.id, name: 'Archive Attach Project' });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Attach Rep', createdByUserId: owner.id });
+    const template = await createResourceTemplate({
+      organizationId: organization.id,
+      name: 'Attach Template',
+      type: 'dashboard',
+      createdByUserId: owner.id,
+    });
+    const credential = await createSharedCredential({
+      organizationId: organization.id,
+      name: 'Attach Credential',
+      provider: 'generic',
+      availableScopes: ['scope_a'],
+      createdByUserId: owner.id,
+    });
+
+    // An already-approved attachment survives archiving the resource it points at.
+    const approvedAttachment = await pushResourceAttachment({
+      organizationId: organization.id,
+      projectId: project.id,
+      resourceKind: 'person',
+      resourceId: person.id,
+      pushedByUserId: owner.id,
+    });
+    await archiveOrgPerson({ organizationId: organization.id, personId: person.id, archivedByUserId: owner.id });
+    const stillActive = await listActiveAttachmentsForProject(organization.id, project.id);
+    expect(stillActive.some((a) => a.id === approvedAttachment.id)).toBe(true);
+
+    // But no *new* attachment can be requested or pushed for any archived resource kind.
+    await expect(
+      requestResourceAttachment({
+        organizationId: organization.id,
+        projectId: project.id,
+        resourceKind: 'person',
+        resourceId: person.id,
+        requestedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(ResourceArchivedError);
+
+    await archiveResourceTemplate({ organizationId: organization.id, templateId: template.id, archivedByUserId: owner.id });
+    await expect(
+      pushResourceAttachment({
+        organizationId: organization.id,
+        projectId: project.id,
+        resourceKind: 'template',
+        resourceId: template.id,
+        pushedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(ResourceArchivedError);
+
+    await archiveSharedCredential({ organizationId: organization.id, credentialId: credential.id, archivedByUserId: owner.id });
+    await expect(
+      requestResourceAttachment({
+        organizationId: organization.id,
+        projectId: project.id,
+        resourceKind: 'credential',
+        resourceId: credential.id,
+        requestedByUserId: owner.id,
+        scopeSelection: ['scope_a'],
+      }),
+    ).rejects.toThrow(ResourceArchivedError);
+
+    // Unarchiving restores the ability to start a new attachment.
+    await unarchiveSharedCredential({ organizationId: organization.id, credentialId: credential.id, unarchivedByUserId: owner.id });
+    await expect(
+      requestResourceAttachment({
+        organizationId: organization.id,
+        projectId: project.id,
+        resourceKind: 'credential',
+        resourceId: credential.id,
+        requestedByUserId: owner.id,
+        scopeSelection: ['scope_a'],
+      }),
+    ).resolves.toBeInstanceOf(ResourceAttachmentModel);
   });
 });
 

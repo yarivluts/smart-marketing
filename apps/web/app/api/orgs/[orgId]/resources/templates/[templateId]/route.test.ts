@@ -9,7 +9,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST as createTemplate } from '../route';
-import { PATCH } from './route';
+import { DELETE, PATCH } from './route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -154,5 +154,44 @@ describe('PATCH /api/orgs/[orgId]/resources/templates/[templateId]', () => {
     expect(response.status).toBe(200);
     const body = (await response.json()) as { template: { config?: unknown } };
     expect(body.template.config).toEqual({ threshold: 0.4 });
+  });
+});
+
+describe('DELETE /api/orgs/[orgId]/resources/templates/[templateId]', () => {
+  it('rejects an unauthenticated caller', async () => {
+    getServerSessionMock.mockResolvedValue(null);
+    const response = await DELETE(new Request('https://growthos.test'), { params: Promise.resolve({ orgId: 'org-1', templateId: 'template-1' }) });
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects a member whose role does not hold resources.manage (viewer)', async () => {
+    const { owner, organization, templateId } = await setupOrgWithTemplate('Archive Template Viewer Org');
+
+    const viewerEmail = uniqueEmail('archive-template-viewer');
+    const invitation = await inviteMemberToOrganization({ organizationId: organization.id, email: viewerEmail, role: 'viewer', invitedByUserId: owner.id });
+    const viewerSession = await sessionFor(unique('uid'), viewerEmail);
+    const viewer = await ensureUserForFirebaseSession({ firebaseUid: viewerSession.uid, email: viewerEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: viewer.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(viewerSession);
+    const response = await DELETE(new Request('https://growthos.test'), { params: Promise.resolve({ orgId: organization.id, templateId }) });
+    expect(response.status).toBe(403);
+  });
+
+  it('archives an existing template', async () => {
+    const { ownerSession, organization, templateId } = await setupOrgWithTemplate('Archive Template Happy Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const response = await DELETE(new Request('https://growthos.test'), { params: Promise.resolve({ orgId: organization.id, templateId }) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'archived' });
+  });
+
+  it('returns 404 for a template id that does not exist in this org', async () => {
+    const { ownerSession, organization } = await setupOrgWithTemplate('Archive Template Missing Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const response = await DELETE(new Request('https://growthos.test'), { params: Promise.resolve({ orgId: organization.id, templateId: 'does-not-exist' }) });
+    expect(response.status).toBe(404);
   });
 });

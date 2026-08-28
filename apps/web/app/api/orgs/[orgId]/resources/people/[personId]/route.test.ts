@@ -9,7 +9,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { POST as createPerson } from '../route';
-import { PATCH } from './route';
+import { DELETE, PATCH } from './route';
 
 const { getServerSessionMock } = vi.hoisted(() => ({ getServerSessionMock: vi.fn() }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
@@ -129,5 +129,44 @@ describe('PATCH /api/orgs/[orgId]/resources/people/[personId]', () => {
     const body = (await response.json()) as { person: { id: string; name: string; title?: string; email?: string } };
     expect(body.person).toMatchObject({ id: personId, name: 'Updated Name', title: 'Updated Title' });
     expect(body.person.email).toBeUndefined();
+  });
+});
+
+describe('DELETE /api/orgs/[orgId]/resources/people/[personId]', () => {
+  it('rejects an unauthenticated caller', async () => {
+    getServerSessionMock.mockResolvedValue(null);
+    const response = await DELETE(new Request('https://growthos.test'), { params: Promise.resolve({ orgId: 'org-1', personId: 'person-1' }) });
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects a member whose role does not hold resources.manage (viewer)', async () => {
+    const { owner, organization, personId } = await setupOrgWithPerson('Archive Person Viewer Org');
+
+    const viewerEmail = uniqueEmail('archive-person-viewer');
+    const invitation = await inviteMemberToOrganization({ organizationId: organization.id, email: viewerEmail, role: 'viewer', invitedByUserId: owner.id });
+    const viewerSession = await sessionFor(unique('uid'), viewerEmail);
+    const viewer = await ensureUserForFirebaseSession({ firebaseUid: viewerSession.uid, email: viewerEmail });
+    await acceptInvite({ organizationId: organization.id, membershipId: invitation.id, userId: viewer.id, callerEmailVerified: true });
+
+    getServerSessionMock.mockResolvedValue(viewerSession);
+    const response = await DELETE(new Request('https://growthos.test'), { params: Promise.resolve({ orgId: organization.id, personId }) });
+    expect(response.status).toBe(403);
+  });
+
+  it('archives an existing person', async () => {
+    const { ownerSession, organization, personId } = await setupOrgWithPerson('Archive Person Happy Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const response = await DELETE(new Request('https://growthos.test'), { params: Promise.resolve({ orgId: organization.id, personId }) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ status: 'archived' });
+  });
+
+  it('returns 404 for a person id that does not exist in this org', async () => {
+    const { ownerSession, organization } = await setupOrgWithPerson('Archive Person Missing Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const response = await DELETE(new Request('https://growthos.test'), { params: Promise.resolve({ orgId: organization.id, personId: 'does-not-exist' }) });
+    expect(response.status).toBe(404);
   });
 });

@@ -21,6 +21,7 @@ import { EditTemplateForm } from '@/components/orgs/edit-template-form';
 import { PendingAttachmentRequests } from '@/components/orgs/pending-attachment-requests';
 import { SetCredentialSecretForm } from '@/components/orgs/set-credential-secret-form';
 import { PushAttachmentForm } from '@/components/orgs/push-attachment-form';
+import { ArchiveToggleButton } from '@/components/orgs/archive-toggle-button';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string }>;
@@ -88,11 +89,18 @@ export default async function ResourceLibraryPage({
                   key={credential.id}
                   className="flex flex-col gap-2 rounded-md border border-input px-3 py-2 text-sm"
                 >
-                  {t('credentialSummary', {
-                    name: credential.name,
-                    provider: credential.provider,
-                    scopeCount: credential.available_scopes?.length ?? 0,
-                  })}
+                  <span>
+                    {t('credentialSummary', {
+                      name: credential.name,
+                      provider: credential.provider,
+                      scopeCount: credential.available_scopes?.length ?? 0,
+                    })}
+                    {credential.archived_at ? (
+                      <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        {t('archivedBadge')}
+                      </span>
+                    ) : null}
+                  </span>
                   {canManageResources ? (
                     <EditCredentialForm
                       orgId={orgId}
@@ -109,6 +117,16 @@ export default async function ResourceLibraryPage({
                     />
                   ) : null}
                   {canManageResources ? (
+                    <ArchiveToggleButton
+                      archivePath={`/api/orgs/${orgId}/resources/credentials/${credential.id}`}
+                      unarchivePath={`/api/orgs/${orgId}/resources/credentials/${credential.id}/unarchive`}
+                      archived={Boolean(credential.archived_at)}
+                      archiveLabel={t('archive')}
+                      unarchiveLabel={t('unarchive')}
+                      errorLabel={credential.archived_at ? t('unarchiveError') : t('archiveError')}
+                    />
+                  ) : null}
+                  {canManageResources && !credential.archived_at ? (
                     <PushAttachmentForm
                       orgId={orgId}
                       resourceKind="credential"
@@ -141,6 +159,11 @@ export default async function ResourceLibraryPage({
                       type: template.type,
                       version: template.version,
                     })}
+                    {template.archived_at ? (
+                      <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        {t('archivedBadge')}
+                      </span>
+                    ) : null}
                   </span>
                   {canManageResources ? (
                     <div className="flex w-full flex-wrap items-center gap-2">
@@ -150,7 +173,17 @@ export default async function ResourceLibraryPage({
                         initialName={template.name}
                         initialConfig={template.config}
                       />
-                      <PushAttachmentForm orgId={orgId} resourceKind="template" resourceId={template.id} projects={pushTargets} />
+                      <ArchiveToggleButton
+                        archivePath={`/api/orgs/${orgId}/resources/templates/${template.id}`}
+                        unarchivePath={`/api/orgs/${orgId}/resources/templates/${template.id}/unarchive`}
+                        archived={Boolean(template.archived_at)}
+                        archiveLabel={t('archive')}
+                        unarchiveLabel={t('unarchive')}
+                        errorLabel={template.archived_at ? t('unarchiveError') : t('archiveError')}
+                      />
+                      {!template.archived_at ? (
+                        <PushAttachmentForm orgId={orgId} resourceKind="template" resourceId={template.id} projects={pushTargets} />
+                      ) : null}
                     </div>
                   ) : null}
                 </li>
@@ -171,7 +204,14 @@ export default async function ResourceLibraryPage({
                   key={person.id}
                   className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-sm"
                 >
-                  <span>{person.title ? `${person.name} — ${person.title}` : person.name}</span>
+                  <span>
+                    {person.title ? `${person.name} — ${person.title}` : person.name}
+                    {person.archived_at ? (
+                      <span className="ms-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        {t('archivedBadge')}
+                      </span>
+                    ) : null}
+                  </span>
                   {canManageResources ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <EditPersonForm
@@ -182,7 +222,17 @@ export default async function ResourceLibraryPage({
                         initialTitle={person.title}
                         initialPhotoUrl={person.photo_url}
                       />
-                      <PushAttachmentForm orgId={orgId} resourceKind="person" resourceId={person.id} projects={pushTargets} />
+                      <ArchiveToggleButton
+                        archivePath={`/api/orgs/${orgId}/resources/people/${person.id}`}
+                        unarchivePath={`/api/orgs/${orgId}/resources/people/${person.id}/unarchive`}
+                        archived={Boolean(person.archived_at)}
+                        archiveLabel={t('archive')}
+                        unarchiveLabel={t('unarchive')}
+                        errorLabel={person.archived_at ? t('unarchiveError') : t('archiveError')}
+                      />
+                      {!person.archived_at ? (
+                        <PushAttachmentForm orgId={orgId} resourceKind="person" resourceId={person.id} projects={pushTargets} />
+                      ) : null}
                     </div>
                   ) : null}
                 </li>

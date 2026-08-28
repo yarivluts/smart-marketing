@@ -44,15 +44,21 @@ import {
   updateOrganization as updateOrganizationInOrganization,
   createOrgPerson as createOrgPersonInOrganization,
   updateOrgPerson as updateOrgPersonInOrganization,
+  archiveOrgPerson as archiveOrgPersonInOrganization,
+  unarchiveOrgPerson as unarchiveOrgPersonInOrganization,
   createProject as createProjectInOrganization,
   createResourceTemplate as createResourceTemplateInOrganization,
   updateResourceTemplate as updateResourceTemplateInOrganization,
+  archiveResourceTemplate as archiveResourceTemplateInOrganization,
+  unarchiveResourceTemplate as unarchiveResourceTemplateInOrganization,
   applyFieldMappingToDelivery as applyFieldMappingToDeliveryInOrganization,
   type ApplyFieldMappingToDeliveryResult,
   createFieldMapping as createFieldMappingInOrganization,
   createHookEndpoint as createHookEndpointInOrganization,
   createSharedCredential as createSharedCredentialInOrganization,
   updateSharedCredential as updateSharedCredentialInOrganization,
+  archiveSharedCredential as archiveSharedCredentialInOrganization,
+  unarchiveSharedCredential as unarchiveSharedCredentialInOrganization,
   decideResourceAttachment as decideResourceAttachmentInOrganization,
   deleteBoard as deleteBoardInOrganization,
   disableHookEndpoint as disableHookEndpointInOrganization,
@@ -312,6 +318,28 @@ export async function updateSharedCredential(input: UpdateSharedCredentialInput)
   return updateSharedCredentialInOrganization(input);
 }
 
+interface ArchiveSharedCredentialInput {
+  organizationId: string;
+  credentialId: string;
+  archivedByUserId: string;
+}
+
+export async function archiveSharedCredential(input: ArchiveSharedCredentialInput): Promise<SharedCredentialModel> {
+  await ensureFirestoreOrm();
+  return archiveSharedCredentialInOrganization(input);
+}
+
+interface UnarchiveSharedCredentialInput {
+  organizationId: string;
+  credentialId: string;
+  unarchivedByUserId: string;
+}
+
+export async function unarchiveSharedCredential(input: UnarchiveSharedCredentialInput): Promise<SharedCredentialModel> {
+  await ensureFirestoreOrm();
+  return unarchiveSharedCredentialInOrganization(input);
+}
+
 interface SetSharedCredentialSecretInput {
   organizationId: string;
   credentialId: string;
@@ -365,6 +393,28 @@ export async function updateResourceTemplate(input: UpdateResourceTemplateInput)
   return updateResourceTemplateInOrganization(input);
 }
 
+interface ArchiveResourceTemplateInput {
+  organizationId: string;
+  templateId: string;
+  archivedByUserId: string;
+}
+
+export async function archiveResourceTemplate(input: ArchiveResourceTemplateInput): Promise<ResourceTemplateModel> {
+  await ensureFirestoreOrm();
+  return archiveResourceTemplateInOrganization(input);
+}
+
+interface UnarchiveResourceTemplateInput {
+  organizationId: string;
+  templateId: string;
+  unarchivedByUserId: string;
+}
+
+export async function unarchiveResourceTemplate(input: UnarchiveResourceTemplateInput): Promise<ResourceTemplateModel> {
+  await ensureFirestoreOrm();
+  return unarchiveResourceTemplateInOrganization(input);
+}
+
 interface CreateOrgPersonInput {
   organizationId: string;
   name: string;
@@ -392,6 +442,28 @@ interface UpdateOrgPersonInput {
 export async function updateOrgPerson(input: UpdateOrgPersonInput): Promise<OrgPersonModel> {
   await ensureFirestoreOrm();
   return updateOrgPersonInOrganization(input);
+}
+
+interface ArchiveOrgPersonInput {
+  organizationId: string;
+  personId: string;
+  archivedByUserId: string;
+}
+
+export async function archiveOrgPerson(input: ArchiveOrgPersonInput): Promise<OrgPersonModel> {
+  await ensureFirestoreOrm();
+  return archiveOrgPersonInOrganization(input);
+}
+
+interface UnarchiveOrgPersonInput {
+  organizationId: string;
+  personId: string;
+  unarchivedByUserId: string;
+}
+
+export async function unarchiveOrgPerson(input: UnarchiveOrgPersonInput): Promise<OrgPersonModel> {
+  await ensureFirestoreOrm();
+  return unarchiveOrgPersonInOrganization(input);
 }
 
 interface RequestResourceAttachmentInput {
