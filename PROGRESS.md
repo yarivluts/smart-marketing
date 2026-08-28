@@ -17,7 +17,45 @@ Template for each entry:
 
 ---
 
-## 2026-08-27 (latest) — Merged PR #338 (KAN-126, API key rename)
+## 2026-08-28 (latest) — Merged PR #340 (KAN-127, TV pairing settings edit)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. Local container's cached `main` ref was stale (diverged at
+    commit #117, ~50 commits behind `origin/main` with no unique local work) — reset it to
+    `origin/main` (`2698b42`) rather than merging/rebasing, since there was nothing to lose.
+  - Checked open PRs first (established pattern) and found **PR #340**
+    (`kan-127-tv-pairing-settings-edit`) already open from a concurrent session: `TASKS.md` had
+    zero `todo` rows left (only `needs-human` KAN-43 and `blocked-by` KAN-50/51), so that session
+    had done the "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up"
+    pass and found the same gap pattern KAN-100 through KAN-126 already closed for sibling
+    registries — `tv-pairing.service.ts` (KAN-67) had create + list + revoke only, no way to fix a
+    typo'd label/board-list/rotation without physically re-pairing the TV. Numbered KAN-127 with no
+    collision (`TASKS.md` row already added by the PR itself). PR #327 (EasySign) still open,
+    still confirmed the repo owner's own manual work — left untouched.
+  - Both CI checks (`lint · typecheck · test · build`, `terraform fmt · validate`) were green,
+    `mergeable_state: clean`, base already current `main`, no open review threads — merged
+    (squash, `e81ca2a`). Branch deletion not attempted (no branch-delete tool available in this
+    session's GitHub MCP toolset; prior runs hit a persistent HTTP 403 on this anyway).
+  - `main` is now caught up through **KAN-127**.
+- **In progress (exact stopping point):** none — the PR-merge housekeeping is a clean stopping
+  point. Did not additionally attempt a fresh sweep-and-implement cycle for a new follow-up task
+  this run, to avoid colliding with other concurrent sessions immediately after just resolving one
+  such collision pattern (same caution noted in the 2026-08-27 entry below).
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next run checks open PRs first (as always), then — since the primary backlog
+  (KAN-17..KAN-127) is exhausted except `needs-human`/`blocked-by` rows — resumes the
+  "sweep every `done` row's own doc-comment notes for a newly-buildable follow-up" pattern that
+  produced KAN-100 through KAN-127.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion keeps failing / has no available tool from this sandbox).
+
+---
+
+## 2026-08-27 — Merged PR #338 (KAN-126, API key rename)
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. Picked up mid-flight behind heavy same-hour concurrent-session
