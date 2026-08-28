@@ -1,5 +1,6 @@
 import type {
   AutomationActionModel,
+  CampaignDraft,
   AutomationActionStatus,
   AutomationGuardrailPolicyConfig,
   AutomationKillSwitchStatus,
@@ -7,6 +8,7 @@ import type {
   CampaignStatus,
   ConnectionWriteTier,
   GuardrailViolationType,
+  CredentialProvider,
   ResourceAttachmentModel,
   SharedCredentialModel,
 } from '@growthos/firebase-orm-models';
@@ -46,7 +48,10 @@ export interface AutomationTargetView {
   environmentId: string;
   resourceAttachmentId?: string;
   campaignResourceName?: string;
+  campaignBudgetResourceName?: string;
   campaignStatus?: CampaignStatus;
+  /** Last time an executed action touched this target's state — the campaign pages' "last known state as of" stamp. */
+  updatedAt?: string;
   adGroupResourceNames?: string[];
   /** Same order as {@link adGroupResourceNames} — `adResourceNames[i]` is the current RSA for `adGroupResourceNames[i]`. See `AutomationTargetStateModel.ad_resource_names`'s own doc comment. */
   adResourceNames?: string[];
@@ -64,7 +69,9 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     environmentId: target.environment_id,
     ...(target.resource_attachment_id !== undefined ? { resourceAttachmentId: target.resource_attachment_id } : {}),
     ...(target.campaign_resource_name !== undefined ? { campaignResourceName: target.campaign_resource_name } : {}),
+    ...(target.campaign_budget_resource_name !== undefined ? { campaignBudgetResourceName: target.campaign_budget_resource_name } : {}),
     ...(target.campaign_status !== undefined ? { campaignStatus: target.campaign_status } : {}),
+    ...(target.updated_at !== undefined ? { updatedAt: target.updated_at } : {}),
     ...(target.ad_group_resource_names !== undefined ? { adGroupResourceNames: target.ad_group_resource_names } : {}),
     ...(target.ad_resource_names !== undefined ? { adResourceNames: target.ad_resource_names } : {}),
     ...(target.meta_ad_set_resource_names !== undefined ? { metaAdSetResourceNames: target.meta_ad_set_resource_names } : {}),
@@ -77,6 +84,8 @@ export interface AutomationConnectionOption {
   id: string;
   label: string;
   tier: ConnectionWriteTier;
+  /** The connected credential's platform (`google_ads`/`meta_ads`/...) — the campaign pages' platform badge. Absent when the attachment's credential row is gone. */
+  provider?: CredentialProvider;
 }
 
 /** Labels each approved credential attachment with its credential's own name — the project may only ever see its own attachment's `write_tier`, never another project's slice of the same shared credential. */
@@ -84,14 +93,18 @@ export function toAutomationConnectionOptions(
   attachments: readonly ResourceAttachmentModel[],
   credentials: readonly SharedCredentialModel[],
 ): AutomationConnectionOption[] {
-  const credentialNameById = new Map(credentials.map((credential) => [credential.id, credential.name]));
+  const credentialById = new Map(credentials.map((credential) => [credential.id, credential]));
   return attachments
     .filter((attachment) => attachment.resource_kind === 'credential')
-    .map((attachment) => ({
-      id: attachment.id,
-      label: credentialNameById.get(attachment.resource_id) ?? attachment.resource_id,
-      tier: attachment.write_tier,
-    }));
+    .map((attachment) => {
+      const credential = credentialById.get(attachment.resource_id);
+      return {
+        id: attachment.id,
+        label: credential?.name ?? attachment.resource_id,
+        tier: attachment.write_tier,
+        ...(credential ? { provider: credential.provider } : {}),
+      };
+    });
 }
 
 /** One row of an action's before/after diff — generic over any action type's payload shape, not just today's single `dailyBudgetUsd` field (KAN-74's "every action browsable with diff" AC). */
@@ -256,4 +269,23 @@ const VIOLATION_LABEL_KEYS: Record<GuardrailViolationType, string> = {
 
 export function violationLabelKey(type: GuardrailViolationType): string {
   return VIOLATION_LABEL_KEYS[type];
+}
+
+/**
+ * The campaign's creatives, derived rather than stored: a target can only
+ * ever have ONE `campaign_draft_create` action (`proposeCampaignDraftCreateAction`
+ * rejects a second), and its `after.campaignDraft` is the single source of
+ * truth for "what ad groups / RSAs / ad sets does this campaign carry" —
+ * nothing copies the draft onto the target row itself. Prefers the executed
+ * draft (the one that actually created the live campaign) over a merely
+ * proposed/blocked one, so the creatives panel shows what IS live, not what
+ * someone once suggested.
+ */
+export function findCampaignDraftForTarget(actions: readonly AutomationActionModel[], targetId: string): CampaignDraft | undefined {
+  const draftActions = actions.filter((action) => action.target_id === targetId && action.action_type === 'campaign_draft_create');
+  const preferred =
+    draftActions.find((action) => action.status === 'executed' || action.status === 'verified') ??
+    draftActions.find((action) => action.status === 'approved' || action.status === 'awaiting_approval');
+  const draft = preferred?.after.campaignDraft;
+  return draft ? (draft as CampaignDraft) : undefined;
 }

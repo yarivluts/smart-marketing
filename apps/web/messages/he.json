@@ -1779,5 +1779,43 @@
     "rank": "{rank}. {name}",
     "rowSummary": "{amount} ({count, plural, one {רשומה אחת} other {# רשומות}})",
     "unattributed": "בנוסף {amount} שטרם שויכו ({count, plural, one {רשומה אחת} other {# רשומות}})"
+  },
+  "Campaigns": {
+    "metaTitle": "קמפיינים",
+    "title": "קמפיינים של {projectName}",
+    "automationQueueLink": "תור האוטומציה",
+    "backToCampaigns": "חזרה לקמפיינים",
+    "noCampaigns": "אין קמפיינים עדיין. הוסף יעד למטה כדי להתחיל.",
+    "newCampaignHeading": "טיוטת קמפיין חדשה",
+    "creativesHeading": "מודעות וקריאייטיבים",
+    "historyHeading": "היסטוריית פעולות",
+    "noHistory": "אף פעולה עוד לא נגעה בקמפיין הזה.",
+    "noCreativesYet": "אין עדיין טיוטת קמפיין ליעד הזה - צור אחת מדף הקמפיינים.",
+    "platformLabel": "פלטפורמה",
+    "statusLabel": "סטטוס",
+    "budgetLabel": "תקציב יומי",
+    "connectionLabel": "חיבור",
+    "dailyBudget": "‎${amount}/יום",
+    "lastActionAt": "פעולה אחרונה: {at}",
+    "lastKnownStateAt": "מצב ידוע אחרון נכון ל-{at}",
+    "stateSourceNote": "המצב משקף פעולות שבוצעו דרך GrowthOS. קריאה חיה מפלטפורמת הפרסום תגיע לאחר אישור הגישה ל-API (KAN-43).",
+    "pauseButton": "השהה קמפיין",
+    "pauseError": "לא ניתן היה להשהות את הקמפיין. נסה שוב.",
+    "keywordsLine": "מילות מפתח: {keywords}",
+    "metaTargetingSummary": "{countries}, גילאים {ageMin}-{ageMax}",
+    "platform": {
+      "google_ads": "Google Ads",
+      "meta_ads": "Meta",
+      "stripe": "Stripe",
+      "ga4": "GA4",
+      "generic": "כללי",
+      "simulated": "סימולציה"
+    },
+    "status": {
+      "enabled": "פעיל",
+      "paused": "מושהה",
+      "removed": "הוסר",
+      "none": "אין קמפיין עדיין"
+    }
   }
 }

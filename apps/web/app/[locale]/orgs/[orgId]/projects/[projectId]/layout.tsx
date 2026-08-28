@@ -67,9 +67,10 @@ export default async function ProjectLayout({
   const canRunAutomation = can(bindings, principal, 'automation.execute', { orgId });
   const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
 
-  const [t, tAutomation, tWinRules, tShell] = await Promise.all([
+  const [t, tAutomation, tCampaigns, tWinRules, tShell] = await Promise.all([
     getTranslations('OrgDetailPage'),
     getTranslations('Automation'),
+    getTranslations('Campaigns'),
     getTranslations('WinRules'),
     getTranslations('AppShell'),
   ]);
@@ -215,7 +216,10 @@ export default async function ProjectLayout({
       ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: 'Puzzle' as const }]
       : []),
     ...(canRunAutomation
-      ? [{ href: `${base}/automation`, label: tAutomation('metaTitle'), icon: 'Bot' as const }]
+      ? [
+          { href: `${base}/campaigns`, label: tCampaigns('metaTitle'), icon: 'Megaphone' as const },
+          { href: `${base}/automation`, label: tAutomation('metaTitle'), icon: 'Bot' as const },
+        ]
       : []),
   ];
 
