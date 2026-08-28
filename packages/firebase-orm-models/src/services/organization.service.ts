@@ -286,6 +286,8 @@ export interface OrgMemberSummary {
   displayName?: string;
   role: Role;
   status: MembershipStatus;
+  /** The project this member's role is scoped to (KAN-135), for a project-scoped role; unset for an org-scoped one. */
+  projectId?: string;
 }
 
 /** Every member (active or invited) of one org, with the invitee/member's profile resolved for display. */
@@ -304,6 +306,7 @@ export async function listOrgMembersWithProfiles(organizationId: string): Promis
     displayName: profiles[index]?.display_name,
     role: membership.role,
     status: membership.status ?? 'active',
+    projectId: membership.project_id,
   }));
 }
 

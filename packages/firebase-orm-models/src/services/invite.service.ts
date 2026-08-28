@@ -1,14 +1,31 @@
-import { INVITABLE_ROLES, isInvitableRole, type InvitableRole } from '@growthos/shared';
+import {
+  INVITABLE_ROLES,
+  invitableRolesForScope,
+  isInvitableRole,
+  isInviteRole,
+  isProjectInvitableRole,
+  PROJECT_INVITABLE_ROLES,
+  type InvitableRole,
+  type InviteRole,
+  type ProjectInvitableRole,
+} from '@growthos/shared';
 import { MembershipModel } from '../models/membership.model';
 import { RoleBindingModel } from '../models/role-binding.model';
+import { ProjectModel } from '../models/project.model';
+import { ProjectNotFoundError } from './resource-library.service';
 import { ensureUserByEmail } from './user.service';
 import { recordAuditLogEntry } from './audit-log.service';
 
 // Re-exported for convenience — `@growthos/shared` is the source of truth
 // (it has no Firebase dependency, so client components can import it
 // directly without pulling the whole ORM into their bundle).
-export { INVITABLE_ROLES, isInvitableRole };
-export type { InvitableRole };
+export { INVITABLE_ROLES, PROJECT_INVITABLE_ROLES, invitableRolesForScope, isInvitableRole, isInviteRole, isProjectInvitableRole };
+export type { InvitableRole, InviteRole, ProjectInvitableRole };
+// `ProjectNotFoundError` (thrown below when an invite's `projectId` doesn't
+// belong to `organizationId`) is not re-exported here — it's already the
+// canonical export from `resource-library.service.ts` (`export *`-ed by
+// `index.ts`), and re-exporting the same class from two modules risks an
+// ambiguous-export collision at the barrel.
 
 export class MembershipAlreadyExistsError extends Error {
   constructor() {
@@ -20,8 +37,32 @@ export class MembershipAlreadyExistsError extends Error {
 export interface InviteMemberParams {
   organizationId: string;
   email: string;
-  role: InvitableRole;
+  role: InviteRole;
   invitedByUserId: string;
+  /**
+   * Required when `role` is project-scoped ({@link isProjectInvitableRole}
+   * — `project_admin`/`editor`/`operator`) and must name a project that
+   * belongs to `organizationId`; must be omitted when `role` is org-scoped
+   * ({@link isInvitableRole} — `org_admin`/`viewer`). See
+   * {@link ProjectRequiredForRoleError}/{@link ProjectScopedRoleNotAllowedError}.
+   */
+  projectId?: string;
+}
+
+/** Thrown by {@link inviteMemberToOrganization} for a project-scoped `role` with no `projectId`. */
+export class ProjectRequiredForRoleError extends Error {
+  constructor() {
+    super('This role must be granted for a specific project — pass a projectId.');
+    this.name = 'ProjectRequiredForRoleError';
+  }
+}
+
+/** Thrown by {@link inviteMemberToOrganization} for an org-scoped `role` with a `projectId`. */
+export class ProjectScopedRoleNotAllowedError extends Error {
+  constructor() {
+    super('This role is granted at the organization level and cannot be scoped to a project.');
+    this.name = 'ProjectScopedRoleNotAllowedError';
+  }
 }
 
 /**
@@ -30,6 +71,19 @@ export interface InviteMemberParams {
  * which `ensureUserForFirebaseSession` (in `user.service.ts`) later links to
  * their real Firebase UID the first time they authenticate with a matching
  * email, so `MembershipModel.user_id` never needs to change at acceptance.
+ *
+ * Validates the role/scope pairing `INVITABLE_ROLES`'s own doc comment
+ * describes (KAN-135): a project-scoped `role` requires `projectId`, naming
+ * a project that actually belongs to `organizationId` (an id belonging to a
+ * *different* org — or no project at all — throws the same
+ * `ProjectNotFoundError` `resource-library.service.ts` already uses for
+ * this exact "project not found in this organization" shape, so a caller
+ * can't distinguish "wrong org" from "no such project"); an org-scoped
+ * `role` must not carry a `projectId` at all — silently ignoring it would
+ * risk minting org-wide access for a caller who thought they were scoping
+ * to one project. The validated `projectId` (if any) is stored on the
+ * membership itself (`MembershipModel.project_id`) so `acceptInvite` can
+ * mint the role binding at the right scope without re-deriving it.
  *
  * Like `removeMembershipCascade`, this is a check-then-act read/write with
  * no transaction (the ORM's client-SDK-based API doesn't expose one): two
@@ -41,6 +95,18 @@ export interface InviteMemberParams {
  * `removeMembershipCascade`.
  */
 export async function inviteMemberToOrganization(params: InviteMemberParams): Promise<MembershipModel> {
+  if (isProjectInvitableRole(params.role)) {
+    if (!params.projectId) {
+      throw new ProjectRequiredForRoleError();
+    }
+    const project = await ProjectModel.init(params.projectId, { organization_id: params.organizationId });
+    if (!project || project.organization_id !== params.organizationId) {
+      throw new ProjectNotFoundError();
+    }
+  } else if (params.projectId) {
+    throw new ProjectScopedRoleNotAllowedError();
+  }
+
   const invitee = await ensureUserByEmail(params.email);
 
   const existingMemberships = await MembershipModel.initPath({ organization_id: params.organizationId })
@@ -56,6 +122,7 @@ export async function inviteMemberToOrganization(params: InviteMemberParams): Pr
   membership.role = params.role;
   membership.status = 'invited';
   membership.invited_by = params.invitedByUserId;
+  membership.project_id = params.projectId;
   membership.setPathParams({ organization_id: params.organizationId });
   await membership.save();
   return membership;
@@ -122,14 +189,17 @@ export interface AcceptInviteResult {
 
 /**
  * Accepts a pending invite: activates the membership and mints the role
- * binding it promised. Same non-atomicity caveat as
- * `inviteMemberToOrganization` — two genuinely concurrent accept calls for
- * the same membership could both pass the `status !== 'invited'` check
- * before either write lands, minting two role bindings for the same grant.
- * The client already disables the accept button once clicked, so the
- * realistic trigger is a duplicated network request, not a UI double-click;
- * `removeMembershipCascade` would still clean up both bindings together if
- * the membership is ever removed.
+ * binding it promised — at `scope_level: 'project'` (`scope_id:
+ * membership.project_id`) when the invite was project-scoped, or
+ * `scope_level: 'org'` (`scope_id: organizationId`) otherwise, per
+ * `MembershipModel.project_id`'s own doc comment (KAN-135). Same
+ * non-atomicity caveat as `inviteMemberToOrganization` — two genuinely
+ * concurrent accept calls for the same membership could both pass the
+ * `status !== 'invited'` check before either write lands, minting two role
+ * bindings for the same grant. The client already disables the accept
+ * button once clicked, so the realistic trigger is a duplicated network
+ * request, not a UI double-click; `removeMembershipCascade` would still
+ * clean up both bindings together if the membership is ever removed.
  */
 export async function acceptInvite(params: AcceptInviteParams): Promise<AcceptInviteResult> {
   const membership = await MembershipModel.init(params.membershipId, {
@@ -160,8 +230,8 @@ export async function acceptInvite(params: AcceptInviteParams): Promise<AcceptIn
   roleBinding.principal_type = 'user';
   roleBinding.principal_id = params.userId;
   roleBinding.role = membership.role;
-  roleBinding.scope_level = 'org';
-  roleBinding.scope_id = params.organizationId;
+  roleBinding.scope_level = membership.project_id ? 'project' : 'org';
+  roleBinding.scope_id = membership.project_id ?? params.organizationId;
   roleBinding.setPathParams({ organization_id: params.organizationId });
   await roleBinding.save();
 

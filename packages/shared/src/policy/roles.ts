@@ -108,23 +108,60 @@ export function roleHasPermission(role: Role, permission: Permission): boolean {
 }
 
 /**
- * Roles grantable via an org-level invite (KAN-25). Restricted to roles
- * whose `ROLE_SCOPE_LEVELS` includes `'org'` — `org_admin` and `viewer` —
- * because the org invite endpoint always binds the accepted role at `org`
- * scope (there is no project-picker in the invite flow). Granting e.g.
- * `project_admin` (typical scope `['project']`, and carrying
+ * Roles grantable via an org-level invite, or via the org-level "change
+ * role" surface (KAN-25). Restricted to roles whose `ROLE_SCOPE_LEVELS`
+ * includes `'org'` — `org_admin` and `viewer` — because both of those
+ * surfaces always bind/rebind the role at `org` scope (no project picker).
+ * Granting e.g. `project_admin` (typical scope `['project']`, and carrying
  * `members.manage`/`project.manage`/`keys.manage`) at `org` scope instead
  * of a specific project would hand the invitee that access across every
- * project in the org — effectively `org_admin` in a different name. Roles
- * meant for narrower project/environment scopes (`project_admin`, `editor`,
- * `operator`, `ingest_only`) need a project-scoped invite flow, which is a
- * separate, not-yet-built story. `platform_admin`/`org_owner` are excluded
- * for a different reason — those aren't handed out by invite at all,
- * they're platform-level or earned by creating the org.
+ * project in the org — effectively `org_admin` in a different name, which
+ * is exactly why roles meant for narrower project/environment scopes are
+ * excluded here. `platform_admin`/`org_owner` are excluded for a different
+ * reason — those aren't handed out by invite at all, they're platform-level
+ * or earned by creating the org.
+ *
+ * `project_admin`/`editor`/`operator` (typical scope `['project']`) are
+ * grantable too, but only through a *project*-scoped invite that names the
+ * target project — see {@link PROJECT_INVITABLE_ROLES} below and
+ * `inviteMemberToOrganization` (`invite.service.ts`, KAN-135), which
+ * enforces the org-vs-project role/scope pairing this list alone can't
+ * express. `ingest_only` (typical scope `['project', 'environment']`) is
+ * deliberately excluded from both lists — it's a machine role minted via
+ * `mintApiKey` (KAN-28), never via a human invite.
  */
 export const INVITABLE_ROLES = ['org_admin', 'viewer'] as const;
 export type InvitableRole = (typeof INVITABLE_ROLES)[number];
 
 export function isInvitableRole(value: string): value is InvitableRole {
   return (INVITABLE_ROLES as readonly string[]).includes(value);
+}
+
+/**
+ * Roles grantable via a *project*-scoped invite (KAN-135) — the counterpart
+ * {@link INVITABLE_ROLES}'s own doc comment names as "a separate,
+ * project-scoped invite flow". Exactly the roles whose `ROLE_SCOPE_LEVELS`
+ * names `'project'` as their typical scope and that a human (not a machine
+ * — see `ingest_only` above) is meant to be invited into. `inviteMemberToOrganization`
+ * requires a `projectId` for one of these and refuses one for an
+ * {@link INVITABLE_ROLES} member — see its own doc comment for the full
+ * validation.
+ */
+export const PROJECT_INVITABLE_ROLES = ['project_admin', 'editor', 'operator'] as const;
+export type ProjectInvitableRole = (typeof PROJECT_INVITABLE_ROLES)[number];
+
+export function isProjectInvitableRole(value: string): value is ProjectInvitableRole {
+  return (PROJECT_INVITABLE_ROLES as readonly string[]).includes(value);
+}
+
+/** Every role grantable via *some* invite flow, at either scope. */
+export type InviteRole = InvitableRole | ProjectInvitableRole;
+
+export function isInviteRole(value: string): value is InviteRole {
+  return isInvitableRole(value) || isProjectInvitableRole(value);
+}
+
+/** The roles an invite may grant at a given scope — {@link INVITABLE_ROLES} for `'org'`, {@link PROJECT_INVITABLE_ROLES} for `'project'`. */
+export function invitableRolesForScope(scope: 'org' | 'project'): readonly InviteRole[] {
+  return scope === 'org' ? INVITABLE_ROLES : PROJECT_INVITABLE_ROLES;
 }

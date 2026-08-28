@@ -170,6 +170,7 @@ import {
   type CreateProjectResult,
   type CredentialProvider,
   type InvitableRole,
+  type InviteRole,
   type KmsProvider,
   type MappingRuleInput,
   type MembershipModel,
@@ -252,8 +253,10 @@ export async function updateProjectDetails(input: UpdateProjectDetailsInput): Pr
 interface InviteMemberInput {
   organizationId: string;
   email: string;
-  role: InvitableRole;
+  role: InviteRole;
   invitedByUserId: string;
+  /** See `InviteMemberParams.projectId`'s doc comment (`invite.service.ts`, KAN-135). */
+  projectId?: string;
 }
 
 export async function inviteMember(input: InviteMemberInput): Promise<MembershipModel> {

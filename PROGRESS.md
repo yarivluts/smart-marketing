@@ -17,6 +17,114 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 (later still) — Delivered KAN-135 (project-scoped invites)
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. Checked open PRs first (established pattern): **#358**
+    (`feat/campaign-live-state`, Yariv's own goal) and **#359** (docs-only PROGRESS.md check-in) were
+    both open and already being watched by the parent session — left both untouched entirely, per
+    this run's own kickoff instructions. **#327** (EasySign) unchanged, still the repo owner's own
+    manual work. No open PR duplicated this run's own pick.
+  - Picked **KAN-135**: the "make `project_admin`/`editor`/`operator` roles actually invitable via a
+    project-scoped invite flow" gap the KAN-133 entry (two entries below) named as the next pick,
+    independently flagged by `INVITABLE_ROLES`'s own doc comment and KAN-132's `reactivateOrgMember`
+    doc comment. `INVITABLE_ROLES` (`packages/shared/src/policy/roles.ts`) only contained
+    `org_admin`/`viewer`; `inviteMemberToOrganization`/`acceptInvite` unconditionally minted an
+    org-scope `RoleBindingModel`, so a role whose own `ROLE_SCOPE_LEVELS` says `['project']` could
+    never actually be granted through the invite flow.
+  - Delivered the full flow. `packages/shared/src/policy/roles.ts`: kept `INVITABLE_ROLES` exactly as
+    is (still org-scope-only — it's also what the pre-existing "change role" surface,
+    `updateMemberRole`, uses to gate rebinding an *active* member, and that surface always mints an
+    org-scope binding, so widening it there would have been the same privilege-escalation bug
+    `INVITABLE_ROLES` was created to prevent); added a new, separate `PROJECT_INVITABLE_ROLES`
+    (`project_admin`/`editor`/`operator`) plus `isProjectInvitableRole`/`InviteRole`/`isInviteRole`/
+    `invitableRolesForScope('org' | 'project')`, and rewrote the stale "separate, not-yet-built story"
+    doc comment now that the story is built. `MembershipModel` gained an optional `project_id` field
+    (set only for a project-scoped invite) so a still-pending invite can record its *intended* scope
+    before any role binding exists to read it back from. `invite.service.ts`'s
+    `inviteMemberToOrganization` now validates the role/scope pairing (project-scoped role requires a
+    `projectId` that actually resolves under `organizationId` — reusing `resource-library.service.ts`'s
+    existing `ProjectNotFoundError` for "wrong org or no such project" so a caller can't tell the two
+    apart; org-scoped role must carry no `projectId` at all) and stores the validated `projectId` on
+    the membership; `acceptInvite` reads it back to mint `scope_level: 'project'`/`scope_id:
+    project_id` instead of always `'org'`. Caught during self-review and also fixed
+    `reactivateOrgMember` (`membership.service.ts`) the same way — its own doc comment already
+    flagged this exact follow-up ("lossless today because every binding this codebase mints is
+    org-scoped ... whichever story builds [project-scoped invites] will need
+    suspend/reactivate to snapshot and restore each binding's own scope"): before this fix, suspending
+    and reactivating a project-scoped member would have silently widened their access to the whole
+    org on reactivation, a real privilege-escalation regression this same PR would otherwise have
+    introduced.
+  - API route (`apps/web/app/api/orgs/[orgId]/invites/route.ts`): accepts an optional `projectId`,
+    validates the same role/scope pairing at the HTTP layer (400s), and — for a project-scoped role —
+    re-derives the caller's raw policy bindings (`getServerSession` + `resolveOrgSessionContext`, the
+    same pattern `omnisearch/route.ts` already established) to check `project.manage` scoped to the
+    named project specifically, not just `members.manage` at the org. Documented honestly in the
+    route's own doc comment: under today's fixed `ROLE_PERMISSIONS` catalog every role carrying
+    `members.manage` also carries `project.manage` in the same scope, so this specific check can never
+    actually deny anyone yet — it exists as the correct authorization boundary for the resource being
+    granted rather than leaning on that catalog coincidence, and as protection if a future role ever
+    decouples the two. The accept route needed no changes — `acceptInvite` now handles scope
+    internally.
+  - UI (`invite-member-form.tsx`): role picker now includes all five invite roles; picking a
+    project-scoped one reveals a project picker scoped to `administeredProjects` — computed
+    server-side in the org page (`page.tsx`) via a per-project `can(bindings, principal,
+    'project.manage', { orgId, projectId })` check (an org-scope admin administers every project, a
+    project-scope one only their own), not just reused from the existing org-wide `canManageProjects`
+    flag. Submit is disabled and an explanatory message shown when the inviter administers zero
+    projects. Also extended `MembersList`/`OrgMemberSummary` with the member's `projectId` so a
+    project-scoped member's row shows *which* project ("role · project (status)"), not just the bare
+    role name — otherwise two `project_admin` rows for different projects would have been visually
+    indistinguishable, a real "everything user-manageable gets an admin surface" gap this same change
+    would have introduced. New en/he translation keys (`inviteProjectLabel`/`inviteProjectNone`/
+    `projectRoleAndStatus`); no Hebrew in source, no hard-coded strings.
+  - Full test coverage: `packages/shared`'s `policy.test.ts` (a `PROJECT_INVITABLE_ROLES`-vs-
+    `ROLE_SCOPE_LEVELS` regression test mirroring the existing `INVITABLE_ROLES` one, plus an
+    `invitableRolesForScope`/`isInviteRole` sanity test); `org-membership-flows.emulator.test.ts`
+    (project-scoped invite→accept mints a `scope_level: 'project'` binding for all three roles;
+    rejects a project-scoped role with no `projectId`; rejects an org-scoped role with a `projectId`;
+    rejects a `projectId` belonging to a different org or no project at all; existing org-scope
+    invite/accept behavior unchanged; `reactivateOrgMember` restores a project-scoped member's binding
+    at its original project scope, not org scope; `updateMemberRole` still refuses a project-scoped
+    member per `RoleNotChangeableError`) — all 39 cases in that file green, 1672/1672 across the whole
+    `firebase-orm-models` package; `apps/web`'s `invites/route.test.ts` (missing-`projectId`,
+    org-role-with-`projectId`, cross-org `projectId` → 404 not 403, a project-scoped `project_admin`
+    blocked at the org-level `members.manage` gate, happy path) and `invite-member-form.test.tsx`
+    (project picker appears/defaults/submits with `projectId`, disabled + explained when no
+    administered projects, drops `projectId` again when switching back to an org role) — 1976/1976
+    across `apps/web`'s unit+emulator suite. Also ran the `orgs.spec.ts` Playwright e2e suite directly
+    (real browser through a real Next.js server against the real Auth/Firestore emulators) — 4/4 green,
+    confirming the widened form renders and the existing invite/accept/revoke flows are unbroken.
+  - Full monorepo `pnpm lint`/`pnpm typecheck`/`pnpm build` green. `pnpm test` green:
+    `packages/shared` 595/595, `packages/firebase-orm-models` 1672/1672,
+    `apps/web` unit+emulator 1976/1976; the full `apps/web` sharded Playwright e2e suite (25 spec
+    files, unrelated feature areas) was still running in the background as this entry was written —
+    no failures observed in the portion that had completed, and CI runs the same suite independently
+    before merge regardless.
+  - Branch `kan-135-project-scoped-invites`, PR opened against `main`; see the PR number recorded
+    below once opened/merged.
+- **In progress (exact stopping point):** confirming CI is green and merging — see the next entry (or
+  this one, updated) for the outcome.
+- **Blocked + why:** nothing blocking.
+- **Next step:** once KAN-135 is merged, the next candidate is retrofitting the ~60 existing
+  `project.manage`-gated project routes/pages (e.g. `requireOrgPermission` call sites under
+  `apps/web/app/api/orgs/[orgId]/projects/[projectId]/...` and the project nav's own `canManageX`
+  checks in `orgs/[orgId]/page.tsx`) to actually pass `projectId` into their `can()` checks — today
+  every one of them checks `{ orgId }` only, so a legitimately-invited project-scoped `project_admin`/
+  `editor`/`operator` (this change makes them mintable for the first time) still can't reach any of
+  those project admin surfaces themselves; only an org-scope admin can act on a project today. That's
+  a materially larger, higher-risk change (every one of those routes needs its own review) than this
+  story's own scope, so it's deliberately left for its own follow-up rather than folded in here.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
+    long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches on
+    `origin` (branch deletion has consistently failed / had no available tool from this sandbox in
+    prior runs).
+
+---
+
 ## 2026-08-28 (even later) — Drove PR #353 through three PROGRESS.md conflicts to merge; KAN-133/#355 and KAN-134/#356 already picked up by concurrent sessions
 
 - **Last completed:**
