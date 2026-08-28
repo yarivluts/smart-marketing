@@ -68,7 +68,7 @@ export default async function McpConsentPage({ params, searchParams }: PageProps
   }
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
-  const activeMemberships = memberships.filter((membership) => membership.status !== 'invited');
+  const activeMemberships = memberships.filter((membership) => (membership.status ?? 'active') === 'active');
   const eligibleMemberships = activeMemberships.filter((membership) =>
     can(bindings, { type: 'user', id: user.id }, 'mcp.read', { orgId: membership.organizationId }),
   );

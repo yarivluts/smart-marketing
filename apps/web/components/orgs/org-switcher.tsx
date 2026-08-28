@@ -9,11 +9,15 @@ export interface OrgSwitcherProps {
   currentOrgId: string;
 }
 
-/** Lists only the orgs the signed-in user is an active member of (KAN-25 AC — never pending invites). */
+/**
+ * Lists only the orgs the signed-in user is an active member of (KAN-25 AC —
+ * never pending invites; KAN-131 — nor a suspended membership, since
+ * `findActiveMembership` would 404 the org page it links to anyway).
+ */
 export function OrgSwitcher({ memberships, currentOrgId }: OrgSwitcherProps): React.ReactElement {
   const t = useTranslations('OrgSwitcher');
   const router = useRouter();
-  const activeMemberships = memberships.filter((membership) => membership.status !== 'invited');
+  const activeMemberships = memberships.filter((membership) => (membership.status ?? 'active') === 'active');
 
   function handleChange(event: React.ChangeEvent<HTMLSelectElement>): void {
     router.push(`/orgs/${event.target.value}`);

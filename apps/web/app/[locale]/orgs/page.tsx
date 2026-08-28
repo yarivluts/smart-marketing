@@ -26,7 +26,7 @@ export default async function OrgsPage({ params }: PageProps): Promise<React.Rea
   }
 
   const { memberships } = await resolveOrgSessionContext(session);
-  const active = memberships.filter((membership) => membership.status !== 'invited');
+  const active = memberships.filter((membership) => (membership.status ?? 'active') === 'active');
   const pending = memberships.filter((membership) => membership.status === 'invited');
   const t = await getTranslations('OrgsPage');
 

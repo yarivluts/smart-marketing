@@ -67,7 +67,7 @@ export const resolveOrgSessionContext = cache(async (session: DecodedIdToken): P
 
   const memberships = await listMembershipsWithOrganizations(user.id);
   const activeOrgIds = memberships
-    .filter((membership) => membership.status !== 'invited')
+    .filter((membership) => (membership.status ?? 'active') === 'active')
     .map((membership) => membership.organizationId);
   const roleBindings = await listRoleBindingsForUser(user.id, activeOrgIds);
   const bindings = toPolicyBindings(roleBindings);

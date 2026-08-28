@@ -38,6 +38,11 @@ describe('findActiveMembership', () => {
     expect(findActiveMembership(memberships, 'org-1')).toBeUndefined();
   });
 
+  it('excludes a suspended membership — access is paused, not merely pending', () => {
+    const memberships = [membership({ status: 'suspended' })];
+    expect(findActiveMembership(memberships, 'org-1')).toBeUndefined();
+  });
+
   it('does not confuse two different orgs even when both are present', () => {
     const memberships = [
       membership({ organizationId: 'org-1', membershipId: 'm1' }),

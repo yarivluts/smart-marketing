@@ -150,7 +150,12 @@
     "inviteError": "לא ניתן היה לשלוח את ההזמנה. ייתכן שהם כבר חברים.",
     "remove": "הסרה",
     "removeError": "לא ניתן היה להסיר את החבר. נסה שוב.",
-    "removeLastOwnerError": "לארגון חייב להיות תמיד לפחות בעלים אחד."
+    "removeLastOwnerError": "לארגון חייב להיות תמיד לפחות בעלים אחד.",
+    "suspend": "השעיה",
+    "suspendError": "לא ניתן היה להשעות את החבר. נסה שוב.",
+    "suspendLastOwnerError": "לארגון חייב להיות תמיד לפחות בעלים אחד.",
+    "reactivate": "הפעלה מחדש",
+    "reactivateError": "לא ניתן היה להפעיל מחדש את החבר. נסה שוב."
   },
   "NewProjectPage": {
     "title": "יצירת פרויקט",
