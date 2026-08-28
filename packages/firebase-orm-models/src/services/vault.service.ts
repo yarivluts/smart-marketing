@@ -110,6 +110,58 @@ export async function revealSharedCredentialSecret(params: RevealSharedCredentia
   return decryptSecret(credential.encrypted_secret, credentialBindingId(params.organizationId, params.credentialId), params.kms);
 }
 
+export interface ClearSharedCredentialSecretParams {
+  organizationId: string;
+  credentialId: string;
+  /** The acting admin, recorded on the org's audit-log chain (KAN-44). */
+  actorId: string;
+}
+
+/**
+ * Removes a credential's stored secret entirely, leaving the credential record itself (name,
+ * provider, `available_scopes`, and any already-approved `ResourceAttachmentModel`s pointing at
+ * it) untouched — the vault sibling of `revokeApiKey`/`disableHookEndpoint`'s "cut off access
+ * immediately, without deleting the registry entry" posture, and the piece
+ * `archiveSharedCredential` deliberately does *not* cover: archiving only hides a credential from
+ * future attach pickers while its secret keeps working for whatever's already attached (see
+ * `SharedCredentialModel.archived_at`'s own doc comment) — there was no way to invalidate a
+ * leaked secret in place before a replacement was ready. No KMS provider needed (unlike
+ * set/reveal/rotate): clearing never touches the ciphertext, it just removes it.
+ *
+ * Sets `encrypted_secret` to an explicit `null` rather than `undefined` — the same "an explicit
+ * `null` overwrites, `undefined` is dropped by `updateDoc()`" reasoning `archived_at`'s own doc
+ * comment documents — so the field is actually cleared in Firestore, not left holding the old
+ * ciphertext. Throws {@link CredentialSecretNotSetError} if there's nothing to clear, the same
+ * guard `rotateSharedCredentialSecretKey` already applies.
+ */
+export async function clearSharedCredentialSecret(params: ClearSharedCredentialSecretParams): Promise<SharedCredentialModel> {
+  const credential = await requireSharedCredentialInOrg(params.organizationId, params.credentialId);
+  if (!credential.encrypted_secret) {
+    throw new CredentialSecretNotSetError();
+  }
+  credential.encrypted_secret = null;
+  await credential.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      actorType: 'user',
+      actorId: params.actorId,
+      action: 'credential.secret_clear',
+      targetType: 'shared_credential',
+      targetId: credential.id,
+      summary: `Cleared the stored secret for credential "${credential.name}"`,
+      // Only ever the *presence* of a secret — see `setSharedCredentialSecret`'s own doc comment.
+      before: { hasSecret: true },
+      after: { hasSecret: false },
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return credential;
+}
+
 export interface RotateSharedCredentialSecretKeyParams {
   organizationId: string;
   credentialId: string;

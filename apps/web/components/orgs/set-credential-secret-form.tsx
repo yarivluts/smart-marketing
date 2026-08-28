@@ -16,7 +16,13 @@ export interface SetCredentialSecretFormProps {
  * Write-only secret entry for a shared credential (KAN-29): the raw secret
  * is only ever submitted, never fetched back — matches how a password field
  * behaves, and keeps the decrypted value off the wire in both directions
- * except this one submit.
+ * except this one submit. Also exposes rotate (re-wrap under the current KMS
+ * key) and clear (KAN-134 — remove the stored secret entirely, e.g. once a
+ * leaked token has to be invalidated immediately and a replacement isn't
+ * ready yet) once a secret is set. Clearing confirms first, the same
+ * "irreversible destructive action" posture `DismissQuarantinedRecordButton`/
+ * `DeleteGoalButton` already take — it immediately breaks any plugin sync
+ * relying on this credential and the removed ciphertext can't be recovered.
  */
 export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetCredentialSecretFormProps): React.ReactElement {
   const t = useTranslations('ResourceLibrary');
@@ -26,6 +32,8 @@ export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetC
   const [error, setError] = useState(false);
   const [rotating, setRotating] = useState(false);
   const [rotateError, setRotateError] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -65,6 +73,26 @@ export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetC
     }
   }
 
+  async function handleClear(): Promise<void> {
+    if (!window.confirm(t('clearSecretConfirm'))) {
+      return;
+    }
+    setClearError(false);
+    setClearing(true);
+    try {
+      const response = await fetch(`/api/orgs/${orgId}/resources/credentials/${credentialId}/secret`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) {
+        setClearError(true);
+        return;
+      }
+      router.refresh();
+    } finally {
+      setClearing(false);
+    }
+  }
+
   return (
     <form className="flex flex-wrap items-end gap-3" onSubmit={handleSubmit} noValidate>
       <span className="text-xs text-muted-foreground">{hasSecret ? t('secretSet') : t('secretNotSet')}</span>
@@ -88,6 +116,11 @@ export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetC
           {t('rotateSecretKey')}
         </Button>
       ) : null}
+      {hasSecret ? (
+        <Button type="button" variant="outline" disabled={clearing} onClick={handleClear}>
+          {t('clearSecret')}
+        </Button>
+      ) : null}
       {error ? (
         <p role="alert" className="w-full text-sm text-destructive">
           {t('setSecretError')}
@@ -96,6 +129,11 @@ export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetC
       {rotateError ? (
         <p role="alert" className="w-full text-sm text-destructive">
           {t('rotateSecretKeyError')}
+        </p>
+      ) : null}
+      {clearError ? (
+        <p role="alert" className="w-full text-sm text-destructive">
+          {t('clearSecretError')}
         </p>
       ) : null}
     </form>
