@@ -17,7 +17,7 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (latest) — Merged PR #345 (verified clean CI), resolved a PROGRESS.md conflict on PR #347, merged it
+## 2026-08-28 (latest) — Merged PR #345 (verified clean CI); drove PR #347 through three PROGRESS.md conflicts and a real CI flake to merge
 
 - **Last completed:**
   - Scheduled run per `CLAUDE.md`. `TASKS.md` still had zero `todo` rows; checked open PRs first
@@ -31,28 +31,44 @@ Template for each entry:
     failure logs directly. A third attempt (already running when this session picked it up) came
     back fully green; another concurrent session merged it moments later. No action needed here
     beyond confirming and unsubscribing.
-  - **PR #347:** CI went green after a concurrent session rebased it onto main to resolve an
-    earlier PROGRESS.md conflict with PR #346. When this session went to merge it, `main` had
-    already advanced again (a direct push, `aa71f3a`, adding the "Campaigns & Ads pages shipped AND
-    validated live on EasySign" entry below) — a second PROGRESS.md conflict. Per the merge-conflict
-    rule (merge the base in, resolve, never rewrite someone else's branch history), merged `origin/
-    main` into `chore/progress-2026-08-28-kan129` locally and resolved by keeping all three
-    overlapping entries in true chronological order: the EasySign-validation entry (newest) on top,
-    then this run's own KAN-129/KAN-128 merge entry, then the pre-existing superseded stub — no
-    content was dropped, only reordered (the stub's own full duplicate, which `main`'s direct push
-    had re-introduced verbatim, was removed a second time since the KAN-129 entry above it already
-    is that record). Verified no leftover conflict markers, pushed, CI came back green, no open
-    review threads, merged (squash).
-- **In progress (exact stopping point):** none — both PRs are merged and `main` is caught up
-  through this reconciliation.
-- **Blocked + why:** nothing blocking.
-- **Next step:** next run checks open PRs (PR #348, `kan-129-win-rule-edit`/KAN-130, was already
-  open from a concurrent session at the time of this entry — resume the sweep from **KAN-131** if
-  it's landed by then), then falls back to the sweep pattern.
+  - **PR #347** went through three separate PROGRESS.md conflicts as `main` kept advancing from
+    concurrent sessions while this one worked: (1) already resolved before this session picked it
+    up (vs. PR #346's entry); (2) this session's own resolution vs. a direct push (`aa71f3a`,
+    the "Campaigns & Ads pages shipped" entry) — merged `origin/main` in locally and kept all
+    entries in chronological order, no content dropped; (3) after pushing that fix, CI hit a real
+    (if unrelated) failure — `automation.emulator.test.ts` failed on this repo's documented
+    Firestore-emulator `RESOURCE_EXHAUSTED`-class flake, impossible to be caused by a
+    `PROGRESS.md`-only diff. A concurrent session (also watching this PR) posted the standing-down
+    comment and spent the one-re-run budget on this session's behalf; while that ran, **both PR #348
+    (KAN-130) and PR #349** (that same concurrent session's own PROGRESS.md entry covering this
+    window) merged to `main`, producing a third conflict.
+    Resolved the same way: merged `main` in again, kept every entry (this one, #349's, and the
+    already-reconciled ones below) in chronological order with nothing dropped — #349's own content
+    is fully superseded by this entry so it's kept as a brief pointer rather than duplicated in
+    full, matching this file's established supersede convention.
+- **In progress (exact stopping point):** PR #347 pushed with this third conflict resolution;
+  waiting on its CI (re-run in progress) before merging. PR #345 is merged; `main` is caught up
+  through PR #349 (KAN-130 included).
+- **Blocked + why:** nothing blocking other than PR #347's own CI finishing.
+- **Next step:** once PR #347's CI is green with no open review threads, merge it. Then resume the
+  sweep from **KAN-131** (KAN-130 already closed by PR #348) if no other PRs are in flight, or
+  continue the campaign-pages goal's own noted "next slices" (real GAQL/Meta live-state reads once
+  KAN-43 lands; per-ad performance tiles off `ad_performance_daily`).
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
     outstanding, long-standing.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature
+    branches on `origin` (branch deletion has consistently failed / had no available tool from
+    this sandbox in prior runs).
+
+---
+
+## 2026-08-28 (later) — Checked state again: KAN-129 merged, KAN-130 + a progress-journal PR both already in flight from concurrent sessions
+
+**Superseded by the entry above** — both PR #348 (KAN-130) and PR #347 (this same progress journal)
+landed shortly after this entry was written; the entry above captures the full outcome of both.
+Kept here as the as-run record of what this session observed before that resolved.
 
 ---
 
