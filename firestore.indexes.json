@@ -4,59 +4,124 @@
       "collectionGroup": "pipeline_messages",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "environment_id", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "enqueued_at", "order": "ASCENDING" }
+        {
+          "fieldPath": "environment_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "enqueued_at",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "pipeline_messages",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "enqueued_at", "order": "ASCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "enqueued_at",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "pipeline_messages",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "enqueued_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "enqueued_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "plugin_source_runs",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "plugin_install_id", "order": "ASCENDING" },
-        { "fieldPath": "started_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "plugin_install_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "started_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "quarantined_records",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "created_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "created_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "raw_records",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "environment_id", "order": "ASCENDING" },
-        { "fieldPath": "kind", "order": "ASCENDING" },
-        { "fieldPath": "schema_name", "order": "ASCENDING" },
-        { "fieldPath": "landed_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "environment_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "kind",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "schema_name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "landed_at",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "tracking_alerts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "detected_at", "order": "DESCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "detected_at",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "automation_actions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "target_id",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "proposed_at",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],

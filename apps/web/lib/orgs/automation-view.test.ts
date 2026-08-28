@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationActionModel, AutomationTargetStateModel } from '@growthos/firebase-orm-models';
-import { toAutomationActionView, toAutomationTargetView } from './automation-view';
+import { findCampaignDraftForTarget, toAutomationActionView, toAutomationTargetView } from './automation-view';
 
 function action(overrides: Partial<AutomationActionModel> & Pick<AutomationActionModel, 'id'>): AutomationActionModel {
   return {
@@ -215,3 +215,46 @@ describe('toAutomationTargetView (KAN-73 follow-up)', () => {
     expect(view.adResourceNames).toEqual(['customers/999/adGroupAds/1']);
   });
 });
+
+describe('findCampaignDraftForTarget', () => {
+  const draft = { platform: 'google_ads', campaignName: 'Brand', dailyBudgetUsd: 30, adGroups: [] };
+
+  function draftAction(overrides: Partial<AutomationActionModel>): AutomationActionModel {
+    return {
+      id: 'a1',
+      target_id: 't1',
+      target_label: 'Summer Sale',
+      action_type: 'campaign_draft_create',
+      status: 'executed',
+      before: {},
+      after: { campaignDraft: draft },
+      guardrail_violations: [],
+      proposed_at: '2026-07-15T00:00:00.000Z',
+      ...overrides,
+    } as AutomationActionModel;
+  }
+
+  it('returns the executed draft for the target', () => {
+    expect(findCampaignDraftForTarget([draftAction({})], 't1')).toEqual(draft);
+  });
+
+  it('prefers the executed draft over a merely awaiting_approval one', () => {
+    const pendingDraft = { ...draft, campaignName: 'Pending Version' };
+    const actions = [
+      draftAction({ id: 'a2', status: 'awaiting_approval', after: { campaignDraft: pendingDraft } }),
+      draftAction({ id: 'a1', status: 'executed' }),
+    ];
+    expect(findCampaignDraftForTarget(actions, 't1')).toEqual(draft);
+  });
+
+  it('falls back to an awaiting_approval draft when nothing executed yet', () => {
+    expect(findCampaignDraftForTarget([draftAction({ status: 'awaiting_approval' })], 't1')).toEqual(draft);
+  });
+
+  it('ignores other targets, other action types, and blocked/rejected drafts', () => {
+    expect(findCampaignDraftForTarget([draftAction({ target_id: 'other' })], 't1')).toBeUndefined();
+    expect(findCampaignDraftForTarget([draftAction({ action_type: 'budget_change' })], 't1')).toBeUndefined();
+    expect(findCampaignDraftForTarget([draftAction({ status: 'blocked' })], 't1')).toBeUndefined();
+  });
+});
+

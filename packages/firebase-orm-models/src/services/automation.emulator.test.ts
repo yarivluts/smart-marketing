@@ -20,6 +20,7 @@ import {
   InvalidAutomationActionError,
   listAuditLogEntriesForOrg,
   listAutomationActionsForProject,
+  listAutomationActionsForTarget,
   listAutomationTargetStatesForProject,
   proposeAdEditAction,
   proposeAutomationBudgetChangeAction,
@@ -800,6 +801,38 @@ describe('listAutomationActionsForProject', () => {
 
     const actions = await listAutomationActionsForProject(organization.id, project.id);
     expect(actions.map((action) => action.id)).toEqual([second.id, first.id]);
+  });
+});
+
+describe('listAutomationActionsForTarget', () => {
+  it('lists ONLY the requested target’s actions, newest-proposal-first — the campaign detail page’s timeline', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Per Target Actions Org');
+    const targetA = await seedTarget(organization.id, project.id, owner.id);
+    const targetB = await seedTarget(organization.id, project.id, owner.id);
+    const firstA = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: targetA.id,
+      afterDailyBudgetUsd: 105,
+      requestedByUserId: owner.id,
+    });
+    await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: targetB.id,
+      afterDailyBudgetUsd: 90,
+      requestedByUserId: owner.id,
+    });
+    const secondA = await proposeAutomationBudgetChangeAction({
+      organizationId: organization.id,
+      projectId: project.id,
+      targetId: targetA.id,
+      afterDailyBudgetUsd: 110,
+      requestedByUserId: owner.id,
+    });
+
+    const actions = await listAutomationActionsForTarget(organization.id, project.id, targetA.id);
+    expect(actions.map((action) => action.id)).toEqual([secondA.id, firstA.id]);
   });
 });
 

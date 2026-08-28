@@ -75,6 +75,7 @@ import {
   listAttachmentsForProject as listAttachmentsForProjectInOrganization,
   listAuditLogEntriesForOrg as listAuditLogEntriesForOrgInOrganization,
   listAutomationActionsForProject as listAutomationActionsForProjectInOrganization,
+  listAutomationActionsForTarget as listAutomationActionsForTargetInOrganization,
   listAutomationTargetStatesForProject as listAutomationTargetStatesForProjectInOrganization,
   listBoardsForProject as listBoardsForProjectInOrganization,
   listEnvironmentsForProject as listEnvironmentsForProjectInOrganization,
@@ -669,6 +670,15 @@ export async function listAutomationActionsForProject(
 ): Promise<AutomationActionModel[]> {
   await ensureFirestoreOrm();
   return listAutomationActionsForProjectInOrganization(organizationId, projectId, limit);
+}
+
+export async function listAutomationActionsForTarget(
+  organizationId: string,
+  projectId: string,
+  targetId: string,
+): Promise<AutomationActionModel[]> {
+  await ensureFirestoreOrm();
+  return listAutomationActionsForTargetInOrganization(organizationId, projectId, targetId);
 }
 
 export async function listAutomationTargetStatesForProject(organizationId: string, projectId: string): Promise<AutomationTargetStateModel[]> {
