@@ -35,6 +35,13 @@ export class ApiKeyNotFoundError extends Error {
   }
 }
 
+export class InvalidApiKeyNameError extends Error {
+  constructor() {
+    super('API key name is required.');
+    this.name = 'InvalidApiKeyNameError';
+  }
+}
+
 // 24 random bytes (base64url) comfortably exceeds what's brute-forceable and
 // matches the entropy other bearer-token schemes (e.g. Stripe's) use.
 const SECRET_BYTES = 24;
@@ -308,6 +315,58 @@ export async function revokeApiKey(params: RevokeApiKeyParams): Promise<ApiKeyMo
     });
   } catch {
     // Best-effort — see the comment in mintApiKey above.
+  }
+
+  return apiKey;
+}
+
+export interface RenameApiKeyParams {
+  organizationId: string;
+  projectId: string;
+  apiKeyId: string;
+  name: string;
+  actorUserId: string;
+}
+
+/**
+ * Corrects a key's own display `name` (KAN-28's `mintApiKey` sets it once,
+ * from whatever the minter typed, and it was never editable again) — the
+ * same "create + list only, no way to fix a typo'd definition" gap
+ * KAN-100/117/119/120/121/123/124 already closed for their own sibling
+ * registries. Every other identifying field (`scopes`, `environment_id`,
+ * `key_prefix`, `hashed_secret`) stays immutable: a different scope list or
+ * environment is a different key, not a correction, the same posture
+ * `updateFieldMapping`/`updateHookEndpoint` already take for their own
+ * structural fields.
+ */
+export async function renameApiKey(params: RenameApiKeyParams): Promise<ApiKeyModel> {
+  const apiKey = await loadApiKey(params.organizationId, params.projectId, params.apiKeyId);
+
+  const trimmedName = params.name.trim();
+  if (!trimmedName) {
+    throw new InvalidApiKeyNameError();
+  }
+
+  const before = { name: apiKey.name };
+  apiKey.name = trimmedName;
+  await apiKey.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: apiKey.environment_id,
+      actorType: 'user',
+      actorId: params.actorUserId,
+      action: 'api_key.rename',
+      targetType: 'api_key',
+      targetId: apiKey.id,
+      summary: `Renamed API key (${apiKey.key_prefix}…) to "${apiKey.name}"`,
+      before,
+      after: { name: apiKey.name },
+    });
+  } catch {
+    // Best-effort — see the equivalent comment in mintApiKey above.
   }
 
   return apiKey;

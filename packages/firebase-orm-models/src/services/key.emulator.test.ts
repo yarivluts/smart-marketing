@@ -7,10 +7,13 @@ import {
   createProject,
   EnvironmentNotFoundError,
   ensureUserForFirebaseSession,
+  InvalidApiKeyNameError,
   InvalidApiKeyScopeError,
   listApiKeysForProject,
+  listAuditLogEntriesForOrg,
   mintApiKey,
   ProjectNotFoundError,
+  renameApiKey,
   revokeApiKey,
   verifyApiKeyForRequest,
 } from '../index';
@@ -434,6 +437,100 @@ describe('revokeApiKey', () => {
         revokedByUserId: owner.id,
       }),
     ).rejects.toBeInstanceOf(ApiKeyNotFoundError);
+  });
+});
+
+describe('renameApiKey', () => {
+  it('replaces the key name, trims it, and does not touch scopes/environment/hashed_secret', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Rename Org');
+    const { apiKey, rawKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+
+    const renamed = await renameApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      apiKeyId: apiKey.id,
+      name: '  Renamed key  ',
+      actorUserId: owner.id,
+    });
+
+    expect(renamed.name).toBe('Renamed key');
+    expect(renamed.scopes).toEqual(['ingest.write']);
+    expect(renamed.environment_id).toBe(prodEnvironment.id);
+    expect(renamed.hashed_secret).toBe(apiKey.hashed_secret);
+
+    // The rename never invalidates the key itself.
+    const result = await verifyApiKeyForRequest({
+      rawKey,
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      requiredScope: 'ingest.write',
+    });
+    expect(result.ok).toBe(true);
+
+    const summaries = await listApiKeysForProject(organization.id, project.id);
+    expect(summaries.find((s) => s.id === apiKey.id)?.name).toBe('Renamed key');
+  });
+
+  it('rejects a blank or whitespace-only name', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Rename Blank Org');
+    const { apiKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Keeps this name',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+
+    await expect(
+      renameApiKey({ organizationId: organization.id, projectId: project.id, apiKeyId: apiKey.id, name: '   ', actorUserId: owner.id }),
+    ).rejects.toBeInstanceOf(InvalidApiKeyNameError);
+
+    const summaries = await listApiKeysForProject(organization.id, project.id);
+    expect(summaries.find((s) => s.id === apiKey.id)?.name).toBe('Keeps this name');
+  });
+
+  it('rejects renaming a key that does not exist in this project', async () => {
+    const { owner, organization, project } = await setupProject('Rename Missing Org');
+
+    await expect(
+      renameApiKey({ organizationId: organization.id, projectId: project.id, apiKeyId: 'does-not-exist', name: 'x', actorUserId: owner.id }),
+    ).rejects.toBeInstanceOf(ApiKeyNotFoundError);
+  });
+
+  it('records an audit log entry with before/after values', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Rename Audit Org');
+    const { apiKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Before rename',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+
+    await renameApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      apiKeyId: apiKey.id,
+      name: 'After rename',
+      actorUserId: owner.id,
+    });
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const renameEntry = entries.find((entry) => entry.action === 'api_key.rename' && entry.target_id === apiKey.id);
+    expect(renameEntry).toBeTruthy();
+    expect(renameEntry?.actor_id).toBe(owner.id);
+    expect(renameEntry?.before).toEqual({ name: 'Before rename' });
+    expect(renameEntry?.after).toEqual({ name: 'After rename' });
   });
 });
 
