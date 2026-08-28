@@ -131,6 +131,13 @@ import {
   proposeOnboardingFunnelSteps as proposeOnboardingFunnelStepsInOrganization,
   queryBoardTile as queryBoardTileInOrganization,
   queryBoardTiles as queryBoardTilesInOrganization,
+  queryMetrics as queryMetricsInOrganization,
+  MetricNotRegisteredError,
+  MetricTargetsUnbuiltWarehouseTableError,
+  ProjectQueryQuotaExceededError,
+  WarehouseNotConfiguredError,
+  WarehouseQueryFailedError,
+  type WarehouseRow,
   queryGoalProgress as queryGoalProgressInOrganization,
   queryProjectFunnelStepsForAdmin as queryProjectFunnelStepsForAdminInOrganization,
   type FunnelStepsOutcome,
@@ -777,6 +784,66 @@ export async function queryBoardTiles(
 ): Promise<BoardTileQueryOutcome[]> {
   await ensureFirestoreOrm();
   return queryBoardTilesInOrganization({ organizationId, projectId, board });
+}
+
+/** How far back the campaign detail page's spend panel looks — 28 days, the same window ad platforms themselves default to. */
+const CAMPAIGN_SPEND_WINDOW_DAYS = 28;
+
+/**
+ * One campaign's warehouse-backed ad spend (the `ad_spend` measure the SaaS
+ * metric pack registers — the one pack metric queryable against a real
+ * warehouse today, see its own doc comment), filtered to this campaign's
+ * platform campaign id. Never throws — mirrors `BoardTileQueryOutcome`'s
+ * per-tile graceful-degradation union, so a project without the pack (or
+ * without a warehouse) renders an honest empty/degraded panel rather than
+ * crashing the page.
+ */
+export type CampaignSpendOutcome =
+  | { ok: true; totalSpendUsd: number; series: WarehouseRow[] }
+  | { ok: false; reason: 'warehouse_not_configured' | 'metric_not_registered' | 'not_yet_backed' | 'quota_exceeded' | 'query_error' };
+
+export async function queryCampaignSpend(
+  organizationId: string,
+  projectId: string,
+  campaignResourceName: string,
+): Promise<CampaignSpendOutcome> {
+  await ensureFirestoreOrm();
+  const end = new Date();
+  const start = new Date(end.getTime() - CAMPAIGN_SPEND_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const toDateString = (date: Date): string => date.toISOString().slice(0, 10);
+  try {
+    const result = await queryMetricsInOrganization({
+      organizationId,
+      projectId,
+      request: {
+        metrics: ['ad_spend'],
+        filters: [{ field: 'campaign_id', operator: '=', value: campaignResourceName }],
+        time: { start: toDateString(start), end: toDateString(end), grain: 'day' },
+      },
+    });
+    const totalSpendUsd = result.series.reduce((sum, row) => {
+      const value = row.ad_spend;
+      return sum + (typeof value === 'number' ? value : Number(value ?? 0));
+    }, 0);
+    return { ok: true, totalSpendUsd, series: result.series };
+  } catch (err) {
+    if (err instanceof WarehouseNotConfiguredError) {
+      return { ok: false, reason: 'warehouse_not_configured' };
+    }
+    if (err instanceof MetricNotRegisteredError) {
+      return { ok: false, reason: 'metric_not_registered' };
+    }
+    if (err instanceof MetricTargetsUnbuiltWarehouseTableError) {
+      return { ok: false, reason: 'not_yet_backed' };
+    }
+    if (err instanceof ProjectQueryQuotaExceededError) {
+      return { ok: false, reason: 'quota_exceeded' };
+    }
+    if (err instanceof WarehouseQueryFailedError) {
+      return { ok: false, reason: 'query_error' };
+    }
+    return { ok: false, reason: 'query_error' };
+  }
 }
 
 export async function listGoalsForProject(organizationId: string, projectId: string): Promise<GoalModel[]> {

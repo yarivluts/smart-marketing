@@ -7,6 +7,8 @@ import type {
   AutomationTargetStateModel,
   CampaignStatus,
   ConnectionWriteTier,
+  ExternalAdPlatform,
+  ImportedAdSnapshot,
   GuardrailViolationType,
   CredentialProvider,
   ResourceAttachmentModel,
@@ -52,6 +54,14 @@ export interface AutomationTargetView {
   campaignStatus?: CampaignStatus;
   /** Last time an executed action touched this target's state — the campaign pages' "last known state as of" stamp. */
   updatedAt?: string;
+  /** Last time the state was recorded as the ad platform itself reported it (a `readCampaignState` refresh or a campaign import/sync) — when present, the campaign pages show "synced from the platform" instead of the executed-actions stand-in note. */
+  lastReadStateAt?: string;
+  /** The real ad platform an imported/synced campaign lives on — the platform badge prefers this over the linked connection's provider (an imported campaign has no connection yet). */
+  externalPlatform?: ExternalAdPlatform;
+  /** The campaign's own ads exactly as the platform reported them at import/sync time — parsed from `imported_ads_json`; absent (not empty) when the target was never imported. */
+  importedAds?: ImportedAdView[];
+  /** The platform's own campaign objective as observed at import/sync time (e.g. Meta's `OUTCOME_LEADS`). */
+  importedObjective?: string;
   adGroupResourceNames?: string[];
   /** Same order as {@link adGroupResourceNames} — `adResourceNames[i]` is the current RSA for `adGroupResourceNames[i]`. See `AutomationTargetStateModel.ad_resource_names`'s own doc comment. */
   adResourceNames?: string[];
@@ -60,8 +70,37 @@ export interface AutomationTargetView {
   metaAdResourceNames?: string[];
 }
 
+/** One imported ad as the campaign detail page renders it — a plain serializable mirror of the service layer's `ImportedAdSnapshot` (client components can only receive plain data across the RSC boundary, same reasoning as `AutomationGuardrailPolicyView`). */
+export type ImportedAdView = ImportedAdSnapshot;
+
+/**
+ * Parses a target's `imported_ads_json` (written only by
+ * `importExternalCampaignSnapshots`, so the shape is trusted — but a
+ * malformed document degrades to "no imported ads" rather than crashing the
+ * page, same defensive posture as `formatDiffValue`'s own unknown-shape
+ * branches).
+ */
+function parseImportedAds(raw: string | undefined): { ads?: ImportedAdView[]; objective?: string } {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw) as { ads?: unknown; objective?: unknown };
+    const ads = Array.isArray(parsed.ads) ? (parsed.ads as ImportedAdView[]) : undefined;
+    const objective = typeof parsed.objective === 'string' ? parsed.objective : undefined;
+    return { ...(ads !== undefined ? { ads } : {}), ...(objective !== undefined ? { objective } : {}) };
+  } catch {
+    return {};
+  }
+}
+
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
+  const imported = parseImportedAds(target.imported_ads_json);
   return {
+    ...(imported.ads !== undefined ? { importedAds: imported.ads } : {}),
+    ...(imported.objective !== undefined ? { importedObjective: imported.objective } : {}),
+    ...(target.last_read_state_at !== undefined ? { lastReadStateAt: target.last_read_state_at } : {}),
+    ...(target.external_platform !== undefined ? { externalPlatform: target.external_platform } : {}),
     id: target.id,
     targetType: target.target_type,
     label: target.label,

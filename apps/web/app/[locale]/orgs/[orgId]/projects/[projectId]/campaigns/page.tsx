@@ -109,7 +109,11 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
                     <span className="flex items-center gap-2">
                       <span className="font-medium">{target.label}</span>
                       <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {connection?.provider ? t(`platform.${connection.provider}`) : t('platform.simulated')}
+                        {target.externalPlatform
+                          ? t(`platform.${target.externalPlatform}`)
+                          : connection?.provider
+                            ? t(`platform.${connection.provider}`)
+                            : t('platform.simulated')}
                       </span>
                       {target.campaignStatus ? (
                         <span

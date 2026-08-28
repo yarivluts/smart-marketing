@@ -9,6 +9,8 @@ import {
   type AutomationBudgetChangeExecutionInput,
   type AutomationBudgetChangeExecutionResult,
   type AutomationCampaignActivationExecutionInput,
+  type AutomationCampaignStateReadInput,
+  type AutomationCampaignStateReadResult,
   type AutomationCampaignDraftCreateExecutionInput,
   type AutomationCampaignDraftCreateExecutionResult,
   type AutomationCampaignDraftRollbackInput,
@@ -360,5 +362,29 @@ export class GoogleAdsAutomationActionExecutor implements AutomationActionExecut
 
   async rollbackMetaAdCreativeEdit(_input: AutomationMetaAdCreativeEditRollbackInput): Promise<void> {
     throw new GoogleAdsMetaAdCreativeEditNotSupportedError();
+  }
+
+  /**
+   * The read seam (KAN-43 groundwork) — one GAQL read of the campaign's own
+   * live status + daily budget, persisted onto the target row with
+   * `last_read_state_at` (see the interface method's own doc comment for why
+   * this is the one executor write that needs no approved action). Uses the
+   * same `campaign_resource_name ?? target.id` fallback as
+   * `resolveCampaignBudgetResourceName` for a target seeded to represent a
+   * pre-existing campaign.
+   */
+  async readCampaignState(input: AutomationCampaignStateReadInput): Promise<AutomationCampaignStateReadResult> {
+    const target = await loadTarget(input);
+    const campaignResourceName = target.campaign_resource_name ?? target.id;
+    const state = await this.apiClient.lookupCampaignState(this.customerId, campaignResourceName);
+    const statusMap = { ENABLED: 'enabled', PAUSED: 'paused', REMOVED: 'removed' } as const;
+    target.campaign_resource_name = campaignResourceName;
+    target.campaign_status = statusMap[state.status];
+    if (state.dailyBudgetUsd !== null) {
+      target.daily_budget_usd = state.dailyBudgetUsd;
+    }
+    target.last_read_state_at = new Date().toISOString();
+    await target.save();
+    return { campaignStatus: target.campaign_status, dailyBudgetUsd: state.dailyBudgetUsd };
   }
 }

@@ -9,6 +9,10 @@ import { BaseModel, Field, Model } from '@arbel/firebase-orm';
 export const CAMPAIGN_STATUSES = ['paused', 'enabled', 'removed'] as const;
 export type CampaignStatus = (typeof CAMPAIGN_STATUSES)[number];
 
+/** The two real ad platforms a campaign target can live on — used by imported/synced targets ({@link AutomationTargetStateModel.external_platform}) whose platform is known from the sync itself rather than from a linked credential's `provider`. */
+export const EXTERNAL_AD_PLATFORMS = ['google_ads', 'meta_ads'] as const;
+export type ExternalAdPlatform = (typeof EXTERNAL_AD_PLATFORMS)[number];
+
 /**
  * A buildable-today stand-in for "the live state of one ad-platform object
  * (campaign/ad group/ad) as reported by the platform's own API" — until
@@ -96,6 +100,41 @@ export class AutomationTargetStateModel extends BaseModel {
   /** Set alongside {@link campaign_resource_name} by `campaign_draft_create`/`campaign_activation` executions; a target with no campaign created yet has this unset. */
   @Field()
   public campaign_status?: CampaignStatus;
+
+  /**
+   * When an `AutomationActionExecutor.readCampaignState` call (or a campaign
+   * import/sync — `importExternalCampaignSnapshots`) last recorded this
+   * target's state as the ad platform itself reported it — distinct from
+   * {@link updated_at} (which any executed action's own write also bumps) so
+   * the campaign pages can honestly distinguish "state as of the last
+   * platform read" from "state as of the last GrowthOS-executed action".
+   */
+  @Field()
+  public last_read_state_at?: string;
+
+  /**
+   * Which real ad platform this target's campaign lives on, when known from a
+   * campaign import/sync itself (`importExternalCampaignSnapshots`) rather
+   * than from a linked credential connection's `provider` — an imported
+   * campaign has no `resource_attachment_id` until someone links one, but its
+   * platform is still a fact worth showing on the campaign pages' badge.
+   */
+  @Field()
+  public external_platform?: ExternalAdPlatform;
+
+  /**
+   * JSON-serialized snapshot of the campaign's own ads exactly as the ad
+   * platform reported them at import/sync time (`ImportedAdSnapshot[]` —
+   * see `automation.service.ts`), for a campaign GrowthOS did NOT create (so
+   * no `campaign_draft_create` action exists to derive creatives from, the
+   * derivation `findCampaignDraftForTarget` performs for GrowthOS-created
+   * campaigns). Stored as a string rather than a typed nested field because
+   * it is a verbatim platform observation replaced whole on every sync,
+   * never partially edited. Bounded by `importExternalCampaignSnapshots`'s
+   * own input caps, so it stays far under Firestore's document size limit.
+   */
+  @Field()
+  public imported_ads_json?: string;
 
   /**
    * The real ad platform's own resource name/id for each ad group a

@@ -214,6 +214,38 @@ describe('toAutomationTargetView (KAN-73 follow-up)', () => {
     expect(view.metaAdResourceNames).toBeUndefined();
     expect(view.adResourceNames).toEqual(['customers/999/adGroupAds/1']);
   });
+
+  it('parses an imported/synced target: external platform, last platform read, objective, and the ads snapshot', () => {
+    const view = toAutomationTargetView(
+      target({
+        id: 'meta_ads_52619',
+        external_platform: 'meta_ads',
+        last_read_state_at: '2026-08-28T10:00:00.000Z',
+        campaign_resource_name: '52619',
+        imported_ads_json: JSON.stringify({
+          objective: 'OUTCOME_TRAFFIC',
+          ads: [{ adName: 'lawyers | va | image ad', headline: 'Sign In Minutes', status: 'PAUSED' }],
+        }),
+      }),
+    );
+    expect(view.externalPlatform).toBe('meta_ads');
+    expect(view.lastReadStateAt).toBe('2026-08-28T10:00:00.000Z');
+    expect(view.importedObjective).toBe('OUTCOME_TRAFFIC');
+    expect(view.importedAds).toEqual([{ adName: 'lawyers | va | image ad', headline: 'Sign In Minutes', status: 'PAUSED' }]);
+  });
+
+  it('degrades a malformed imported_ads_json to "no imported ads" instead of crashing the page', () => {
+    const view = toAutomationTargetView(target({ id: 't5', imported_ads_json: '{not json' }));
+    expect(view.importedAds).toBeUndefined();
+    expect(view.importedObjective).toBeUndefined();
+  });
+
+  it('omits the imported/synced fields entirely for a target that was never imported', () => {
+    const view = toAutomationTargetView(target({ id: 't6' }));
+    expect(view.externalPlatform).toBeUndefined();
+    expect(view.lastReadStateAt).toBeUndefined();
+    expect(view.importedAds).toBeUndefined();
+  });
 });
 
 describe('findCampaignDraftForTarget', () => {

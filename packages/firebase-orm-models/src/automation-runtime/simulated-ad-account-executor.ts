@@ -8,6 +8,8 @@ import type {
   AutomationBudgetChangeExecutionInput,
   AutomationBudgetChangeExecutionResult,
   AutomationCampaignActivationExecutionInput,
+  AutomationCampaignStateReadInput,
+  AutomationCampaignStateReadResult,
   AutomationCampaignDraftCreateExecutionInput,
   AutomationCampaignDraftCreateExecutionResult,
   AutomationCampaignDraftRollbackInput,
@@ -215,6 +217,14 @@ export class SimulatedAdAccountExecutor implements AutomationActionExecutor {
     const target = await loadTarget(input);
     target.updated_at = new Date().toISOString();
     await target.save();
+  }
+
+  /** The target row IS the simulated platform, so a "live read" reports the row itself — stamping `last_read_state_at` (and deliberately NOT `updated_at`, which stays "last executed action") is the whole side effect. */
+  async readCampaignState(input: AutomationCampaignStateReadInput): Promise<AutomationCampaignStateReadResult> {
+    const target = await loadTarget(input);
+    target.last_read_state_at = new Date().toISOString();
+    await target.save();
+    return { campaignStatus: target.campaign_status ?? null, dailyBudgetUsd: target.daily_budget_usd };
   }
 }
 

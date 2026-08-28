@@ -1,3 +1,5 @@
+import type { CampaignStatus } from '../models/automation-target-state.model';
+
 export interface AutomationBudgetChangeExecutionInput {
   organizationId: string;
   projectId: string;
@@ -160,6 +162,32 @@ export interface AutomationCampaignActivationExecutionInput {
   environmentId: string;
   targetId: string;
   campaignResourceName: string;
+}
+
+/**
+ * Input for the read seam (`readCampaignState`) — no resource name is passed
+ * because the executor reads the target row's own `campaign_resource_name`
+ * (falling back to the target id itself for a target seeded to represent a
+ * pre-existing live campaign, the same fallback
+ * `GoogleAdsAutomationActionExecutor.resolveCampaignBudgetResourceName`
+ * already applies for `budget_change`).
+ */
+export interface AutomationCampaignStateReadInput {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  targetId: string;
+}
+
+/**
+ * What one live read of a campaign's platform state returned —
+ * `campaignStatus` is `null` when the target has no campaign yet;
+ * `dailyBudgetUsd` is `null` when the platform reports no campaign-level
+ * daily budget (e.g. a Meta campaign using ad-set-level budgets).
+ */
+export interface AutomationCampaignStateReadResult {
+  campaignStatus: CampaignStatus | null;
+  dailyBudgetUsd: number | null;
 }
 
 /**
@@ -440,4 +468,16 @@ export interface AutomationActionExecutor {
   rollbackMetaAdSetTargetingEdit(input: AutomationMetaAdSetTargetingEditRollbackInput): Promise<void>;
   executeMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditExecutionInput): Promise<AutomationMetaAdCreativeEditExecutionResult>;
   rollbackMetaAdCreativeEdit(input: AutomationMetaAdCreativeEditRollbackInput): Promise<void>;
+  /**
+   * The read seam (KAN-43 groundwork): reads the target's campaign state as
+   * the ad platform itself reports it right now, persists what it read onto
+   * the target row (`campaign_status`, `daily_budget_usd` when the platform
+   * reports one) along with `last_read_state_at`, and returns it — the one
+   * executor method that writes the target row WITHOUT an approved action,
+   * legal precisely because it only ever records observed platform state,
+   * never changes it. The simulated executor reports the target row itself
+   * (it IS the simulated platform), so a refresh there is an honest no-op
+   * beyond stamping `last_read_state_at`.
+   */
+  readCampaignState(input: AutomationCampaignStateReadInput): Promise<AutomationCampaignStateReadResult>;
 }

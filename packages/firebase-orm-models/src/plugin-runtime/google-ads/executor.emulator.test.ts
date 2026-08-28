@@ -52,6 +52,7 @@ function fakeApiClient(overrides: Partial<GoogleAdsApiClient> = {}): GoogleAdsAp
     setCampaignBudgetAmount: vi.fn().mockResolvedValue(undefined),
     setCampaignStatus: vi.fn().mockResolvedValue(undefined),
     lookupCampaignBudgetResourceName: vi.fn().mockRejectedValue(new GoogleAdsApiError('No campaign found.', 404)),
+    lookupCampaignState: vi.fn().mockResolvedValue({ status: 'PAUSED', dailyBudgetUsd: 25 }),
     createCustomerMatchUserList: vi.fn().mockResolvedValue({ userListResourceName: 'customers/999/userLists/1' }),
     addHashedEmailsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 0 }),
     addAdGroupKeywords: vi.fn().mockResolvedValue({
@@ -124,6 +125,38 @@ describe('GoogleAdsAutomationActionExecutor', () => {
     expect(reloaded.daily_budget_usd).toBe(25);
     expect(reloaded.ad_group_resource_names).toEqual(CREATE_RESULT.adGroupResourceNames);
     expect(reloaded.ad_resource_names).toEqual(CREATE_RESULT.adResourceNames);
+  });
+
+  it('readCampaignState: reads live status + budget via GAQL, persists them with last_read_state_at (pre-existing-campaign id fallback)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('GAds Executor Read State Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Read State Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient({ lookupCampaignState: vi.fn().mockResolvedValue({ status: 'ENABLED', dailyBudgetUsd: 42 }) });
+    const executor = new GoogleAdsAutomationActionExecutor(apiClient, '999');
+
+    const result = await executor.readCampaignState({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+    });
+
+    expect(result).toEqual({ campaignStatus: 'enabled', dailyBudgetUsd: 42 });
+    // No `campaign_resource_name` was recorded, so the read falls back to the target id itself.
+    expect(apiClient.lookupCampaignState).toHaveBeenCalledWith('999', target.id);
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloaded.campaign_status).toBe('enabled');
+    expect(reloaded.daily_budget_usd).toBe(42);
+    expect(reloaded.campaign_resource_name).toBe(target.id);
+    expect(reloaded.last_read_state_at).toEqual(expect.any(String));
   });
 
   it('rolls back a campaign draft creation by setting the campaign REMOVED', async () => {
