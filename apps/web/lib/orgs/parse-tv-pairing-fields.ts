@@ -61,3 +61,55 @@ export async function parseClaimTvPairingRequestBody(request: NextRequest): Prom
     label: body.label,
   };
 }
+
+export interface ParsedUpdateTvPairingSettingsFields {
+  boardIds: string[];
+  rotationSeconds: number;
+  reducedMotion: boolean;
+  label: string;
+}
+
+export type ParsedUpdateTvPairingSettingsRequest = (ParsedUpdateTvPairingSettingsFields & { error?: undefined }) | { error: NextResponse };
+
+interface RawUpdateTvPairingSettingsBody {
+  boardIds?: unknown;
+  rotationSeconds?: unknown;
+  reducedMotion?: unknown;
+  label?: unknown;
+}
+
+/**
+ * Shape-only validation for editing an already-claimed pairing's settings
+ * (KAN-127) — the same split {@link parseClaimTvPairingRequestBody} already
+ * establishes: `updateTvPairingSettings` (`tv-pairing.service.ts`) is the
+ * one that rejects an empty board list or an out-of-range rotation
+ * interval. No `code` field here — unlike claiming, editing an already-
+ * claimed pairing needs no redemption code.
+ */
+export async function parseUpdateTvPairingSettingsRequestBody(request: NextRequest): Promise<ParsedUpdateTvPairingSettingsRequest> {
+  const parsed = await parseJsonBody<RawUpdateTvPairingSettingsBody>(request);
+  if (parsed.error) {
+    return { error: parsed.error };
+  }
+  const body = parsed.body;
+
+  if (!Array.isArray(body.boardIds) || body.boardIds.length === 0 || !body.boardIds.every((id) => typeof id === 'string')) {
+    return invalid('board_ids_required');
+  }
+  if (typeof body.rotationSeconds !== 'number' || !Number.isFinite(body.rotationSeconds)) {
+    return invalid('invalid_rotation_seconds');
+  }
+  if (typeof body.reducedMotion !== 'boolean') {
+    return invalid('invalid_reduced_motion');
+  }
+  if (typeof body.label !== 'string' || body.label.trim().length === 0) {
+    return invalid('label_required');
+  }
+
+  return {
+    boardIds: body.boardIds as string[],
+    rotationSeconds: body.rotationSeconds,
+    reducedMotion: body.reducedMotion,
+    label: body.label,
+  };
+}
