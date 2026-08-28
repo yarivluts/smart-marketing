@@ -17,6 +17,78 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 (latest) — Delivered KAN-131 (ingest quarantine dismiss), opened PR
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` confirmed zero `todo` rows (only `needs-human` KAN-43
+    and `blocked-by` KAN-50/51). Checked open PRs first (established pattern) and found **PR #348**
+    (`kan-129-win-rule-edit`, titled KAN-130 — a concurrent session's win-rule edit-form follow-up,
+    CI not yet checked by this run) and **PR #347** (docs-only PROGRESS.md update recording an
+    earlier run's KAN-128/KAN-129 merges) both already open, plus **PR #327** (EasySign, still
+    confirmed the repo owner's own manual work). Since PR #348 already claimed **KAN-130**, this run
+    swept for the next gap under **KAN-131** rather than colliding on the same number, and left all
+    three open PRs untouched (no CI failure, review comment, or merge-conflict signal on any of them
+    to act on).
+  - Swept `packages/firebase-orm-models/src/services/*.ts` against their sibling admin UI pages for
+    a genuinely new gap, explicitly avoiding KAN-130's win-rule scope. Found: `quarantine.service.ts`
+    (KAN-34)'s `listQuarantinedRecordsForProject`/`replayQuarantinedRecord` covered "the schema/
+    payload got fixed, try again" but had **no path for "this will never validate and isn't worth a
+    schema change"** — an abandoned integration's payload, a one-off malformed test event. Such a
+    record just sat in the bounded `status == 'quarantined'` list forever, crowding out records an
+    operator could actually still act on — confirmed directly by reading `quarantine.service.ts`,
+    `QuarantinedRecordModel` (only `quarantined`/`replayed` statuses existed), and the ingest-health
+    admin page (only a Replay button, no dismiss/discard control) before committing to it. Same
+    "sits forever, forces itself into an admin's attention" shape KAN-127/KAN-129 already closed for
+    TV pairings and shared credentials/templates/people, just for a different registry.
+  - Delivered **KAN-131**: `'dismissed'` added to `QUARANTINED_RECORD_STATUSES` + new
+    `dismissed_at`/`dismissed_by_user_id` fields on `QuarantinedRecordModel`; new
+    `dismissQuarantinedRecord` in `quarantine.service.ts` (positional-args signature matching
+    `replayQuarantinedRecord`'s own shape in this file) flips a still-`quarantined` record straight
+    to `dismissed`, audit-logged as `quarantined_record.dismiss`; a new
+    `QuarantinedRecordNotActionableError` (mirroring `AttachmentNotPendingError`'s "already been
+    decided" posture) guards against dismissing a record already `replayed` or already `dismissed`.
+    Terminal and one-way by design — there is no `undismiss`, same posture `replayed` already has.
+    New `POST .../quarantined-records/[quarantinedRecordId]/dismiss` route (`ingest.write` gated,
+    same as the sibling `replay` route; 409 `invalid_state` for an already-resolved record, matching
+    this codebase's established 409 convention) and a new `DismissQuarantinedRecordButton` on the
+    ingest-health page's quarantine browser next to the existing Replay button, confirming before
+    submitting (`window.confirm`, same posture as `DeleteGoalButton`/`DeleteSegmentButton`) since a
+    dismissed record cannot be brought back. en/he translations. `TASKS.md` row added.
+  - Full test coverage added and run against the real local Firestore/Auth emulators (not just
+    written): `packages/firebase-orm-models` — `quarantine.emulator.test.ts` 14/14 green (5 new
+    `dismissQuarantinedRecord` cases: success + drops from list, rejects an already-replayed record,
+    rejects an already-dismissed record, cross-project isolation, unknown id) plus a new
+    `quarantined_record.dismiss` case in `audit-log.emulator.test.ts` (15/15 green); `apps/web` — a
+    new `dismiss/route.test.ts` (7/7: 401/403/404×2/200/409) and a new
+    `dismiss-quarantined-record-button.test.tsx` (3/3: confirm-declined no-op, confirm-accepted
+    POST+refresh, inline error) plus the pre-existing `replay-quarantined-record-button.test.tsx`
+    (3/3, unaffected). Full monorepo `pnpm build`/`pnpm lint`/`pnpm typecheck` green; `pnpm test`
+    green across every package (`packages/shared`, `packages/firebase-orm-models`,
+    `apps/web` unit/component/route suite, `packages/dbt-transform`) — full details in the PR body's
+    own test-plan section, including any confirmed-flake re-run this run had to spend.
+  - Self-reviewed the diff before opening the PR (correctness, missing tests, reuse/simplification)
+    per `CLAUDE.md`'s git-workflow rule; fixed what the review found before pushing.
+  - Opened **PR (branch `kan-131-quarantine-dismiss`)** against `main`. Not merged by this run —
+    per this task's own instruction, CI-watching and merge are left to the parent/next session.
+- **In progress (exact stopping point):** PR open, CI not yet observed by this run (opened at the
+  very end of the run). Next run (or the parent session) should check its CI status first before
+  anything else, same as every other open PR.
+- **Blocked + why:** nothing blocking the next code task once this PR lands — KAN-130 (PR #348) and
+  this run's own KAN-131 will both be new merged stories to check for on the next pass.
+- **Next step:** next run checks open PRs first (as always): this run's own new PR, PR #348
+  (KAN-130), and PR #347 (docs-only), merging or fixing whichever needs it; once all three are
+  settled, resume the "sweep every `done` row's own doc-comment notes for a newly-buildable
+  follow-up" pattern from **KAN-132**.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still
+    outstanding, long-standing.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin` (branch deletion has consistently failed / had no available tool from this sandbox
+    in prior runs).
+
+---
+
 ## 2026-08-28 — Campaigns & Ads pages shipped AND validated live on EasySign (Yariv's new goal, slice 1)
 
 - **Last completed:** Yariv's directive (set as a session goal): pages to view the actual ads from

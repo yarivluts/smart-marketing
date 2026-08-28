@@ -5,6 +5,7 @@ import {
   AuditLogEntryModel,
   createOrganizationWithOwner,
   createProject,
+  dismissQuarantinedRecord,
   drainPendingPipelineMessages,
   enqueueAcceptedRecordsForPipeline,
   ensureUserForFirebaseSession,
@@ -401,6 +402,24 @@ describe('audit-log wiring into mutation call sites (KAN-44)', () => {
     const replayEntry = entries.find((e) => e.action === 'quarantined_record.replay');
     expect(replayEntry?.target_id).toBe(quarantined.id);
     expect(replayEntry?.actor_id).toBe(owner.id);
+  });
+
+  it('records quarantined_record.dismiss', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Quarantine Dismiss Audit Org');
+    await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: 'e1', event: 'signup', ts: '2026-07-07T10:00:00Z' }] },
+    });
+    const [quarantined] = await listQuarantinedRecordsForProject(organization.id, project.id);
+
+    await dismissQuarantinedRecord(organization.id, project.id, quarantined.id, owner.id);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const dismissEntry = entries.find((e) => e.action === 'quarantined_record.dismiss');
+    expect(dismissEntry?.target_id).toBe(quarantined.id);
+    expect(dismissEntry?.actor_id).toBe(owner.id);
   });
 
   function alwaysFailingSink(): WarehouseSink {

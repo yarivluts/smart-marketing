@@ -6,8 +6,13 @@ import type { SchemaDefKind } from './schema-def.model';
  * `replayed`: a replay attempt (KAN-34) has resolved this record — either it was accepted into the
  * pipeline, or it turned out to be a duplicate of an already-accepted record. A replay that still
  * fails leaves the record `quarantined` (with its `reasons` refreshed), not `replayed`.
+ * `dismissed`: a deliberate "won't fix" (KAN-131) — an operator decided this record will never
+ * validate (an abandoned integration's payload, a one-off malformed test event) and isn't worth
+ * evolving the schema to accommodate, so it's discarded without ever being replayed. Same terminal,
+ * one-way posture as `replayed` — there is no `undismiss`, matching this model's own precedent that
+ * once a record leaves `quarantined` it does not come back.
  */
-export const QUARANTINED_RECORD_STATUSES = ['quarantined', 'replayed'] as const;
+export const QUARANTINED_RECORD_STATUSES = ['quarantined', 'replayed', 'dismissed'] as const;
 export type QuarantinedRecordStatus = (typeof QUARANTINED_RECORD_STATUSES)[number];
 
 /**
@@ -65,4 +70,12 @@ export class QuarantinedRecordModel extends BaseModel {
 
   @Field({ is_required: false })
   public replayed_at?: string;
+
+  /** Set together with `status: 'dismissed'` (KAN-131) — when this record was permanently discarded without replay. */
+  @Field({ is_required: false })
+  public dismissed_at?: string;
+
+  /** The user who dismissed this record (KAN-131) — kept alongside `dismissed_at` for the same audit-trail reasons `replayed_at` alone doesn't name who acted, only when. */
+  @Field({ is_required: false })
+  public dismissed_by_user_id?: string;
 }
