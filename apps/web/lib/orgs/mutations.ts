@@ -19,6 +19,10 @@ import {
   ensureAutomationTargetSeeded as ensureAutomationTargetSeededInOrganization,
   executeAutomationAction as executeAutomationActionInOrganization,
   getAutomationActionTargetId as getAutomationActionTargetIdInOrganization,
+  importExternalCampaignSnapshots as importExternalCampaignSnapshotsInOrganization,
+  refreshAutomationTargetState as refreshAutomationTargetStateInOrganization,
+  type ExternalCampaignSnapshotInput,
+  type ImportExternalCampaignSnapshotsResult,
   proposeAdEditAction as proposeAdEditActionInOrganization,
   proposeAutomationBudgetChangeAction as proposeAutomationBudgetChangeActionInOrganization,
   proposeCampaignActivationAction as proposeCampaignActivationActionInOrganization,
@@ -1806,6 +1810,31 @@ export async function executeAutomationAction(
   const targetId = await getAutomationActionTargetIdInOrganization(organizationId, projectId, actionId);
   const executor = await resolveAutomationActionExecutorForTargetInOrganization(organizationId, projectId, targetId, kms);
   return executeAutomationActionInOrganization({ organizationId, projectId, actionId, executedByUserId, executor });
+}
+
+/** The read seam's mutation wrapper — same caller-resolves-the-executor split as {@link executeAutomationAction} (the service stays provider-agnostic; only the resolver knows Google Ads/Meta exist). */
+export async function refreshAutomationTargetState(
+  organizationId: string,
+  projectId: string,
+  targetId: string,
+  refreshedByUserId: string,
+  kms?: KmsProvider,
+): Promise<AutomationTargetStateModel> {
+  await ensureFirestoreOrm();
+  const executor = await resolveAutomationActionExecutorForTargetInOrganization(organizationId, projectId, targetId, kms);
+  return refreshAutomationTargetStateInOrganization({ organizationId, projectId, targetId, executor, refreshedByUserId });
+}
+
+/** Campaign discovery/sync (see `importExternalCampaignSnapshots`'s own doc comment) — upserts one target row per observed live campaign, pure observation. */
+export async function importExternalCampaignSnapshots(
+  organizationId: string,
+  projectId: string,
+  environmentId: string,
+  snapshots: ExternalCampaignSnapshotInput[],
+  importedByUserId: string,
+): Promise<ImportExternalCampaignSnapshotsResult> {
+  await ensureFirestoreOrm();
+  return importExternalCampaignSnapshotsInOrganization({ organizationId, projectId, environmentId, snapshots, importedByUserId });
 }
 
 interface VerifyAutomationActionInput {

@@ -30,8 +30,23 @@ export interface MetaCampaignDraftView {
 
 export type CampaignDraftView = GoogleAdsCampaignDraftView | MetaCampaignDraftView;
 
+/** One ad exactly as the ad platform reported it at import/sync time — mirrors the server's `ImportedAdSnapshot` (same client-boundary reasoning as the draft views above). */
+export interface ImportedAdView {
+  adSetName?: string;
+  adName: string;
+  status?: string;
+  headline?: string;
+  primaryText?: string;
+  description?: string;
+  linkUrl?: string;
+  imageUrl?: string;
+  callToActionType?: string;
+}
+
 export interface CampaignCreativesPanelProps {
   draft: CampaignDraftView | undefined;
+  /** The platform-reported ads of an imported/synced campaign — when present, rendered INSTEAD of `draft` (an imported campaign has no draft; the snapshot is the platform's own truth). */
+  importedAds?: ImportedAdView[];
 }
 
 /**
@@ -42,8 +57,64 @@ export interface CampaignCreativesPanelProps {
  * URL/keywords); Meta ad sets carry a single link-ad creative + audience
  * targeting.
  */
-export function CampaignCreativesPanel({ draft }: CampaignCreativesPanelProps): React.ReactElement {
+export function CampaignCreativesPanel({ draft, importedAds }: CampaignCreativesPanelProps): React.ReactElement {
   const t = useTranslations('Campaigns');
+
+  if (importedAds && importedAds.length > 0) {
+    return (
+      <ul className="flex flex-col gap-3">
+        {importedAds.map((ad, index) => (
+          <li key={`${index}-${ad.adName}`} className="flex flex-col gap-2 rounded-md border border-input p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium" dir="auto">
+                {ad.adName}
+              </span>
+              <span className="flex items-center gap-2">
+                {ad.adSetName ? (
+                  <span className="text-xs text-muted-foreground" dir="auto">
+                    {ad.adSetName}
+                  </span>
+                ) : null}
+                {ad.status ? (
+                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                    {ad.status}
+                  </span>
+                ) : null}
+              </span>
+            </div>
+            <div className="flex gap-3 rounded-md bg-muted/40 p-3">
+              {ad.imageUrl ? (
+                <img src={ad.imageUrl} alt={ad.headline ?? ad.adName} className="h-24 w-24 shrink-0 rounded border object-cover" />
+              ) : null}
+              <div className="flex min-w-0 flex-col gap-1">
+                {ad.headline ? (
+                  <span className="font-medium" dir="auto">
+                    {ad.headline}
+                  </span>
+                ) : null}
+                {ad.primaryText ? <span dir="auto">{ad.primaryText}</span> : null}
+                {ad.description ? (
+                  <span className="text-muted-foreground" dir="auto">
+                    {ad.description}
+                  </span>
+                ) : null}
+                {ad.linkUrl ? (
+                  <span className="truncate text-xs text-muted-foreground" dir="ltr">
+                    {ad.linkUrl}
+                  </span>
+                ) : null}
+                {ad.callToActionType ? (
+                  <span className="text-xs text-muted-foreground" dir="ltr">
+                    {t('importedAdCta', { cta: ad.callToActionType })}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   if (!draft) {
     return <p className="text-sm text-muted-foreground">{t('noCreativesYet')}</p>;

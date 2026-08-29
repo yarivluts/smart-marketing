@@ -50,10 +50,41 @@ const metaDraft: CampaignDraftView = {
   ],
 };
 
+const importedAds = [
+  {
+    adSetName: 'Ad Set A',
+    adName: 'lawyers | va | image ad',
+    status: 'PAUSED',
+    headline: 'Sign In Minutes',
+    primaryText: 'Contracts signed from the phone in the same call.',
+    linkUrl: 'https://easysign.example.com/lawyers',
+    imageUrl: 'https://cdn.example.com/ad.png',
+    callToActionType: 'SIGN_UP',
+  },
+];
+
 describe('CampaignCreativesPanel', () => {
   it('shows the no-draft empty state when the target has no campaign draft', () => {
     renderPanel(undefined);
     expect(screen.getByText('No campaign draft exists for this target yet - create one from the campaigns page.')).toBeInTheDocument();
+  });
+
+  it('renders imported platform ads (image, headline, primary text, link, CTA, status) and prefers them over a draft', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <CampaignCreativesPanel draft={googleDraft} importedAds={importedAds} />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText('lawyers | va | image ad')).toBeInTheDocument();
+    expect(screen.getByText('Ad Set A')).toBeInTheDocument();
+    expect(screen.getByText('PAUSED')).toBeInTheDocument();
+    expect(screen.getByText('Sign In Minutes')).toBeInTheDocument();
+    expect(screen.getByText('Contracts signed from the phone in the same call.')).toBeInTheDocument();
+    expect(screen.getByText('https://easysign.example.com/lawyers')).toBeInTheDocument();
+    expect(screen.getByText('CTA: SIGN_UP')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Sign In Minutes' })).toHaveAttribute('src', 'https://cdn.example.com/ad.png');
+    // The imported snapshot IS the platform's truth for this campaign — the draft is not rendered alongside it.
+    expect(screen.queryByText('Sign Anywhere')).not.toBeInTheDocument();
   });
 
   it('renders a Google draft as ad groups with RSA headlines, descriptions, final URL, and keywords', () => {

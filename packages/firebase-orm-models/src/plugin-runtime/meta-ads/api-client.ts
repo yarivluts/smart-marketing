@@ -108,6 +108,13 @@ export interface MetaGetAdResult {
   creativeId: string;
 }
 
+/** A campaign's own live status + daily budget as Meta reports them (the `readCampaignState` seam, KAN-43 groundwork) — `dailyBudgetCents` is `null` for a campaign with no campaign-level budget (its ad sets carry their own instead). */
+export interface MetaCampaignStateResult {
+  campaignId: string;
+  status: MetaObjectStatus;
+  dailyBudgetCents: number | null;
+}
+
 export interface MetaUpdateAdParams {
   creativeId: string;
 }
@@ -224,6 +231,15 @@ export interface MetaAdsApiClient {
    * to a real campaign.
    */
   getCampaign(campaignId: string): Promise<{ campaignId: string }>;
+  /**
+   * Reads a campaign's own live status + daily budget (the
+   * `readCampaignState` seam, KAN-43 groundwork) — the campaign-level sibling
+   * of {@link getAdSet}'s own live read, kept separate from
+   * {@link getCampaign} (a pure existence check whose narrow result shape
+   * `budget_change` execution already depends on). Throws `MetaAdsApiError`
+   * if `campaignId` doesn't resolve to a real campaign.
+   */
+  getCampaignState(campaignId: string): Promise<MetaCampaignStateResult>;
   /**
    * Reads an ad set's own live daily budget/status/targeting spec (KAN-73
    * follow-up: post-creation ad-set edits, and the later "ad-set
@@ -456,6 +472,17 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
   async getCampaign(campaignId: string): Promise<{ campaignId: string }> {
     const result = await this.getRequest<{ id: string }>(campaignId, { fields: 'id' });
     return { campaignId: result.id };
+  }
+
+  async getCampaignState(campaignId: string): Promise<MetaCampaignStateResult> {
+    const result = await this.getRequest<{ id: string; status: MetaObjectStatus; daily_budget?: string }>(campaignId, {
+      fields: 'id,status,daily_budget',
+    });
+    return {
+      campaignId: result.id,
+      status: result.status,
+      dailyBudgetCents: result.daily_budget !== undefined ? Number(result.daily_budget) : null,
+    };
   }
 
   async getAdSet(adSetId: string): Promise<MetaGetAdSetResult> {

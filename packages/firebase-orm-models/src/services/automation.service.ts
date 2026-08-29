@@ -1,6 +1,12 @@
 import { evaluateBudgetChangeGuardrails, evaluateCampaignActivationGuardrails, evaluateCampaignCreationGuardrails, type GuardrailViolation } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
-import { AutomationTargetStateModel } from '../models/automation-target-state.model';
+import {
+  AutomationTargetStateModel,
+  CAMPAIGN_STATUSES,
+  EXTERNAL_AD_PLATFORMS,
+  type CampaignStatus,
+  type ExternalAdPlatform,
+} from '../models/automation-target-state.model';
 import { AutomationActionModel, type AutomationActionStatus, type AutomationActionType } from '../models/automation-action.model';
 import { ResourceAttachmentModel, type ConnectionWriteTier } from '../models/resource-attachment.model';
 import { ProjectNotFoundError } from './resource-library.service';
@@ -1709,4 +1715,229 @@ export async function listAutomationActionsForTarget(
     .orderBy('proposed_at', 'desc')
     .limit(limit)
     .get();
+}
+
+export interface RefreshAutomationTargetStateParams {
+  organizationId: string;
+  projectId: string;
+  targetId: string;
+  /** The provider-resolved executor (see `resolveAutomationActionExecutorForTarget`) — defaults to the simulated one, same fallback every execute path takes. */
+  executor?: AutomationActionExecutor;
+  refreshedByUserId: string;
+}
+
+/**
+ * The read seam's service verb (KAN-43 groundwork): asks the target's own
+ * executor to read the campaign's state as the ad platform reports it right
+ * now — the executor itself persists what it read (`campaign_status`,
+ * `daily_budget_usd`, `last_read_state_at`; see
+ * `AutomationActionExecutor.readCampaignState`'s own doc comment for why
+ * this is the one executor write that needs no approved action) — and
+ * returns the refreshed target row.
+ */
+export async function refreshAutomationTargetState(params: RefreshAutomationTargetStateParams): Promise<AutomationTargetStateModel> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const target = await AutomationTargetStateModel.init(params.targetId, {
+    organization_id: params.organizationId,
+    project_id: params.projectId,
+  });
+  if (!target || target.project_id !== params.projectId) {
+    throw new AutomationTargetNotFoundError(params.targetId);
+  }
+
+  const executor = params.executor ?? defaultAutomationActionExecutor;
+  await executor.readCampaignState({
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    environmentId: target.environment_id,
+    targetId: params.targetId,
+  });
+
+  const refreshed = await AutomationTargetStateModel.init(params.targetId, {
+    organization_id: params.organizationId,
+    project_id: params.projectId,
+  });
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: target.environment_id,
+      actorType: 'user',
+      actorId: params.refreshedByUserId,
+      action: 'automation_target.refresh_state',
+      targetType: 'automation_target',
+      targetId: params.targetId,
+      summary: `Refreshed live platform state for automation target "${target.label}"`,
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return refreshed ?? target;
+}
+
+/** One ad exactly as the ad platform reported it at import/sync time — stored verbatim (JSON, see `AutomationTargetStateModel.imported_ads_json`) and rendered by the campaign detail page's creatives panel for a campaign GrowthOS didn't create. All content fields optional: a platform report can omit any of them. */
+export interface ImportedAdSnapshot {
+  adSetName?: string;
+  adName: string;
+  /** The platform's own status vocabulary as observed (e.g. Meta's `PAUSED`) — displayed verbatim, never interpreted. */
+  status?: string;
+  headline?: string;
+  primaryText?: string;
+  description?: string;
+  linkUrl?: string;
+  imageUrl?: string;
+  callToActionType?: string;
+}
+
+/** One live campaign as observed on a real ad platform, for import/sync into a target row (`importExternalCampaignSnapshots`). */
+export interface ExternalCampaignSnapshotInput {
+  /** The platform's own campaign id/resource name — becomes `campaign_resource_name` verbatim (the target's document id is a sanitized derivation of it). */
+  externalCampaignId: string;
+  platform: ExternalAdPlatform;
+  name: string;
+  status: CampaignStatus;
+  dailyBudgetUsd: number;
+  objective?: string;
+  ads: ImportedAdSnapshot[];
+}
+
+export interface ImportExternalCampaignSnapshotsParams {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  snapshots: ExternalCampaignSnapshotInput[];
+  importedByUserId: string;
+}
+
+export interface ImportExternalCampaignSnapshotsResult {
+  created: number;
+  updated: number;
+  targetIds: string[];
+}
+
+/** Bounds one import call (and thereby each target's `imported_ads_json` size — see that field's own doc comment). */
+const MAX_IMPORT_SNAPSHOTS = 100;
+const MAX_IMPORT_ADS_PER_CAMPAIGN = 50;
+const MAX_IMPORT_STRING_LENGTH = 2000;
+
+function validateImportString(value: unknown, field: string, required: boolean): void {
+  if (value === undefined) {
+    if (required) {
+      throw new InvalidAutomationActionError(`${field} is required`);
+    }
+    return;
+  }
+  if (typeof value !== 'string' || (required && value.trim().length === 0) || value.length > MAX_IMPORT_STRING_LENGTH) {
+    throw new InvalidAutomationActionError(`${field} must be a non-empty string of at most ${MAX_IMPORT_STRING_LENGTH} characters`);
+  }
+}
+
+/** A target document id derived from a platform campaign id — Firestore document ids cannot contain `/` (present in every Google Ads resource name), so anything outside a safe charset collapses to `_`. The raw external id is preserved verbatim in `campaign_resource_name`. */
+function importedTargetId(platform: ExternalAdPlatform, externalCampaignId: string): string {
+  return `${platform}_${externalCampaignId.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+}
+
+/**
+ * Campaign discovery/sync (the read-direction sibling of the propose->approve->
+ * execute write path): upserts one target row per observed live campaign,
+ * recording the platform's own state (`campaign_status`, budget, ads
+ * snapshot) with `last_read_state_at` — never proposing or executing
+ * anything. Until KAN-43 lets the app's own executors pull this (see
+ * `AutomationActionExecutor.readCampaignState`), the observations arrive
+ * pushed from a connector/agent that CAN read the platform; either way the
+ * write is pure observation, the same legality reasoning as the read seam's.
+ */
+export async function importExternalCampaignSnapshots(
+  params: ImportExternalCampaignSnapshotsParams,
+): Promise<ImportExternalCampaignSnapshotsResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  if (!Array.isArray(params.snapshots) || params.snapshots.length === 0 || params.snapshots.length > MAX_IMPORT_SNAPSHOTS) {
+    throw new InvalidAutomationActionError(`snapshots must be a non-empty array of at most ${MAX_IMPORT_SNAPSHOTS} campaigns`);
+  }
+  for (const snapshot of params.snapshots) {
+    validateImportString(snapshot.externalCampaignId, 'externalCampaignId', true);
+    validateImportString(snapshot.name, 'name', true);
+    validateImportString(snapshot.objective, 'objective', false);
+    if (!EXTERNAL_AD_PLATFORMS.includes(snapshot.platform)) {
+      throw new InvalidAutomationActionError(`platform must be one of: ${EXTERNAL_AD_PLATFORMS.join(', ')}`);
+    }
+    if (!CAMPAIGN_STATUSES.includes(snapshot.status)) {
+      throw new InvalidAutomationActionError(`status must be one of: ${CAMPAIGN_STATUSES.join(', ')}`);
+    }
+    if (!Number.isFinite(snapshot.dailyBudgetUsd) || snapshot.dailyBudgetUsd < 0) {
+      throw new InvalidAutomationActionError('dailyBudgetUsd must be a non-negative number');
+    }
+    if (!Array.isArray(snapshot.ads) || snapshot.ads.length > MAX_IMPORT_ADS_PER_CAMPAIGN) {
+      throw new InvalidAutomationActionError(`ads must be an array of at most ${MAX_IMPORT_ADS_PER_CAMPAIGN} ads`);
+    }
+    for (const ad of snapshot.ads) {
+      validateImportString(ad.adName, 'ads[].adName', true);
+      validateImportString(ad.adSetName, 'ads[].adSetName', false);
+      validateImportString(ad.status, 'ads[].status', false);
+      validateImportString(ad.headline, 'ads[].headline', false);
+      validateImportString(ad.primaryText, 'ads[].primaryText', false);
+      validateImportString(ad.description, 'ads[].description', false);
+      validateImportString(ad.linkUrl, 'ads[].linkUrl', false);
+      validateImportString(ad.imageUrl, 'ads[].imageUrl', false);
+      validateImportString(ad.callToActionType, 'ads[].callToActionType', false);
+    }
+  }
+
+  const now = new Date().toISOString();
+  let created = 0;
+  let updated = 0;
+  const targetIds: string[] = [];
+  for (const snapshot of params.snapshots) {
+    const targetId = importedTargetId(snapshot.platform, snapshot.externalCampaignId);
+    targetIds.push(targetId);
+    const existing = await AutomationTargetStateModel.init(targetId, {
+      organization_id: params.organizationId,
+      project_id: params.projectId,
+    });
+    const target = existing && existing.project_id === params.projectId ? existing : new AutomationTargetStateModel();
+    const isNew = target !== existing;
+    if (isNew) {
+      target.organization_id = params.organizationId;
+      target.project_id = params.projectId;
+      target.environment_id = params.environmentId;
+      target.target_type = 'campaign';
+      target.seeded_at = now;
+      target.updated_at = now;
+      target.seeded_by_user_id = params.importedByUserId;
+      target.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
+    }
+    target.label = snapshot.name;
+    target.daily_budget_usd = snapshot.dailyBudgetUsd;
+    target.campaign_resource_name = snapshot.externalCampaignId;
+    target.campaign_status = snapshot.status;
+    target.external_platform = snapshot.platform;
+    target.imported_ads_json = JSON.stringify({ objective: snapshot.objective, ads: snapshot.ads });
+    target.last_read_state_at = now;
+    await target.save(isNew ? targetId : undefined);
+    if (isNew) {
+      created += 1;
+    } else {
+      updated += 1;
+    }
+  }
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      environmentId: params.environmentId,
+      actorType: 'user',
+      actorId: params.importedByUserId,
+      action: 'automation_target.import_snapshots',
+      targetType: 'automation_target',
+      targetId: targetIds[0] ?? 'none',
+      summary: `Imported ${params.snapshots.length} live campaign snapshot(s) from the ad platform (${created} new, ${updated} updated)`,
+    });
+  } catch {
+    // Best-effort — see recordAuditLogEntry's own doc comment.
+  }
+
+  return { created, updated, targetIds };
 }

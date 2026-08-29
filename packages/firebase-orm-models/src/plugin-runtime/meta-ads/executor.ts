@@ -9,6 +9,8 @@ import {
   type AutomationBudgetChangeExecutionInput,
   type AutomationBudgetChangeExecutionResult,
   type AutomationCampaignActivationExecutionInput,
+  type AutomationCampaignStateReadInput,
+  type AutomationCampaignStateReadResult,
   type AutomationCampaignDraftCreateExecutionInput,
   type AutomationCampaignDraftCreateExecutionResult,
   type AutomationCampaignDraftRollbackInput,
@@ -474,5 +476,30 @@ export class MetaAutomationActionExecutor implements AutomationActionExecutor {
     await this.apiClient.updateAd(input.adResourceName, { creativeId: input.previousCreativeResourceName });
     target.updated_at = new Date().toISOString();
     await target.save();
+  }
+
+  /**
+   * The read seam (KAN-43 groundwork) — one live Graph API read of the
+   * campaign's own status + daily budget, persisted onto the target row with
+   * `last_read_state_at` (see the interface method's own doc comment). Uses
+   * the same `campaign_resource_name ?? target.id` fallback as
+   * `resolveCampaignBudgetResourceName` for a target seeded to represent a
+   * pre-existing campaign this plugin didn't create. Meta's `DELETED` maps to
+   * `removed` — see {@link MetaObjectStatus}'s own doc comment.
+   */
+  async readCampaignState(input: AutomationCampaignStateReadInput): Promise<AutomationCampaignStateReadResult> {
+    const target = await loadTarget(input);
+    const campaignResourceName = target.campaign_resource_name ?? target.id;
+    const state = await this.apiClient.getCampaignState(campaignResourceName);
+    const statusMap = { ACTIVE: 'enabled', PAUSED: 'paused', DELETED: 'removed' } as const;
+    const dailyBudgetUsd = state.dailyBudgetCents !== null ? state.dailyBudgetCents / 100 : null;
+    target.campaign_resource_name = campaignResourceName;
+    target.campaign_status = statusMap[state.status];
+    if (dailyBudgetUsd !== null) {
+      target.daily_budget_usd = dailyBudgetUsd;
+    }
+    target.last_read_state_at = new Date().toISOString();
+    await target.save();
+    return { campaignStatus: target.campaign_status, dailyBudgetUsd };
   }
 }

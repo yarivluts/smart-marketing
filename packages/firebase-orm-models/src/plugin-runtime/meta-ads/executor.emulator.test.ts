@@ -48,6 +48,7 @@ function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiCli
     setDailyBudgetCents: vi.fn().mockResolvedValue(undefined),
     setObjectStatus: vi.fn().mockResolvedValue(undefined),
     getCampaign: vi.fn().mockRejectedValue(new MetaAdsApiError('No campaign found.', 404)),
+    getCampaignState: vi.fn().mockResolvedValue({ campaignId: 'campaign-1', status: 'PAUSED', dailyBudgetCents: 2500 }),
     getAdSet: vi
       .fn()
       .mockResolvedValue({ adSetId: 'adset-1', dailyBudgetCents: 2500, status: 'ACTIVE', targeting: { countries: ['US'], ageMin: 18, ageMax: 45 } }),
@@ -229,6 +230,39 @@ describe('MetaAutomationActionExecutor', () => {
     expect(apiClient.setObjectStatus).toHaveBeenCalledWith('campaign-1', 'DELETED');
     const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
     expect(reloaded.campaign_status).toBe('removed');
+  });
+
+  it('readCampaignState: reads live status + budget from the Graph API, persists them with last_read_state_at', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Meta Executor Read State Org');
+    const target = await ensureAutomationTargetSeeded({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: unique('campaign'),
+      targetType: 'campaign',
+      label: 'Read State Target',
+      initialDailyBudgetUsd: 0,
+      seededByUserId: owner.id,
+    });
+    const apiClient = fakeApiClient({
+      getCampaignState: vi.fn().mockResolvedValue({ campaignId: target.id, status: 'ACTIVE', dailyBudgetCents: 350 }),
+    });
+    const executor = new MetaAutomationActionExecutor(apiClient, '999', 'page-1');
+
+    const result = await executor.readCampaignState({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: 'live',
+      targetId: target.id,
+    });
+
+    expect(result).toEqual({ campaignStatus: 'enabled', dailyBudgetUsd: 3.5 });
+    // No `campaign_resource_name` was recorded, so the read falls back to the target id itself.
+    expect(apiClient.getCampaignState).toHaveBeenCalledWith(target.id);
+    const [reloaded] = await listAutomationTargetStatesForProject(organization.id, project.id);
+    expect(reloaded.campaign_status).toBe('enabled');
+    expect(reloaded.daily_budget_usd).toBe(3.5);
+    expect(reloaded.last_read_state_at).toEqual(expect.any(String));
   });
 
   it('activates and rolls back activation', async () => {

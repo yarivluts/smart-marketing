@@ -12,6 +12,12 @@ export class GoogleAdsApiError extends Error {
 
 export type GoogleAdsCampaignStatus = 'PAUSED' | 'ENABLED' | 'REMOVED';
 
+/** A campaign's own live status + daily budget as one GAQL read reports them (the `readCampaignState` seam, KAN-43 groundwork) — `dailyBudgetUsd` is `null` when the campaign row carries no readable budget amount. */
+export interface GoogleAdsCampaignStateResult {
+  status: GoogleAdsCampaignStatus;
+  dailyBudgetUsd: number | null;
+}
+
 export interface GoogleAdsApiClientOptions {
   developerToken: string;
   clientId: string;
@@ -113,6 +119,15 @@ export interface GoogleAdsApiClient {
    * campaign.
    */
   lookupCampaignBudgetResourceName(customerId: string, campaignResourceName: string): Promise<string>;
+  /**
+   * Reads a campaign's own live status + daily budget via GAQL (the
+   * `readCampaignState` read seam, KAN-43 groundwork) — the same
+   * `googleAds:search` call shape as {@link lookupCampaignBudgetResourceName},
+   * selecting `campaign.status` and `campaign_budget.amount_micros` instead.
+   * Throws `GoogleAdsApiError` if `campaignResourceName` doesn't resolve to a
+   * real campaign.
+   */
+  lookupCampaignState(customerId: string, campaignResourceName: string): Promise<GoogleAdsCampaignStateResult>;
   /**
    * Creates a CRM-based (Customer Match) `UserList` on the given customer —
    * used by `GoogleCustomerMatchSinkPluginExecutor` (KAN-72 follow-up,
@@ -356,6 +371,36 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
       throw new GoogleAdsApiError(`No Google Ads campaign found for resource name "${campaignResourceName}".`, 404);
     }
     return budgetResourceName;
+  }
+
+  async lookupCampaignState(customerId: string, campaignResourceName: string): Promise<GoogleAdsCampaignStateResult> {
+    const accessToken = await this.getAccessToken();
+    // Same caller-supplied-id escaping reasoning as `lookupCampaignBudgetResourceName` above.
+    const escapedCampaignResourceName = campaignResourceName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const query = `SELECT campaign.status, campaign_budget.amount_micros FROM campaign WHERE campaign.resource_name = '${escapedCampaignResourceName}'`;
+    const response = await fetch(`${GOOGLE_ADS_API_BASE_URL}/customers/${customerId}/googleAds:search`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'developer-token': this.options.developerToken,
+        ...(this.options.loginCustomerId ? { 'login-customer-id': this.options.loginCustomerId } : {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new GoogleAdsApiError(`Google Ads API search for campaign "${campaignResourceName}" failed with status ${response.status}: ${detail}`, response.status);
+    }
+    const body = (await response.json()) as {
+      results?: Array<{ campaign?: { status?: GoogleAdsCampaignStatus }; campaignBudget?: { amountMicros?: string } }>;
+    };
+    const status = body.results?.[0]?.campaign?.status;
+    if (!status) {
+      throw new GoogleAdsApiError(`No Google Ads campaign found for resource name "${campaignResourceName}".`, 404);
+    }
+    const amountMicros = body.results?.[0]?.campaignBudget?.amountMicros;
+    return { status, dailyBudgetUsd: amountMicros !== undefined ? Number(amountMicros) / 1_000_000 : null };
   }
 
   /**

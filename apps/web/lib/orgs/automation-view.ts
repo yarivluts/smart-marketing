@@ -7,6 +7,8 @@ import type {
   AutomationTargetStateModel,
   CampaignStatus,
   ConnectionWriteTier,
+  ExternalAdPlatform,
+  ImportedAdSnapshot,
   GuardrailViolationType,
   CredentialProvider,
   ResourceAttachmentModel,
@@ -52,6 +54,14 @@ export interface AutomationTargetView {
   campaignStatus?: CampaignStatus;
   /** Last time an executed action touched this target's state — the campaign pages' "last known state as of" stamp. */
   updatedAt?: string;
+  /** Last time the state was recorded as the ad platform itself reported it (a `readCampaignState` refresh or a campaign import/sync) — when present, the campaign pages show "synced from the platform" instead of the executed-actions stand-in note. */
+  lastReadStateAt?: string;
+  /** The real ad platform an imported/synced campaign lives on — the platform badge prefers this over the linked connection's provider (an imported campaign has no connection yet). */
+  externalPlatform?: ExternalAdPlatform;
+  /** The campaign's own ads exactly as the platform reported them at import/sync time — parsed from `imported_ads_json`; absent (not empty) when the target was never imported. */
+  importedAds?: ImportedAdView[];
+  /** The platform's own campaign objective as observed at import/sync time (e.g. Meta's `OUTCOME_LEADS`). */
+  importedObjective?: string;
   adGroupResourceNames?: string[];
   /** Same order as {@link adGroupResourceNames} — `adResourceNames[i]` is the current RSA for `adGroupResourceNames[i]`. See `AutomationTargetStateModel.ad_resource_names`'s own doc comment. */
   adResourceNames?: string[];
@@ -60,8 +70,56 @@ export interface AutomationTargetView {
   metaAdResourceNames?: string[];
 }
 
+/** One imported ad as the campaign detail page renders it — a plain serializable mirror of the service layer's `ImportedAdSnapshot` (client components can only receive plain data across the RSC boundary, same reasoning as `AutomationGuardrailPolicyView`). */
+export type ImportedAdView = ImportedAdSnapshot;
+
+/**
+ * Parses a target's `imported_ads_json` (written only by
+ * `importExternalCampaignSnapshots`, so the shape is trusted — but a
+ * malformed document degrades to "no imported ads" rather than crashing the
+ * page, same defensive posture as `formatDiffValue`'s own unknown-shape
+ * branches).
+ */
+function parseImportedAds(raw: string | undefined): { ads?: ImportedAdView[]; objective?: string } {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw) as { ads?: unknown; objective?: unknown };
+    const ads = Array.isArray(parsed.ads) ? (parsed.ads as ImportedAdView[]) : undefined;
+    const objective = typeof parsed.objective === 'string' ? parsed.objective : undefined;
+    return { ...(ads !== undefined ? { ads } : {}), ...(objective !== undefined ? { objective } : {}) };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * `updated_at` is one of @arbel/firebase-orm's reserved `BaseModel` fields:
+ * every `.save()` overwrites it with `Date.getTime()` (a number), regardless
+ * of the ISO string the service assigned — so a target row read back carries
+ * an epoch number there while the fields this codebase owns outright (e.g.
+ * `last_read_state_at`) keep their ISO string. Normalizing here keeps the
+ * pages from rendering a raw epoch at the reader.
+ */
+function toIsoTimestamp(value: string | number | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value === 'number') {
+    return new Date(value).toISOString();
+  }
+  const asNumber = Number(value);
+  return Number.isFinite(asNumber) && value.trim() !== '' && !value.includes('-') ? new Date(asNumber).toISOString() : value;
+}
+
 export function toAutomationTargetView(target: AutomationTargetStateModel): AutomationTargetView {
+  const imported = parseImportedAds(target.imported_ads_json);
   return {
+    ...(imported.ads !== undefined ? { importedAds: imported.ads } : {}),
+    ...(imported.objective !== undefined ? { importedObjective: imported.objective } : {}),
+    ...(target.last_read_state_at !== undefined ? { lastReadStateAt: toIsoTimestamp(target.last_read_state_at) } : {}),
+    ...(target.external_platform !== undefined ? { externalPlatform: target.external_platform } : {}),
     id: target.id,
     targetType: target.target_type,
     label: target.label,
@@ -71,7 +129,7 @@ export function toAutomationTargetView(target: AutomationTargetStateModel): Auto
     ...(target.campaign_resource_name !== undefined ? { campaignResourceName: target.campaign_resource_name } : {}),
     ...(target.campaign_budget_resource_name !== undefined ? { campaignBudgetResourceName: target.campaign_budget_resource_name } : {}),
     ...(target.campaign_status !== undefined ? { campaignStatus: target.campaign_status } : {}),
-    ...(target.updated_at !== undefined ? { updatedAt: target.updated_at } : {}),
+    ...(target.updated_at !== undefined ? { updatedAt: toIsoTimestamp(target.updated_at) } : {}),
     ...(target.ad_group_resource_names !== undefined ? { adGroupResourceNames: target.ad_group_resource_names } : {}),
     ...(target.ad_resource_names !== undefined ? { adResourceNames: target.ad_resource_names } : {}),
     ...(target.meta_ad_set_resource_names !== undefined ? { metaAdSetResourceNames: target.meta_ad_set_resource_names } : {}),

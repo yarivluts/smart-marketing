@@ -11,6 +11,7 @@ import {
   listAutomationTargetStatesForProject,
   listOrgProjects,
   listSharedCredentials,
+  queryCampaignSpend,
 } from '@/lib/orgs/queries';
 import {
   findCampaignDraftForTarget,
@@ -18,9 +19,11 @@ import {
   toAutomationConnectionOptions,
   toAutomationTargetView,
 } from '@/lib/orgs/automation-view';
-import { CampaignCreativesPanel, type CampaignDraftView } from '@/components/orgs/campaign-creatives-panel';
+import { CampaignCreativesPanel, type CampaignDraftView, type ImportedAdView } from '@/components/orgs/campaign-creatives-panel';
+import { CampaignSpendPanel } from '@/components/orgs/campaign-spend-panel';
 import { AutomationActivateCampaignButton } from '@/components/orgs/automation-activate-campaign-button';
 import { PauseCampaignButton } from '@/components/orgs/pause-campaign-button';
+import { RefreshCampaignStateButton } from '@/components/orgs/refresh-campaign-state-button';
 import { AutomationActionList } from '@/components/orgs/automation-action-list';
 
 type PageProps = Readonly<{
@@ -87,6 +90,20 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
   const executedActivation = targetActions.find(
     (action) => action.action_type === 'campaign_activation' && action.status === 'executed',
   );
+  // Same `campaign_resource_name ?? id` fallback the executors apply for a target seeded to
+  // represent a pre-existing campaign — the spend rows' `campaign_id` dimension carries the
+  // platform's own campaign id either way.
+  const spendOutcome = await queryCampaignSpend(orgId, projectId, target.campaignResourceName ?? target.id);
+  const spendView = spendOutcome.ok
+    ? {
+        ok: true as const,
+        totalSpendUsd: spendOutcome.totalSpendUsd,
+        days: spendOutcome.series.map((row) => ({
+          date: String(row.bucket_date ?? ''),
+          spendUsd: typeof row.ad_spend === 'number' ? row.ad_spend : Number(row.ad_spend ?? 0),
+        })),
+      }
+    : spendOutcome;
 
   const t = await getTranslations('Campaigns');
 
@@ -103,8 +120,18 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
         <div className="flex flex-wrap gap-x-8 gap-y-2">
           <span>
             <span className="text-muted-foreground">{t('platformLabel')}{': '}</span>
-            {connection?.provider ? t(`platform.${connection.provider}`) : t('platform.simulated')}
+            {target.externalPlatform
+              ? t(`platform.${target.externalPlatform}`)
+              : connection?.provider
+                ? t(`platform.${connection.provider}`)
+                : t('platform.simulated')}
           </span>
+          {target.importedObjective ? (
+            <span>
+              <span className="text-muted-foreground">{t('objectiveLabel')}{': '}</span>
+              <span dir="ltr">{target.importedObjective}</span>
+            </span>
+          ) : null}
           <span>
             <span className="text-muted-foreground">{t('statusLabel')}{': '}</span>
             {target.campaignStatus ? t(`status.${target.campaignStatus}`) : t('status.none')}
@@ -126,10 +153,15 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
           </span>
         ) : null}
         {target.updatedAt ? <span className="text-xs text-muted-foreground">{t('lastKnownStateAt', { at: target.updatedAt })}</span> : null}
-        {/* Honest stand-in label, matching the codebase's convention for its
-          buildable-today seams: until a real ad-platform read lands (KAN-43),
-          this state reflects executed GrowthOS actions, not a platform pull. */}
-        <span className="text-xs text-muted-foreground">{t('stateSourceNote')}</span>
+        {/* When a platform read/sync has recorded state (`last_read_state_at`),
+          say so with its timestamp; otherwise keep the honest stand-in label —
+          until a real ad-platform read lands for THIS target (KAN-43), state
+          reflects executed GrowthOS actions, not a platform pull. */}
+        {target.lastReadStateAt ? (
+          <span className="text-xs text-muted-foreground">{t('lastPlatformReadAt', { at: target.lastReadStateAt })}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">{t('stateSourceNote')}</span>
+        )}
         <div className="flex gap-2 pt-2">
           {target.campaignResourceName && target.campaignStatus === 'paused' ? (
             <AutomationActivateCampaignButton orgId={orgId} projectId={projectId} targetId={target.id} />
@@ -137,12 +169,18 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
           {target.campaignStatus === 'enabled' && executedActivation ? (
             <PauseCampaignButton orgId={orgId} projectId={projectId} activationActionId={executedActivation.id} />
           ) : null}
+          <RefreshCampaignStateButton orgId={orgId} projectId={projectId} targetId={target.id} />
         </div>
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('creativesHeading')}</h2>
-        <CampaignCreativesPanel draft={draft} />
+        <CampaignCreativesPanel draft={draft} importedAds={target.importedAds as ImportedAdView[] | undefined} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">{t('spendHeading')}</h2>
+        <CampaignSpendPanel spend={spendView} />
       </section>
 
       <section className="flex flex-col gap-3">

@@ -82,7 +82,6 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
   const draftlessTargets = targetViews.filter((target) => !target.campaignResourceName);
 
   const t = await getTranslations('Campaigns');
-  const tAutomation = await getTranslations('Automation');
 
   return (
     <main className="container mx-auto flex max-w-5xl flex-col gap-8 py-16">
@@ -109,7 +108,11 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
                     <span className="flex items-center gap-2">
                       <span className="font-medium">{target.label}</span>
                       <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                        {connection?.provider ? t(`platform.${connection.provider}`) : t('platform.simulated')}
+                        {target.externalPlatform
+                          ? t(`platform.${target.externalPlatform}`)
+                          : connection?.provider
+                            ? t(`platform.${connection.provider}`)
+                            : t('platform.simulated')}
                       </span>
                       {target.campaignStatus ? (
                         <span
@@ -138,7 +141,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{tAutomation('seedTargetHeading')}</h2>
+        <h2 className="text-lg font-semibold">{t('seedTargetHeading')}</h2>
         <AutomationSeedTargetForm orgId={orgId} projectId={projectId} connections={connections} />
       </section>
 

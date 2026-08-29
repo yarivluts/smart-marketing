@@ -121,6 +121,7 @@ function fakeApiClient(overrides: Partial<MetaAdsApiClient> = {}): MetaAdsApiCli
     setDailyBudgetCents: async () => undefined,
     setObjectStatus: async () => undefined,
     getCampaign: async () => ({ campaignId: 'unused' }),
+    getCampaignState: async () => ({ campaignId: 'unused', status: 'PAUSED', dailyBudgetCents: null }),
     getAdSet: async () => ({ adSetId: 'unused', status: 'PAUSED', targeting: { countries: ['US'], ageMin: 18, ageMax: 65 } }),
     updateAdSet: async () => undefined,
     createCustomAudience: async () => ({ audienceId: 'unused' }),
