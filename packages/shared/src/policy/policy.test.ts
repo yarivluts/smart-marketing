@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { can, evaluate, type PolicyBinding, type ResourceScope } from './engine';
 import { PERMISSIONS, type Permission } from './permissions';
-import { INVITABLE_ROLES, ROLES, ROLE_PERMISSIONS, ROLE_SCOPE_LEVELS, type Role } from './roles';
+import {
+  INVITABLE_ROLES,
+  invitableRolesForScope,
+  isInviteRole,
+  PROJECT_INVITABLE_ROLES,
+  ROLES,
+  ROLE_PERMISSIONS,
+  ROLE_SCOPE_LEVELS,
+  type Role,
+} from './roles';
 import { isScopeLevel, SCOPE_LEVELS } from './scopes';
 import { isRole } from './roles';
 import { isPermission } from './permissions';
@@ -57,6 +66,29 @@ describe('permission catalog and role bundles', () => {
       }
       expect(invitable).toBe(ROLE_SCOPE_LEVELS[role].includes('org'));
     }
+  });
+
+  it('never makes a role invitable at project scope unless it is meant to be bound at project scope, and excludes the machine-only ingest_only role (KAN-135)', () => {
+    // Sibling of the org-scope regression test above, for PROJECT_INVITABLE_ROLES.
+    // `viewer`'s typical scope also includes `'project'`, but it stays reachable
+    // only through the org-scope invite flow (INVITABLE_ROLES) — unchanged by
+    // KAN-135 — so it's excluded from the "every project-scoped role is
+    // invitable" expectation the same way ingest_only is.
+    const expectedProjectInvitable = ROLES.filter(
+      (role) => ROLE_SCOPE_LEVELS[role].includes('project') && role !== 'ingest_only' && role !== 'viewer',
+    );
+    expect([...PROJECT_INVITABLE_ROLES].sort()).toEqual([...expectedProjectInvitable].sort());
+  });
+
+  it('invitableRolesForScope/isInviteRole agree with INVITABLE_ROLES/PROJECT_INVITABLE_ROLES', () => {
+    expect(invitableRolesForScope('org')).toEqual(INVITABLE_ROLES);
+    expect(invitableRolesForScope('project')).toEqual(PROJECT_INVITABLE_ROLES);
+    for (const role of [...INVITABLE_ROLES, ...PROJECT_INVITABLE_ROLES]) {
+      expect(isInviteRole(role)).toBe(true);
+    }
+    expect(isInviteRole('org_owner')).toBe(false);
+    expect(isInviteRole('ingest_only')).toBe(false);
+    expect(isInviteRole('not-a-role')).toBe(false);
   });
 });
 
