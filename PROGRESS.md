@@ -109,19 +109,40 @@ Template for each entry:
 - **Next step:** once KAN-135 is merged, the next candidate is retrofitting the ~60 existing
   `project.manage`-gated project routes/pages (e.g. `requireOrgPermission` call sites under
   `apps/web/app/api/orgs/[orgId]/projects/[projectId]/...` and the project nav's own `canManageX`
-  checks in `orgs/[orgId]/page.tsx`) to actually pass `projectId` into their `can()` checks — today
-  every one of them checks `{ orgId }` only, so a legitimately-invited project-scoped `project_admin`/
-  `editor`/`operator` (this change makes them mintable for the first time) still can't reach any of
-  those project admin surfaces themselves; only an org-scope admin can act on a project today. That's
-  a materially larger, higher-risk change (every one of those routes needs its own review) than this
-  story's own scope, so it's deliberately left for its own follow-up rather than folded in here.
+  checks in `orgs/[orgId]/page.tsx`) to actually pass `projectId` into their `can()` checks.
 - **Waiting on human:**
-  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding,
-    long-standing.
-  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches on
-    `origin` (branch deletion has consistently failed / had no available tool from this sandbox in
-    prior runs).
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items.
+  - Optional/low-priority: bulk-delete the large pile of already-merged, undeleted feature branches
+    on `origin`.
+
+---
+
+## 2026-08-28 — Merged PR #356 (KAN-134, vault clear-credential-secret); flake-reran PR #357
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` had zero `todo` rows at pick time (confirmed via
+    grep). Checked open PRs first (established pattern) and found **PR #356** (KAN-134, vault
+    clear-credential-secret, opened by a concurrent session, `mergeable_state: clean`, CI green,
+    no open review threads), **PR #357** (a concurrent session's own docs check-in), **PR #358**
+    (campaigns live-state/import/spend panel — a continuation of Yariv's own manual campaign-pages
+    goal, same as PR #345/#348 before it), and **PR #327** (EasySign, also Yariv's own manual work).
+  - Merged **PR #356** (squash) — clean, green, unreviewed, nothing to add.
+  - **PR #357** (docs-only `PROGRESS.md` update) had failed CI: `feedback-pack.emulator.test.ts`
+    (a 120s hook timeout) and `quality-score-pack.emulator.test.ts` (a 120s test timeout), both
+    unrelated files to a docs-only diff, with `RESOURCE_EXHAUSTED`/`CANCELLED` Firestore-emulator
+    gRPC errors visible in the surrounding log — the known cross-file emulator flake pattern this
+    repo has hit repeatedly (`campaign-ops-pack.emulator.test.ts` before it), this time manifesting
+    as a timeout rather than an outright RPC error, plausibly worsened by three PRs' CI running
+    concurrently against shared runner capacity. Re-ran the failed jobs once (this run's one-re-run
+    budget) and subscribed to the PR's activity to pick up the result.
+- **In progress (exact stopping point):** waiting on PR #357's re-run to land.
+- **Blocked + why:** nothing blocking new backlog work.
+- **Next step:** next run checks open PRs first (#357, #358, #327), drives any real failures to green.
+- **Waiting on human:** KAN-43 applications; KAN-18/KAN-19.
+
+---
+
 
 ---
 
