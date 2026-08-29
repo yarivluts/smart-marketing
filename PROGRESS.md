@@ -58,7 +58,33 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 — Merged PR #356 (KAN-134, vault clear-credential-secret); flake-reran PR #357
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` had zero `todo` rows at pick time (confirmed via
+    grep). Checked open PRs first (established pattern) and found **PR #356** (KAN-134, vault
+    clear-credential-secret, opened by a concurrent session, `mergeable_state: clean`, CI green,
+    no open review threads), **PR #357** (a concurrent session's own docs check-in), **PR #358**
+    (campaigns live-state/import/spend panel — a continuation of Yariv's own manual campaign-pages
+    goal, same as PR #345/#348 before it), and **PR #327** (EasySign, also Yariv's own manual work).
+  - Merged **PR #356** (squash) — clean, green, unreviewed, nothing to add.
+  - **PR #357** (docs-only `PROGRESS.md` update) had failed CI: `feedback-pack.emulator.test.ts`
+    (a 120s hook timeout) and `quality-score-pack.emulator.test.ts` (a 120s test timeout), both
+    unrelated files to a docs-only diff, with `RESOURCE_EXHAUSTED`/`CANCELLED` Firestore-emulator
+    gRPC errors visible in the surrounding log — the known cross-file emulator flake pattern this
+    repo has hit repeatedly (`campaign-ops-pack.emulator.test.ts` before it), this time manifesting
+    as a timeout rather than an outright RPC error, plausibly worsened by three PRs' CI running
+    concurrently against shared runner capacity. Re-ran the failed jobs once (this run's one-re-run
+    budget) and subscribed to the PR's activity to pick up the result.
+- **In progress (exact stopping point):** waiting on PR #357's re-run to land.
+- **Blocked + why:** nothing blocking new backlog work.
+- **Next step:** next run checks open PRs first (#357, #358, #327), drives any real failures to green.
+- **Waiting on human:** KAN-43 applications; KAN-18/KAN-19.
+
+---
+
 ## 2026-08-28 — Drove PR #353 through three PROGRESS.md conflicts to merge; KAN-133/#355 and KAN-134/#356 already picked up by concurrent sessions
+
 
 - **Last completed:**
   - Continuation of this run's own check-in pass (the entry two below is this run's original

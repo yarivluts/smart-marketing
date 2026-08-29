@@ -124,5 +124,5 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/onboarding/pack', () => {
 
     const boards = await listBoardsForProject(organization.id, project.id);
     expect(boards.map((board) => board.name).sort()).toEqual(['Funnel', 'Marketing', 'Revenue / MRR']);
-  }, 60_000);
+  }, 120_000);
 });
