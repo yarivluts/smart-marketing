@@ -25,6 +25,9 @@ import {
   MembershipNotActiveError,
   MembershipNotFoundError,
   MembershipNotSuspendedError,
+  ProjectNotFoundError,
+  ProjectRequiredForRoleError,
+  ProjectScopedRoleNotAllowedError,
   reactivateOrgMember,
   removeOrgMember,
   RoleNotChangeableError,
@@ -339,6 +342,129 @@ describe('invite -> accept flow', () => {
   });
 });
 
+describe('project-scoped invite -> accept flow (KAN-135)', () => {
+  it('invites project_admin/editor/operator for a specific project, then mints a project-scope binding on accept', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('proj-invite-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Project Invite Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+
+    for (const role of ['project_admin', 'editor', 'operator'] as const) {
+      const inviteeEmail = uniqueEmail(`proj-invitee-${role}`);
+      const invitation = await inviteMemberToOrganization({
+        organizationId: organization.id,
+        email: inviteeEmail,
+        role,
+        invitedByUserId: owner.id,
+        projectId: project.id,
+      });
+      expect(invitation.project_id).toBe(project.id);
+
+      const invitee = await ensureUserByEmail(inviteeEmail);
+      const { membership, roleBinding } = await acceptInvite({
+        organizationId: organization.id,
+        membershipId: invitation.id,
+        userId: invitee.id,
+        callerEmailVerified: true,
+      });
+      expect(membership.status).toBe('active');
+      expect(roleBinding.role).toBe(role);
+      expect(roleBinding.scope_level).toBe('project');
+      expect(roleBinding.scope_id).toBe(project.id);
+
+      const bindings = await listRoleBindingsForUser(invitee.id, [organization.id]);
+      expect(bindings).toContainEqual(expect.objectContaining({ role, scope_level: 'project', scope_id: project.id }));
+    }
+  });
+
+  it('rejects a project-scoped role invited with no projectId', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('proj-missing-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Project Missing Org', ownerUserId: owner.id });
+
+    await expect(
+      inviteMemberToOrganization({
+        organizationId: organization.id,
+        email: uniqueEmail('proj-missing-invitee'),
+        role: 'editor',
+        invitedByUserId: owner.id,
+      }),
+    ).rejects.toThrow(ProjectRequiredForRoleError);
+  });
+
+  it('rejects an org-scoped role (org_admin/viewer) invited with a projectId', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('proj-notallowed-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Project Not Allowed Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+
+    await expect(
+      inviteMemberToOrganization({
+        organizationId: organization.id,
+        email: uniqueEmail('proj-notallowed-invitee'),
+        role: 'viewer',
+        invitedByUserId: owner.id,
+        projectId: project.id,
+      }),
+    ).rejects.toThrow(ProjectScopedRoleNotAllowedError);
+  });
+
+  it('rejects a projectId that belongs to a different organization', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('cross-org-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Cross Org Owner Org', ownerUserId: owner.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('other-org-owner') });
+    const { organization: otherOrg } = await createOrganizationWithOwner({ name: 'Other Org', ownerUserId: otherOwner.id });
+    const { project: otherOrgProject } = await createProject({ organizationId: otherOrg.id, name: 'Other Org Project' });
+
+    await expect(
+      inviteMemberToOrganization({
+        organizationId: organization.id,
+        email: uniqueEmail('cross-org-invitee'),
+        role: 'editor',
+        invitedByUserId: owner.id,
+        projectId: otherOrgProject.id,
+      }),
+    ).rejects.toThrow(ProjectNotFoundError);
+  });
+
+  it('rejects a projectId that does not exist at all', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('nx-project-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Nonexistent Project Org', ownerUserId: owner.id });
+
+    await expect(
+      inviteMemberToOrganization({
+        organizationId: organization.id,
+        email: uniqueEmail('nx-project-invitee'),
+        role: 'operator',
+        invitedByUserId: owner.id,
+        projectId: 'does-not-exist',
+      }),
+    ).rejects.toThrow(ProjectNotFoundError);
+  });
+
+  it('leaves the existing org-scope invite/accept behavior unchanged for org_admin/viewer', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('unchanged-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Unchanged Org', ownerUserId: owner.id });
+
+    const inviteeEmail = uniqueEmail('unchanged-invitee');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: inviteeEmail,
+      role: 'org_admin',
+      invitedByUserId: owner.id,
+    });
+    expect(invitation.project_id).toBeFalsy();
+
+    const invitee = await ensureUserByEmail(inviteeEmail);
+    const { roleBinding } = await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: invitee.id,
+      callerEmailVerified: true,
+    });
+    expect(roleBinding.scope_level).toBe('org');
+    expect(roleBinding.scope_id).toBe(organization.id);
+  });
+});
+
 describe('ensureUserForFirebaseSession identity merge (KAN-133)', () => {
   it('still binds firebaseUid to the placeholder on an unverified first sign-in — gating the bind itself would orphan the invite forever', async () => {
     const inviteeEmail = uniqueEmail('unverified-bind-invitee');
@@ -601,6 +727,22 @@ describe('updateMemberRole', () => {
 
     await expect(updateMemberRole(organization.id, 'does-not-exist', 'viewer', owner.id)).rejects.toThrow(MembershipNotFoundError);
   });
+
+  it('throws RoleNotChangeableError for a project-scoped member (project_admin/editor/operator) — this surface only swaps org_admin/viewer (KAN-135)', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('umr-proj-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Role Update Project Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: uniqueEmail('umr-proj-invitee'),
+      role: 'editor',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+
+    await expect(updateMemberRole(organization.id, invitation.id, 'viewer', owner.id)).rejects.toThrow(RoleNotChangeableError);
+  });
 });
 
 describe('suspendOrgMember / reactivateOrgMember (KAN-132)', () => {
@@ -764,5 +906,39 @@ describe('suspendOrgMember / reactivateOrgMember (KAN-132)', () => {
 
     const reloaded = await MembershipModel.init(ownerAMembership.id, { organization_id: organization.id });
     expect(reloaded?.status).toBe('suspended');
+  });
+
+  it('restores a project-scoped member\'s binding at its original project scope, not org scope (KAN-135)', async () => {
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('suspend-proj-owner') });
+    const { organization } = await createOrganizationWithOwner({ name: 'Suspend Project Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+
+    const memberEmail = uniqueEmail('suspend-proj-member');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: memberEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const member = await ensureUserByEmail(memberEmail);
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: member.id,
+      callerEmailVerified: true,
+    });
+
+    await suspendOrgMember(organization.id, invitation.id, owner.id);
+    expect(await listRoleBindingsForUser(member.id, [organization.id])).toHaveLength(0);
+
+    const reactivated = await reactivateOrgMember(organization.id, invitation.id, owner.id);
+    expect(reactivated.status).toBe('active');
+
+    const bindingsAfter = await listRoleBindingsForUser(member.id, [organization.id]);
+    expect(bindingsAfter).toHaveLength(1);
+    expect(bindingsAfter[0].role).toBe('project_admin');
+    expect(bindingsAfter[0].scope_level).toBe('project');
+    expect(bindingsAfter[0].scope_id).toBe(project.id);
   });
 });

@@ -58,6 +58,20 @@ Template for each entry:
 
 ---
 
+## 2026-08-28 — Delivered KAN-135 (project-scoped invites)
+
+- **Last completed:**
+  - Merged PR #360 (`kan-135-project-scoped-invites`).
+  - Delivered project-scoped invites for `project_admin`, `editor`, and `operator`.
+  - Added full test coverage across `packages/shared`, `packages/firebase-orm-models`, and `apps/web`.
+- **In progress (exact stopping point):** complete.
+- **Blocked + why:** nothing blocking.
+- **Next step:** continue backlog sweep.
+- **Waiting on human:** KAN-43 applications; KAN-18/KAN-19.
+
+
+---
+
 ## 2026-08-28 — Merged PR #356 (KAN-134, vault clear-credential-secret); flake-reran PR #357
 
 - **Last completed:**
@@ -80,6 +94,12 @@ Template for each entry:
 - **Blocked + why:** nothing blocking new backlog work.
 - **Next step:** next run checks open PRs first (#357, #358, #327), drives any real failures to green.
 - **Waiting on human:** KAN-43 applications; KAN-18/KAN-19.
+<<<<<<< HEAD
+=======
+
+---
+
+>>>>>>> origin/main
 
 ---
 

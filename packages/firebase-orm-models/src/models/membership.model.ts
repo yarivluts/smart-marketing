@@ -41,4 +41,21 @@ export class MembershipModel extends BaseModel {
 
   @Field()
   public accepted_at?: string;
+
+  /**
+   * Set by `inviteMemberToOrganization` (KAN-135) only when `role` is
+   * project-scoped (`project_admin`/`editor`/`operator` — see
+   * `PROJECT_INVITABLE_ROLES` in `@growthos/shared`); the target project's
+   * id, always a project under this same `organization_id`. Unset for an
+   * org-scoped role (`org_admin`/`viewer`). This is the *intended* scope of
+   * the grant, recorded on the membership itself because a pending invite
+   * has no role binding yet to read it back from — `acceptInvite` reads it
+   * to decide whether the `RoleBindingModel` it mints is `scope_level:
+   * 'project'` (`scope_id: project_id`) or `scope_level: 'org'` (`scope_id:
+   * organization_id`); `reactivateOrgMember` reads it the same way to
+   * restore a suspended member's binding at its original scope rather than
+   * always minting a fresh org-scope one.
+   */
+  @Field()
+  public project_id?: string;
 }

@@ -65,6 +65,16 @@ export default async function OrgDetailPage({
   const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
   const canManageBilling = can(bindings, principal, 'billing.manage', { orgId });
 
+  // Projects the signed-in inviter administers (KAN-135) — scopes the
+  // invite form's project picker to only the projects a project-scoped
+  // invite (`project_admin`/`editor`/`operator`) could actually target. An
+  // org-scope `project.manage` binding (e.g. `canManageProjects` above)
+  // covers every project, so this is a superset check per project rather
+  // than reusing `canManageProjects` directly.
+  const administeredProjects = projects
+    .filter((project) => can(bindings, principal, 'project.manage', { orgId, projectId: project.id }))
+    .map((project) => ({ id: project.id, name: project.name }));
+
   const t = await getTranslations('OrgDetailPage');
 
   return (
@@ -323,8 +333,15 @@ export default async function OrgDetailPage({
 
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">{t('membersHeading')}</h2>
-          <MembersList orgId={orgId} members={members} canManageMembers={canManageMembers} />
-          {canManageMembers ? <InviteMemberForm orgId={orgId} /> : null}
+          <MembersList
+            orgId={orgId}
+            members={members}
+            canManageMembers={canManageMembers}
+            projects={projects.map((project) => ({ id: project.id, name: project.name }))}
+          />
+          {canManageMembers ? (
+            <InviteMemberForm orgId={orgId} administeredProjects={administeredProjects} />
+          ) : null}
         </section>
       </main>
     </OrgShell>

@@ -4,6 +4,7 @@ import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
   acceptInvite,
   createOrganizationWithOwner,
+  createProject,
   ensureUserForFirebaseSession,
   inviteMemberToOrganization,
 } from '@growthos/firebase-orm-models';
@@ -91,7 +92,7 @@ describe('POST /api/orgs/[orgId]/invites', () => {
     expect(response.status).toBe(403);
   });
 
-  it('rejects a missing email and an uninvitable role', async () => {
+  it('rejects a missing email and a genuinely uninvitable role', async () => {
     const ownerSession = await sessionFor(unique('uid'), uniqueEmail('validation-owner'));
     const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
     const { organization } = await createOrganizationWithOwner({ name: 'Validation Org', ownerUserId: owner.id });
@@ -100,12 +101,94 @@ describe('POST /api/orgs/[orgId]/invites', () => {
     const missingEmail = inviteRequest(organization.id, { role: 'viewer' });
     expect((await POST(missingEmail.request, { params: missingEmail.params })).status).toBe(400);
 
-    // project_admin's scope level is 'project', not 'org' — an org-level
-    // invite can only grant a role whose scope includes 'org' (see
-    // INVITABLE_ROLES; this is the privilege-escalation bug the PR's own
-    // self-review already found and fixed for this exact role).
-    const badRole = inviteRequest(organization.id, { email: uniqueEmail('x'), role: 'project_admin' });
-    expect((await POST(badRole.request, { params: badRole.params })).status).toBe(400);
+    // org_owner is never handed out by invite at all — see INVITABLE_ROLES'/
+    // PROJECT_INVITABLE_ROLES' own doc comments (roles.ts).
+    const badRole = inviteRequest(organization.id, { email: uniqueEmail('x'), role: 'org_owner' });
+    const badRoleResponse = await POST(badRole.request, { params: badRole.params });
+    expect(badRoleResponse.status).toBe(400);
+    expect(await badRoleResponse.json()).toMatchObject({ error: 'invalid_role' });
+  });
+
+  it('rejects a project-scoped role (project_admin/editor/operator) invited without a projectId (KAN-135)', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('proj-missing-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Project Missing Org', ownerUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    // project_admin's typical scope is 'project', not 'org' — an org-level
+    // invite with no projectId can only grant a role whose scope includes
+    // 'org' (this is the exact privilege-escalation shape KAN-25's own
+    // review caught and INVITABLE_ROLES exists to prevent).
+    const { request, params } = inviteRequest(organization.id, { email: uniqueEmail('x'), role: 'project_admin' });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'project_required' });
+  });
+
+  it('rejects an org-scoped role (org_admin/viewer) invited with a projectId', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('proj-notallowed-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Project Not Allowed Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = inviteRequest(organization.id, {
+      email: uniqueEmail('x'),
+      role: 'viewer',
+      projectId: project.id,
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'project_not_allowed' });
+  });
+
+  it('rejects a project-scoped invite naming a project that belongs to a different org, with 404 not 403 (KAN-26 non-enumeration)', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('cross-org-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Cross Org Inviter Org', ownerUserId: owner.id });
+
+    const otherOwner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: uniqueEmail('other-org-owner') });
+    const { organization: otherOrg } = await createOrganizationWithOwner({ name: 'Other Org', ownerUserId: otherOwner.id });
+    const { project: otherOrgProject } = await createProject({ organizationId: otherOrg.id, name: 'Other Org Project' });
+
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const { request, params } = inviteRequest(organization.id, {
+      email: uniqueEmail('x'),
+      role: 'editor',
+      projectId: otherOrgProject.id,
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(404);
+    expect(await response.json()).toMatchObject({ error: 'project_not_found' });
+  });
+
+  it("rejects a project-scoped project_admin (bound only to their own project) from inviting via this org-level route at all — members.manage is org-scope only", async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('scoped-inviter-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Scoped Inviter Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+
+    const projectAdminEmail = uniqueEmail('project-admin-inviter');
+    const invitation = await inviteMemberToOrganization({
+      organizationId: organization.id,
+      email: projectAdminEmail,
+      role: 'project_admin',
+      invitedByUserId: owner.id,
+      projectId: project.id,
+    });
+    const projectAdminSession = await sessionFor(unique('uid'), projectAdminEmail);
+    const projectAdmin = await ensureUserForFirebaseSession({ firebaseUid: projectAdminSession.uid, email: projectAdminEmail });
+    await acceptInvite({
+      organizationId: organization.id,
+      membershipId: invitation.id,
+      userId: projectAdmin.id,
+      callerEmailVerified: true,
+    });
+
+    getServerSessionMock.mockResolvedValue(projectAdminSession);
+    const { request, params } = inviteRequest(organization.id, { email: uniqueEmail('nope'), role: 'viewer' });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(403);
   });
 
   it('lets an org_owner invite a new member and rejects a duplicate invite to the same email', async () => {
@@ -123,5 +206,22 @@ describe('POST /api/orgs/[orgId]/invites', () => {
     const second = inviteRequest(organization.id, { email: inviteeEmail, role: 'org_admin' });
     const secondResponse = await POST(second.request, { params: second.params });
     expect(secondResponse.status).toBe(409);
+  });
+
+  it('lets an org_owner invite a project_admin scoped to a project in their org (KAN-135)', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('proj-happy-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Project Happy Org', ownerUserId: owner.id });
+    const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = inviteRequest(organization.id, {
+      email: uniqueEmail('proj-happy-invitee'),
+      role: 'project_admin',
+      projectId: project.id,
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({ membershipId: expect.any(String) });
   });
 });

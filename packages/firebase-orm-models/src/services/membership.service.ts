@@ -149,6 +149,15 @@ export async function removeOrgMember(
  * `invited` membership has no role binding yet (see `acceptInvite`'s own
  * doc comment), so only the membership doc is updated — the invite simply
  * promises the new role once accepted.
+ *
+ * `isInvitableRole` (checked below for both the current and requested role)
+ * is the org-scope-only set — `org_admin`/`viewer` — so a project-scoped
+ * member (`project_admin`/`editor`/`operator`, KAN-135) always throws
+ * {@link RoleNotChangeableError} here, matching the "invite is the only way
+ * in, revoke-and-reinvite is the only way to change it" posture that scope
+ * still has; this surface only mints org-scope bindings, and silently
+ * "changing" a project-scoped member's role through it would either drop
+ * their project scope entirely or (worse) widen it to org-wide.
  */
 export async function updateMemberRole(
   organizationId: string,
@@ -282,19 +291,16 @@ export async function suspendOrgMember(
 
 /**
  * Restores a suspended member's access: flips `status` back to `active` and
- * mints a fresh org-scope role binding for `membership.role` — the same
- * binding shape {@link acceptInvite} creates on first acceptance. Recreating
+ * mints a fresh role binding for `membership.role`, at the same scope
+ * {@link acceptInvite} originally minted it at — `scope_level: 'project'`
+ * (`scope_id: membership.project_id`) for a project-scoped role,
+ * `scope_level: 'org'` (`scope_id: organizationId`) otherwise, per
+ * `MembershipModel.project_id`'s own doc comment (KAN-135). Recreating
  * rather than un-deleting is deliberate: {@link suspendOrgMember} genuinely
  * removes the binding documents (see its own doc comment), so there is
- * nothing left to restore in place; a new binding with the same role has an
- * identical practical effect and keeps this symmetric with how every other
- * binding in this codebase gets minted. Lossless today because every binding
- * this codebase mints is org-scoped (see `INVITABLE_ROLES`'s own doc comment
- * — the project-scoped invite flow that would produce project/environment-
- * scope bindings for a member doesn't exist yet); whichever story builds
- * that flow will need `suspendOrgMember`/`reactivateOrgMember` to snapshot
- * and restore each removed binding's own scope instead of always minting a
- * fresh org-scope one.
+ * nothing left to restore in place; a new binding with the same role and
+ * scope has an identical practical effect and keeps this symmetric with how
+ * every other binding in this codebase gets minted.
  */
 export async function reactivateOrgMember(
   organizationId: string,
@@ -313,8 +319,8 @@ export async function reactivateOrgMember(
   roleBinding.principal_type = 'user';
   roleBinding.principal_id = membership.user_id;
   roleBinding.role = membership.role;
-  roleBinding.scope_level = 'org';
-  roleBinding.scope_id = organizationId;
+  roleBinding.scope_level = membership.project_id ? 'project' : 'org';
+  roleBinding.scope_id = membership.project_id ?? organizationId;
   roleBinding.setPathParams({ organization_id: organizationId });
   await roleBinding.save();
 

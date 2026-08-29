@@ -6,20 +6,35 @@ import { ChangeRoleControl } from './change-role-control';
 import { SuspendMemberButton } from './suspend-member-button';
 import { ReactivateMemberButton } from './reactivate-member-button';
 
+export interface MembersListProject {
+  id: string;
+  name: string;
+}
+
 export interface MembersListProps {
   orgId: string;
   members: OrgMemberSummary[];
   /** Renders a revoke/remove action per row — gated the same as the invite form, on `members.manage`. */
   canManageMembers: boolean;
+  /** Resolves a project-scoped member's `projectId` (KAN-135) to a display name — see `roleAndStatus` vs `projectRoleAndStatus` below. */
+  projects: readonly MembersListProject[];
 }
 
-export async function MembersList({ orgId, members, canManageMembers }: MembersListProps): Promise<React.ReactElement> {
+export async function MembersList({
+  orgId,
+  members,
+  canManageMembers,
+  projects,
+}: MembersListProps): Promise<React.ReactElement> {
   const t = await getTranslations('Members');
 
   return (
     <ul className="flex flex-col gap-2">
       {members.map((member) => {
         const changeableRole = isInvitableRole(member.role) ? member.role : null;
+        const memberProjectName = member.projectId
+          ? (projects.find((project) => project.id === member.projectId)?.name ?? member.projectId)
+          : undefined;
         return (
           <li
             key={member.membershipId}
@@ -34,7 +49,9 @@ export async function MembersList({ orgId, members, canManageMembers }: MembersL
                 </>
               ) : (
                 <span className="text-muted-foreground">
-                  {t('roleAndStatus', { role: member.role, status: member.status })}
+                  {memberProjectName
+                    ? t('projectRoleAndStatus', { role: member.role, project: memberProjectName, status: member.status })
+                    : t('roleAndStatus', { role: member.role, status: member.status })}
                 </span>
               )}
               {canManageMembers && member.status === 'active' ? (
