@@ -2,8 +2,6 @@ import 'client-only';
 import { type FirebaseApp, getApps, initializeApp } from 'firebase/app';
 import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
 
-const EMULATOR_PROJECT_ID = 'demo-growthos-test';
-
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let emulatorConnected = false;
