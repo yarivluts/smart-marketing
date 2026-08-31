@@ -17,6 +17,78 @@ Template for each entry:
 
 ---
 
+## 2026-08-31 — Scheduled run: verified `main` is red (nav-collapse regression), no safe PR can reach green — standing down
+
+- **Last completed:** picked up the scheduled run per CLAUDE.md; `TASKS.md` has no `todo` rows left
+  (only `KAN-18`/`KAN-19`, both `in-progress`/infra-bound, and `KAN-50`/`KAN-51`, both `blocked-by`
+  `KAN-43`) — the entire buildable backlog is `done`. Before sweeping for a new follow-up-style task
+  (this repo's established pattern once the backlog is exhausted), checked CI health first and found
+  `main` red on the **Test** step of the latest run
+  ([run 33425871919](https://github.com/yarivluts/smart-marketing/actions/runs/33425871919), head
+  `bd7d215`) — confirmed independently, not just via the two already-open PRs:
+  - Root cause: three same-day direct-to-`main` pushes by the repo owner (`4f50462`, `0be7808`
+    "redesign GrowthOS into 3-module architecture", `bd7d215` "complete comprehensive UI/UX overhaul
+    across all 54 routes") collapsed the per-project sidebar from ~20 top-level links down to 3
+    primary modules (Ads & Performance / Funnel & Goals / AI Copilot & Automation) + Settings
+    (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx`). The dropped pages'
+    `page.tsx` files are all still present and working — they're just no longer linked from
+    anywhere in the UI (Settings is only a name/vertical edit form, no sub-nav) — but
+    `apps/web/e2e/*.spec.ts` still clicks the old sidebar links by exact accessible name. Verified
+    16 distinct now-orphaned nav targets referenced across the e2e suite: API keys, Billing ops
+    feed, Boards, Campaign ops, Cohort retention, Cost guardrails, Customers, Inbound hooks, Ingest
+    health, Metric catalog, Plugin registry, Plugins, Record feed, Resource library, Schema
+    registry (16th, "Funnel", may just be a rename to "Funnel & Goals" — not independently
+    verified). This is a real, wide product-navigation regression, not a test-only mismatch: per
+    `CLAUDE.md`'s "everything user-manageable gets an admin surface" rule, an admin surface that's
+    unreachable from the UI is effectively gone even though the route still renders.
+  - `pnpm lint` and `pnpm typecheck` are both green on `bd7d215` (confirmed via the run's own job
+    steps) — only **Test** (unit+emulator, then the sharded Playwright e2e suite) fails, which is
+    why **Build** shows `skipped`.
+  - Two PRs already open from the same day independently found and partially chased this: **#362**
+    ("repair campaign-daily-budget-control test text matchers") and **#363** ("record CI-red root
+    cause"), both based on the older `4f50462` tip. Re-verified both against the *current* `main`
+    tip directly rather than trusting the stale PR bodies: `campaign-daily-budget-control.test.tsx`
+    (PR #362's target) **already passes 5/5** on `bd7d215` — `bd7d215`'s own overhaul evidently
+    superseded whatever `0be7808` had broken there, so #362 looks moot now. #363's root-cause
+    finding (the nav collapse itself) is still accurate on `bd7d215` — verified independently above
+    — but its PR body's own file list was written against the older commit and hasn't been
+    re-checked against `bd7d215`.
+  - Because `apps/web`'s source changed in all three of today's pushes, turbo's cache for
+    `apps/web#test` is invalidated — so *any* PR against current `main`, even one that touches zero
+    web-app code, will re-run and fail the same e2e nav assertions. There is currently no diff that
+    can land with a fully green `pnpm test`, and `CLAUDE.md`'s merge gate is unconditional ("all
+    checks must be green before merge") — so per this session's own reading of the CI-red drive-to-
+    green rules, this is squarely "root-cause in code the PR doesn't touch, no fix exists yet, say
+    what's failing and why" territory, not something to patch around (guessing at which of ~16
+    pages should be folded into which module, or silently deleting/rewriting 13+ e2e specs to match
+    a guess, would very likely conflict with product decisions the repo owner is actively mid-stream
+    on today).
+- **In progress (exact stopping point):** nothing coded — this run is a docs-only status
+  check-in, opened as a PR per the branch/PR workflow rather than committed straight to `main`, same
+  as every prior "chore: record …" entry in this file. CI on this PR's own head will very likely
+  show the identical pre-existing Test failure (docs-only diff, so not caused by it).
+- **Blocked + why:** the backlog is otherwise exhausted, and the one thing actually blocking every
+  future PR (the nav-collapse regression) is a product/UX decision — where does each of the 16
+  dropped pages live now (folded into one of the 3 new modules? reachable via an expanded Settings
+  sub-nav? intentionally deprecated and its e2e spec deleted?) — not a mechanical bug a scheduled
+  run should guess at unilaterally while the repo owner is actively iterating on this exact redesign
+  same-day.
+- **Next step:** once a human (or an explicitly-instructed run carrying that decision) says where
+  each dropped page should be reachable from, the fix is mechanical: restore the links per that
+  decision and update/delete the corresponding `apps/web/e2e/*.spec.ts` nav-click assertions to
+  match, then resume normal backlog sweeping once `main` is green again. Until then, scheduled runs
+  should keep checking CI health first rather than opening more doomed-to-be-red feature PRs.
+- **Waiting on human:**
+  - The nav-restructuring decision itself (see above) — this is the actual blocker.
+  - Close or update PR #362 (looks moot against current `main`) and PR #363 (stale file list, root
+    cause still valid) once the above decision is made.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining infra (staging deploys, per-env BigQuery split, terraform
+    import/apply reconciliation) — still outstanding.
+
+---
+
 ## 2026-08-28 (latest) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
 
 - **Last completed:** the three follow-ups #345 named, plus two real bugs the rendered pages
