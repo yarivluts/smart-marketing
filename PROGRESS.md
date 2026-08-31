@@ -17,6 +17,51 @@ Template for each entry:
 
 ---
 
+## 2026-08-31 — CI red on `main`: two chore fixes in flight (#361/#362); found the tri-module redesign broke most of the e2e nav suite (needs-human)
+
+- **Last completed:**
+  - `main` was already red from two of the repo owner's own manual commits (`0be7808` tri-module UI
+    redesign, `4f50462` Firebase client defaults). A prior session (same day) had already opened
+    **PR #361** (remove the now-unused `EMULATOR_PROJECT_ID` const breaking lint) and **PR #362**
+    (fix `campaign-daily-budget-control.test.tsx`'s exact-string matchers, broken by that component
+    now rendering the amount/`/day` suffix as two separate spans) — #362's branch already has #361's
+    fix merged into it. This session subscribed to both PRs' activity and picked up where that
+    session left off.
+  - #362's CI came back red on a **different, unrelated** failure: Playwright shard 1/3 — 7 failed,
+    7 passed. Every failure times out on `page.getByRole('link', { name: '<Feature>' }).click()`
+    for a nav item that no longer exists (`Campaign ops`, `Cohort retention`, `Cost guardrails`,
+    `Customers`, `Schema registry`, `Metric catalog`, `Billing ops feed`, …). Root cause: `0be7808`
+    collapsed `ProjectLayout`'s sidebar (`apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/layout.tsx`)
+    from one link per feature down to exactly 3 primary modules (Ads & Performance, Funnel & Goals,
+    AI Copilot & Automation) + Settings. The old feature pages/routes still exist, they're just no
+    longer linked from the nav these specs click through. Grep confirms **13 of 25** `apps/web/e2e/*.spec.ts`
+    files assert on now-removed nav labels — this was only shard 1/3, so the true count across all
+    shards is almost certainly higher. Posted a standing-down comment on #362 naming this (not
+    re-running CI — it's a real, reproducible failure, not a flake) and did **not** attempt a fix:
+    which of "fold into one of the 3 modules (and which)", "keep reachable via Settings/omni-search
+    and update the specs to match", or "intentionally deprecate" is a product/IA call, not something
+    derivable from the diff.
+- **In progress (exact stopping point):** #362 (unit-test fix, already carries #361's fix) is
+  otherwise ready but can't go green until the e2e regression above is resolved — and neither can
+  **any** future PR, since `lint · typecheck · test · build` bundles e2e into the same gating check.
+  #361 itself is superseded by #362 once #362 merges (same established pattern as prior duplicate-PR
+  reconciliations in this file) — not closed yet, left open until #362 actually merges.
+- **Blocked + why:** the whole CI gate is blocked repo-wide on a human decision about the new
+  3-module nav's intended reach — see above. Notified the repo owner directly (push notification)
+  since this affects every PR, not just #361/#362.
+- **Next step:** once a human says which of the three remediation shapes above is correct, update
+  the affected `apps/web/e2e/*.spec.ts` files (and/or the nav) accordingly, get #362 green, merge
+  it, then close #361 as superseded. Until then, do not start new backlog work — it would just add
+  more red PRs on top of an already-broken gate. `TASKS.md` itself is otherwise exhausted (only
+  `needs-human` KAN-43 and `blocked-by` KAN-50/51 remain in the numbered backlog).
+- **Waiting on human:**
+  - **Decide the nav/e2e reconciliation for the tri-module redesign** (see above) — this is the
+    active blocker for all CI.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+
+---
+
 ## 2026-08-28 (latest) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
 
 - **Last completed:** the three follow-ups #345 named, plus two real bugs the rendered pages
