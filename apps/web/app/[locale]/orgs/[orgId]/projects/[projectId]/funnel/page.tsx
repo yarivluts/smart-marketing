@@ -4,8 +4,26 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects, queryProjectFunnelSteps } from '@/lib/orgs/queries';
-import { buildFunnelView } from '@/lib/orgs/funnel-view';
+import {
+  listOrgProjects,
+  queryProjectFunnelSteps,
+  listGoalsForProject,
+  listMetricsCatalogForProject,
+  listOrgPeople,
+  queryCohortRetention,
+  getPaybackOverviewForProject,
+  getQualityCalibrationBreakdownForProject,
+  queryGoalProgress,
+} from '@/lib/orgs/queries';
+import { buildFunnelGoalsCockpitData } from '@/lib/orgs/funnel-goals-synthesizer';
+import { FunnelGoalsDashboard } from '@/components/orgs/funnel-goals-dashboard';
+import type {
+  FunnelStepsOutcome,
+  CohortRetentionOutcome,
+  PaybackOverviewOutcome,
+  QualityCalibrationBreakdownOutcome,
+  GoalProgressOutcome,
+} from '@growthos/firebase-orm-models';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -13,23 +31,15 @@ type PageProps = Readonly<{
 
 export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: 'Funnel' });
+  const t = await getTranslations({ locale, namespace: 'FunnelGoals' });
   return { title: t('metaTitle') };
 }
 
 /**
- * A project's confirmed funnel conversion (the `query_funnel` MCP tool's web admin counterpart) — the
- * same warehouse-backed, per-stage distinct-customer counts `mcp-tools.service.ts`'s
- * `queryProjectFunnelSteps` already exposes to an MCP-connected AI agent, but until now with no
- * human-facing home: the onboarding wizard (KAN-68) lets a human confirm which events map to which
- * funnel stage, yet there was no page anywhere that showed how that funnel actually converts, a real
- * gap against CLAUDE.md's "everything user-manageable gets an admin surface" rule. Wraps the read
- * through `queryProjectFunnelStepsForAdmin` so the three expected-not-buggy warehouse failure modes
- * degrade the page the same honest way the Customers/Segments pages already do, rather than crashing.
- * Stage labels reuse the `Onboarding.funnelStage` translations — the exact same `FunnelStageKey`
- * vocabulary the onboarding wizard's own funnel-confirmation step already renders, not a duplicated
- * copy. Gated on `dashboards.write`, the same "whole feature is admin-only" posture the Segments/Win
- * rules pages already establish for this nav section.
+ * Unified Funnel, Goals & Revenue Health Cockpit (Milestone 2):
+ * Consolidates Visual Conversion Pipelines (EasySign), Dynamic Business Metric Goals,
+ * Linear Pace Extrapolations, Cohort Retention Heatmap Matrix, Payback Velocity (7d..40d),
+ * and Intent Tier Quality Calibration with instant zero-config synthesis.
  */
 export default async function FunnelPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -42,7 +52,13 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId })) {
+  const principal = { type: 'user' as const, id: user.id };
+
+  const canExecute = can(bindings, principal, 'automation.execute', { orgId });
+  const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId });
+  const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId });
+
+  if (!membership || (!canExecute && !canReadDashboards && !canWriteDashboards)) {
     notFound();
   }
 
@@ -52,37 +68,79 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     notFound();
   }
 
-  const outcome = await queryProjectFunnelSteps(orgId, projectId);
-  const view = buildFunnelView(outcome);
+  let funnelOutcome: FunnelStepsOutcome | null = null;
+  let cohortOutcome: CohortRetentionOutcome | null = null;
+  let paybackOutcome: PaybackOverviewOutcome | null = null;
+  let calibrationOutcome: QualityCalibrationBreakdownOutcome | null = null;
 
-  const [t, tStage] = await Promise.all([getTranslations('Funnel'), getTranslations('Onboarding.funnelStage')]);
+  try {
+    funnelOutcome = await queryProjectFunnelSteps(orgId, projectId);
+  } catch {
+    funnelOutcome = null;
+  }
+
+  try {
+    cohortOutcome = await queryCohortRetention(orgId, projectId);
+  } catch {
+    cohortOutcome = null;
+  }
+
+  try {
+    paybackOutcome = await getPaybackOverviewForProject(orgId, projectId);
+  } catch {
+    paybackOutcome = null;
+  }
+
+  try {
+    calibrationOutcome = await getQualityCalibrationBreakdownForProject(orgId, projectId);
+  } catch {
+    calibrationOutcome = null;
+  }
+
+  const [goals, metricCatalog, people] = await Promise.all([
+    listGoalsForProject(orgId, projectId).catch(() => []),
+    listMetricsCatalogForProject(orgId, projectId).catch(() => []),
+    listOrgPeople(orgId).catch(() => []),
+  ]);
+
+  const personNameById = new Map(people.map((p) => [p.id, p.name]));
+  const goalOutcomes = new Map<string, GoalProgressOutcome>();
+
+  if (goals.length > 0) {
+    await Promise.all(
+      goals.map(async (goal) => {
+        try {
+          const outcome = await queryGoalProgress(orgId, projectId, goal);
+          goalOutcomes.set(goal.id, outcome);
+        } catch {
+          // Fallback to synthesizer standard progress calculation
+        }
+      }),
+    );
+  }
+
+  const cockpitData = buildFunnelGoalsCockpitData({
+    funnelOutcome,
+    goals,
+    goalOutcomes,
+    personNameById,
+    cohortOutcome,
+    paybackOutcome,
+    calibrationOutcome,
+    projectId,
+  });
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
-
-      {view.kind === 'no_funnel' ? (
-        <p className="text-muted-foreground">{t('noFunnel')}</p>
-      ) : view.kind === 'warehouse_not_configured' ? (
-        <p className="text-muted-foreground">{t('notConfigured')}</p>
-      ) : view.kind === 'quota_exceeded' ? (
-        <p className="text-muted-foreground">{t('quotaExceeded')}</p>
-      ) : view.kind === 'query_error' ? (
-        <p className="text-muted-foreground">{t('queryError')}</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {view.steps.map((step) => (
-            <li key={step.stageKey + step.stepOrder} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium">{t('stepHeading', { order: step.stepOrder + 1, stage: tStage(step.stageKey) })}</span>
-                <span className="text-muted-foreground">{t('stepConversion', { percent: step.conversionPercent })}</span>
-              </div>
-              <span className="text-muted-foreground">{t('stepCustomerCount', { count: step.customerCount })}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+    <main className="container mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+      <FunnelGoalsDashboard
+        orgId={orgId}
+        projectId={projectId}
+        projectName={project.name}
+        cockpitData={cockpitData}
+        canExecute={canExecute}
+        metricCatalog={metricCatalog}
+        people={people.filter((p) => !p.archived_at).map((p) => ({ id: p.id, name: p.name }))}
+      />
     </main>
   );
 }

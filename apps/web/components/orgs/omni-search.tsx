@@ -172,7 +172,7 @@ export function OmniSearchTrigger({ orgId, projectId }: OmniSearchTriggerProps):
         className="flex w-full items-center gap-2 rounded-xl border border-input bg-background px-3 py-2 text-sm text-muted-foreground shadow-soft hover:bg-accent/10"
       >
         <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-        <span className="flex-1 truncate text-left">{t('trigger')}</span>
+        <span className="flex-1 truncate text-start">{t('trigger')}</span>
         <kbd className="hidden shrink-0 rounded border border-input px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/80 md:inline-block">
           {t('shortcutHint')}
         </kbd>

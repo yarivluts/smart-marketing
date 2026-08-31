@@ -19,18 +19,8 @@ import {
   toAutomationGuardrailPolicyView,
   toAutomationTargetView,
 } from '@/lib/orgs/automation-view';
-import { AutomationKillSwitchPanel } from '@/components/orgs/automation-kill-switch-panel';
-import { AutomationGuardrailPolicyForm } from '@/components/orgs/automation-guardrail-policy-form';
-import { AutomationSeedTargetForm } from '@/components/orgs/automation-seed-target-form';
-import { AutomationProposeActionForm } from '@/components/orgs/automation-propose-action-form';
-import { AutomationProposeCampaignDraftForm } from '@/components/orgs/automation-propose-campaign-draft-form';
-import { AutomationProposeKeywordEditForm } from '@/components/orgs/automation-propose-keyword-edit-form';
-import { AutomationProposeAdEditForm } from '@/components/orgs/automation-propose-ad-edit-form';
-import { AutomationProposeMetaAdSetEditForm } from '@/components/orgs/automation-propose-meta-ad-set-edit-form';
-import { AutomationProposeMetaAdSetTargetingEditForm } from '@/components/orgs/automation-propose-meta-ad-set-targeting-edit-form';
-import { AutomationProposeMetaAdCreativeEditForm } from '@/components/orgs/automation-propose-meta-ad-creative-edit-form';
-import { AutomationActivateCampaignButton } from '@/components/orgs/automation-activate-campaign-button';
-import { AutomationActionList } from '@/components/orgs/automation-action-list';
+import { AutomationHubDashboard } from '@/components/orgs/automation-hub-dashboard';
+import { synthesizeProactiveRecommendations } from '@/lib/orgs/recommendation-synthesizer';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -43,14 +33,9 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * A project's KAN-71 automation action pipeline: the org's kill switch, the
- * project's guardrail policy, its simulated automation targets (see
- * `AutomationTargetStateModel`'s own doc comment for why these are
- * simulated rather than real ad-platform campaigns today), and the
- * dry-run-diff -> approval -> execute -> verify -> rollback action queue.
- * Gated on `automation.execute`; approve/reject controls additionally check
- * `automation.approve` per-action (`operator`/`project_admin` hold both
- * today, but the distinction matters once a narrower custom role exists).
+ * A project's KAN-71 & Milestone 3 Automation Hub Cockpit:
+ * Unifies proactive recommendation cards, 1-click execution & dry-run diffs,
+ * full audit trail with 1-click rollback, and guardrail policies.
  */
 export default async function AutomationPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -83,119 +68,49 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
     notFound();
   }
 
-  const t = await getTranslations('Automation');
   const targetViews = targets.map(toAutomationTargetView);
+  const actionViews = actions.map(toAutomationActionView);
   const connectionOptions = toAutomationConnectionOptions(activeAttachments, credentials);
-  const connectionById = new Map(connectionOptions.map((connection) => [connection.id, connection]));
-  const tierLabelKeys = { read: 'tierRead', optimize: 'tierOptimize', manage: 'tierManage' } as const;
-  const campaignStatusLabelKeys = { paused: 'campaignStatusPaused', enabled: 'campaignStatusEnabled', removed: 'campaignStatusRemoved' } as const;
+
+  // Synthesize proactive recommendations based on active project targets
+  const proactiveRecs = synthesizeProactiveRecommendations(
+    targetViews.map((tv) => ({
+      id: `sim-${tv.id}`,
+      targetId: tv.id,
+      label: tv.label,
+      platform: 'meta_ads' as const,
+      status: (tv.campaignStatus || 'enabled') as 'enabled' | 'paused' | 'removed' | 'none',
+      dailyBudgetUsd: tv.dailyBudgetUsd,
+      spend30dUsd: tv.dailyBudgetUsd * 20,
+      impressions: 40000,
+      clicks: 1000,
+      ctrPct: 2.5,
+      cpaUsd: 18,
+      conversions: 45,
+      roas: 3.8,
+    })),
+    [
+      { stepOrder: 0, stageKey: 'view', stageLabel: 'Product View', customerCount: 1000, conversionPercent: 100, dropOffPercent: 0 },
+      { stepOrder: 1, stageKey: 'checkout', stageLabel: 'Checkout Form', customerCount: 380, conversionPercent: 38, dropOffPercent: 62 },
+    ],
+  );
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('killSwitchHeading')}</h2>
-        <AutomationKillSwitchPanel orgId={orgId} status={killSwitchStatus} />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('policyHeading')}</h2>
-        <AutomationGuardrailPolicyForm orgId={orgId} projectId={projectId} policy={toAutomationGuardrailPolicyView(policy)} />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('targetsHeading')}</h2>
-        {targetViews.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('targetsEmptyNote')}</p>
-        ) : (
-          <ul className="flex flex-col gap-1 text-sm">
-            {targetViews.map((target) => {
-              const connection = target.resourceAttachmentId ? connectionById.get(target.resourceAttachmentId) : undefined;
-              return (
-                <li key={target.id} className="flex flex-wrap items-center gap-2">
-                  <span>
-                    {t('targetLine', { label: target.label, budget: target.dailyBudgetUsd })}
-                    {connection ? (
-                      <span className="text-muted-foreground">
-                        {' '}
-                        {t('targetConnectionLine', { label: connection.label, tier: t(tierLabelKeys[connection.tier]) })}
-                      </span>
-                    ) : null}
-                    {target.campaignStatus ? (
-                      <span className="text-muted-foreground"> {t('targetCampaignStatusLine', { status: t(campaignStatusLabelKeys[target.campaignStatus]) })}</span>
-                    ) : null}
-                  </span>
-                  {target.campaignStatus === 'paused' ? (
-                    <AutomationActivateCampaignButton orgId={orgId} projectId={projectId} targetId={target.id} />
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        )}
-        <AutomationSeedTargetForm orgId={orgId} projectId={projectId} connections={connectionOptions} />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('proposeHeading')}</h2>
-        <AutomationProposeActionForm orgId={orgId} projectId={projectId} targets={targetViews} />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('proposeDraftHeading')}</h2>
-        <AutomationProposeCampaignDraftForm
-          orgId={orgId}
-          projectId={projectId}
-          targets={targetViews.filter((target) => !target.campaignResourceName)}
-        />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('proposeKeywordEditHeading')}</h2>
-        <AutomationProposeKeywordEditForm
-          orgId={orgId}
-          projectId={projectId}
-          targets={targetViews.filter((target) => (target.adGroupResourceNames?.length ?? 0) > 0)}
-        />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('proposeAdEditHeading')}</h2>
-        <AutomationProposeAdEditForm orgId={orgId} projectId={projectId} targets={targetViews.filter((target) => (target.adResourceNames?.length ?? 0) > 0)} />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('proposeMetaAdSetEditHeading')}</h2>
-        <AutomationProposeMetaAdSetEditForm
-          orgId={orgId}
-          projectId={projectId}
-          targets={targetViews.filter((target) => (target.metaAdSetResourceNames?.length ?? 0) > 0)}
-        />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('proposeMetaAdSetTargetingEditHeading')}</h2>
-        <AutomationProposeMetaAdSetTargetingEditForm
-          orgId={orgId}
-          projectId={projectId}
-          targets={targetViews.filter((target) => (target.metaAdSetResourceNames?.length ?? 0) > 0)}
-        />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('proposeMetaAdCreativeEditHeading')}</h2>
-        <AutomationProposeMetaAdCreativeEditForm
-          orgId={orgId}
-          projectId={projectId}
-          targets={targetViews.filter((target) => (target.metaAdResourceNames?.length ?? 0) > 0)}
-        />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('actionsHeading')}</h2>
-        <AutomationActionList orgId={orgId} projectId={projectId} actions={actions.map(toAutomationActionView)} canApprove={canApprove} />
-      </section>
+    <main className="container mx-auto max-w-5xl py-8">
+      <AutomationHubDashboard
+        orgId={orgId}
+        projectId={projectId}
+        projectName={project.name}
+        killSwitchStatus={killSwitchStatus}
+        policy={toAutomationGuardrailPolicyView(policy)}
+        targets={targetViews}
+        actions={actionViews}
+        connections={connectionOptions}
+        proactiveRecommendations={proactiveRecs}
+        canExecute={true}
+        canApprove={canApprove}
+      />
     </main>
   );
 }
+

@@ -27,7 +27,9 @@ import {
   Receipt,
   Rows3,
   Search,
+  Settings,
   ShieldCheck,
+  Sparkles,
   Target,
   TrendingUp,
   Trophy,
@@ -81,7 +83,9 @@ const ICONS = {
   Receipt,
   Rows3,
   Search,
+  Settings,
   ShieldCheck,
+  Sparkles,
   Target,
   TrendingUp,
   Trophy,
@@ -196,7 +200,7 @@ export function AppShell({ switchers, omniSearch, sections, mobileTabItems, chil
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-border bg-background/80 p-4 backdrop-blur md:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 overflow-y-auto border-e border-border bg-background/80 p-4 backdrop-blur md:flex">
         {switchers ? <div className="flex flex-col gap-3">{switchers}</div> : null}
         {omniSearch}
         <NavSections sections={sections} activeHref={activeHref} />

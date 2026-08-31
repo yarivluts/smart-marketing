@@ -625,6 +625,8 @@ export async function listFirmographicCompositionAlertsForProject(organizationId
   return listFirmographicCompositionAlertsForProjectInOrganization(organizationId, projectId);
 }
 
+export type { CampaignSpendBreakdownOutcome };
+
 export async function getCampaignSpendBreakdownForProject(organizationId: string, projectId: string): Promise<CampaignSpendBreakdownOutcome> {
   await ensureFirestoreOrm();
   return getCampaignSpendBreakdownForProjectInOrganization(organizationId, projectId);

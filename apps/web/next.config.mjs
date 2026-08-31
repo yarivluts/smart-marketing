@@ -7,8 +7,12 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Self-contained server bundle for containerized (Cloud Run) deploys.
-  output: 'standalone',
+  // Standalone output for containerized (Cloud Run) deploys; skipped on Windows local builds
+  output:
+    process.env.NEXT_OUTPUT_STANDALONE === 'true' ||
+    (process.env.NODE_ENV === 'production' && process.platform !== 'win32')
+      ? 'standalone'
+      : undefined,
   // Trace files from the monorepo root so workspace deps are included.
   outputFileTracingRoot: path.join(dirname, '../../'),
   // Linting is enforced by the dedicated `lint` turbo task / CI, not the build.

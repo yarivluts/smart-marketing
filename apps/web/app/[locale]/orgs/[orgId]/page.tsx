@@ -56,13 +56,6 @@ export default async function OrgDetailPage({
   const principal = { type: 'user' as const, id: user.id };
   const canManageMembers = can(bindings, principal, 'members.manage', { orgId });
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
-  const canManageKeys = can(bindings, principal, 'keys.manage', { orgId });
-  const canManageSchemas = can(bindings, principal, 'schema.write', { orgId });
-  const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId });
-  const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
-  const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
-  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
-  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
   const canManageBilling = can(bindings, principal, 'billing.manage', { orgId });
 
   // Projects the signed-in inviter administers (KAN-135) — scopes the
@@ -75,7 +68,10 @@ export default async function OrgDetailPage({
     .filter((project) => can(bindings, principal, 'project.manage', { orgId, projectId: project.id }))
     .map((project) => ({ id: project.id, name: project.name }));
 
-  const t = await getTranslations('OrgDetailPage');
+  const [t, tShell] = await Promise.all([
+    getTranslations('OrgDetailPage'),
+    getTranslations('AppShell'),
+  ]);
 
   return (
     <OrgShell locale={locale} orgId={orgId}>
@@ -111,220 +107,18 @@ export default async function OrgDetailPage({
               {currentProjectId ? (
                 <div className="flex items-center gap-4">
                   <EnvBadge orgId={orgId} projectId={currentProjectId} currentEnv={currentEnv} />
-                  <Link
-                    className="text-sm underline"
-                    href={`/orgs/${orgId}/projects/${currentProjectId}/resources`}
-                  >
-                    {t('projectResourcesLink')}
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/campaigns`}>
+                    {tShell('adsAndPerformance')}
                   </Link>
-                  {canManageKeys ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/keys`}
-                    >
-                      {t('projectKeysLink')}
-                    </Link>
-                  ) : null}
-                  {canManageSchemas ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/schema-defs`}
-                    >
-                      {t('projectSchemaRegistryLink')}
-                    </Link>
-                  ) : null}
-                  {canManageMetrics ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/metric-defs`}
-                    >
-                      {t('projectMetricRegistryLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/ingest-health`}
-                    >
-                      {t('projectIngestHealthLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/hooks`}
-                    >
-                      {t('projectHooksLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/field-mappings`}
-                    >
-                      {t('projectFieldMappingsLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/billing-ops-feed`}
-                    >
-                      {t('projectBillingOpsFeedLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/record-feed`}
-                    >
-                      {t('projectRecordFeedLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/customers`}
-                    >
-                      {t('projectCustomersLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/feedback`}
-                    >
-                      {t('projectFeedbackLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/churn-reasons`}
-                    >
-                      {t('projectChurnReasonsLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/intent-quality`}
-                    >
-                      {t('projectIntentQualityLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/firmographics`}
-                    >
-                      {t('projectFirmographicsLink')}
-                    </Link>
-                  ) : null}
-                  {canViewIngestHealth ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/experiments`}
-                    >
-                      {t('projectExperimentsLink')}
-                    </Link>
-                  ) : null}
-                  {canManageProjects ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/cost-guardrails`}
-                    >
-                      {t('projectCostGuardrailsLink')}
-                    </Link>
-                  ) : null}
-                  {canManageProjects ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/session-replay`}
-                    >
-                      {t('projectSessionReplayLink')}
-                    </Link>
-                  ) : null}
-                  {canManageProjects ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/settings`}
-                    >
-                      {t('projectSettingsLink')}
-                    </Link>
-                  ) : null}
-                  {canManagePlugins ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/plugins`}
-                    >
-                      {t('projectPluginsLink')}
-                    </Link>
-                  ) : null}
-                  {canViewBoards ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/boards`}
-                    >
-                      {t('projectBoardsLink')}
-                    </Link>
-                  ) : null}
-                  {canManageBoards ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/goals`}
-                    >
-                      {t('projectGoalsLink')}
-                    </Link>
-                  ) : null}
-                  {canManageBoards ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/segments`}
-                    >
-                      {t('projectSegmentsLink')}
-                    </Link>
-                  ) : null}
-                  {canManageBoards ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/funnel`}
-                    >
-                      {t('projectFunnelLink')}
-                    </Link>
-                  ) : null}
-                  {canManageBoards ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/cohorts`}
-                    >
-                      {t('projectCohortsLink')}
-                    </Link>
-                  ) : null}
-                  {canManageBoards ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/insights`}
-                    >
-                      {t('projectInsightsLink')}
-                    </Link>
-                  ) : null}
-                  {canManageBoards ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/tv`}
-                    >
-                      {t('projectTvLink')}
-                    </Link>
-                  ) : null}
-                  {canManageBoards ? (
-                    <Link
-                      className="text-sm underline"
-                      href={`/orgs/${orgId}/projects/${currentProjectId}/campaign-ops`}
-                    >
-                      {t('projectCampaignOpsLink')}
-                    </Link>
-                  ) : null}
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/funnel`}>
+                    {tShell('funnelAndGoals')}
+                  </Link>
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/automation`}>
+                    {tShell('aiCopilotAndAutomation')}
+                  </Link>
+                  <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/settings`}>
+                    {tShell('settings')}
+                  </Link>
                 </div>
               ) : null}
             </>
