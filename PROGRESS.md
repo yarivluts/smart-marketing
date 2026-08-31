@@ -17,6 +17,41 @@ Template for each entry:
 
 ---
 
+## 2026-08-31 (later) — Follow-up scheduled run: confirmed and sharpened the diagnosis below (no code change)
+
+- **Last completed:** independently reproduced the finding two sessions ago (this entry, below):
+  `main`'s `lint`/`typecheck` are clean on HEAD (`bd7d215`) — only `Test` is red, for the same
+  tri-module-nav-vs-e2e-spec reason. Two new, material findings on top of it:
+  - The ~20 orphaned feature pages (grep of `apps/web/e2e/*.spec.ts` across all shards, not just
+    shard 1/3 — Campaign ops, Cohort retention, Cost guardrails, Customers, Schema registry, Metric
+    catalog, Billing ops feed, Experiments, Feedback, Inbound hooks, Ingest health, Intent &
+    quality, API keys, Plugins, Record feed, Resource library, TV pairing, Boards, …) still exist as
+    routes on disk — nothing was deleted, they're just unlinked from `ProjectLayout`'s nav.
+  - They are **also absent from OmniSearch** (`components/orgs/omni-search.tsx`'s index only covers
+    boards/metrics/segments/campaigns/goals/win_rules/customers) — so there is currently **no path
+    at all**, nav or search, to roughly 20 admin/operational surfaces. That's a direct conflict with
+    CLAUDE.md's non-negotiable "everything user-manageable gets an admin surface" rule, not just an
+    IA/cosmetic question — worth knowing when deciding how urgently to resolve it.
+  - Considered doing the mechanical fix myself (swap each spec's nav-click for `page.goto(route)`,
+    leaving feature coverage intact) — rejected for the same reason the entry below already gives:
+    it would get CI green while quietly hiding a real reachability regression from view, and this
+    now makes three independent sessions reaching the same "needs a human call" conclusion.
+  - Also flagged: `0be7808`/`4f50462`/`bd7d215` all landed as direct pushes to `main`, not through a
+    branch + PR — which is how a change that breaks `Test` reached `main` without CI ever gating it,
+    the exact scenario CLAUDE.md's branch+PR rule exists to prevent.
+- **In progress (exact stopping point):** none — no code change. #362/#363 still open and unmerged,
+  both still blocked on the same thing.
+- **Blocked + why:** same as below — needs a human IA decision per feature area.
+- **Next step:** same as below, now with the OmniSearch-coverage confirmation folded in — a fix
+  should either restore real reachability (nav, Settings, or OmniSearch) for each area, or make an
+  explicit, recorded call to deprecate it; silently switching the e2e specs to `page.goto` would
+  paper over the reachability gap rather than resolve it.
+- **Waiting on human:** same list as below, plus: this is worth a decision soon — it has now blocked
+  every PR (including two trivial fixes and two docs-only records) across at least three separate
+  scheduled runs today.
+
+---
+
 ## 2026-08-31 — CI red on `main`: two chore fixes in flight (#361/#362); found the tri-module redesign broke most of the e2e nav suite (needs-human)
 
 - **Last completed:**
@@ -139,12 +174,6 @@ Template for each entry:
 - **Blocked + why:** nothing blocking new backlog work.
 - **Next step:** next run checks open PRs first (#357, #358, #327), drives any real failures to green.
 - **Waiting on human:** KAN-43 applications; KAN-18/KAN-19.
-<<<<<<< HEAD
-=======
-
----
-
->>>>>>> origin/main
 
 ---
 
