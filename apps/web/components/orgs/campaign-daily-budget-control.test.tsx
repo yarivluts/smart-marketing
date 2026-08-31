@@ -11,6 +11,16 @@ vi.mock('@/i18n/navigation', () => ({
   }),
 }));
 
+// The budget amount and "/day" suffix render as two separate <span> elements
+// (bidi-safe number isolation), so their accessible name joins them with a
+// space ("$100 /day") and their combined text is split across nodes. Neither
+// `getByText('$100/day')` nor an exact-string `name` match can find it —
+// match loosely instead of coupling the test to the (non-)whitespace between
+// them.
+function BUDGET_AMOUNT_NAME_RE(amount: number): RegExp {
+  return new RegExp(`^\\$${amount}\\s*/day$`);
+}
+
 function renderBudgetControl(props: Partial<Parameters<typeof CampaignDailyBudgetControl>[0]> = {}) {
   const defaultProps = {
     orgId: 'org-1',
@@ -36,7 +46,7 @@ describe('CampaignDailyBudgetControl', () => {
 
   it('renders initial budget amount and preset buttons', () => {
     renderBudgetControl({ initialDailyBudgetUsd: 100 });
-    expect(screen.getByText('$100/day')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: BUDGET_AMOUNT_NAME_RE(100) })).toBeInTheDocument();
     expect(screen.getByText('+10%')).toBeInTheDocument();
     expect(screen.getByText('+20%')).toBeInTheDocument();
     expect(screen.getByText('-20%')).toBeInTheDocument();
@@ -54,7 +64,7 @@ describe('CampaignDailyBudgetControl', () => {
 
     fireEvent.click(screen.getByText('+20%'));
 
-    expect(screen.getByText('$120/day')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: BUDGET_AMOUNT_NAME_RE(120) })).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/orgs/org-1/projects/proj-1/automation/actions/quick-execute',
       expect.objectContaining({
@@ -79,7 +89,7 @@ describe('CampaignDailyBudgetControl', () => {
     renderBudgetControl({ initialDailyBudgetUsd: 100 });
 
     // Open editor
-    fireEvent.click(screen.getByText('$100/day'));
+    fireEvent.click(screen.getByRole('button', { name: BUDGET_AMOUNT_NAME_RE(100) }));
 
     const input = screen.getByRole('spinbutton');
     expect(input).toHaveValue(100);
@@ -117,7 +127,7 @@ describe('CampaignDailyBudgetControl', () => {
     fireEvent.click(screen.getByText('+20%'));
 
     await waitFor(() => {
-      expect(screen.getByText('$100/day')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: BUDGET_AMOUNT_NAME_RE(100) })).toBeInTheDocument();
       expect(screen.getByRole('alert')).toHaveTextContent(
         'Action blocked: Exceeds project daily budget ceiling',
       );
@@ -126,7 +136,7 @@ describe('CampaignDailyBudgetControl', () => {
 
   it('disables interactions when disabled prop is true', () => {
     renderBudgetControl({ disabled: true });
-    expect(screen.getByRole('button', { name: '$100/day' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: BUDGET_AMOUNT_NAME_RE(100) })).toBeDisabled();
     expect(screen.queryByText('+10%')).not.toBeInTheDocument();
   });
 });
