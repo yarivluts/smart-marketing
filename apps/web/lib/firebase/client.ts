@@ -18,10 +18,10 @@ function getFirebaseApp(): FirebaseApp {
     return app;
   }
   app = initializeApp({
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? 'demo-api-key',
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? EMULATOR_PROJECT_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyDJ7U_VLfSzEsiUUI3mUts_UBkBBKjJa8k',
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'growthos-g2w84.firebaseapp.com',
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'growthos-g2w84',
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || '1:1098891924957:web:2e4ee0bc9b9b79e804d234',
   });
   return app;
 }

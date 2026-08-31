@@ -89,11 +89,16 @@ export function AuthProvider({ children }: { children: ReactNode }): React.React
   const [sessionSyncing, setSessionSyncing] = useState(false);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
-    return onAuthStateChanged(auth, (nextUser) => {
-      setUser(nextUser);
+    try {
+      const auth = getFirebaseAuth();
+      return onAuthStateChanged(auth, (nextUser) => {
+        setUser(nextUser);
+        setLoading(false);
+      });
+    } catch (error) {
+      console.warn('Firebase Auth initialization warning:', error);
       setLoading(false);
-    });
+    }
   }, []);
 
   const value = useMemo<AuthContextValue>(
