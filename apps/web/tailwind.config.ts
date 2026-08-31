@@ -19,13 +19,12 @@ const config: Config = {
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        // A soft, diffused shadow scale (low-opacity, large blur, minimal spread) rather than
-        // Tailwind's default harsher/darker shadows — the "floating card" look Intercom's panels
-        // use. Tinted toward the brand blue instead of pure black for a warmer, on-brand feel.
-        soft: '0 1px 2px 0 hsl(234 30% 20% / 0.04), 0 2px 8px -2px hsl(234 30% 20% / 0.06)',
-        'soft-md': '0 2px 4px 0 hsl(234 30% 20% / 0.04), 0 8px 24px -4px hsl(234 30% 20% / 0.08)',
-        'soft-lg': '0 4px 8px 0 hsl(234 30% 20% / 0.04), 0 16px 40px -8px hsl(234 30% 20% / 0.12)',
-        glow: '0 0 0 1px hsl(var(--primary) / 0.05), 0 8px 24px -4px hsl(var(--primary) / 0.25)',
+        soft: '0 1px 3px 0 hsl(222 47% 11% / 0.05), 0 1px 2px -1px hsl(222 47% 11% / 0.05)',
+        'soft-md': '0 4px 6px -1px hsl(222 47% 11% / 0.07), 0 2px 4px -2px hsl(222 47% 11% / 0.07)',
+        'soft-lg': '0 10px 15px -3px hsl(222 47% 11% / 0.08), 0 4px 6px -4px hsl(222 47% 11% / 0.08)',
+        'soft-xl': '0 20px 25px -5px hsl(222 47% 11% / 0.09), 0 8px 10px -6px hsl(222 47% 11% / 0.09)',
+        glow: '0 0 0 1px hsl(var(--primary) / 0.1), 0 8px 24px -4px hsl(var(--primary) / 0.3)',
+        'glow-emerald': '0 0 0 1px hsl(var(--success) / 0.15), 0 8px 24px -4px hsl(var(--success) / 0.3)',
       },
       colors: {
         border: 'hsl(var(--border))',
@@ -33,6 +32,14 @@ const config: Config = {
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
         primary: {
           DEFAULT: 'hsl(var(--primary))',
           foreground: 'hsl(var(--primary-foreground))',
@@ -53,26 +60,62 @@ const config: Config = {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
         },
+        success: {
+          DEFAULT: 'hsl(var(--success))',
+          foreground: 'hsl(var(--success-foreground))',
+        },
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))',
+        },
+        alert: {
+          DEFAULT: 'hsl(var(--alert))',
+          foreground: 'hsl(var(--alert-foreground))',
+        },
+        info: {
+          DEFAULT: 'hsl(var(--info))',
+          foreground: 'hsl(var(--info-foreground))',
+        },
       },
       borderRadius: {
+        xl: 'calc(var(--radius) + 4px)',
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
       keyframes: {
-        // KAN-67's war-room confetti burst (`confetti-burst.tsx`): each
-        // particle falls from just above the viewport to just below it while
-        // spinning, driven purely by a CSS animation (no canvas/animation
-        // library) so it's paused for free whenever `prefers-reduced-motion`
-        // is honored (that component skips rendering particles at all in
-        // that case rather than relying on this keyframe not firing).
         'confetti-fall': {
           '0%': { transform: 'translateY(-10vh) rotate(0deg)', opacity: '1' },
           '100%': { transform: 'translateY(110vh) rotate(720deg)', opacity: '0.3' },
         },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        'fade-out': {
+          '0%': { opacity: '1' },
+          '100%': { opacity: '0' },
+        },
+        'zoom-in-95': {
+          '0%': { transform: 'scale(0.95)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        'slide-down': {
+          '0%': { transform: 'translateY(-10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        'slide-up': {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
       },
       animation: {
         'confetti-fall': 'confetti-fall linear forwards',
+        'fade-in': 'fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        'fade-out': 'fade-out 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        'zoom-in-95': 'zoom-in-95 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        'slide-down': 'slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        'slide-up': 'slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
       },
     },
   },

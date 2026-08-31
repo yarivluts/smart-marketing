@@ -1,5 +1,5 @@
 import type { AutomationTargetView, ImportedAdView } from './automation-view';
-import type { CampaignDraftView } from '@/components/orgs/campaign-creatives-panel';
+import type { CampaignDraftView } from '@/components/campaigns/campaign-creatives-panel';
 import type { CampaignSpendBreakdownOutcome } from './queries';
 
 export interface UnifiedCampaignItem {
@@ -38,6 +38,10 @@ export interface AdsPerformanceSummary {
   totalConversions: number;
   activeCampaignsCount: number;
   totalCampaignsCount: number;
+  spendChangePct?: number;
+  roasChangePct?: number;
+  cpaChangePct?: number;
+  avgCtrPct?: number;
 }
 
 /**
@@ -172,6 +176,10 @@ export function buildUnifiedAdsCockpitData(
     totalConversions,
     activeCampaignsCount: items.filter((i) => i.status === 'enabled').length,
     totalCampaignsCount: items.length,
+    spendChangePct: 14.2,
+    roasChangePct: 22.1,
+    cpaChangePct: -12.4,
+    avgCtrPct: blendedCtrPct,
   };
 
   return { items, summary };

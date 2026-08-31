@@ -1,160 +1,70 @@
-# Project: GrowthOS Redesign
+# Project: GrowthOS UI/UX Overhaul
 
 ## Architecture
-GrowthOS is a frictionless, zero-configuration marketing and growth operations platform built with Next.js 15 App Router, TypeScript, Tailwind CSS, Radix UI, Lucide icons, `next-intl` bilingual localization (Hebrew RTL / English LTR), and a backend powered by NestJS, Firestore ORM models, and an extensible `AutomationActionExecutor` pipeline for Google Ads, Meta Ads, and Simulated Ad Accounts.
-
-### System Topography & Module Boundaries
-```
-GrowthOS Navigation (Tri-Module Architecture)
-├── Global Header (Locale Switcher EN/HE, Org/Project Selectors, AI Copilot Command Bar)
-│
-├── 1. Ads & Performance (מודעות וביצועים) [COMPLETED]
-│   ├── Unified Campaigns & Ad Performance Cockpit (Meta & Google Ads, ROAS, Spend, Status Toggles)
-│   ├── Creatives Gallery (Visual previews of images, copy, headlines, CTA)
-│   └── Spend & ROAS Analytics (40d payback, quality calibration, budget targets)
-│
-├── 2. Funnel & Goals (משפך ויעדים) [NEXT]
-│   ├── Visual Conversion Funnels (Multi-step conversion pipeline e.g. EasySign: Sent → Viewed → Signed)
-│   ├── Metric Goals & Dynamic Pace (Thermometer progress, projected dates, target vs actual)
-│   └── Revenue Health & Retention (Cohort retention heatmap, payback velocity)
-│
-├── 3. AI Copilot & Automation (עוזר AI ואוטומציה)
-│   ├── Interactive Bilingual Copilot Chat (Hebrew & English natural language commands & queries)
-│   ├── In-Context Smart Recommendations (Proactive cards with Before/After diffs & 1-click approve)
-│   ├── Pending Proposals Queue & Action Hub (Explicit diffs, estimated impact summary)
-│   ├── Execution Logs & Audit Trail (Real-time history, verification, 1-click rollback)
-│   └── Safety & Guardrails (Emergency Kill Switch, budget policy limits)
-│
-└── 4. Settings & Resources (Secondary / Non-intrusive)
-    └── Account Settings, API Keys, Cost Guardrails, Plugins, Audit Log
-```
-
----
+- **Framework**: Next.js 15 App Router (`apps/web`), React 19, TypeScript
+- **Styling**: Tailwind CSS, PostCSS, CSS Variables (`globals.css`), Lucide React icons, Radix UI primitives
+- **Internationalization**: `next-intl` with full bi-directional support (`he` RTL, `en` LTR)
+- **State & Data Flow**: Zustand stores, React Query, Firebase Auth & Firestore client/emulator hooks
 
 ## Feature Inventory
-| # | Feature | Description | Milestone | Source | Status |
-|---|---------|-------------|-----------|--------|--------|
-| 1 | Tri-Module Navigation Restructuring | Consolidate 32+ cluttered links into 3 clean modules (Ads, Funnel & Goals, Copilot & Automation) + secondary Settings | M1 | ORIGINAL_REQUEST §R1 | **DONE** |
-| 2 | Unified Campaigns Cockpit | Visual campaign cards/table with Meta/Google platform badges, live spend, ROAS, and zero DB configs | M1 | ORIGINAL_REQUEST §R1 | **DONE** |
-| 3 | 2-Click Campaign Actions | Inline daily budget adjustment and <= 2-click pause/activate status toggles | M1 | ORIGINAL_REQUEST §Acceptance Criteria | **DONE** |
-| 4 | Creatives Preview Gallery | Visual ad preview cards for Meta & Google ads with image, headline, primary text, and CTA buttons | M1 | ORIGINAL_REQUEST §R1 | **DONE** |
-| 5 | Visual Conversion Funnels | Multi-step conversion funnel (e.g. EasySign: Sent → Viewed → Signed) with drop-off percentages & counts | M2 | ORIGINAL_REQUEST §R1 | PLANNED |
-| 6 | Business Metric Goals & Dynamic Pace | Active goals with target inputs, dynamic pace thermometers, and projected completion dates | M2 | ORIGINAL_REQUEST §R1 | PLANNED |
-| 7 | Revenue Health & Cohorts | Cohort retention heatmap and customer velocity metrics | M2 | ORIGINAL_REQUEST §R1 | PLANNED |
-| 8 | Bilingual Natural Language Copilot | Interactive conversational chat in Hebrew (RTL) and English (LTR) parsing analytics and action intents | M3 | ORIGINAL_REQUEST §R2 | PLANNED |
-| 9 | Proactive In-Context Smart Cards | Embedded recommendation cards in campaign/funnel screens with Before/After diffs and impact summaries | M3 | ORIGINAL_REQUEST §R2 | PLANNED |
-| 10 | 1-Click Action Execution | 1-click approval and instant execution via `AutomationActionExecutor` with fast verification | M3 | ORIGINAL_REQUEST §R2 | PLANNED |
-| 11 | Audit Trail & 1-Click Rollback | Complete action history with verification and 1-click rollback execution | M3 | ORIGINAL_REQUEST §R2 | PLANNED |
-| 12 | Zero-Setup Executive Blended Report | Blended cross-channel overview (Meta + Google spend, blended CAC, conversion velocity, churn/dunning) | M4 | ORIGINAL_REQUEST §R3 | PLANNED |
-| 13 | Bilingual Symmetrical Localization | 100% UI strings localized in `messages/he.json` and `messages/en.json` passing `messages.test.ts` | M4 | ORIGINAL_REQUEST §R4 | PLANNED |
-| 14 | RTL Layout & Visual Polish | Modern Tailwind CSS, Radix UI, Lucide icons, seamless RTL/LTR switching with zero layout breakage | M4 | ORIGINAL_REQUEST §R4 | PLANNED |
-| 15 | Monorepo Build, Typecheck, Lint Clean | Monorepo passes `pnpm build`, `pnpm typecheck`, and `pnpm lint` with 0 errors | M4 | ORIGINAL_REQUEST §Acceptance Criteria | PLANNED |
-| 16 | E2E Opaque-Box Test Suite (Tiers 1-4) | Comprehensive requirement-driven opaque-box test suite across all 3 modules and AI action engine | M5 | Project Pattern Dual Track | **READY** (57 tests passing) |
-| 17 | Adversarial Coverage Hardening (Tier 5) | White-box adversarial test cases and edge-case hardening via Challenger loop | M5 | Project Pattern Dual Track | PLANNED |
-
----
+| # | Feature | Description | Milestone | Source |
+|---|---------|-------------|-----------|--------|
+| 1 | Theme Tokens & CSS Palette | Slate backgrounds, Indigo primary, Emerald positive/growth, Amber warning, Rose alert tokens | M1 | ORIGINAL_REQUEST §R1, Explorer 1 |
+| 2 | Standardized UI Primitives | 12+ shadcn/Radix-based primitives (badge, stat-card, table, tabs, dialog, select, skeleton, toast, switch, textarea, button, card) | M1 | ORIGINAL_REQUEST §R1, Explorer 1 |
+| 3 | App Shell & Global Navigation | Modern floating header, workspace switcher, clean active route indicators, mobile navigation drawer | M1 | ORIGINAL_REQUEST §R2.1, Explorer 2 |
+| 4 | Cmd+K Omni-Search Modal | Floating global search dialog with instant visual preview and keyboard navigation | M1 | ORIGINAL_REQUEST §R2.1, Explorer 2 |
+| 5 | Ads KPI Metric Scorecards | Sleek metric scorecards with trend chips, positive/negative delta indicators, period comparisons | M2 | ORIGINAL_REQUEST §R2.2, Explorer 2 |
+| 6 | Meta Feed & Google RSA Previews | Modern creative preview cards with live asset rendering and platform badges | M2 | ORIGINAL_REQUEST §R2.2, Explorer 2 |
+| 7 | Campaign Interactive Controls | 1-click status toggles, inline daily budget sliders/steppers with instant feedback | M2 | ORIGINAL_REQUEST §R2.2, Explorer 2 |
+| 8 | Blended Executive Reporting | Multi-channel aggregated performance charts and summary tables | M2 | ORIGINAL_REQUEST §R2.2, Explorer 2 |
+| 9 | Conversion Funnel Flow | Step-by-step visual funnel with animated flow connectors and drop-off rate chips | M3 | ORIGINAL_REQUEST §R2.3, Explorer 2 |
+| 10 | Dynamic Goal Thermometers | Statistical goal progress bars with pace badges and projected completion dates | M3 | ORIGINAL_REQUEST §R2.3, Explorer 2 |
+| 11 | Cohort Retention Heatmaps | Interactive cohort matrix with color-graded retention cells | M3 | ORIGINAL_REQUEST §R2.3, Explorer 2 |
+| 12 | TV Billboard Display Mode | High-impact full-screen TV dashboard with animated live win-feed | M3 | ORIGINAL_REQUEST §R2.6, Explorer 2 |
+| 13 | Operations & Settings Tables | Modernized settings forms, member management tables with role badges, billing feed | M3 | ORIGINAL_REQUEST §R2.6, Explorer 2 |
+| 14 | AI Copilot Chat Interface | Conversational AI chat panel with streaming message bubbles and suggested actions | M4 | ORIGINAL_REQUEST §R2.4, Explorer 2 |
+| 15 | AI Proposal Diff Cards | Before/After visual diff cards with 1-click approve, reject, and rollback controls | M4 | ORIGINAL_REQUEST §R2.4, Explorer 2 |
+| 16 | Execution Audit Trail | Filterable, searchable audit trail table with status pills and timestamps | M4 | ORIGINAL_REQUEST §R2.4, Explorer 2 |
+| 17 | Auth & Onboarding Overhaul | Branded login, signup, and onboarding wizard cards with smooth transitions and validation | M4 | ORIGINAL_REQUEST §R2.5, Explorer 2 |
+| 18 | Micro-Interactions & Transitions | Smooth hover states, button loading transitions, skeleton loaders, toast notifications | M1-M4 | ORIGINAL_REQUEST §R3, Explorer 1 |
+| 19 | Bilingual RTL/LTR Symmetrical Polish | Complete Hebrew (RTL) and English (LTR) layout symmetry, directional icon flipping | M5 | ORIGINAL_REQUEST §R4, Explorer 3 |
+| 20 | Translation Key Parity | 100% dictionary key parity between messages/he.json and messages/en.json with zero missing keys | M5 | ORIGINAL_REQUEST §R4, Explorer 3 |
+| 21 | Full Monorepo Build, Typecheck, Lint & E2E Tests | Zero build errors, zero type errors, clean lint, 100% passing unit and E2E test suites | M5 | ORIGINAL_REQUEST Acceptance Criteria, Explorer 3 |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Navigation & Tri-Module Foundation (Ads & Performance) | Restructure AppShell and sidebar to 3 clean modules; build unified Ads & Performance cockpit with Meta/Google cards, creatives gallery, spend/ROAS analytics, and <= 2-click status/budget controls | none | **DONE** |
-| M2 | Funnel & Goals Module | Build visual multi-step conversion funnel (EasySign), dynamic goal pace thermometers, projected completion dates, and revenue health/retention matrix | M1 | **DONE** |
-| M3 | Hybrid AI Action Engine & Copilot Integration | Build bilingual Copilot chat & command bar, proactive in-context smart recommendation cards with Before/After diffs, 1-click execution endpoint, and rollback pipeline | M1 | **DONE** |
-| M4 | Zero-Setup Executive Reporting & Bilingual Polish | Build `ExecutiveBlendedReport`, complete 100% translation key parity in `messages/he.json` and `messages/en.json`, RTL layout polish, and verify `pnpm build`, `pnpm typecheck`, `pnpm lint` | M1, M2, M3 | **DONE** |
-| M5 | Final Milestone: 100% E2E Test Suite & Adversarial Hardening | Phase 1: Verify 100% pass across all Tiers 1-4 tests published by E2E Testing Track; Phase 2: Tier 5 Adversarial Coverage Hardening | M1, M2, M3, M4 | **DONE** |
-
----
+| M1 | Design System Primitives & App Shell | Theme tokens (globals.css, tailwind.config.ts), UI primitives in components/ui/*, App Shell layout, floating header, workspace switcher, Cmd+K search dialog | none | DONE |
+| M2 | Ads & Performance Cockpit | /campaigns page overhaul: KPI scorecards, Meta/Google creative cards, 1-click toggles, daily budget steppers/sliders, blended reporting | M1 | DONE |
+| M3 | Funnel, Goals & Operations Hub | /funnel, /goals, /tv, /settings, /members, /billing-ops-feed: conversion funnel flow, goal thermometers, cohort heatmaps, TV billboard, settings tables | M1 | DONE |
+| M4 | AI Copilot & Auth Screens | /automation, /login, /signup, /onboarding: AI chat panel, Before/After proposal diffs, audit trail, authentication & onboarding cards | M1 | DONE |
+| M5 | Bilingual Polish & E2E Test Suite Pass | RTL/LTR mirroring, translation dictionary parity, E2E test suite pass (Tiers 1-4), adversarial hardening (Tier 5), typecheck, build, lint | M1, M2, M3, M4 | DONE |
 
 ## Interface Contracts
+### UI Primitives Contract (`apps/web/components/ui/`)
+- `Button`: `variant: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link' | 'emerald'`, `size: 'default' | 'sm' | 'lg' | 'icon'`, `isLoading?: boolean`
+- `Badge`: `variant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info'`
+- `StatCard`: `title: string`, `value: string | number`, `change?: number`, `changeType?: 'increase' | 'decrease' | 'neutral'`, `period?: string`, `icon?: LucideIcon`, `trendData?: number[]`
+- `Dialog` / `Modal`: Radix UI Dialog primitive with standard overlay, animated content wrapper, header, footer, close trigger
+- `Table`: Standardized `Table`, `TableHeader`, `TableBody`, `TableHead`, `TableRow`, `TableCell` with zebra/hover support
+- `Tabs`: Radix UI Tabs primitive with pill/underline variant, smooth active indicator
+- `Skeleton`: Standardized pulse shimmer loader with configurable radius/height
+- `Toast`: Global toast provider and hook (`useToast`, `toast({ title, description, variant })`)
+- `Switch`: Accessible toggle switch with smooth transition and emerald active state
 
-### AI Copilot & Action Engine Contracts
-```typescript
-export interface CopilotMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  actionProposal?: CopilotActionProposal;
-}
-
-export interface CopilotActionProposal {
-  actionType: 'budget_change' | 'campaign_activation' | 'campaign_draft_create' | 'keyword_edit' | 'ad_edit';
-  targetId: string;
-  targetLabel: string;
-  beforeValue: string | number;
-  afterValue: string | number;
-  estimatedImpact: string;
-  impactBadge: 'high' | 'medium' | 'low';
-  payload: Record<string, unknown>;
-  quickExecuteToken?: string;
-}
-
-export interface SmartRecommendationCardProps {
-  id: string;
-  category: 'budget' | 'ad_fatigue' | 'funnel_dropoff' | 'pacing';
-  title: string;
-  description: string;
-  beforeDiff: string;
-  afterDiff: string;
-  projectedImpact: string;
-  actionProposal: CopilotActionProposal;
-  onApprove: (proposal: CopilotActionProposal) => Promise<void>;
-  onDismiss: (id: string) => void;
-}
-```
-
-### Blended Executive Reporting Contracts
-```typescript
-export interface ExecutiveBlendedMetrics {
-  totalSpendUsd: number;
-  metaSpendUsd: number;
-  googleSpendUsd: number;
-  blendedCacUsd: number;
-  blendedRoas: number;
-  totalConversions: number;
-  conversionVelocityDays: number;
-  churnRatePct: number;
-  dunningRecoveryRatePct: number;
-  periodComparison: {
-    spendChangePct: number;
-    cacChangePct: number;
-    roasChangePct: number;
-  };
-}
-```
-
----
+### Bi-directional Layout Contract
+- Use Tailwind logical classes (`start`, `end`, `ms-*`, `me-*`, `ps-*`, `pe-*`, `text-start`, `text-end`) rather than left/right.
+- Directional icons (arrows, chevrons, flow steps) must include `rtl:rotate-180` or directional context lookup.
+- Numeric and currency strings (e.g. `$100/day`, `+14.2%`) must have `dir="ltr"` and `inline-block` to avoid RTL bi-di number inversion.
 
 ## Code Layout
-- `apps/web/app/[locale]/orgs/[orgId]/projects/[projectId]/`: App Router project pages
-  - `layout.tsx`: Consolidated 3-module AppShell layout [DONE]
-  - `page.tsx`: Redirect to `/campaigns` [DONE]
-  - `campaigns/`: Ads & Performance module pages [DONE]
-  - `funnel/`: Funnel & Goals module pages [NEXT]
-  - `automation/`: AI Copilot & Automation module pages
-  - `settings/`: Consolidated secondary settings [DONE]
-- `apps/web/components/orgs/`: Shared project UI components
-  - `app-shell.tsx`: Primary sidebar with 3 clean modules + settings [DONE]
-  - `ads-performance-dashboard.tsx`: Unified Ads cockpit [DONE]
-  - `campaign-list-table.tsx`: Campaigns table [DONE]
-  - `campaign-status-toggle.tsx`: 1-click status switch [DONE]
-  - `campaign-daily-budget-control.tsx`: 1-click presets & inline budget [DONE]
-  - `meta-ad-preview-card.tsx` & `google-search-ad-preview-card.tsx`: Ad preview mockups [DONE]
-  - `creative-preview-gallery.tsx`: Creatives gallery [DONE]
-  - `visual-funnel-steps.tsx`: Multi-step conversion funnel [NEXT]
-  - `funnel-goals-view.tsx`: Funnel & Goals consolidated view [NEXT]
-  - `executive-blended-report.tsx`: Blended cross-channel overview
-- `apps/web/components/ai/`: AI Copilot & Smart Card components
-  - `copilot-chat-panel.tsx`: Bilingual conversational chat
-  - `copilot-command-bar.tsx`: Quick NL command palette
-  - `smart-recommendation-cards.tsx`: In-context 1-click optimization cards
-- `apps/web/lib/orgs/`: Organization & metrics helpers
-  - `ads-performance-synthesizer.ts`: Zero-config ads metrics synthesizer [DONE]
-  - `funnel-goals-synthesizer.ts`: Funnel & goal pace synthesizer [NEXT]
-- `apps/web/lib/ai/`: AI Copilot NLP & recommendation engine
-  - `copilot-engine.ts`: Bilingual intent parsing & proposal generator
-  - `recommendation-engine.ts`: Proactive recommendation generator
-- `apps/web/messages/`: Localization files
-  - `en.json`: English LTR messages [M1 DONE]
-  - `he.json`: Hebrew RTL messages [M1 DONE]
-- `apps/web/tests/e2e/`: Opaque-box E2E test suite (Tiers 1-4) [DONE]
+- `apps/web/app/globals.css`: Root CSS theme variables (light/dark mode, slate/indigo/emerald/amber/rose palettes)
+- `apps/web/tailwind.config.ts`: Tailwind color and animation extensions
+- `apps/web/components/ui/`: Standardized UI primitive library
+- `apps/web/components/shell/`: Floating header, workspace switcher, nav menu, Cmd+K omni-search
+- `apps/web/components/campaigns/`: Campaign scorecards, budget sliders, creative preview cards
+- `apps/web/components/funnel/`: Funnel step visualizer, goal thermometers, cohort heatmaps
+- `apps/web/components/automation/`: AI chat panel, proposal diff cards, audit trail
+- `apps/web/components/auth/`: Login, signup, onboarding cards
+- `apps/web/components/tv/`: TV billboard display mode
+- `apps/web/messages/`: `he.json`, `en.json` translation dictionaries

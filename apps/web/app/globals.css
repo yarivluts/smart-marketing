@@ -3,56 +3,76 @@
 @tailwind utilities;
 
 /*
- * Intercom-inspired design language: a blue-to-violet brand palette, soft
- * blue-tinted neutrals instead of flat gray, generous rounding, and gentle
- * diffused (rather than harsh black) shadows. Every token below drives the
- * shadcn/ui primitives (Button, Input, ...) and every existing `bg-background`
- * / `border-border` / `rounded-md` usage across the app automatically, since
- * they're all defined in terms of these CSS variables.
+ * Modern SaaS Design System Tokens:
+ * Slate neutral foundation, Indigo primary CTA & accents, Emerald growth/success,
+ * Amber warning/caution, Rose alert/destructive, soft diffused shadows,
+ * glassmorphic backdrops, and accessible focus rings.
  */
 @layer base {
   :root {
-    --background: 220 45% 98.5%;
-    --foreground: 234 24% 15%;
-    --muted: 220 35% 95%;
-    --muted-foreground: 234 12% 46%;
-    --border: 222 25% 90%;
-    --input: 222 25% 88%;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
     --primary: 243 75% 59%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 35% 95%;
-    --secondary-foreground: 234 24% 20%;
-    --accent: 268 72% 60%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 243 75% 59%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 358 75% 59%;
+    --destructive: 350 89% 60%;
     --destructive-foreground: 0 0% 100%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --alert: 350 89% 60%;
+    --alert-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
     --ring: 243 75% 59%;
-    --radius: 1rem;
+    --radius: 0.75rem;
 
-    /* Brand gradient endpoints (primary blue -> accent violet), for the CTA gradient and the
-       decorative background wash — kept as separate tokens from --primary/--accent so the
-       gradient's exact stops can be tuned without affecting solid-fill usages of those colors. */
-    --gradient-from: 243 82% 60%;
+    /* Brand gradient endpoints */
+    --gradient-from: 243 75% 59%;
     --gradient-to: 268 75% 62%;
   }
 
   .dark {
-    --background: 235 32% 9%;
-    --foreground: 220 35% 96%;
-    --muted: 235 24% 15%;
-    --muted-foreground: 220 15% 65%;
-    --border: 235 20% 20%;
-    --input: 235 20% 22%;
-    --primary: 243 85% 70%;
-    --primary-foreground: 235 32% 9%;
-    --secondary: 235 24% 16%;
-    --secondary-foreground: 220 35% 92%;
-    --accent: 268 78% 70%;
-    --accent-foreground: 235 32% 9%;
-    --destructive: 358 75% 62%;
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 239 84% 67%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 350 89% 60%;
     --destructive-foreground: 0 0% 100%;
-    --ring: 243 85% 70%;
-    --gradient-from: 243 85% 66%;
+    --success: 160 84% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --alert: 350 89% 60%;
+    --alert-foreground: 0 0% 100%;
+    --info: 199 89% 55%;
+    --info-foreground: 0 0% 100%;
+    --border: 217 33% 18%;
+    --input: 217 33% 18%;
+    --ring: 239 84% 67%;
+    --gradient-from: 239 84% 67%;
     --gradient-to: 268 78% 68%;
   }
 }
@@ -71,9 +91,6 @@
   h3 {
     letter-spacing: -0.02em;
   }
-  /* Every interactive/structural element gets a smooth, quick transition by default (Intercom's
-     UI never has an abrupt state change — hover/focus/color shifts always ease) without needing
-     `transition-*` repeated on every element by hand. */
   a,
   button,
   input,
@@ -87,13 +104,19 @@
 }
 
 @layer utilities {
-  /* The brand gradient, for primary CTAs and decorative accents. */
   .bg-brand-gradient {
     background-image: linear-gradient(135deg, hsl(var(--gradient-from)), hsl(var(--gradient-to)));
   }
-  /* A soft, large-radius wash used behind hero/empty-state sections instead of a flat panel. */
   .bg-brand-wash {
     background-image: radial-gradient(circle at top left, hsl(var(--gradient-from) / 0.12), transparent 60%),
       radial-gradient(circle at bottom right, hsl(var(--gradient-to) / 0.12), transparent 55%);
+  }
+  .bg-emerald-gradient {
+    background-image: linear-gradient(135deg, #10b981, #059669);
+  }
+  .bg-glass {
+    background-color: hsl(var(--background) / 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
 }

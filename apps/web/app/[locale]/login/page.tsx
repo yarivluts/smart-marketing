@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { EmailPasswordForm } from '@/components/auth/email-password-form';
+import { AuthCard } from '@/components/auth/auth-card';
 import { getServerSession } from '@/lib/auth/get-server-session';
 
 type PageProps = Readonly<{
@@ -18,18 +19,17 @@ export default async function LoginPage({ params }: PageProps): Promise<React.Re
   const { locale } = await params;
   setRequestLocale(locale);
 
-  // A real (verified) session redirects away from login. This deliberately
-  // does NOT mirror `middleware.ts`'s cookie-presence check: a stale/forged
-  // cookie must never bounce a visitor away from the one page that can get
-  // them a real session.
+  // A real (verified) session redirects away from login.
   const session = await getServerSession();
   if (session) {
     redirect(`/${locale}/dashboard`);
   }
 
   return (
-    <Suspense>
-      <EmailPasswordForm mode="signin" />
-    </Suspense>
+    <AuthCard showBrandingSide={true}>
+      <Suspense>
+        <EmailPasswordForm mode="signin" />
+      </Suspense>
+    </AuthCard>
   );
 }

@@ -25,6 +25,11 @@ describe('Card', () => {
     expect(screen.getByTestId('card')).toHaveClass('rounded-2xl', 'shadow-soft');
   });
 
+  it('supports hoverable card styling', () => {
+    render(<Card data-testid="card" hoverable>content</Card>);
+    expect(screen.getByTestId('card')).toHaveClass('hover:shadow-soft-md');
+  });
+
   it('merges a custom className rather than replacing the base styling', () => {
     render(
       <Card data-testid="card" className="p-4">

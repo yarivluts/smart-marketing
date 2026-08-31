@@ -22,7 +22,9 @@ describe('CopilotChatPanel Component', () => {
     fireEvent.click(screen.getByTestId('copilot-send-button'));
 
     expect(screen.getByText('אילו מודעות הכי רווחיות השבוע?')).toBeInTheDocument();
-    expect(screen.getByText(/המודעות הכי רווחיות השבוע הן במודעות Meta עם ROAS של 4.2x/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText(/המודעות הכי רווחיות השבוע הן במודעות Meta עם ROAS של 4.2x/)).toBeInTheDocument();
+    });
   });
 
   it('renders proposal card upon budget increase intent and triggers quick execution', async () => {
@@ -33,7 +35,9 @@ describe('CopilotChatPanel Component', () => {
     fireEvent.change(input, { target: { value: 'Increase budget for retargeting campaign to $250' } });
     fireEvent.click(screen.getByTestId('copilot-send-button'));
 
-    expect(screen.getByTestId('proposal-card')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('proposal-card')).toBeInTheDocument();
+    });
     expect(screen.getByText('Meta Retargeting Leads')).toBeInTheDocument();
     expect(screen.getByText('$150/day')).toBeInTheDocument();
     expect(screen.getByText('$250/day')).toBeInTheDocument();

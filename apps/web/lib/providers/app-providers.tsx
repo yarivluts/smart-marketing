@@ -5,6 +5,7 @@ import type { Principal } from '@growthos/shared';
 import { AuthProvider, useAuth } from '@/lib/auth/auth-context';
 import { OrgProvider, useOrgContext } from '@/lib/orgs/org-context';
 import { PermissionProvider } from '@/lib/permissions/permission-context';
+import { Toaster } from '@/components/ui/toaster';
 
 function AuthenticatedPermissionProvider({ children }: { children: ReactNode }): React.ReactElement {
   const { user } = useAuth();
@@ -26,13 +27,14 @@ function AuthenticatedPermissionProvider({ children }: { children: ReactNode }):
   );
 }
 
-/** Wires the Firebase Auth session, org/role-binding lookup, and the client-side permission gate together. */
+/** Wires the Firebase Auth session, org/role-binding lookup, client permission gate, and global toast notifications together. */
 export function AppProviders({ children }: { children: ReactNode }): React.ReactElement {
   return (
     <AuthProvider>
       <OrgProvider>
         <AuthenticatedPermissionProvider>{children}</AuthenticatedPermissionProvider>
       </OrgProvider>
+      <Toaster />
     </AuthProvider>
   );
 }

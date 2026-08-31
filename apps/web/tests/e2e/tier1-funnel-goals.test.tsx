@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import React from 'react';
 import { renderWithIntl, createMockEasySignFunnel, createMockGoal } from './helpers/test-harness';
 import { calculateGoalProgress } from '@growthos/shared';
-import { toFunnelStepView, buildFunnelView } from '../../lib/orgs/funnel-view';
+import { buildFunnelView } from '../../lib/orgs/funnel-view';
 
 // Mock Visual Funnel Component
 function MockVisualFunnel({ steps = createMockEasySignFunnel() }) {
@@ -43,7 +43,7 @@ function MockVisualFunnel({ steps = createMockEasySignFunnel() }) {
 }
 
 // Mock Goal Thermometer Component
-function MockGoalCard({ goal = createMockGoal(), onTargetChange = vi.fn() }) {
+function MockGoalCard({ goal = createMockGoal() }) {
   const progress = calculateGoalProgress({
     direction: goal.direction,
     targetValue: goal.targetValue,
@@ -84,6 +84,52 @@ function MockGoalCard({ goal = createMockGoal(), onTargetChange = vi.fn() }) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Mock Cohort Retention Matrix Component
+function MockRetentionCohortMatrix() {
+  const cohorts = [
+    { cohortMonth: '2026-05', size: 120, m0: 100, m1: 68, m2: 54, m3: 48 },
+    { cohortMonth: '2026-06', size: 150, m0: 100, m1: 72, m2: 58, m3: null },
+    { cohortMonth: '2026-07', size: 180, m0: 100, m1: 75, m2: null, m3: null },
+  ];
+
+  function getRetentionColor(pct: number | null) {
+    if (pct === null) return 'bg-muted/20 text-muted-foreground';
+    if (pct >= 70) return 'bg-emerald-500/20 text-emerald-700 font-bold';
+    if (pct >= 50) return 'bg-emerald-500/10 text-emerald-600';
+    return 'bg-amber-500/10 text-amber-600';
+  }
+
+  return (
+    <div data-testid="cohort-matrix" className="border rounded-xl p-4">
+      <h3 className="text-lg font-bold mb-3">Cohort Retention Heatmap</h3>
+      <table className="w-full text-xs text-center border-collapse">
+        <thead>
+          <tr className="border-b">
+            <th className="text-left py-2">Cohort</th>
+            <th>Users</th>
+            <th>M0</th>
+            <th>M1</th>
+            <th>M2</th>
+            <th>M3</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cohorts.map((c) => (
+            <tr key={c.cohortMonth} className="border-b">
+              <td className="text-left font-medium py-2">{c.cohortMonth}</td>
+              <td>{c.size}</td>
+              <td className={getRetentionColor(c.m0)}>{c.m0}%</td>
+              <td className={getRetentionColor(c.m1)}>{c.m1}%</td>
+              <td className={getRetentionColor(c.m2)}>{c.m2 !== null ? `${c.m2}%` : '-'}</td>
+              <td className={getRetentionColor(c.m3)}>{c.m3 !== null ? `${c.m3}%` : '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -188,5 +234,17 @@ describe('Tier 1: Visual Funnels & Business Goals (R1, R2)', () => {
     });
     expect(badCac.status).toBe('off_track');
     expect(badCac.isGoalMet).toBe(false);
+  });
+
+  it('3.7 renders Cohort Retention Heatmap with color-coded retention cells across monthly cohorts', () => {
+    renderWithIntl(<MockRetentionCohortMatrix />);
+
+    expect(screen.getByTestId('cohort-matrix')).toBeInTheDocument();
+    expect(screen.getByText('2026-05')).toBeInTheDocument();
+    expect(screen.getByText('2026-06')).toBeInTheDocument();
+    expect(screen.getByText('2026-07')).toBeInTheDocument();
+    expect(screen.getByText('68%')).toBeInTheDocument();
+    expect(screen.getByText('72%')).toBeInTheDocument();
+    expect(screen.getByText('75%')).toBeInTheDocument();
   });
 });

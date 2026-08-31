@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
-import React from 'react';
+import { describe, expect, it, vi } from 'vitest';
+import { screen, fireEvent } from '@testing-library/react';
+import React, { useState } from 'react';
 import { renderWithIntl } from './helpers/test-harness';
 import en from '../../messages/en.json';
 import he from '../../messages/he.json';
@@ -100,5 +100,60 @@ describe('Tier 1: Bilingual Symmetrical Localization & RTL/LTR (R4)', () => {
     expect(he.Campaigns.metaTitle).toBe('קמפיינים');
     expect(en.Automation.metaTitle).toBe('Automation');
     expect(he.Automation.metaTitle).toBe('אוטומציה');
+  });
+
+  it('7.7 Directional Icon Mirroring: flips navigation arrows and progress chevrons in RTL', () => {
+    function DirectionalBreadcrumb({ locale = 'en' }: { locale: 'en' | 'he' }) {
+      const isRtl = locale === 'he';
+      return (
+        <div data-testid="breadcrumb-trail" dir={isRtl ? 'rtl' : 'ltr'}>
+          <span>Campaigns</span>
+          <span
+            data-testid="breadcrumb-arrow"
+            className={`inline-block transition-transform ${isRtl ? 'rotate-180' : ''}`}
+          >
+            →
+          </span>
+          <span>Target Settings</span>
+        </div>
+      );
+    }
+
+    const { rerender } = renderWithIntl(<DirectionalBreadcrumb locale="en" />);
+    expect(screen.getByTestId('breadcrumb-arrow')).not.toHaveClass('rotate-180');
+
+    rerender(<DirectionalBreadcrumb locale="he" />);
+    expect(screen.getByTestId('breadcrumb-arrow')).toHaveClass('rotate-180');
+  });
+
+  it('7.8 LocaleSwitcher: toggles language between English and Hebrew seamlessly', () => {
+    function MockLocaleSwitcher({ onLocaleChange = vi.fn() }) {
+      const [currentLocale, setCurrentLocale] = useState('en');
+      function toggle() {
+        const next = currentLocale === 'en' ? 'he' : 'en';
+        setCurrentLocale(next);
+        onLocaleChange(next);
+      }
+      return (
+        <button
+          type="button"
+          data-testid="locale-switch-btn"
+          onClick={toggle}
+          aria-label="Switch Language"
+        >
+          {currentLocale === 'en' ? 'עברית' : 'English'}
+        </button>
+      );
+    }
+
+    const onLocaleChange = vi.fn();
+    renderWithIntl(<MockLocaleSwitcher onLocaleChange={onLocaleChange} />);
+
+    const btn = screen.getByTestId('locale-switch-btn');
+    expect(btn).toHaveTextContent('עברית');
+
+    fireEvent.click(btn);
+    expect(onLocaleChange).toHaveBeenCalledWith('he');
+    expect(btn).toHaveTextContent('English');
   });
 });

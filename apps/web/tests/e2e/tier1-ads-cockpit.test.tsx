@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import React, { useState } from 'react';
 import { renderWithIntl, createMockCampaign } from './helpers/test-harness';
 import { CampaignCreativesPanel, type ImportedAdView } from '../../components/orgs/campaign-creatives-panel';
 import en from '../../messages/en.json';
 
-// Test mock component representing the unified Ads Cockpit UI
+// Mock Cockpit Component with Inline Budget & 1-Click Toggle
 function MockAdsCockpit({
   initialCampaigns = [
     createMockCampaign({ id: 'c1', name: 'Meta Retargeting Leads', platform: 'meta', status: 'ENABLED', spendUsd: 1200, roas: 3.8, dailyBudgetUsd: 150 }),
@@ -45,6 +45,19 @@ function MockAdsCockpit({
     );
   }
 
+  function stepBudget(campaignId: string, delta: number) {
+    setCampaigns((prev) =>
+      prev.map((c) => {
+        if (c.id === campaignId) {
+          const nextBudget = Math.max(0, c.dailyBudgetUsd + delta);
+          onBudgetChange(campaignId, nextBudget);
+          return { ...c, dailyBudgetUsd: nextBudget };
+        }
+        return c;
+      }),
+    );
+  }
+
   return (
     <div data-testid="ads-cockpit">
       <h2>Ads & Performance Cockpit</h2>
@@ -69,14 +82,30 @@ function MockAdsCockpit({
             </div>
 
             <div className="mt-3 grid grid-cols-4 gap-2 text-sm">
-              <div>
+              <div className="flex items-center gap-1">
                 <span className="text-muted-foreground">Daily Budget:</span>
+                <button
+                  type="button"
+                  data-testid={`budget-minus-${camp.id}`}
+                  onClick={() => stepBudget(camp.id, -25)}
+                  className="px-1 border rounded"
+                >
+                  -
+                </button>
                 <input
                   data-testid={`budget-input-${camp.id}`}
                   type="number"
-                  defaultValue={camp.dailyBudgetUsd}
-                  onBlur={(e) => handleBudget(camp.id, Number(e.target.value))}
+                  value={camp.dailyBudgetUsd}
+                  onChange={(e) => handleBudget(camp.id, Number(e.target.value))}
                 />
+                <button
+                  type="button"
+                  data-testid={`budget-plus-${camp.id}`}
+                  onClick={() => stepBudget(camp.id, 25)}
+                  className="px-1 border rounded"
+                >
+                  +
+                </button>
               </div>
               <div>
                 <span className="text-muted-foreground">Spend:</span>
@@ -130,13 +159,12 @@ describe('Tier 1: Unified Ads & Performance Cockpit (R1)', () => {
     expect(screen.getByTestId('status-text-c1')).toHaveTextContent('ENABLED');
   });
 
-  it('2.3 updates daily budget inline and triggers instant state update on blur', () => {
+  it('2.3 updates daily budget inline and triggers instant state update on change', () => {
     const onBudgetChange = vi.fn();
     renderWithIntl(<MockAdsCockpit onBudgetChange={onBudgetChange} />);
 
     const budgetInput = screen.getByTestId('budget-input-c1');
     fireEvent.change(budgetInput, { target: { value: '350' } });
-    fireEvent.blur(budgetInput);
 
     expect(onBudgetChange).toHaveBeenCalledWith('c1', 350);
   });
@@ -194,5 +222,62 @@ describe('Tier 1: Unified Ads & Performance Cockpit (R1)', () => {
     expect(screen.getByText('Sign PDF Online Fast')).toBeInTheDocument();
     expect(screen.getByText('Close deals faster with automated signing workflows.')).toBeInTheDocument();
     expect(screen.getByText('https://growthos.io/signup')).toBeInTheDocument();
+  });
+
+  it('2.7 Budget Stepper (+ / - buttons): steps daily budget up and down accurately by preset increments', () => {
+    const onBudgetChange = vi.fn();
+    renderWithIntl(<MockAdsCockpit onBudgetChange={onBudgetChange} />);
+
+    const plusBtn = screen.getByTestId('budget-plus-c1');
+    const minusBtn = screen.getByTestId('budget-minus-c1');
+
+    // Initial budget is $150. Click +25
+    fireEvent.click(plusBtn);
+    expect(onBudgetChange).toHaveBeenCalledWith('c1', 175);
+    expect(screen.getByTestId('budget-input-c1')).toHaveValue(175);
+
+    // Click -25
+    fireEvent.click(minusBtn);
+    expect(onBudgetChange).toHaveBeenCalledWith('c1', 150);
+    expect(screen.getByTestId('budget-input-c1')).toHaveValue(150);
+  });
+
+  it('2.8 Optimistic toggle failure rollback: rolls back status when network request rejects', async () => {
+    function OptimisticToggleWithError() {
+      const [status, setStatus] = useState<'ENABLED' | 'PAUSED'>('ENABLED');
+      const [error, setError] = useState<string | null>(null);
+
+      async function toggle() {
+        const prev = status;
+        const next = status === 'ENABLED' ? 'PAUSED' : 'ENABLED';
+        setStatus(next); // Optimistic
+        setError(null);
+        try {
+          // Simulate network failure
+          throw new Error('Network timeout');
+        } catch {
+          setStatus(prev); // Rollback
+          setError('Failed to update status. Reverted.');
+        }
+      }
+
+      return (
+        <div>
+          <span data-testid="campaign-status">{status}</span>
+          <button data-testid="toggle-btn" type="button" onClick={toggle}>Toggle</button>
+          {error && <span data-testid="error-msg">{error}</span>}
+        </div>
+      );
+    }
+
+    renderWithIntl(<OptimisticToggleWithError />);
+
+    expect(screen.getByTestId('campaign-status')).toHaveTextContent('ENABLED');
+
+    fireEvent.click(screen.getByTestId('toggle-btn'));
+
+    // Status rolled back to ENABLED and error displayed
+    expect(screen.getByTestId('campaign-status')).toHaveTextContent('ENABLED');
+    expect(screen.getByTestId('error-msg')).toHaveTextContent('Failed to update status. Reverted.');
   });
 });

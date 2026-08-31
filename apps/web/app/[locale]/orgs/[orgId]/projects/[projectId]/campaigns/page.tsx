@@ -18,8 +18,8 @@ import {
   toAutomationTargetView,
 } from '@/lib/orgs/automation-view';
 import { buildUnifiedAdsCockpitData } from '@/lib/orgs/ads-performance-synthesizer';
-import { AdsPerformanceDashboard } from '@/components/orgs/ads-performance-dashboard';
-import type { CampaignDraftView } from '@/components/orgs/campaign-creatives-panel';
+import { AdsPerformanceDashboard } from '@/components/campaigns/ads-performance-dashboard';
+import type { CampaignDraftView } from '@/components/campaigns/campaign-creatives-panel';
 import type { CampaignSpendBreakdownOutcome } from '@/lib/orgs/queries';
 
 type PageProps = Readonly<{
@@ -33,7 +33,7 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 /**
- * Unified Ads & Performance Cockpit (Milestone 1):
+ * Unified Ads & Performance Cockpit (Milestone 2):
  * Consolidates Meta Ads and Google Ads campaigns, visual creative previews,
  * blended executive KPI metrics, live spend, ROAS, 1-click status toggles,
  * and inline daily budget controls with zero-config instant synthesis.

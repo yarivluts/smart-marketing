@@ -73,7 +73,7 @@ describe('AdsPerformanceDashboard', () => {
     expect(screen.getByText('Total Spend')).toBeInTheDocument();
     expect(screen.getAllByText('$2,600').length).toBeGreaterThan(0);
     expect(screen.getAllByText('3.8x').length).toBeGreaterThan(0);
-    expect(screen.getByTestId('proactive-recommendation-card')).toBeInTheDocument();
+    expect(screen.getByTestId('proactive-recommendation-banner')).toBeInTheDocument();
     expect(screen.getByText('1-Click Apply')).toBeInTheDocument();
   });
 
