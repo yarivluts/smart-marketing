@@ -30,12 +30,12 @@
   "OmniSearch": {
     "trigger": "חיפוש...",
     "shortcutHint": "⌘K",
-    "dialogLabel": "חיפוש לוחות, מדדים, פלחים, קמפיינים, יעדים, כללי ניצחון ולקוחות",
-    "inputPlaceholder": "חיפוש לוחות, מדדים, פלחים, קמפיינים, לקוחות...",
+    "dialogLabel": "חיפוש לוחות, מדדים, פלחים, קמפיינים, יעדים, כללי ניצחון, לקוחות ועמודים",
+    "inputPlaceholder": "חיפוש לוחות, מדדים, פלחים, קמפיינים, לקוחות, עמודים...",
     "emptyPrompt": "התחילו להקליד כדי לחפש בפרויקט זה.",
     "loading": "טוען...",
     "noResults": "אין תוצאות עבור \"{query}\".",
-    "resultType": "{type, select, board {לוח} metric {מדד} segment {פלח} campaign {קמפיין} goal {יעד} win_rule {כלל ניצחון} customer {לקוח} other {תוצאה}}"
+    "resultType": "{type, select, board {לוח} metric {מדד} segment {פלח} campaign {קמפיין} goal {יעד} win_rule {כלל ניצחון} customer {לקוח} page {עמוד} other {תוצאה}}"
   },
   "Auth": {
     "emailLabel": "אימייל",

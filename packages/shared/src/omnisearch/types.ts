@@ -10,9 +10,12 @@
  * customer" query to prefetch, so a `customer` result is only ever produced
  * query-time, by running the KAN-108 Customer 360 substring search live as
  * the palette's own query changes — see `apps/web/lib/orgs/omnisearch.ts`'s
- * `buildOmniSearchCustomerItems`.
+ * `buildOmniSearchCustomerItems`. `page` is the odd one out: not a listed
+ * entity at all, but a static "jump to this page" shortcut for every
+ * permission-gated nav destination `ProjectLayout` renders — see
+ * `buildOmniSearchPageShortcuts` in the same file.
  */
-export const OMNI_SEARCH_RESULT_TYPES = ['board', 'metric', 'segment', 'campaign', 'goal', 'win_rule', 'customer'] as const;
+export const OMNI_SEARCH_RESULT_TYPES = ['board', 'metric', 'segment', 'campaign', 'goal', 'win_rule', 'customer', 'page'] as const;
 
 export type OmniSearchResultType = (typeof OMNI_SEARCH_RESULT_TYPES)[number];
 

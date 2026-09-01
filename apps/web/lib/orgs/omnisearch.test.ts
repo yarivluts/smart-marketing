@@ -36,7 +36,12 @@ vi.mock('@/lib/orgs/queries', () => ({
   searchProjectCustomers: searchProjectCustomersMock,
 }));
 
-import { buildOmniSearchCustomerItems, buildOmniSearchIndexForProject, type OmniSearchPermissions } from './omnisearch';
+import {
+  buildOmniSearchCustomerItems,
+  buildOmniSearchIndexForProject,
+  buildOmniSearchPageShortcuts,
+  type OmniSearchPermissions,
+} from './omnisearch';
 
 const ALL_ALLOWED: OmniSearchPermissions = {
   canSearchBoards: true,
@@ -236,5 +241,34 @@ describe('buildOmniSearchCustomerItems', () => {
     const items = await buildOmniSearchCustomerItems('org-1', 'project-1', 'jane', true);
 
     expect(items).toEqual([]);
+  });
+});
+
+describe('buildOmniSearchPageShortcuts', () => {
+  it('maps each nav item into a page-typed OmniSearchItem keyed by its own href', () => {
+    const items = buildOmniSearchPageShortcuts([
+      { href: '/orgs/org-1/projects/project-1/cost-guardrails', label: 'Cost guardrails', icon: 'Gauge' },
+      { href: '/orgs/org-1/projects/project-1/cohorts', label: 'Cohort retention', icon: 'Grid3x3' },
+    ]);
+
+    expect(items).toEqual([
+      { id: '/orgs/org-1/projects/project-1/cost-guardrails', type: 'page', label: 'Cost guardrails', href: '/orgs/org-1/projects/project-1/cost-guardrails' },
+      { id: '/orgs/org-1/projects/project-1/cohorts', type: 'page', label: 'Cohort retention', href: '/orgs/org-1/projects/project-1/cohorts' },
+    ]);
+  });
+
+  it('returns nothing for an empty nav item list', () => {
+    expect(buildOmniSearchPageShortcuts([])).toEqual([]);
+  });
+
+  it('de-dupes items sharing the same href, keeping the first occurrence', () => {
+    const items = buildOmniSearchPageShortcuts([
+      { href: '/orgs/org-1/projects/project-1/cohorts', label: 'Cohort retention', icon: 'Grid3x3' },
+      { href: '/orgs/org-1/projects/project-1/cohorts', label: 'Cohorts (duplicate)', icon: 'Grid3x3' },
+    ]);
+
+    expect(items).toEqual([
+      { id: '/orgs/org-1/projects/project-1/cohorts', type: 'page', label: 'Cohort retention', href: '/orgs/org-1/projects/project-1/cohorts' },
+    ]);
   });
 });
