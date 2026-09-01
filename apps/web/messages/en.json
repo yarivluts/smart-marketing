@@ -30,12 +30,12 @@
   "OmniSearch": {
     "trigger": "Search...",
     "shortcutHint": "⌘K",
-    "dialogLabel": "Search boards, metrics, segments, campaigns, goals, win rules, and customers",
-    "inputPlaceholder": "Search boards, metrics, segments, campaigns, customers...",
+    "dialogLabel": "Search boards, metrics, segments, campaigns, goals, win rules, customers, and pages",
+    "inputPlaceholder": "Search boards, metrics, segments, campaigns, customers, pages...",
     "emptyPrompt": "Start typing to search this project.",
     "loading": "Loading...",
     "noResults": "No results for \"{query}\".",
-    "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} goal {Goal} win_rule {Win rule} customer {Customer} other {Result}}"
+    "resultType": "{type, select, board {Board} metric {Metric} segment {Segment} campaign {Campaign} goal {Goal} win_rule {Win rule} customer {Customer} page {Page} other {Result}}"
   },
   "Auth": {
     "emailLabel": "Email",

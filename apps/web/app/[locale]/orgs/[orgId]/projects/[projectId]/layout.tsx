@@ -11,6 +11,7 @@ import { ProjectSwitcher } from '@/components/orgs/project-switcher';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
+import { buildOmniSearchPageShortcuts } from '@/lib/orgs/omnisearch';
 import { listOrgProjects } from '@/lib/orgs/queries';
 
 type LayoutProps = Readonly<{
@@ -188,6 +189,20 @@ export default async function ProjectLayout({
     { href: `${base}/settings`, label: tShell('settings'), icon: 'Settings' },
   ];
 
+  // KAN-85 follow-up: every restored nav item above also becomes a "jump to
+  // this page" omnisearch result, not just the pre-existing per-entity index
+  // (see `buildOmniSearchPageShortcuts`'s own doc comment). Deliberately
+  // excludes `primaryModuleItems` — those 3 links were never dropped, so
+  // they're already one click away everywhere and don't need a search
+  // shortcut of their own.
+  const pageShortcuts = buildOmniSearchPageShortcuts([
+    ...orgItems,
+    ...insightsItems,
+    ...dataItems,
+    ...restoredAutomationItems,
+    ...secondaryItems,
+  ]);
+
   return (
     <AppShell
       switchers={
@@ -201,7 +216,7 @@ export default async function ProjectLayout({
           />
         </>
       }
-      omniSearch={<OmniSearchTrigger orgId={orgId} projectId={projectId} />}
+      omniSearch={<OmniSearchTrigger orgId={orgId} projectId={projectId} pageShortcuts={pageShortcuts} />}
       sections={sections}
       mobileTabItems={mobileTabItems}
     >

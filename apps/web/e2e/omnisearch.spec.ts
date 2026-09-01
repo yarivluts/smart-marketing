@@ -66,6 +66,34 @@ test.describe('Global omnisearch (KAN-85)', () => {
     await expect(page.getByRole('heading', { name: 'Marketing Overview' })).toBeVisible();
   });
 
+  test('jumps to a nav-only page (no listed entities) via a static page shortcut', async ({ page }) => {
+    // Regression for the KAN-85 follow-up: a page with no listed entities of its own (e.g. Cohort
+    // retention has no "list everything" omnisearch entity type) was invisible to Cmd/Ctrl-K even
+    // though it's reachable from the sidebar — see `buildOmniSearchPageShortcuts`.
+    test.setTimeout(90_000);
+    await signUp(page, uniqueEmail('omnisearch-page-shortcut'));
+    const orgId = await createOrganization(page, 'Omnisearch Page Shortcut E2E Org');
+
+    await page.getByRole('link', { name: 'New project' }).click();
+    await page.getByLabel('Project name').fill('Client Gamma');
+    await page.getByRole('button', { name: 'Create project' }).click();
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    const projectId = page.url().split('/').slice(-2)[0];
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/campaigns`);
+
+    await page.keyboard.press('ControlOrMeta+k');
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    await page.getByPlaceholder(/search boards, metrics/i).fill('cohort retention');
+    const result = page.getByRole('option', { name: /Cohort retention/ });
+    await expect(result).toBeVisible();
+    await expect(result).toHaveText(/Page/);
+    await result.click();
+
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/cohorts$`));
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
   test('typing a query with no matches shows an empty state, and Escape closes the palette', async ({ page }) => {
     test.setTimeout(60_000);
     await signUp(page, uniqueEmail('omnisearch-empty'));

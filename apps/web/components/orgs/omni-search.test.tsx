@@ -10,10 +10,10 @@ vi.mock('@/i18n/navigation', () => ({
   useRouter: () => ({ push }),
 }));
 
-function renderTrigger(): ReturnType<typeof render> {
+function renderTrigger(pageShortcuts: unknown[] = []): ReturnType<typeof render> {
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <OmniSearchTrigger orgId="org-1" projectId="project-1" />
+      <OmniSearchTrigger orgId="org-1" projectId="project-1" pageShortcuts={pageShortcuts as never} />
     </NextIntlClientProvider>,
   );
 }
@@ -36,6 +36,12 @@ function mockFetchOnce(items: unknown[], customerItems: unknown[] = []): void {
 const BOARD_ITEM = { id: 'board-1', type: 'board', label: 'Marketing Overview', href: '/orgs/org-1/projects/project-1/boards/board-1' };
 const METRIC_ITEM = { id: 'metric-1', type: 'metric', label: 'CAC', href: '/orgs/org-1/projects/project-1/metric-defs' };
 const GOAL_ITEM = { id: 'goal-1', type: 'goal', label: 'Grow MRR 20%', href: '/orgs/org-1/projects/project-1/goals/goal-1' };
+const PAGE_SHORTCUT = {
+  id: '/orgs/org-1/projects/project-1/cost-guardrails',
+  type: 'page',
+  label: 'Cost guardrails',
+  href: '/orgs/org-1/projects/project-1/cost-guardrails',
+};
 
 describe('OmniSearchTrigger', () => {
   beforeEach(() => {
@@ -244,5 +250,45 @@ describe('OmniSearchTrigger', () => {
     await screen.findByRole('dialog');
 
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('ranks and navigates to a static page shortcut alongside the fetched index, with no fetch wait needed', async () => {
+    mockFetchOnce([BOARD_ITEM]);
+    renderTrigger([PAGE_SHORTCUT]);
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await screen.findByRole('dialog');
+
+    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cost guard' } });
+
+    fireEvent.click(await screen.findByText('Cost guardrails'));
+
+    expect(push).toHaveBeenCalledWith(PAGE_SHORTCUT.href);
+  });
+
+  it('shows a matching page shortcut immediately, without waiting for the fetched index', async () => {
+    // Regression: page shortcuts are meant to rank with no fetch wait needed (they don't depend on
+    // the `/omnisearch` fetch at all), so a query matching one must render right away even while
+    // that fetch is still pending — not stay stuck behind the "Loading..." state.
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Promise(() => {})));
+    renderTrigger([PAGE_SHORTCUT]);
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await screen.findByRole('dialog');
+
+    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cost guard' } });
+
+    expect(await screen.findByText('Cost guardrails')).toBeInTheDocument();
+    expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+  });
+
+  it('shows a page shortcut with the "Page" result-type label', async () => {
+    mockFetchOnce([]);
+    renderTrigger([PAGE_SHORTCUT]);
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+    await screen.findByRole('dialog');
+
+    fireEvent.change(screen.getByPlaceholderText(/search boards, metrics/i), { target: { value: 'cost guard' } });
+
+    const option = await screen.findByRole('option', { name: /Cost guardrails/ });
+    expect(option).toHaveTextContent('Page');
   });
 });
