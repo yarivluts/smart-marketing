@@ -313,7 +313,7 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/segments', () => {
   });
 
   it('KAN-136: lets a project-scoped editor create a segment in THEIR OWN project', async () => {
-    const { ownerSession, organization, project, owner } = await setupOrgProject('Segment Create Project-Scoped Org');
+    const { organization, project, owner } = await setupOrgProject('Segment Create Project-Scoped Org');
     await registerSchemaDefinition({
       organizationId: organization.id,
       projectId: project.id,
