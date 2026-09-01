@@ -101,6 +101,88 @@ Template for each entry:
 
 ---
 
+## 2026-09-01 — Delivered KAN-136 slice 1 (project-scope reachability: shared helper + Boards feature); closed #366 once #365 merged
+
+- **Last completed:**
+  - Scheduled run. Checked `main`'s CI health and open PRs first, per this repo's established
+    pattern. Found `main` still CI-red from yesterday's direct pushes (`0be7808`/`4f50462`/`bd7d215`,
+    the tri-module nav redesign) — a repo-wide blocker unrelated to any one PR's diff, already
+    root-caused by several prior runs (see the 2026-08-31 entries above). **PR #365**
+    (`fix/restore-project-nav-reachability`, the real fix — see its own entry directly above) was
+    already open with an authoring session actively re-running its own failed CI job at the time
+    this run started — left it untouched rather than duplicate that supervision or risk a
+    conflicting push. **#364** was already closed by that session; **#366** (e2e-specs-only
+    workaround, leaves the 16 pages permanently unreachable from the UI even though it makes CI
+    green) was still open — this run closed it with an explanatory comment once #365 actually
+    merged into `main` (see below), pointing at #365 as the real fix.
+  - Picked up the backlog while #365 was still in flight: `TASKS.md` had no `todo` rows, so swept
+    recently-`done` rows' own
+    doc-comment notes per this repo's established post-backlog pattern. **KAN-135**'s own row named
+    the exact gap: ~60 `project.manage`/`dashboards.*`-gated project routes and pages call
+    `can()`/`requireOrgPermission` with only `{ orgId }`, so a project-scoped `project_admin`/
+    `editor`/`operator` binding (KAN-135, `scopeLevel: 'project'`) never satisfies the check — only an
+    org-scope admin can act on a project today. Too large for one PR (this repo's own convention for
+    a gap this size, per KAN-18/27/46-48/81/86, is to slice it), so delivered the shared fix plus its
+    first concrete slice as **KAN-136**.
+  - Delivered: `requireProjectPermission(orgId, projectId, permission)` in `apps/web/lib/orgs/
+    access.ts` — shares `requireOrgPermission`'s own 401/404/403 logic via a new private
+    `requirePermissionAtScope` helper, differing only in also passing `projectId` into `can()`'s
+    resource scope (fully backward compatible — every existing `requireOrgPermission` call site is
+    untouched). Wired it into the **Boards** feature end to end (this slice's boundary): all 3 API
+    routes (`boards/route.ts`, `boards/[boardId]/route.ts`, `boards/[boardId]/tiles/route.ts`) and
+    both pages (`boards/page.tsx`, `boards/[boardId]/page.tsx`, whose own `can()` calls now pass
+    `projectId` too).
+  - **Self-review caught a real gap before it shipped**: the full `pnpm test` run failed
+    `lib/orgs/route-isolation-guard.test.ts` (a KAN-26 filesystem-scanning guard that fails CI the
+    moment an org-scoped route file has no recognized permission gate) — it only recognized
+    `requireOrgPermission`/`requireOrgMembership` by name, not the new `requireProjectPermission`, so
+    it flagged all 3 boards routes as unguarded even though they're now *more* correctly guarded than
+    before. Fixed the guard itself to also recognize `requireProjectPermission` (updated its own doc
+    comment too) rather than working around it.
+  - Test coverage: `access.test.ts` gained a `requireProjectPermission` suite (401/404/
+    403-cross-project-isolation/200-same-project/200-org-scope-still-works); each of the 3 boards
+    route test files gained a project-scoped-member-succeeds case plus a cross-project-isolation-
+    still-denies case, via a real KAN-135 invite→accept flow against the Firestore emulator (not
+    mocked) — 43 new/updated tests, all green.
+  - **Full local verification**, run for real end to end (not assumed from a partial run): `pnpm
+    lint` and `pnpm typecheck` green across the whole monorepo (8 packages). `pnpm build` green (7/7
+    tasks). `pnpm test`'s unit+emulator half green across the whole monorepo on a clean run — apps/web
+    alone: **378 test files, 2372 tests, all passing** (this includes the isolation-guard fix and all
+    43 new KAN-136 tests). `pnpm test`'s e2e half hit the exact same pre-existing, already-documented
+    main-wide nav regression PR #365 exists to fix (`billing-ops-feed.spec.ts` failing on a
+    `getByRole('link', { name: 'Billing ops feed' }).click()` — a link the tri-module redesign
+    dropped) — confirmed twice (original + retry) before stopping the run there rather than
+    re-discovering the same known, undiffed-by-this-PR failure across the remaining ~15 orphaned
+    specs. This diff touches no e2e spec and no nav code, so this failure is inherited from `main`,
+    not introduced here — the same posture PR #364's own body already documented for exactly this
+    situation.
+  - Opened **PR #368** (branch `kan-136-project-scoped-permission-boards`) documenting the above
+    honestly: lint/typecheck/unit+emulator tests/build genuinely green; e2e sharded blocked on the
+    same repo-wide nav regression #365 exists to fix, not on anything in this diff.
+  - **#365 merged into `main` shortly after** (commit `4ea6902`). Closed **#366** with an
+    explanatory comment pointing at #365 as the real fix (its own test-only repoint would have kept
+    the 16 pages permanently unreachable from the UI even with CI green). Rebased this PR's branch
+    onto the new `main` to pick up the fix.
+- **In progress (exact stopping point):** PR #368 rebased onto post-#365 `main`; re-verifying
+  `pnpm test`/`pnpm build` on the rebased head (the e2e blocker should now be gone) before confirming
+  GitHub Actions CI and merging.
+- **Blocked + why:** nothing now that #365 has landed — the transitive `main`-CI-red blocker is
+  resolved.
+- **Next step:** once PR #368 is green (local + GitHub Actions) with no open review threads, merge
+  it. Then continue the KAN-136 series: the remaining ~55+ `project.manage`/`dashboards.*`/
+  `schema.write`/etc.-gated route families (goals, segments, schema-defs, metric-defs, ingest-health,
+  keys, cost-guardrails, plugins, campaign-ops, ...) each need their own follow-up slice adopting the
+  same one-line `requireOrgPermission` → `requireProjectPermission` swap this PR used.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - The nav IA decision itself (which of the 3 primary modules should surface which restored feature
+    more prominently) is still open for a human to answer whenever they want to revisit it — #365
+    intentionally didn't touch that, and neither does this PR.
+
+---
+
 ## 2026-08-28 (latest) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
 
 - **Last completed:** the three follow-ups #345 named, plus two real bugs the rendered pages
@@ -178,12 +260,6 @@ Template for each entry:
 - **Blocked + why:** nothing blocking new backlog work.
 - **Next step:** next run checks open PRs first (#357, #358, #327), drives any real failures to green.
 - **Waiting on human:** KAN-43 applications; KAN-18/KAN-19.
-<<<<<<< HEAD
-=======
-
----
-
->>>>>>> origin/main
 
 ---
 

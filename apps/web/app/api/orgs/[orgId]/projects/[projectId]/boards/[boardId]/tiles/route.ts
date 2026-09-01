@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { BoardNotFoundError, InvalidBoardError } from '@growthos/firebase-orm-models';
 import { saveBoardTiles } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseSaveBoardTilesRequestBody } from '@/lib/orgs/parse-board-fields';
 import { toBoardView } from '@/lib/orgs/board-view';
 
@@ -17,7 +17,7 @@ interface RouteParams {
  */
 export async function PUT(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, boardId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

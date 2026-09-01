@@ -72,10 +72,47 @@ export async function requireOrgMembership(organizationId: string): Promise<OrgP
  * existence is already known to them), a missing permission for the
  * requested action is a normal 403 — that doesn't leak anything they don't
  * already know.
+ *
+ * Checks the permission at org scope only — a role binding scoped to one
+ * project (`project_admin`/`editor`/`operator`, KAN-135) never satisfies
+ * this, even for the right project, because `resource.projectId` is left
+ * unset. That's deliberate for routes with no project in their URL (org
+ * settings, members, org-level resources), but every `.../projects/
+ * [projectId]/...` route should use {@link requireProjectPermission}
+ * instead so a project-scoped member can actually reach it (KAN-136).
  */
 export async function requireOrgPermission(
   organizationId: string,
   permission: Permission,
+): Promise<OrgPermissionResult> {
+  return requirePermissionAtScope(organizationId, permission, {});
+}
+
+/**
+ * {@link requireOrgPermission}, but the permission is also checked at
+ * project scope — a role binding scoped to this specific `projectId`
+ * (`project_admin`/`editor`/`operator`, KAN-135) satisfies the check exactly
+ * like an org-scope binding does, via `can()`'s own scope-inheritance rules
+ * (a binding scoped to a *different* project still doesn't match).
+ *
+ * KAN-136: before this existed, every `.../projects/[projectId]/...` route
+ * called {@link requireOrgPermission} with only `{ orgId }`, so a newly
+ * invited project-scoped member could never reach any of them — only an
+ * org-scope admin could act on a project. Use this (not
+ * {@link requireOrgPermission}) for any route or page under a project.
+ */
+export async function requireProjectPermission(
+  organizationId: string,
+  projectId: string,
+  permission: Permission,
+): Promise<OrgPermissionResult> {
+  return requirePermissionAtScope(organizationId, permission, { projectId });
+}
+
+async function requirePermissionAtScope(
+  organizationId: string,
+  permission: Permission,
+  scope: { projectId?: string },
 ): Promise<OrgPermissionResult> {
   const session = await getServerSession();
   if (!session) {
@@ -87,7 +124,7 @@ export async function requireOrgPermission(
   if (!membership) {
     return { error: NextResponse.json({ error: 'not_found' }, { status: 404 }) };
   }
-  if (!can(bindings, { type: 'user', id: user.id }, permission, { orgId: organizationId })) {
+  if (!can(bindings, { type: 'user', id: user.id }, permission, { orgId: organizationId, ...scope })) {
     return { error: NextResponse.json({ error: 'forbidden' }, { status: 403 }) };
   }
 

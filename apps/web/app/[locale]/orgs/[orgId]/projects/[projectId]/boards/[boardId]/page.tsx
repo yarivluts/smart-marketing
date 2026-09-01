@@ -37,7 +37,8 @@ export async function generateMetadata({ params }: PageProps) {
  * add/move/resize/remove + "Save layout". Gated on `dashboards.read` to view
  * (`viewer` included — see the boards list page's own doc comment for why);
  * the settings form, delete button, and grid editor's edit affordances are
- * separately gated on `dashboards.write` below.
+ * separately gated on `dashboards.write` below. Checked at project scope,
+ * not just org scope (KAN-136) — see the boards list page's own doc comment.
  */
 export default async function BoardDetailPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId, boardId } = await params;
@@ -51,11 +52,13 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
-  const canViewBoard = can(bindings, principal, 'dashboards.read', { orgId }) || can(bindings, principal, 'dashboards.write', { orgId });
+  const canViewBoard =
+    can(bindings, principal, 'dashboards.read', { orgId, projectId }) ||
+    can(bindings, principal, 'dashboards.write', { orgId, projectId });
   if (!membership || !canViewBoard) {
     notFound();
   }
-  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
 
   // `freshness` (KAN-69): one project-wide badge shared by every tile on
   // this board — see `resolveBoardFreshness`'s own doc comment for why a

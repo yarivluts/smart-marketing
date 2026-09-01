@@ -27,6 +27,9 @@ export async function generateMetadata({ params }: PageProps) {
  * included — KAN-60 follow-up, session-B dogfooding QA 2026-08-18: a viewer
  * couldn't see board data at all, only write-capable roles could reach this
  * page); the create form is separately gated on `dashboards.write` below.
+ * Checked at project scope, not just org scope (KAN-136), so a
+ * project-scoped `project_admin`/`editor`/`operator` (KAN-135) can reach
+ * their own project's boards, not only an org-scope admin.
  */
 export default async function BoardsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -40,11 +43,13 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
-  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || can(bindings, principal, 'dashboards.write', { orgId });
+  const canViewBoards =
+    can(bindings, principal, 'dashboards.read', { orgId, projectId }) ||
+    can(bindings, principal, 'dashboards.write', { orgId, projectId });
   if (!membership || !canViewBoards) {
     notFound();
   }
-  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
 
   const projects = await listOrgProjects(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
