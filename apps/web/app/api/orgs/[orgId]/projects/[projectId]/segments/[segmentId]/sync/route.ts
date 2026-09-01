@@ -10,7 +10,7 @@ import {
   UnsupportedSinkPluginError,
 } from '@growthos/firebase-orm-models';
 import { syncSegmentToCrm } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { toCrmSyncRunView } from '@/lib/orgs/crm-sync-view';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
@@ -30,7 +30,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, segmentId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }

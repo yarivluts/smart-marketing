@@ -67,6 +67,21 @@ async function setupOrgProjectSegment(orgName: string) {
   return { ownerSession, owner, organization, project, segment };
 }
 
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
+}
+
 function deleteRequest(
   orgId: string,
   projectId: string,
@@ -119,6 +134,18 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/segments/[segmentId]', (
 
     const second = deleteRequest(organization.id, project.id, segment.id);
     expect((await DELETE(second.request, { params: second.params })).status).toBe(404);
+  });
+
+  it("KAN-136 isolation: a project-scoped project_admin for one project can't delete a SIBLING project's segment", async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Delete Sibling Project Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+    const memberSession = await inviteProjectScopedMember(organization.id, otherProject.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = deleteRequest(organization.id, project.id, segment.id);
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(403);
   });
 });
 
@@ -283,5 +310,28 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/segments/[segmentId]', ()
     });
     const response = await PATCH(request, { params });
     expect(response.status).toBe(404);
+  });
+
+  it('KAN-136: lets a project-scoped project_admin update a segment in THEIR OWN project', async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Project-Scoped Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { status: 'in_progress' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+  });
+
+  it("KAN-136 isolation: a project-scoped project_admin for one project can't update a SIBLING project's segment", async () => {
+    const { ownerSession, organization, project, segment } = await setupOrgProjectSegment('Segment Patch Sibling Project Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+    const memberSession = await inviteProjectScopedMember(organization.id, otherProject.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = patchRequest(organization.id, project.id, segment.id, { status: 'in_progress' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(403);
   });
 });

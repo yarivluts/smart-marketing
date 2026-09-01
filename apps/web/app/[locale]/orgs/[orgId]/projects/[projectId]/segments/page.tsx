@@ -48,6 +48,9 @@ export async function generateMetadata({ params }: PageProps) {
  * (`segment.service.ts`), so there is exactly one segment definition, not
  * two. Gated on `dashboards.write`, reusing the goals/boards features'
  * permission (same reasoning `goals/page.tsx` documents for its own reuse).
+ * Checked at project scope, not just org scope (KAN-136), so a
+ * project-scoped `project_admin`/`editor`/`operator` (KAN-135) can reach
+ * their own project's segments, not only an org-scope admin.
  * Each row also carries KAN-81's work-list owner/status controls.
  */
 export default async function SegmentsPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
@@ -62,7 +65,7 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId })) {
     notFound();
   }
 

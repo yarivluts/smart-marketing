@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidSegmentError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { createSegment } from '@/lib/orgs/mutations';
 import { listSegmentsForProject } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseCreateSegmentRequestBody } from '@/lib/orgs/parse-segment-fields';
 import { toSegmentSummaryView } from '@/lib/orgs/segment-view';
 
@@ -13,7 +13,7 @@ interface RouteParams {
 /** Lists a project's saved segments (KAN-76), newest-first — gated on `dashboards.write`, reusing the goals/boards features' permission. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -37,7 +37,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
