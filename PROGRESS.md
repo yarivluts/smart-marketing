@@ -63,19 +63,29 @@ Template for each entry:
     recording PR #377/KAN-139's own merge) — merged `main` in again, resolving a second `PROGRESS.md`
     conflict the same way (kept both entries, this one first as truly latest) with no code changes on
     either side to reconcile.
-- **In progress (exact stopping point):** PR #383 open (post-second-merge-conflict-resolution push),
-  CI re-running on the new merge commit. Will merge once green with no open review threads.
-- **Blocked + why:** nothing — waiting on CI only.
-- **Next step:** once PR #383 merges, continue the KAN-136 slice series with the next unclaimed
-  feature family from the remaining list (cost-guardrails/plugins/campaign-ops/hooks/field-mappings/
-  ...) — check open PRs first, as always, since this slice series has had near-continuous concurrent
-  activity from other sessions all run.
+  - CI's `lint · typecheck · test · build` check failed a second time on that new merge commit
+    (`e755c32`, docs-only, no code changed) — every unit/emulator test file passed (378/378, 2429
+    tests); the failure was entirely in the Playwright e2e shard, `e2e/campaign-ops.spec.ts` (failed)
+    and `e2e/cohorts.spec.ts` (flaky, passed its own retry), neither touched by this diff, both
+    preceded by the same documented `RESOURCE_EXHAUSTED` emulator cascade. This PR's one-re-run budget
+    was already spent on the first failure, so per this repo's CI-red policy this second failure is
+    treated as real (wait it out, don't re-run again) — posted a second standing-down comment and left
+    the PR watched rather than idle.
+- **In progress (exact stopping point):** PR #383 open, CI red on the e2e-only flake described above.
+  Needs either a natural future green or a human-triggered re-run (this session's one-re-run budget
+  for this PR is spent) before it can merge.
+- **Blocked + why:** waiting on a human to re-run CI on PR #383 (or a future scheduled run to find it
+  naturally green) — this session's own one-re-run allowance for the PR is already used.
+- **Next step:** once PR #383 is green and merges, continue the KAN-136 slice series with the next
+  unclaimed feature family from the remaining list (cost-guardrails/plugins/campaign-ops/hooks/
+  field-mappings/...) — check open PRs first, as always, since this slice series has had
+  near-continuous concurrent activity from other sessions all run.
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Review/merge PR #383 (or let this run's own supervision drive it to green and merge, per this
-    repo's PR-babysitting rules).
+  - **Re-run CI on PR #383** (`lint · typecheck · test · build`) — red on an unrelated, documented
+    Playwright e2e emulator flake, this session's re-run budget for the PR already spent.
 
 ---
 
