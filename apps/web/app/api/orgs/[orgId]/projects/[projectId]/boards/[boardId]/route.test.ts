@@ -1,7 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
-import { createBoard, createOrganizationWithOwner, createProject, ensureUserForFirebaseSession } from '@growthos/firebase-orm-models';
+import {
+  acceptInvite,
+  createBoard,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
+} from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { DELETE, PATCH } from './route';
 
@@ -38,6 +45,21 @@ async function setupOrgProjectBoard(orgName: string) {
   const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
   const board = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
   return { ownerSession, owner, organization, project, board };
+}
+
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
 }
 
 function patchRequest(
@@ -110,6 +132,17 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/boards/[boardId]', () => 
     expect(body.board.name).toBe('Revenue');
     expect(body.board.compare).toBe('previous_period');
   });
+
+  it('KAN-136: lets a project-scoped project_admin rename a board in THEIR OWN project', async () => {
+    const { ownerSession, organization, project, board } = await setupOrgProjectBoard('Board Settings Project-Scoped Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = patchRequest(organization.id, project.id, board.id, { name: 'Renamed' });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+  });
 });
 
 describe('DELETE /api/orgs/[orgId]/projects/[projectId]/boards/[boardId]', () => {
@@ -137,5 +170,17 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/boards/[boardId]', () =>
 
     const second = deleteRequest(organization.id, project.id, board.id);
     expect((await DELETE(second.request, { params: second.params })).status).toBe(404);
+  });
+
+  it("KAN-136 isolation: a project-scoped project_admin for one project can't delete a SIBLING project's board", async () => {
+    const { ownerSession, organization, project, board } = await setupOrgProjectBoard('Board Delete Sibling Project Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+    const memberSession = await inviteProjectScopedMember(organization.id, otherProject.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = deleteRequest(organization.id, project.id, board.id);
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(403);
   });
 });

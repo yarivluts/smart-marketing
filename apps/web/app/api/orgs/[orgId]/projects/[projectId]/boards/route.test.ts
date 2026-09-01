@@ -45,6 +45,21 @@ async function setupOrgProject(orgName: string) {
   return { ownerSession, organization, project };
 }
 
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
+}
+
 function boardsRequest(
   orgId: string,
   projectId: string,
@@ -107,6 +122,38 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/boards', () => {
     const response = await GET(request, { params });
     expect(response.status).toBe(404);
   });
+
+  it(
+    'KAN-136: lets a project-scoped project_admin list boards for THEIR OWN project — before this ' +
+      'fix a project-scoped binding never satisfied this route\'s permission check at all',
+    async () => {
+      const { ownerSession, organization, project } = await setupOrgProject('Board List Project-Scoped Org');
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = boardsRequest(organization.id, project.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ boards: [] });
+    },
+  );
+
+  it(
+    "KAN-136 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org — a project-scope binding never grants access sideways',
+    async () => {
+      const { ownerSession, organization, project } = await setupOrgProject('Board List Sibling Project Org');
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = boardsRequest(organization.id, otherProject.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/boards', () => {
@@ -139,5 +186,16 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/boards', () => {
     const listed = (await listResponse.json()) as { boards: Array<{ id: string }> };
     expect(listed.boards).toHaveLength(1);
     expect(listed.boards[0].id).toBe(body.board.id);
+  });
+
+  it('KAN-136: lets a project-scoped editor create a board in THEIR OWN project', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Board Create Project-Scoped Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'editor', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = boardsRequest(organization.id, project.id, { name: 'Revenue' });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
   });
 });
