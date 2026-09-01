@@ -53,8 +53,18 @@ Template for each entry:
     kept both, dropped "(latest)" from the now-superseded Segments one) plus a clean auto-merge in
     `TASKS.md`; re-verified `pnpm build`/`lint`/`typecheck` and the full `apps/web` test suite green
     before re-pushing.
-- **In progress (exact stopping point):** PR #383 open (post-merge-conflict-resolution push), CI
-  re-running on the merge commit. Will merge once green with no open review threads.
+  - CI's `lint · typecheck · test · build` check then failed once on the merge commit — a 120s test
+    timeout in `packages/firebase-orm-models/src/plugin-runtime/quality-score-pack/
+    quality-score-pack.emulator.test.ts`, a file this PR's diff never touches, preceded by the same
+    documented Firestore-emulator `RESOURCE_EXHAUSTED`/`CANCELLED` stream-error cascade this repo's
+    history repeatedly names. Posted a standing-down comment and used the one allowed re-run — came
+    back green, confirming the flake diagnosis.
+  - By the time that re-run finished (~50 min later), `main` had moved once more (docs-only PR #384
+    recording PR #377/KAN-139's own merge) — merged `main` in again, resolving a second `PROGRESS.md`
+    conflict the same way (kept both entries, this one first as truly latest) with no code changes on
+    either side to reconcile.
+- **In progress (exact stopping point):** PR #383 open (post-second-merge-conflict-resolution push),
+  CI re-running on the new merge commit. Will merge once green with no open review threads.
 - **Blocked + why:** nothing — waiting on CI only.
 - **Next step:** once PR #383 merges, continue the KAN-136 slice series with the next unclaimed
   feature family from the remaining list (cost-guardrails/plugins/campaign-ops/hooks/field-mappings/
@@ -66,6 +76,38 @@ Template for each entry:
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
   - Review/merge PR #383 (or let this run's own supervision drive it to green and merge, per this
     repo's PR-babysitting rules).
+
+---
+
+## 2026-09-01 — PR #377 (KAN-139, Metric Registry) merged: real GitHub Actions CI green end to end
+
+- **Last completed:** closing the loop on the KAN-139 entry below. PR #377 hit an unusually heavy
+  round of churn from this "project-scope reachability" slice series' own concurrent-session
+  collision rate: two different pre-existing CI flakes back to back on the first push (the
+  well-documented `e2e/campaign-ops.spec.ts`/`e2e/cohorts.spec.ts` cascading timeout, then a second,
+  unrelated `packages/firebase-orm-models` `campaign-target.emulator.test.ts` Firestore-SDK
+  internal-assertion crash under `RESOURCE_EXHAUSTED` — neither related to this diff, both confirmed
+  via local isolation runs), followed by **three separate docs-only merge conflicts** in
+  `TASKS.md`/`PROGRESS.md`'s own top entries as `main` advanced through PR #378 (KAN-140, Schema
+  Registry), PR #375 (KAN-138, Segments), and two docs-only "record the merge" PRs (#381/#382) — each
+  requiring a rebase-resolve-repush cycle, none touching `metric-defs` code. After the third rebase,
+  real GitHub Actions CI ran the full `lint · typecheck · test · build` job end to end on the final
+  head and came back **green** — `terraform fmt · validate` green too, `mergeable_state: clean`, no
+  open review threads. Merged PR #377 into `main` (squash) as `32f81ff`. Attempted to delete the
+  merged branch (`kan-139-project-scoped-permission-metric-defs`) — hit this sandbox's long-documented
+  `git push --delete` HTTP 403 (same pattern noted in prior runs' entries), not treated as blocking.
+- **In progress (exact stopping point):** complete.
+- **Blocked + why:** nothing.
+- **Next step:** continue the KAN-136 slice series — the remaining route families not yet claimed by
+  KAN-136 through KAN-140 (check `TASKS.md`'s own KAN-136..140 rows and open PRs first before picking,
+  this series has collided on nearly every slice today) each need their own follow-up slice adopting
+  the `requireOrgPermission` → `requireProjectPermission` swap `access.ts` supports.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: the merged branch above still exists on `origin` (delete failed, HTTP
+    403 as noted).
 
 ---
 
