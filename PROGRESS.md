@@ -54,19 +54,21 @@ Template for each entry:
     GitHub activity to drive it to green and merge per this repo's standing PR-babysitting rules.
   - Updated `TASKS.md` with a new **KAN-137** row for this slice, following KAN-136's own row as
     the template (no separate Jira ticket, same as KAN-136).
-- **In progress (exact stopping point):** PR #374 open, CI running. Will merge once green with no
-  open review threads, then update this entry's own "Last completed" is already accurate — no
-  further PROGRESS.md update needed unless CI surfaces something to document.
-- **Blocked + why:** nothing — waiting on CI only.
-- **Next step:** once PR #374 is green and merges, continue the KAN-136/KAN-137 series with slice 3
-  — the next feature family from the remaining list (segments, schema-defs, metric-defs,
-  ingest-health, keys, cost-guardrails, plugins, campaign-ops, ...), same one-line-swap pattern.
+  - **CI came back green** (`lint · typecheck · test · build` and `terraform fmt · validate` both
+    succeeded), `mergeable_state: clean`, no open review threads — **merged** (squash, `f519539`).
+    Branch deletion for `kan-136-slice2-goals` hit the same HTTP 403 prior runs have documented from
+    this sandbox — left undeleted, same as the existing pile of merged branches noted in earlier
+    entries.
+- **In progress (exact stopping point):** none — `main` (`f519539`) is green. This entry itself is a
+  docs-only PROGRESS.md update PR, per the branch/PR workflow.
+- **Blocked + why:** nothing.
+- **Next step:** continue the KAN-136/KAN-137 series with slice 3 — the next feature family from the
+  remaining list (segments, schema-defs, metric-defs, ingest-health, keys, cost-guardrails, plugins,
+  campaign-ops, ...), same one-line-swap pattern.
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Review/merge PR #374 (or let this run's own supervision drive it to green and merge, per this
-    repo's PR-babysitting rules).
 
 ---
 
