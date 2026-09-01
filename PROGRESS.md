@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-09-01 — Fixed CI red: restored the tri-module redesign's dropped per-feature nav (no product decision needed)
+
+- **Last completed:** picked up the scheduled run per `CLAUDE.md`. `TASKS.md` has no `todo` rows
+  (only `KAN-18`/`KAN-19`, infra-bound, and `KAN-50`/`KAN-51`, `blocked-by` `KAN-43`). Checked open
+  PRs first per this repo's established pattern and found three: **#362** (unit-test matcher fix),
+  **#363** and **#364** (both docs-only "record the CI-red finding" check-ins) — all blocked on the
+  same nav-collapse regression at least 3 prior scheduled runs had independently diagnosed and
+  explicitly declined to fix themselves, reasoning it needed a human IA call (see the 2026-08-31
+  entries below for the full diagnosis this run started from).
+  - Re-verified: `components/orgs/campaign-daily-budget-control.test.tsx` already passes 5/5 on
+    current `main` (`bd7d215`'s own later rewrite superseded whatever `0be7808` broke there) — **#362
+    is moot**, closed with an explanatory comment. **#363** duplicated #364's own finding with a
+    stale file list — closed as superseded by #364.
+  - Re-examined the actual blocker: `0be7808`/`bd7d215` (both direct pushes to `main` by the repo
+    owner) collapsed `ProjectLayout`'s sidebar from ~29 per-feature links down to 3 primary modules
+    (Ads & Performance / Funnel & Goals / AI Copilot & Automation) + Settings. Every dropped page's
+    route still exists and still works — they were just unlinked from anywhere in the UI (also
+    absent from OmniSearch, a separate, smaller gap left for a future pass — it's a different,
+    heavier subsystem: a server-built ranked index with its own result-type taxonomy, not a nav
+    link). Prior runs treated "where does each of ~16-20 pages belong" as an unavoidable product/IA
+    judgment call and stood down rather than guess.
+  - **The actual fix needs no such guess.** `git show 0be7808^:.../layout.tsx` has the complete
+    pre-redesign nav — every item already permission-gated via `can()`, already keyed to translation
+    strings that were never deleted (`OrgDetailPage.project*Link` in `messages/en.json`/`he.json`,
+    label text unchanged, e.g. `projectCohortsLink` = "Cohort retention", `projectFunnelLink` =
+    "Conversion" — confirmed exact string match against every `e2e/*.spec.ts` nav-click assertion
+    before writing anything). Restored that entire nav verbatim as additional sections *below* the
+    3 new primary-module links (which stay exactly as the redesign left them) — org-level shortcuts
+    (Home/org Resources/Audit log/org Plugin registry), an unheaded insights group (Boards/Goals/
+    Segments/Win rules/"Conversion"→funnel/Cohort retention/Insights/War-room TV/Campaign ops/Rep
+    collections), a Data-heading group (Schema registry/Metric catalog/Ingest health/Inbound hooks/
+    Field mappings/Billing ops feed/Record feed/Customers/Feedback/Churn reasons/Intent & quality/
+    Firmographics/Experiments/Support/Demos), and a Settings-heading group (existing Settings page +
+    Project resources/API keys/Cost guardrails/Session replay). Deliberately did **not** re-add
+    `campaigns`/`automation` as their own links — they'd just be a second link to the exact href the
+    two new primary-module items already cover. This makes zero decisions about which of the 3
+    modules "owns" a feature — it just stops deleting the fallback that reaches every feature,
+    leaving that IA judgment call fully open for whenever a human wants to make it.
+  - Verification: `pnpm --filter @growthos/web typecheck` and `lint` both green. Ran all ~20
+    previously-orphaned specs plus the ones that shared the same nav (`campaign-ops`, `cohorts`,
+    `cost-guardrails`, `customers`, `billing-ops-feed`, `boards`, `experiments`, `feedback`, `hooks`,
+    `ingest-health`, `insights`, `intent-quality`, `keys`, `metric-defs`, `record-feed`,
+    `schema-registry`, `funnel`, `tv-pairing`, `omnisearch`, `plugins`, `resource-library`,
+    `onboarding` — 26 tests) directly against the Firestore/Auth emulators, not just trusting CI.
+- **In progress (exact stopping point):** PR opened (`fix/restore-project-nav-reachability`) once
+  the local run above confirmed green; merging once CI itself is green, then closing #364 as
+  superseded (its own diagnosis is now folded into this entry).
+- **Blocked + why:** nothing — this was the one blocker for all CI, and it turned out mechanical.
+- **Next step:** once merged, resume normal backlog sweeping (`TASKS.md` is otherwise exhausted).
+  Two deliberately-deferred follow-ups, documented rather than done here: (1) OmniSearch's index
+  still only covers boards/metrics/segments/campaigns/goals/win_rules/customers — the restored pages
+  above are reachable via nav but still invisible to Cmd/Ctrl-K; (2) the actual "which of the 3
+  primary modules should surface which restored feature more prominently" IA question is still open
+  for a human to answer whenever they want to revisit it — this fix intentionally didn't touch that.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional: the IA question above, and the OmniSearch-coverage gap, whenever there's appetite for
+    a genuine product pass on the 3-module redesign.
+
+---
+
 ## 2026-08-28 (latest) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
 
 - **Last completed:** the three follow-ups #345 named, plus two real bugs the rendered pages
