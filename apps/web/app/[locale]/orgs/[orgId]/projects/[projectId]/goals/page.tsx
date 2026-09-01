@@ -27,7 +27,9 @@ export async function generateMetadata({ params }: PageProps) {
  * Gated on `dashboards.write` for the whole page — the same "whole feature,
  * not just mutation, is admin-only" posture every other project admin
  * surface in this codebase (including `boards/page.tsx`, which this page
- * mirrors) uses.
+ * mirrors) uses. Checked at project scope, not just org scope (KAN-136), so
+ * a project-scoped `project_admin`/`editor`/`operator` (KAN-135) can reach
+ * their own project's goals, not only an org-scope admin.
  */
 export default async function GoalsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -40,7 +42,7 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId })) {
     notFound();
   }
 

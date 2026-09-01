@@ -2,11 +2,13 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { DecodedIdToken } from 'firebase-admin/auth';
 import {
+  acceptInvite,
   createGoal,
   createOrganizationWithOwner,
   createOrgPerson,
   createProject,
   ensureUserForFirebaseSession,
+  inviteMemberToOrganization,
   registerMetricDefinition,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -69,6 +71,21 @@ async function setupOrgProjectGoal(orgName: string) {
     createdByUserId: owner.id,
   });
   return { ownerSession, owner, organization, project, goal };
+}
+
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
 }
 
 function getRequest(
@@ -135,6 +152,37 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]', () => {
     expect(body.goal).toMatchObject({ name: 'Q3 signups', targetValue: 1000 });
     expect(body.thermometer.kind).toBe('warehouse_not_configured');
   });
+
+  it(
+    'KAN-136: lets a project-scoped project_admin view a goal in THEIR OWN project — before this ' +
+      "fix a project-scoped binding never satisfied this route's permission check at all",
+    async () => {
+      const { ownerSession, organization, project, goal } = await setupOrgProjectGoal('Goal Get Project-Scoped Org');
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = getRequest(organization.id, project.id, goal.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(200);
+    },
+  );
+
+  it(
+    "KAN-136 isolation: a project-scoped project_admin for one project can't view a SIBLING " +
+      "project's goal",
+    async () => {
+      const { ownerSession, organization, project, goal } = await setupOrgProjectGoal('Goal Get Sibling Project Org');
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, otherProject.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = getRequest(organization.id, project.id, goal.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });
 
 describe('DELETE /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]', () => {
@@ -162,6 +210,18 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]', () => {
 
     const second = deleteRequest(organization.id, project.id, goal.id);
     expect((await DELETE(second.request, { params: second.params })).status).toBe(404);
+  });
+
+  it("KAN-136 isolation: a project-scoped project_admin for one project can't delete a SIBLING project's goal", async () => {
+    const { ownerSession, organization, project, goal } = await setupOrgProjectGoal('Goal Delete Sibling Project Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+    const memberSession = await inviteProjectScopedMember(organization.id, otherProject.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = deleteRequest(organization.id, project.id, goal.id);
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(403);
   });
 });
 
@@ -213,6 +273,17 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/goals/[goalId]', () => {
     const getResult = await GET(getRequest(organization.id, project.id, goal.id).request, { params: getRequest(organization.id, project.id, goal.id).params });
     const getBody = (await getResult.json()) as { goal: { targetValue: number | null } };
     expect(getBody.goal.targetValue).toBe(1500);
+  });
+
+  it('KAN-136: lets a project-scoped project_admin update a goal in THEIR OWN project', async () => {
+    const { ownerSession, organization, project, goal } = await setupOrgProjectGoal('Goal Patch Project-Scoped Org');
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = patchRequest(organization.id, project.id, goal.id, { targetValue: 1500 });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
   });
 
   it('returns 404 for a definition update against a goal id that does not exist', async () => {
