@@ -37,8 +37,9 @@ test.describe('Feedback & NPS (KAN-82)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Feedback' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/feedback$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/feedback`);
     await expect(page.getByRole('heading', { name: `Feedback & NPS for Client Gamma` })).toBeVisible();
     await expect(page.getByText('Install the Feedback & NPS pack to start collecting NPS surveys and scoring them.')).toBeVisible();
 

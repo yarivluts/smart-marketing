@@ -37,8 +37,9 @@ test.describe('Experiments (KAN-89)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Experiments' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/experiments$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/experiments`);
     await expect(page.getByRole('heading', { name: `Experiments for Client Delta` })).toBeVisible();
     await expect(page.getByText('Install the Experiment pack to start tracking exposures and conversions for your A/B tests.')).toBeVisible();
 

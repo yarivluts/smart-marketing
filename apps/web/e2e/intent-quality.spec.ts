@@ -37,8 +37,9 @@ test.describe('Intent & Quality Scoring (KAN-83)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Intent & quality' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/intent-quality$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/intent-quality`);
     await expect(page.getByRole('heading', { name: `Intent & quality for Client Delta` })).toBeVisible();
     await expect(
       page.getByText('Install the Intent & Quality Scoring pack to start capturing onboarding-survey answers and computing a quality score at signup.'),
