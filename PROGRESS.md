@@ -54,20 +54,27 @@ Template for each entry:
     in the background past this entry's own write time — confirmed separately before merge.
   - Opened **PR #378** (branch `kan-140-project-scoped-permission-schema-defs`) documenting the
     above; subscribed to its GitHub activity to drive it to green and merge per this repo's standing
-    PR-babysitting rules.
-- **In progress (exact stopping point):** PR #378 open, CI running. Will merge once green with no
-  open review threads.
-- **Blocked + why:** nothing — waiting on CI only.
-- **Next step:** once PR #378 merges, continue the KAN-136 slice series with the next unclaimed
-  feature family from the remaining list (whichever of ingest-health/keys/cost-guardrails/plugins/
-  campaign-ops isn't already claimed by a concurrent session's open PR at pick time — check open PRs
-  first, as always).
+    PR-babysitting rules. Also confirmed `packages/firebase-orm-models`'s own suite (untouched by
+    this diff, still running in the background at PR-open time) came back green: 133/133 files,
+    1680/1680 tests.
+  - Both checks (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green on
+    the first run (~45 min), `mergeable_state: clean`, no open review threads — merged (squash,
+    `8eae783`). Unsubscribed once confirmed merged; cancelled the scheduled 60-minute check-in since
+    it was no longer needed. Remote branch deletion failed with the same recurring HTTP 403 this file
+    has documented since 2026-07-04.
+  - `main` is now caught up through **KAN-140**.
+- **In progress (exact stopping point):** none — this PROGRESS.md update itself is the only
+  remaining artifact of this run.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next run checks open PRs first (as always), then continues the KAN-136 slice series
+  with the next unclaimed feature family from the remaining list (ingest-health/keys/cost-guardrails/
+  plugins/campaign-ops/...).
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Review/merge PR #378 (or let this run's own supervision drive it to green and merge, per this
-    repo's PR-babysitting rules).
+  - Optional/low-priority: the recurring branch-deletion HTTP 403 (no fix attempted this run, same
+    long-standing issue).
 
 ---
 
