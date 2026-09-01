@@ -17,6 +17,80 @@ Template for each entry:
 
 ---
 
+## 2026-09-01 (latest) — Delivered the KAN-85 omnisearch follow-up: restored nav pages are now searchable
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md` confirmed exhausted (only `KAN-18`/`KAN-19`,
+    infra-bound, and `KAN-50`/`KAN-51`, `blocked-by` `KAN-43`, remain `todo`-adjacent). Checked open
+    PRs first (established pattern) and found **#367** (docs check-in, merged cleanly by the time
+    this run looked — CI took ~47 min), **#366** (an e2e click→`page.goto()` workaround for the same
+    nav-collapse bug PR #365 had already fixed for real by restoring the actual nav links — closed as
+    superseded, since #365's real fix keeps the specs' original click-through regression coverage of
+    the nav itself, which #366's `goto()` workaround would have thrown away).
+  - Picked up the one deliberately-deferred follow-up named in the 2026-09-01 nav-restore entry
+    below: the KAN-85 global omnisearch (Cmd/Ctrl-K) index only ever covered listed *entities*
+    (boards, goals, segments, campaigns, metrics, win rules, customers) — never the destination
+    *pages* PR #365 had just restored to the sidebar, so e.g. Cost guardrails or Cohort retention
+    stayed unreachable via search even after coming back to the nav.
+  - Delivered as **PR #369**: a new `page` omnisearch result type
+    (`packages/shared/src/omnisearch/types.ts`) and a pure `buildOmniSearchPageShortcuts` helper
+    (`apps/web/lib/orgs/omnisearch.ts`) that turns `ProjectLayout`'s own nav items — already
+    translated and permission-filtered server-side, identical `can()` checks as the sidebar itself —
+    into static "jump to this page" results, de-duped by href defensively. `ProjectLayout` builds
+    this from its restored nav sections (excluding the 3 primary-module links, which were never
+    dropped and are already one click away) and passes it into `OmniSearchTrigger` as a new
+    `pageShortcuts` prop, merged client-side alongside the existing fetched entity index — no extra
+    network round-trip.
+  - **Self-review caught a real bug before merge:** delegated an independent subagent review of the
+    diff (this repo's established pattern), which found that the palette's render logic gated *all*
+    results behind the fetched-index's own `loading` flag — so a matching page shortcut, despite
+    being ready immediately with no fetch dependency, was still hidden behind "Loading..." until the
+    unrelated `/omnisearch` fetch resolved, directly contradicting the feature's own point. Fixed the
+    ternary to only show the loading state while there are truly no results yet, with a new
+    regression test (`omni-search.test.tsx`) asserting a page shortcut renders while that fetch is
+    still pending (a never-resolving mock `fetch`). The same review also flagged that
+    `buildOmniSearchPageShortcuts` had no protection against two nav items sharing an `href`
+    (a silent duplicate React key) — added defensive de-dupe-by-href plus a unit test for it, even
+    though today's `ProjectLayout` nav arrays don't actually collide.
+  - Verification: `pnpm typecheck`/`lint`/`build` green across the whole monorepo;
+    `pnpm --filter @growthos/web run test:unit:emulator` (real Firestore + Auth emulators) green,
+    378 files / 2367 tests; ran the omnisearch e2e specs for real against the emulators + a real
+    `next dev` server (not just typechecked) — all 3 pass, including a new e2e test jumping via
+    Cmd/Ctrl-K straight to Cohort retention (a page with no listed-entity coverage of its own) and
+    landing on `/cohorts`.
+  - Also opened **PR #370**: a tiny, separate docs-only fix removing a stray unresolved-merge-
+    conflict block (`<<<<<<< HEAD` / `=======` / `>>>>>>> origin/main`, both sides having converged
+    to the same `---` separator) that an earlier merge had committed into this file — noticed while
+    writing #366's close comment, kept as its own PR to stay scoped per `CLAUDE.md`.
+  - Both PRs' CI (`lint · typecheck · test · build`, ~45 min each — this repo's full suite including
+    sharded e2e) were driven to green via scheduled self-check-ins rather than polling, then merged
+    (squash): **#369** at `4aa06ba`, **#370** at `0b1b9ac`. Remote branch deletion for both
+    (`feat/omnisearch-page-shortcuts`, `chore/progress-conflict-marker-cleanup`) failed with the
+    same HTTP 403 this sandbox's git remote has consistently rejected branch deletes with across many
+    prior runs (not a GitHub permissions issue) — left merged-but-undeleted, same as the existing
+    pile noted in earlier entries.
+- **In progress (exact stopping point):** none — both PRs merged, `main` green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** `TASKS.md`'s numbered backlog (KAN-17..KAN-78) is fully exhausted apart from
+  infra/human-blocked items. Two small, still-open follow-ups from today's nav-restore work, noted
+  again for whenever there's appetite: (1) OmniSearch's Cmd/Ctrl-K coverage is now closed for nav
+  pages, but the separate OmniSearch *index* used elsewhere (Cmd/Ctrl-K vs. any future global search
+  UI) still doesn't cover the org-level pages that live outside a project context beyond the ones
+  already in `orgItems`; (2) the "which of the 3 primary modules should surface which restored
+  feature more prominently" IA question from the nav-restore entry is still open for a human. Absent
+  either of those, the next run should check open PRs first (this repo has multiple concurrent
+  scheduled sessions — `81e4220`/KAN-136 landed on `main` mid-way through this very run), then either
+  continue the KAN-100+-style gap-finding sweep for genuine, undocumented gaps, or stand by for
+  `KAN-43`/`KAN-18`/`KAN-19` to unblock the remaining infra-bound stories.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional: delete the two merged-but-undeleted branches above (and the existing pile from prior
+    entries) — this sandbox's git remote has consistently rejected branch-delete pushes with an
+    HTTP 403, and no available GitHub tool in this session covers branch deletion either.
+
+---
+
 ## 2026-09-01 — Fixed CI red: restored the tri-module redesign's dropped per-feature nav (no product decision needed)
 
 - **Last completed:** picked up the scheduled run per `CLAUDE.md`. `TASKS.md` has no `todo` rows
