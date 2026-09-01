@@ -46,19 +46,25 @@ Template for each entry:
     tests); `pnpm build` green (7/7 packages).
   - Opened **PR #380** (branch `kan-141-project-scoped-permission-ingest-health`) documenting the
     above; subscribed to its GitHub activity to drive it to green and merge.
-- **In progress (exact stopping point):** PR #380 open, CI running; PR #379 (the KAN-140 merge-outcome
-  docs follow-up) also still open. Will merge both once green with no open review threads.
-- **Blocked + why:** nothing — waiting on CI only.
-- **Next step:** once both PRs merge, continue the KAN-136 slice series with the next unclaimed
-  feature family from the remaining list (keys/cost-guardrails/plugins/campaign-ops/hooks/
-  field-mappings/... — check open PRs first, as always, since #375/#377 were both still in flight at
-  this run's last check).
+  - Both checks (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green on
+    PR #379 first (~44 min), `mergeable_state: clean`, no open review threads — merged (squash,
+    `d5a0bd2`). PR #380 followed the same pattern shortly after (~42 min), also green/clean/no
+    threads — merged (squash, `2ca3b07`). Unsubscribed from both once confirmed merged; cancelled the
+    scheduled 55-minute check-in since it was no longer needed. Remote branch deletion for both
+    failed with the same recurring HTTP 403 this file has documented since 2026-07-04.
+  - `main` is now caught up through **KAN-141**.
+- **In progress (exact stopping point):** none — this PROGRESS.md update itself is the only
+  remaining artifact of this run.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next run checks open PRs first (as always — #375/#377 were both still in flight at
+  this run's last check), then continues the KAN-136 slice series with the next unclaimed feature
+  family from the remaining list (keys/cost-guardrails/plugins/campaign-ops/hooks/field-mappings/...).
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Review/merge PR #379 and PR #380 (or let this run's own supervision drive them to green and
-    merge, per this repo's PR-babysitting rules).
+  - Optional/low-priority: the recurring branch-deletion HTTP 403 (no fix attempted this run, same
+    long-standing issue).
 
 ---
 
