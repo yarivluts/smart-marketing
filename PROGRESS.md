@@ -17,7 +17,39 @@ Template for each entry:
 
 ---
 
-## 2026-09-01 (latest) — Delivered a KAN-136 project-scope reachability slice for Segments, tracked as KAN-138
+## 2026-09-01 (latest) — PR #377 (KAN-139, Metric Registry) merged: real GitHub Actions CI green end to end
+
+- **Last completed:** closing the loop on the KAN-139 entry below. PR #377 hit an unusually heavy
+  round of churn from this "project-scope reachability" slice series' own concurrent-session
+  collision rate: two different pre-existing CI flakes back to back on the first push (the
+  well-documented `e2e/campaign-ops.spec.ts`/`e2e/cohorts.spec.ts` cascading timeout, then a second,
+  unrelated `packages/firebase-orm-models` `campaign-target.emulator.test.ts` Firestore-SDK
+  internal-assertion crash under `RESOURCE_EXHAUSTED` — neither related to this diff, both confirmed
+  via local isolation runs), followed by **three separate docs-only merge conflicts** in
+  `TASKS.md`/`PROGRESS.md`'s own top entries as `main` advanced through PR #378 (KAN-140, Schema
+  Registry), PR #375 (KAN-138, Segments), and two docs-only "record the merge" PRs (#381/#382) — each
+  requiring a rebase-resolve-repush cycle, none touching `metric-defs` code. After the third rebase,
+  real GitHub Actions CI ran the full `lint · typecheck · test · build` job end to end on the final
+  head and came back **green** — `terraform fmt · validate` green too, `mergeable_state: clean`, no
+  open review threads. Merged PR #377 into `main` (squash) as `32f81ff`. Attempted to delete the
+  merged branch (`kan-139-project-scoped-permission-metric-defs`) — hit this sandbox's long-documented
+  `git push --delete` HTTP 403 (same pattern noted in prior runs' entries), not treated as blocking.
+- **In progress (exact stopping point):** complete.
+- **Blocked + why:** nothing.
+- **Next step:** continue the KAN-136 slice series — the remaining route families not yet claimed by
+  KAN-136 through KAN-140 (check `TASKS.md`'s own KAN-136..140 rows and open PRs first before picking,
+  this series has collided on nearly every slice today) each need their own follow-up slice adopting
+  the `requireOrgPermission` → `requireProjectPermission` swap `access.ts` supports.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: the merged branch above still exists on `origin` (delete failed, HTTP
+    403 as noted).
+
+---
+
+## 2026-09-01 — Delivered a KAN-136 project-scope reachability slice for Segments, tracked as KAN-138
 
 - **Last completed:**
   - Scheduled run. `TASKS.md` had no plain `todo` rows (only the perennial `KAN-18`/`KAN-19`
