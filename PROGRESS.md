@@ -117,6 +117,72 @@ Template for each entry:
 
 ---
 
+## 2026-09-01 — Delivered KAN-137 (project-scope reachability follow-up, slice: Goals)
+
+- **Last completed:**
+  - Scheduled run. `TASKS.md` had no `todo` rows (only `KAN-18`/`KAN-19`, infra-bound, and
+    `KAN-50`/`KAN-51`, `blocked-by` `KAN-43`), so checked open PRs first per this repo's established
+    pattern before sweeping for a new follow-up. Found three already open, all opened within the
+    prior ~25 minutes by concurrent sessions: **#369** (omnisearch page-shortcut indexing, KAN-85
+    follow-up — exactly the gap this run's own "next step" note would have picked), **#370**
+    (docs-only PROGRESS.md conflict-marker cleanup), and **#368** (KAN-136, the shared
+    `requireProjectPermission` helper + a first slice for Boards — the exact "~60 routes still check
+    `{ orgId}` only" follow-up KAN-135's own row flagged). All three were self-contained and already
+    in good shape (green locally per their own PR descriptions) — left them untouched rather than
+    duplicate work in flight.
+  - Picked a **different, non-overlapping slice of the same KAN-136 gap**: Goals. Read PR #368's
+    diff directly (public, same repo) to reuse its exact `requireProjectPermission` design rather
+    than invent a second, subtly-different one — expected to collide trivially with #368's own copy
+    of `access.ts`/`route-isolation-guard.test.ts` at whichever PR merges second (same "keep one
+    copy" conflict class KAN-99/105/106/109's own entries already normalized), but the two PRs touch
+    disjoint route/page files (`boards/*` vs. `goals/*`) so there's no risk of double-applying the
+    actual permission-scope fix.
+  - Delivered: `requireProjectPermission(orgId, projectId, permission)` in `apps/web/lib/orgs/access.ts`
+    (a `requirePermissionAtScope` refactor shared with the existing `requireOrgPermission`, checking
+    `can()` with `{ orgId, projectId }` so a project-scoped `project_admin`/`editor`/`operator`
+    binding, KAN-135, satisfies it exactly like an org-scope binding does). Wired into all 3 Goals
+    API routes (`goals/route.ts` GET/POST, `goals/[goalId]/route.ts` GET/PATCH/DELETE) and both
+    pages (`goals/page.tsx`, `goals/[goalId]/page.tsx` — these call `can()` directly rather than
+    through a route helper, so just gained `projectId` in their existing scope object).
+    `route-isolation-guard.test.ts` (KAN-26) updated to also recognize `requireProjectPermission` as
+    a valid gate, mirroring the doc-comment/assertion-message changes #368 also made there.
+  - Full test coverage: `access.test.ts` gained a `requireProjectPermission` describe block (401,
+    404 no-membership, 403 project-scoped-binding-on-a-different-project, 200 own-project, 200
+    org-scope-still-works — 5 tests). `goals/route.test.ts` and `goals/[goalId]/route.test.ts` each
+    gained an `inviteProjectScopedMember` helper (real KAN-135 invite→accept flow against the
+    Firestore emulator) plus project-scoped-member-succeeds cases (list/create/read/update/delete)
+    and one cross-project-isolation-still-denies case, mirroring #368's own boards test additions.
+  - Verification: `pnpm --filter @growthos/web typecheck`/`lint` green; ran the four directly
+    touched test files against the real Firestore/Auth emulators (`firebase emulators:exec ...
+    "vitest run lib/orgs/access.test.ts lib/orgs/route-isolation-guard.test.ts 'app/api/orgs/
+    [orgId]/projects/[projectId]/goals'"`) — 4 files, 49 tests, all green. Full monorepo `pnpm build`
+    green (7/7 tasks); `pnpm --filter @growthos/dbt-transform test` (untouched by this diff)
+    independently confirmed green (250/250) after the shared monorepo `pnpm test` run hit that
+    package's well-documented DuckDB-file-lock flake once.
+  - **#368 (KAN-136) and #369/#370 all merged to `main` while this work was in progress** — as
+    expected (see the entry above), rebasing this branch onto the new `main` auto-resolved the
+    `access.ts`/`access.test.ts`/`route-isolation-guard.test.ts` changes cleanly (git recognized this
+    run's own `requireProjectPermission` addition as byte-identical to #368's, so only one copy
+    survives); the only real conflicts were both `TASKS.md` and this file's own top entries, resolved
+    by keeping both rows/entries side by side.
+  - Opened **PR #373**, subscribed to its activity, and scheduled a ~50-minute self check-in rather
+    than polling. Real GitHub Actions CI (`lint · typecheck · test · build` + `terraform fmt ·
+    validate`) came back green on the first run (~44 min). A second, unrelated docs-only commit
+    (`0cfc296`, recording PR #368's own merge outcome) landed directly on `main` while CI was running,
+    conflicting only in this file's own top entry — rebased and resolved by keeping both entries, same
+    pattern as the earlier `access.ts` collision.
+- **In progress (exact stopping point):** none — CI green, merging next.
+- **Blocked + why:** nothing blocking.
+- **Next step:** merge PR #373, delete the branch. Remaining ~50+ route families (segments,
+  schema-defs, metric-defs, ingest-health, keys, cost-guardrails, plugins, campaign-ops, ...) each
+  still need their own follow-up slice — a good next pick for whichever run finds this gap next,
+  checking open PRs first to avoid another collision.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+
+---
+
 ## 2026-09-01 — Fixed CI red: restored the tri-module redesign's dropped per-feature nav (no product decision needed)
 
 - **Last completed:** picked up the scheduled run per `CLAUDE.md`. `TASKS.md` has no `todo` rows

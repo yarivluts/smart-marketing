@@ -28,7 +28,8 @@ export async function generateMetadata({ params }: PageProps) {
  * range/deadline/owner) plus its computed pace thermometer — fetched
  * server-side via `queryGoalProgress`, the same "server-side query, then
  * render" structure `boards/[boardId]/page.tsx` uses per tile. Gated on
- * `dashboards.write`, same posture as the goals list page.
+ * `dashboards.write`, same posture as the goals list page — checked at
+ * project scope (KAN-136), so a project-scoped member can reach it.
  */
 export default async function GoalDetailPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId, goalId } = await params;
@@ -41,7 +42,7 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId })) {
     notFound();
   }
 
