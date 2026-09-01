@@ -178,12 +178,6 @@ Template for each entry:
 - **Blocked + why:** nothing blocking new backlog work.
 - **Next step:** next run checks open PRs first (#357, #358, #327), drives any real failures to green.
 - **Waiting on human:** KAN-43 applications; KAN-18/KAN-19.
-<<<<<<< HEAD
-=======
-
----
-
->>>>>>> origin/main
 
 ---
 
