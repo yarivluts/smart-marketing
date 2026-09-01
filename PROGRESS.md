@@ -91,6 +91,32 @@ Template for each entry:
 
 ---
 
+## 2026-09-01 — PR #368 (KAN-136 slice 1) merged: real GitHub Actions CI green end to end
+
+- **Last completed:** closing the loop on the KAN-136 entry below. After rebasing PR #368 onto
+  `main` post-#365, real GitHub Actions CI ran the full `lint · typecheck · test · build` job
+  end to end on the rebased head and came back **green** (Test step covered unit+emulator+the full
+  3-shard e2e suite, ~40 min, no failures — confirming the e2e blocker really was #365's nav gap and
+  is now gone) — `terraform fmt · validate` green too, no open review threads. PR #368 merged into
+  `main` as `81e4220`. Attempted to delete the merged branch
+  (`kan-136-project-scoped-permission-boards`) — hit this sandbox's long-documented `git push
+  --delete` HTTP 403 (same pattern noted in prior runs' entries), not treated as blocking.
+- **In progress (exact stopping point):** complete.
+- **Blocked + why:** nothing.
+- **Next step:** continue the KAN-136 series — the remaining ~55+ `project.manage`/`dashboards.*`/
+  `schema.write`/etc.-gated route families (goals, segments, schema-defs, metric-defs,
+  ingest-health, keys, cost-guardrails, plugins, campaign-ops, ...) each need their own follow-up
+  slice adopting the `requireOrgPermission` → `requireProjectPermission` swap `access.ts` now
+  supports.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional/low-priority: the merged branch above still exists on `origin` (delete failed, HTTP
+    403 as noted).
+
+---
+
 ## 2026-09-01 — Fixed CI red: restored the tri-module redesign's dropped per-feature nav (no product decision needed)
 
 - **Last completed:** picked up the scheduled run per `CLAUDE.md`. `TASKS.md` has no `todo` rows
