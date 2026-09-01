@@ -17,6 +17,59 @@ Template for each entry:
 
 ---
 
+## 2026-09-01 — Delivered KAN-136 slice 2 (project-scope reachability: Goals feature), tracked as KAN-137
+
+- **Last completed:**
+  - Scheduled run. Checked `main`'s CI health and open PRs first, per this repo's established
+    pattern — `main` was green (KAN-136 slice 1 / PR #368 and the nav-fix PR #365 both already
+    merged), and the two open PRs (#371, #372) were both docs-only PROGRESS.md check-ins from other
+    concurrent sessions, unrelated to any code change — left them untouched.
+  - `TASKS.md` had no `todo` rows (only `KAN-18`/`KAN-19`, infra-bound, and `KAN-50`/`KAN-51`,
+    `blocked-by` `KAN-43`), so per KAN-136 slice 1's own explicit "Next step" — continue the slice
+    series — picked the next feature family named there: **Goals**.
+  - Delivered **KAN-136 slice 2** (no dedicated Jira ticket, tracked as **KAN-137** in `TASKS.md`,
+    the same convention KAN-136 itself used): swapped `requireOrgPermission(orgId, ...)` for
+    `requireProjectPermission(orgId, projectId, ...)` in both goals API routes (`goals/route.ts`
+    GET/POST, `goals/[goalId]/route.ts` GET/PATCH/DELETE) and both pages' own
+    `can(..., { orgId })` calls (`goals/page.tsx`, `goals/[goalId]/page.tsx`, now
+    `{ orgId, projectId }`) — the identical one-line-swap pattern slice 1 established for Boards,
+    no other logic changed.
+  - Test coverage: each of the 2 goals route test files gained a project-scoped-member-succeeds
+    case plus a cross-project-isolation-still-denies case, via the same real KAN-135 invite→accept
+    flow against the Firestore emulator slice 1 used (8 new tests total).
+  - **Full local verification**, run end to end: `pnpm build` green (7/7 packages); `pnpm lint` and
+    `pnpm typecheck` green across the whole monorepo. `pnpm test`'s unit+emulator half green across
+    every package: `apps/web` 378/378 test files (2385/2385 tests); `apps/api` 141/141 tests (first
+    run hit one test's known Firestore-emulator `RESOURCE_EXHAUSTED`-class flake timeout in an
+    unrelated MCP rate-limit e2e spec — `apps/api` isn't touched by this diff — confirmed a flake by
+    rerunning the whole package clean, 17/17 suites); `packages/firebase-orm-models` 1680/1680 tests
+    (first run hit the same known flake pattern, this time in an unrelated quality-score-pack
+    emulator test — also untouched by this diff — confirmed flake, rerun green 133/133 files);
+    `packages/shared` (595/595), `packages/tracking-sdk` (29/29), `packages/mcp-headless-example`
+    (8/8) all green on the first pass; `packages/dbt-transform` 250/250 dbt tests green. e2e
+    (Playwright) half not re-run locally this session (no e2e spec or nav code touched by this
+    diff) — left for GitHub Actions CI to confirm, per this repo's established posture for a diff
+    that doesn't touch that surface.
+  - Opened **PR #374** (branch `kan-136-slice2-goals`) documenting the above; subscribed to its
+    GitHub activity to drive it to green and merge per this repo's standing PR-babysitting rules.
+  - Updated `TASKS.md` with a new **KAN-137** row for this slice, following KAN-136's own row as
+    the template (no separate Jira ticket, same as KAN-136).
+- **In progress (exact stopping point):** PR #374 open, CI running. Will merge once green with no
+  open review threads, then update this entry's own "Last completed" is already accurate — no
+  further PROGRESS.md update needed unless CI surfaces something to document.
+- **Blocked + why:** nothing — waiting on CI only.
+- **Next step:** once PR #374 is green and merges, continue the KAN-136/KAN-137 series with slice 3
+  — the next feature family from the remaining list (segments, schema-defs, metric-defs,
+  ingest-health, keys, cost-guardrails, plugins, campaign-ops, ...), same one-line-swap pattern.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Review/merge PR #374 (or let this run's own supervision drive it to green and merge, per this
+    repo's PR-babysitting rules).
+
+---
+
 ## 2026-09-01 (latest) — Delivered the KAN-85 omnisearch follow-up: restored nav pages are now searchable
 
 - **Last completed:**
