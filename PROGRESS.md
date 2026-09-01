@@ -60,12 +60,34 @@ Template for each entry:
     `cost-guardrails`, `customers`, `billing-ops-feed`, `boards`, `experiments`, `feedback`, `hooks`,
     `ingest-health`, `insights`, `intent-quality`, `keys`, `metric-defs`, `record-feed`,
     `schema-registry`, `funnel`, `tv-pairing`, `omnisearch`, `plugins`, `resource-library`,
-    `onboarding` — 26 tests) directly against the Firestore/Auth emulators, not just trusting CI.
-- **In progress (exact stopping point):** PR opened (`fix/restore-project-nav-reachability`) once
-  the local run above confirmed green; merging once CI itself is green, then closing #364 as
-  superseded (its own diagnosis is now folded into this entry).
+    `onboarding` — 26 tests) directly against the Firestore/Auth emulators, not just trusting CI —
+    every one passed at least once locally, several only on a retry (this sandbox's own documented
+    dev-server/emulator contention: different assertions timed out on each retry, never the same one
+    twice — not a real regression).
+  - Two of those specs needed real fixes, both pre-existing mismatches the restored nav finally let
+    CI *reach* rather than anything the restoration itself broke: `funnel.spec.ts` asserted the old
+    dedicated funnel page's "no funnel confirmed yet" empty state, but `bd7d215`'s own rewrite
+    replaced that page with a "Funnel, Goals & Revenue Health" cockpit that always synthesizes a
+    full zero-config view (no empty state left to assert) — updated the spec's assertions +
+    description to match the page's real, current, intentional content. `onboarding.spec.ts`'s
+    starter-board `getByRole('link', { name: 'Funnel' })` assertion (no `exact`) became ambiguous
+    once the restored sidebar's own "Funnel & Goals" primary-module link also substring-matched
+    "Funnel" — added `exact: true`, same pattern `insights.spec.ts` already used.
+  - PR #365 opened, CI ran and found exactly one failure (`campaign-ops.spec.ts`, cascading into the
+    next-run `cohorts.spec.ts`) — the same "first compile in this run" timing flake
+    `playwright.config.ts`'s own comments document (previously hit `auth.spec.ts`/`boards.spec.ts`/
+    `ingest-health.spec.ts`); posted a standing-down comment naming it and re-ran the failed job once
+    (this run's one-re-run budget) rather than guessing at a code fix for a non-reproducible timing
+    issue already independently confirmed passing in the local emulator runs above. Re-run came back
+    fully green (`lint`/`typecheck`/`test`/`build` all pass). **Merged** (squash, `4ea6902`).
+  - Closed #362 (moot) and #363 (superseded by #364) with explanatory comments during triage; closed
+    #364 (superseded by this PR, which carries the actual fix) once #365 merged. Branch deletion for
+    `fix/restore-project-nav-reachability` failed with the same HTTP 403 prior runs have hit from
+    this sandbox — left undeleted, same as the existing pile of merged branches noted below.
+- **In progress (exact stopping point):** none — `main` (`4ea6902`) is green. This entry itself is a
+  docs-only PROGRESS.md update PR, per the branch/PR workflow.
 - **Blocked + why:** nothing — this was the one blocker for all CI, and it turned out mechanical.
-- **Next step:** once merged, resume normal backlog sweeping (`TASKS.md` is otherwise exhausted).
+- **Next step:** resume normal backlog sweeping (`TASKS.md` is otherwise exhausted).
   Two deliberately-deferred follow-ups, documented rather than done here: (1) OmniSearch's index
   still only covers boards/metrics/segments/campaigns/goals/win_rules/customers — the restored pages
   above are reachable via nav but still invisible to Cmd/Ctrl-K; (2) the actual "which of the 3
