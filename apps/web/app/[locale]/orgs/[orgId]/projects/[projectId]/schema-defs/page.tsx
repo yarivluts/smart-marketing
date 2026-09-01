@@ -71,7 +71,7 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'schema.write', { orgId, projectId })) {
     notFound();
   }
 

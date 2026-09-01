@@ -6,7 +6,7 @@ import {
   SchemaDefNotFoundError,
 } from '@growthos/firebase-orm-models';
 import { evolveSchemaDefinition } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseSchemaDefRequestBody } from '@/lib/orgs/parse-schema-fields';
 import { toSchemaDefView } from '@/lib/orgs/schema-def-view';
 
@@ -23,7 +23,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'schema.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'schema.write');
   if (error) {
     return error;
   }

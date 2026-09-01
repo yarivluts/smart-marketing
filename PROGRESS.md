@@ -17,6 +17,60 @@ Template for each entry:
 
 ---
 
+## 2026-09-01 (latest) — Delivered a KAN-136 project-scope reachability slice for Schema Registry, tracked as KAN-140
+
+- **Last completed:**
+  - Scheduled run. Checked `main`'s CI health and open PRs first, per this repo's established
+    pattern — `main` was green (KAN-136/137 Goals slice, PR #374, and its own docs follow-up PR #376
+    both already merged). Two open PRs from concurrent sessions were already claiming the next two
+    feature families in KAN-136's own "remaining route families" list: **#375** (KAN-138, Segments)
+    and **#377** (KAN-139, Metric Registry) — left both untouched to avoid duplicate work.
+  - `TASKS.md` had no other `todo` rows (only `KAN-18`/`KAN-19`, infra-bound, and `KAN-50`/`KAN-51`,
+    `blocked-by` `KAN-43`), so per KAN-136's own slice-series convention, picked the next unclaimed
+    feature family from the remaining list: **Schema Registry** (`schema-defs`). Numbered this
+    **KAN-140** (not KAN-138/139, already claimed) to avoid a third collision.
+  - Swapped `requireOrgPermission(orgId, ...)` for `requireProjectPermission(orgId, projectId, ...)`
+    in all 5 schema-defs API routes (`schema-defs/route.ts` GET/POST, `schema-defs/evolve/route.ts`,
+    `schema-defs/check-tracking-alerts/route.ts`, `schema-defs/register-touchpoint/route.ts`,
+    `schema-defs/sync-marts/route.ts`) and the Schema Registry page's own `can(..., { orgId })` call
+    (`schema-defs/page.tsx`, now `{ orgId, projectId }`) — no other logic changed, the identical
+    one-line-swap pattern every prior slice (Boards/Goals/Segments/Metric Registry) used. Left the
+    project layout's/org page's own nav-visibility `canManageSchemas` checks (still `{ orgId }` only)
+    untouched, matching every prior slice's precedent — none of them extended nav visibility either,
+    so a project-scoped member can reach the page directly but won't yet see it in the sidebar; that
+    stays a documented, consistent gap across the whole slice series, not something to fix piecemeal
+    per-slice.
+  - Test coverage: each of the 5 schema-defs route test files gained a project-scoped
+    `project_admin`-succeeds case — the only project-invitable role that actually holds
+    `schema.write` (`editor`/`operator` don't) — plus a cross-project-isolation-still-denies case,
+    via the same real KAN-135 invite→accept flow every prior slice used (14 new tests total).
+  - **Full local verification, run end to end** (after `pnpm install` + `pnpm build`, neither of
+    which had been run yet in this container): `pnpm build` green (7/7 packages, including
+    `apps/web`'s own Next.js production build, which type-checks every route). `pnpm lint` and
+    `pnpm typecheck` green across the whole monorepo. `pnpm test`'s unit+emulator half green across
+    every package: `apps/web` 378/378 test files (2396/2396 tests, incl. all 14 new KAN-140 cases —
+    the 5 directly-touched schema-defs files alone: 40/40); `packages/shared` (595/595); `apps/api`
+    (141/141). `packages/firebase-orm-models`'s own suite (untouched by this diff) was still running
+    in the background past this entry's own write time — confirmed separately before merge.
+  - Opened **PR #378** (branch `kan-140-project-scoped-permission-schema-defs`) documenting the
+    above; subscribed to its GitHub activity to drive it to green and merge per this repo's standing
+    PR-babysitting rules.
+- **In progress (exact stopping point):** PR #378 open, CI running. Will merge once green with no
+  open review threads.
+- **Blocked + why:** nothing — waiting on CI only.
+- **Next step:** once PR #378 merges, continue the KAN-136 slice series with the next unclaimed
+  feature family from the remaining list (whichever of ingest-health/keys/cost-guardrails/plugins/
+  campaign-ops isn't already claimed by a concurrent session's open PR at pick time — check open PRs
+  first, as always).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Review/merge PR #378 (or let this run's own supervision drive it to green and merge, per this
+    repo's PR-babysitting rules).
+
+---
+
 ## 2026-09-01 — Delivered KAN-136 slice 2 (project-scope reachability: Goals feature), tracked as KAN-137
 
 - **Last completed:**

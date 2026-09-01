@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { ensureTouchpointSchemaRegistered } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string }>;
@@ -16,7 +16,7 @@ interface RouteParams {
  */
 export async function POST(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'schema.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'schema.write');
   if (error) {
     return error;
   }
