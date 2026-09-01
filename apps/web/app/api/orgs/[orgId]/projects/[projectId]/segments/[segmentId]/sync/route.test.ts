@@ -84,6 +84,21 @@ async function setupOrgProjectSegment(orgName: string) {
   return { ownerSession, owner, organization, project, segment };
 }
 
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
+}
+
 /** Registers + installs the built-in CRM webhook plugin, fully configured with an approved `generic` credential attachment. */
 async function setupInstalledCrmWebhookInstall(organizationId: string, projectId: string, ownerId: string) {
   const credential = await createSharedCredential({ organizationId, name: 'CRM webhook (test)', provider: 'generic', availableScopes: ['account'], createdByUserId: ownerId });
@@ -266,5 +281,30 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/segments/[segmentId]/sync'
     expect(body.run.status).toBe('failed');
     expect(body.run.recordsAttempted).toBe(0);
     expect(body.run.errorMessage).toEqual(expect.any(String));
+  });
+
+  it('KAN-136: lets a project-scoped project_admin sync a segment in THEIR OWN project', async () => {
+    const { ownerSession, owner, organization, project, segment } = await setupOrgProjectSegment('Crm Sync Route Project-Scoped Org');
+    const install = await setupInstalledCrmWebhookInstall(organization.id, project.id, owner.id);
+    const ownerUser = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', ownerUser.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = syncRequest(organization.id, project.id, segment.id, { installId: install.id });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(200);
+  });
+
+  it("KAN-136 isolation: a project-scoped project_admin for one project can't sync a SIBLING project's segment", async () => {
+    const { ownerSession, owner, organization, project, segment } = await setupOrgProjectSegment('Crm Sync Route Sibling Project Org');
+    const install = await setupInstalledCrmWebhookInstall(organization.id, project.id, owner.id);
+    const ownerUser = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+    const memberSession = await inviteProjectScopedMember(organization.id, otherProject.id, 'project_admin', ownerUser.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = syncRequest(organization.id, project.id, segment.id, { installId: install.id });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(403);
   });
 });
