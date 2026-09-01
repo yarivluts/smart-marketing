@@ -17,7 +17,79 @@ Template for each entry:
 
 ---
 
-## 2026-09-01 (latest) — PR #377 (KAN-139, Metric Registry) merged: real GitHub Actions CI green end to end
+## 2026-09-01 (latest) — Delivered a KAN-136 project-scope reachability slice for Keys, tracked as KAN-142
+
+- **Last completed:**
+  - Continuing the same scheduled run that delivered KAN-140 (Schema Registry) and KAN-141 (Ingest
+    Health): merged PR #380 (squash, `2ca3b07`), opened a docs follow-up (**PR #381**) recording that
+    outcome, then checked open PRs again before picking the next slice — **#375** (KAN-138, Segments)
+    and **#377** (KAN-139, Metric Registry) were still open/unmerged (their head SHAs had changed,
+    suggesting the owning sessions were rebasing to resolve conflicts), so picked the next unclaimed
+    feature family: **Keys**.
+  - Scoped this slice to the Keys page's own full action surface, not just its 2 own `keys/...`
+    routes: the page also renders a Revoke control for MCP OAuth connections that POSTs to
+    `mcp-grants/[grantId]/route.ts`, sharing its exact `keys.manage` gate — leaving it out would have
+    left the page reachable but that one button still broken for a project-scoped member. Swapped
+    `requireOrgPermission(orgId, ...)` for `requireProjectPermission(orgId, projectId, ...)` in all 3
+    routes (`keys/route.ts` GET/POST, `keys/[apiKeyId]/route.ts` DELETE/PATCH,
+    `mcp-grants/[grantId]/route.ts` DELETE) and the Keys page's own `can(..., { orgId })` call (now
+    `{ orgId, projectId }`) — no other logic changed, the identical one-line-swap pattern every prior
+    slice used.
+  - Test coverage: each of the 3 route test files gained a project-scoped `project_admin`-succeeds
+    case (the only project-invitable role that holds `keys.manage` — `editor`/`operator` don't) plus
+    a cross-project-isolation-still-denies case, via the same real KAN-135 invite→accept flow every
+    prior slice used.
+  - **Full local verification**: `pnpm typecheck`/`pnpm lint` green across the monorepo; the 3
+    directly-touched route test files green against real Firestore/Auth emulators (31/31, incl. all
+    new KAN-142 cases); the full `apps/web` unit+emulator suite green (378/378 files, 2415/2415
+    tests); `pnpm build` green (7/7 packages).
+  - Opened **PR #383** (branch `kan-142-project-scoped-permission-keys`; numbered #383 since #382 was
+    independently taken by a concurrent session's own docs follow-up for KAN-138) documenting the
+    above; subscribed to its GitHub activity to drive it to green and merge.
+  - Merged PR #381 (squash, `5cddaaf`) once green/clean/no threads. By the time PR #383's own CI came
+    back green, `main` had moved twice more (Segments/KAN-138 via #375, then Metric Registry/KAN-139
+    via #377) — merged `main` into the PR branch, resolving a real `PROGRESS.md` conflict (both this
+    entry and the concurrent Segments entry below had claimed the "(latest)" header at the same spot;
+    kept both, dropped "(latest)" from the now-superseded Segments one) plus a clean auto-merge in
+    `TASKS.md`; re-verified `pnpm build`/`lint`/`typecheck` and the full `apps/web` test suite green
+    before re-pushing.
+  - CI's `lint · typecheck · test · build` check then failed once on the merge commit — a 120s test
+    timeout in `packages/firebase-orm-models/src/plugin-runtime/quality-score-pack/
+    quality-score-pack.emulator.test.ts`, a file this PR's diff never touches, preceded by the same
+    documented Firestore-emulator `RESOURCE_EXHAUSTED`/`CANCELLED` stream-error cascade this repo's
+    history repeatedly names. Posted a standing-down comment and used the one allowed re-run — came
+    back green, confirming the flake diagnosis.
+  - By the time that re-run finished (~50 min later), `main` had moved once more (docs-only PR #384
+    recording PR #377/KAN-139's own merge) — merged `main` in again, resolving a second `PROGRESS.md`
+    conflict the same way (kept both entries, this one first as truly latest) with no code changes on
+    either side to reconcile.
+  - CI's `lint · typecheck · test · build` check failed a second time on that new merge commit
+    (`e755c32`, docs-only, no code changed) — every unit/emulator test file passed (378/378, 2429
+    tests); the failure was entirely in the Playwright e2e shard, `e2e/campaign-ops.spec.ts` (failed)
+    and `e2e/cohorts.spec.ts` (flaky, passed its own retry), neither touched by this diff, both
+    preceded by the same documented `RESOURCE_EXHAUSTED` emulator cascade. This PR's one-re-run budget
+    was already spent on the first failure, so per this repo's CI-red policy this second failure is
+    treated as real (wait it out, don't re-run again) — posted a second standing-down comment and left
+    the PR watched rather than idle.
+- **In progress (exact stopping point):** PR #383 open, CI red on the e2e-only flake described above.
+  Needs either a natural future green or a human-triggered re-run (this session's one-re-run budget
+  for this PR is spent) before it can merge.
+- **Blocked + why:** waiting on a human to re-run CI on PR #383 (or a future scheduled run to find it
+  naturally green) — this session's own one-re-run allowance for the PR is already used.
+- **Next step:** once PR #383 is green and merges, continue the KAN-136 slice series with the next
+  unclaimed feature family from the remaining list (cost-guardrails/plugins/campaign-ops/hooks/
+  field-mappings/...) — check open PRs first, as always, since this slice series has had
+  near-continuous concurrent activity from other sessions all run.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - **Re-run CI on PR #383** (`lint · typecheck · test · build`) — red on an unrelated, documented
+    Playwright e2e emulator flake, this session's re-run budget for the PR already spent.
+
+---
+
+## 2026-09-01 — PR #377 (KAN-139, Metric Registry) merged: real GitHub Actions CI green end to end
 
 - **Last completed:** closing the loop on the KAN-139 entry below. PR #377 hit an unusually heavy
   round of churn from this "project-scope reachability" slice series' own concurrent-session

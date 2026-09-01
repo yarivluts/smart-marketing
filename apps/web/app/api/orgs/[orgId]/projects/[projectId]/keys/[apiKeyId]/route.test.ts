@@ -38,6 +38,21 @@ async function sessionFor(firebaseUid: string, email: string): Promise<DecodedId
   return { uid: firebaseUid, email } as DecodedIdToken;
 }
 
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
+}
+
 function revokeRequest(
   orgId: string,
   projectId: string,
@@ -93,6 +108,46 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]', () => 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'revoked' });
   });
+
+  it('KAN-142: lets a project-scoped project_admin revoke a key in THEIR OWN project', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('revoke-project-scoped-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Revoke Project-Scoped Org', ownerUserId: owner.id });
+    const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
+    const prodEnvironment = environments.find((e) => e.name === 'prod')!;
+    const { apiKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Doomed key',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = revokeRequest(organization.id, project.id, apiKey.id);
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(200);
+  });
+
+  it(
+    "KAN-142 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org',
+    async () => {
+      const ownerSession = await sessionFor(unique('uid'), uniqueEmail('revoke-sibling-owner'));
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+      const { organization } = await createOrganizationWithOwner({ name: 'Revoke Sibling Project Org', ownerUserId: owner.id });
+      const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = revokeRequest(organization.id, otherProject.id, 'some-key');
+      const response = await DELETE(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });
 
 function patchRequest(orgId: string, projectId: string, apiKeyId: string, body: unknown): NextRequest {
@@ -203,4 +258,46 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/keys/[apiKeyId]', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ apiKeyId: apiKey.id, name: 'Updated name' });
   });
+
+  it('KAN-142: lets a project-scoped project_admin rename a key in THEIR OWN project', async () => {
+    const ownerSession = await sessionFor(unique('uid'), uniqueEmail('rename-project-scoped-owner'));
+    const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+    const { organization } = await createOrganizationWithOwner({ name: 'Rename Project-Scoped Org', ownerUserId: owner.id });
+    const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
+    const prodEnvironment = environments.find((e) => e.name === 'prod')!;
+    const { apiKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Original name',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const response = await PATCH(patchRequest(organization.id, project.id, apiKey.id, { name: 'Updated name' }), {
+      params: Promise.resolve({ orgId: organization.id, projectId: project.id, apiKeyId: apiKey.id }),
+    });
+    expect(response.status).toBe(200);
+  });
+
+  it(
+    "KAN-142 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org',
+    async () => {
+      const ownerSession = await sessionFor(unique('uid'), uniqueEmail('rename-sibling-owner'));
+      const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });
+      const { organization } = await createOrganizationWithOwner({ name: 'Rename Sibling Project Org', ownerUserId: owner.id });
+      const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const response = await PATCH(patchRequest(organization.id, otherProject.id, 'some-key', { name: 'x' }), {
+        params: Promise.resolve({ orgId: organization.id, projectId: otherProject.id, apiKeyId: 'some-key' }),
+      });
+      expect(response.status).toBe(403);
+    },
+  );
 });

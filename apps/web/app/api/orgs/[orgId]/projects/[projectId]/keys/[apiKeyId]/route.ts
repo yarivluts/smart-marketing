@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { ApiKeyNotFoundError, InvalidApiKeyNameError } from '@growthos/firebase-orm-models';
 import { renameApiKey, revokeApiKey } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 interface RouteParams {
@@ -11,7 +11,7 @@ interface RouteParams {
 /** Revokes a key immediately (KAN-30/KAN-28 AC) — gated on `keys.manage`, same as minting. */
 export async function DELETE(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, apiKeyId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'keys.manage');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'keys.manage');
   if (error) {
     return error;
   }
@@ -36,7 +36,7 @@ export async function DELETE(_request: Request, { params }: RouteParams): Promis
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, apiKeyId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'keys.manage');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'keys.manage');
   if (error) {
     return error;
   }
