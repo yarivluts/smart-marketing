@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { GoalNotFoundError, InvalidGoalError, type GoalModel } from '@growthos/firebase-orm-models';
 import { deleteGoal, updateGoal, updateGoalDefinition } from '@/lib/orgs/mutations';
 import { getGoal, queryGoalProgress } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseUpdateGoalRequestBody } from '@/lib/orgs/parse-goal-fields';
 import { buildGoalThermometerView, toGoalSummaryView } from '@/lib/orgs/goal-view';
 
@@ -13,7 +13,7 @@ interface RouteParams {
 /** One goal's own settings plus its computed progress thermometer (KAN-64) — mirrors the board detail page's "settings + per-tile query outcome" split, at the single-goal grain. */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, goalId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -47,7 +47,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
  */
 export async function PATCH(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, goalId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
 /** Deletes a goal outright (see `deleteGoal`'s own doc comment for why a goal, like a board, has no keep-forever audit requirement of its own). */
 export async function DELETE(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, goalId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'dashboards.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'dashboards.write');
   if (error) {
     return error;
   }
