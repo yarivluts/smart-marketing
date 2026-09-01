@@ -54,7 +54,9 @@ function groupIntoFamilies(views: readonly MetricDefView[]): MetricFamily[] {
  * register a new one or evolve an existing family to its next version.
  * Gated on `metrics.write` for the whole page — same "whole feature, not
  * just mutation, is admin-only" posture KAN-31's schema registry page
- * established.
+ * established. Checked at project scope, not just org scope (KAN-136), so
+ * a project-scoped `project_admin`/`editor`/`operator` (KAN-135) can reach
+ * their own project's metric catalog.
  */
 export default async function MetricRegistryPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -67,7 +69,7 @@ export default async function MetricRegistryPage({ params }: PageProps): Promise
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'metrics.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'metrics.write', { orgId, projectId })) {
     notFound();
   }
 

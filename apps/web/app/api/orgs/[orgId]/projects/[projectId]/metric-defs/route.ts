@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { DuplicateMetricDefinitionError, InvalidMetricDefinitionError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { registerMetricDefinition } from '@/lib/orgs/mutations';
 import { listMetricDefinitionsForProject, listOrgProjects } from '@/lib/orgs/queries';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseMetricDefRequestBody } from '@/lib/orgs/parse-metric-def-fields';
 import { toMetricDefView } from '@/lib/orgs/metric-def-view';
 
@@ -12,15 +12,17 @@ interface RouteParams {
 
 /**
  * Lists every version of every metric registered in a project (KAN-40) — an
- * admin surface gated on `metrics.write`. Validates `projectId` belongs to
- * the org first (404 otherwise), same convention KAN-31's schema-defs route
- * established: without this check a project id from a different org would
- * silently return an empty `200` instead of the `404` this route's own POST
- * returns for the same input.
+ * admin surface gated on `metrics.write`, checked at project scope (KAN-136)
+ * so a project-scoped `project_admin`/`editor`/`operator` (KAN-135) can
+ * reach it. Validates `projectId` belongs to the org first (404 otherwise),
+ * same convention KAN-31's schema-defs route established: without this
+ * check a project id from a different org would silently return an empty
+ * `200` instead of the `404` this route's own POST returns for the same
+ * input.
  */
 export async function GET(_request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { error } = await requireOrgPermission(orgId, 'metrics.write');
+  const { error } = await requireProjectPermission(orgId, projectId, 'metrics.write');
   if (error) {
     return error;
   }
@@ -36,7 +38,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams): Promi
 /** Registers v1 of a new metric (plan `04 §2`: "every metric is defined once as config"). */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'metrics.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'metrics.write');
   if (error) {
     return error;
   }
