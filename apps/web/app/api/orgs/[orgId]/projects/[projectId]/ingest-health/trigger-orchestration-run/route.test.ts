@@ -45,6 +45,21 @@ async function setupOrgProject(orgName: string) {
   return { ownerSession, owner, organization, project };
 }
 
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
+}
+
 function triggerRequest(orgId: string, projectId: string): { request: NextRequest; params: Promise<{ orgId: string; projectId: string }> } {
   return {
     request: new NextRequest(`https://growthos.test/api/orgs/${orgId}/projects/${projectId}/ingest-health/trigger-orchestration-run`, {
@@ -113,4 +128,29 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/ingest-health/trigger-orch
     expect(body.status).toBe('succeeded');
     expect(body.errorMessage).toBeNull();
   });
+
+  it('KAN-141: lets a project-scoped project_admin trigger an orchestration run for THEIR OWN project', async () => {
+    const { organization, project, owner } = await setupOrgProject('Trigger Orchestration Route Project-Scoped Org');
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = triggerRequest(organization.id, project.id);
+    const response = await POST(request, { params });
+    expect(response.status).toBe(200);
+  });
+
+  it(
+    "KAN-141 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org',
+    async () => {
+      const { organization, project, owner } = await setupOrgProject('Trigger Orchestration Route Sibling Project Org');
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = triggerRequest(organization.id, otherProject.id);
+      const response = await POST(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });

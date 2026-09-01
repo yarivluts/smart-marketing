@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { QuarantinedRecordNotActionableError, QuarantinedRecordNotFoundError } from '@growthos/firebase-orm-models';
 import { dismissQuarantinedRecord } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; quarantinedRecordId: string }>;
@@ -14,7 +14,7 @@ interface RouteParams {
  */
 export async function POST(_request: Request, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId, quarantinedRecordId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'ingest.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'ingest.write');
   if (error) {
     return error;
   }
