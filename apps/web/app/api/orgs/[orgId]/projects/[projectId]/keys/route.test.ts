@@ -43,7 +43,22 @@ async function setupOrgProject(orgName: string) {
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
   const prodEnvironment = environments.find((e) => e.name === 'prod')!;
-  return { ownerSession, organization, project, prodEnvironment };
+  return { ownerSession, owner, organization, project, prodEnvironment };
+}
+
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
 }
 
 function keysRequest(
@@ -118,6 +133,36 @@ describe('GET /api/orgs/[orgId]/projects/[projectId]/keys', () => {
     const response = await GET(request, { params });
     expect(response.status).toBe(404);
   });
+
+  it(
+    'KAN-142: lets a project-scoped project_admin list keys for THEIR OWN project — before this ' +
+      "fix a project-scoped binding never satisfied this route's permission check at all",
+    async () => {
+      const { organization, project, owner } = await setupOrgProject('Keys List Project-Scoped Org');
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = keysRequest(organization.id, project.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ apiKeys: [] });
+    },
+  );
+
+  it(
+    "KAN-142 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org — a project-scope binding never grants access sideways',
+    async () => {
+      const { organization, project, owner } = await setupOrgProject('Keys List Sibling Project Org');
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = keysRequest(organization.id, otherProject.id);
+      const response = await GET(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });
 
 describe('POST /api/orgs/[orgId]/projects/[projectId]/keys', () => {
@@ -172,5 +217,19 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/keys', () => {
     expect(listed.apiKeys[0]).toMatchObject({ id: body.apiKeyId, name: 'CI key', keyPrefix: body.keyPrefix });
     expect(listed.apiKeys[0]).not.toHaveProperty('hashedSecret');
     expect(listed.apiKeys[0]).not.toHaveProperty('rawKey');
+  });
+
+  it('KAN-142: lets a project-scoped project_admin mint a key in THEIR OWN project', async () => {
+    const { organization, project, prodEnvironment, owner } = await setupOrgProject('Keys Mint Project-Scoped Org');
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = keysRequest(organization.id, project.id, {
+      name: 'CI key',
+      environmentId: prodEnvironment.id,
+      scopes: ['ingest.write'],
+    });
+    const response = await POST(request, { params });
+    expect(response.status).toBe(201);
   });
 });

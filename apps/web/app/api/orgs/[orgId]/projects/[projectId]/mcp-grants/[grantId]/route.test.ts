@@ -41,6 +41,21 @@ async function sessionFor(firebaseUid: string, email: string): Promise<DecodedId
   return { uid: firebaseUid, email } as DecodedIdToken;
 }
 
+/** Invites+accepts a project-scoped member (KAN-135) so a test can assert the KAN-136 gap is closed. */
+async function inviteProjectScopedMember(
+  organizationId: string,
+  projectId: string,
+  role: 'project_admin' | 'editor' | 'operator',
+  invitedByUserId: string,
+): Promise<DecodedIdToken> {
+  const email = uniqueEmail(`project-${role}`);
+  const invitation = await inviteMemberToOrganization({ organizationId, email, role, invitedByUserId, projectId });
+  const session = await sessionFor(unique('uid'), email);
+  const invitee = await ensureUserForFirebaseSession({ firebaseUid: session.uid, email });
+  await acceptInvite({ organizationId, membershipId: invitation.id, userId: invitee.id, callerEmailVerified: true });
+  return session;
+}
+
 function revokeRequest(
   orgId: string,
   projectId: string,
@@ -181,4 +196,29 @@ describe('DELETE /api/orgs/[orgId]/projects/[projectId]/mcp-grants/[grantId]', (
     expect(secondResponse.status).toBe(200);
     expect(await secondResponse.json()).toEqual({ status: 'revoked' });
   });
+
+  it('KAN-142: lets a project-scoped project_admin revoke an MCP grant in THEIR OWN project', async () => {
+    const { owner, organization, project, grant } = await setupOrgWithGrant('MCP Grant Project-Scoped Org');
+    const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+    getServerSessionMock.mockResolvedValue(memberSession);
+    const { request, params } = revokeRequest(organization.id, project.id, grant.id);
+    const response = await DELETE(request, { params });
+    expect(response.status).toBe(200);
+  });
+
+  it(
+    "KAN-142 isolation: a project-scoped project_admin for one project still can't reach a SIBLING " +
+      'project in the same org',
+    async () => {
+      const { owner, organization, project } = await setupOrgWithGrant('MCP Grant Sibling Project Org');
+      const { project: otherProject } = await createProject({ organizationId: organization.id, name: 'Other Project' });
+      const memberSession = await inviteProjectScopedMember(organization.id, project.id, 'project_admin', owner.id);
+
+      getServerSessionMock.mockResolvedValue(memberSession);
+      const { request, params } = revokeRequest(organization.id, otherProject.id, 'some-grant');
+      const response = await DELETE(request, { params });
+      expect(response.status).toBe(403);
+    },
+  );
 });

@@ -17,7 +17,52 @@ Template for each entry:
 
 ---
 
-## 2026-09-01 (latest) — Delivered a KAN-136 project-scope reachability slice for Ingest Health, tracked as KAN-141
+## 2026-09-01 (latest) — Delivered a KAN-136 project-scope reachability slice for Keys, tracked as KAN-142
+
+- **Last completed:**
+  - Continuing the same scheduled run that delivered KAN-140 (Schema Registry) and KAN-141 (Ingest
+    Health): merged PR #380 (squash, `2ca3b07`), opened a docs follow-up (**PR #381**) recording that
+    outcome, then checked open PRs again before picking the next slice — **#375** (KAN-138, Segments)
+    and **#377** (KAN-139, Metric Registry) were still open/unmerged (their head SHAs had changed,
+    suggesting the owning sessions were rebasing to resolve conflicts), so picked the next unclaimed
+    feature family: **Keys**.
+  - Scoped this slice to the Keys page's own full action surface, not just its 2 own `keys/...`
+    routes: the page also renders a Revoke control for MCP OAuth connections that POSTs to
+    `mcp-grants/[grantId]/route.ts`, sharing its exact `keys.manage` gate — leaving it out would have
+    left the page reachable but that one button still broken for a project-scoped member. Swapped
+    `requireOrgPermission(orgId, ...)` for `requireProjectPermission(orgId, projectId, ...)` in all 3
+    routes (`keys/route.ts` GET/POST, `keys/[apiKeyId]/route.ts` DELETE/PATCH,
+    `mcp-grants/[grantId]/route.ts` DELETE) and the Keys page's own `can(..., { orgId })` call (now
+    `{ orgId, projectId }`) — no other logic changed, the identical one-line-swap pattern every prior
+    slice used.
+  - Test coverage: each of the 3 route test files gained a project-scoped `project_admin`-succeeds
+    case (the only project-invitable role that holds `keys.manage` — `editor`/`operator` don't) plus
+    a cross-project-isolation-still-denies case, via the same real KAN-135 invite→accept flow every
+    prior slice used.
+  - **Full local verification**: `pnpm typecheck`/`pnpm lint` green across the monorepo; the 3
+    directly-touched route test files green against real Firestore/Auth emulators (31/31, incl. all
+    new KAN-142 cases); the full `apps/web` unit+emulator suite green (378/378 files, 2415/2415
+    tests); `pnpm build` green (7/7 packages).
+  - Opened **PR #382** (branch `kan-142-project-scoped-permission-keys`) documenting the above;
+    subscribed to its GitHub activity to drive it to green and merge.
+- **In progress (exact stopping point):** PR #382 open, CI running; PR #381 (the KAN-140/141
+  merge-outcome docs follow-up) also still open. Will merge both once green with no open review
+  threads.
+- **Blocked + why:** nothing — waiting on CI only.
+- **Next step:** once both PRs merge, continue the KAN-136 slice series with the next unclaimed
+  feature family from the remaining list (cost-guardrails/plugins/campaign-ops/hooks/field-mappings/
+  ... — check open PRs first, as always, since #375/#377 were both still in flight at this run's last
+  check).
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Review/merge PR #381 and PR #382 (or let this run's own supervision drive them to green and
+    merge, per this repo's PR-babysitting rules).
+
+---
+
+## 2026-09-01 — Delivered a KAN-136 project-scope reachability slice for Ingest Health, tracked as KAN-141
 
 - **Last completed:**
   - Continuing the same scheduled run that delivered KAN-140 (Schema Registry) just before this:
