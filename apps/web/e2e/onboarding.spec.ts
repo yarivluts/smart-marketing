@@ -74,7 +74,11 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await expect(page.getByRole('heading', { name: 'Your starter board' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Marketing' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Revenue / MRR' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Funnel' })).toBeVisible();
+    // `exact: true`: the 3-module nav redesign (`bd7d215`) added a sidebar link labeled
+    // "Funnel & Goals", whose accessible name now substring-matches this board tile's own
+    // "Funnel" link name, making the unqualified locator ambiguous (a real regression the
+    // redesign introduced, not a nav-link removal like the rest of this file's fixes).
+    await expect(page.getByRole('link', { name: 'Funnel', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Invite your team' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Set a goal' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Turn on the war room' })).toBeVisible();
