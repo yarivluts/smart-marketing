@@ -38,8 +38,9 @@ test.describe('Org Resource Library: create, request, approve, detach (KAN-27)',
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Resource library' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/resources$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/resources`);
     // "Name" is ambiguous on this page (the credential/template/person create
     // forms each have their own), so target the credential form by its id.
     await page.locator('#credential-name').fill('Shared Meta MCC');

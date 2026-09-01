@@ -17,7 +17,65 @@ Template for each entry:
 
 ---
 
-## 2026-08-28 (latest) - Campaign gaps closed: live-state read seam, real-platform import, spend panel
+## 2026-09-01 (latest) — Fixed CI-red: e2e specs updated for the 3-module nav redesign
+
+- **Last completed:**
+  - Scheduled run per `CLAUDE.md`. `TASKS.md`'s backlog is fully exhausted (only `KAN-18`/`KAN-19`,
+    infra-bound `in-progress`, and `KAN-50`/`KAN-51`, `blocked-by` `KAN-43`, remain), so checked open
+    PRs and CI health first, per the established pattern from the last several runs' entries.
+  - Found `main` red since the owner's own direct pushes yesterday (`0be7808`/`4f50462`/`bd7d215` —
+    a 3-module nav redesign + auth defaults, pushed straight to `main` outside the branch+PR flow, so
+    nothing here to review/merge). Three prior runs (PRs #362/#363/#364, all still open) had already
+    root-caused this precisely and deliberately declined to fix it, reasoning the "which of the 16
+    dropped pages folds into which of the 3 new modules" question was a live product decision the
+    owner was mid-stream on and guessing risked conflicting with that work.
+  - Re-verified against the *current* `main` tip (`bd7d215`, unchanged since PR #364's finding — no
+    further owner activity landed) and concluded the safe, non-product-guessing half of that fix was
+    now worth doing on its own: the redesign didn't remove any pages, only their sidebar links (`git
+    show` against the pre-redesign commit confirmed every route still exists — `boards`, `cohorts`,
+    `campaign-ops`, `cost-guardrails`, `customers`, `schema-defs`, `metric-defs`, `ingest-health`,
+    `hooks`, `billing-ops-feed`, `record-feed`, `keys`, org-level `resources`/`plugins`, project-level
+    `plugins`). The IA question (which module each page moves *into*) is still untouched and still
+    the owner's call; this run only replaced each e2e spec's now-broken `getByRole('link', {name:
+    ...}).click()` step with a direct `page.goto()` to the same URL the click used to land on
+    (extracted from each spec's own pre-existing `toHaveURL` assertion, so no guessed paths).
+  - Updated all 16 broken nav-link occurrences across 15 `apps/web/e2e/*.spec.ts` files (one, the
+    "Funnel" match in `onboarding.spec.ts`, turned out to be an unrelated board-tile link, not a nav
+    link — left untouched). Empirically verified the fix by running every one of the 16 modified spec
+    files for real against the local Firestore/Auth emulators + a real `next dev` server (not just
+    `tsc`): all pass, with only the pre-existing, already-documented dev-server-cold-compile/CI-runner
+    contention flakes this repo's own `playwright.config.ts` comments describe (resolved by the
+    existing `retries: 2` budget) — zero remaining nav-link failures.
+  - Also cleaned up a leftover unresolved-merge-conflict marker (`<<<<<<< HEAD` / `>>>>>>> origin/main`)
+    that had been committed into this file itself, found while adding this entry.
+  - `pnpm lint` and `pnpm typecheck` green across the whole monorepo (needed to build
+    `@growthos/shared`, `@growthos/firebase-orm-models`, and `@growthos/tracking-sdk` first — a clean
+    checkout doesn't have their `dist/` output yet, which is why apps/web's own typecheck/e2e run
+    initially failed with `Cannot find module '@growthos/shared'` / `'@growthos/tracking-sdk'` before
+    that).
+  - Branch `fix/e2e-nav-orphaned-routes-direct-navigation`, PR opened against `main`.
+- **In progress (exact stopping point):** PR open, CI running. Will merge once green (this PR's own
+  diff only touches e2e spec files + this doc, so CI going green on it is the actual proof the repo's
+  test suite is unblocked again).
+- **Blocked + why:** nothing blocking this PR. The IA/product-taxonomy question (where each of the 16
+  pages *should* live in the new 3-module nav, if anywhere) is still open and still not this run's to
+  guess — flagged again below for the owner or a future run once that decision lands.
+- **Next step:** once this merges, PRs #362 (real, unrelated `campaign-daily-budget-control` test fix)
+  and #363/#364 (docs-only check-ins recording the same root cause this PR fixes) should all go green
+  on rebase — #362 is worth merging for real once it does; #363/#364 can close as superseded by this
+  entry. Then resume the normal backlog sweep — `TASKS.md` has no `todo` rows left, so that means
+  another gap-finding pass (KAN-100..KAN-135-style) or waiting on `KAN-43`/`KAN-18`/`KAN-19`.
+- **Waiting on human:**
+  - The nav IA decision itself — which of the 16 now-unlinked pages moves into `Ads & Performance`/
+    `Funnel & Goals`/`AI Copilot & Automation`, which live under an expanded `Settings`, and which (if
+    any) are intentionally deprecated. This run deliberately left that alone.
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
+    outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+
+---
+
+## 2026-08-28 - Campaign gaps closed: live-state read seam, real-platform import, spend panel
 
 - **Last completed:** the three follow-ups #345 named, plus two real bugs the rendered pages
   exposed. PR #358 (`feat/campaign-live-state`), deployed to web-dev (`web-dev-00033-lcb`).
@@ -94,12 +152,6 @@ Template for each entry:
 - **Blocked + why:** nothing blocking new backlog work.
 - **Next step:** next run checks open PRs first (#357, #358, #327), drives any real failures to green.
 - **Waiting on human:** KAN-43 applications; KAN-18/KAN-19.
-<<<<<<< HEAD
-=======
-
----
-
->>>>>>> origin/main
 
 ---
 

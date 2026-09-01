@@ -39,8 +39,9 @@ test.describe('Global omnisearch (KAN-85)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Boards' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/boards`);
     await page.getByLabel('Name').fill('Marketing Overview');
     await page.getByRole('button', { name: 'Create board' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards/[^/]+$`), { timeout: 20_000 });

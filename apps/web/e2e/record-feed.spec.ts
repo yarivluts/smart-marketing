@@ -38,8 +38,9 @@ test.describe('Record feed (KAN-81)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Record feed' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/record-feed$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/record-feed`);
     await expect(page.getByRole('heading', { name: `Record feed for Client Beta` })).toBeVisible();
     await expect(page.getByText('Register an event schema first to browse a record feed.')).toBeVisible();
   });
@@ -62,8 +63,7 @@ test.describe('Record feed (KAN-81)', () => {
     // fixture's full accepted/quarantined/duplicate breakdown.
     await seedIngestFixture({ organizationId: orgId, projectId, ownerEmail: email });
 
-    await page.getByRole('link', { name: 'Record feed' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/record-feed$`));
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/record-feed`);
 
     // Both accepted records show before any filter is applied.
     await expect(page.getByText('id ord-1')).toBeVisible();

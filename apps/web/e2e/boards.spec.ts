@@ -43,8 +43,9 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
     // A board's tile picker only offers registered, active metrics — register one first.
-    await page.getByRole('link', { name: 'Metric catalog' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/metric-defs$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to these pages — they still
+    // exist and render, just aren't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/metric-defs`);
     await page.getByLabel('Name').fill('ad_spend');
     await page.getByLabel('Table').fill('fact_ad_spend');
     await page.getByLabel('Column', { exact: true }).fill('reporting_spend');
@@ -52,9 +53,7 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await page.getByRole('button', { name: 'Register metric' }).click();
     await expect(page.getByText('ad_spend', { exact: true })).toBeVisible();
 
-    await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
-    await page.getByRole('link', { name: 'Boards' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/boards$`));
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/boards`);
     await expect(page.getByText('This project has no boards yet.')).toBeVisible();
 
     await page.getByLabel('Name').fill('Marketing');

@@ -37,8 +37,9 @@ test.describe('Customer search (KAN-108)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Customers' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/customers$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/customers`);
     await expect(page.getByRole('heading', { name: 'Customer search for Client Epsilon' })).toBeVisible();
     await expect(page.getByText('Register an entity schema first to search customers.')).toBeVisible();
   });
@@ -55,16 +56,17 @@ test.describe('Customer search (KAN-108)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    // Register a "customer" entity schema so the search form itself renders.
-    await page.getByRole('link', { name: 'Schema registry' }).click();
+    // Register a "customer" entity schema so the search form itself renders. The 3-module nav
+    // redesign (`bd7d215`) dropped the sidebar link to this page — it still exists and renders,
+    // just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/schema-defs`);
     await page.getByLabel('Kind').selectOption('entity');
     await page.getByLabel('Name', { exact: true }).fill('customer');
     await page.getByLabel('Field name').fill('email');
     await page.getByRole('button', { name: 'Register schema' }).click();
     await expect(page.getByText('entity: customer')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Customers' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/customers$`));
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/customers`);
 
     // No query yet — a prompt, not a warehouse call.
     await expect(page.getByText('Enter a search term to look up a customer.')).toBeVisible();

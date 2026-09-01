@@ -37,8 +37,9 @@ test.describe('Campaign ops (KAN-86)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Campaign ops' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/campaign-ops$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/campaign-ops`);
     await expect(page.getByRole('heading', { name: 'Campaign ops for Client Delta' })).toBeVisible();
 
     // Spend targets don't need the pack installed at all — no warehouse configured in this environment.

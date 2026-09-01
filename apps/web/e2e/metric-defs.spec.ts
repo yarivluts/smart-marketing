@@ -36,8 +36,9 @@ test.describe('Metric catalog: register an aggregation and a formula metric, inv
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Metric catalog' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/metric-defs$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/metric-defs`);
     await expect(page.getByText('No metrics registered for this project yet.')).toBeVisible();
 
     // Register v1: an aggregation metric summing ad spend.

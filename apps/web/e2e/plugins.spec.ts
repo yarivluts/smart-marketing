@@ -53,10 +53,11 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
     await page.getByRole('button', { name: 'Create project' }).click();
     // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
-    await page.goto(`/en/orgs/${orgId}`);
+    const projectId = page.url().split('/').slice(-2)[0];
 
-    await page.getByRole('link', { name: 'Plugin registry' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/plugins$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to these pages — they still
+    // exist and render, just aren't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/plugins`);
 
     await expect(page.getByText('No plugin manifests have been registered in this organization yet.')).toBeVisible();
     await page.getByLabel('plugin.yaml').fill(MANIFEST_YAML);
@@ -65,9 +66,7 @@ test.describe('Plugins: register a manifest, install it via the gallery, disable
     await expect(page.getByText('Shopify Commerce Pack')).toBeVisible();
     await expect(page.getByText('v1.0.0 · source')).toBeVisible();
 
-    await page.goto(`/en/orgs/${orgId}`);
-    await page.getByRole('link', { name: 'Plugins' }).click();
-    await expect(page).toHaveURL(/\/en\/orgs\/[^/]+\/projects\/[^/]+\/plugins$/);
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/plugins`);
 
     await expect(page.getByText('No plugins have been installed in this project yet.')).toBeVisible();
 

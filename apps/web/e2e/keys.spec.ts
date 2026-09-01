@@ -40,8 +40,9 @@ test.describe('Project API keys: mint, copy-once, revoke (KAN-30)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'API keys' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/keys$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/keys`);
     await expect(page.getByText('No keys minted for this project yet.')).toBeVisible();
 
     await page.getByLabel('Name').fill('CI key');

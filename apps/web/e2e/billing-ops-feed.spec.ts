@@ -37,8 +37,9 @@ test.describe('Billing ops feed (KAN-80)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Billing ops feed' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/billing-ops-feed$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/billing-ops-feed`);
     await expect(page.getByRole('heading', { name: `Billing ops feed for Client Alpha` })).toBeVisible();
     await expect(page.getByText('No billing events landed for this project yet.')).toBeVisible();
     // KAN-94: a third section for subscriptions currently in dunning, alongside the existing churn one.

@@ -47,8 +47,9 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     await seedIngestFixture({ organizationId: orgId, projectId, ownerEmail: email });
 
-    await page.getByRole('link', { name: 'Ingest health' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/ingest-health$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/ingest-health`);
 
     // Only one kind (event) was seeded, so the "Overall" and "Events" rows
     // render identical counts — scope to the "Overall" row specifically to
@@ -93,12 +94,13 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await page.getByRole('link', { name: 'New project' }).click();
     await page.getByLabel('Project name').fill('Client Alpha');
     await page.getByRole('button', { name: 'Create project' }).click();
-    // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page — this
-    // project is the org's only one, so the org page defaults its switcher to it without a `?project=`.
+    // Creating a project now lands on the onboarding wizard (KAN-68) rather than the org page.
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
-    await page.goto(`/en/orgs/${orgId}`);
+    const projectId = page.url().split('/').slice(-2)[0];
 
-    await page.getByRole('link', { name: 'Ingest health' }).click();
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/ingest-health`);
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
     await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
     await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();

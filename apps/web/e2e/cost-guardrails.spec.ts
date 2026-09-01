@@ -36,8 +36,9 @@ test.describe('Cost guardrails: set a project quota, see usage + labels reflecte
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}?project=${projectId}`);
 
-    await page.getByRole('link', { name: 'Cost guardrails' }).click();
-    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/cost-guardrails$`));
+    // The 3-module nav redesign (`bd7d215`) dropped the sidebar link to this page — it still
+    // exists and renders, just isn't linked from anywhere in the UI yet, so navigate directly.
+    await page.goto(`/en/orgs/${orgId}/projects/${projectId}/cost-guardrails`);
 
     await expect(page.getByText('No quota has been explicitly set for this project yet — the default limit applies.')).toBeVisible();
     await expect(page.getByText(/0 of 500 query attempts used today/)).toBeVisible();
