@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { InvalidMetricDefinitionError, MetricDefNotFoundError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { evolveMetricDefinition } from '@/lib/orgs/mutations';
-import { requireOrgPermission } from '@/lib/orgs/access';
+import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseMetricDefRequestBody } from '@/lib/orgs/parse-metric-def-fields';
 import { toMetricDefView } from '@/lib/orgs/metric-def-view';
 
@@ -18,7 +18,7 @@ interface RouteParams {
  */
 export async function POST(request: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const { orgId, projectId } = await params;
-  const { user, error } = await requireOrgPermission(orgId, 'metrics.write');
+  const { user, error } = await requireProjectPermission(orgId, projectId, 'metrics.write');
   if (error) {
     return error;
   }

@@ -43,22 +43,87 @@ Template for each entry:
     directly-touched route test files green against real Firestore/Auth emulators (31/31, incl. all
     new KAN-142 cases); the full `apps/web` unit+emulator suite green (378/378 files, 2415/2415
     tests); `pnpm build` green (7/7 packages).
-  - Opened **PR #382** (branch `kan-142-project-scoped-permission-keys`) documenting the above;
-    subscribed to its GitHub activity to drive it to green and merge.
-- **In progress (exact stopping point):** PR #382 open, CI running; PR #381 (the KAN-140/141
-  merge-outcome docs follow-up) also still open. Will merge both once green with no open review
-  threads.
+  - Opened **PR #383** (branch `kan-142-project-scoped-permission-keys`; numbered #383 since #382 was
+    independently taken by a concurrent session's own docs follow-up for KAN-138) documenting the
+    above; subscribed to its GitHub activity to drive it to green and merge.
+  - Merged PR #381 (squash, `5cddaaf`) once green/clean/no threads. By the time PR #383's own CI came
+    back green, `main` had moved twice more (Segments/KAN-138 via #375, then Metric Registry/KAN-139
+    via #377) — merged `main` into the PR branch, resolving a real `PROGRESS.md` conflict (both this
+    entry and the concurrent Segments entry below had claimed the "(latest)" header at the same spot;
+    kept both, dropped "(latest)" from the now-superseded Segments one) plus a clean auto-merge in
+    `TASKS.md`; re-verified `pnpm build`/`lint`/`typecheck` and the full `apps/web` test suite green
+    before re-pushing.
+- **In progress (exact stopping point):** PR #383 open (post-merge-conflict-resolution push), CI
+  re-running on the merge commit. Will merge once green with no open review threads.
 - **Blocked + why:** nothing — waiting on CI only.
-- **Next step:** once both PRs merge, continue the KAN-136 slice series with the next unclaimed
+- **Next step:** once PR #383 merges, continue the KAN-136 slice series with the next unclaimed
   feature family from the remaining list (cost-guardrails/plugins/campaign-ops/hooks/field-mappings/
-  ... — check open PRs first, as always, since #375/#377 were both still in flight at this run's last
-  check).
+  ...) — check open PRs first, as always, since this slice series has had near-continuous concurrent
+  activity from other sessions all run.
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Review/merge PR #381 and PR #382 (or let this run's own supervision drive them to green and
-    merge, per this repo's PR-babysitting rules).
+  - Review/merge PR #383 (or let this run's own supervision drive it to green and merge, per this
+    repo's PR-babysitting rules).
+
+---
+
+## 2026-09-01 — Delivered a KAN-136 project-scope reachability slice for Segments, tracked as KAN-138
+
+- **Last completed:**
+  - Scheduled run. `TASKS.md` had no plain `todo` rows (only the perennial `KAN-18`/`KAN-19`
+    infra-bound items and `KAN-50`/`KAN-51` `blocked-by` `KAN-43`), and the prior run's own
+    PROGRESS.md entry pointed at KAN-136's slice series as the live thread — checked open PRs first
+    (this repo's established pattern) and found **three** concurrent sessions already mid-flight:
+    **#372** (docs-only, recording PR #368/KAN-136-slice-1's merge), **#373** and **#374**, which had
+    each *independently* delivered the exact same next slice — **Goals**, both claiming **KAN-137** —
+    without knowing about each other. Rather than open a third duplicate PR on Goals, picked a
+    different, non-overlapping feature family from KAN-136's own "remaining families" list:
+    **Segments**.
+  - Delivered as **PR #375**: the same one-line-swap pattern KAN-136/137 established —
+    `requireOrgPermission(orgId, ...)` → `requireProjectPermission(orgId, projectId, ...)` in all 4
+    segments API routes (`segments/route.ts` GET/POST, `segments/[segmentId]/route.ts` DELETE/PATCH,
+    `segments/[segmentId]/sync/route.ts` POST, `segments/suggest/route.ts` POST) and the segments
+    page's own `can(..., { orgId })` call (`segments/page.tsx`, now `{ orgId, projectId }` — segments
+    has no separate `[segmentId]` detail page, its detail view renders inline via a `viewMembers`
+    query param). New tests: each of the 4 route test files gained a project-scoped-member-succeeds
+    case plus a cross-project-isolation-still-denies case, via a real KAN-135 invite→accept flow
+    against the Firestore emulator — 115/115 green (segments + `access.test.ts` +
+    `route-isolation-guard.test.ts`). Numbered **KAN-138** (not KAN-137) since #373/#374 already
+    claimed that number for Goals.
+  - `TASKS.md` needed re-resolving **twice** after opening the PR, purely from other concurrent
+    sessions' own slices landing on `main` mid-flight and each appending a row at the same spot:
+    once against #374's merged KAN-137 (Goals) row, once against #378's merged KAN-140 (Schema
+    Registry) row — both resolved the same way, keeping every row in ascending KAN order, re-verified
+    green (`pnpm build`/`lint`/`typecheck` + a targeted emulator test run) and re-pushed each time.
+  - CI on the PR failed once with `FIRESTORE (11.10.0) INTERNAL ASSERTION FAILED` (ID: 27ce) inside
+    `packages/firebase-orm-models/src/plugin-runtime/engagement-pack/engagement-pack.emulator.test.ts`
+    — a file this PR's diff never touches (confirmed via `git diff --stat`), and an emulator/SDK-level
+    internal-assertion crash rather than a business-logic failure, so treated as this repo's
+    documented class of Firestore-emulator flake. Posted a standing-down comment naming the failure
+    and why it wasn't this PR's, then used the one allowed re-run — came back green, confirming the
+    flake diagnosis.
+  - By the time CI was green and no review threads were open, `main` had moved again (**#380**,
+    KAN-141 Ingest Health) — rather than chase a third local re-merge for an unrelated docs/slice
+    commit, merged the PR directly via the GitHub API (squash) and let GitHub's own merge machinery
+    reconcile it: merged clean as `b7c6a3a`. Branch deletion hit the same HTTP 403 this sandbox's git
+    remote has consistently rejected branch-delete pushes with across many prior runs — left
+    undeleted, same as the existing pile.
+- **In progress (exact stopping point):** none — PR #375 merged, `main` green.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** the KAN-136 slice series continues to be worked concurrently by multiple sessions
+  (Goals/KAN-137 done via #374, Schema Registry/KAN-140 done via #378, Ingest Health/KAN-141 done via
+  #380 per that entry below, Segments/KAN-138 done here; Metric Registry/KAN-139 was still open as
+  **#377** at last check) — the next run should check open PRs first, then pick from the remaining
+  families (keys, cost-guardrails, plugins, campaign-ops, ...) not yet claimed by an open or merged
+  PR, same collision-avoidance approach this run used.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
+  - Optional: delete the merged-but-undeleted branch above (and the existing pile from prior entries)
+    — this sandbox's git remote has consistently rejected branch-delete pushes with an HTTP 403, and
+    no available GitHub tool in this session covers branch deletion either.
 
 ---
 
@@ -91,19 +156,25 @@ Template for each entry:
     tests); `pnpm build` green (7/7 packages).
   - Opened **PR #380** (branch `kan-141-project-scoped-permission-ingest-health`) documenting the
     above; subscribed to its GitHub activity to drive it to green and merge.
-- **In progress (exact stopping point):** PR #380 open, CI running; PR #379 (the KAN-140 merge-outcome
-  docs follow-up) also still open. Will merge both once green with no open review threads.
-- **Blocked + why:** nothing — waiting on CI only.
-- **Next step:** once both PRs merge, continue the KAN-136 slice series with the next unclaimed
-  feature family from the remaining list (keys/cost-guardrails/plugins/campaign-ops/hooks/
-  field-mappings/... — check open PRs first, as always, since #375/#377 were both still in flight at
-  this run's last check).
+  - Both checks (`lint · typecheck · test · build`, `terraform fmt · validate`) came back green on
+    PR #379 first (~44 min), `mergeable_state: clean`, no open review threads — merged (squash,
+    `d5a0bd2`). PR #380 followed the same pattern shortly after (~42 min), also green/clean/no
+    threads — merged (squash, `2ca3b07`). Unsubscribed from both once confirmed merged; cancelled the
+    scheduled 55-minute check-in since it was no longer needed. Remote branch deletion for both
+    failed with the same recurring HTTP 403 this file has documented since 2026-07-04.
+  - `main` is now caught up through **KAN-141**.
+- **In progress (exact stopping point):** none — this PROGRESS.md update itself is the only
+  remaining artifact of this run.
+- **Blocked + why:** nothing blocking the next code task.
+- **Next step:** next run checks open PRs first (as always — #375/#377 were both still in flight at
+  this run's last check), then continues the KAN-136 slice series with the next unclaimed feature
+  family from the remaining list (keys/cost-guardrails/plugins/campaign-ops/hooks/field-mappings/...).
 - **Waiting on human:**
   - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications (LONG LEAD) — still
     outstanding.
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
-  - Review/merge PR #379 and PR #380 (or let this run's own supervision drive them to green and
-    merge, per this repo's PR-babysitting rules).
+  - Optional/low-priority: the recurring branch-deletion HTTP 403 (no fix attempted this run, same
+    long-standing issue).
 
 ---
 
@@ -165,6 +236,71 @@ Template for each entry:
   - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
   - Optional/low-priority: the recurring branch-deletion HTTP 403 (no fix attempted this run, same
     long-standing issue).
+
+---
+
+## 2026-09-01 — Delivered KAN-136 slice (project-scope reachability: Metric Registry), tracked as KAN-139; PR #373 closed as superseded
+
+- **Last completed:**
+  - Scheduled run. This run's own first attempt was a genuine collision, worth recording plainly:
+    picked up the KAN-136 slice series (`TASKS.md` had no `todo` rows), independently built a Goals
+    slice at the same time PR #368 (KAN-136 slice 1, Boards) was still in flight, opened **PR #373**,
+    rebased it twice as `main` moved through #368/#369/#370 then a docs commit, got CI green — and
+    only then discovered a **concurrent session (the same author as #368) had already merged the
+    identical Goals slice directly to `main` as `f519539`** ("slice 2 - Goals (KAN-136/137)") while
+    PR #373's CI was still running. Diffed this branch against `f519539` and confirmed the only
+    differences were doc-comment wording — no substantive code difference, so no cherry-pick of
+    anything unique was needed. Closed **PR #373 with an explanatory comment** pointing at `f519539`,
+    unsubscribed from its activity, deleted the trigger scheduled to babysit it, reset local `main` to
+    `origin/main`, and deleted the now-obsolete local/remote branch (remote delete hit this sandbox's
+    long-documented HTTP 403, left undeleted same as the existing pile).
+  - Checked open PRs again before picking a genuinely new slice: **#375** (KAN-138, Segments) and
+    **#376** (docs-only, recording `f519539`'s own outcome) were both already open/claimed — picked
+    the next unclaimed feature family from KAN-137's own "remaining" list: **Metric Registry**
+    (`metric-defs`).
+  - Delivered: swapped `requireOrgPermission(orgId, ...)` for `requireProjectPermission(orgId,
+    projectId, ...)` in both metric-registry API routes (`metric-defs/route.ts` GET/POST,
+    `metric-defs/evolve/route.ts` POST) and the metric registry page's own `can(..., { orgId })` call
+    (`metric-defs/page.tsx`, now `{ orgId, projectId }`) — the identical one-line-swap pattern every
+    prior slice used, no other logic changed.
+  - Test coverage: `metric-defs/route.test.ts` gained a project-scoped-member-succeeds case for both
+    GET (list) and POST (register) plus a cross-project-isolation-still-denies case;
+    `metric-defs/evolve/route.test.ts` gained a project-scoped-member-succeeds case for evolving an
+    already-registered metric — via the same real KAN-135 invite→accept flow against the Firestore
+    emulator every prior slice used (17 tests across both files, all green).
+  - Verification: `pnpm --filter @growthos/web typecheck`/`lint` green; ran the two directly touched
+    test files against the real Firestore/Auth emulators — 2 files, 17 tests, all green. Full
+    monorepo `pnpm build` green (7/7 tasks).
+  - Updated `TASKS.md` with a new **KAN-139** row (KAN-138 already claimed by #375's own in-flight
+    PR at pick time, so this took the next free number).
+  - Opened **PR #377**, subscribed to its activity, self-reviewed the diff (no issues found). CI hit
+    **two different pre-existing flakes back to back**, neither related to this diff: first the
+    well-documented `e2e/campaign-ops.spec.ts` → `e2e/cohorts.spec.ts` cascading timeout (same
+    signature the nav-restore PR #365 hit hours earlier) — posted a comment and used this PR's
+    one-re-run budget; the re-run then hit a second, unrelated failure in
+    `packages/firebase-orm-models`'s `campaign-target.emulator.test.ts` (a Firestore JS SDK internal
+    assertion crash under the same `RESOURCE_EXHAUSTED` contention pattern) — a package this diff
+    never touches, confirmed passing 16/16 in local isolation. Posted a second comment and a push
+    notification to the repo owner (re-run budget spent, needs a human-triggered re-run), then kept
+    the PR watched via scheduled check-ins rather than re-running again.
+  - While waiting, **main advanced again** with PR #378 (KAN-140, Schema Registry — see the entry
+    above), a different, non-overlapping slice; this produced a real (docs-only) merge conflict in
+    `TASKS.md`/`PROGRESS.md`'s own top entries once `mergeable_state` flipped to `dirty` — rebased
+    onto the new `main` and resolved by keeping both entries side by side, same pattern every prior
+    collision in this series used. No code conflict (KAN-140 touches `schema-defs`, not `metric-defs`).
+- **In progress (exact stopping point):** PR #377 rebased onto current `main`, pushed. CI will re-run
+  fresh on the rebased commit — watching for whether that alone clears both flakes (a fresh run is a
+  new roll of the dice, not a "re-run of the same failed job", so this doesn't spend a new budget
+  entry; if it fails again, root-cause for real rather than assuming a third flake).
+- **Blocked + why:** was blocked on a human-triggered CI re-run; the rebase-driven fresh CI run may
+  resolve that on its own.
+- **Next step:** confirm the fresh CI run's outcome; merge once green with no collision, delete the
+  branch. Remaining ~45+ route families (ingest-health, keys, cost-guardrails, plugins, campaign-ops,
+  ...) each still need their own follow-up slice — check open PRs first, this series has had frequent
+  concurrent-session collisions today.
+- **Waiting on human:**
+  - **KAN-43** — submit Google Ads dev token + Meta Marketing API applications — still outstanding.
+  - **KAN-18/KAN-19** — remaining real-infra reconciliation items — still outstanding.
 
 ---
 
