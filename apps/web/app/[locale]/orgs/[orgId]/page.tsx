@@ -57,6 +57,13 @@ export default async function OrgDetailPage({
   const canManageMembers = can(bindings, principal, 'members.manage', { orgId });
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
   const canManageBilling = can(bindings, principal, 'billing.manage', { orgId });
+  const canManageKeys = can(bindings, principal, 'keys.manage', { orgId });
+  const canManageSchemas = can(bindings, principal, 'schema.write', { orgId });
+  const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId });
+  const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
+  const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
+  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
 
   // Projects the signed-in inviter administers (KAN-135) — scopes the
   // invite form's project picker to only the projects a project-scoped
@@ -72,6 +79,65 @@ export default async function OrgDetailPage({
     getTranslations('OrgDetailPage'),
     getTranslations('AppShell'),
   ]);
+
+  // Restored pre-tri-module-redesign per-feature quick links (see
+  // `ProjectLayout`'s own doc comment for why: the redesign dropped these
+  // from every project-scoped nav surface, including this one, leaving the
+  // pages themselves fully working but unreachable — and every e2e spec
+  // that signs up, creates a project, and clicks a feature by name does so
+  // from this org page, not from inside a project route). `campaigns`/
+  // `funnel`/`automation`/`settings` are already covered above by the 3
+  // primary-module links plus the org-settings link; not repeated here
+  // except `funnel`/`settings`, which the pre-redesign page linked under
+  // different labels ("Conversion"/"Project settings") that some specs
+  // click by name.
+  const projectQuickLinks: { href: string; label: string }[] = currentProjectId
+    ? [
+        { href: `${currentProjectId}/resources`, label: t('projectResourcesLink') },
+        ...(canManageKeys ? [{ href: `${currentProjectId}/keys`, label: t('projectKeysLink') }] : []),
+        ...(canManageSchemas
+          ? [{ href: `${currentProjectId}/schema-defs`, label: t('projectSchemaRegistryLink') }]
+          : []),
+        ...(canManageMetrics
+          ? [{ href: `${currentProjectId}/metric-defs`, label: t('projectMetricRegistryLink') }]
+          : []),
+        ...(canViewIngestHealth
+          ? [
+              { href: `${currentProjectId}/ingest-health`, label: t('projectIngestHealthLink') },
+              { href: `${currentProjectId}/hooks`, label: t('projectHooksLink') },
+              { href: `${currentProjectId}/field-mappings`, label: t('projectFieldMappingsLink') },
+              { href: `${currentProjectId}/billing-ops-feed`, label: t('projectBillingOpsFeedLink') },
+              { href: `${currentProjectId}/record-feed`, label: t('projectRecordFeedLink') },
+              { href: `${currentProjectId}/customers`, label: t('projectCustomersLink') },
+              { href: `${currentProjectId}/feedback`, label: t('projectFeedbackLink') },
+              { href: `${currentProjectId}/churn-reasons`, label: t('projectChurnReasonsLink') },
+              { href: `${currentProjectId}/intent-quality`, label: t('projectIntentQualityLink') },
+              { href: `${currentProjectId}/firmographics`, label: t('projectFirmographicsLink') },
+              { href: `${currentProjectId}/experiments`, label: t('projectExperimentsLink') },
+            ]
+          : []),
+        ...(canManageProjects
+          ? [
+              { href: `${currentProjectId}/cost-guardrails`, label: t('projectCostGuardrailsLink') },
+              { href: `${currentProjectId}/session-replay`, label: t('projectSessionReplayLink') },
+              { href: `${currentProjectId}/settings`, label: t('projectSettingsLink') },
+            ]
+          : []),
+        ...(canManagePlugins ? [{ href: `${currentProjectId}/plugins`, label: t('projectPluginsLink') }] : []),
+        ...(canViewBoards ? [{ href: `${currentProjectId}/boards`, label: t('projectBoardsLink') }] : []),
+        ...(canManageBoards
+          ? [
+              { href: `${currentProjectId}/goals`, label: t('projectGoalsLink') },
+              { href: `${currentProjectId}/segments`, label: t('projectSegmentsLink') },
+              { href: `${currentProjectId}/funnel`, label: t('projectFunnelLink') },
+              { href: `${currentProjectId}/cohorts`, label: t('projectCohortsLink') },
+              { href: `${currentProjectId}/insights`, label: t('projectInsightsLink') },
+              { href: `${currentProjectId}/tv`, label: t('projectTvLink') },
+              { href: `${currentProjectId}/campaign-ops`, label: t('projectCampaignOpsLink') },
+            ]
+          : []),
+      ].map((item) => ({ href: `/orgs/${orgId}/projects/${item.href}`, label: item.label }))
+    : [];
 
   return (
     <OrgShell locale={locale} orgId={orgId}>
@@ -119,6 +185,15 @@ export default async function OrgDetailPage({
                   <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${currentProjectId}/settings`}>
                     {tShell('settings')}
                   </Link>
+                </div>
+              ) : null}
+              {projectQuickLinks.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-4">
+                  {projectQuickLinks.map((item) => (
+                    <Link key={item.href} className="text-sm underline" href={item.href}>
+                      {item.label}
+                    </Link>
+                  ))}
                 </div>
               ) : null}
             </>

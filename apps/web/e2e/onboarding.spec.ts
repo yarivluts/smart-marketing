@@ -74,7 +74,10 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
     await expect(page.getByRole('heading', { name: 'Your starter board' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Marketing' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Revenue / MRR' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Funnel' })).toBeVisible();
+    // exact: true - the persistent sidebar's own "Funnel & Goals" primary-module link also
+    // contains "Funnel" as a substring, which Playwright's default name matching would otherwise
+    // match ambiguously alongside this starter board link.
+    await expect(page.getByRole('link', { name: 'Funnel', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Invite your team' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Set a goal' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Turn on the war room' })).toBeVisible();
