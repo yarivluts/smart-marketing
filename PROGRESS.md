@@ -77,6 +77,26 @@ core requirements verified, 8/40 metrics returning). Root-caused and fixed in th
 - **Next step:** CI green -> merge -> deploy web+api -> run the data-ops script (archive 5 dead
   metrics, pause goal, archive duplicate project, set ILS/Asia/Jerusalem, backfill raw records)
   -> re-probe prod.
+- **Closed out (2026-09-10 01:xx):** #386 merged (CI green after aligning ~10 test fixtures that
+  themselves used columns core tables never had - `timeColumn: 'date'` on
+  `fact_landing_page_performance`, formula dims the operands lacked). API dev+prod, web dev+prod
+  redeployed from main. Data-ops applied through the app's own admin routes on the EasySign
+  project: 5 dead metrics archived (`ad_spend_real`, `ad_clicks_real`, `ad_impressions_real`,
+  `prefix_test_metric`, `lp_signup_to_paid_rate`), goal `Ntu4Yd2aheCuctbgukUH` paused, project
+  `lmPi6tE3IP8qJbgFhqfK` archived, `ILS` + `Asia/Jerusalem` declared, 9 raw records backfilled.
+  Re-probed prod with a minted-then-revoked key: 15 tools, 35 active metrics, `list_insights`
+  now carries one `metric_health` finding - `cost_per_signup` declares `platform`/`campaign_name`
+  that `lp_conversions` lacks (the audit's own CAC-family P-06 finding, now self-reported).
+- **Incident I caused and fixed (#387):** the backfill re-landed 6 rows already in
+  `growthos_raw.raw_records` (BigQuery `insertId` dedup is a ~1-minute window), the
+  `unique_stg_raw_records_raw_record_key` test failed, and the hourly `dbt-refresh` run went red
+  (`dbt-refresh-gt876`). Fix: `stg_raw_records` now dedupes per record key (`qualify
+  row_number() = 1`) - idempotency lives at the staging layer, where a KAN-34 replay or a
+  backfill can re-land safely. Image `build-dedupe-20260910013747` repointed; execution
+  `dbt-refresh-qcsdv` green; staging counts match Firestore exactly (dev 4 / prod 1
+  `trial_started`). Rule reinforced: verify every dbt change from a JOB execution.
+- **Next step:** J-04 purge (destructive, waiting on Yariv's explicit go); session B's
+  `mcp-setup-tools.ts` PR (P-08/P-09/P-10, J-07); pack-definition decisions for J-03.
 
 
 ## 2026-09-01 (latest) — Delivered a KAN-136 project-scope reachability slice for Keys, tracked as KAN-142
