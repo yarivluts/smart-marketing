@@ -310,11 +310,18 @@ export async function listOrgMembersWithProfiles(organizationId: string): Promis
   }));
 }
 
-/** Every project in an org, for the project switcher. */
-export async function listOrgProjects(organizationId: string): Promise<ProjectModel[]> {
-  return ProjectModel.initPath({ organization_id: organizationId })
+export interface ListOrgProjectsOptions {
+  /** Include projects `archiveProject` has retired (see `ProjectModel.archived_at`) — off by default, so every existing caller keeps seeing only live projects. */
+  includeArchived?: boolean;
+}
+
+/** Every live project in an org, for the project switcher — archived ones are hidden unless `includeArchived` is set (the settings page that offers "unarchive" is the one caller that wants them). */
+export async function listOrgProjects(organizationId: string, options: ListOrgProjectsOptions = {}): Promise<ProjectModel[]> {
+  const projects = await ProjectModel.initPath({ organization_id: organizationId })
     .where('organization_id', '==', organizationId)
     .get();
+  // `unarchiveProject` clears the stamp with an explicit `null` (see its own comment), so both spellings mean "live".
+  return options.includeArchived ? projects : projects.filter((project) => project.archived_at === undefined || project.archived_at === null);
 }
 
 /** The fixed dev/staging/prod environments provisioned for one project (KAN-30's key-creation environment picker). */

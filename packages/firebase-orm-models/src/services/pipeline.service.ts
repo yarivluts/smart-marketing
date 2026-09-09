@@ -3,7 +3,8 @@ import { ProjectModel } from '../models/project.model';
 import { RawRecordModel } from '../models/raw-record.model';
 import type { SchemaDefKind } from '../models/schema-def.model';
 import { publishPipelineMessage } from '../pipeline/transport';
-import { defaultWarehouseSink, type WarehouseSink } from '../pipeline/sink';
+import { defaultWarehouseSink, resolveBigQueryRawRecordSinkFromEnv, type WarehouseSink } from '../pipeline/sink';
+import { WarehouseNotConfiguredError } from '../warehouse/query-executor';
 import {
   STRIPE_CHARGE_EVENT_NAME,
   STRIPE_FAILED_PAYMENT_EVENT_NAME,
@@ -591,6 +592,93 @@ export async function replayFailedPipelineMessagesForProject(
         targetId: projectId,
         summary: `Retried ${failed.length} failed pipeline message(s): ${result.delivered} delivered, ${result.failed} still failing`,
         after: { attempted: failed.length, delivered: result.delivered, failed: result.failed },
+      });
+    } catch {
+      // Best-effort — see the comment on `recordAuditLogEntry`.
+    }
+  }
+
+  return result;
+}
+
+/** Bounds one `reexportRawRecordsToWarehouse` call — a backfill is run per schema, in pages, never as one unbounded scan. */
+export const MAX_RAW_RECORD_REEXPORT_BATCH_SIZE = 500;
+
+export interface ReexportRawRecordsParams {
+  organizationId: string;
+  projectId: string;
+  /** Only records of this schema (e.g. `trial_started`); omit for every schema, newest-landed first, up to `limit`. */
+  schemaName?: string;
+  limit?: number;
+  /** Test seam — production callers leave it unset so the env-configured BigQuery sink is used. */
+  sink?: WarehouseSink | null;
+  performedByUserId?: string;
+}
+
+export interface ReexportRawRecordsResult {
+  attempted: number;
+  exported: number;
+  failed: number;
+}
+
+/**
+ * Streams already-landed Firestore raw records into the BigQuery raw table again (EasySign audit
+ * P-01: records accepted before an environment's BigQuery export was configured sat in Firestore —
+ * win rules fired on them — but never reached the warehouse, so no metric could see them). Each row
+ * is inserted with its Firestore document id as `insertId`/`raw_record_id`, the same key the live
+ * `DualWarehouseSink` path uses, so re-exporting a record that did reach BigQuery is an idempotent
+ * no-op rather than a duplicate. Per-record `allSettled`: one failing row never aborts the batch.
+ * Throws `WarehouseNotConfiguredError` when this deployment has no BigQuery raw export at all —
+ * there's nothing to backfill into.
+ */
+export async function reexportRawRecordsToWarehouse(params: ReexportRawRecordsParams): Promise<ReexportRawRecordsResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const sink = params.sink === undefined ? resolveBigQueryRawRecordSinkFromEnv() : params.sink;
+  if (!sink) {
+    throw new WarehouseNotConfiguredError();
+  }
+  const limit = Math.min(params.limit ?? MAX_RAW_RECORD_REEXPORT_BATCH_SIZE, MAX_RAW_RECORD_REEXPORT_BATCH_SIZE);
+
+  // The collection path already scopes to this project; filtering `schema_name` and ordering by
+  // `landed_at` is the compound query `firestore.indexes.json` declares for `raw_records`.
+  let query = RawRecordModel.initPath({ organization_id: params.organizationId, project_id: params.projectId }).query();
+  if (params.schemaName) {
+    query = query.where('schema_name', '==', params.schemaName);
+  }
+  const records: RawRecordModel[] = await query.orderBy('landed_at', 'desc').limit(limit).get();
+
+  const outcomes = await Promise.allSettled(
+    records.map((record) =>
+      sink.insertRawRecord(
+        {
+          organizationId: record.organization_id,
+          projectId: record.project_id,
+          environmentId: record.environment_id,
+          batchId: record.batch_id,
+          kind: record.kind,
+          schemaName: record.schema_name,
+          clientId: record.client_id,
+          payload: record.payload,
+        },
+        record.id,
+      ),
+    ),
+  );
+  const exported = outcomes.filter((outcome) => outcome.status === 'fulfilled').length;
+  const result: ReexportRawRecordsResult = { attempted: records.length, exported, failed: records.length - exported };
+
+  if (params.performedByUserId) {
+    try {
+      await recordAuditLogEntry({
+        organizationId: params.organizationId,
+        projectId: params.projectId,
+        actorType: 'user',
+        actorId: params.performedByUserId,
+        action: 'raw_record.reexport',
+        targetType: 'project',
+        targetId: params.projectId,
+        summary: `Re-exported ${result.exported} of ${result.attempted} raw record(s)${params.schemaName ? ` for "${params.schemaName}"` : ''} to the warehouse`,
+        after: { ...result, ...(params.schemaName ? { schemaName: params.schemaName } : {}) },
       });
     } catch {
       // Best-effort — see the comment on `recordAuditLogEntry`.

@@ -1,6 +1,13 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
 import type { GoalDirection, GoalRhythm } from '@growthos/shared';
 
+export const GOAL_STATUSES = ['active', 'paused'] as const;
+export type GoalStatus = (typeof GOAL_STATUSES)[number];
+
+export function isGoalStatus(value: string): value is GoalStatus {
+  return (GOAL_STATUSES as readonly string[]).includes(value);
+}
+
 /**
  * A project-scoped goal (KAN-64, E12.1, plan `04 §6`): pins any registered
  * metric to a target (or range) and a deadline, with an owner and a calendar
@@ -83,4 +90,14 @@ export class GoalModel extends BaseModel {
 
   @Field({ is_required: true })
   public updated_at!: string;
+
+  /**
+   * `paused` takes the goal out of pace tracking without deleting it
+   * (EasySign audit J-05: a goal measuring seed data with 22 days left had
+   * no option between "keep reporting off-track" and "delete forever").
+   * Optional so every goal created before this field existed reads as
+   * `active`; `goal.service.ts`'s `setGoalStatus` is the only writer.
+   */
+  @Field()
+  public status?: GoalStatus;
 }

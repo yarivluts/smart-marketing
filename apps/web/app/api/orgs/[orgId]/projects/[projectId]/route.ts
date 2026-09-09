@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { InvalidProjectNameError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
+import { InvalidProjectCurrencyError, InvalidProjectNameError, InvalidProjectTimezoneError, ProjectNotFoundError } from '@growthos/firebase-orm-models';
 import { updateProjectDetails } from '@/lib/orgs/mutations';
 import { requireOrgPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
@@ -11,6 +11,8 @@ interface RouteParams {
 interface UpdateProjectRequestBody {
   name?: unknown;
   vertical?: unknown;
+  currency?: unknown;
+  timezone?: unknown;
 }
 
 /**
@@ -33,12 +35,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     return parsed.error;
   }
 
-  const { name, vertical } = parsed.body;
+  const { name, vertical, currency, timezone } = parsed.body;
   if (typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ error: 'name_required' }, { status: 400 });
   }
   if (vertical !== undefined && typeof vertical !== 'string') {
     return NextResponse.json({ error: 'invalid_vertical' }, { status: 400 });
+  }
+  if (currency !== undefined && typeof currency !== 'string') {
+    return NextResponse.json({ error: 'invalid_currency' }, { status: 400 });
+  }
+  if (timezone !== undefined && typeof timezone !== 'string') {
+    return NextResponse.json({ error: 'invalid_timezone' }, { status: 400 });
   }
 
   try {
@@ -47,10 +55,18 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
       projectId,
       name,
       vertical,
+      currency,
+      timezone,
       actorUserId: user.id,
     });
     return NextResponse.json({
-      project: { id: project.id, name: project.name, vertical: project.vertical ?? '' },
+      project: {
+        id: project.id,
+        name: project.name,
+        vertical: project.vertical ?? '',
+        currency: project.currency ?? '',
+        timezone: project.timezone ?? '',
+      },
     });
   } catch (err) {
     if (err instanceof ProjectNotFoundError) {
@@ -58,6 +74,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams): Prom
     }
     if (err instanceof InvalidProjectNameError) {
       return NextResponse.json({ error: 'name_required' }, { status: 400 });
+    }
+    if (err instanceof InvalidProjectCurrencyError) {
+      return NextResponse.json({ error: 'invalid_currency' }, { status: 400 });
+    }
+    if (err instanceof InvalidProjectTimezoneError) {
+      return NextResponse.json({ error: 'invalid_timezone' }, { status: 400 });
     }
     throw err;
   }

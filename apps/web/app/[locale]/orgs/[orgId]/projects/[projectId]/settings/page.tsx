@@ -4,8 +4,9 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listOrgProjects } from '@/lib/orgs/queries';
+import { listOrgProjectsIncludingArchived } from '@/lib/orgs/queries';
 import { ProjectSettingsForm } from '@/components/orgs/project-settings-form';
+import { ArchiveProjectButton } from '@/components/orgs/archive-project-button';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -41,7 +42,8 @@ export default async function ProjectSettingsPage({ params }: PageProps): Promis
     notFound();
   }
 
-  const projects = await listOrgProjects(orgId);
+  // Including archived: this is the one page that must still resolve an archived project, so an admin can unarchive it.
+  const projects = await listOrgProjectsIncludingArchived(orgId);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
     notFound();
@@ -62,7 +64,15 @@ export default async function ProjectSettingsPage({ params }: PageProps): Promis
           projectId={projectId}
           initialName={project.name}
           initialVertical={project.vertical ?? ''}
+          initialCurrency={project.currency ?? ''}
+          initialTimezone={project.timezone ?? ''}
         />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="text-lg font-semibold">{t('archiveHeading')}</h2>
+        <p className="text-sm text-muted-foreground">{project.archived_at ? t('archivedNote', { at: project.archived_at }) : t('archiveHelp')}</p>
+        <ArchiveProjectButton orgId={orgId} projectId={projectId} archived={project.archived_at !== undefined && project.archived_at !== null} />
       </section>
     </main>
   );

@@ -2,6 +2,7 @@ import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQu
 import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
+import { auditMetricCatalogHealth, listMetricDefinitionsForProject } from './metric-registry.service';
 import { getOnboardingState } from './onboarding.service';
 import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 
@@ -388,7 +389,7 @@ export async function queryProjectFunnelStepsForAdmin(params: QueryProjectFunnel
   }
 }
 
-export type ProjectInsightKind = 'tracking_alert' | 'win_event';
+export type ProjectInsightKind = 'tracking_alert' | 'win_event' | 'metric_health';
 export type ProjectInsightSeverity = 'info' | 'warning';
 
 interface ProjectInsightBase {
@@ -407,7 +408,8 @@ interface ProjectInsightBase {
  */
 export type ProjectInsight =
   | (ProjectInsightBase & { kind: 'tracking_alert'; schemaName: string; lastSeenAt: string })
-  | (ProjectInsightBase & { kind: 'win_event'; winRuleName: string; schemaName: string; clientId: string });
+  | (ProjectInsightBase & { kind: 'win_event'; winRuleName: string; schemaName: string; clientId: string })
+  | (ProjectInsightBase & { kind: 'metric_health'; metricName: string; version: number; reasons: string[] });
 
 export interface ListProjectInsightsParams {
   organizationId: string;
@@ -419,20 +421,43 @@ const DEFAULT_INSIGHTS_LIMIT = 20;
 const MAX_INSIGHTS_LIMIT = 100;
 
 /**
- * `list_insights` (plan `12 §6.2`): fans out to the two per-project "here is
- * something noteworthy" feeds that already exist — active tracking-broke
- * episodes (KAN-36) and fired win-rule events (KAN-65/66) — and merges them
- * newest-first. Both sources are Firestore-backed, not warehouse-backed, so
- * (unlike every other tool in this file/module) this one actually returns
- * real data in every environment today, with no KAN-18 dependency.
+ * `list_insights` (plan `12 §6.2`): fans out to the per-project "here is
+ * something noteworthy" feeds — active tracking-broke episodes (KAN-36),
+ * fired win-rule events (KAN-65/66), and (EasySign audit P-03) every active
+ * metric that registration validation would reject today, so a catalog
+ * that can't be queried is flagged here rather than discovered one raw
+ * warehouse error at a time — and merges them newest-first. Every source is
+ * Firestore-backed, not warehouse-backed, so (unlike every other tool in
+ * this file/module) this one actually returns real data in every
+ * environment today, with no KAN-18 dependency.
+ *
+ * A `metric_health` insight's `occurredAt` is the definition's own
+ * `created_at` (the moment the broken definition entered the catalog), so
+ * it sorts as old news rather than crowding out today's wins — and stays
+ * stable across calls, the same way an alert's `detected_at` does.
  */
 export async function listProjectInsights(params: ListProjectInsightsParams): Promise<ProjectInsight[]> {
   const limit = clampLimit(params.limit, DEFAULT_INSIGHTS_LIMIT, MAX_INSIGHTS_LIMIT);
 
-  const [alerts, wins] = await Promise.all([
+  const [alerts, wins, metricProblems, metricDefs] = await Promise.all([
     listActiveTrackingAlertsForProject(params.organizationId, params.projectId),
     listRecentWinEventsForProject(params.organizationId, params.projectId, limit),
+    auditMetricCatalogHealth(params.organizationId, params.projectId),
+    listMetricDefinitionsForProject(params.organizationId, params.projectId),
   ]);
+  const createdAtByDefId = new Map(metricDefs.map((def) => [def.id, def.created_at] as const));
+
+  const metricHealthInsights: ProjectInsight[] = metricProblems.map((problem) => ({
+    kind: 'metric_health',
+    id: `metric-health:${problem.metricDefId}`,
+    title: `Metric "${problem.name}" cannot be queried as defined`,
+    detail: problem.reasons.join(' '),
+    occurredAt: createdAtByDefId.get(problem.metricDefId) ?? new Date(0).toISOString(),
+    severity: 'warning',
+    metricName: problem.name,
+    version: problem.version,
+    reasons: problem.reasons,
+  }));
 
   const alertInsights: ProjectInsight[] = alerts.map((alert) => ({
     kind: 'tracking_alert',
@@ -457,7 +482,7 @@ export async function listProjectInsights(params: ListProjectInsightsParams): Pr
     clientId: win.client_id,
   }));
 
-  return [...alertInsights, ...winInsights]
+  return [...alertInsights, ...winInsights, ...metricHealthInsights]
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
     .slice(0, limit);
 }

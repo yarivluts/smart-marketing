@@ -76,12 +76,42 @@ export class InvalidProjectNameError extends Error {
   }
 }
 
+export class InvalidProjectCurrencyError extends Error {
+  constructor() {
+    super('Currency must be a three-letter ISO-4217 code, e.g. ILS or USD.');
+    this.name = 'InvalidProjectCurrencyError';
+  }
+}
+
+export class InvalidProjectTimezoneError extends Error {
+  constructor() {
+    super('Timezone must be a valid IANA time zone name, e.g. Asia/Jerusalem.');
+    this.name = 'InvalidProjectTimezoneError';
+  }
+}
+
+const ISO_4217_PATTERN = /^[A-Z]{3}$/;
+
+/** `Intl` is the one IANA zone catalog Node ships with — no dependency, and it's exactly what the runtime would use to format in that zone. */
+function isValidTimezone(timezone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface UpdateProjectDetailsParams {
   organizationId: string;
   projectId: string;
   name: string;
   /** Omit (or pass an empty string) to clear the vertical. */
   vertical?: string;
+  /** ISO-4217 code; omit to leave unchanged, pass an empty string to clear. */
+  currency?: string;
+  /** IANA time zone; omit to leave unchanged, pass an empty string to clear. */
+  timezone?: string;
   actorUserId: string;
 }
 
@@ -111,10 +141,31 @@ export async function updateProjectDetails(params: UpdateProjectDetailsParams): 
     throw new InvalidProjectNameError();
   }
 
-  const before = { name: project.name, vertical: project.vertical ?? '' };
+  const currency = params.currency?.trim().toUpperCase();
+  if (currency !== undefined && currency !== '' && !ISO_4217_PATTERN.test(currency)) {
+    throw new InvalidProjectCurrencyError();
+  }
+  const timezone = params.timezone?.trim();
+  if (timezone !== undefined && timezone !== '' && !isValidTimezone(timezone)) {
+    throw new InvalidProjectTimezoneError();
+  }
+
+  const snapshot = (): Record<string, string> => ({
+    name: project.name,
+    vertical: project.vertical ?? '',
+    currency: project.currency ?? '',
+    timezone: project.timezone ?? '',
+  });
+  const before = snapshot();
 
   project.name = trimmedName;
   project.vertical = params.vertical?.trim() ?? '';
+  if (currency !== undefined) {
+    project.currency = currency;
+  }
+  if (timezone !== undefined) {
+    project.timezone = timezone;
+  }
   project.setPathParams({ organization_id: params.organizationId });
   await project.save();
 
@@ -129,10 +180,62 @@ export async function updateProjectDetails(params: UpdateProjectDetailsParams): 
       targetId: params.projectId,
       summary: `Updated project "${project.name}"`,
       before,
-      after: { name: project.name, vertical: project.vertical ?? '' },
+      after: snapshot(),
     });
   } catch {
     // Best-effort — audit logging must never turn a successful save into a failure for the caller.
+  }
+
+  return project;
+}
+
+/**
+ * Retires a project (EasySign audit J-06: a duplicate project had no way
+ * out of the org except a full delete) — stamps `archived_at`, which hides
+ * it from `listOrgProjects` and everything built on it; nothing under the
+ * project is touched. Idempotent. See `ProjectModel.archived_at`.
+ */
+export async function archiveProject(organizationId: string, projectId: string, actorUserId: string): Promise<ProjectModel> {
+  return setProjectArchived(organizationId, projectId, actorUserId, true);
+}
+
+/** Reverses {@link archiveProject}. */
+export async function unarchiveProject(organizationId: string, projectId: string, actorUserId: string): Promise<ProjectModel> {
+  return setProjectArchived(organizationId, projectId, actorUserId, false);
+}
+
+async function setProjectArchived(organizationId: string, projectId: string, actorUserId: string, archived: boolean): Promise<ProjectModel> {
+  const project = await ProjectModel.init(projectId, { organization_id: organizationId });
+  if (!project || project.organization_id !== organizationId) {
+    throw new ProjectNotFoundError();
+  }
+  const wasArchived = project.archived_at !== undefined;
+  if (wasArchived === archived) {
+    return project;
+  }
+
+  // `@arbel/firebase-orm` drops `undefined` fields from the update it sends
+  // (see `GoalModel.target_value`'s doc comment), so clearing the stamp has
+  // to go through an explicit `null`; readers treat both as "not archived".
+  project.archived_at = (archived ? new Date().toISOString() : null) as string | undefined;
+  project.setPathParams({ organization_id: organizationId });
+  await project.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      projectId,
+      actorType: 'user',
+      actorId: actorUserId,
+      action: archived ? 'project.archive' : 'project.unarchive',
+      targetType: 'project',
+      targetId: projectId,
+      summary: `${archived ? 'Archived' : 'Unarchived'} project "${project.name}"`,
+      before: { archived: wasArchived },
+      after: { archived },
+    });
+  } catch {
+    // Best-effort — see updateProjectDetails.
   }
 
   return project;

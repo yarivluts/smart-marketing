@@ -32,6 +32,8 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   query_funnel: { kind: 'connection-scope', permission: 'mcp.read' },
   search_customers: { kind: 'connection-scope', permission: 'mcp.read' },
   list_insights: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_segments: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_win_rules: { kind: 'connection-scope', permission: 'mcp.read' },
   propose_action: { kind: 'per-call-permission', permission: 'automation.execute' },
   approve_action: { kind: 'per-call-permission', permission: 'automation.approve' },
   create_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },

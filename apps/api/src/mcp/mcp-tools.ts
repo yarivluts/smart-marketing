@@ -6,6 +6,8 @@ import {
   getMetricCatalogDetail,
   listMetricsCatalogForProject,
   listProjectInsights,
+  listSegmentsForProject,
+  listWinRulesForProject,
   MetricNotRegisteredError,
   MetricTargetsUnbuiltWarehouseTableError,
   ProjectNotFoundError,
@@ -390,6 +392,58 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
       const { limit } = args as { limit?: number };
       const insights = await listProjectInsights({ organizationId: auth.organizationId, projectId: auth.projectId, limit });
       return textResult({ insights });
+    }),
+  );
+
+  // The two read tools the EasySign audit (P-09) found missing everywhere: a
+  // caller could `create_segment` but never see what segments exist, and
+  // could see win *events* but never the rules that fire them. Same
+  // connection-scope `mcp.read` gate as every other read tool here; both
+  // are Firestore-backed config reads, no warehouse round trip.
+  server.registerTool(
+    'list_segments',
+    {
+      title: 'List segments',
+      description: "List every saved segment in this project (name, entity schema, filters, work-list status) — the read side of create_segment.",
+      inputSchema: {},
+    },
+    auditedToolHandler(auth, 'list_segments', async () => {
+      const segments = await listSegmentsForProject(auth.organizationId, auth.projectId);
+      return textResult({
+        segments: segments.map((segment) => ({
+          id: segment.id,
+          name: segment.name,
+          schema_name: segment.schema_name,
+          filters: segment.filters,
+          event_conditions: segment.event_conditions ?? [],
+          status: segment.status ?? null,
+          owner_person_id: segment.owner_person_id ?? null,
+          created_at: segment.created_at,
+        })),
+      });
+    }),
+  );
+
+  server.registerTool(
+    'list_win_rules',
+    {
+      title: 'List win rules',
+      description: 'List every win rule configured in this project (name, the event schema it watches, its filters, win type, active flag) — the rules behind the win_event insights list_insights reports.',
+      inputSchema: {},
+    },
+    auditedToolHandler(auth, 'list_win_rules', async () => {
+      const rules = await listWinRulesForProject(auth.organizationId, auth.projectId);
+      return textResult({
+        win_rules: rules.map((rule) => ({
+          id: rule.id,
+          name: rule.name,
+          schema_name: rule.schema_name,
+          filters: rule.filters,
+          win_type: rule.win_type,
+          active: rule.active,
+          updated_at: rule.updated_at,
+        })),
+      });
     }),
   );
 }

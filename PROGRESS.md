@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-09-09 - EasySign external audit: platform defects P-01..P-10 + project fixes J-01..J-08
+
+Yariv handed over an end-to-end audit of the EasySign Growth project (MCP + metric registry, 0/4
+core requirements verified, 8/40 metrics returning). Root-caused and fixed in this order:
+
+- **Stale artifacts were most of the "critical" list (infra, done today):**
+  - `dbt-refresh` Cloud Run job was still on the Aug-20 image, so every core model added since
+    (`fact_funnel_event`, `fact_subscription_event`, `dim_subscription`, `fact_revenue_event`, +13
+    more) never existed in BigQuery - J-01 / P-01 / most of P-07. Rebuilt + repointed + executed
+    from a JOB run; all tables present. (The standing rule "repoint the job image with every dbt
+    merge" was never automated; still click-ops - flagged.) `fact_funnel_step` stays BigQuery-
+    disabled by design (DuckDB-only seed) - `query_funnel` needs the funnel-steps export first.
+  - `api-prod`/`api-dev` were on the Aug-20 image; redeployed from main. Verified with a
+    short-lived, then revoked, `mcp.read` key: `total_ad_spend` now queries (P-04 was the stale
+    image), `signups`/`trial_starts`/`mrr` compile and run against the new tables.
+  - `web-prod` was on an Aug-22 image (the campaigns pages had never reached prod); redeployed.
+  - The 13-vs-26 MCP tool gap (P-09) is session B's UNCOMMITTED `mcp-setup-tools.ts` in the main
+    checkout (preprod was deployed from that working tree). Not mine to commit - relayed to B with
+    the three audit items that belong in that file (P-08 scopes, P-10 raw i18n keys, hard-coded
+    preprod host).
+  - P-02 is a data artifact, not a leak: the same 75.5 seed row was ingested into BOTH dev and
+    prod (dev: 2 rows, prod: 1 - verified in the mart view per `environment_id`), and the compiled
+    query does predicate on the key's environment. Physical dataset split stays a defense-in-depth
+    follow-up.
+  - P-01's "5 ingested, 2 in the warehouse": all 5 pipeline messages are `delivered`; the 3 missing
+    ones landed on Aug 18-19, before `GROWTHOS_BIGQUERY_RAW_DATASET` was set on api-dev. The
+    pipeline is correct today; what was missing was a backfill path (built below).
+- **Code (branch `fix/audit-platform`):**
+  - P-05: `warehouse/core-table-catalog.ts` - the dbt core tables' real columns (snapshot from
+    BigQuery INFORMATION_SCHEMA, regeneration query in the header, drift-guarded against
+    `_core.yml`); registration now rejects a time column / column / filter field / dimension a
+    core table lacks, `sum`/`avg` over a non-numeric column, and any metric on a BigQuery-disabled
+    model. A table that is neither a schema nor a core table is still ALLOWED at registration
+    (an externally provisioned relation must not be a hard block) but flagged by the health sweep.
+  - P-06: a formula may only declare dimensions every operand shares.
+  - P-03: new `metric_health` insight kind - `auditMetricCatalogHealth` re-runs registration
+    validation over every active metric on each `list_insights`; the web Insights page renders it.
+  - P-09: `list_segments` + `list_win_rules` MCP read tools.
+  - J-02: `archiveMetricDefinition` (new `archived` status; refused while an active formula
+    references the family) + route + catalog button.
+  - J-05: `GoalModel.status` (`active`/`paused`) + `setGoalStatus` + route + button.
+  - J-06: `archiveProject`/`unarchiveProject` (`archived_at`, hidden from `listOrgProjects` by
+    default) + route + settings-page section. J-03: project `currency` + `timezone` fields,
+    validated (ISO-4217 / IANA via `Intl`), on the settings form.
+  - P-01: `reexportRawRecordsToWarehouse` streams already-landed Firestore raw records through the
+    BigQuery raw sink (idempotent by record id) + ingest-health button; new composite index
+    `raw_records(schema_name, landed_at DESC)` declared AND created live first.
+  - Found by the new validation: the EasySign pack's own metrics targeted `events.event_name`/`ts`
+    (columns that never existed) - repointed to `event_type`/`occurred_at`; the `signingTier`
+    breakdown and the avg-turnaround metric are payload fields inside `events.properties` and
+    are deliberately not registered until event schemas get flattened marts.
+- **Remaining, honestly:** J-04 purge of seed rows is destructive on the prod warehouse - staged
+  with exact statements, waiting on Yariv's explicit go. J-07 (business-model profile / setup
+  requirements) lives entirely in session B's uncommitted work. J-03's rolling-window dau/wau/mau
+  needs a compiler feature (no window semantics today); `churned_mrr` type vocabulary and the
+  CAC join-key question are definition-level decisions for the pack owner. J-08 guardrails MCP
+  tool not built.
+- **Next step:** CI green -> merge -> deploy web+api -> run the data-ops script (archive 5 dead
+  metrics, pause goal, archive duplicate project, set ILS/Asia/Jerusalem, backfill raw records)
+  -> re-probe prod.
+
+
 ## 2026-09-01 (latest) — Delivered a KAN-136 project-scope reachability slice for Keys, tracked as KAN-142
 
 - **Last completed:**

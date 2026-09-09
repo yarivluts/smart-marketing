@@ -11,6 +11,10 @@ export interface ProjectSettingsFormProps {
   projectId: string;
   initialName: string;
   initialVertical: string;
+  /** ISO-4217 code or empty when the project has never declared one. */
+  initialCurrency?: string;
+  /** IANA time zone or empty when the project has never declared one. */
+  initialTimezone?: string;
 }
 
 /**
@@ -25,11 +29,15 @@ export function ProjectSettingsForm({
   projectId,
   initialName,
   initialVertical,
+  initialCurrency = '',
+  initialTimezone = '',
 }: ProjectSettingsFormProps): React.ReactElement {
   const t = useTranslations('ProjectSettings');
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [vertical, setVertical] = useState(initialVertical);
+  const [currency, setCurrency] = useState(initialCurrency);
+  const [timezone, setTimezone] = useState(initialTimezone);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -49,10 +57,17 @@ export function ProjectSettingsForm({
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, vertical }),
+        body: JSON.stringify({ name, vertical, currency, timezone }),
       });
       if (!response.ok) {
-        setError(t('saveError'));
+        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        if (body.error === 'invalid_currency') {
+          setError(t('invalidCurrencyError'));
+        } else if (body.error === 'invalid_timezone') {
+          setError(t('invalidTimezoneError'));
+        } else {
+          setError(t('saveError'));
+        }
         return;
       }
       setSaved(true);
@@ -77,6 +92,22 @@ export function ProjectSettingsForm({
         </label>
         <Input id="project-settings-vertical" value={vertical} onChange={(event) => setVertical(event.target.value)} />
         <p className="text-xs text-muted-foreground">{t('verticalHelp')}</p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor="project-settings-currency">
+          {t('currencyLabel')}
+        </label>
+        <Input id="project-settings-currency" value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} maxLength={3} dir="ltr" />
+        <p className="text-xs text-muted-foreground">{t('currencyHelp')}</p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor="project-settings-timezone">
+          {t('timezoneLabel')}
+        </label>
+        <Input id="project-settings-timezone" value={timezone} onChange={(event) => setTimezone(event.target.value)} dir="ltr" />
+        <p className="text-xs text-muted-foreground">{t('timezoneHelp')}</p>
       </div>
 
       {error ? (

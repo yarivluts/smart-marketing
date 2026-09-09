@@ -90,16 +90,26 @@ export function readWarehouseSinkEnvConfig(env: NodeJS.ProcessEnv = process.env)
  * without mutating real `process.env` or needing real GCP credentials.
  */
 export function resolveWarehouseSinkFromEnv(env: NodeJS.ProcessEnv = process.env): WarehouseSink {
-  const config = readWarehouseSinkEnvConfig(env);
   const firestoreSink = new FirestoreWarehouseSink();
+  const bigQuerySink = resolveBigQueryRawRecordSinkFromEnv(env);
+  return bigQuerySink ? new DualWarehouseSink(firestoreSink, bigQuerySink) : firestoreSink;
+}
+
+/**
+ * The BigQuery half of {@link resolveWarehouseSinkFromEnv} on its own, or `null` when the raw
+ * export isn't configured — what `reexportRawRecordsToWarehouse` (`services/pipeline.service.ts`)
+ * streams through when backfilling records that landed in Firestore before the export existed,
+ * so the backfill never re-saves the Firestore documents it is reading from.
+ */
+export function resolveBigQueryRawRecordSinkFromEnv(env: NodeJS.ProcessEnv = process.env): BigQueryRawRecordSink | null {
+  const config = readWarehouseSinkEnvConfig(env);
   if (!config.projectId || !config.dataset) {
-    return firestoreSink;
+    return null;
   }
-  const bigQuerySink = new BigQueryRawRecordSink({
+  return new BigQueryRawRecordSink({
     client: createRealBigQueryInsertClient(config.projectId),
     dataset: config.dataset,
   });
-  return new DualWarehouseSink(firestoreSink, bigQuerySink);
 }
 
 /**
