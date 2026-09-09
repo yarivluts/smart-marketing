@@ -54,3 +54,14 @@ select
     -- every column that makes one raw record distinct from another.
     {{ surrogate_key(['organization_id', 'project_id', 'environment_id', 'batch_id', 'kind', 'schema_name', 'client_id']) }} as raw_record_key
 from source_records
+-- The raw table can legitimately hold the SAME record more than once: BigQuery's
+-- streaming-insert `insertId` dedup is a best-effort window of about a minute, so a
+-- KAN-34 DLQ replay or the ingest-health "re-export records to warehouse" backfill
+-- (`reexportRawRecordsToWarehouse`) that re-lands a record later inserts a second
+-- physical row. Idempotency therefore lives HERE, not in the sink: keep the first
+-- landing of each key so `raw_record_key` stays unique (the `_staging.yml` test) and
+-- nothing downstream double-counts a replayed record.
+qualify row_number() over (
+    partition by organization_id, project_id, environment_id, batch_id, kind, schema_name, client_id
+    order by landed_at
+) = 1

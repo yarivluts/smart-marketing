@@ -626,8 +626,11 @@ export interface ReexportRawRecordsResult {
  * P-01: records accepted before an environment's BigQuery export was configured sat in Firestore —
  * win rules fired on them — but never reached the warehouse, so no metric could see them). Each row
  * is inserted with its Firestore document id as `insertId`/`raw_record_id`, the same key the live
- * `DualWarehouseSink` path uses, so re-exporting a record that did reach BigQuery is an idempotent
- * no-op rather than a duplicate. Per-record `allSettled`: one failing row never aborts the batch.
+ * `DualWarehouseSink` path uses. Note BigQuery's `insertId` dedup is only a best-effort window of
+ * about a minute, so re-exporting a record that already reached the raw table DOES land a second
+ * physical row there — idempotency is guaranteed one layer up, by `stg_raw_records`'s own
+ * dedupe on the record key (`packages/dbt-transform`), so nothing downstream double-counts.
+ * Per-record `allSettled`: one failing row never aborts the batch.
  * Throws `WarehouseNotConfiguredError` when this deployment has no BigQuery raw export at all —
  * there's nothing to backfill into.
  */
