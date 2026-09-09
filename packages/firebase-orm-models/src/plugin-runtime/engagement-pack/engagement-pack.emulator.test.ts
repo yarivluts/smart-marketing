@@ -130,7 +130,7 @@ describe('ensureEngagementPackRegistered — idempotency and isolation', () => {
     expect(result.registered).not.toContain('dau');
 
     const dau = await getActiveMetricDefinition(organization.id, project.id, 'dau');
-    expect(dau?.dimensions).toEqual(['plan']);
+    expect(dau?.dimensions).toEqual(['step']);
     expect(dau?.version).toBe(1);
   });
 

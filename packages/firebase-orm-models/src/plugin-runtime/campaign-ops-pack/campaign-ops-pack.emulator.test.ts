@@ -146,7 +146,7 @@ describe('ensureCampaignOpsPackRegistered — idempotency and isolation', () => 
       name: 'collection_7d',
       definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'legacy_payback_export', column: 'amount', timeColumn: 'reported_on', filters: [] } },
       // Must carry the dimensions the pack's own formulas over `collection_7d` declare - a formula may only declare dimensions every operand shares.
-      dimensions: [],
+      dimensions: ['campaign_id'],
       createdByUserId: owner.id,
     });
 
