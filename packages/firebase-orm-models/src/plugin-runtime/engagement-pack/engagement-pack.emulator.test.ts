@@ -119,7 +119,7 @@ describe('ensureEngagementPackRegistered — idempotency and isolation', () => {
         kind: 'aggregation',
         aggregation: { function: 'count_distinct', table: 'fact_funnel_event', column: 'customer_id', timeColumn: 'ts', filters: [] },
       },
-      dimensions: ['plan'], // deliberately different from the pack's own dimensions, to prove this pre-existing version is left untouched
+      dimensions: ['step'], // deliberately different from the pack's own dimensions (and a real fact_funnel_event column), to prove this pre-existing version is left untouched
       createdByUserId: owner.id,
     });
 
