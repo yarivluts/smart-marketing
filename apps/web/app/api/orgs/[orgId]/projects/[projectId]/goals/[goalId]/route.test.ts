@@ -52,7 +52,7 @@ async function setupOrgProjectGoal(orgName: string) {
     // A "signups"-named metric against an unrelated real table — this fixture exercises the
     // "no warehouse configured" degrade, independent of whichever table the SaaS pack's actual
     // `signups` metric targets.
-    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
+    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
     dimensions: [],
     createdByUserId: owner.id,
   });

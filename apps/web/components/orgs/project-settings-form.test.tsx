@@ -42,7 +42,7 @@ describe('ProjectSettingsForm', () => {
     expect(fetch).toHaveBeenCalledWith('/api/orgs/org-1/projects/project-1', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Storefront', vertical: 'fintech' }),
+      body: JSON.stringify({ name: 'Storefront', vertical: 'fintech', currency: '', timezone: '' }),
     });
   });
 

@@ -60,7 +60,12 @@ export function ProjectSettingsForm({
         body: JSON.stringify({ name, vertical, currency, timezone }),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { error?: string };
+        let body: { error?: string } = {};
+        try {
+          body = (await response.json()) as { error?: string };
+        } catch {
+          // A non-JSON failure body carries no reason to translate; the generic message below covers it.
+        }
         if (body.error === 'invalid_currency') {
           setError(t('invalidCurrencyError'));
         } else if (body.error === 'invalid_timezone') {
