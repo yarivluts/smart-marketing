@@ -57,7 +57,7 @@ async function registerSignups(organizationId: string, projectId: string, create
     organizationId,
     projectId,
     name: 'signups',
-    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
+    definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
     dimensions: [],
     createdByUserId,
   });
@@ -68,7 +68,7 @@ async function registerCostPerSignup(organizationId: string, projectId: string, 
     organizationId,
     projectId,
     name: 'cost_per_signup',
-    definition: { kind: 'aggregation', aggregation: { function: 'avg', table: 'fact_landing_page_performance', column: 'cost_per_signup', timeColumn: 'date', filters: [] } },
+    definition: { kind: 'aggregation', aggregation: { function: 'avg', table: 'fact_landing_page_performance', column: 'conversions', timeColumn: 'activity_date', filters: [] } },
     dimensions: [],
     createdByUserId,
   });
