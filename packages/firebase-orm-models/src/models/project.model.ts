@@ -31,4 +31,34 @@ export class ProjectModel extends BaseModel {
    */
   @Field()
   public session_replay_url_template?: string;
+
+  /**
+   * ISO-4217 code (e.g. `ILS`, `USD`) every spend/revenue figure this
+   * project reports is denominated in (EasySign audit J-03: nothing declared
+   * a currency, so an ILS-priced product's numbers rendered as `$`). Unset
+   * means "not declared" — surfaces still fall back to their USD-implicit
+   * labels, the pre-existing behaviour, rather than guessing.
+   */
+  @Field()
+  public currency?: string;
+
+  /**
+   * IANA time zone (e.g. `Asia/Jerusalem`) the project's business days run
+   * in — declared here so day-grain buckets can eventually follow it; today
+   * every grain in `@growthos/shared`'s compiler is UTC-implicit, and this
+   * field is what a caller reads to know the offset that applies.
+   */
+  @Field()
+  public timezone?: string;
+
+  /**
+   * Set by `archiveProject` (EasySign audit J-06): an archived project drops
+   * out of `listOrgProjects` (and so out of the switcher, every list, and
+   * every MCP project listing) without deleting a single document under
+   * it — the same "retired, never erased" posture `MetricDefModel`'s
+   * `archived` status takes. `listOrgProjects({ includeArchived: true })`
+   * is the only way to see it again, and `unarchiveProject` clears it.
+   */
+  @Field()
+  public archived_at?: string;
 }

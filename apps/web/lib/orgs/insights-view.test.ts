@@ -3,6 +3,29 @@ import type { ProjectInsight } from '@growthos/firebase-orm-models';
 import { buildInsightsView, toInsightView } from './insights-view';
 
 describe('toInsightView', () => {
+  it('maps a metric_health insight to the metricHealth translation keys + args, joining the reasons', () => {
+    const insight: ProjectInsight = {
+      kind: 'metric_health',
+      id: 'metric-health:def-1',
+      title: 'Metric "cac" cannot be queried as defined',
+      detail: 'Formula dimension "platform" is not declared on referenced metric(s): new_paying.',
+      occurredAt: '2026-08-01T00:00:00.000Z',
+      severity: 'warning',
+      metricName: 'cac',
+      version: 1,
+      reasons: ['Formula dimension "platform" is not declared on referenced metric(s): new_paying.', 'Second reason.'],
+    };
+
+    expect(toInsightView(insight)).toEqual({
+      id: 'metric-health:def-1',
+      severity: 'warning',
+      occurredAt: '2026-08-01T00:00:00.000Z',
+      titleKey: 'metricHealthTitle',
+      detailKey: 'metricHealthDetail',
+      args: { metricName: 'cac', version: '1', reasons: 'Formula dimension "platform" is not declared on referenced metric(s): new_paying. Second reason.' },
+    });
+  });
+
   it('maps a tracking_alert insight to the trackingAlert translation keys + args', () => {
     const insight: ProjectInsight = {
       kind: 'tracking_alert',

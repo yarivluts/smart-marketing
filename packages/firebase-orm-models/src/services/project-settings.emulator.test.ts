@@ -134,7 +134,7 @@ describe('updateProjectDetails', () => {
     const updateEntry = entries.find((entry) => entry.action === 'project.update' && entry.target_id === project.id);
     expect(updateEntry).toBeTruthy();
     expect(updateEntry?.actor_id).toBe(owner.id);
-    expect(updateEntry?.before).toEqual({ name: 'Original Project', vertical: 'ecommerce' });
-    expect(updateEntry?.after).toEqual({ name: 'Renamed Project', vertical: updated.vertical });
+    expect(updateEntry?.before).toEqual({ name: 'Original Project', vertical: 'ecommerce', currency: '', timezone: '' });
+    expect(updateEntry?.after).toEqual({ name: 'Renamed Project', vertical: updated.vertical, currency: '', timezone: '' });
   });
 });

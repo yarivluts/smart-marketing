@@ -146,7 +146,7 @@ describe('queryMetrics', () => {
       // A real (non-`KNOWN_UNBUILT_WAREHOUSE_TABLES`) table, deliberately not `fact_funnel_event`
       // (the SaaS pack's real `signups` table) — this test exercises the cache/executor plumbing,
       // which is only reachable once a query compiles past the "buildable table" fast-fail.
-      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
       dimensions: [],
       createdByUserId: owner.id,
     });

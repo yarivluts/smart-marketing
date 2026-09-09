@@ -123,6 +123,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "raw_records",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "schema_name",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "landed_at",
+          "order": "DESCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

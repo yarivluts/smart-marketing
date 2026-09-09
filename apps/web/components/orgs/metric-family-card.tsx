@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { EvolveMetricDefForm } from './evolve-metric-def-form';
+import { ArchiveMetricDefButton } from './archive-metric-def-button';
 import { metricVersionToFormState, type MetricVersionView } from './metric-definition-editor';
 
 export interface MetricFamilyCardProps {
@@ -19,6 +20,14 @@ export function MetricFamilyCard({ orgId, projectId, name, versions }: MetricFam
   const t = useTranslations('MetricRegistry');
   const [evolving, setEvolving] = useState(false);
   const latest = versions[versions.length - 1];
+  const isArchived = latest?.status === 'archived';
+
+  function statusLabel(status: MetricVersionView['status']): string {
+    if (status === 'active') {
+      return t('activeLabel');
+    }
+    return status === 'archived' ? t('archivedLabel') : t('supersededLabel');
+  }
 
   function formulaOrAggregationSummary(version: MetricVersionView): string {
     if (version.definitionKind === 'formula') {
@@ -36,10 +45,13 @@ export function MetricFamilyCard({ orgId, projectId, name, versions }: MetricFam
     <li className="flex flex-col gap-3 rounded-md border border-input p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-medium">{name}</span>
-        {!evolving ? (
-          <Button type="button" variant="outline" size="sm" onClick={() => setEvolving(true)}>
-            {t('evolve')}
-          </Button>
+        {!evolving && !isArchived ? (
+          <span className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setEvolving(true)}>
+              {t('evolve')}
+            </Button>
+            <ArchiveMetricDefButton orgId={orgId} projectId={projectId} name={name} />
+          </span>
         ) : null}
       </div>
 
@@ -48,7 +60,7 @@ export function MetricFamilyCard({ orgId, projectId, name, versions }: MetricFam
           <span className="text-muted-foreground">
             {t('versionStatusLabel', {
               version: String(version.version),
-              status: version.status === 'active' ? t('activeLabel') : t('supersededLabel'),
+              status: statusLabel(version.status),
             })}
           </span>
           <span>{formulaOrAggregationSummary(version)}</span>

@@ -198,6 +198,8 @@ describe('McpController (e2e)', () => {
           'describe_metric',
           'list_insights',
           'list_metrics',
+          'list_segments',
+          'list_win_rules',
           'propose_action',
           'query_cohort',
           'query_funnel',

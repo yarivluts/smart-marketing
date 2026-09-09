@@ -232,6 +232,12 @@ export const listOrgProjects = cache(async (organizationId: string): Promise<Pro
   return listOrgProjectsForOrganization(organizationId);
 });
 
+/** Live AND archived projects — only the project settings page (which offers "unarchive") wants these; everything else keeps the archived-hidden default above. */
+export async function listOrgProjectsIncludingArchived(organizationId: string): Promise<ProjectModel[]> {
+  await ensureFirestoreOrm();
+  return listOrgProjectsForOrganization(organizationId, { includeArchived: true });
+}
+
 /** Validates a `(client_id, redirect_uri)` pair against a registered MCP OAuth client (KAN-75) — throws `InvalidMcpOAuthClientError` otherwise. Used by the consent POST route before it builds any redirect through `redirect_uri`, so an unvalidated value can never become an open-redirect target. */
 export async function requireRegisteredMcpRedirectUri(clientId: string, redirectUri: string): Promise<void> {
   await ensureFirestoreOrm();

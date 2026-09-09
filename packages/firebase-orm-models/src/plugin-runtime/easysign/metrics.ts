@@ -18,19 +18,31 @@ export const EASYSIGN_DOCUMENTS_DECLINED_NAME = 'easysign_documents_declined';
 export const EASYSIGN_COMPLETION_RATE_NAME = 'easysign_signing_completion_rate';
 export const EASYSIGN_AVG_TURNAROUND_NAME = 'easysign_avg_turnaround_time_sec';
 
+/**
+ * Every aggregation here targets the dbt `events` core table by its REAL
+ * columns (`event_type` = the ingested schema name, `occurred_at` = the
+ * event timestamp) — the EasySign audit (P-05) found the originals pointing
+ * at `event_name`/`ts`, which that table never had, so every one failed at
+ * query time. Payload fields (`signingTier`, `signingDurationSec`) live
+ * inside `events.properties` (JSON) and cannot be a GROUP BY column or an
+ * aggregated column until event schemas get flattened mart views the way
+ * measure/entity schemas do (`warehouse/schema-mart.ts`, `MART_KINDS`) —
+ * so the tier breakdown and the average-turnaround metric are deliberately
+ * not registered rather than registered broken.
+ */
 export const EASYSIGN_AGGREGATION_METRICS: EasySignMetricDefinition[] = [
   {
     name: EASYSIGN_DOCUMENTS_CREATED_NAME,
     featured: true,
-    dimensions: ['signingTier'],
+    dimensions: [],
     definition: {
       kind: 'aggregation',
       aggregation: {
         function: 'count',
         table: 'events',
         column: 'event_id',
-        timeColumn: 'ts',
-        filters: [{ field: 'event_name', operator: '=', value: 'easysign.document_created' }],
+        timeColumn: 'occurred_at',
+        filters: [{ field: 'event_type', operator: '=', value: 'easysign.document_created' }],
       },
     },
   },
@@ -44,23 +56,23 @@ export const EASYSIGN_AGGREGATION_METRICS: EasySignMetricDefinition[] = [
         function: 'count',
         table: 'events',
         column: 'event_id',
-        timeColumn: 'ts',
-        filters: [{ field: 'event_name', operator: '=', value: 'easysign.signing_viewed' }],
+        timeColumn: 'occurred_at',
+        filters: [{ field: 'event_type', operator: '=', value: 'easysign.signing_viewed' }],
       },
     },
   },
   {
     name: EASYSIGN_DOCUMENTS_SIGNED_NAME,
     featured: true,
-    dimensions: ['signingTier'],
+    dimensions: [],
     definition: {
       kind: 'aggregation',
       aggregation: {
         function: 'count',
         table: 'events',
         column: 'event_id',
-        timeColumn: 'ts',
-        filters: [{ field: 'event_name', operator: '=', value: 'easysign.document_signed' }],
+        timeColumn: 'occurred_at',
+        filters: [{ field: 'event_type', operator: '=', value: 'easysign.document_signed' }],
       },
     },
   },
@@ -74,23 +86,8 @@ export const EASYSIGN_AGGREGATION_METRICS: EasySignMetricDefinition[] = [
         function: 'count',
         table: 'events',
         column: 'event_id',
-        timeColumn: 'ts',
-        filters: [{ field: 'event_name', operator: '=', value: 'easysign.document_declined' }],
-      },
-    },
-  },
-  {
-    name: EASYSIGN_AVG_TURNAROUND_NAME,
-    featured: true,
-    dimensions: ['signingTier'],
-    definition: {
-      kind: 'aggregation',
-      aggregation: {
-        function: 'avg',
-        table: 'events',
-        column: 'signingDurationSec',
-        timeColumn: 'ts',
-        filters: [{ field: 'event_name', operator: '=', value: 'easysign.document_signed' }],
+        timeColumn: 'occurred_at',
+        filters: [{ field: 'event_type', operator: '=', value: 'easysign.document_declined' }],
       },
     },
   },

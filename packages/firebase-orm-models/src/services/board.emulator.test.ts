@@ -590,7 +590,7 @@ describe('queryBoardTile', () => {
       organizationId: organization.id,
       projectId: project.id,
       name: 'landing_page_views',
-      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'date', filters: [] } },
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
       dimensions: [],
       createdByUserId: owner.id,
     });

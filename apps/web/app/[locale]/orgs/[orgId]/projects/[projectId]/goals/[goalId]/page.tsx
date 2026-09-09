@@ -8,6 +8,7 @@ import { getGoal, listMetricsCatalogForProject, listOrgPeople, listOrgProjects, 
 import { buildGoalThermometerView } from '@/lib/orgs/goal-view';
 import { GoalThermometer } from '@/components/orgs/goal-thermometer';
 import { DeleteGoalButton } from '@/components/orgs/delete-goal-button';
+import { GoalStatusButton } from '@/components/orgs/goal-status-button';
 import { EditGoalForm } from '@/components/orgs/edit-goal-form';
 
 type PageProps = Readonly<{
@@ -68,7 +69,13 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-bold tracking-tight">{goal.name}</h1>
-        <DeleteGoalButton orgId={orgId} projectId={projectId} goalId={goalId} />
+        <div className="flex items-center gap-2">
+          {(goal.status ?? 'active') === 'paused' ? (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800">{t('pausedBadge')}</span>
+          ) : null}
+          <GoalStatusButton orgId={orgId} projectId={projectId} goalId={goalId} status={goal.status ?? 'active'} />
+          <DeleteGoalButton orgId={orgId} projectId={projectId} goalId={goalId} />
+        </div>
       </div>
 
       <section className="flex flex-col gap-3">

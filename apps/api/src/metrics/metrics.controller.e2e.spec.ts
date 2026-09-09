@@ -199,15 +199,16 @@ describe('MetricsController (e2e)', () => {
       projectId: project.id,
       name: 'ad_spend',
       definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
-      dimensions: [],
+      // Both operands carry `channel`: a formula may only declare dimensions every operand shares.
+      dimensions: ['channel'],
       createdByUserId: owner.id,
     });
     await registerMetricDefinition({
       organizationId: organization.id,
       projectId: project.id,
       name: 'signups',
-      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [] } },
-      dimensions: [],
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fixture_signup_export', timeColumn: 'date', filters: [] } },
+      dimensions: ['channel'],
       createdByUserId: owner.id,
     });
     await registerMetricDefinition({

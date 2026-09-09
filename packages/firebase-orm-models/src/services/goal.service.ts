@@ -11,7 +11,7 @@ import {
   type MetricQueryRequest,
 } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
-import { GoalModel } from '../models/goal.model';
+import { GoalModel, type GoalStatus } from '../models/goal.model';
 import { OrgPersonModel } from '../models/org-person.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
@@ -449,6 +449,43 @@ export async function getGoal(organizationId: string, projectId: string, goalId:
     }
     throw error;
   }
+}
+
+/**
+ * Pauses or resumes a goal (EasySign audit J-05) — see `GoalModel.status`'s
+ * own doc comment. Idempotent: setting the status a goal already has is a
+ * no-op that still returns the goal, so a double-click never errors.
+ */
+export async function setGoalStatus(organizationId: string, projectId: string, goalId: string, status: GoalStatus, actorUserId: string): Promise<GoalModel> {
+  const goal = await loadGoal(organizationId, projectId, goalId);
+  const previous: GoalStatus = goal.status ?? 'active';
+  if (previous === status) {
+    return goal;
+  }
+  goal.status = status;
+  goal.updated_by = actorUserId;
+  goal.updated_at = new Date().toISOString();
+  goal.setPathParams({ organization_id: organizationId, project_id: projectId });
+  await goal.save();
+
+  try {
+    await recordAuditLogEntry({
+      organizationId,
+      projectId,
+      actorType: 'user',
+      actorId: actorUserId,
+      action: status === 'paused' ? 'goal.pause' : 'goal.resume',
+      targetType: 'goal',
+      targetId: goalId,
+      summary: `${status === 'paused' ? 'Paused' : 'Resumed'} goal "${goal.name}"`,
+      before: { status: previous },
+      after: { status },
+    });
+  } catch {
+    // Best-effort — see the comment in createGoal above.
+  }
+
+  return goal;
 }
 
 /** Deletes a goal outright — a goal is disposable config, the same "no audit-trail-of-its-own-survival requirement" posture `deleteBoard` documents for boards. */

@@ -33,6 +33,7 @@ import {
 import { DismissQuarantinedRecordButton } from '@/components/orgs/dismiss-quarantined-record-button';
 import { ReplayQuarantinedRecordButton } from '@/components/orgs/replay-quarantined-record-button';
 import { RetryFailedPipelineMessagesButton } from '@/components/orgs/retry-failed-pipeline-messages-button';
+import { ReexportRawRecordsButton } from '@/components/orgs/reexport-raw-records-button';
 import { SweepQueuedPipelineMessagesButton } from '@/components/orgs/sweep-queued-pipeline-messages-button';
 import { TriggerOrchestrationRunButton } from '@/components/orgs/trigger-orchestration-run-button';
 
@@ -180,9 +181,12 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{t('pipelineFailuresHeading')}</h2>
-          {failedPipelineMessages.length > 0 ? (
-            <RetryFailedPipelineMessagesButton orgId={orgId} projectId={projectId} />
-          ) : null}
+          <div className="flex items-start gap-2">
+            {failedPipelineMessages.length > 0 ? (
+              <RetryFailedPipelineMessagesButton orgId={orgId} projectId={projectId} />
+            ) : null}
+            <ReexportRawRecordsButton orgId={orgId} projectId={projectId} />
+          </div>
         </div>
         {failedPipelineMessages.length === 0 ? (
           <p className="text-muted-foreground">{t('noPipelineFailures')}</p>

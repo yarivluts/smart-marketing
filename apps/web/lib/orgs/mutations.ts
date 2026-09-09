@@ -77,6 +77,15 @@ import {
   type EnsureTouchpointSchemaRegisteredResult,
   ensureTouchpointSchemaRegistered as ensureTouchpointSchemaRegisteredInOrganization,
   evolveMetricDefinition as evolveMetricDefinitionInOrganization,
+  archiveMetricDefinition as archiveMetricDefinitionInOrganization,
+  type ArchiveMetricDefinitionParams,
+  setGoalStatus as setGoalStatusInOrganization,
+  type GoalStatus,
+  archiveProject as archiveProjectInOrganization,
+  unarchiveProject as unarchiveProjectInOrganization,
+  reexportRawRecordsToWarehouse as reexportRawRecordsToWarehouseInOrganization,
+  type ReexportRawRecordsParams,
+  type ReexportRawRecordsResult,
   evolveSchemaDefinition as evolveSchemaDefinitionInOrganization,
   type FieldMappingModel,
   getOrCreateOnboardingState as getOrCreateOnboardingStateInOrganization,
@@ -246,6 +255,8 @@ interface UpdateProjectDetailsInput {
   projectId: string;
   name: string;
   vertical?: string;
+  currency?: string;
+  timezone?: string;
   actorUserId: string;
 }
 
@@ -1867,4 +1878,33 @@ export async function rollbackAutomationAction(
   const targetId = await getAutomationActionTargetIdInOrganization(organizationId, projectId, actionId);
   const executor = await resolveAutomationActionExecutorForTargetInOrganization(organizationId, projectId, targetId, kms);
   return rollbackAutomationActionInOrganization({ organizationId, projectId, actionId, reason: 'manual', actorId, executor });
+}
+
+/** Retires a metric family — see `archiveMetricDefinition`'s own doc comment (EasySign audit J-02). */
+export async function archiveMetricDefinition(input: ArchiveMetricDefinitionParams): Promise<MetricDefModel> {
+  await ensureFirestoreOrm();
+  return archiveMetricDefinitionInOrganization(input);
+}
+
+/** Pauses/resumes a goal — see `setGoalStatus`'s own doc comment (EasySign audit J-05). */
+export async function setGoalStatus(organizationId: string, projectId: string, goalId: string, status: GoalStatus, actorUserId: string): Promise<GoalModel> {
+  await ensureFirestoreOrm();
+  return setGoalStatusInOrganization(organizationId, projectId, goalId, status, actorUserId);
+}
+
+/** Retires a project without deleting anything under it — see `archiveProject`'s own doc comment (EasySign audit J-06). */
+export async function archiveProject(organizationId: string, projectId: string, actorUserId: string): Promise<ProjectModel> {
+  await ensureFirestoreOrm();
+  return archiveProjectInOrganization(organizationId, projectId, actorUserId);
+}
+
+export async function unarchiveProject(organizationId: string, projectId: string, actorUserId: string): Promise<ProjectModel> {
+  await ensureFirestoreOrm();
+  return unarchiveProjectInOrganization(organizationId, projectId, actorUserId);
+}
+
+/** Backfills already-landed raw records into the warehouse's raw table — see `reexportRawRecordsToWarehouse`'s own doc comment (EasySign audit P-01). */
+export async function reexportRawRecordsToWarehouse(input: ReexportRawRecordsParams): Promise<ReexportRawRecordsResult> {
+  await ensureFirestoreOrm();
+  return reexportRawRecordsToWarehouseInOrganization(input);
 }

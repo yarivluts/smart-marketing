@@ -12,6 +12,7 @@ import { MetricDefModel } from '../models/metric-def.model';
 import { getActiveMetricDefinition } from './metric-registry.service';
 import { listSchemaDefinitionsForProject } from './schema-registry.service';
 import { martViewName } from '../warehouse/schema-mart';
+import { BIGQUERY_DISABLED_CORE_TABLES } from '../warehouse/core-table-catalog';
 import { ProjectNotFoundError } from './resource-library.service';
 
 export class MetricNotRegisteredError extends Error {
@@ -56,7 +57,7 @@ export class MetricNotRegisteredError extends Error {
  * existing `WarehouseQueryFailedError` degrade, just one warehouse round
  * trip later.
  */
-export const KNOWN_UNBUILT_WAREHOUSE_TABLES = new Set<string>([]);
+export const KNOWN_UNBUILT_WAREHOUSE_TABLES = new Set<string>(BIGQUERY_DISABLED_CORE_TABLES);
 
 /** One metric (by name) whose aggregation targets a table in {@link KNOWN_UNBUILT_WAREHOUSE_TABLES}. */
 export interface UnbuiltWarehouseTableRef {

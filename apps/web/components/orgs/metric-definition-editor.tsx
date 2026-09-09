@@ -85,7 +85,7 @@ function blankFilterRow(): MetricFilterRow {
 export interface MetricVersionView {
   id: string;
   version: number;
-  status: 'active' | 'superseded';
+  status: 'active' | 'superseded' | 'archived';
   definitionKind: MetricDefinitionKindRow;
   aggregation: { function: MetricAggFunctionRow; table: string; column?: string; timeColumn: string; filters: MetricFilterRow[] } | null;
   formula: string | null;
