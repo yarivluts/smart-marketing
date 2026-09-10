@@ -61,6 +61,27 @@ pnpm typecheck     # tsc --noEmit across all packages
 
 `pnpm build && pnpm test` must be green before every PR.
 
+## Credentials
+
+**Never** look for a token in a `.env`, a dotfile, or this repo — there are none, by design.
+Every GrowthOS credential lives in Google Secret Manager (project `growthos-g2w84`) and is
+fetched at the moment of use:
+
+```bash
+TOKEN="$(scripts/secrets/get-secret.sh jira-api-token)"      # bash
+$token = ./scripts/secrets/get-secret.ps1 jira-api-token     # PowerShell
+```
+
+Never print one, never write one to disk, and never ask a human to paste one into a chat —
+a value that reaches a terminal reaches a transcript, and a transcript is a file that syncs.
+A secret that has been seen in a transcript is burned: say so plainly and rotate it.
+
+[`docs/agent-credentials.md`](./docs/agent-credentials.md) has the catalogue, the
+prerequisites, how to add or rotate one, and how scheduled cloud runs read the same store.
+The same rules bind every agent working here — [`AGENTS.md`](./AGENTS.md) and
+[`GEMINI.md`](./GEMINI.md) point back at this file so Codex/ChatGPT Code and Gemini CLI
+pick them up too.
+
 ## Backlog & Jira
 
 - The backlog lives in the Jira project **KAN** (GrowthOS). Epics KAN-1..KAN-16, stories

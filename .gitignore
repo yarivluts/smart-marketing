@@ -54,3 +54,6 @@ infra/terraform/override.tf
 infra/terraform/override.tf.json
 infra/terraform/*_override.tf
 infra/terraform/*_override.tf.json
+
+# Local validation screenshots — evidence for a run, never part of the repo
+apps/web/*.png
