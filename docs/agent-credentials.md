@@ -52,10 +52,29 @@ Manager, so an agent can read them without an access round trip.
 
 | Name | Value |
 |---|---|
-| `JIRA_SITE` | _not yet recorded — the `https://<site>.atlassian.net` for the KAN project_ |
-| `JIRA_EMAIL` | _not yet recorded — the Atlassian account the API token belongs to_ |
+| `JIRA_SITE` | `https://genius-mind.atlassian.net` |
+| `JIRA_EMAIL` | `yariv.luts@gmail.com` |
 | GCP project | `growthos-g2w84` |
 | Region | `me-west1` |
+
+Both are also set as Windows user environment variables, so a local shell can read them
+from `$JIRA_SITE` / `$JIRA_EMAIL` without opening this file.
+
+## Talking to Jira
+
+The backlog is the **KAN** project (id `10002`) on that site; the same site also hosts
+`ES` (Easy Sign, `10101`), `SC` (Success Center, `10035`) and `SMAR` (SmartBusiness,
+`10068`). Authentication is HTTP Basic with `email:api-token` — there is no OAuth dance:
+
+```bash
+TOKEN="$(scripts/secrets/get-secret.sh jira-api-token)"
+curl -s -u "$JIRA_EMAIL:$TOKEN" -H 'Accept: application/json' \
+  "$JIRA_SITE/rest/api/3/search/jql?jql=project%3DKAN&maxResults=50"
+```
+
+A 401 here almost always means the *site* is wrong rather than the token: an Atlassian
+API token is scoped to one site and returns 401 against every other host, including
+`api.atlassian.com`. Check `$JIRA_SITE` before assuming the credential is bad.
 
 ## Rules that are not negotiable
 

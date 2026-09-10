@@ -72,4 +72,17 @@ describe('per-toolchain instruction files', () => {
     expect(credentialsDoc).not.toMatch(/ATATT[A-Za-z0-9]/);
     expect(credentialsDoc).not.toMatch(/ya29\.[A-Za-z0-9]/);
   });
+
+  /**
+   * The Jira token spent a week looking broken because the site URL was unknown: an
+   * Atlassian API token is scoped to a single site and answers 401 against every other
+   * host, so a missing `JIRA_SITE` is indistinguishable from a bad credential. Recording
+   * the resolved site is what actually unblocked it — a placeholder creeping back in
+   * would silently reintroduce that dead end.
+   */
+  it('records the resolved Jira site and account rather than a placeholder', () => {
+    const credentialsDoc = read('docs/agent-credentials.md');
+    expect(credentialsDoc).toMatch(/https:\/\/[a-z0-9-]+\.atlassian\.net/);
+    expect(credentialsDoc).not.toContain('not yet recorded');
+  });
 });
