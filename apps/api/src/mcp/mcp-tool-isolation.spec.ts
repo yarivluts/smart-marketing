@@ -38,9 +38,28 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   approve_action: { kind: 'per-call-permission', permission: 'automation.approve' },
   create_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
   create_segment: { kind: 'per-call-permission', permission: 'dashboards.write' },
+  // The self-service administration surface (`mcp-admin-tools.ts`): every operation a
+  // GrowthOS engineer used to have to run on a customer's behalf.
+  list_warehouse_tables: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_schemas: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_hook_endpoints: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_metric_versions: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_goals: { kind: 'connection-scope', permission: 'mcp.read' },
+  get_goal_progress: { kind: 'connection-scope', permission: 'mcp.read' },
+  delete_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
+  register_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
+  evolve_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
+  archive_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
+  set_goal_status: { kind: 'per-call-permission', permission: 'dashboards.write' },
+  update_project_settings: { kind: 'per-call-permission', permission: 'project.configure' },
+  archive_project: { kind: 'per-call-permission', permission: 'project.configure' },
+  create_hook_endpoint: { kind: 'per-call-permission', permission: 'ingest.write' },
+  set_hook_signing_secret: { kind: 'per-call-permission', permission: 'ingest.write' },
+  reexport_raw_records: { kind: 'per-call-permission', permission: 'ingest.write' },
+  purge_project_data: { kind: 'per-call-permission', permission: 'ingest.write' },
 };
 
-const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts'];
+const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-admin-tools.ts'];
 
 function readToolFile(name: string): string {
   return readFileSync(path.join(__dirname, name), 'utf8');

@@ -1,6 +1,11 @@
 import { PipelineMessageModel } from '../models/pipeline-message.model';
 import { ProjectModel } from '../models/project.model';
 import { RawRecordModel } from '../models/raw-record.model';
+import { IngestBatchModel } from '../models/ingest-batch.model';
+import { QuarantinedRecordModel } from '../models/quarantined-record.model';
+import { IngestDedupKeyModel } from '../models/ingest-dedup-key.model';
+import { WinEventModel } from '../models/win-event.model';
+import { TrackingAlertModel } from '../models/tracking-alert.model';
 import type { SchemaDefKind } from '../models/schema-def.model';
 import { publishPipelineMessage } from '../pipeline/transport';
 import { defaultWarehouseSink, resolveBigQueryRawRecordSinkFromEnv, type WarehouseSink } from '../pipeline/sink';
@@ -689,4 +694,95 @@ export async function reexportRawRecordsToWarehouse(params: ReexportRawRecordsPa
   }
 
   return result;
+}
+
+/**
+ * Every landed-data model {@link purgeProjectLandedData} clears — each one
+ * represents INGESTED DATA or its bookkeeping, never configuration.
+ * `IngestDedupKeyModel` matters as much as the records themselves: leaving a
+ * purged record's dedup claim behind would make a genuine re-send of that
+ * same event id look like a duplicate and be silently dropped.
+ */
+const PURGEABLE_LANDED_DATA_COLLECTION_NAMES = [
+  'raw_records',
+  'pipeline_messages',
+  'ingest_batches',
+  'quarantined_records',
+  'ingest_dedup_keys',
+  'win_events',
+  'tracking_alerts',
+] as const;
+
+/** The collection names {@link purgeProjectLandedData} clears, for callers that want to describe the operation before running it. */
+export const PURGEABLE_LANDED_DATA_COLLECTIONS: readonly string[] = PURGEABLE_LANDED_DATA_COLLECTION_NAMES;
+
+/** Deletes an already-fetched page of documents and reports how many. Kept separate from the query so each model's own `initPath(...)` call stays concretely typed — a union of model constructors loses `initPath`'s `this` binding. */
+async function deleteAllDocuments(documents: readonly { delete(): Promise<unknown> }[]): Promise<number> {
+  // Sequential rather than one batch: `@arbel/firebase-orm` exposes a per-model
+  // `delete()`, not a batch handle (the same constraint `removeMembershipCascade`
+  // documents), and a purge is a rare admin action where clarity beats throughput.
+  for (const document of documents) {
+    await document.delete();
+  }
+  return documents.length;
+}
+
+export interface PurgeProjectLandedDataParams {
+  organizationId: string;
+  projectId: string;
+  /** Restrict the purge to one environment; omit to clear every environment of the project. */
+  environmentId?: string;
+  performedByUserId: string;
+}
+
+export type PurgeProjectLandedDataResult = Record<string, number>;
+
+/**
+ * Deletes every landed ingest record (and its bookkeeping) for a project,
+ * leaving all configuration — metric definitions, goals, segments, win
+ * rules, schemas, keys, hook endpoints, automation targets, boards —
+ * untouched. This is the "start clean before real data arrives" operation
+ * the EasySign audit's J-04 needed, and which previously had no path at all
+ * short of a human with direct database access.
+ *
+ * Firestore only. The warehouse copy is cleared by deleting the same rows
+ * from the raw export table and letting the next dbt build rewrite the core
+ * models from what remains — a separate, deliberately manual step, since a
+ * deployment with no warehouse configured must still be able to purge its
+ * Firestore side.
+ */
+export async function purgeProjectLandedData(params: PurgeProjectLandedDataParams): Promise<PurgeProjectLandedDataResult> {
+  await requireProjectInOrg(params.organizationId, params.projectId);
+  const pathParams = { organization_id: params.organizationId, project_id: params.projectId };
+  const scopeToEnvironment = <Q extends { where(field: string, operator: '==', value: string): Q }>(query: Q): Q =>
+    params.environmentId === undefined ? query : query.where('environment_id', '==', params.environmentId);
+
+  const deleted: PurgeProjectLandedDataResult = {
+    raw_records: await deleteAllDocuments(await scopeToEnvironment(RawRecordModel.initPath(pathParams).query()).get()),
+    pipeline_messages: await deleteAllDocuments(await scopeToEnvironment(PipelineMessageModel.initPath(pathParams).query()).get()),
+    ingest_batches: await deleteAllDocuments(await scopeToEnvironment(IngestBatchModel.initPath(pathParams).query()).get()),
+    quarantined_records: await deleteAllDocuments(await scopeToEnvironment(QuarantinedRecordModel.initPath(pathParams).query()).get()),
+    ingest_dedup_keys: await deleteAllDocuments(await scopeToEnvironment(IngestDedupKeyModel.initPath(pathParams).query()).get()),
+    win_events: await deleteAllDocuments(await scopeToEnvironment(WinEventModel.initPath(pathParams).query()).get()),
+    tracking_alerts: await deleteAllDocuments(await scopeToEnvironment(TrackingAlertModel.initPath(pathParams).query()).get()),
+  };
+
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      ...(params.environmentId ? { environmentId: params.environmentId } : {}),
+      actorType: 'user',
+      actorId: params.performedByUserId,
+      action: 'project.purge_landed_data',
+      targetType: 'project',
+      targetId: params.projectId,
+      summary: `Purged ${Object.values(deleted).reduce((sum, count) => sum + count, 0)} landed data document(s) ${params.environmentId ? 'in one environment' : 'across every environment'}`,
+      after: deleted,
+    });
+  } catch {
+    // Best-effort — see the comment on `recordAuditLogEntry`.
+  }
+
+  return deleted;
 }

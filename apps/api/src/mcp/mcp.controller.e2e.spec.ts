@@ -88,7 +88,7 @@ async function seedWinEvent(organizationId: string, projectId: string, label: st
 
 async function setupProjectWithKey(
   orgName: string,
-  scopes: ('mcp.read' | 'ingest.write' | 'dashboards.write')[] = ['mcp.read'],
+  scopes: ('mcp.read' | 'ingest.write' | 'dashboards.write' | 'metrics.write' | 'project.configure')[] = ['mcp.read'],
 ) {
   const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
@@ -196,10 +196,27 @@ describe('McpController (e2e)', () => {
           'create_segment',
           'decompose',
           'describe_metric',
+          'archive_metric',
+          'delete_goal',
+          'get_goal_progress',
+          'list_goals',
+          'archive_project',
+          'create_hook_endpoint',
+          'evolve_metric',
+          'list_hook_endpoints',
           'list_insights',
+          'list_metric_versions',
           'list_metrics',
+          'list_schemas',
           'list_segments',
+          'list_warehouse_tables',
           'list_win_rules',
+          'purge_project_data',
+          'reexport_raw_records',
+          'register_metric',
+          'set_goal_status',
+          'set_hook_signing_secret',
+          'update_project_settings',
           'propose_action',
           'query_cohort',
           'query_funnel',
@@ -331,6 +348,107 @@ describe('McpController (e2e)', () => {
         });
         expect(segmentResult.isError).toBe(true);
         expect((segmentResult.content as Array<{ type: string; text: string }>)[0].text).toContain('dashboards.write');
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('the self-service admin tools let a key finish its own project setup: read the warehouse catalog, register a metric, declare currency/timezone, provision a signed webhook', async () => {
+      const { project, rawKey } = await setupProjectWithKey('Admin Tools Self Service Org', ['mcp.read', 'metrics.write', 'project.configure', 'ingest.write']);
+      const client = await connectedClient(rawKey);
+      const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string => (result.content as Array<{ text: string }>)[0].text;
+      try {
+        // The catalog an agent needs before it can write a valid metric at all.
+        const tables = JSON.parse(textOf(await client.callTool({ name: 'list_warehouse_tables', arguments: {} }))) as {
+          tables: Array<{ table: string; built: boolean; columns: Array<{ column: string; type: string }> }>;
+        };
+        const revenue = tables.tables.find((entry) => entry.table === 'fact_revenue_event');
+        expect(revenue?.built).toBe(true);
+        expect(revenue?.columns.map((column) => column.column)).toContain('amount');
+        expect(tables.tables.find((entry) => entry.table === 'fact_funnel_step')?.built).toBe(false);
+
+        // A metric written against that catalog registers; one naming a column the table lacks is refused with the reason.
+        const registered = await client.callTool({
+          name: 'register_metric',
+          arguments: { name: 'collected_revenue', kind: 'aggregation', function: 'sum', table: 'fact_revenue_event', column: 'amount', time_column: 'ts', dimensions: ['plan'] },
+        });
+        expect(registered.isError ?? false).toBe(false);
+        expect(JSON.parse(textOf(registered))).toMatchObject({ name: 'collected_revenue', version: 1, status: 'active' });
+
+        const rejected = await client.callTool({
+          name: 'register_metric',
+          arguments: { name: 'bad_metric', kind: 'aggregation', function: 'sum', table: 'fact_revenue_event', column: 'amount', time_column: 'date' },
+        });
+        expect(rejected.isError).toBe(true);
+        expect(textOf(rejected)).toContain('time column "date" does not exist');
+
+        // Archiving retires the family.
+        expect(JSON.parse(textOf(await client.callTool({ name: 'archive_metric', arguments: { name: 'collected_revenue' } })))).toMatchObject({ status: 'archived' });
+
+        // Project self-description — the audit's J-03, previously impossible for any API key to do.
+        expect(JSON.parse(textOf(await client.callTool({ name: 'update_project_settings', arguments: { currency: 'ils', timezone: 'Asia/Jerusalem' } })))).toMatchObject({
+          currency: 'ILS',
+          timezone: 'Asia/Jerusalem',
+          name: 'Website',
+        });
+        expect((await client.callTool({ name: 'update_project_settings', arguments: { currency: 'shekels' } })).isError).toBe(true);
+
+        // A signed webhook receiver, provisioned end to end.
+        const hook = JSON.parse(textOf(await client.callTool({ name: 'create_hook_endpoint', arguments: { name: 'Product events' } }))) as {
+          id: string;
+          url_path: string;
+          signature_header_name: string;
+        };
+        expect(hook.url_path.startsWith('/v1/hooks/')).toBe(true);
+        expect(hook.signature_header_name).toBe('X-GrowthOS-Signature');
+
+        const listed = JSON.parse(textOf(await client.callTool({ name: 'list_hook_endpoints', arguments: {} }))) as {
+          hook_endpoints: Array<{ id: string; signing_secret_set: boolean; environment_id: string }>;
+        };
+        const created = listed.hook_endpoints.find((endpoint) => endpoint.id === hook.id);
+        expect(created?.signing_secret_set).toBe(false);
+        expect(project.id).toBeTruthy();
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('purge_project_data refuses without a matching confirm_project_id, so it can never be aimed at another project', async () => {
+      const { project, rawKey } = await setupProjectWithKey('Admin Tools Purge Guard Org', ['mcp.read', 'ingest.write']);
+      const client = await connectedClient(rawKey);
+      try {
+        const wrong = await client.callTool({ name: 'purge_project_data', arguments: { confirm_project_id: 'some-other-project' } });
+        expect(wrong.isError).toBe(true);
+        expect((wrong.content as Array<{ text: string }>)[0].text).toContain('nothing was deleted');
+
+        const right = await client.callTool({ name: 'purge_project_data', arguments: { confirm_project_id: project.id } });
+        expect(right.isError ?? false).toBe(false);
+        expect(JSON.parse((right.content as Array<{ text: string }>)[0].text).deleted).toMatchObject({ raw_records: 0 });
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('every admin tool refuses a key that lacks its own scope, naming the scope it needs', async () => {
+      const { rawKey } = await setupProjectWithKey('Admin Tools No Scope Org', ['mcp.read']);
+      const client = await connectedClient(rawKey);
+      try {
+        const cases: Array<[string, Record<string, unknown>, string]> = [
+          ['register_metric', { name: 'x', kind: 'aggregation', function: 'count', table: 'events', time_column: 'occurred_at' }, 'metrics.write'],
+          ['archive_metric', { name: 'x' }, 'metrics.write'],
+          ['set_goal_status', { goal_id: 'x', status: 'paused' }, 'dashboards.write'],
+          ['update_project_settings', { currency: 'USD' }, 'project.configure'],
+          ['archive_project', { archived: true }, 'project.configure'],
+          ['create_hook_endpoint', { name: 'x' }, 'ingest.write'],
+          ['reexport_raw_records', {}, 'ingest.write'],
+          ['purge_project_data', { confirm_project_id: 'x' }, 'ingest.write'],
+        ];
+        for (const [tool, args, permission] of cases) {
+          const result = await client.callTool({ name: tool, arguments: args });
+          // Jest has no per-assertion message argument, so the tool name rides in the compared value.
+          expect({ tool, isError: result.isError }).toEqual({ tool, isError: true });
+          expect(`${tool}: ${(result.content as Array<{ text: string }>)[0].text}`).toContain(permission);
+        }
       } finally {
         await client.close();
       }
