@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-09-10 — J-04 executed, remaining audit items closed, and MCP self-service shipped (#388)
+
+- **J-04 (destructive, explicitly authorized by Yariv):** purged the EasySign project — 15 rows
+  from `growthos_raw.raw_records` (the backfill duplicates included) and 49 Firestore documents
+  across raw_records / pipeline_messages / ingest_batches / quarantined_records / win_events /
+  `ingest_dedup_keys`. That last collection was my own addition to the list: leaving a purged
+  record's dedup claim behind would make a genuine re-send of the same event id look like a
+  duplicate and be dropped in silence. Every configuration document survived. dbt rebuilt clean:
+  stg/lp/cohort/entities all 0 for the project.
+- **Metric semantics.** `trial_starts` → `count(events)` filtered `event_type='trial_started'`
+  (EasySign's own event schema, not Stripe's `fact_subscription_event`). `cost_per_signup` →
+  dimensions `[]`: the requested fix (declare platform/campaign_name on `lp_conversions`) is
+  impossible and the new validation correctly refuses it — `fact_landing_page_performance` has
+  landing_page/campaign_id/channel_id and nothing else. The ad side keys on `campaign_name`, the
+  landing-page side on `campaign_id`; there is no join key, so the empty set is the only legal
+  dimension set. A real per-campaign CAC needs both sides to agree on a key at ingest — a product
+  decision, put to Yariv, not something to paper over in the registry.
+- **Webhook.** Production HMAC endpoint provisioned for the prod environment
+  (`X-GrowthOS-Signature`, hex HMAC-SHA256 of the raw body) and verified against the live
+  receiver: valid signature 202 with `signature_verified: true`, wrong signature 401.
+- **MCP self-service (#388, merged + deployed):** 17 new tools in `mcp-admin-tools.ts` — every
+  operation this audit needed a GrowthOS engineer for. Metric register/evolve/archive + version
+  history, goal list/progress/pause/delete, project self-description + archive, webhook
+  provisioning + signing secret, raw-record backfill, and a confirmation-guarded landed-data
+  purge (new `purgeProjectLandedData` service). Plus the two read tools an agent needs *before*
+  it can write a valid metric: `list_warehouse_tables` (the real dbt column catalog, with
+  declared-but-unbuilt models shown honestly) and `list_schemas`.
+  - **P-08's real fix:** not granting keys `project.manage` (a leaked token must never reshape
+    access) but splitting out `project.configure` — a project describing itself. Verified on
+    deployed prod with a minted-then-revoked key: 32 tools, 23 warehouse tables (22 built,
+    `fact_funnel_step` honestly false), a bad-column `register_metric` refused with the reason,
+    and `purge_project_data` refusing a `confirm_project_id` that is not the caller's own project.
+- **Deliberately not done:** did NOT import session B's uncommitted `mcp-setup-tools.ts` — 800
+  lines of in-flight work, and importing it would have produced a conflict plus two divergent
+  implementations of `update_project`/`archive_project`. Relayed exactly what overlaps and which
+  scope to use instead of `project.manage`.
+- **Next step:** the CAC join-key decision (Yariv); session B's setup-tools PR (P-09/P-10, J-07);
+  J-03's rolling-window dau/wau/mau, which needs window semantics the compiler does not have.
+
+
 ## 2026-09-09 - EasySign external audit: platform defects P-01..P-10 + project fixes J-01..J-08
 
 Yariv handed over an end-to-end audit of the EasySign Growth project (MCP + metric registry, 0/4
