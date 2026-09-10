@@ -8,7 +8,10 @@ import { type Permission } from './permissions';
  * `project.manage`/`members.manage`/`billing.manage`/`resources.manage`/
  * `sources.manage` (org/project administration — a leaked long-lived key
  * should never be able to reshape who has access or which connectors/
- * sources exist), `keys.manage` (a key must not be able to mint or revoke
+ * sources exist; note `project.configure`, which covers only a project's own
+ * declared name/vertical/currency/timezone and archiving it, IS grantable —
+ * see that permission's own note in `permissions.ts` for why the two are
+ * separate), `keys.manage` (a key must not be able to mint or revoke
  * other keys), `automation.approve`/`automation.execute` (plan 06 §3:
  * "automation execution rights are a separate, elevated scope" — money-
  * moving actions need a human role, not a bearer token), `pii.read`
@@ -38,6 +41,7 @@ import { type Permission } from './permissions';
  */
 export const API_KEY_SCOPES = [
   'ingest.write',
+  'project.configure',
   'schema.write',
   'metrics.write',
   'dashboards.write',
