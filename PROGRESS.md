@@ -17,6 +17,48 @@ Template for each entry:
 
 ---
 
+## 2026-09-16 - Hourly quality pass #2: board tiles
+
+- **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/boards/[boardId]` - the tile renderer.
+- **Finding:** `isEmpty` was derived from the query's raw row count (`outcome.series.length === 0`)
+  while every chart kind renders from a *subset* of those rows. `buildTimeSeriesView` splits by
+  `period` and charts only the current one, so a tile whose rows were all `period: 'previous'`
+  produced `series: []` yet was not flagged empty - the chart components skipped their empty
+  branch and drew an `<svg>` with no polylines. A blank box, on a tile that had queried fine.
+  This is the unexplained-empty-tile report from the session-B relay (2026-08-20): the
+  Landing-page board's big-number and breakdown tiles were blank while its table tile, fed the
+  same rows, rendered them correctly.
+- **Second defect in the same place:** a big number with no current-period rows summed to `0`
+  and rendered as a metric that genuinely measured zero.
+- **Fixed:** emptiness now comes from the shaped content. Big numbers and funnels keep using the
+  current-period row count, since their shape is configuration-driven - a funnel always emits one
+  step per configured metric. PR #396, KAN-105. Also fixes the TV war room, which renders through
+  the same `BoardTileView`.
+- **Merged this pass:** #393 (KAN-90, KAN-91), #394 (KAN-103), #395 (KAN-104) - all Done.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit (`/campaigns`) | #392 | metrics derived from budget; now null when unmeasured |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge; now nullable |
+| Creative preview gallery | #392 | synthesized ad creatives; removed |
+| Automation hub (`/automation`) | #392 | invented proposals + fake org ids; route now redirects |
+| Copilot chat + engine | #393 | failure reported as success; engine ignored its context |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing; blank tiles |
+
+**Not yet reviewed:** goals, funnel, ingest-health, keys, settings, metric-defs, schema-defs,
+segments, customers, hooks, experiments, cohorts, plugins, resources, record-feed, win-rules,
+cost-guardrails, churn-reasons, field-mappings, demos, feedback, firmographics, intent-quality,
+insights, session-replay, support, rep-collections, billing-ops-feed, campaign-ops.
+
+- **Blocked:** nothing on this item.
+- **Next step:** next hourly pass takes the next unreviewed page.
+- **Waiting on human:** the primary checkout still holds ~164 uncommitted session-B files and
+  cannot be pulled; the CAC join-key decision; KAN-43; the tracking snippet on the real EasySign
+  site; revoking the old Jira token in Atlassian.
+
 ## 2026-09-15 - Hourly quality pass #1: onboarding wizard
 
 - **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/onboarding` (the source-connection step).
