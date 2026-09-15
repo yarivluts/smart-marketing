@@ -67,9 +67,26 @@ export function ExecutiveBlendedReport({
 
   const { metrics, channels, rebalancingRecommendation } = reportData;
 
-  const isSpendPositive = metrics.periodComparison.spendChangePct >= 0;
-  const isCacReduced = metrics.periodComparison.cacChangePct <= 0; // Negative CAC change is positive cost reduction
-  const isRoasPositive = metrics.periodComparison.roasChangePct >= 0;
+  /*
+    Every figure below is nullable, and null means GrowthOS has not measured it. These
+    helpers are the only way a value reaches the screen, so a missing measurement renders as
+    "No data" rather than as a confident number. The previous version could not express
+    absence at all: the builder manufactured spend from the daily budget, revenue from a
+    fixed ROAS multiplier, and churn/dunning/velocity from constants, and this component
+    printed them under a green "Live Blended Pipeline" badge.
+  */
+  const noData = t('noData', { defaultMessage: 'No data' });
+  const usd = (v: number | null): string => (v === null ? noData : `$${v.toLocaleString()}`);
+  const usd2 = (v: number | null): string => (v === null ? noData : `$${v.toFixed(2)}`);
+  const times = (v: number | null, digits = 1): string => (v === null ? noData : `${v.toFixed(digits)}x`);
+  const pct = (v: number | null): string => (v === null ? noData : `${v}%`);
+  const plain = (v: number | null): string => (v === null ? noData : String(v));
+
+  // Absent until a prior-period baseline exists; the chips are withheld rather than defaulted.
+  const comparison = metrics.periodComparison;
+  const isSpendPositive = (comparison?.spendChangePct ?? 0) >= 0;
+  const isCacReduced = (comparison?.cacChangePct ?? 0) <= 0; // A CAC decrease is an improvement
+  const isRoasPositive = (comparison?.roasChangePct ?? 0) >= 0;
 
   return (
     <div
@@ -155,29 +172,31 @@ export function ExecutiveBlendedReport({
               dir="ltr"
               data-testid="total-spend-val"
             >
-              {`$${metrics.totalSpendUsd.toLocaleString()}`}
+              {usd(metrics.totalSpendUsd)}
             </div>
             <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
               <span data-testid="meta-spend-breakdown">
                 {'Meta: '}
-                <span dir="ltr">{`$${metrics.metaSpendUsd.toLocaleString()}`}</span>
+                <span dir="ltr">{usd(metrics.metaSpendUsd)}</span>
               </span>
               <span data-testid="google-spend-breakdown">
                 {'Google: '}
-                <span dir="ltr">{`$${metrics.googleSpendUsd.toLocaleString()}`}</span>
+                <span dir="ltr">{usd(metrics.googleSpendUsd)}</span>
               </span>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            {isSpendPositive ? (
-              <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
-            ) : (
-              <TrendingDown className="h-3.5 w-3.5 text-rose-500" aria-hidden="true" />
-            )}
-            <span>
-              {`${isSpendPositive ? '+' : ''}${metrics.periodComparison.spendChangePct}% ${t('vsPrevPeriod', { defaultMessage: 'vs prev period' })}`}
-            </span>
-          </div>
+          {comparison ? (
+            <div className="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              {isSpendPositive ? (
+                <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : (
+                <TrendingDown className="h-3.5 w-3.5 text-rose-500" aria-hidden="true" />
+              )}
+              <span>
+                {`${isSpendPositive ? '+' : ''}${comparison.spendChangePct}% ${t('vsPrevPeriod', { defaultMessage: 'vs prev period' })}`}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         {/* Card 2: Blended CAC */}
@@ -197,22 +216,24 @@ export function ExecutiveBlendedReport({
               dir="ltr"
               data-testid="blended-cac-val"
             >
-              {`$${metrics.blendedCacUsd.toFixed(2)}`}
+              {usd2(metrics.blendedCacUsd)}
             </div>
             <div className="mt-2 text-xs text-muted-foreground font-medium">
-              {`${metrics.totalConversions} ${t('totalConversionsLabel', { defaultMessage: 'Total Conversions' })}`}
+              {`${plain(metrics.totalConversions)} ${t('totalConversionsLabel', { defaultMessage: 'Total Conversions' })}`}
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            {isCacReduced ? (
-              <TrendingDown className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-            ) : (
-              <TrendingUp className="h-3.5 w-3.5 text-rose-500" aria-hidden="true" />
-            )}
-            <span>
-              {`${metrics.periodComparison.cacChangePct}% ${t('vsPrevPeriod', { defaultMessage: 'vs prev period' })}`}
-            </span>
-          </div>
+          {comparison ? (
+            <div className="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              {isCacReduced ? (
+                <TrendingDown className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+              ) : (
+                <TrendingUp className="h-3.5 w-3.5 text-rose-500" aria-hidden="true" />
+              )}
+              <span>
+                {`${comparison.cacChangePct}% ${t('vsPrevPeriod', { defaultMessage: 'vs prev period' })}`}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         {/* Card 3: Blended ROAS */}
@@ -232,25 +253,27 @@ export function ExecutiveBlendedReport({
               dir="ltr"
               data-testid="blended-roas-val"
             >
-              {`${metrics.blendedRoas.toFixed(1)}x`}
+              {times(metrics.blendedRoas)}
             </div>
             <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" aria-hidden="true" />
               <span>
-                {`${t('conversionVelocityLabel', { defaultMessage: 'Conversion Velocity' })}: ${metrics.conversionVelocityDays} ${t('daysUnit', { defaultMessage: 'days' })}`}
+                {`${t('conversionVelocityLabel', { defaultMessage: 'Conversion Velocity' })}: ${plain(metrics.conversionVelocityDays)} ${t('daysUnit', { defaultMessage: 'days' })}`}
               </span>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-            {isRoasPositive ? (
-              <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
-            ) : (
-              <TrendingDown className="h-3.5 w-3.5 text-rose-500" aria-hidden="true" />
-            )}
-            <span>
-              {`${isRoasPositive ? '+' : ''}${metrics.periodComparison.roasChangePct}% ${t('vsPrevPeriod', { defaultMessage: 'vs prev period' })}`}
-            </span>
-          </div>
+          {comparison ? (
+            <div className="mt-3 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              {isRoasPositive ? (
+                <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
+              ) : (
+                <TrendingDown className="h-3.5 w-3.5 text-rose-500" aria-hidden="true" />
+              )}
+              <span>
+                {`${isRoasPositive ? '+' : ''}${comparison.roasChangePct}% ${t('vsPrevPeriod', { defaultMessage: 'vs prev period' })}`}
+              </span>
+            </div>
+          ) : null}
         </div>
 
         {/* Card 4: Revenue & Dunning Health */}
@@ -270,14 +293,14 @@ export function ExecutiveBlendedReport({
               dir="ltr"
               data-testid="dunning-rate-val"
             >
-              {`${metrics.dunningRecoveryRatePct}%`}
+              {pct(metrics.dunningRecoveryRatePct)}
             </div>
             <div className="mt-2 text-xs text-muted-foreground font-medium">
               {t('dunningRecoveryLabel', { defaultMessage: 'Dunning Recovery Rate' })}
             </div>
           </div>
           <div className="mt-3 text-xs text-muted-foreground">
-            {`${t('churnRateLabel', { defaultMessage: 'Churn Rate' })}: ${metrics.churnRatePct}%`}
+            {`${t('churnRateLabel', { defaultMessage: 'Churn Rate' })}: ${pct(metrics.churnRatePct)}`}
           </div>
         </div>
       </div>
@@ -358,13 +381,13 @@ export function ExecutiveBlendedReport({
                 <div>
                   <span className="text-[10px] text-muted-foreground">{t('metricRoas', { defaultMessage: 'ROAS' })}</span>
                   <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">
-                    {`${channel.roas}x`}
+                    {channel.roas === null ? noData : `${channel.roas}x`}
                   </div>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-foreground">{t('metricCac', { defaultMessage: 'CAC' })}</span>
                   <div className="text-xs font-bold text-foreground" dir="ltr">
-                    {`$${channel.cacUsd.toFixed(2)}`}
+                    {usd2(channel.cacUsd)}
                   </div>
                 </div>
               </div>

@@ -639,15 +639,19 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(emptyHe).toHaveLength(0);
     });
 
-    it('5.4.2 Zero-division resilience: cac and roas calculations return 0 and never throw NaN / Infinity on zero values', () => {
-      // CAC
-      expect(calculateBlendedCac(0, 0)).toBe(0);
-      expect(calculateBlendedCac(5000, 0)).toBe(0);
+    it('5.4.2 Zero-division resilience: cac and roas return null on an undefined ratio and never NaN / Infinity', () => {
+      /*
+        These used to expect 0. A CAC of 0 reads as "we acquire customers for free" and a
+        ROAS of 0 as "this spend returned nothing", but both cases here mean the ratio has
+        no denominator - which is a different statement, and the one the UI must render as
+        "No data". A real measured 0 still comes back as 0 (last assertion of each pair).
+      */
+      expect(calculateBlendedCac(0, 0)).toBeNull();
+      expect(calculateBlendedCac(5000, 0)).toBeNull();
       expect(calculateBlendedCac(0, 50)).toBe(0);
 
-      // ROAS
-      expect(calculateBlendedRoas(0, 0)).toBe(0);
-      expect(calculateBlendedRoas(5000, 0)).toBe(0);
+      expect(calculateBlendedRoas(0, 0)).toBeNull();
+      expect(calculateBlendedRoas(5000, 0)).toBeNull();
       expect(calculateBlendedRoas(0, 500)).toBe(0);
 
       // Full Synthesizer with zero data
@@ -669,21 +673,21 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(Number.isFinite(zeroMetrics.blendedRoas)).toBe(true);
     });
 
-    it('5.4.3 Period-over-period time-window scaling: scales 7d (7/30), 30d (1.0), and 90d (3.0) metrics with 100% channel sum parity', () => {
-      // 30d baseline
+    it('5.4.3 Time-window switching reports no data for an unmeasured project and still renders the controls', () => {
+      /*
+        This assertion used to be that 7d spend was LESS than 30d spend and 90d GREATER —
+        for a project with no targets and no warehouse rows. Nothing was being scaled: the
+        builder invented a baseline of $8,500 Meta / $5,750 Google and multiplied it by
+        7/30, 1.0 or 3.0, so the test confirmed the arithmetic of a fabrication. With no
+        measurements there is nothing to scale and nothing to compare.
+      */
       const report30d = buildExecutiveReportData({ timeWindow: '30d', seed: 'test-scaling' });
-      // 7d scaled
       const report7d = buildExecutiveReportData({ timeWindow: '7d', seed: 'test-scaling' });
-      // 90d scaled
       const report90d = buildExecutiveReportData({ timeWindow: '90d', seed: 'test-scaling' });
 
-      expect(report7d.metrics.totalSpendUsd).toBeLessThan(report30d.metrics.totalSpendUsd);
-      expect(report90d.metrics.totalSpendUsd).toBeGreaterThan(report30d.metrics.totalSpendUsd);
-
-      // Channel allocation percentage sums to 100% across all windows
       for (const report of [report7d, report30d, report90d]) {
-        const totalPct = report.channels.reduce((sum, c) => sum + c.percentage, 0);
-        expect(totalPct).toBe(100);
+        expect(report.metrics.totalSpendUsd).toBeNull();
+        expect(report.channels).toHaveLength(0);
       }
 
       // Render ExecutiveBlendedReport and test time-window filter buttons

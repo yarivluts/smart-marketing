@@ -232,8 +232,8 @@ describe('Tier 4: End-to-End Real-World Application Scenarios (R1-R4)', () => {
       return (
         <div data-testid="exec-review">
           <h2>Executive Growth Review</h2>
-          <div data-testid="kpi-spend">Total Spend: ${metrics.totalSpendUsd.toLocaleString()}</div>
-          <div data-testid="kpi-cac">Blended CAC: ${metrics.blendedCacUsd.toFixed(2)}</div>
+          <div data-testid="kpi-spend">Total Spend: ${(metrics.totalSpendUsd ?? 0).toLocaleString()}</div>
+          <div data-testid="kpi-cac">Blended CAC: ${(metrics.blendedCacUsd ?? 0).toFixed(2)}</div>
           <div data-testid="kpi-roas">Blended ROAS: {metrics.blendedRoas}x</div>
           <div data-testid="kpi-retention">Dunning Recovery: {metrics.dunningRecoveryRatePct}%</div>
 

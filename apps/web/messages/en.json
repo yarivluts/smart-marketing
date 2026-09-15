@@ -2124,6 +2124,7 @@
     "shortcutClose": "Close"
   },
   "ExecutiveReport": {
+    "noData": "No data",
     "metaTitle": "Executive Report",
     "title": "Executive Growth & Performance Overview",
     "subtitle": "Zero-configuration blended analytics across Meta & Google Ads",

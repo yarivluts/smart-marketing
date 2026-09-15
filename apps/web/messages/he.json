@@ -2124,6 +2124,7 @@
     "shortcutClose": "סגירה"
   },
   "ExecutiveReport": {
+    "noData": "אין נתונים",
     "metaTitle": "דוח מנהלים",
     "title": "סקירת צמיחה וביצועים למנהלים",
     "subtitle": "ניתוח משולב ללא הגדרה עבור Meta Ads ו-Google Ads",
