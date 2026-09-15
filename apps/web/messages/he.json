@@ -171,6 +171,12 @@
     "genericError": "משהו השתבש. נסה שוב."
   },
   "Onboarding": {
+    "sourceStepDataStatusHeading": "נתונים שהתקבלו",
+    "sourceStepNoEventsYet": "עדיין לא הגיעו אירועים לפרויקט הזה. מפתח לבדו אינו מעביר נתונים — האפליקציה שלכם עדיין צריכה לשלוח אירועים לנקודת הקצה שלמעלה.",
+    "sourceStepEventsReceived": "התקבלו {count} אירועים. הקליטה עובדת.",
+    "sourceStepQuarantined": "{count} רשומות נדחו והועברו לבידוד.",
+    "sourceStepIngestHealthLink": "בדקו מדוע במסך תקינות הקליטה",
+    "sourceContinueWithoutDataButton": "המשך ללא נתונים",
     "metaTitle": "צעדים ראשונים",
     "title": "הגדרת {projectName}",
     "genericError": "משהו השתבש. נסה שוב.",

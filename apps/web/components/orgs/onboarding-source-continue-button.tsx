@@ -11,10 +11,26 @@ export interface OnboardingSourceContinueButtonProps {
   projectId: string;
   method: OnboardingSourceConnectionMethod;
   pluginId?: string;
+  /** Whether any event has actually been accepted for this project — see below. */
+  hasReceivedData?: boolean;
 }
 
-/** Advances the wizard's "connect a first source" step, once a real connection has been detected server-side (a source plugin install, or an `ingest.write` key) — see the onboarding page's own doc comment for how `method`/`pluginId` are derived. */
-export function OnboardingSourceContinueButton({ orgId, projectId, method, pluginId }: OnboardingSourceContinueButtonProps): React.ReactElement {
+/**
+ * Advances the wizard's "connect a first source" step.
+ *
+ * The step is reachable once a source plugin is installed or an `ingest.write` key exists,
+ * but neither of those means data is flowing: minting a key moves nothing on its own. So the
+ * label distinguishes the two — continuing with no events received is a legitimate choice
+ * (you may be wiring the snippet up later), it just should not read as though the connection
+ * is finished. See the onboarding page for how `method`/`pluginId` are derived.
+ */
+export function OnboardingSourceContinueButton({
+  orgId,
+  projectId,
+  method,
+  pluginId,
+  hasReceivedData = false,
+}: OnboardingSourceContinueButtonProps): React.ReactElement {
   const t = useTranslations('Onboarding');
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -47,7 +63,7 @@ export function OnboardingSourceContinueButton({ orgId, projectId, method, plugi
         </p>
       ) : null}
       <Button type="button" onClick={handleClick} disabled={submitting}>
-        {t('sourceContinueButton')}
+        {hasReceivedData ? t('sourceContinueButton') : t('sourceContinueWithoutDataButton')}
       </Button>
     </div>
   );
