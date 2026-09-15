@@ -300,11 +300,44 @@ function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]) {
  * genuine zero) is derived here once for every kind, rather than each
  * type-specific renderer re-deriving it from its own already-shaped data.
  */
+/** Distributive, so omitting the two wrapper fields keeps the union's members (and its `kind` discriminant) intact instead of collapsing them to their common keys. */
+type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never;
+
+type TileContent = DistributiveOmit<
+  Extract<TileRenderView, { kind: Exclude<TileRenderView['kind'], 'unavailable'> }>,
+  'isEmpty' | 'freshness'
+>;
+
+/**
+ * Whether a shaped tile holds anything to draw — see `buildTileRenderView` for why this is
+ * derived from the content rather than the query's row count.
+ *
+ * `big_number` and `funnel` are the exceptions and take `currentRowCount` instead: their
+ * shape comes from the tile's own configuration, not from the data. A funnel always emits one
+ * step per configured metric and a big number always emits a value, so both look non-empty
+ * even when nothing was returned. For those two, "did the current period return any rows"
+ * is the only question that distinguishes an unmeasured tile from a genuine zero.
+ */
+function contentIsEmpty(content: TileContent, currentRowCount: number): boolean {
+  switch (content.kind) {
+    case 'big_number':
+    case 'funnel':
+      return currentRowCount === 0;
+    case 'time_series':
+      return content.series.length === 0 || content.series.every((series) => series.points.length === 0);
+    case 'table':
+      return content.rows.length === 0;
+    case 'heatmap':
+      return content.rowLabels.length === 0 || content.columnLabels.length === 0;
+    case 'histogram':
+      return content.labels.length === 0;
+  }
+}
+
 export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutcome, freshness: TileFreshness | null = null): TileRenderView {
   if (!outcome.ok) {
     return { kind: 'unavailable', reason: outcome.reason, message: outcome.message };
   }
-  const isEmpty = outcome.series.length === 0;
   const content = (() => {
     switch (tile.type) {
       case 'big_number':
@@ -324,5 +357,25 @@ export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutc
         return buildTableView(outcome.series);
     }
   })();
+
+  /*
+    Emptiness is decided by what the tile can actually draw, not by the raw row count.
+
+    It used to be `outcome.series.length === 0`. But every chart kind renders from a *subset*
+    of those rows: `buildTimeSeriesView` splits by `period` and charts only the current one,
+    so a tile whose rows were all `period: 'previous'` produced `series: []` while the row
+    count said "not empty". `LineChartView` and `BarChartView` then skipped their empty branch
+    and rendered an `<svg>` with no polylines, or a flex container with no bars — a blank box
+    with no explanation, on a tile whose query had succeeded.
+
+    That is the reported symptom exactly: on the Landing-page board the big-number and
+    breakdown tiles came up blank while the table tile, which renders every row regardless of
+    period, showed the same underlying data correctly.
+
+    Big numbers and funnels are judged on the current period's row count instead, because
+    their shape is configuration-driven rather than data-driven — see `contentIsEmpty`.
+  */
+  const isEmpty = contentIsEmpty(content, splitByPeriod(outcome.series).current.length);
+
   return { ...content, isEmpty, freshness };
 }
