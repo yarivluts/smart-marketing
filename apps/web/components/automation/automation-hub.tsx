@@ -9,7 +9,6 @@ import {
   History,
   Bot,
   CheckCircle2,
-  TrendingUp,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -51,47 +50,18 @@ export function AutomationHub({
 
   const [activeTab, setActiveTab] = React.useState('copilot');
   const [localActions, setLocalActions] = React.useState<AuditActionItem[]>(actions);
-  const [localProposals, setLocalProposals] = React.useState<ActionProposalData[]>(
-    proposals.length > 0
-      ? proposals
-      : [
-          {
-            id: 'rec-1',
-            targetId: 'tgt-meta-scale',
-            targetLabel: 'Meta Retargeting Leads',
-            actionType: 'budget_change',
-            platform: 'meta_ads',
-            impactBadge: 'high',
-            beforeValue: '$150/day',
-            afterValue: '$250/day',
-            diffEntries: [{ key: 'Daily Budget', before: '$150/day', after: '$250/day' }],
-            estimatedImpact: '+32% projected conversions (ROAS 4.2x)',
-            status: 'awaiting_approval',
-          },
-          {
-            id: 'rec-2',
-            targetId: 'tgt-google-rebal',
-            targetLabel: 'Google Brand Search',
-            actionType: 'bid_strategy_change',
-            platform: 'google_ads',
-            impactBadge: 'medium',
-            beforeValue: 'Manual CPC',
-            afterValue: 'Target ROAS (450%)',
-            diffEntries: [{ key: 'Bid Strategy', before: 'Manual CPC', after: 'Target ROAS (450%)' }],
-            estimatedImpact: '+18% conversion value efficiency',
-            status: 'awaiting_approval',
-          },
-        ],
-  );
+  const [localProposals, setLocalProposals] = React.useState<ActionProposalData[]>(proposals);
 
   React.useEffect(() => {
     setLocalActions(actions);
   }, [actions]);
 
+  // Mirrors `proposals` unconditionally. An earlier version seeded this state with two
+  // invented proposals and only re-synced when the incoming array was non-empty, so a
+  // project with nothing pending rendered fabricated budget changes carrying real-looking
+  // figures — with a working Approve button next to them.
   React.useEffect(() => {
-    if (proposals.length > 0) {
-      setLocalProposals(proposals);
-    }
+    setLocalProposals(proposals);
   }, [proposals]);
 
   async function handleApproveProposal(proposal: ActionProposalData) {
@@ -172,31 +142,24 @@ export function AutomationHub({
         </div>
       </div>
 
-      {/* KPI Metric Summary Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/*
+        KPI Metric Summary Row. Both values are counted from the actions and proposals this
+        component was actually given. There is deliberately no third "AI-Optimized Spend"
+        card and no change-vs-last-week badge: the component receives no spend figure and no
+        prior-period baseline, and the previous versions of both were invented constants
+        ($14,850, +12.5%, +24.2%) that moved for no one and were indistinguishable from a
+        real reading. A number shown here has to come from the data.
+      */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
           title={locale === 'he' ? 'פעולות שבוצעו' : 'Actions Executed'}
           value={executedCount}
-          change={12.5}
-          changeType="increase"
-          period="vs last week"
           icon={CheckCircle2}
         />
         <StatCard
           title={locale === 'he' ? 'הצעות ממתינות' : 'Pending Proposals'}
           value={pendingCount}
-          change={0}
-          changeType="neutral"
-          period="ready for approval"
           icon={Sparkles}
-        />
-        <StatCard
-          title={locale === 'he' ? 'תקציב מנוהל ב-AI' : 'AI-Optimized Spend'}
-          value="$14,850"
-          change={24.2}
-          changeType="increase"
-          period="monthly active"
-          icon={TrendingUp}
         />
       </div>
 

@@ -1,6 +1,5 @@
-import { Suspense } from 'react';
+import { redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { AutomationHub } from '@/components/automation/automation-hub';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string }>;
@@ -12,19 +11,20 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') || 'Automation Hub' };
 }
 
-export default async function TopLevelAutomationPage({ params }: PageProps): Promise<React.ReactElement> {
+/**
+ * Automation is meaningless without a project: every proposal, guardrail and audit entry
+ * is scoped to one. This route used to render the hub directly with the literal ids
+ * `default-org` / `default-project`, which match no organization and no project — so the
+ * page showed invented proposals, an invented spend figure, and an Approve button that
+ * only mutated local state. Nothing a user did here could reach a real campaign.
+ *
+ * The real surface is `/orgs/{orgId}/projects/{projectId}/automation`. This route now
+ * sends the visitor to the dashboard to choose one, which is also where the command
+ * palette's context-free "Automation" entry lands.
+ */
+export default async function TopLevelAutomationPage({ params }: PageProps): Promise<never> {
   const { locale } = await params;
   setRequestLocale(locale);
 
-  return (
-    <main className="container mx-auto max-w-6xl py-8 px-4 sm:px-6">
-      <Suspense>
-        <AutomationHub
-          orgId="default-org"
-          projectId="default-project"
-          projectName="GrowthOS Cockpit"
-        />
-      </Suspense>
-    </main>
-  );
+  redirect(`/${locale}/dashboard`);
 }
