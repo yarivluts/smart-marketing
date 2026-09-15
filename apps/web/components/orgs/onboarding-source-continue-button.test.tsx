@@ -20,7 +20,7 @@ describe('OnboardingSourceContinueButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ state: { step: 'funnel' } }) } as Response);
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
-        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="push_your_own" />
+        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="push_your_own" hasReceivedData />
       </NextIntlClientProvider>,
     );
 
@@ -38,7 +38,7 @@ describe('OnboardingSourceContinueButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ state: { step: 'funnel' } }) } as Response);
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
-        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="plugin" pluginId="com.growthos.stripe" />
+        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="plugin" pluginId="com.growthos.stripe" hasReceivedData />
       </NextIntlClientProvider>,
     );
 
@@ -57,7 +57,7 @@ describe('OnboardingSourceContinueButton', () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
     render(
       <NextIntlClientProvider locale="en" messages={messages}>
-        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="push_your_own" />
+        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="push_your_own" hasReceivedData />
       </NextIntlClientProvider>,
     );
 
@@ -65,5 +65,34 @@ describe('OnboardingSourceContinueButton', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
+  });
+  /**
+   * The step is reachable as soon as an ingest.write key exists, but minting a key moves no
+   * data. A project could finish the wizard and land on an empty starter board with nothing
+   * having said that nothing was ever received. Continuing anyway is legitimate - the snippet
+   * may go up later - so this is a label, not a block.
+   */
+  it('labels the button differently when no event has been received', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="push_your_own" />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Continue without data' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Continue' })).not.toBeInTheDocument();
+  });
+
+  it('still advances the wizard when continuing without data', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => ({ state: { step: 'funnel' } }) } as Response);
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <OnboardingSourceContinueButton orgId="org-1" projectId="project-1" method="push_your_own" />
+      </NextIntlClientProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue without data' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
   });
 });

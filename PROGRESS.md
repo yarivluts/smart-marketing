@@ -17,6 +17,46 @@ Template for each entry:
 
 ---
 
+## 2026-09-15 - Hourly quality pass #1: onboarding wizard
+
+- **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/onboarding` (the source-connection step).
+- **Finding:** the step equated "an `ingest.write` key exists" with "a source is connected" -
+  `OnboardingSourceContinueButton`'s own doc comment said so. Minting a key moves no data; the
+  customer's app still has to post events. A project could therefore finish the whole wizard,
+  land on the starter board and find it empty, with nothing having said that nothing was ever
+  received. This is the same gap the EasySign audit hit from the other end ("no real data has
+  ever flowed in") weeks after onboarding was considered complete.
+- **Fixed:** the step now reads recent ingest batches and reports accepted / quarantined counts,
+  links quarantine to Ingest Health, and labels the continue button "Continue without data"
+  when nothing has arrived. Labelled rather than blocked - continuing is legitimate, it just
+  must not read as a finished connection. PR #395, KAN-104.
+- **Also this session:** #392 merged (fabricated data across ads cockpit, executive report,
+  creative gallery, automation hub - KAN-86..89 Done). #393 open (copilot honesty, KAN-90/91).
+  #394 open (emulator gRPC flake, KAN-103).
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit (`/campaigns`) | #392 | metrics were derived from budget; now null when unmeasured |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge; now nullable |
+| Creative preview gallery | #392 | synthesized ad creatives; removed |
+| Automation hub (`/automation`) | #392 | invented proposals + fake org ids; route now redirects |
+| Copilot chat + engine | #393 | failure reported as success; engine ignored its context |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+
+**Not yet reviewed:** boards, goals, funnel, ingest-health, keys, settings, metric-defs,
+schema-defs, segments, customers, hooks, experiments, cohorts, plugins, resources, tv,
+record-feed, win-rules, cost-guardrails, churn-reasons, field-mappings, demos, feedback,
+firmographics, intent-quality, insights, session-replay, support, rep-collections,
+billing-ops-feed, campaign-ops.
+
+- **Blocked:** nothing on this item.
+- **Next step:** next hourly pass picks the next unreviewed page from the list above.
+- **Waiting on human:** the primary checkout `c:\www\smart-marketing` still holds ~164
+  uncommitted session-B files and cannot be pulled; the CAC join-key decision; KAN-43; the
+  tracking snippet on the real EasySign site; revoking the old Jira token in Atlassian.
+
 ## 2026-09-10 — J-04 executed, remaining audit items closed, and MCP self-service shipped (#388)
 
 - **J-04 (destructive, explicitly authorized by Yariv):** purged the EasySign project — 15 rows

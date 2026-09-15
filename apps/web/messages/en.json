@@ -171,6 +171,12 @@
     "genericError": "Something went wrong. Please try again."
   },
   "Onboarding": {
+    "sourceStepDataStatusHeading": "Data received",
+    "sourceStepNoEventsYet": "No events have reached this project yet. A key on its own does not move data - your app still has to send events to the ingest endpoint above.",
+    "sourceStepEventsReceived": "{count} events accepted so far. Ingestion is working.",
+    "sourceStepQuarantined": "{count} records were rejected and quarantined.",
+    "sourceStepIngestHealthLink": "See why in Ingest Health",
+    "sourceContinueWithoutDataButton": "Continue without data",
     "metaTitle": "Get started",
     "title": "Get {projectName} set up",
     "genericError": "Something went wrong. Please try again.",

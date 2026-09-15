@@ -13,6 +13,7 @@ import {
   listOrgProjects,
   listPluginInstallsForProject,
   listPluginManifestsForOrg,
+  listRecentIngestBatchesForProject,
   onboardingMetricPacks,
   proposeOnboardingFunnelSteps,
 } from '@/lib/orgs/queries';
@@ -126,11 +127,12 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
 async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: string }): Promise<React.ReactElement> {
   const t = await getTranslations('Onboarding');
 
-  const [manifests, installs, environments, apiKeys] = await Promise.all([
+  const [manifests, installs, environments, apiKeys, batches] = await Promise.all([
     listPluginManifestsForOrg(orgId),
     listPluginInstallsForProject(orgId, projectId),
     listEnvironmentsForProject(orgId, projectId),
     listApiKeysForProject(orgId, projectId),
+    listRecentIngestBatchesForProject(orgId, projectId, 50),
   ]);
   const manifestViews = manifests.map(toPluginManifestView);
   const installViews = installs.map(toPluginInstallView);
@@ -141,6 +143,22 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
   );
   const hasIngestKey = apiKeys.some((apiKey) => !apiKey.revokedAt && apiKey.scopes.includes('ingest.write'));
   const environmentOptions = environments.map((environment) => ({ id: environment.id, name: environment.name }));
+
+  /*
+    What has actually arrived, as opposed to what has been set up.
+
+    The step treated "an ingest.write key exists" as "a source is connected" — the continue
+    button's own doc comment said so. But minting a key moves no data; the customer's app
+    still has to post events. So a project could finish the whole wizard, land on the starter
+    board, and find it empty, with nothing anywhere having said that nothing was ever
+    received. That is what happened on the first real customer project.
+
+    Reading the batches is cheap and it is the only honest signal, so the step now reports it
+    and the continue button below says which of the two situations the user is in.
+  */
+  const acceptedCount = batches.reduce((total, batch) => total + batch.accepted_count, 0);
+  const quarantinedCount = batches.reduce((total, batch) => total + batch.quarantined_count, 0);
+  const hasReceivedData = acceptedCount > 0;
 
   return (
     <section className="flex flex-col gap-6">
@@ -173,10 +191,38 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
         )}
       </div>
 
+      <div className="flex flex-col gap-2" data-testid="onboarding-ingest-status">
+        <h3 className="font-medium">{t('sourceStepDataStatusHeading')}</h3>
+        {hasReceivedData ? (
+          <p className="text-sm text-muted-foreground">{t('sourceStepEventsReceived', { count: acceptedCount })}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t('sourceStepNoEventsYet')}</p>
+        )}
+        {quarantinedCount > 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t('sourceStepQuarantined', { count: quarantinedCount })}{' '}
+            <Link className="underline" href={`/orgs/${orgId}/projects/${projectId}/ingest-health`}>
+              {t('sourceStepIngestHealthLink')}
+            </Link>
+          </p>
+        ) : null}
+      </div>
+
       {connectedSourceInstall ? (
-        <OnboardingSourceContinueButton orgId={orgId} projectId={projectId} method="plugin" pluginId={connectedSourceInstall.pluginId} />
+        <OnboardingSourceContinueButton
+          orgId={orgId}
+          projectId={projectId}
+          method="plugin"
+          pluginId={connectedSourceInstall.pluginId}
+          hasReceivedData={hasReceivedData}
+        />
       ) : hasIngestKey ? (
-        <OnboardingSourceContinueButton orgId={orgId} projectId={projectId} method="push_your_own" />
+        <OnboardingSourceContinueButton
+          orgId={orgId}
+          projectId={projectId}
+          method="push_your_own"
+          hasReceivedData={hasReceivedData}
+        />
       ) : (
         <p className="text-sm text-muted-foreground">{t('sourceStepContinueHint')}</p>
       )}
