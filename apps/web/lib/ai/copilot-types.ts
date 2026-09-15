@@ -8,7 +8,14 @@ export interface CopilotActionProposal {
   targetLabel: string;
   beforeValue: string | number;
   afterValue: string | number;
-  estimatedImpact: string;
+  /**
+   * Optional, because a projection needs a performance baseline and GrowthOS has none yet.
+   * It used to be required, which forced every proposal to assert an outcome — "+32%
+   * projected conversions", "+45 qualified leads / month", "Blended ROAS increases from
+   * 2.31x to 3.66x" — that was a hardcoded literal, not a forecast. `ProposalDiffCard`
+   * already renders it conditionally.
+   */
+  estimatedImpact?: string;
   impactBadge: 'high' | 'medium' | 'low';
   payload: Record<string, unknown>;
   quickExecuteToken?: string;

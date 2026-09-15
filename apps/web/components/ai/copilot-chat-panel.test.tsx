@@ -48,7 +48,10 @@ describe('CopilotChatPanel Component', () => {
 
     await waitFor(() => {
       expect(onExecuteProposal).toHaveBeenCalled();
-      expect(screen.getByText(/Action executed successfully! Rollback is available in audit log./)).toBeInTheDocument();
+      // This file tests a re-export of components/automation/copilot-chat-panel, so it moves
+      // with that component's wording. The message changed when the panel stopped reporting
+      // failures as successes - see KAN-90.
+      expect(screen.getByText(/Action submitted\./)).toBeInTheDocument();
     });
   });
 

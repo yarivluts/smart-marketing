@@ -287,6 +287,28 @@ export function CopilotChatPanel({
     }, 200);
   }
 
+  function appendSystemMessage(content: string) {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: `sys-${Date.now()}`,
+        role: 'assistant',
+        content,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
+  }
+
+  /**
+   * Reports what actually happened.
+   *
+   * Two separate ways this used to claim success on a failure: the `catch` branch appended
+   * the very same "Action executed successfully! Rollback is available in audit log."
+   * message as the happy path, and the happy path itself never inspected the response —
+   * `fetch` only rejects on a network error, so a 400 or a 403 from the propose endpoint
+   * resolved normally and was reported as executed. Either way the user was sent looking
+   * for a rollback entry that was never written.
+   */
   async function handleApprove(proposal: ActionProposalData) {
     setIsExecuting(true);
     setExecutingProposalId(proposal.targetId);
@@ -294,7 +316,7 @@ export function CopilotChatPanel({
       if (onExecuteProposal) {
         await onExecuteProposal(proposal);
       } else if (orgId && projectId) {
-        await fetch(`/api/orgs/${orgId}/projects/${projectId}/automation/actions/propose`, {
+        const res = await fetch(`/api/orgs/${orgId}/projects/${projectId}/automation/actions/propose`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -303,33 +325,14 @@ export function CopilotChatPanel({
             afterDailyBudgetUsd: proposal.payload?.dailyBudgetUsd,
           }),
         });
+        if (!res.ok) {
+          throw new Error(`propose failed with ${res.status}`);
+        }
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys-${Date.now()}`,
-          role: 'assistant',
-          content:
-            locale === 'he'
-              ? 'הפעולה בוצעה בהצלחה! ניתן לבטל בכל עת.'
-              : 'Action executed successfully! Rollback is available in audit log.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      appendSystemMessage(t('actionExecuted'));
     } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `sys-${Date.now()}`,
-          role: 'assistant',
-          content:
-            locale === 'he'
-              ? 'הפעולה בוצעה בהצלחה! ניתן לבטל בכל עת.'
-              : 'Action executed successfully! Rollback is available in audit log.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      appendSystemMessage(t('actionFailed'));
     } finally {
       setIsExecuting(false);
       setExecutingProposalId(null);
