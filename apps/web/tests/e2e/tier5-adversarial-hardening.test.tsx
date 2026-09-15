@@ -445,42 +445,58 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
   // Module 3 (AI Copilot & Automation): Mixed Hebrew/English NLP commands, budget surge guardrails, emergency kill switch, 1-click rollback
   // =========================================================================
   describe('5.3 Module 3: AI Copilot & Automation Hardening', () => {
-    it('5.3.1 Mixed Hebrew/English NLP commands: parses all intent vectors, extracts budget numbers, and falls back gracefully', () => {
-      // Hebrew Budget Increase
-      const heBudget = processCopilotQuery('הגדל תקציב ל-400$', { locale: 'he' });
-      expect(heBudget.actionProposal).toBeDefined();
+    it('5.3.1 Mixed Hebrew/English NLP: acts only on campaigns that exist and declines what it cannot measure', () => {
+      /*
+        This used to call processCopilotQuery with no context at all and assert that it
+        still produced proposals - against `target-meta-1`, "Meta Retargeting Leads" at
+        "$150/day", and a rebalance labelled "Shift $500/day". None of those ids or figures
+        existed anywhere; the engine declared a CopilotContext and ignored it. Since the
+        chat panel POSTs an approved proposal to the real automation endpoint, the test was
+        pinning a path from a typed sentence to a budget change on a live ad account,
+        routed by invented identifiers.
+      */
+      const context = {
+        locale: 'he' as const,
+        targets: [
+          { id: 'tgt-real-1', label: 'EasySign Brand', dailyBudgetUsd: 120, status: 'enabled' },
+        ],
+      };
+
+      // Hebrew budget increase, against the one real campaign.
+      const heBudget = processCopilotQuery('הגדל תקציב ל-400$', context);
       expect(heBudget.actionProposal?.actionType).toBe('budget_change');
+      expect(heBudget.actionProposal?.targetId).toBe('tgt-real-1');
+      expect(heBudget.actionProposal?.beforeValue).toBe('$120/day');
       expect(heBudget.actionProposal?.afterValue).toBe('$400/day');
-      expect(heBudget.message.role).toBe('assistant');
+      // No invented forecast attached to it.
+      expect(heBudget.actionProposal?.estimatedImpact).toBeUndefined();
 
-      // Hebrew Search Campaign Draft
-      const heDraft = processCopilotQuery('צור קמפיין חיפוש חדש לעורכי דין', { locale: 'he' });
+      // The same query with no campaigns to act on asks which campaign, and proposes nothing.
+      const heBudgetNoTargets = processCopilotQuery('הגדל תקציב ל-400$', { locale: 'he' });
+      expect(heBudgetNoTargets.actionProposal).toBeUndefined();
+
+      // Draft creation needs no prior measurement, only a budget.
+      const heDraft = processCopilotQuery('צור קמפיין חיפוש חדש לעורכי דין בתקציב 200', context);
       expect(heDraft.actionProposal?.actionType).toBe('campaign_draft_create');
-      expect(heDraft.message.content).toContain('טיוטת קמפיין');
 
-      // Hebrew Rebalancing
-      const heRebalance = processCopilotQuery('איזון תקציב בין גוגל למטא', { locale: 'he' });
-      expect(heRebalance.actionProposal?.actionType).toBe('budget_change');
-      expect(heRebalance.actionProposal?.targetLabel).toContain('Shift $500/day');
-
-      // Hebrew Campaign Pause
-      const hePause = processCopilotQuery('השהה קמפיין עם CAC גבוה', { locale: 'he' });
+      // Pause resolves the real campaign rather than a hardcoded "low ROAS" one.
+      const hePause = processCopilotQuery('השהה קמפיין', context);
       expect(hePause.actionProposal?.actionType).toBe('campaign_activation');
+      expect(hePause.actionProposal?.targetId).toBe('tgt-real-1');
       expect(hePause.actionProposal?.afterValue).toBe('PAUSED');
 
-      // English Top Performing Ads
+      // Rebalancing and "top performing" both need performance figures nothing measures.
+      const heRebalance = processCopilotQuery('איזון תקציב בין גוגל למטא', context);
+      expect(heRebalance.actionProposal).toBeUndefined();
+
       const enAds = processCopilotQuery('What are our top performing ads this week?', { locale: 'en' });
-      expect(enAds.message.content).toContain('top-performing ads this week');
       expect(enAds.actionProposal).toBeUndefined();
+      expect(enAds.message.content).toContain('no performance data');
 
-      // Mixed Hebrew & English BiDi string
-      const mixedQuery = processCopilotQuery('תעשה shift budget ל-Meta Ads בבקשה', { locale: 'he' });
-      expect(mixedQuery.actionProposal?.actionType).toBe('budget_change');
-
-      // Unrecognized fallback
-      const unknownQuery = processCopilotQuery('random unparseable sentence 12345', { locale: 'en' });
+      // Unrecognized fallback.
+      const unknownQuery = processCopilotQuery('random unparseable sentence', { locale: 'en' });
       expect(unknownQuery.actionProposal).toBeUndefined();
-      expect(unknownQuery.message.content).toContain('How can I help you optimize');
+      expect(unknownQuery.message.content).toContain('How can I help you');
     });
 
     it('5.3.2 Budget surge & multi-constraint guardrails: strictly enforces 50% max daily increase, spend ceilings, protected targets, allowed UTC hours', () => {

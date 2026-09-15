@@ -14,7 +14,7 @@ export interface CopilotEngineResult {
 }
 
 /**
- * Extracts numeric budget amount from query string (e.g.  , 250$, 250/day, ל-150$).
+ * Extracts a numeric budget amount from a query string (e.g. 250, $250, 250/day, ל-150$).
  */
 function extractBudgetAmount(input: string): number | null {
   const match = input.match(/(?:\$|ל-|ל)?\s*(\d+(?:\.\d+)?)\s*(?:\$|\/day|\/יום)?/i);
@@ -25,9 +25,47 @@ function extractBudgetAmount(input: string): number | null {
   return null;
 }
 
+type CopilotTarget = NonNullable<CopilotContext['targets']>[number];
+
 /**
- * Pure bilingual natural language parsing & proposal generation engine.
- * Supports Hebrew and English intent detection with zero-latency heuristics.
+ * Finds the campaign a query is talking about, among the campaigns that actually exist.
+ *
+ * Returns null rather than guessing when the project has no campaigns, or when the query
+ * names none and there is more than one it could mean. Acting on the wrong campaign is
+ * worse than asking which one.
+ */
+function resolveTarget(context: CopilotContext, normalized: string): CopilotTarget | null {
+  const targets = context.targets ?? [];
+  if (targets.length === 0) {
+    return null;
+  }
+
+  const named = targets.find((t) => t.label.length > 2 && normalized.includes(t.label.toLowerCase()));
+  if (named) {
+    return named;
+  }
+
+  const enabled = targets.filter((t) => t.status === 'enabled');
+  if (enabled.length === 1) {
+    return enabled[0];
+  }
+  return targets.length === 1 ? targets[0] : null;
+}
+
+/**
+ * Bilingual intent parsing over the caller's real project context.
+ *
+ * Every branch that produces an approvable action resolves a campaign that exists, and every
+ * branch that would need a performance measurement declines instead — GrowthOS has no
+ * impressions, clicks, conversions or revenue source wired up yet, only spend.
+ *
+ * This engine previously ignored `context` entirely despite declaring it, and every branch
+ * returned hardcoded content: a budget proposal against `target-meta-1` / "Meta Retargeting
+ * Leads" at "$150/day", a pause proposal against `target-google-low-roas` prefaced with
+ * "Identified underperforming campaign with high CAC and sub-par ROAS", a rebalance claiming
+ * "Blended ROAS increases from 2.31x to 3.66x", and an analytics answer asserting "4.2x
+ * ROAS". None of those ids exist and none of those figures were ever measured — while the
+ * chat panel's Approve button POSTs the proposal to the real automation endpoint.
  */
 export function processCopilotQuery(
   rawInput: string,
@@ -39,7 +77,38 @@ export function processCopilotQuery(
   const timestamp = new Date().toISOString();
   const msgId = `asst-${Date.now()}`;
 
-  // 1. Analytics Query: Top Performing Ads / Best ROAS
+  const reply = (en: string, he: string): CopilotEngineResult => ({
+    message: { id: msgId, role: 'assistant', content: locale === 'he' ? he : en, timestamp },
+  });
+
+  const withProposal = (
+    en: string,
+    he: string,
+    actionProposal: CopilotActionProposal,
+  ): CopilotEngineResult => ({
+    message: {
+      id: msgId,
+      role: 'assistant',
+      content: locale === 'he' ? he : en,
+      timestamp,
+      actionProposal,
+    },
+    actionProposal,
+  });
+
+  const noPerformanceData = (): CopilotEngineResult =>
+    reply(
+      'I have no performance data for this project yet, so I cannot rank campaigns or judge which are underperforming. Connect an ad platform, let the warehouse refresh, then ask again.',
+      'אין לי עדיין נתוני ביצועים בפרויקט הזה, ולכן אי אפשר לדרג קמפיינים או לקבוע מי מתפקד פחות טוב. חבר פלטפורמת מודעות, המתן לרענון המחסן, ושאל שוב.',
+    );
+
+  const noCampaign = (): CopilotEngineResult =>
+    reply(
+      'I could not tell which campaign you mean. Name it and I will prepare the change.',
+      'לא הצלחתי לזהות לאיזה קמפיין הכוונה. ציין את שמו ואכין את השינוי.',
+    );
+
+  // 1. Analytics: top performing / best ROAS. Needs measured performance.
   if (
     normalized.includes('הכי רווחיות') ||
     normalized.includes('המודעות הטובות') ||
@@ -49,20 +118,10 @@ export function processCopilotQuery(
     normalized.includes('top performing') ||
     normalized.includes('most profitable')
   ) {
-    return {
-      message: {
-        id: msgId,
-        role: 'assistant',
-        content:
-          locale === 'he'
-            ? 'המודעות הכי רווחיות השבוע הן במודעות Meta עם ROAS של 4.2x.'
-            : 'Your top-performing ads this week are Meta Retargeting campaigns with 4.2x ROAS.',
-        timestamp,
-      },
-    };
+    return noPerformanceData();
   }
 
-  // 2. Budget Increase / Change Intent
+  // 2. Budget change. Needs a real campaign; its current budget is a real value.
   if (
     normalized.includes('הגדל תקציב') ||
     normalized.includes('העלה תקציב') ||
@@ -72,85 +131,77 @@ export function processCopilotQuery(
     normalized.includes('raise budget') ||
     normalized.includes('budget to')
   ) {
-    const extractedAmount = extractBudgetAmount(input) || 250;
-    const targetLabel = 'Meta Retargeting Leads';
-    const targetId = 'target-meta-1';
-    const beforeValue = '$150/day';
-    const afterValue = `$${extractedAmount}/day`;
+    const target = resolveTarget(context, normalized);
+    if (!target) {
+      return noCampaign();
+    }
+
+    const amount = extractBudgetAmount(input);
+    if (amount === null) {
+      return reply(
+        `How much should the daily budget for "${target.label}" be?`,
+        `לאיזה סכום להגדיר את התקציב היומי של "${target.label}"?`,
+      );
+    }
 
     const actionProposal: CopilotActionProposal = {
       actionType: 'budget_change',
-      targetId,
-      targetLabel,
-      beforeValue,
-      afterValue,
-      estimatedImpact: '+32% projected conversions',
-      impactBadge: 'high',
-      payload: {
-        targetId,
-        dailyBudgetUsd: extractedAmount,
-        actionType: 'budget_change',
-      },
+      targetId: target.id,
+      targetLabel: target.label,
+      beforeValue: `$${target.dailyBudgetUsd}/day`,
+      afterValue: `$${amount}/day`,
+      // No estimatedImpact: projecting a result needs a performance baseline, and the
+      // previous "+32% projected conversions" was a constant with no origin.
+      impactBadge: amount > target.dailyBudgetUsd * 1.5 ? 'high' : 'medium',
+      payload: { targetId: target.id, dailyBudgetUsd: amount, actionType: 'budget_change' },
       quickExecuteToken: `token-${Date.now()}`,
     };
 
-    return {
-      message: {
-        id: msgId,
-        role: 'assistant',
-        content:
-          locale === 'he'
-            ? 'הכנתי הצעה להגדלת תקציב עבור קמפיין Meta Retargeting.'
-            : 'Prepared budget increase proposal for Meta Retargeting campaign.',
-        timestamp,
-        actionProposal,
-      },
+    return withProposal(
+      `Prepared a budget change for "${target.label}", from $${target.dailyBudgetUsd}/day to $${amount}/day.`,
+      `הכנתי שינוי תקציב עבור "${target.label}", מ-$${target.dailyBudgetUsd} ליום ל-$${amount} ליום.`,
       actionProposal,
-    };
+    );
   }
 
-  // 3. Campaign Draft Creation Intent
+  // 3. Campaign draft creation. Creates something new, so it needs no prior measurement —
+  // but it must not promise a result either.
   if (
     normalized.includes('קמפיין חיפוש') ||
     normalized.includes('צור קמפיין') ||
     normalized.includes('קמפיין חדש') ||
     normalized.includes('new campaign') ||
-    normalized.includes('campaign for lawyers') ||
     normalized.includes('create campaign') ||
     normalized.includes('search campaign')
   ) {
+    const dailyBudgetUsd = extractBudgetAmount(input);
+    if (dailyBudgetUsd === null) {
+      return reply(
+        'What daily budget should the new campaign start at?',
+        'באיזה תקציב יומי להתחיל את הקמפיין החדש?',
+      );
+    }
+
+    const campaignName = input.slice(0, 80);
     const actionProposal: CopilotActionProposal = {
       actionType: 'campaign_draft_create',
-      targetId: 'target-google-draft-1',
-      targetLabel: 'Google Search - Legal Leads',
-      beforeValue: 'Draft',
-      afterValue: 'Created ($200/day)',
-      estimatedImpact: '+45 qualified leads / month',
-      impactBadge: 'high',
-      payload: {
-        platform: 'google_ads',
-        campaignName: 'Google Search - Legal Leads',
-        dailyBudgetUsd: 200,
-      },
+      targetId: `draft-${Date.now()}`,
+      targetLabel: campaignName,
+      beforeValue: 'None',
+      afterValue: `Draft ($${dailyBudgetUsd}/day)`,
+      impactBadge: 'medium',
+      payload: { platform: 'google_ads', campaignName, dailyBudgetUsd },
       quickExecuteToken: `token-draft-${Date.now()}`,
     };
 
-    return {
-      message: {
-        id: msgId,
-        role: 'assistant',
-        content:
-          locale === 'he'
-            ? 'טיוטת קמפיין חדש מוכנה לאישור.'
-            : 'New search campaign draft ready for approval.',
-        timestamp,
-        actionProposal,
-      },
+    return withProposal(
+      `Prepared a campaign draft at $${dailyBudgetUsd}/day. Review the creatives before approving.`,
+      `הכנתי טיוטת קמפיין בתקציב $${dailyBudgetUsd} ליום. עבור על הקריאייטיבים לפני אישור.`,
       actionProposal,
-    };
+    );
   }
 
-  // 4. Budget Rebalancing (Multi-Channel Shift)
+  // 4. Budget rebalancing. Needs per-channel return figures to argue from.
   if (
     normalized.includes('reallocate') ||
     normalized.includes('rebalance') ||
@@ -159,78 +210,33 @@ export function processCopilotQuery(
     normalized.includes('חלוקת תקציב') ||
     normalized.includes('shift budget')
   ) {
-    const actionProposal: CopilotActionProposal = {
-      actionType: 'budget_change',
-      targetId: 'target-meta-1',
-      targetLabel: 'Shift $500/day from Google to Meta Ads',
-      beforeValue: 'Google: $700, Meta: $300',
-      afterValue: 'Google: $200, Meta: $800',
-      estimatedImpact: 'Blended ROAS increases from 2.31x to 3.66x',
-      impactBadge: 'high',
-      payload: {
-        actionType: 'budget_change',
-        metaBudget: 800,
-        googleBudget: 200,
-      },
-      quickExecuteToken: `token-rebalance-${Date.now()}`,
-    };
-
-    return {
-      message: {
-        id: msgId,
-        role: 'assistant',
-        content:
-          locale === 'he'
-            ? 'הכנתי הצעת איזון תקציבים רב-ערוצית: העברת 500$ מגוגל (ROAS 1.5x) למטא (ROAS 4.2x).'
-            : 'Prepared multi-channel rebalancing proposal: Shift $500/day from Google (1.5x ROAS) to Meta (4.2x ROAS).',
-        timestamp,
-        actionProposal,
-      },
-      actionProposal,
-    };
+    return noPerformanceData();
   }
 
-  // 5. Funnel Drop-off Optimization
+  // 5. Funnel drop-off. Real whenever the caller supplied real funnel steps.
   if (
     normalized.includes('drop-off') ||
     normalized.includes('dropoff') ||
     normalized.includes('נטישה') ||
-    normalized.includes('משפך') ||
-    normalized.includes('stage 2') ||
-    normalized.includes('שלב 2')
+    normalized.includes('משפך')
   ) {
-    const actionProposal: CopilotActionProposal = {
-      actionType: 'campaign_draft_create',
-      targetId: 'target-retarget-dropoff',
-      targetLabel: 'EasySign - Viewed Drop-off Retargeting',
-      beforeValue: '62% Drop-off',
-      afterValue: '35% Projected Drop-off ($150/day)',
-      estimatedImpact: '+30% recovery (+270 signed leads)',
-      impactBadge: 'high',
-      payload: {
-        platform: 'meta',
-        campaignName: 'EasySign - Viewed Drop-off Retargeting',
-        dailyBudgetUsd: 150,
-      },
-      quickExecuteToken: `token-funnel-${Date.now()}`,
-    };
+    const steps = context.funnelSteps ?? [];
+    if (steps.length === 0) {
+      return reply(
+        'I have no funnel data for this project yet.',
+        'אין לי עדיין נתוני משפך בפרויקט הזה.',
+      );
+    }
 
-    return {
-      message: {
-        id: msgId,
-        role: 'assistant',
-        content:
-          locale === 'he'
-            ? 'הכנתי טיוטת קמפיין ריטרגטינג ייעודית למבקרים שנטשו בשלב הצפייה במסמך.'
-            : 'Prepared a targeted retargeting campaign draft for visitors who dropped off at the document view stage.',
-        timestamp,
-        actionProposal,
-      },
-      actionProposal,
-    };
+    const worst = [...steps].sort((a, b) => b.dropOffPercent - a.dropOffPercent)[0];
+    return reply(
+      `The largest drop-off is at "${worst.stageLabel}", losing ${worst.dropOffPercent}% of the visitors who reach it. Ask me to draft a retargeting campaign for that stage and name a daily budget.`,
+      `הנטישה הגדולה ביותר היא בשלב "${worst.stageLabel}", עם ${worst.dropOffPercent}% מהמבקרים שמגיעים אליו. בקש ממני טיוטת קמפיין ריטרגטינג לשלב הזה וציין תקציב יומי.`,
+    );
   }
 
-  // 6. Pause Underperforming / High CAC Ad Sets
+  // 6. Pause. A user naming a campaign is an instruction, not a finding of ours — the
+  // proposal is legitimate, but it must not be dressed up as underperformance we detected.
   if (
     normalized.includes('pause') ||
     normalized.includes('עצור') ||
@@ -240,47 +246,31 @@ export function processCopilotQuery(
     normalized.includes('ביצועים נמוכים') ||
     normalized.includes('low roas')
   ) {
+    const target = resolveTarget(context, normalized);
+    if (!target) {
+      return noCampaign();
+    }
+
     const actionProposal: CopilotActionProposal = {
       actionType: 'campaign_activation',
-      targetId: 'target-google-low-roas',
-      targetLabel: 'Google Ads - Broad Discovery',
-      beforeValue: 'ENABLED ($120/day)',
+      targetId: target.id,
+      targetLabel: target.label,
+      beforeValue: `ENABLED ($${target.dailyBudgetUsd}/day)`,
       afterValue: 'PAUSED',
-      estimatedImpact: 'Saves $3,600/month on low ROAS (1.2x)',
       impactBadge: 'medium',
-      payload: {
-        targetId: 'target-google-low-roas',
-        actionType: 'campaign_pause',
-      },
+      payload: { targetId: target.id, actionType: 'campaign_pause' },
       quickExecuteToken: `token-pause-${Date.now()}`,
     };
 
-    return {
-      message: {
-        id: msgId,
-        role: 'assistant',
-        content:
-          locale === 'he'
-            ? 'זיהיתי קמפיין עם CAC גבוה ו-ROAS נמוך. מוכן להשהות אותו לאישור.'
-            : 'Identified underperforming campaign with high CAC and sub-par ROAS. Ready to pause upon approval.',
-        timestamp,
-        actionProposal,
-      },
+    return withProposal(
+      `Ready to pause "${target.label}", currently running at $${target.dailyBudgetUsd}/day.`,
+      `מוכן להשהות את "${target.label}", שרץ כעת בתקציב $${target.dailyBudgetUsd} ליום.`,
       actionProposal,
-    };
+    );
   }
 
-  // Default Fallback
-  return {
-    message: {
-      id: msgId,
-      role: 'assistant',
-      content:
-        locale === 'he'
-          ? 'במה אוכל לעזור לך לייעל את הקמפיינים היום?'
-          : 'How can I help you optimize your growth campaigns today?',
-      timestamp,
-    },
-  };
+  return reply(
+    'How can I help you with your campaigns today?',
+    'במה אוכל לעזור לך עם הקמפיינים היום?',
+  );
 }
-
