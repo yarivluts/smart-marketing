@@ -27,6 +27,7 @@ every environment picks it up on the next call.
 | Secret | What it is |
 |---|---|
 | `jira-api-token` | Atlassian API token for the KAN backlog (see below) |
+| `easysign-prod-growthos-api-key` | EasySign's `GROWTHOS_API_KEY` — a `gos_live_` ingest key for the EasySign Growth **prod** environment, scope `ingest.write` only |
 | `google-ads-developer-token` | Google Ads API developer token |
 | `meta-user-access-token` | Meta Marketing API user access token |
 | `growthos-vault-keys-dev` / `-preprod` / `-prod` | envelope-encryption keys the app's own credential vault uses (`GROWTHOS_VAULT_KEYS`) |
@@ -83,6 +84,20 @@ API token is scoped to one site and returns 401 against every other host, includ
   session. A value that reaches a terminal reaches a transcript, and a transcript is a file
   on disk that syncs.
 - **Never write one to disk.** Not even to a temp file, not even briefly.
+- **Piping a minted secret? Check what else is on stdout.** `connectFirestoreOrmAdmin`
+  prints `Setting up Admin SDK query compatibility` to **stdout**, not stderr. A script
+  that mints a key and pipes stdout into `gcloud secrets versions add` therefore stores
+  the banner *and* the key as one 83-character blob that authenticates as nothing.
+  Silence stdout across the connect call, or write the value to a different fd:
+  ```js
+  const realWrite = process.stdout.write.bind(process.stdout);
+  process.stdout.write = () => true;
+  await orm.connectFirestoreOrmAdmin({ projectId: 'growthos-g2w84' });
+  process.stdout.write = realWrite;
+  ```
+  Verify afterwards by hashing the stored value and comparing it to the record's
+  `hashed_secret` — that check is what caught this, and a 401 alone would not have told
+  you whether the key or the lookup was at fault.
 - **Never ask a human to paste one into a chat.** Give them the command to run in their own
   terminal instead:
   ```bash
