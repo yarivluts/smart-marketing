@@ -50,7 +50,7 @@ describe('CopilotChatPanel Component', () => {
 
     await waitFor(() => {
       expect(onExecuteProposal).toHaveBeenCalled();
-      expect(screen.getByText(/Action executed successfully! Rollback is available in audit log./)).toBeInTheDocument();
+      expect(screen.getByText(/Action submitted\./)).toBeInTheDocument();
     });
   });
 
@@ -69,5 +69,52 @@ describe('CopilotChatPanel Component', () => {
         expect(screen.getByText(/top performing ads this week/i)).toBeInTheDocument();
       });
     }
+  });
+  /**
+   * The failure path used to append the success message verbatim - the catch block was a
+   * copy of the happy path - and the happy path never checked the response, so a 400 or 403
+   * from the propose endpoint resolved normally and also read as success. Both halves are
+   * pinned here.
+   */
+  it('reports a rejected proposal as failed rather than executed', async () => {
+    const onExecuteProposal = vi.fn().mockRejectedValue(new Error('propose rejected'));
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} onExecuteProposal={onExecuteProposal} />, { locale: 'en' });
+
+    fireEvent.change(screen.getByTestId('copilot-input'), {
+      target: { value: 'Increase budget for retargeting campaign to $250' },
+    });
+    fireEvent.click(screen.getByTestId('copilot-send-button'));
+
+    await waitFor(() => expect(screen.getByTestId('proposal-card')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('quick-execute-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/did not go through/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Action submitted\./)).not.toBeInTheDocument();
+  });
+
+  it('treats a non-ok HTTP response from the propose endpoint as a failure', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 403 }));
+
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} orgId="org-1" projectId="proj-1" />, {
+      locale: 'en',
+    });
+
+    fireEvent.change(screen.getByTestId('copilot-input'), {
+      target: { value: 'Increase budget for retargeting campaign to $250' },
+    });
+    fireEvent.click(screen.getByTestId('copilot-send-button'));
+
+    await waitFor(() => expect(screen.getByTestId('proposal-card')).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId('quick-execute-button'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/did not go through/i)).toBeInTheDocument();
+    });
+
+    fetchSpy.mockRestore();
   });
 });
