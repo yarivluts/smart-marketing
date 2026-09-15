@@ -1,5 +1,11 @@
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app';
-import { collection, connectFirestoreEmulator, getDocs, getFirestore } from 'firebase/firestore';
+import {
+  collection,
+  connectFirestoreEmulator,
+  getDocs,
+  getFirestore,
+  initializeFirestore,
+} from 'firebase/firestore';
 import { FirestoreOrmRepository } from '@arbel/firebase-orm';
 
 // Both admin subpaths below are exports-map-only, invisible to this package's
@@ -88,7 +94,30 @@ export async function connectFirestoreOrm(options: FirestoreConnectionOptions): 
   const app: FirebaseApp =
     existingApp ??
     initializeApp({ apiKey: options.apiKey ?? 'demo-api-key', projectId: options.projectId }, appName);
-  const firestore = getFirestore(app);
+
+  /*
+    Against the emulator, force the long-polling transport — the same fix
+    `test-utils/emulator.ts` already applies, which this path never received.
+
+    The client SDK's default gRPC transport multiplexes every read, even a one-shot
+    `getDocs()`, as a target on one shared `Listen` stream per Firestore instance. Across a
+    suite of emulator-backed test files sharing one emulator, the accumulated target state on
+    that stream grows without bound until it trips gRPC's 4MB limit, and the error surfaces as
+    a nonsense `RESOURCE_EXHAUSTED: Received message larger than max (2812728582 vs 4194304)`
+    on whichever test happens to be reading at the time. A multi-gigabyte "message" is the
+    tell: nothing in these tests is remotely that size.
+
+    Everything reaching Firestore through `connectFirestoreOrm` was on the unfixed path —
+    apps/web's `lib/orgs` suites and every apps/api e2e spec — which is why the flake kept
+    reappearing after the other path was fixed. Long-polling issues one request per read and
+    accumulates nothing.
+
+    Production keeps gRPC: it is the faster transport, and the problem is specific to many
+    short-lived test connections against a single shared emulator.
+  */
+  const firestore = options.emulatorHost
+    ? initializeFirestore(app, { experimentalForceLongPolling: true })
+    : getFirestore(app);
 
   if (options.emulatorHost) {
     const [host, portString] = options.emulatorHost.split(':');
