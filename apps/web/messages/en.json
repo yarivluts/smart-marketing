@@ -1952,6 +1952,7 @@
     "tabOverview": "Campaigns & Performance",
     "tabCreatives": "Creatives Gallery",
     "tabAnalytics": "Spend & ROAS Analytics",
+    "noData": "No data",
     "metricTotalSpend": "Total Spend",
     "metricBlendedRoas": "Blended ROAS",
     "metricImpressionsClicks": "Impressions & Clicks",

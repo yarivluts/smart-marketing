@@ -31,9 +31,7 @@ const mockSummary: AdsPerformanceSummary = {
   totalConversions: 420,
   activeCampaignsCount: 2,
   totalCampaignsCount: 2,
-  spendChangePct: 15.0,
-  roasChangePct: 22.1,
-  cpaChangePct: -12.4,
+  campaignsWithSpendCount: 6,
 };
 
 const mockItems: UnifiedCampaignItem[] = [

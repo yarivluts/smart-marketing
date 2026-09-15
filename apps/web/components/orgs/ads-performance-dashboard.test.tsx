@@ -49,6 +49,7 @@ describe('AdsPerformanceDashboard', () => {
     totalConversions: 115,
     activeCampaignsCount: 1,
     totalCampaignsCount: 1,
+    campaignsWithSpendCount: 1,
   };
 
   it('renders KPI metric cards, proactive recommendation, and sub-tabs', () => {

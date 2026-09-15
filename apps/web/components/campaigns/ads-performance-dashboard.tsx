@@ -76,9 +76,14 @@ export function AdsPerformanceDashboard({
     });
   }, [initialItems, platformFilter, statusFilter, searchQuery]);
 
-  // Target candidate for proactive recommendation (highest ROAS campaign)
+  // Target candidate for proactive recommendation (highest ROAS campaign). Only campaigns
+  // with a measured ROAS are eligible: approving this raises the daily budget on a real ad
+  // account, so ranking by an unmeasured value would propose spending more on a campaign
+  // nobody has evidence about. With nothing measured there is no candidate and no proposal.
   const topCampaign = useMemo(() => {
-    return [...initialItems].sort((a, b) => b.roas - a.roas)[0];
+    return initialItems
+      .filter((c): c is (typeof initialItems)[number] & { roas: number } => typeof c.roas === 'number')
+      .sort((a, b) => b.roas - a.roas)[0];
   }, [initialItems]);
 
   async function handleApplyRecommendation(): Promise<void> {
