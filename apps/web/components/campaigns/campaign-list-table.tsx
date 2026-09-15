@@ -134,39 +134,60 @@ export function CampaignListTable({
                   />
                 </td>
 
+                {/*
+                  Spend, ROAS, CTR and CPA are each null when GrowthOS has no measurement,
+                  and every one of these cells renders "No data" rather than a figure. The
+                  warehouse supplies spend only; the rest have no source wired up yet.
+                */}
                 {/* Spend (30d) */}
                 <td className="px-5 py-4">
                   <div className="flex flex-col">
                     <span className="font-bold text-foreground text-xs" dir="ltr">
-                      {`$${item.spend30dUsd.toLocaleString()}`}
+                      {item.spend30dUsd === null ? t('noData') : `$${item.spend30dUsd.toLocaleString()}`}
                     </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {t('conversionsCountShort', { count: item.conversions })}
-                    </span>
+                    {item.conversions === null ? null : (
+                      <span className="text-[10px] text-muted-foreground">
+                        {t('conversionsCountShort', { count: item.conversions })}
+                      </span>
+                    )}
                   </div>
                 </td>
 
                 {/* ROAS Badge */}
                 <td className="px-5 py-4">
-                  <Badge
-                    variant={item.roas >= 3.0 ? 'success' : item.roas >= 2.0 ? 'warning' : 'secondary'}
-                    size="sm"
-                    className="font-bold"
-                  >
-                    <TrendingUp className="h-3 w-3 me-1 shrink-0" aria-hidden="true" />
-                    <span dir="ltr">{`${item.roas}x`}</span>
-                  </Badge>
+                  {item.roas === null ? (
+                    <span className="text-[11px] text-muted-foreground">{t('noData')}</span>
+                  ) : (
+                    <Badge
+                      variant={item.roas >= 3.0 ? 'success' : item.roas >= 2.0 ? 'warning' : 'secondary'}
+                      size="sm"
+                      className="font-bold"
+                    >
+                      <TrendingUp className="h-3 w-3 me-1 shrink-0" aria-hidden="true" />
+                      <span dir="ltr">{`${item.roas}x`}</span>
+                    </Badge>
+                  )}
                 </td>
 
                 {/* Performance (CTR / CPA) */}
                 <td className="px-5 py-4">
                   <div className="flex flex-col text-[11px] gap-0.5">
-                    <span className="font-semibold text-foreground">
-                      <span dir="ltr">{`${item.ctrPct}%`}</span> {t('ctrLabel')}
-                    </span>
-                    <span className="text-muted-foreground">
-                      <span dir="ltr">{`$${item.cpaUsd}`}</span> {t('cpaLabel')}
-                    </span>
+                    {item.ctrPct === null && item.cpaUsd === null ? (
+                      <span className="text-muted-foreground">{t('noData')}</span>
+                    ) : (
+                      <>
+                        {item.ctrPct === null ? null : (
+                          <span className="font-semibold text-foreground">
+                            <span dir="ltr">{`${item.ctrPct}%`}</span> {t('ctrLabel')}
+                          </span>
+                        )}
+                        {item.cpaUsd === null ? null : (
+                          <span className="text-muted-foreground">
+                            <span dir="ltr">{`$${item.cpaUsd}`}</span> {t('cpaLabel')}
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
                 </td>
 

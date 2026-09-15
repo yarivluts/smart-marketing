@@ -16,11 +16,13 @@ export interface PeriodComparison {
 export interface ChannelSpendAllocationItem {
   platform: 'meta_ads' | 'google_ads' | 'simulated';
   label: string;
+  /** Real measured spend. Channels are only emitted when there is spend to report. */
   spendUsd: number;
   percentage: number;
-  roas: number;
-  conversions: number;
-  cacUsd: number;
+  /** Null when the blended figure this derives from was never measured. */
+  roas: number | null;
+  conversions: number | null;
+  cacUsd: number | null;
   colorClass: string;
 }
 
@@ -38,33 +40,17 @@ export interface ExecutiveReportData {
 }
 
 /**
- * Deterministically derives a pseudo-random floating ratio between 0.85 and 1.15
- * based on a string seed (e.g. project ID or target ID) so synthesized performance
- * figures are stable and repeatable across page reloads without hardcoding.
+ * Division-by-zero protected CAC calculator. Returns null when there is nothing to divide,
+ * so an unmeasurable CAC stays unmeasured instead of reading as a free acquisition.
  */
-export function getDeterministicFactor(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  const normalized = Math.abs(hash % 1000) / 1000;
-  return 0.85 + normalized * 0.3; // 0.85 .. 1.15
-}
-
-/**
- * Division-by-zero protected CAC calculator.
- */
-export function calculateBlendedCac(spend: number, conversions: number): number {
-  if (conversions <= 0) return 0;
+export function calculateBlendedCac(spend: number, conversions: number): number | null {
+  if (conversions <= 0) return null;
   return Number((spend / conversions).toFixed(2));
 }
 
-/**
- * Division-by-zero protected ROAS calculator.
- */
-export function calculateBlendedRoas(revenue: number, spend: number): number {
-  if (spend <= 0) return 0;
+/** Division-by-zero protected ROAS calculator. Null when spend is zero or unknown. */
+export function calculateBlendedRoas(revenue: number, spend: number): number | null {
+  if (spend <= 0) return null;
   return Number((revenue / spend).toFixed(2));
 }
 
@@ -76,27 +62,11 @@ export interface BuildExecutiveMetricsOptions {
   overrides?: Partial<ExecutiveBlendedMetrics>;
 }
 
-/**
- * Builds blended cross-channel executive metrics combining live Meta and Google Ads
- * data or synthesizing consistent, realistic figures with zero setup.
- */
-export function buildExecutiveBlendedMetrics(
-  options: BuildExecutiveMetricsOptions = {},
-): ExecutiveBlendedMetrics {
-  const {
-    targets = [],
-    spendOutcome = null,
-    timeWindow = '30d',
-    seed = 'default-project',
-    overrides = {},
-  } = options;
-
-  const factor = seed === 'default-project' ? 1.0 : getDeterministicFactor(seed);
-
-  // Time window scaling multipliers
-  const windowMultiplier = timeWindow === '7d' ? 7 / 30 : timeWindow === '90d' ? 3.0 : 1.0;
-
-  // Check if live warehouse spend exists
+/** Splits real per-campaign spend across the platforms the targets belong to. */
+function sumRealSpendByPlatform(
+  targets: readonly AutomationTargetView[],
+  spendOutcome: CampaignSpendBreakdownOutcome | null,
+): { meta: number; google: number; other: number; measuredCount: number } {
   const spendByCampaignId = new Map<string, number>();
   if (spendOutcome && spendOutcome.ok) {
     for (const row of spendOutcome.rows) {
@@ -104,103 +74,93 @@ export function buildExecutiveBlendedMetrics(
     }
   }
 
-  let computedMetaSpend = 0;
-  let computedGoogleSpend = 0;
-  let computedSimulatedSpend = 0;
-  let computedConversions = 0;
-  let computedRevenue = 0;
+  let meta = 0;
+  let google = 0;
+  let other = 0;
+  let measuredCount = 0;
 
-  if (targets.length > 0) {
-    for (const target of targets) {
-      const liveSpend =
-        spendByCampaignId.get(target.campaignResourceName ?? target.id) ??
-        spendByCampaignId.get(target.label);
-      const isLive = typeof liveSpend === 'number' && liveSpend > 0;
+  for (const target of targets) {
+    const spend =
+      spendByCampaignId.get(target.campaignResourceName ?? target.id) ??
+      spendByCampaignId.get(target.label);
+    if (typeof spend !== 'number' || !Number.isFinite(spend)) {
+      continue;
+    }
+    measuredCount += 1;
 
-      const targetFactor = getDeterministicFactor(target.id || target.label);
-      const baseSpend30d = (target.dailyBudgetUsd || 50) * 30 * 0.88 * targetFactor;
-      const spend30d = isLive ? liveSpend : baseSpend30d;
-      const targetSpend = Math.round(spend30d * windowMultiplier);
+    const label = target.label.toLowerCase();
+    const isMeta =
+      target.externalPlatform === 'meta_ads' ||
+      label.includes('meta') ||
+      label.includes('facebook') ||
+      Boolean(target.resourceAttachmentId);
+    const isGoogle =
+      target.externalPlatform === 'google_ads' || label.includes('google') || label.includes('search');
 
-      const isMeta =
-        target.externalPlatform === 'meta_ads' ||
-        target.label.toLowerCase().includes('meta') ||
-        target.label.toLowerCase().includes('facebook') ||
-        Boolean(target.resourceAttachmentId);
-
-      const isGoogle =
-        target.externalPlatform === 'google_ads' ||
-        target.label.toLowerCase().includes('google') ||
-        target.label.toLowerCase().includes('search');
-
-      const targetRoas = isMeta ? 3.6 * targetFactor : 2.9 * targetFactor;
-      const targetRevenue = targetSpend * targetRoas;
-      const cpc = isGoogle ? 1.75 : 1.15;
-      const cvr = isGoogle ? 0.08 : 0.055;
-      const clicks = Math.max(5, Math.round(targetSpend / cpc));
-      const targetConversions = Math.max(1, Math.round(clicks * cvr));
-
-      if (isMeta) {
-        computedMetaSpend += targetSpend;
-      } else if (isGoogle) {
-        computedGoogleSpend += targetSpend;
-      } else {
-        computedSimulatedSpend += targetSpend;
-      }
-
-      computedConversions += targetConversions;
-      computedRevenue += targetRevenue;
+    if (isMeta) {
+      meta += spend;
+    } else if (isGoogle) {
+      google += spend;
+    } else {
+      other += spend;
     }
   }
 
-  // If no targets exist or spend is zero, fallback to realistic zero-config baseline
-  if (computedMetaSpend + computedGoogleSpend + computedSimulatedSpend === 0) {
-    const baseMeta30d = Math.round(8500 * factor);
-    const baseGoogle30d = Math.round(5750 * factor);
-
-    computedMetaSpend = Math.round(baseMeta30d * windowMultiplier);
-    computedGoogleSpend = Math.round(baseGoogle30d * windowMultiplier);
-    computedConversions = Math.round(300 * factor * windowMultiplier);
-    computedRevenue = (computedMetaSpend * 3.8) + (computedGoogleSpend * 2.8);
-  }
-
-  const totalSpendUsd = computedMetaSpend + computedGoogleSpend + computedSimulatedSpend;
-  const blendedCacUsd = calculateBlendedCac(totalSpendUsd, computedConversions);
-  const blendedRoas = calculateBlendedRoas(computedRevenue, totalSpendUsd) || 3.4;
-
-  // Period comparison indicators
-  const periodComparison: PeriodComparison = {
-    spendChangePct: timeWindow === '7d' ? 4.8 : timeWindow === '90d' ? 24.5 : 12.4,
-    cacChangePct: timeWindow === '7d' ? -3.2 : timeWindow === '90d' ? -14.2 : -8.5,
-    roasChangePct: timeWindow === '7d' ? 6.1 : timeWindow === '90d' ? 32.0 : 15.2,
-    conversionsChangePct: timeWindow === '7d' ? 8.4 : timeWindow === '90d' ? 42.0 : 18.2,
-  };
-
-  const defaultMetrics: ExecutiveBlendedMetrics = {
-    totalSpendUsd,
-    metaSpendUsd: computedMetaSpend,
-    googleSpendUsd: computedGoogleSpend,
-    blendedCacUsd,
-    blendedRoas,
-    totalConversions: computedConversions,
-    conversionVelocityDays: Number((4.2 * (1 / Math.max(0.8, factor))).toFixed(1)),
-    churnRatePct: Number((2.1 * factor).toFixed(1)),
-    dunningRecoveryRatePct: Number((78.5 * factor).toFixed(1)),
-    periodComparison,
-  };
-
-  return {
-    ...defaultMetrics,
-    ...overrides,
-    periodComparison: {
-      ...defaultMetrics.periodComparison,
-      ...(overrides.periodComparison ?? {}),
-    },
-  };
+  return { meta, google, other, measuredCount };
 }
 
 /**
- * Builds full executive report data including channel spend breakdown and rebalancing insights.
+ * Builds blended cross-channel executive metrics from live Meta and Google Ads spend.
+ *
+ * Spend is the only figure the warehouse supplies. Revenue, conversions, churn and dunning
+ * recovery have no source wired up, so they come back null rather than estimated. Previously
+ * this function invented all of them: revenue was `spend * 3.6` (Meta) or `* 2.9` (Google),
+ * conversions were `spend / cpc * cvr` with cpc and cvr as constants, and churn, dunning
+ * recovery and conversion velocity were the literals 2.1%, 78.5% and 4.2 days scaled by a
+ * hash of the project id. With no targets at all it fell back to a wholly invented baseline
+ * of $8,500 Meta / $5,750 Google / 300 conversions. `periodComparison` was a lookup table
+ * keyed by time window (`12.4` / `-8.5` / `15.2` for 30d) rather than any comparison.
+ */
+export function buildExecutiveBlendedMetrics(
+  options: BuildExecutiveMetricsOptions = {},
+): ExecutiveBlendedMetrics {
+  const { targets = [], spendOutcome = null, overrides = {} } = options;
+
+  const { meta, google, other, measuredCount } = sumRealSpendByPlatform(targets, spendOutcome);
+  const hasSpend = measuredCount > 0;
+  const totalSpendUsd = hasSpend ? meta + google + other : null;
+
+  const measured: ExecutiveBlendedMetrics = {
+    totalSpendUsd,
+    metaSpendUsd: hasSpend ? meta : null,
+    googleSpendUsd: hasSpend ? google : null,
+    // Each of these needs a source that does not exist yet. See the type's doc comment.
+    blendedCacUsd: null,
+    blendedRoas: null,
+    totalConversions: null,
+    conversionVelocityDays: null,
+    churnRatePct: null,
+    dunningRecoveryRatePct: null,
+  };
+
+  // `overrides` is how a caller supplies genuinely measured figures (the report component
+  // passes `externalMetrics` straight through). It is the one sanctioned way to populate the
+  // null fields, and it must stay explicit rather than defaulted.
+  return { ...measured, ...overrides };
+}
+
+/**
+ * Builds full executive report data including channel spend breakdown.
+ *
+ * Per-channel ROAS, conversions and CAC are only computed when the blended figures they
+ * derive from were actually supplied. They used to be manufactured from the blended ROAS by
+ * multiplying it by 1.12 for Meta and 0.88 for Google — numbers with no origin at all — and
+ * conversions were split by the spend ratio as though attribution followed spend.
+ *
+ * The rebalancing recommendation is likewise conditional. It used to be a fixed suggestion to
+ * move $500/day from Google to Meta for a "$2,400 projected revenue gain", with a rationale
+ * quoting ROAS figures ("3.8x vs 2.9x") that nothing had measured — offered with an Apply
+ * button against a real ad account.
  */
 export function buildExecutiveReportData(
   options: BuildExecutiveMetricsOptions = {},
@@ -208,43 +168,43 @@ export function buildExecutiveReportData(
   const metrics = buildExecutiveBlendedMetrics(options);
   const timeWindow = options.timeWindow ?? '30d';
 
-  const total = Math.max(1, metrics.totalSpendUsd);
-  const metaPct = Math.round((metrics.metaSpendUsd / total) * 100);
-  const googlePct = 100 - metaPct;
+  const channels: ChannelSpendAllocationItem[] = [];
+  if (metrics.totalSpendUsd !== null && metrics.totalSpendUsd > 0) {
+    const total = metrics.totalSpendUsd;
+    const metaSpend = metrics.metaSpendUsd ?? 0;
+    const googleSpend = metrics.googleSpendUsd ?? 0;
+    const metaPct = Math.round((metaSpend / total) * 100);
 
-  const channels: ChannelSpendAllocationItem[] = [
-    {
-      platform: 'meta_ads',
-      label: 'Meta Ads',
-      spendUsd: metrics.metaSpendUsd,
-      percentage: metaPct,
-      roas: Number((metrics.blendedRoas * 1.12).toFixed(2)),
-      conversions: Math.round(metrics.totalConversions * (metaPct / 100)),
-      cacUsd: calculateBlendedCac(metrics.metaSpendUsd, Math.round(metrics.totalConversions * (metaPct / 100))),
-      colorClass: 'bg-blue-600',
-    },
-    {
-      platform: 'google_ads',
-      label: 'Google Ads',
-      spendUsd: metrics.googleSpendUsd,
-      percentage: googlePct,
-      roas: Number((metrics.blendedRoas * 0.88).toFixed(2)),
-      conversions: Math.max(1, metrics.totalConversions - Math.round(metrics.totalConversions * (metaPct / 100))),
-      cacUsd: calculateBlendedCac(metrics.googleSpendUsd, Math.max(1, metrics.totalConversions - Math.round(metrics.totalConversions * (metaPct / 100)))),
-      colorClass: 'bg-emerald-600',
-    },
-  ];
+    const splitConversions = (share: number): number | null =>
+      metrics.totalConversions === null ? null : Math.round(metrics.totalConversions * share);
 
-  return {
-    metrics,
-    timeWindow,
-    channels,
-    rebalancingRecommendation: {
-      fromChannel: 'Google Ads',
-      toChannel: 'Meta Ads',
-      suggestedShiftDailyUsd: 500,
-      projectedRevenueGainUsd: 2400,
-      rationale: 'Meta Ads ROAS (3.8x) is currently 31% higher than Google Search (2.9x). Rebalancing $500/day optimizes blended CPA.',
-    },
-  };
+    const metaConversions = splitConversions(metaPct / 100);
+    const googleConversions = splitConversions(1 - metaPct / 100);
+
+    channels.push(
+      {
+        platform: 'meta_ads',
+        label: 'Meta Ads',
+        spendUsd: metaSpend,
+        percentage: metaPct,
+        roas: metrics.blendedRoas,
+        conversions: metaConversions,
+        cacUsd: metaConversions === null ? null : calculateBlendedCac(metaSpend, metaConversions),
+        colorClass: 'bg-blue-600',
+      },
+      {
+        platform: 'google_ads',
+        label: 'Google Ads',
+        spendUsd: googleSpend,
+        percentage: 100 - metaPct,
+        roas: metrics.blendedRoas,
+        conversions: googleConversions,
+        cacUsd:
+          googleConversions === null ? null : calculateBlendedCac(googleSpend, googleConversions),
+        colorClass: 'bg-emerald-600',
+      },
+    );
+  }
+
+  return { metrics, timeWindow, channels };
 }

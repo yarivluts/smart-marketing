@@ -26,14 +26,14 @@ function MockExecutiveBlendedReport({
         <div data-testid="metric-spend-card" className="p-4 border rounded-lg bg-background">
           <div className="text-xs text-muted-foreground">Total Blended Spend</div>
           <div className="text-2xl font-extrabold mt-1" dir="ltr" data-testid="total-spend-val">
-            ${metrics.totalSpendUsd.toLocaleString()}
+            ${(metrics.totalSpendUsd ?? 0).toLocaleString()}
           </div>
           <div className="text-xs text-muted-foreground mt-2 flex justify-between">
-            <span data-testid="meta-spend-breakdown">Meta: <span dir="ltr">${metrics.metaSpendUsd.toLocaleString()}</span></span>
-            <span data-testid="google-spend-breakdown">Google: <span dir="ltr">${metrics.googleSpendUsd.toLocaleString()}</span></span>
+            <span data-testid="meta-spend-breakdown">Meta: <span dir="ltr">${(metrics.metaSpendUsd ?? 0).toLocaleString()}</span></span>
+            <span data-testid="google-spend-breakdown">Google: <span dir="ltr">${(metrics.googleSpendUsd ?? 0).toLocaleString()}</span></span>
           </div>
           <div className="text-xs text-green-600 mt-1">
-            +{metrics.periodComparison.spendChangePct}% vs prev period
+            +{metrics.periodComparison?.spendChangePct}% vs prev period
           </div>
         </div>
 
@@ -41,13 +41,13 @@ function MockExecutiveBlendedReport({
         <div data-testid="metric-cac-card" className="p-4 border rounded-lg bg-background">
           <div className="text-xs text-muted-foreground">Blended CAC</div>
           <div className="text-2xl font-extrabold mt-1" dir="ltr" data-testid="blended-cac-val">
-            ${metrics.blendedCacUsd.toFixed(2)}
+            ${(metrics.blendedCacUsd ?? 0).toFixed(2)}
           </div>
           <div className="text-xs text-muted-foreground mt-2">
             {metrics.totalConversions} Total Conversions
           </div>
           <div className="text-xs text-green-600 mt-1">
-            {metrics.periodComparison.cacChangePct}% vs prev period
+            {metrics.periodComparison?.cacChangePct}% vs prev period
           </div>
         </div>
 
@@ -55,13 +55,13 @@ function MockExecutiveBlendedReport({
         <div data-testid="metric-roas-card" className="p-4 border rounded-lg bg-background">
           <div className="text-xs text-muted-foreground">Blended ROAS</div>
           <div className="text-2xl font-extrabold mt-1" dir="ltr" data-testid="blended-roas-val">
-            {metrics.blendedRoas.toFixed(1)}x
+            {(metrics.blendedRoas ?? 0).toFixed(1)}x
           </div>
           <div className="text-xs text-muted-foreground mt-2">
             Conversion Velocity: {metrics.conversionVelocityDays} days
           </div>
           <div className="text-xs text-green-600 mt-1">
-            +{metrics.periodComparison.roasChangePct}% vs prev period
+            +{metrics.periodComparison?.roasChangePct}% vs prev period
           </div>
         </div>
 

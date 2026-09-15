@@ -1952,6 +1952,7 @@
     "tabOverview": "קמפיינים וביצועים",
     "tabCreatives": "גלריית קריאייטיבים",
     "tabAnalytics": "ניתוח הוצאה ו-ROAS",
+    "noData": "אין נתונים",
     "metricTotalSpend": "סך ההוצאה",
     "metricBlendedRoas": "ROAS משולב",
     "metricImpressionsClicks": "חשיפות והקלקות",
@@ -2123,6 +2124,7 @@
     "shortcutClose": "סגירה"
   },
   "ExecutiveReport": {
+    "noData": "אין נתונים",
     "metaTitle": "דוח מנהלים",
     "title": "סקירת צמיחה וביצועים למנהלים",
     "subtitle": "ניתוח משולב ללא הגדרה עבור Meta Ads ו-Google Ads",

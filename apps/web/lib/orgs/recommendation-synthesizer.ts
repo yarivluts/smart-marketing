@@ -5,6 +5,13 @@ import type { FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
 /**
  * Proactively inspects active campaigns, conversion funnels, and goal pace
  * to generate prioritized Smart Recommendation Proposals for the Automation Hub.
+ *
+ * Every recommendation here turns into an approvable action against a real ad account —
+ * raising a budget, pausing delivery. So each one may only be raised from a measurement
+ * that actually exists: a campaign whose `roas` is null is skipped rather than assumed.
+ * `UnifiedCampaignItem` used to guarantee a number for ROAS by deriving it from the daily
+ * budget, which meant this function could propose pausing a live campaign as
+ * "underperforming" on the strength of a figure nothing had measured.
  */
 export function synthesizeProactiveRecommendations(
   campaigns: readonly UnifiedCampaignItem[] = [],
@@ -12,8 +19,12 @@ export function synthesizeProactiveRecommendations(
 ): Omit<SmartRecommendationCardProps, 'onApprove' | 'onDismiss'>[] {
   const recommendations: Omit<SmartRecommendationCardProps, 'onApprove' | 'onDismiss'>[] = [];
 
+  const measured = campaigns.filter(
+    (c): c is UnifiedCampaignItem & { roas: number } => typeof c.roas === 'number',
+  );
+
   // 1. High ROAS Budget Scaling (Budget Opportunity)
-  const highRoasCampaign = [...campaigns]
+  const highRoasCampaign = [...measured]
     .filter((c) => c.status === 'enabled' && c.roas >= 3.5)
     .sort((a, b) => b.roas - a.roas)[0];
 
@@ -44,8 +55,11 @@ export function synthesizeProactiveRecommendations(
   }
 
   // 2. Low ROAS Ad Pause / Budget Reallocation (Ad Fatigue / Waste Reduction)
-  const lowRoasCampaign = [...campaigns]
-    .filter((c) => c.status === 'enabled' && c.spend30dUsd > 300 && c.roas < 1.8)
+  const lowRoasCampaign = [...measured]
+    .filter(
+      (c) =>
+        c.status === 'enabled' && typeof c.spend30dUsd === 'number' && c.spend30dUsd > 300 && c.roas < 1.8,
+    )
     .sort((a, b) => a.roas - b.roas)[0];
 
   if (lowRoasCampaign) {

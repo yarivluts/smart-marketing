@@ -13,8 +13,10 @@ export interface GoogleSearchAdPreviewCardProps {
   className?: string;
 }
 
+// Returns '' rather than a stand-in domain when the ad has no final URL — see the note on
+// the Meta card. The breadcrumb below is dropped entirely in that case.
 function parseHostname(finalUrl: string): string {
-  if (!finalUrl) return 'growthos.io';
+  if (!finalUrl) return '';
   try {
     const url = new URL(finalUrl.startsWith('http') ? finalUrl : `https://${finalUrl}`);
     return url.hostname;
@@ -49,9 +51,11 @@ export function GoogleSearchAdPreviewCard({
         <span className="rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
           {t('googleSponsoredLabel')}
         </span>
-        <span className="truncate text-muted-foreground font-mono text-[11px]" dir="ltr">
-          {hostname}{' › ads › '}{pathSlug}
-        </span>
+        {hostname ? (
+          <span className="truncate text-muted-foreground font-mono text-[11px]" dir="ltr">
+            {hostname}{' › ads › '}{pathSlug}
+          </span>
+        ) : null}
       </div>
 
       {/* Blue Clickable RSA Headline Bar */}

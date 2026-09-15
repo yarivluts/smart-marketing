@@ -35,17 +35,28 @@ export interface SmartRecommendationCardProps {
   onDismiss?: (id: string) => void;
 }
 
+/**
+ * Executive-level blended figures. Every field is nullable and `null` means "not measured",
+ * for the same reason as `UnifiedCampaignItem`: this is the report a founder reads to decide
+ * where money goes, and it is the last place that should print a plausible-looking constant.
+ *
+ * These were all derived from `dailyBudgetUsd` when nothing had been measured — spend as
+ * `budget * 30 * 0.88 * factor`, revenue as `spend * 3.6`, and `churnRatePct` /
+ * `dunningRecoveryRatePct` / `conversionVelocityDays` as flat constants scaled by a hash of
+ * the project id — while the report rendered a green "Live Blended Pipeline" badge over them.
+ */
 export interface ExecutiveBlendedMetrics {
-  totalSpendUsd: number;
-  metaSpendUsd: number;
-  googleSpendUsd: number;
-  blendedCacUsd: number;
-  blendedRoas: number;
-  totalConversions: number;
-  conversionVelocityDays: number;
-  churnRatePct: number;
-  dunningRecoveryRatePct: number;
-  periodComparison: {
+  totalSpendUsd: number | null;
+  metaSpendUsd: number | null;
+  googleSpendUsd: number | null;
+  blendedCacUsd: number | null;
+  blendedRoas: number | null;
+  totalConversions: number | null;
+  conversionVelocityDays: number | null;
+  churnRatePct: number | null;
+  dunningRecoveryRatePct: number | null;
+  /** Absent until a prior-period baseline is computed; there is no source for one today. */
+  periodComparison?: {
     spendChangePct: number;
     cacChangePct: number;
     roasChangePct: number;
