@@ -12,8 +12,11 @@ export interface MetaAdPreviewCardProps {
   className?: string;
 }
 
+// Returns '' rather than a stand-in domain when the ad carries no link. This card mimics
+// the real Facebook ad unit, so a hard-coded 'growthos.io' here read as the ad's genuine
+// destination — for an ad that in fact has none.
 function parseHostname(linkUrl?: string): string {
-  if (!linkUrl) return 'growthos.io';
+  if (!linkUrl) return '';
   try {
     const url = new URL(linkUrl.startsWith('http') ? linkUrl : `https://${linkUrl}`);
     return url.hostname;
@@ -114,9 +117,11 @@ export function MetaAdPreviewCard({
       {/* Link & Headline Bar */}
       <div className="flex items-center justify-between gap-3 bg-muted/30 p-4">
         <div className="flex flex-col min-w-0 flex-1">
-          <span className="truncate text-[10px] uppercase font-bold tracking-wider text-muted-foreground" dir="ltr">
-            {hostname}
-          </span>
+          {hostname ? (
+            <span className="truncate text-[10px] uppercase font-bold tracking-wider text-muted-foreground" dir="ltr">
+              {hostname}
+            </span>
+          ) : null}
           {ad.headline ? (
             <span className="line-clamp-1 text-xs font-bold leading-snug text-foreground mt-0.5" dir="auto">
               {ad.headline}
