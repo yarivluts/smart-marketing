@@ -405,7 +405,14 @@ export function buildDeterministicDemoGoals(projectId = 'default-project'): Unif
 }
 
 /**
- * Builds unified goal items from live Firestore models and query outcomes, or falls back to demo goals.
+ * Builds unified goal items from live Firestore models and query outcomes, or falls back to
+ * demo goals.
+ *
+ * The fallback is deliberate and, unlike the ad-performance figures, honest: every demo goal
+ * carries `isDemo: true`, `GoalThermometerCard` renders a "Demo Data" badge beside it, and
+ * editing one deliberately skips the PATCH so nothing fictional is ever persisted. Keep that
+ * contract intact — a demo goal that loses its flag becomes indistinguishable from a target
+ * the team actually set.
  */
 export function buildUnifiedGoalsData(
   projectId: string,
