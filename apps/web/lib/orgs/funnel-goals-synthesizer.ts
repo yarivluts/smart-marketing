@@ -97,16 +97,26 @@ export interface QualityCalibrationItem {
   avgCollectedRevenue40d: number;
 }
 
+/**
+ * The funnel cockpit's headline figures.
+ *
+ * The retention / velocity / payback / dunning / churn fields are nullable because GrowthOS
+ * has no source for any of them yet. They used to be the literals 64, 3.8, 48200, 82.4 and
+ * 1.8 - written straight into the returned object, never derived from anything - and the
+ * dashboard rendered them beside the two figures that are real. `topFunnelDropOffPct` had a
+ * `|| 62` fallback and `overallFunnelConversionPct` fell back to 22, so even those two
+ * produced confident numbers for a project with no funnel at all.
+ */
 export interface FunnelGoalsExecutiveSummary {
-  overallFunnelConversionPct: number;
-  topFunnelDropOffPct: number;
+  overallFunnelConversionPct: number | null;
+  topFunnelDropOffPct: number | null;
   activeGoalsCount: number;
   goalsOnTrackCount: number;
-  avgMonth1RetentionPct: number;
-  avgConversionVelocityDays: number;
-  total40dPaybackUsd: number;
-  dunningRecoveryRatePct: number;
-  churnRatePct: number;
+  avgMonth1RetentionPct: number | null;
+  avgConversionVelocityDays: number | null;
+  total40dPaybackUsd: number | null;
+  dunningRecoveryRatePct: number | null;
+  churnRatePct: number | null;
 }
 
 export interface ProactiveFunnelGoalRecommendation {
@@ -124,6 +134,13 @@ export interface ProactiveFunnelGoalRecommendation {
 
 export interface FunnelGoalsCockpitData {
   summary: FunnelGoalsExecutiveSummary;
+  /**
+   * Whether `funnelSteps` is the zero-config sample funnel rather than the project's own.
+   * `buildVisualFunnelData` has always computed this; this builder used to take only its
+   * `.steps` and drop the flag, so the dashboard had no way to label sample data and showed
+   * `createMockEasySignFunnel`'s 1000/380/220 as the project's real funnel.
+   */
+  isSimulatedFunnel: boolean;
   funnelSteps: FunnelStepItem[];
   funnelViewKind: FunnelView['kind'];
   goals: UnifiedGoalItem[];
@@ -637,33 +654,63 @@ export function buildFunnelGoalsCockpitData(params: {
   // 5. Executive Summary & Proactive Recommendation
   const totalConversions = funnelSteps.length > 0 ? funnelSteps[funnelSteps.length - 1].customerCount : 220;
   const initialEntrants = funnelSteps.length > 0 ? funnelSteps[0].customerCount : 1000;
-  const overallConversionPct = initialEntrants > 0 ? Math.round((totalConversions / initialEntrants) * 100) : 22;
+  // Null while the funnel is the zero-config sample: a conversion rate computed from
+  // createMockEasySignFunnel's 1000/380/220 is exactly as invented as the drop-off beside it,
+  // and reporting one but not the other would be arbitrary.
+  const overallConversionPct =
+    visualFunnel.isSimulated || initialEntrants === 0
+      ? null
+      : Math.round((totalConversions / initialEntrants) * 100);
 
-  const proactiveRecommendation: ProactiveFunnelGoalRecommendation = {
-    id: 'rec-funnel-viewed-dropoff',
-    category: 'funnel_dropoff',
-    title: 'High Drop-Off at EasySign Viewed Stage',
-    description: '62% of users drop off between Sent and Viewed. Deploying an instant SMS reminder sequence increases completion by +14%.',
-    beforeDiff: 'Manual Follow-up (38% viewed rate)',
-    afterDiff: 'Automated SMS Multi-touch (52% projected viewed rate)',
-    projectedImpact: '+14% Completed Signatures (+31 conversions/mo)',
-    actionType: 'funnel_optimization',
-    targetId: 'easysign_funnel_viewed',
-    targetLabel: 'EasySign Conversion Funnel',
-  };
+  /*
+    Only raised from the project's own funnel.
+
+    This used to be a fixed recommendation - "62% of users drop off between Sent and Viewed.
+    Deploying an instant SMS reminder sequence increases completion by +14%", projecting
+    "+31 conversions/mo" against the target id `easysign_funnel_viewed` - returned
+    unconditionally, including for a project whose funnel was the zero-config sample. The
+    dashboard puts an Apply button on it that POSTs to the real automation endpoint, so a
+    customer could act on a drop-off that had never been measured, quoted to the percent.
+
+    A recommendation needs a real funnel with a real worst step; without one there is nothing
+    to recommend, so this is null and the dashboard renders no card.
+  */
+  const worstStep = visualFunnel.isSimulated
+    ? null
+    : [...funnelSteps].sort((a, b) => b.dropOffPercent - a.dropOffPercent)[0] ?? null;
+
+  const proactiveRecommendation: ProactiveFunnelGoalRecommendation | null =
+    worstStep && worstStep.dropOffPercent > 0
+      ? {
+          id: `rec-funnel-${worstStep.stageKey}`,
+          category: 'funnel_dropoff',
+          title: `Largest drop-off at ${worstStep.stageLabel}`,
+          description: `${worstStep.dropOffPercent}% of the visitors who reach "${worstStep.stageLabel}" do not continue past it.`,
+          beforeDiff: `${worstStep.dropOffPercent}% drop-off`,
+          afterDiff: 'Retargeting campaign draft',
+          // No projected impact: projecting one needs a model of the intervention's effect,
+          // and the previous "+14% / +31 conversions/mo" was a literal, not a forecast.
+          projectedImpact: '',
+          actionType: 'funnel_optimization',
+          targetId: `funnel_${worstStep.stageKey}`,
+          targetLabel: worstStep.stageLabel,
+        }
+      : null;
 
   return {
     summary: {
       overallFunnelConversionPct: overallConversionPct,
-      topFunnelDropOffPct: visualFunnel.biggestDropOffPercent || 62,
+      topFunnelDropOffPct: visualFunnel.isSimulated ? null : visualFunnel.biggestDropOffPercent,
       activeGoalsCount: goalsSummary.totalGoalsCount,
       goalsOnTrackCount: goalsSummary.onTrackCount,
-      avgMonth1RetentionPct: 64,
-      avgConversionVelocityDays: 3.8,
-      total40dPaybackUsd: 48200,
-      dunningRecoveryRatePct: 82.4,
-      churnRatePct: 1.8,
+      // Each of these needs a source that does not exist yet - see the interface doc comment.
+      avgMonth1RetentionPct: null,
+      avgConversionVelocityDays: null,
+      total40dPaybackUsd: null,
+      dunningRecoveryRatePct: null,
+      churnRatePct: null,
     },
+    isSimulatedFunnel: visualFunnel.isSimulated,
     funnelSteps,
     funnelViewKind: funnelView.kind,
     goals: goalItems,
