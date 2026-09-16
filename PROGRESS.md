@@ -17,6 +17,63 @@ Template for each entry:
 
 ---
 
+## 2026-09-16 - Hourly quality pass #6: API keys page
+
+- **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/keys`. Reviewed as a security surface
+  rather than a data one - it holds no fabricated figures.
+- **Finding:** the page is where a credential audit happens, and it answered neither question
+  such an audit starts with. A revoked key rendered the bare word "Revoked" - no date, no actor
+  - and no key showed its creator at all. Both were already available: `createdBy` has been on
+  `ApiKeySummary` since it existed and was simply never rendered; `revoked_by` has been on the
+  model just as long but `toSummary` dropped it, so the page could not have shown it.
+- **Fixed:** `revokedBy` added to the summary; the page renders the creator on every key and the
+  revocation date plus actor on a revoked one, resolved to display names through the org member
+  list. A key minted by someone who has since left says so rather than printing a raw uid.
+  PR #400, KAN-108.
+- **Merged this pass:** #399 (KAN-92 Done).
+- **KAN-103 diagnostic:** on the #397 run every vitest summary reported all-passing - 386 files,
+  2485 tests, zero failures - and the task still exited 1 on `@growthos/web#test`. The failure is
+  therefore not an assertion. Both web test scripts are wrapped in `firebase emulators:exec`,
+  which returns its own exit code, so the emulator is exiting non-zero after the tests pass.
+  Hardening tests will not help; the fix is an emulator that survives a 33-minute run, or a
+  wrapper that separates "the command failed" from "the emulator failed on teardown".
+
+### Note on the sprint workflow in CLAUDE.md
+
+The primary checkout's `CLAUDE.md` now carries a step-4 instruction to run `pnpm sprints list` /
+`complete-ready` and follow `docs/sprints.md`. None of that exists on `main` - the doc, the
+`scripts/sprints.mjs` runner and the `sprints` / `test:sprints` package scripts are all part of
+session B's uncommitted work, and `git log --all -- docs/sprints.md` returns nothing. So the
+contract as written cannot be followed from a clean checkout, by me or by any other agent. Not a
+defect to fix here; it resolves itself when session B commits.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit | #392 | metrics derived from budget |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge |
+| Creative preview gallery | #392 | synthesized ad creatives |
+| Top-level /automation route | #392 | invented proposals + fake org ids; now redirects |
+| Copilot chat + engine | #393, #399 | canned replies; panel had its own duplicate engine |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing |
+| Funnel cockpit | #397 | sample funnel unlabelled; 5 literal KPIs |
+| Project automation page | #398 | literal performance input bypassing the #392 guard |
+| Ingest health | #5 | clean - no changes |
+| API keys | #400 | creator and revoker never surfaced |
+
+**Not yet reviewed:** goals, settings, metric-defs, schema-defs, segments, customers, hooks,
+experiments, cohorts, plugins, resources, record-feed, win-rules, cost-guardrails, churn-reasons,
+field-mappings, demos, feedback, firmographics, intent-quality, insights, session-replay, support,
+rep-collections, billing-ops-feed, campaign-ops.
+
+- **Next step:** next pass takes the next unreviewed page.
+- **Waiting on human:** the primary checkout still holds ~164 uncommitted session-B files and
+  cannot be pulled - now also blocking the sprint workflow its own CLAUDE.md prescribes; the CAC
+  join-key decision; KAN-43; the tracking snippet on the real EasySign site; revoking the old Jira
+  token in Atlassian.
+
 ## 2026-09-16 - Hourly quality pass #5: ingest health (clean) + copilot panel
 
 - **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/ingest-health`. **No defects found.**
