@@ -88,7 +88,7 @@ async function seedWinEvent(organizationId: string, projectId: string, label: st
 
 async function setupProjectWithKey(
   orgName: string,
-  scopes: ('mcp.read' | 'ingest.write' | 'dashboards.write' | 'metrics.write' | 'project.configure')[] = ['mcp.read'],
+  scopes: ('mcp.read' | 'ingest.write' | 'dashboards.write' | 'metrics.write' | 'schema.write' | 'project.configure')[] = ['mcp.read'],
 ) {
   const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
@@ -214,6 +214,8 @@ describe('McpController (e2e)', () => {
           'purge_project_data',
           'reexport_raw_records',
           'register_metric',
+          'register_schema',
+          'evolve_schema',
           'set_goal_status',
           'set_hook_signing_secret',
           'update_project_settings',
@@ -354,7 +356,7 @@ describe('McpController (e2e)', () => {
     });
 
     it('the self-service admin tools let a key finish its own project setup: read the warehouse catalog, register a metric, declare currency/timezone, provision a signed webhook', async () => {
-      const { project, rawKey } = await setupProjectWithKey('Admin Tools Self Service Org', ['mcp.read', 'metrics.write', 'project.configure', 'ingest.write']);
+      const { project, rawKey } = await setupProjectWithKey('Admin Tools Self Service Org', ['mcp.read', 'metrics.write', 'schema.write', 'project.configure', 'ingest.write']);
       const client = await connectedClient(rawKey);
       const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string => (result.content as Array<{ text: string }>)[0].text;
       try {
@@ -366,6 +368,56 @@ describe('McpController (e2e)', () => {
         expect(revenue?.built).toBe(true);
         expect(revenue?.columns.map((column) => column.column)).toContain('amount');
         expect(tables.tables.find((entry) => entry.table === 'fact_funnel_step')?.built).toBe(false);
+
+        /*
+          Schema registration, the step that gated every self-serve integration.
+
+          The registry is strict by design: a record whose event name is not registered, or
+          that carries a property the schema does not declare, is rejected into quarantine. The
+          service to register one has existed all along, but nothing exposed it to a key holder
+          - the only REST route is session-cookie admin - so a customer with an API key could
+          send perfectly good events forever and watch every one of them be quarantined, with
+          no way to fix it that did not involve a GrowthOS engineer.
+        */
+        const schema = await client.callTool({
+          name: 'register_schema',
+          arguments: {
+            kind: 'event',
+            name: 'signup',
+            fields: [
+              { name: 'customer_id', type: 'string', is_required: true, is_identity_key: true },
+              { name: 'plan', type: 'string' },
+            ],
+          },
+        });
+        expect(schema.isError ?? false).toBe(false);
+        expect(JSON.parse(textOf(schema))).toMatchObject({ name: 'signup', kind: 'event', version: 1, status: 'active' });
+
+        // Registering the same family twice is refused rather than silently forking it.
+        expect((await client.callTool({
+          name: 'register_schema',
+          arguments: { kind: 'event', name: 'signup', fields: [{ name: 'customer_id', type: 'string' }] },
+        })).isError).toBe(true);
+
+        // Evolving it additively is allowed and supersedes v1.
+        expect(JSON.parse(textOf(await client.callTool({
+          name: 'evolve_schema',
+          arguments: {
+            kind: 'event',
+            name: 'signup',
+            fields: [
+              { name: 'customer_id', type: 'string', is_required: true, is_identity_key: true },
+              { name: 'plan', type: 'string' },
+              { name: 'referrer', type: 'string' },
+            ],
+          },
+        })))).toMatchObject({ name: 'signup', version: 2, status: 'active' });
+
+        // It is now visible to the catalog tool a setup agent reads.
+        const schemas = JSON.parse(textOf(await client.callTool({ name: 'list_schemas', arguments: {} }))) as {
+          schemas: Array<{ name: string; version: number }>;
+        };
+        expect(schemas.schemas.find((entry) => entry.name === 'signup')?.version).toBe(2);
 
         // A metric written against that catalog registers; one naming a column the table lacks is refused with the reason.
         const registered = await client.callTool({
