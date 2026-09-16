@@ -47,6 +47,8 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   list_goals: { kind: 'connection-scope', permission: 'mcp.read' },
   get_goal_progress: { kind: 'connection-scope', permission: 'mcp.read' },
   delete_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
+  register_schema: { kind: 'per-call-permission', permission: 'schema.write' },
+  evolve_schema: { kind: 'per-call-permission', permission: 'schema.write' },
   register_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
   evolve_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
   archive_metric: { kind: 'per-call-permission', permission: 'metrics.write' },

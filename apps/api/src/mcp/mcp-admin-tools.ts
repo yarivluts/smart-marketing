@@ -9,6 +9,7 @@ import {
   createHookEndpoint,
   DuplicateMetricDefinitionError,
   evolveMetricDefinition,
+  evolveSchemaDefinition,
   GoalNotFoundError,
   HookEndpointNotFoundError,
   HookEndpointNotHmacModeError,
@@ -34,6 +35,7 @@ import {
   queryGoalProgress,
   reexportRawRecordsToWarehouse,
   registerMetricDefinition,
+  registerSchemaDefinition,
   setGoalStatus,
   setHookEndpointSigningSecret,
   unarchiveProject,
@@ -176,6 +178,34 @@ const metricDefinitionInputShape = {
   dimensions: z.unknown().optional().describe('Breakdown dimensions. For an aggregation each must be a real column on the table; for a formula each must be declared on EVERY referenced metric.'),
 };
 
+const schemaDefinitionInputShape = {
+  kind: z.string().describe('One of: event, entity, measure. An event is something that happened; an entity is a thing with a stable id; a measure is a numeric reading with a value and a timestamp.'),
+  name: z.string().min(1).describe('Schema name, e.g. "signup" or "subscription_state_change". This is the value the ingest envelope carries, and for measure/entity kinds it is also the table name a metric can query.'),
+  fields: z
+    .unknown()
+    .describe(
+      'Array of { name, type, is_required?, is_pii?, is_identity_key? }. type is one of: string, number, boolean, timestamp. A record carrying a property this list does not declare is rejected into quarantine, so declare every property you intend to send.',
+    ),
+};
+
+/**
+ * Normalises the tool's loosely-typed `fields` argument into the service's SchemaFieldInput.
+ *
+ * The three booleans default to false rather than being required: the common case is a plain
+ * optional property, and making a caller spell out `is_pii: false` on every field is the kind
+ * of friction that pushes people back to asking a human to register the schema for them.
+ */
+function toSchemaFields(args: any): { name: string; type: string; isRequired: boolean; isPii: boolean; isIdentityKey: boolean }[] {
+  const raw = Array.isArray(args.fields) ? args.fields : [];
+  return raw.map((field: any) => ({
+    name: String(field?.name ?? ''),
+    type: String(field?.type ?? ''),
+    isRequired: field?.is_required === true,
+    isPii: field?.is_pii === true,
+    isIdentityKey: field?.is_identity_key === true,
+  }));
+}
+
 const archiveMetricInputShape = { name: z.string().min(1).describe('The metric family to retire. Refused while an active formula still references it.') };
 const metricVersionsInputShape = { name: z.string().min(1) };
 const goalIdInputShape = { goal_id: z.string().min(1) };
@@ -255,6 +285,52 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
           })),
       });
     }),
+  );
+
+  server.registerTool(
+    'register_schema',
+    {
+      title: 'Register schema',
+      description:
+        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. Requires "schema.write".',
+      inputSchema: toolInputSchema(schemaDefinitionInputShape),
+    },
+    auditedToolHandler(auth, 'register_schema', async (args: any) =>
+      runAdminTool(auth, 'schema.write', args, async (a: any) => {
+        const schemaDef = await registerSchemaDefinition({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          kind: String(a.kind),
+          name: String(a.name),
+          fields: toSchemaFields(a),
+          createdByUserId: actorId(auth),
+        });
+        return textResult({ name: schemaDef.name, kind: schemaDef.kind, version: schemaDef.version, status: schemaDef.status });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'evolve_schema',
+    {
+      title: 'Evolve schema',
+      description:
+        'Register the next version of an already-registered schema. Additive changes only - removing a field, or adding a required one, is rejected as a breaking change, because records already in flight were written against the previous version. The previous version is kept as "superseded" rather than deleted. Requires "schema.write".',
+      inputSchema: toolInputSchema(schemaDefinitionInputShape),
+    },
+    auditedToolHandler(auth, 'evolve_schema', async (args: any) =>
+      runAdminTool(auth, 'schema.write', args, async (a: any) => {
+        const schemaDef = await evolveSchemaDefinition({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          kind: String(a.kind),
+          name: String(a.name),
+          fields: toSchemaFields(a),
+          createdByUserId: actorId(auth),
+        });
+        return textResult({ name: schemaDef.name, kind: schemaDef.kind, version: schemaDef.version, status: schemaDef.status });
+      }),
+    ),
   );
 
   server.registerTool(
