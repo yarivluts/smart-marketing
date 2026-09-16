@@ -17,6 +17,66 @@ Template for each entry:
 
 ---
 
+## 2026-09-16 - Hourly quality pass #8: metric catalog / KAN-102
+
+- **Surface reviewed:** the metric catalog and `describe_metric`, taken as KAN-102 - the
+  events -> metrics contract.
+- **The premise was wrong, and I checked before building.** The brief was that nothing turns
+  `events` into `fact_funnel_event`. The chain is intact, verified model by model:
+  `raw_records -> stg_raw_records -> stg_events (kind='event') -> events (event_type =
+  schema_name) -> fact_funnel_event (step = coalesce(properties.event_name, event_type)) ->
+  signups = count_distinct(customer_id) where step='signup'`.
+  `fact_funnel_event` selects every non-touchpoint row of `events`, and its own comment says it
+  deliberately does not require a confirmed funnel so `signups` works before onboarding.
+- **So the two tickets were one.** "accepted:1 but signups=0" is what happens when events are
+  quarantined for lack of a registered schema - `events` stays empty and so does the fact table.
+  KAN-94 / PR #401 is the fix. **I was one step from building a second mapping layer on top of a
+  working one**; the brief was specific and confident and I had already agreed with it.
+- **What was genuinely missing:** nothing told anyone which event feeds which metric. A metric
+  names a warehouse table and the table name reveals nothing about what to emit.
+  `describe_metric` now returns `requiredEvents`. PR #403, KAN-102.
+- **Scoped narrowly:** only `fact_funnel_event` is modelled, where the lineage is total and the
+  hint exact. `dim_subscription` / `fact_revenue_event` fold several event types through their own
+  logic and return nothing rather than a confident guess.
+- **Worth remembering separately:** the dbt job runs hourly, so a correctly ingested event does
+  not reach a metric until the next refresh. A zero read minutes after sending is not evidence of
+  a wiring failure - and would look exactly like one.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit | #392 | metrics derived from budget |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge |
+| Creative preview gallery | #392 | synthesized ad creatives |
+| Top-level /automation route | #392 | invented proposals + fake org ids |
+| Copilot chat + engine | #393, #399 | canned replies; duplicate engine in the panel |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing |
+| Funnel cockpit | #397 | sample funnel unlabelled; 5 literal KPIs |
+| Project automation page | #398 | literal input bypassing the #392 guard |
+| Ingest health | #5 | clean - no changes |
+| API keys | #400 | creator and revoker never surfaced |
+| Hook endpoints | #402 | 202 pending never becomes data, and never said so |
+| Metric catalog / describe_metric | #403 | no way to learn which event feeds a metric |
+
+**Not yet reviewed:** goals, settings, schema-defs, segments, customers, experiments, cohorts,
+plugins, resources, record-feed, win-rules, cost-guardrails, churn-reasons, field-mappings, demos,
+feedback, firmographics, intent-quality, insights, session-replay, support, rep-collections,
+billing-ops-feed, campaign-ops.
+
+- **Standing lesson, third instance:** twice the defect was one layer away from where I looked
+  (a flag the page never passed; a guard its caller fed dishonestly). This time the defect was not
+  there at all, and the brief describing it was wrong. Read the code before writing code, even
+  when the report is specific and confident - especially then.
+- **Next step:** inline quarantine reasons on the ingest POST response, which EasySign ranked
+  first for a normal user: a rejected record returns HTTP 200 with accepted:0 and the reason lives
+  only in a second undocumented endpoint.
+- **Waiting on human:** default key scopes (`project.configure` absent from issued keys - a
+  blast-radius product decision, not mine); the primary checkout's uncommitted session-B files;
+  the CAC join-key decision; KAN-43; the tracking snippet on the real EasySign site; revoking the
+  old Jira token in Atlassian.
+
 ## 2026-09-16 - Hourly quality pass #7: hook endpoints, and the self-serve gap analysis
 
 - **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/hooks`, chosen because it also answered a

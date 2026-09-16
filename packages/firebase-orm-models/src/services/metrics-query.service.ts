@@ -217,6 +217,69 @@ export interface MetricCatalogDetail extends MetricCatalogEntry {
   aggregation?: MetricAggregationDef;
   formula?: string;
   dependsOn: string[];
+  /**
+   * What has to be sent for this metric to be non-zero, in the caller's own terms.
+   *
+   * A metric names a warehouse table, and knowing the table tells you nothing about what to
+   * emit: `signups` reads `fact_funnel_event`, and no amount of staring at that name reveals
+   * that it wants an event whose schema is called `signup` carrying a `customer_id`. Someone
+   * integrating would register a schema, POST successfully, see `accepted: 1`, and still read
+   * zero - with the definition in front of them and no way to tell what was missing.
+   *
+   * Undefined when the metric reads a table this cannot speak for (a custom measure/entity
+   * mart, or a core table with no event-shaped source). Saying nothing is better than guessing.
+   */
+  requiredEvents?: RequiredEventHint[];
+}
+
+/** One event a metric needs in order to count anything. */
+export interface RequiredEventHint {
+  /** The `schema` value the ingest envelope must carry, i.e. the registered schema's name. */
+  event: string;
+  /** Envelope/property fields the metric reads, so an event that omits them counts for nothing. */
+  requiredFields: string[];
+  /** Why this event, in one line — the actual derivation, not a restatement of the filter. */
+  because: string;
+}
+
+/**
+ * Derives {@link MetricCatalogDetail.requiredEvents} from an aggregation definition.
+ *
+ * Only `fact_funnel_event` is modelled here, deliberately. Its lineage is simple and total —
+ * `fact_funnel_event` selects every non-touchpoint row of `events` and sets
+ * `step = properties.event_name ?? event_type`, where `event_type` is the record's own
+ * `schema_name` — so a `step = X` filter means exactly "send an event whose schema is X".
+ *
+ * The other core tables are not guessed at. `dim_subscription` and `fact_revenue_event` fold
+ * several event types through their own logic, and a hint that is confidently wrong is worse
+ * than none: it would send someone off to emit an event that changes nothing.
+ */
+function deriveRequiredEvents(aggregation: MetricAggregationDef | undefined): RequiredEventHint[] | undefined {
+  if (!aggregation || aggregation.table !== 'fact_funnel_event') {
+    return undefined;
+  }
+
+  const stepFilter = (aggregation.filters ?? []).find((filter) => filter.field === 'step' && filter.operator === '=');
+  if (!stepFilter || typeof stepFilter.value !== 'string') {
+    // No step filter means the metric counts every event, which is a real answer worth giving.
+    return [
+      {
+        event: '*',
+        requiredFields: aggregation.column ? [aggregation.column] : [],
+        because: 'Counts every non-touchpoint event this project ingests, whatever its schema.',
+      },
+    ];
+  }
+
+  return [
+    {
+      event: stepFilter.value,
+      // customer_id on fact_funnel_event is the record's entity_id, which the ingest envelope
+      // carries — so naming the column directly would send someone looking for a property.
+      requiredFields: aggregation.column === 'customer_id' ? ['customer_id (envelope)'] : aggregation.column ? [aggregation.column] : [],
+      because: `fact_funnel_event.step is the event's own schema name, so this metric counts events registered and sent as "${stepFilter.value}".`,
+    },
+  ];
 }
 
 /** `GET /v1/metrics/{name}` (plan `12 §3`): the active version's full definition, or `null` if no metric is registered under that name — the same 404-not-403 non-enumeration posture as every other cross-tenant lookup in this codebase (there's nothing tenant-scoped to leak here, but the shape is kept consistent). */
@@ -226,6 +289,7 @@ export async function getMetricCatalogDetail(organizationId: string, projectId: 
     return null;
   }
   const dependsOn = active.definition_kind === 'formula' && active.formula ? [...collectIdentifiers(parseFormula(active.formula))] : [];
+  const requiredEvents = deriveRequiredEvents(active.aggregation);
   return {
     name: active.name,
     version: active.version,
@@ -234,5 +298,6 @@ export async function getMetricCatalogDetail(organizationId: string, projectId: 
     ...(active.aggregation ? { aggregation: active.aggregation } : {}),
     ...(active.formula ? { formula: active.formula } : {}),
     dependsOn,
+    ...(requiredEvents ? { requiredEvents } : {}),
   };
 }
