@@ -498,6 +498,9 @@
     "suggestionSummary": "{targetField} ← {sourcePath} ({confidence}% match)"
   },
   "SchemaRegistry": {
+    "eventRejectedCount": "{count} records rejected and quarantined - they never landed, so this schema still reads as never received.",
+    "eventRejectedLink": "See why in Ingest Health",
+    "eventRejectedSampleNote": "Counted from the {sampled} most recent quarantined records, so the real number may be higher.",
     "metaTitle": "Schema registry",
     "title": "Schema registry for {projectName}",
     "registeredHeading": "Registered schemas",

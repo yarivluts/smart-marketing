@@ -8,9 +8,11 @@ import {
   getEventVolumeOverviewForProject,
   listEnvironmentsForProject,
   listOrgProjects,
+  listQuarantinedRecordsForProject,
   listSchemaDefinitionsForProject,
   listTrackingAlertsForProject,
 } from '@/lib/orgs/queries';
+import { Link } from '@/i18n/navigation';
 import { toSchemaDefView, type SchemaDefView } from '@/lib/orgs/schema-def-view';
 import { toTrackingAlertView, trackingAlertStatusLabelKey } from '@/lib/orgs/tracking-alert-view';
 import { RegisterSchemaDefForm } from '@/components/orgs/register-schema-def-form';
@@ -91,6 +93,31 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
   // pattern the cost-guardrails page uses for its own equivalent duplicate fetch).
   const eventVolumeOverview = await getEventVolumeOverviewForProject(orgId, projectId, { precomputedSchemaDefs: schemaDefs });
 
+  /*
+    Rejected records, tallied per schema and environment.
+
+    The volume overview is built from LANDED records, and a quarantined record never lands -
+    it is diverted before raw_records is written. So a schema whose traffic is being rejected
+    in full reports lastSeenAt: null and renders as "Never received a record", which reads as
+    "you have not sent anything". The opposite can be true: hundreds of records arriving and
+    every one bouncing off one undeclared property.
+
+    That is the single worst state to be in silently, because the page that exists to tell you
+    whether tracking works says the thing that makes you go and check your emitter.
+
+    Bounded by a sample rather than a count query: Firestore has no group-by, a per-schema
+    count would be one query per schema per environment, and the exact number matters far less
+    than the fact that it is not zero. The copy says it is a sample so the figure is not read
+    as authoritative.
+  */
+  const QUARANTINE_SAMPLE_SIZE = 500;
+  const quarantinedSample = await listQuarantinedRecordsForProject(orgId, projectId, QUARANTINE_SAMPLE_SIZE);
+  const rejectedCountByKey = new Map<string, number>();
+  for (const record of quarantinedSample) {
+    const key = `${record.schema_name}:${record.environment_id}`;
+    rejectedCountByKey.set(key, (rejectedCountByKey.get(key) ?? 0) + 1);
+  }
+
   const families = groupIntoFamilies(schemaDefs.map(toSchemaDefView));
   // `TrackingAlertModel` only stores `environment_id` — resolve the display name server-side,
   // same "build an id->name lookup, pass plain strings across the RSC boundary" pattern the
@@ -145,6 +172,9 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
           <CheckTrackingAlertsButton orgId={orgId} projectId={projectId} />
         </div>
 
+        {quarantinedSample.length >= QUARANTINE_SAMPLE_SIZE ? (
+          <p className="text-xs text-muted-foreground">{t('eventRejectedSampleNote', { sampled: QUARANTINE_SAMPLE_SIZE })}</p>
+        ) : null}
         {eventVolumeOverview.length === 0 ? (
           <p className="text-muted-foreground">{t('noEventSchemas')}</p>
         ) : (
@@ -161,6 +191,14 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
                   <span className="text-xs text-muted-foreground">
                     {entry.lastSeenAt === null ? t('eventNeverSeen') : t('eventLastSeen', { lastSeenAt: entry.lastSeenAt })}
                   </span>
+                  {(rejectedCountByKey.get(`${entry.schemaName}:${entry.environmentId}`) ?? 0) > 0 ? (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      {t('eventRejectedCount', { count: rejectedCountByKey.get(`${entry.schemaName}:${entry.environmentId}`) ?? 0 })}{' '}
+                      <Link className="underline" href={`/orgs/${orgId}/projects/${projectId}/ingest-health`}>
+                        {t('eventRejectedLink')}
+                      </Link>
+                    </span>
+                  ) : null}
                 </div>
                 <EventVolumeSparkline dailyCounts={entry.dailyCounts} />
               </li>

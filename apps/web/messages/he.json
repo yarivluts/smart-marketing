@@ -498,6 +498,9 @@
     "suggestionSummary": "{targetField} ← {sourcePath} (התאמה של {confidence}%)"
   },
   "SchemaRegistry": {
+    "eventRejectedCount": "{count} רשומות נדחו והועברו לבידוד — הן מעולם לא נחתו, ולכן הסכימה עדיין מוצגת כמי שלא התקבלה.",
+    "eventRejectedLink": "בדקו מדוע במסך תקינות הקליטה",
+    "eventRejectedSampleNote": "נספר מתוך {sampled} הרשומות האחרונות שבבידוד, ולכן המספר בפועל עשוי להיות גבוה יותר.",
     "metaTitle": "מרשם סכימות",
     "title": "מרשם סכימות עבור {projectName}",
     "registeredHeading": "סכימות רשומות",
