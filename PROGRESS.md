@@ -17,6 +17,63 @@ Template for each entry:
 
 ---
 
+## 2026-09-16 - Hourly quality pass #9: ingest API response
+
+- **Surface reviewed:** the ingest POST response - ranked first by the EasySign session for a
+  normal user, and the clearest remaining instance of the standing priority: success reported
+  when nothing succeeded.
+- **Finding:** a record that failed validation came back as a bare count - `202` with
+  `accepted: 0, quarantined: 1` and no reason. To learn why, the sender had to already know that
+  `GET /v1/ingest/batches/{id}` exists; nothing in the response mentions it.
+  **The reasons were never missing.** `ingestBatch` computes them per record during validation
+  and persists them on the batch. `IngestBatchSummary` did not carry them, and the controller
+  could not return what it was not given - two layers each dropping a value already in hand.
+- **Fixed:** the response carries `rejected` - only the records that were not accepted, each with
+  its reasons. A clean batch is byte-identical to before; the field's absence is the signal that
+  nothing failed. PR #404, KAN-95.
+- **Deliberately not changed:** the 202, including when `accepted` is 0. A wholly-rejected batch
+  is not a transport failure and this endpoint has always answered 202, so non-2xx would break
+  every caller checking `res.ok`. Documented in `docs/api/ingest.md` as an open API decision with
+  the workaround, rather than slipped into a quality pass.
+- **Merged this pass:** #401 (KAN-94 - left In Review, not Done: merged is not deployed), #402.
+- **Filed:** KAN-110 - the revenue/subscription core models hardcode `stripe_charge` and
+  `stripe_subscription`, so `mrr` is unreachable for any customer without a PSP. Carries two
+  customer constraints (no subscription_id; integer ILS) and one correction worth keeping:
+  `mrr_normalized` means normalized to a **monthly** figure, not converted to a base currency -
+  there is no FX logic anywhere in the repo, and `currency` is its own column.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit | #392 | metrics derived from budget |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge |
+| Creative preview gallery | #392 | synthesized ad creatives |
+| Top-level /automation route | #392 | invented proposals + fake org ids |
+| Copilot chat + engine | #393, #399 | canned replies; duplicate engine in the panel |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing |
+| Funnel cockpit | #397 | sample funnel unlabelled; 5 literal KPIs |
+| Project automation page | #398 | literal input bypassing the #392 guard |
+| Ingest health | #5 | clean - no changes |
+| API keys | #400 | creator and revoker never surfaced |
+| Hook endpoints | #402 | 202 pending never becomes data, and never said so |
+| Metric catalog / describe_metric | #403 | no way to learn which event feeds a metric |
+| Ingest API response | #404 | rejection reasons computed, then dropped twice |
+
+**Not yet reviewed:** goals, settings, schema-defs, segments, customers, experiments, cohorts,
+plugins, resources, record-feed, win-rules, cost-guardrails, churn-reasons, field-mappings, demos,
+feedback, firmographics, intent-quality, insights, session-replay, support, rep-collections,
+billing-ops-feed, campaign-ops.
+
+- **Next step:** next pass takes the next unreviewed page.
+- **Waiting on human:** (1) whether to redeploy `api-prod` from main - `register_schema` is merged
+  and green but not callable until then, and EasySign is holding 8 schemas for the signal; (2)
+  whether EasySign should pursue `mrr` now via a custom measure schema rather than wait on
+  KAN-110, which has no date; (3) default key scopes (`project.configure` absent from issued
+  keys); (4) the primary checkout's uncommitted session-B files; (5) the CAC join key; (6)
+  KAN-43; (7) the tracking snippet on the real site; (8) revoking the old Jira token.
+
 ## 2026-09-16 - Hourly quality pass #7: hook endpoints, and the self-serve gap analysis
 
 - **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/hooks`, chosen because it also answered a
