@@ -17,6 +17,67 @@ Template for each entry:
 
 ---
 
+## 2026-09-16 - Hourly quality pass #7: hook endpoints, and the self-serve gap analysis
+
+- **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/hooks`, chosen because it also answered a
+  question the EasySign session had asked: do hook deliveries bypass the schema registry?
+- **Answer, and the finding:** they do not bypass it - **they never reach ingest at all**.
+  `receiveHookPayload` verifies the signature when the endpoint asks for one, stores a
+  `HookDeliveryModel` with status `pending`, and returns. It does not touch the registry, create
+  records, or quarantine. A delivery becomes data only when `applyFieldMappingToDelivery` runs,
+  whose only caller is a session-cookie admin route driven one delivery at a time. Nothing
+  applies a mapping automatically.
+  So the queue's two buttons - Reviewed and Discard - both leave the payload un-ingested, and the
+  page offered no path to the action that does. A sender could POST correct payloads
+  indefinitely, get 202 every time, walk the whole queue marking things reviewed, and end up with
+  zero records - without even a quarantine row to investigate, because quarantine is an ingest
+  concept and ingest was never reached.
+- **Fixed:** the queue states what pending means and links to field mappings; an e2e assertion
+  pins the contract (a 202'd delivery stays pending, carries no `applied_at`, creates no ingest
+  batch). PR #402.
+- **Also this pass - KAN-94, the self-serve 80/20:** `register_schema` and `evolve_schema` on MCP,
+  per-call-permission on `schema.write` (already in `API_KEY_SCOPES`). Verified the premise first:
+  the services existed all along, MCP had only `list_schemas`, and the sole REST route is
+  session-cookie admin. PR #401. Three follow-up facts confirmed in code for EasySign: `boolean`
+  is accepted (six types, my description listed four - corrected), schemas are **project-wide**
+  not per-environment, and `anon_id` is an implicit envelope field so anonymous web events stitch.
+- **Merged this pass:** #397 (KAN-106), #400 (KAN-108).
+- **Deliberately not decided by me:** the default scope set for newly minted keys. EasySign is
+  right that issued keys lack `project.configure`, but which scopes a new key gets is a product
+  decision about blast radius, not a bug to quietly widen. Raised to Yariv.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit | #392 | metrics derived from budget |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge |
+| Creative preview gallery | #392 | synthesized ad creatives |
+| Top-level /automation route | #392 | invented proposals + fake org ids |
+| Copilot chat + engine | #393, #399 | canned replies; panel had its own duplicate engine |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing |
+| Funnel cockpit | #397 | sample funnel unlabelled; 5 literal KPIs |
+| Project automation page | #398 | literal input bypassing the #392 guard |
+| Ingest health | #5 | clean - no changes |
+| API keys | #400 | creator and revoker never surfaced |
+| Hook endpoints | #402 | 202 pending never becomes data, and never said so |
+
+**Not yet reviewed:** goals, settings, metric-defs, schema-defs, segments, customers, experiments,
+cohorts, plugins, resources, record-feed, win-rules, cost-guardrails, churn-reasons,
+field-mappings, demos, feedback, firmographics, intent-quality, insights, session-replay, support,
+rep-collections, billing-ops-feed, campaign-ops.
+
+- **Next step:** KAN-102 (events -> metrics). EasySign argued it outranks inline quarantine
+  reasons and the argument holds: register_schema plus inline reasons still ends at a zero
+  dashboard, because `signups` reads `fact_funnel_event` and nothing turns `events` into it. Trace
+  whether repointing catalog metrics at `events` with filters (the `trial_starts@v2` shape) is
+  sound generally or only works for counting, and report before building.
+- **Waiting on human:** default key scopes (above); the primary checkout's ~164 uncommitted
+  session-B files, which also block the sprint workflow its own CLAUDE.md prescribes; the CAC
+  join-key decision; KAN-43; the tracking snippet on the real EasySign site; revoking the old Jira
+  token in Atlassian.
+
 ## 2026-09-16 - Hourly quality pass #6: API keys page
 
 - **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/keys`. Reviewed as a security surface
