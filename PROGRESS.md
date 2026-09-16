@@ -17,6 +17,60 @@ Template for each entry:
 
 ---
 
+## 2026-09-16 - Hourly quality pass #4: project automation page
+
+- **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/automation` - the real automation page
+  (pass #1 covered the context-free `/automation` route, which now redirects, and the
+  `AutomationHub` component; this is the different page users actually open).
+- **Finding, and it undid one of my own fixes:** the page built the recommender's input by hand
+  with a literal for every performance field - the same `roas: 3.8`, `conversions: 45`,
+  `cpaUsd: 18`, `clicks: 1000`, `impressions: 40000` for every campaign, `spend30dUsd` as
+  `dailyBudgetUsd * 20`, and a hardcoded two-step funnel with a 62% drop-off.
+  In #392 I made `recommendation-synthesizer` skip campaigns whose `roas` is null, so it could
+  not propose budget changes from unmeasured figures. A literal 3.8 is never null, so the
+  "scale this high-performing campaign" branch fired for every campaign on every project, with
+  an Apply button wired to a real ad account. The constant also sat permanently above the 3.5
+  threshold, so the opposite branch - pause a campaign under 1.8 - could never fire at all.
+  **A guard is only as good as what is fed through it.** I had checked the guard, not its callers.
+- **Fixed:** unmeasured fields are null and the ROAS-driven recommendations correctly produce
+  nothing; the funnel comes from `queryProjectFunnelSteps` or is absent. Invented forecasts
+  still attached to the recommendations ('+28% projected conversions', '+35 rescued conversions
+  / month', 'Projected: ~35% drop-off') are gone. PR #398, KAN-107.
+- **Merged this pass:** #396 (KAN-105 Done).
+- **Reopened:** KAN-103. The emulator flake recurred on the #397 run inside
+  `@growthos/firebase-orm-models` - the package whose path already had
+  `experimentalForceLongPolling` before #394. My "zero GrpcConnection lines" measurement was
+  taken over a single test file; under the full suite it still happens. Individual tests there
+  run 51s / 74s / 127s, so a full run holds the emulator open long enough for the upstream bug
+  to bite. Next angle: a separate Firestore instance per test file, or sharding.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit | #392 | metrics derived from budget |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge |
+| Creative preview gallery | #392 | synthesized ad creatives |
+| Top-level /automation route | #392 | invented proposals + fake org ids; now redirects |
+| Copilot chat + engine | #393 | failure reported as success; engine ignored its context |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing |
+| Funnel cockpit | #397 | sample funnel unlabelled; 5 literal KPIs; fixed recommendation |
+| Project automation page | #398 | literal performance input bypassing the #392 guard |
+
+**Not yet reviewed:** goals, ingest-health, keys, settings, metric-defs, schema-defs, segments,
+customers, hooks, experiments, cohorts, plugins, resources, record-feed, win-rules,
+cost-guardrails, churn-reasons, field-mappings, demos, feedback, firmographics, intent-quality,
+insights, session-replay, support, rep-collections, billing-ops-feed, campaign-ops.
+
+- **Standing lessons:** (1) verifying a flag exists in a component does not verify the page
+  passes it; (2) verifying a guard does not verify its callers feed it honestly. Both times the
+  defect was one layer away from where I looked.
+- **Next step:** next pass takes the next unreviewed page.
+- **Waiting on human:** the primary checkout still holds ~164 uncommitted session-B files and
+  cannot be pulled; the CAC join-key decision; KAN-43; the tracking snippet on the real EasySign
+  site; revoking the old Jira token in Atlassian.
+
 ## 2026-09-16 - Hourly quality pass #2: board tiles
 
 - **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/boards/[boardId]` - the tile renderer.

@@ -37,14 +37,15 @@ export function synthesizeProactiveRecommendations(
       description: `Campaign "${highRoasCampaign.label}" is performing at ${highRoasCampaign.roas.toFixed(1)}x ROAS with strong conversion headroom. Increase daily budget by 25% to capture incremental demand.`,
       beforeDiff: `$${highRoasCampaign.dailyBudgetUsd}/day`,
       afterDiff: `$${nextBudget}/day`,
-      projectedImpact: '+28% projected conversions at steady CPA',
+      // No forecast: projecting one needs a performance baseline, and '+28%' was a literal.
+      projectedImpact: '',
       actionProposal: {
         actionType: 'budget_change',
         targetId: highRoasCampaign.targetId,
         targetLabel: highRoasCampaign.label,
         beforeValue: `$${highRoasCampaign.dailyBudgetUsd}/day`,
         afterValue: `$${nextBudget}/day`,
-        estimatedImpact: '+28% conversions',
+        estimatedImpact: '',
         impactBadge: 'high',
         payload: {
           targetId: highRoasCampaign.targetId,
@@ -97,18 +98,20 @@ export function synthesizeProactiveRecommendations(
         title: `Recover ${highDropoffStep.stageLabel} Stage Drop-off`,
         description: `Stage "${highDropoffStep.stageLabel}" has a ${highDropoffStep.dropOffPercent.toFixed(0)}% drop-off rate. Deploy a high-intent retargeting campaign to rescue incomplete conversions.`,
         beforeDiff: `Drop-off: ${highDropoffStep.dropOffPercent.toFixed(0)}%`,
-        afterDiff: 'Projected: ~35% drop-off',
-        projectedImpact: '+35 rescued conversions / month',
+        afterDiff: 'Retargeting campaign draft',
+        projectedImpact: '',
         actionProposal: {
           actionType: 'campaign_draft_create',
           targetId: `target-funnel-${highDropoffStep.stageKey}`,
           targetLabel: `${highDropoffStep.stageLabel} Drop-off Recovery`,
           beforeValue: 'No Retargeting',
           afterValue: 'Retargeting ($150/day)',
-          estimatedImpact: '+35 conversions/mo',
+          estimatedImpact: '',
           impactBadge: 'high',
           payload: {
             campaignName: `${highDropoffStep.stageLabel} Retargeting Leads`,
+            // A starting point for the draft, which the user edits before approving - not a
+            // recommended spend derived from anything.
             dailyBudgetUsd: 150,
             platform: 'meta',
           },
