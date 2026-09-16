@@ -551,6 +551,86 @@ describe('getMetricCatalogDetail', () => {
     });
   });
 
+  /**
+   * Knowing a metric reads `fact_funnel_event` tells an integrator nothing about what to send.
+   * The lineage is real and total - fact_funnel_event selects every non-touchpoint row of
+   * `events` and sets step = properties.event_name ?? event_type, where event_type is the
+   * record's own schema_name - so a `step = 'signup'` filter means exactly "register and send
+   * an event whose schema is signup". Without that spelled out, someone registers a schema,
+   * POSTs successfully, sees accepted:1, and still reads zero with no way to tell why.
+   */
+  it('tells a caller which event has to be sent for a funnel metric to count', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Detail Lineage Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups',
+      definition: {
+        kind: 'aggregation',
+        aggregation: {
+          function: 'count_distinct',
+          table: 'fact_funnel_event',
+          column: 'customer_id',
+          timeColumn: 'ts',
+          filters: [{ field: 'step', operator: '=', value: 'signup' }],
+        },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const detail = await getMetricCatalogDetail(organization.id, project.id, 'signups');
+
+    expect(detail?.requiredEvents).toEqual([
+      {
+        event: 'signup',
+        requiredFields: ['customer_id (envelope)'],
+        because:
+          `fact_funnel_event.step is the event's own schema name, so this metric counts events registered and sent as "signup".`,
+      },
+    ]);
+  });
+
+  it('says a funnel metric with no step filter counts every event', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Detail Lineage All Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'dau',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'count_distinct', table: 'fact_funnel_event', column: 'customer_id', timeColumn: 'ts', filters: [] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    const detail = await getMetricCatalogDetail(organization.id, project.id, 'dau');
+    expect(detail?.requiredEvents?.[0].event).toBe('*');
+  });
+
+  /*
+    Deliberately silent for tables whose lineage folds several event types through their own
+    logic. A hint that is confidently wrong is worse than none - it would send someone off to
+    emit an event that changes nothing.
+  */
+  it('claims nothing for a table it cannot speak for', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Detail Lineage Quiet Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'mrr',
+      definition: {
+        kind: 'aggregation',
+        aggregation: { function: 'sum', table: 'dim_subscription', column: 'mrr', timeColumn: 'started_at', filters: [] },
+      },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+
+    expect((await getMetricCatalogDetail(organization.id, project.id, 'mrr'))?.requiredEvents).toBeUndefined();
+  });
+
   it('returns a formula metric with its direct dependencies as dependsOn', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Detail Formula Org');
     await registerMetricDefinition({

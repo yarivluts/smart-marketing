@@ -261,7 +261,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     'describe_metric',
     {
       title: 'Describe metric',
-      description: 'Get the full definition (aggregation/formula, dimensions, lineage) of one registered metric by name.',
+      description: 'Get the full definition (aggregation/formula, dimensions, lineage) of one registered metric by name, including requiredEvents - which event schema has to be registered and sent for this metric to count anything, since knowing the warehouse table it reads does not tell you what to emit.',
       inputSchema: toolInputSchema(describeMetricInputShape),
     },
     auditedToolHandler(auth, 'describe_metric', async (args: any) => {
