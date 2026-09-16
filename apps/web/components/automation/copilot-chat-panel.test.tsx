@@ -6,16 +6,16 @@ import { CopilotChatPanel } from './copilot-chat-panel';
 
 describe('CopilotChatPanel Component', () => {
   it('renders chat interface with correct direction in English and Hebrew', () => {
-    const { unmount } = renderWithIntl(<CopilotChatPanel initialMessages={[]} />, { locale: 'en' });
+    const { unmount } = renderWithIntl(<CopilotChatPanel initialMessages={[]} targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} />, { locale: 'en' });
     expect(screen.getByTestId('copilot-chat-container')).toHaveAttribute('dir', 'ltr');
     unmount();
 
-    renderWithIntl(<CopilotChatPanel initialMessages={[]} />, { locale: 'he' });
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} />, { locale: 'he' });
     expect(screen.getByTestId('copilot-chat-container')).toHaveAttribute('dir', 'rtl');
   });
 
   it('sends user message and displays natural language Hebrew analytics response', async () => {
-    renderWithIntl(<CopilotChatPanel initialMessages={[]} />, { locale: 'he' });
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} />, { locale: 'he' });
 
     const input = screen.getByTestId('copilot-input');
     fireEvent.change(input, { target: { value: 'אילו מודעות הכי רווחיות השבוע?' } });
@@ -24,13 +24,15 @@ describe('CopilotChatPanel Component', () => {
     expect(screen.getByText('אילו מודעות הכי רווחיות השבוע?')).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText(/המודעות הכי רווחיות השבוע הן במודעות Meta עם ROAS של 4.2x/)).toBeInTheDocument();
+      // Ranking ads needs a measurement GrowthOS has no source for, so the copilot declines
+      // rather than asserting the 4.2x it used to invent.
+      expect(screen.getByText(/אין לי עדיין נתוני ביצועים/)).toBeInTheDocument();
     });
   });
 
   it('renders proposal card upon budget increase intent and triggers quick execution', async () => {
     const onExecuteProposal = vi.fn().mockResolvedValue(undefined);
-    renderWithIntl(<CopilotChatPanel initialMessages={[]} onExecuteProposal={onExecuteProposal} />, { locale: 'en' });
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} onExecuteProposal={onExecuteProposal} />, { locale: 'en' });
 
     const input = screen.getByTestId('copilot-input');
     fireEvent.change(input, { target: { value: 'Increase budget for retargeting campaign to $250' } });
@@ -40,7 +42,7 @@ describe('CopilotChatPanel Component', () => {
       expect(screen.getByTestId('proposal-card')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Meta Retargeting Leads')).toBeInTheDocument();
+    expect(screen.getByText('EasySign Brand')).toBeInTheDocument();
     expect(screen.getByText('$150/day')).toBeInTheDocument();
     expect(screen.getByText('$250/day')).toBeInTheDocument();
 
@@ -55,7 +57,7 @@ describe('CopilotChatPanel Component', () => {
   });
 
   it('provides quick prompt chips to trigger instant queries', async () => {
-    renderWithIntl(<CopilotChatPanel initialMessages={[]} />, { locale: 'en' });
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} />, { locale: 'en' });
 
     const chips = screen.getAllByRole('button');
     const topAdsChip = chips.find((c) => c.textContent?.includes('Top Ads'));
@@ -66,7 +68,7 @@ describe('CopilotChatPanel Component', () => {
       expect(screen.getByText('What are top ads this week?')).toBeInTheDocument();
 
       await waitFor(() => {
-        expect(screen.getByText(/top performing ads this week/i)).toBeInTheDocument();
+        expect(screen.getByText(/no performance data/i)).toBeInTheDocument();
       });
     }
   });
@@ -78,7 +80,7 @@ describe('CopilotChatPanel Component', () => {
    */
   it('reports a rejected proposal as failed rather than executed', async () => {
     const onExecuteProposal = vi.fn().mockRejectedValue(new Error('propose rejected'));
-    renderWithIntl(<CopilotChatPanel initialMessages={[]} onExecuteProposal={onExecuteProposal} />, { locale: 'en' });
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} onExecuteProposal={onExecuteProposal} />, { locale: 'en' });
 
     fireEvent.change(screen.getByTestId('copilot-input'), {
       target: { value: 'Increase budget for retargeting campaign to $250' },
@@ -99,7 +101,7 @@ describe('CopilotChatPanel Component', () => {
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{}', { status: 403 }));
 
-    renderWithIntl(<CopilotChatPanel initialMessages={[]} orgId="org-1" projectId="proj-1" />, {
+    renderWithIntl(<CopilotChatPanel initialMessages={[]} targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} orgId="org-1" projectId="proj-1" />, {
       locale: 'en',
     });
 
