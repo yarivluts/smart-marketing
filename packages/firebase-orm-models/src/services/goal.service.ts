@@ -510,7 +510,21 @@ export async function deleteGoal(organizationId: string, projectId: string, goal
 }
 
 export type GoalProgressOutcome =
-  | { ok: true; actualValue: number; progress: GoalProgressResult }
+  | {
+      ok: true;
+      actualValue: number;
+      progress: GoalProgressResult;
+      /**
+       * Whether the metric returned any rows at all over the goal's window.
+       *
+       * `actualValue` is a sum, so a metric that has never received a single record sums to 0
+       * - identical to a metric measured at zero. Pace is then computed against that 0 and the
+       * goal reads "off track", in red, with 0% filled: a project that has not started
+       * reporting is presented exactly like one that is failing, and the two need opposite
+       * responses. Callers must branch on this before showing a pace status.
+       */
+      hasMeasurements: boolean;
+    }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
 
 export interface QueryGoalProgressParams {
@@ -610,7 +624,8 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       actualValue: 0,
       elapsedFraction: 0,
     });
-    return { ok: true, actualValue: 0, progress };
+    // Not started yet, so nothing has been measured - and nothing could have been.
+    return { ok: true, actualValue: 0, progress, hasMeasurements: false };
   }
 
   const queryEnd = asOfDate < goal.deadline ? asOfDate : goal.deadline;
@@ -646,7 +661,9 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       elapsedFraction,
       history,
     });
-    return { ok: true, actualValue, progress };
+    // Rows returned, not the summed value: a metric measured at zero has rows and is a real
+    // reading; a metric that has never received a record has none and sums to the same 0.
+    return { ok: true, actualValue, progress, hasMeasurements: result.series.length > 0 };
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { ok: false, reason: 'warehouse_not_configured', message: error.message };

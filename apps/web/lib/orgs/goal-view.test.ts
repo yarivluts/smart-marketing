@@ -17,9 +17,16 @@ function goal(overrides: Partial<GoalModel> & Pick<GoalModel, 'id'>): GoalModel 
   } as GoalModel;
 }
 
-function okOutcome(actualValue: number, progress: Partial<GoalProgressResult>): GoalProgressOutcome {
+function okOutcome(
+  actualValue: number,
+  progress: Partial<GoalProgressResult>,
+  // Defaults true: these cases are about pace arithmetic, and a goal with no measurements at
+  // all short-circuits before pace is computed - that path has its own cases below.
+  hasMeasurements = true,
+): GoalProgressOutcome {
   return {
     ok: true,
+    hasMeasurements,
     actualValue,
     progress: {
       expectedAtNow: 0,
@@ -105,5 +112,45 @@ describe('buildGoalThermometerView', () => {
       kind: 'query_error',
       message: 'bad query',
     });
+  });
+});
+
+/**
+ * A goal on a metric that has never received a record summed to 0, and pace computed against
+ * that 0 rendered "off track" in red at 0% filled - a project that has not started reporting
+ * shown exactly like one that is failing. The two call for opposite responses: one means go and
+ * fix your tracking, the other means go and fix your business.
+ */
+describe('buildGoalThermometerView - no measurements', () => {
+  it('reports no_measurements rather than an off-track pace when the metric returned no rows', () => {
+    const view = buildGoalThermometerView({
+      ok: true,
+      hasMeasurements: false,
+      actualValue: 0,
+      progress: { expectedAtNow: 50, progressRatio: 0, projectedFinalValue: 0, status: 'off_track', isGoalMet: false },
+    });
+
+    expect(view.kind).toBe('no_measurements');
+  });
+
+  it('still reports a genuine zero as a real pace when rows were returned', () => {
+    const view = buildGoalThermometerView({
+      ok: true,
+      hasMeasurements: true,
+      actualValue: 0,
+      progress: { expectedAtNow: 50, progressRatio: 0, projectedFinalValue: 0, status: 'off_track', isGoalMet: false },
+    });
+
+    expect(view.kind).toBe('ok');
+    expect(view.kind === 'ok' && view.status).toBe('off_track');
+    expect(view.kind === 'ok' && view.actualValue).toBe(0);
+  });
+
+  it('keeps the typed degraded states ahead of the measurement check', () => {
+    // A warehouse that is not configured has no measurements either, but saying "no data yet"
+    // would send someone to look at their tracking when the warehouse is the problem.
+    expect(buildGoalThermometerView({ ok: false, reason: 'warehouse_not_configured', message: 'nope' }).kind).toBe(
+      'warehouse_not_configured',
+    );
   });
 });

@@ -1353,6 +1353,7 @@
     "expectedAtNowLabel": "צפוי עד כה",
     "projectedFinalValueLabel": "תחזית ליעד הזמן",
     "thermometerUnavailableReason": {
+      "no_measurements": "עדיין אין נתונים למדד הזה — לא ניתן לקבוע קצב",
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",
       "not_yet_backed": "עדיין לא מגובה בנתונים אמיתיים",
