@@ -382,6 +382,12 @@ export interface ApiKeySummary {
   createdBy: string;
   lastUsedAt?: string;
   revokedAt?: string;
+  /**
+   * Who revoked the key. The model has stored this since keys existed but the summary never
+   * carried it, so the admin page could say a key was revoked and never by whom - which is
+   * the first question asked when auditing a credential.
+   */
+  revokedBy?: string;
 }
 
 function toSummary(apiKey: ApiKeyModel): ApiKeySummary {
@@ -394,6 +400,7 @@ function toSummary(apiKey: ApiKeyModel): ApiKeySummary {
     createdBy: apiKey.created_by,
     lastUsedAt: apiKey.last_used_at,
     revokedAt: apiKey.revoked_at,
+    revokedBy: apiKey.revoked_by,
   };
 }
 

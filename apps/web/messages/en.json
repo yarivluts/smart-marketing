@@ -327,6 +327,10 @@
     "writeTierError": "Couldn't update the write tier. Please try again."
   },
   "ApiKeys": {
+    "createdByLabel": "Created by {actor}",
+    "revokedDetailLabel": "Revoked {revokedAt} by {actor}",
+    "revokedOnLabel": "Revoked {revokedAt}",
+    "unknownActorLabel": "an account that is no longer a member",
     "metaTitle": "API keys",
     "title": "API keys for {projectName}",
     "existingKeysHeading": "Existing keys",
