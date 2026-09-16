@@ -217,15 +217,31 @@ describe('funnel-goals-synthesizer', () => {
         projectId: 'demo-project',
       });
 
-      expect(cockpit.summary.overallFunnelConversionPct).toBe(22);
-      expect(cockpit.summary.topFunnelDropOffPct).toBe(62);
+      /*
+        funnelOutcome is null here, so the funnel is the zero-config sample. This used to
+        assert 22 / 62 and a recommendation with the fixed target id `easysign_funnel_viewed`
+        - all computed from, or written for, createMockEasySignFunnel's 1000/380/220. The
+        dashboard rendered them as the project's own numbers, with an Apply button on the
+        recommendation that POSTs to the real automation endpoint.
+      */
+      expect(cockpit.isSimulatedFunnel).toBe(true);
+      expect(cockpit.summary.overallFunnelConversionPct).toBeNull();
+      expect(cockpit.summary.topFunnelDropOffPct).toBeNull();
+      expect(cockpit.proactiveRecommendation).toBeNull();
+
+      // Never measured anywhere, so never reported.
+      expect(cockpit.summary.avgMonth1RetentionPct).toBeNull();
+      expect(cockpit.summary.avgConversionVelocityDays).toBeNull();
+      expect(cockpit.summary.total40dPaybackUsd).toBeNull();
+      expect(cockpit.summary.dunningRecoveryRatePct).toBeNull();
+      expect(cockpit.summary.churnRatePct).toBeNull();
+
+      // Goal counts are real - they come from the goal list itself.
       expect(cockpit.summary.activeGoalsCount).toBe(5);
       expect(cockpit.funnelSteps).toHaveLength(3);
       expect(cockpit.cohortRows.length).toBeGreaterThan(0);
       expect(cockpit.paybackVelocity).toHaveLength(4);
       expect(cockpit.qualityCalibration).toHaveLength(4);
-      expect(cockpit.proactiveRecommendation).not.toBeNull();
-      expect(cockpit.proactiveRecommendation?.targetId).toBe('easysign_funnel_viewed');
     });
   });
 });

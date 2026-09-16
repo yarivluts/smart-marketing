@@ -123,6 +123,50 @@ insights, session-replay, support, rep-collections, billing-ops-feed, campaign-o
   cannot be pulled; the CAC join-key decision; KAN-43; the tracking snippet on the real EasySign
   site; revoking the old Jira token in Atlassian.
 
+## 2026-09-16 - Hourly quality pass #3: funnel cockpit
+
+- **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/funnel`.
+- **Finding 1 (the one I had previously called safe):** `buildVisualFunnelData` computes
+  `isSimulated`, but `buildFunnelGoalsCockpitData` took only its `.steps` and dropped the flag,
+  and the dashboard never passed one to `VisualFunnelSteps` - which has always been able to
+  render the badge. So `createMockEasySignFunnel`'s 1000/380/220 rendered as the project's own
+  funnel, unlabelled. In pass #1 I checked the badge existed in the component and concluded the
+  funnel was honest; I had not checked that this page reaches it. Checking the component is not
+  checking the page.
+- **Finding 2:** five of the summary's nine figures were literals (retention 64, velocity 3.8,
+  payback 48200, dunning 82.4, churn 1.8), plus `|| 62` and `: 22` fallbacks, plus four fixed
+  sub-label strings ("+2.4% vs benchmark", "80% on-track", "+4% vs cohort", "100% pace").
+- **Finding 3:** `proactiveRecommendation` was fixed copy quoting a 62% drop-off and projecting
+  "+31 conversions/mo", returned unconditionally - with an Apply button that POSTs to the real
+  automation endpoint. Now derived from the project's own worst step, or null.
+- **Fixed:** PR #397, KAN-106. Also: PR #396 (board tiles) needed a follow-up commit - I ran
+  `tsc` before appending tests and only vitest after, and vitest does not typecheck.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit | #392 | metrics derived from budget; now null when unmeasured |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge |
+| Creative preview gallery | #392 | synthesized ad creatives; removed |
+| Automation hub | #392 | invented proposals + fake org ids; route redirects |
+| Copilot chat + engine | #393 | failure reported as success; engine ignored its context |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing |
+| Funnel cockpit | #397 | sample funnel unlabelled; 5 literal KPIs; fixed recommendation |
+
+**Not yet reviewed:** goals, ingest-health, keys, settings, metric-defs, schema-defs, segments,
+customers, hooks, experiments, cohorts, plugins, resources, record-feed, win-rules,
+cost-guardrails, churn-reasons, field-mappings, demos, feedback, firmographics, intent-quality,
+insights, session-replay, support, rep-collections, billing-ops-feed, campaign-ops.
+
+- **Standing lesson for later passes:** verifying a flag exists in a component does not verify
+  the page passes it. Trace the value from the builder to the rendered element.
+- **Next step:** next pass takes the next unreviewed page.
+- **Waiting on human:** the primary checkout still holds ~164 uncommitted session-B files and
+  cannot be pulled; the CAC join-key decision; KAN-43; the tracking snippet on the real EasySign
+  site; revoking the old Jira token in Atlassian.
+
 ## 2026-09-16 - Hourly quality pass #2: board tiles
 
 - **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/boards/[boardId]` - the tile renderer.

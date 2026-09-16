@@ -47,8 +47,20 @@ describe('FunnelGoalsDashboard Component', () => {
   });
 
   it('supports 1-click execution of proactive drop-off recommendation', async () => {
+    /*
+      A real funnel outcome, not null. A proactive recommendation is now only raised from the
+      project's own funnel - with the zero-config sample there is nothing measured to
+      recommend against, and the card's Apply button POSTs to the real automation endpoint.
+    */
     const cockpitData = buildFunnelGoalsCockpitData({
-      funnelOutcome: null,
+      funnelOutcome: {
+        ok: true,
+        steps: [
+          { stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
+          { stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
+          { stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
+        ],
+      },
       goals: [],
       projectId: 'test-proj',
     });
@@ -127,5 +139,48 @@ describe('FunnelGoalsDashboard Component', () => {
     expect(screen.getByText('40-Day Payback Velocity')).toBeInTheDocument();
     expect(screen.getByText('Signup Quality & Payback Calibration')).toBeInTheDocument();
     expect(screen.getByText('Diamond (Tier 1)')).toBeInTheDocument();
+  });
+  /**
+   * buildFunnelGoalsCockpitData took only `.steps` off buildVisualFunnelData and dropped its
+   * isSimulated flag, and the dashboard never passed one to VisualFunnelSteps - which has
+   * always been able to render the badge. So createMockEasySignFunnel's 1000/380/220 showed
+   * as the project's own funnel with nothing marking it as a sample.
+   */
+  it('badges the funnel as sample data when the project has no real funnel', () => {
+    const cockpitData = buildFunnelGoalsCockpitData({
+      funnelOutcome: null,
+      goals: [],
+      projectId: 'test-proj',
+    });
+
+    expect(cockpitData.isSimulatedFunnel).toBe(true);
+
+    renderWithIntl(
+      <FunnelGoalsDashboard orgId="org-1" projectId="test-proj" cockpitData={cockpitData} canExecute={false} />,
+    );
+
+    expect(screen.getByText('Simulated Mode (Zero-Config)')).toBeInTheDocument();
+  });
+
+  it('shows no sample badge once the funnel is real', () => {
+    const cockpitData = buildFunnelGoalsCockpitData({
+      funnelOutcome: {
+        ok: true,
+        steps: [
+          { stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
+          { stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
+        ],
+      },
+      goals: [],
+      projectId: 'test-proj',
+    });
+
+    expect(cockpitData.isSimulatedFunnel).toBe(false);
+
+    renderWithIntl(
+      <FunnelGoalsDashboard orgId="org-1" projectId="test-proj" cockpitData={cockpitData} canExecute={false} />,
+    );
+
+    expect(screen.queryByText('Simulated Mode (Zero-Config)')).not.toBeInTheDocument();
   });
 });

@@ -617,7 +617,14 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
 
     it('4.3 executes 1-click proactive recommendation and updates visual state', async () => {
       const data = buildFunnelGoalsCockpitData({
-        funnelOutcome: null,
+        funnelOutcome: {
+        ok: true,
+        steps: [
+          { stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
+          { stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
+          { stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
+        ],
+      },
         goals: [],
         projectId: 'test-dash',
       });

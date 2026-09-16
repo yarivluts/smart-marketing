@@ -2061,6 +2061,8 @@
     }
   },
   "FunnelGoals": {
+    "noData": "No data",
+    "simulatedBadge": "Sample funnel - no real data yet",
     "metaTitle": "Funnel & Goals",
     "cockpitTitle": "Funnel, Goals & Revenue Health",
     "cockpitDescription": "Visual conversion pipelines, dynamic business goals tracking, and cohort retention health.",

@@ -44,6 +44,16 @@ export function FunnelGoalsDashboard({
   people = [],
 }: FunnelGoalsDashboardProps): React.ReactElement {
   const t = useTranslations('FunnelGoals');
+  /*
+    Every KPI below is nullable and renders "No data" when unmeasured. They used to be the
+    literals 64, 3.8, 48200, 82.4 and 1.8 written into the builder's returned object, shown
+    beside the two figures that are real. The small sub-labels under each card were the same
+    kind of thing - "+2.4% vs benchmark", "80% on-track", "+4% vs cohort", "100% pace" - fixed
+    strings with no computation behind them, so they are gone rather than defaulted: a
+    comparison needs something to compare against.
+  */
+  const noData = t('noData');
+  const pct = (value: number | null): string => (value === null ? noData : `${value}%`);
   const tGoals = useTranslations('Goals');
 
   const [activeTab, setActiveTab] = useState<'funnel' | 'goals' | 'retention'>('funnel');
@@ -61,6 +71,7 @@ export function FunnelGoalsDashboard({
 
   const {
     summary,
+    isSimulatedFunnel,
     funnelSteps,
     cohortRows,
     cohortPeriodNumbers,
@@ -146,11 +157,8 @@ export function FunnelGoalsDashboard({
             <Target className="h-4 w-4 text-primary" aria-hidden="true" />
           </div>
           <div className="mt-2 text-xl font-bold text-foreground" dir="ltr">
-            {`${summary.overallFunnelConversionPct}%`}
+            {pct(summary.overallFunnelConversionPct)}
           </div>
-          <span className="mt-1 text-[10px] text-green-600 dark:text-green-400 font-medium">
-            <span dir="ltr">{t('kpiBenchmarkComparison', { diff: '+2.4%' })}</span>
-          </span>
         </div>
 
         {/* Goals on Track */}
@@ -162,9 +170,6 @@ export function FunnelGoalsDashboard({
           <div className="mt-2 text-xl font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">
             {`${summary.goalsOnTrackCount} / ${summary.activeGoalsCount}`}
           </div>
-          <span className="mt-1 text-[10px] text-muted-foreground">
-            <span dir="ltr">{t('kpiOnTrackRate', { rate: '80%' })}</span>
-          </span>
         </div>
 
         {/* M1 Retention Rate */}
@@ -174,11 +179,8 @@ export function FunnelGoalsDashboard({
             <Users className="h-4 w-4 text-blue-500" aria-hidden="true" />
           </div>
           <div className="mt-2 text-xl font-bold text-foreground" dir="ltr">
-            {`${summary.avgMonth1RetentionPct}%`}
+            {pct(summary.avgMonth1RetentionPct)}
           </div>
-          <span className="mt-1 text-[10px] text-green-600 dark:text-green-400 font-medium">
-            <span dir="ltr">{t('kpiCohortComparison', { diff: '+4%' })}</span>
-          </span>
         </div>
 
         {/* Conversion Velocity */}
@@ -188,7 +190,7 @@ export function FunnelGoalsDashboard({
             <Clock className="h-4 w-4 text-indigo-500" aria-hidden="true" />
           </div>
           <div className="mt-2 text-xl font-bold text-foreground" dir="ltr">
-            {`${summary.avgConversionVelocityDays} ${t('daysUnit')}`}
+            {summary.avgConversionVelocityDays === null ? noData : `${summary.avgConversionVelocityDays} ${t('daysUnit')}`}
           </div>
           <span className="mt-1 text-[10px] text-muted-foreground">
             {t('kpiTimeToSign')}
@@ -202,11 +204,8 @@ export function FunnelGoalsDashboard({
             <Activity className="h-4 w-4 text-amber-500" aria-hidden="true" />
           </div>
           <div className="mt-2 text-xl font-bold text-foreground" dir="ltr">
-            {`$${summary.total40dPaybackUsd.toLocaleString()}`}
+            {summary.total40dPaybackUsd === null ? noData : `$${summary.total40dPaybackUsd.toLocaleString()}`}
           </div>
-          <span className="mt-1 text-[10px] text-green-600 dark:text-green-400 font-medium">
-            <span dir="ltr">{t('kpiPaceMet', { pace: '100%' })}</span>
-          </span>
         </div>
 
         {/* Dunning & Churn */}
@@ -216,11 +215,13 @@ export function FunnelGoalsDashboard({
             <ShieldCheck className="h-4 w-4 text-purple-500" aria-hidden="true" />
           </div>
           <div className="mt-2 text-xl font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">
-            {`${summary.dunningRecoveryRatePct}%`}
+            {pct(summary.dunningRecoveryRatePct)}
           </div>
-          <span className="mt-1 text-[10px] text-muted-foreground">
-            {t('kpiChurnRate', { rate: summary.churnRatePct })}
-          </span>
+          {summary.churnRatePct === null ? null : (
+            <span className="mt-1 text-[10px] text-muted-foreground">
+              {t('kpiChurnRate', { rate: summary.churnRatePct })}
+            </span>
+          )}
         </div>
       </div>
 
@@ -322,9 +323,16 @@ export function FunnelGoalsDashboard({
       {/* Tab Content */}
       {activeTab === 'funnel' && (
         <div className="flex flex-col gap-6" data-testid="funnel-tab-content">
+          {/*
+            VisualFunnelSteps has always been able to badge sample data; it simply was never
+            told. buildFunnelGoalsCockpitData took only `.steps` off buildVisualFunnelData and
+            dropped its isSimulated flag, so createMockEasySignFunnel's 1000/380/220 rendered
+            as the project's own funnel with nothing marking it.
+          */}
           <VisualFunnelSteps
             steps={funnelSteps}
             funnelName={projectName}
+            isSimulated={isSimulatedFunnel}
             onAskCopilot={handleApplyRecommendation}
           />
         </div>
