@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { Link } from '@/i18n/navigation';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -137,6 +138,26 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('queueHeading')}</h2>
+        {/*
+          What "pending" actually means, which the queue never said.
+
+          receiveHookPayload stores the delivery and returns; it does not touch the schema
+          registry and does not create records - a hook delivery never reaches ingest on its
+          own. It becomes data only when applyFieldMappingToDelivery runs, and the only way to
+          run that is the admin field-mappings surface, one delivery at a time.
+
+          So the two buttons the queue offered - Reviewed and Discard - both leave the payload
+          un-ingested, and a user could walk the entire queue marking deliveries reviewed and
+          end up with zero records, having been told "202" on every POST. Stating it, and
+          linking to the action that does ingest, is the difference between a review queue and
+          a dead end.
+        */}
+        <p className="text-sm text-muted-foreground">
+          {t('queueNotIngestedNote')}{' '}
+          <Link className="underline" href={`/orgs/${orgId}/projects/${projectId}/field-mappings`}>
+            {t('queueFieldMappingsLink')}
+          </Link>
+        </p>
         {hookDeliveries.length === 0 ? (
           <p className="text-muted-foreground">{t('noDeliveries')}</p>
         ) : (

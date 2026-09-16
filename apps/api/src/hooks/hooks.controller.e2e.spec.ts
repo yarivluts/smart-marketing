@@ -11,6 +11,7 @@ import {
   generateLocalKmsKeyRing,
   LocalKmsProvider,
   listHookDeliveriesForProject,
+  listRecentIngestBatchesForProject,
   setHookEndpointSigningSecret,
   type LocalKmsKeyRing,
 } from '@growthos/firebase-orm-models';
@@ -111,6 +112,21 @@ describe('HooksController (e2e)', () => {
     expect(deliveries).toHaveLength(1);
     expect(deliveries[0].id).toBe(body.delivery_id);
     expect(JSON.parse(deliveries[0].raw_payload)).toEqual(payload);
+
+    /*
+      And it is NOT ingested. receiveHookPayload stores the delivery and returns; it never
+      touches the schema registry and never creates a record, so a hook delivery does not
+      reach ingest on its own - it becomes data only when a field mapping is applied to it,
+      which is a separate admin action.
+
+      Worth pinning because the 202 reads like acceptance: a sender can POST correct payloads
+      indefinitely, get 202 every time, and have nothing measurable anywhere. The delivery is
+      not quarantined either, so it does not even show up as a rejection to investigate.
+    */
+    expect(deliveries[0].status).toBe('pending');
+    expect(deliveries[0].applied_at).toBeUndefined();
+    expect(deliveries[0].applied_batch_id).toBeUndefined();
+    expect(await listRecentIngestBatchesForProject(organization.id, project.id)).toHaveLength(0);
   });
 
   it('verifies an hmac_sha256 endpoint over real HTTP, rejecting a bad signature and accepting a correct one', async () => {
