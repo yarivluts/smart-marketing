@@ -1038,6 +1038,9 @@
     "targetInputPlaceholder": "No target"
   },
   "CostGuardrails": {
+    "loggedCostTotal": "Estimated cost across these entries: {total}",
+    "loggedCostPartial": "{withCost} of {total} entries carry an estimate; the rest ran on an executor that does not report bytes processed, so the real total is higher.",
+    "loggedCostNone": "None of these entries carry a cost estimate, so no total can be shown.",
     "metaTitle": "Cost guardrails",
     "title": "Cost guardrails for {projectName}",
     "usageHeading": "Today's usage",
