@@ -4,7 +4,13 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { listApiKeysForProject, listEnvironmentsForProject, listMcpOAuthGrantsForProject, listOrgProjects } from '@/lib/orgs/queries';
+import {
+  listApiKeysForProject,
+  listEnvironmentsForProject,
+  listMcpOAuthGrantsForProject,
+  listOrgMembers,
+  listOrgProjects,
+} from '@/lib/orgs/queries';
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
 import { mcpApiUrl } from '@/lib/orgs/mcp-api-url';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
@@ -53,10 +59,11 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [environments, apiKeys, mcpGrants] = await Promise.all([
+  const [environments, apiKeys, mcpGrants, members] = await Promise.all([
     listEnvironmentsForProject(orgId, projectId),
     listApiKeysForProject(orgId, projectId),
     listMcpOAuthGrantsForProject(orgId, projectId),
+    listOrgMembers(orgId),
   ]);
 
   const t = await getTranslations('ApiKeys');
@@ -68,6 +75,23 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
   // `ProjectModel[]` to client code.
   const environmentOptions = environments.map((environment) => ({ id: environment.id, name: environment.name }));
   const environmentNameById = new Map(environmentOptions.map((environment) => [environment.id, environment.name]));
+
+  /*
+    Who minted each key, and who revoked it.
+
+    Both ids were already loaded - `createdBy` has been on `ApiKeySummary` all along and
+    `revoked_by` on the model - and the page rendered neither. A revoked key said only
+    "Revoked", with no date and no actor. Those are the first two questions asked when
+    auditing a credential: who issued this, and who took it away.
+
+    Resolved to a display name through the org's member list; a key minted by someone who has
+    since left resolves to nothing, so it says so rather than printing a raw uid.
+  */
+  const actorNameById = new Map(
+    members.map((member) => [member.userId, member.displayName ?? member.email] as const),
+  );
+  const actorName = (userId: string | undefined): string =>
+    (userId ? actorNameById.get(userId) : undefined) ?? t('unknownActorLabel');
 
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
@@ -94,10 +118,15 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
                     <span className="text-muted-foreground">{apiKey.scopes.join(', ')}</span>
                     <span className="text-muted-foreground">
                       {apiKey.revokedAt
-                        ? t('revokedLabel')
+                        ? apiKey.revokedBy
+                          ? t('revokedDetailLabel', { revokedAt: apiKey.revokedAt, actor: actorName(apiKey.revokedBy) })
+                          : t('revokedOnLabel', { revokedAt: apiKey.revokedAt })
                         : apiKey.lastUsedAt
                           ? t('lastUsedLabel', { lastUsedAt: apiKey.lastUsedAt })
                           : t('neverUsedLabel')}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {t('createdByLabel', { actor: actorName(apiKey.createdBy) })}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">

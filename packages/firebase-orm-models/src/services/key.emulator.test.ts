@@ -567,3 +567,41 @@ describe('listApiKeysForProject', () => {
     expect(live.revokedAt).toBeUndefined();
   });
 });
+
+/**
+ * The admin keys page renders this summary. `revoked_by` has been stored since keys existed,
+ * but `toSummary` never carried it, so the page could say a key was revoked and never by whom
+ * - the first question asked when auditing a credential. `createdBy` was carried but likewise
+ * never rendered.
+ */
+describe('listApiKeysForProject summary', () => {
+  it('carries both the creator and the revoker', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Key Audit Org');
+    const { apiKey } = await mintApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      name: 'Audited key',
+      scopes: ['ingest.write'],
+      createdByUserId: owner.id,
+    });
+
+    const beforeRevoke = (await listApiKeysForProject(organization.id, project.id)).find((k) => k.id === apiKey.id);
+    expect(beforeRevoke?.createdBy).toBe(owner.id);
+    // Not yet revoked, so neither revocation field is claimed.
+    expect(beforeRevoke?.revokedAt).toBeUndefined();
+    expect(beforeRevoke?.revokedBy).toBeUndefined();
+
+    await revokeApiKey({
+      organizationId: organization.id,
+      projectId: project.id,
+      apiKeyId: apiKey.id,
+      revokedByUserId: owner.id,
+    });
+
+    const afterRevoke = (await listApiKeysForProject(organization.id, project.id)).find((k) => k.id === apiKey.id);
+    expect(afterRevoke?.revokedBy).toBe(owner.id);
+    expect(afterRevoke?.revokedAt).toBeTruthy();
+    expect(afterRevoke?.createdBy).toBe(owner.id);
+  });
+});

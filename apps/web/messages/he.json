@@ -327,6 +327,10 @@
     "writeTierError": "לא ניתן היה לעדכן את רמת הרשאת הכתיבה. נסה שוב."
   },
   "ApiKeys": {
+    "createdByLabel": "נוצר על ידי {actor}",
+    "revokedDetailLabel": "בוטל ב-{revokedAt} על ידי {actor}",
+    "revokedOnLabel": "בוטל ב-{revokedAt}",
+    "unknownActorLabel": "חשבון שאינו חבר יותר",
     "metaTitle": "מפתחות API",
     "title": "מפתחות API עבור {projectName}",
     "existingKeysHeading": "מפתחות קיימים",
