@@ -17,6 +17,71 @@ Template for each entry:
 
 ---
 
+## 2026-09-16 - Hourly quality passes #10 and #11
+
+### Pass #11: cost guardrails
+
+- **Page reviewed:** `/cost-guardrails`. **Finding:** the page is called Cost Guardrails and the
+  guardrail it enforces is a query COUNT - the daily limit is a number of attempts, not a spend
+  cap. Every executed query logs a real `estimatedCostUsd` derived from the bytes BigQuery
+  reported processing; the page printed each one per row and never added them up. The question
+  its own name promises to answer was the one thing it did not say.
+- **Fixed:** the total, plus how much of the list it covers. An entry has no estimate when it ran
+  on an executor that does not report bytes processed, or never executed; those contribute
+  nothing, so the figure is a lower bound whenever some are missing - and the page says so. That
+  caveat is the substance: a spend figure that silently omits inputs reads as complete and gets
+  budgeted against. A measured zero counts as real, per the same distinction drawn in #396.
+  Totalling extracted to a pure view function so it is testable. PR #406, KAN-112.
+- The rest of the page was already honest. The gap was aggregation, not fabrication.
+
+### Pass #10: schema registry
+
+- **Finding:** the event-volume list is built from LANDED records, and a quarantined record never
+  lands. A schema whose traffic is rejected in full reported `lastSeenAt: null` and rendered
+  "Never received a record" - which reads as "you have not sent anything" at exactly the moment
+  records are arriving and bouncing. PR #405, KAN-111 (merged).
+
+### Working-order change
+
+Three consecutive passes collided on PROGRESS.md: each pass appended an entry at the top of the
+same file on its own branch, so whichever PR merged second always conflicted. From pass #11 the
+PROGRESS entry is written last, on its own branch cut from a main that already contains the
+previous pass. This entry covers #10 and #11 together as the first application of that.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit | #392 | metrics derived from budget |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge |
+| Creative preview gallery | #392 | synthesized ad creatives |
+| Top-level /automation route | #392 | invented proposals + fake org ids |
+| Copilot chat + engine | #393, #399 | canned replies; duplicate engine in the panel |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing |
+| Funnel cockpit | #397 | sample funnel unlabelled; 5 literal KPIs |
+| Project automation page | #398 | literal input bypassing the #392 guard |
+| Ingest health | #5 | clean - no changes |
+| API keys | #400 | creator and revoker never surfaced |
+| Hook endpoints | #402 | 202 pending never becomes data, and never said so |
+| Metric catalog / describe_metric | #403 | no way to learn which event feeds a metric |
+| Ingest API response | #404 | rejection reasons computed, then dropped twice |
+| Schema registry | #405 | "never received" hid fully-rejected traffic |
+| Cost guardrails | #406 | per-query cost logged, never totalled |
+
+**Not yet reviewed:** goals, settings, segments, customers, experiments, cohorts, plugins,
+resources, record-feed, win-rules, churn-reasons, field-mappings, demos, feedback, firmographics,
+intent-quality, insights, session-replay, support, rep-collections, billing-ops-feed,
+campaign-ops.
+
+- **Next step:** next pass takes the next unreviewed page.
+- **Waiting on human:** (1) whether to redeploy `api-prod` - `register_schema` is merged and green
+  but not callable until then, and EasySign is holding 8 schemas for the signal; (2) whether
+  EasySign should pursue `mrr` now via a custom measure schema rather than wait on KAN-110, which
+  has no date; (3) default key scopes (`project.configure` absent from issued keys); (4) the
+  primary checkout's uncommitted session-B files; (5) the CAC join key; (6) KAN-43; (7) the
+  tracking snippet on the real site; (8) revoking the old Jira token.
+
 ## 2026-09-16 - Hourly quality pass #9: ingest API response
 
 - **Surface reviewed:** the ingest POST response - ranked first by the EasySign session for a
