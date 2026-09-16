@@ -1038,6 +1038,9 @@
     "targetInputPlaceholder": "ללא יעד"
   },
   "CostGuardrails": {
+    "loggedCostTotal": "עלות משוערת עבור הרשומות האלה: {total}",
+    "loggedCostPartial": "{withCost} מתוך {total} רשומות נושאות אומדן; השאר רצו על מנוע שאינו מדווח בתים שעובדו, ולכן הסך האמיתי גבוה יותר.",
+    "loggedCostNone": "אף אחת מהרשומות האלה אינה נושאת אומדן עלות, ולכן לא ניתן להציג סך.",
     "metaTitle": "בקרות עלות",
     "title": "בקרות עלות עבור {projectName}",
     "usageHeading": "השימוש היום",

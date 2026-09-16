@@ -5,7 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { checkProjectQueryQuota, getProjectCostQuota, listOrgProjects, listQueryCostLogEntriesForProject } from '@/lib/orgs/queries';
-import { formatEstimatedCostUsd, formatLabels, outcomeLabelKey, toProjectCostQuotaView, toQueryCostLogEntryView } from '@/lib/orgs/cost-guardrail-view';
+import { formatEstimatedCostUsd, formatLabels, outcomeLabelKey, summariseLoggedCost, toProjectCostQuotaView, toQueryCostLogEntryView } from '@/lib/orgs/cost-guardrail-view';
 import { SetCostQuotaForm } from '@/components/orgs/set-cost-quota-form';
 
 type PageProps = Readonly<{
@@ -59,6 +59,23 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
   const quotaView = toProjectCostQuotaView(quota);
   const logViews = logEntries.map(toQueryCostLogEntryView);
 
+  /*
+    What these queries actually cost.
+
+    The page is called Cost Guardrails and the guardrail it enforces is a query COUNT - the
+    daily limit is a number of attempts, not a spend cap. Meanwhile every executed query logs
+    a real estimatedCostUsd, derived from the bytes BigQuery reported processing, and the page
+    printed each one individually and never added them up. So the one question the page's own
+    name promises to answer - what is this costing - was the one thing it did not say.
+
+    Totalled only over the entries listed, and only over those that carry an estimate: an
+    entry that ran on an executor which does not report bytes processed (DuckDB in dev, and
+    any blocked or failed attempt) has no cost to add. Stating how many of the entries are
+    represented keeps the total from being read as complete, which matters more here than the
+    number itself - a spend figure that silently omits half its inputs is worse than none.
+  */
+  const loggedCost = summariseLoggedCost(logViews);
+
   const t = await getTranslations('CostGuardrails');
 
   return (
@@ -103,6 +120,20 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
             ))}
           </ul>
         )}
+        {logViews.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            {loggedCost.entriesWithCost > 0 ? (
+              <p className="text-sm font-medium">{t('loggedCostTotal', { total: formatEstimatedCostUsd(loggedCost.totalUsd) })}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">{t('loggedCostNone')}</p>
+            )}
+            {loggedCost.isPartial ? (
+              <p className="text-xs text-muted-foreground">
+                {t('loggedCostPartial', { withCost: loggedCost.entriesWithCost, total: loggedCost.totalEntries })}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <p className="text-xs text-muted-foreground">{t('logCapNote', { count: logViews.length })}</p>
       </section>
     </main>

@@ -107,3 +107,32 @@ export function parseLabelsInput(input: string): Record<string, string> {
 }
 
 export type { ProjectQueryQuotaStatus };
+
+/** What a set of logged entries cost, and how much of the set that figure actually covers. */
+export interface LoggedCostSummary {
+  /** Sum over the entries that carry an estimate. 0 when none do - read `entriesWithCost` first. */
+  totalUsd: number;
+  entriesWithCost: number;
+  totalEntries: number;
+  /** True when some entries carry no estimate, so `totalUsd` understates the real spend. */
+  isPartial: boolean;
+}
+
+/**
+ * Totals the estimated cost of logged queries.
+ *
+ * An entry has no estimate when it ran on an executor that does not report bytes processed
+ * (DuckDB in development) or when it never executed at all (a blocked or failed attempt). Those
+ * contribute nothing, so the total is a lower bound whenever `isPartial` is true - which the
+ * caller must say out loud. A spend figure that silently omits some of its inputs is worse than
+ * showing no figure, because it reads as complete and gets budgeted against.
+ */
+export function summariseLoggedCost(entries: readonly QueryCostLogEntryView[]): LoggedCostSummary {
+  const withCost = entries.filter((entry) => entry.estimatedCostUsd !== null);
+  return {
+    totalUsd: withCost.reduce((total, entry) => total + (entry.estimatedCostUsd ?? 0), 0),
+    entriesWithCost: withCost.length,
+    totalEntries: entries.length,
+    isPartial: withCost.length > 0 && withCost.length < entries.length,
+  };
+}
