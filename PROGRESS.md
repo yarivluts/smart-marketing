@@ -17,7 +17,43 @@ Template for each entry:
 
 ---
 
-## 2026-09-16 - Hourly quality passes #10 and #11
+## 2026-09-16 - Hourly quality passes #12 and #13
+
+### Pass #13: trial pipeline widget
+
+- **Page reviewed:** the trial pipeline widget. **Finding:** it summed across the 30-day window
+  with `sumMetric`, which is right for a flow and wrong for everything else. `activeTrials` is a
+  gauge - a stock, not a flow - so summing 30 daily readings of "how many trials are open today"
+  counted every still-open trial once per day it stayed open. `conversionRatePct` is worse: adding
+  30 daily percentages produced 600%. A number that cannot exist was rendered without complaint.
+- **Fixed:** rewrote the view to `latestValue()`, returning the most recent non-empty bucket
+  instead of a sum. Both figures are now `number | null` and carry `asOfBucket` so the widget can
+  say *when* it is true - a gauge without an as-of date is an assertion about now that may be days
+  stale. PR #409, KAN-114. Merged.
+- The recurring shape again: the defect was not a wrong constant but **a function answering a
+  question it had not been asked** - "how many, total" in place of "how many, now".
+
+### Pass #12: MCP schema self-registration reaches a real integrator
+
+- **Finding, from the field rather than from a page.** EasySign attempted their first
+  `register_schema` call against prod and were refused for lack of `schema.write`. Verified in
+  code rather than taking the report at face value: their key carries
+  `[mcp.read, metrics.write, ingest.write]`, and scopes are **immutable** - `renameApiKey` only
+  changes the name, there is no scope-update path. So a key minted without `schema.write` can
+  never gain it; every integrator who hits this needs a human to mint a replacement, which is
+  precisely the handoff self-serve exists to remove.
+- **Unblocked operationally:** minted `easysign-prod-selfserve-mcp-key` into Secret Manager
+  (`mcp.read, schema.write, ingest.write, metrics.write`). Verified the gate actually passes by
+  calling `register_schema` with a deliberately invalid kind and getting
+  `Unknown schema kind "not_a_kind"` back - a *validation* error, not a scope refusal, which is
+  the only evidence that distinguishes "reached the service" from "looked like it did". The probe
+  created nothing.
+- **Left open deliberately:** whether `schema.write` belongs in the default scope set is a product
+  decision (KAN-97), not an operational one, and minting one key does not settle it. Evidence
+  recorded on the ticket.
+- Also confirmed, because EasySign reported it as a defect: MCP statelessness is by design -
+  `StreamableHTTPServerTransport({ sessionIdGenerator: undefined })`, a fresh server/transport
+  pair per request. Already documented at `docs/mcp/README.md:29`; no change needed.
 
 ### Pass #11: cost guardrails
 
