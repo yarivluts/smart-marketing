@@ -41,7 +41,10 @@ export function TrialPipelineWidget({ view }: TrialPipelineWidgetProps): React.R
       <h2 className="text-lg font-semibold">{t('heading')}</h2>
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
         <div className="flex flex-col">
-          <span className="text-2xl font-bold tabular-nums">{formatNumber(view.activeTrials)}</span>
+          {/* Null when no bucket reported a count - unknown, which is not the same as zero open trials. */}
+          <span className="text-2xl font-bold tabular-nums">
+            {view.activeTrials === null ? '—' : formatNumber(view.activeTrials)}
+          </span>
           <span className="text-xs text-muted-foreground">{t('inTrialLabel')}</span>
         </div>
         <div className="flex flex-col">

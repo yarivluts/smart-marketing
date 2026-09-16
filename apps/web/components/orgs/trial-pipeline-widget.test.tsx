@@ -15,7 +15,7 @@ function renderWidget(view: TrialPipelineWidgetView) {
 
 describe('TrialPipelineWidget', () => {
   it('renders the active-trial count and conversion percentage', () => {
-    renderWidget({ status: 'ok', activeTrials: 42, conversionRatePct: 18.5 });
+    renderWidget({ status: 'ok', activeTrials: 42, conversionRatePct: 18.5, asOfBucket: '2026-07-02' });
     expect(screen.getByText('42')).toBeInTheDocument();
     expect(screen.getByText('18.5%')).toBeInTheDocument();
     expect(screen.getByText('In trial now')).toBeInTheDocument();
@@ -23,7 +23,7 @@ describe('TrialPipelineWidget', () => {
   });
 
   it('shows a dash for the conversion rate when there is no conversion data yet', () => {
-    renderWidget({ status: 'ok', activeTrials: 3, conversionRatePct: null });
+    renderWidget({ status: 'ok', activeTrials: 3, conversionRatePct: null, asOfBucket: '2026-07-02' });
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
