@@ -356,3 +356,78 @@ describe('computeTileFreshness', () => {
     expect(computeTileFreshness(asOf, nowMs)).toEqual({ asOf, isStale: true });
   });
 });
+
+/**
+ * The reported symptom on the Landing-page board: the big-number and breakdown tiles came up
+ * as blank boxes while the table tile, fed the identical rows, rendered them correctly.
+ *
+ * `isEmpty` was `outcome.series.length === 0` - the raw row count - but every chart kind
+ * draws from a subset. `buildTimeSeriesView` splits by `period` and charts only the current
+ * one, so rows that are all `period: 'previous'` yield `series: []` while the row count says
+ * "not empty". The chart components then skip their empty branch and render an `<svg>` with
+ * no polylines, with nothing to tell the user why.
+ */
+/**
+ * `TileRenderView` includes the `unavailable` member, which carries no `isEmpty`, so reading
+ * that field off the union does not typecheck. These cases always pass `ok: true`, so the
+ * view is never `unavailable` - this narrows once and fails loudly if that ever stops holding.
+ */
+function drawable(view: ReturnType<typeof buildTileRenderView>) {
+  if (view.kind === 'unavailable') {
+    throw new Error(`expected a drawable tile, got unavailable: ${view.message}`);
+  }
+  return view;
+}
+
+describe('buildTileRenderView - isEmpty reflects what can actually be drawn', () => {
+  const previousOnlyRows = [
+    { bucket_date: '2026-01-01', period: 'previous', ad_spend: 10 },
+    { bucket_date: '2026-01-02', period: 'previous', ad_spend: 12 },
+  ];
+
+  it('flags a chart whose rows are all from the previous period as empty', () => {
+    for (const type of ['line', 'bar'] as const) {
+      const view = drawable(buildTileRenderView(tile({ type }), { ok: true, series: previousOnlyRows }));
+      expect({ type, isEmpty: view.isEmpty }).toEqual({ type, isEmpty: true });
+      // The blank box came from this combination: nothing to draw, but not flagged empty.
+      expect(view.kind === 'time_series' && view.series).toEqual([]);
+    }
+  });
+
+  it('flags a big number with no current-period rows as empty rather than a genuine zero', () => {
+    const view = drawable(buildTileRenderView(tile({ type: 'big_number' }), { ok: true, series: previousOnlyRows }));
+    expect(view.isEmpty).toBe(true);
+    // Summing zero rows gives 0; that 0 must not read as a metric that genuinely measured zero.
+    expect(view.kind === 'big_number' && view.value).toBe(0);
+  });
+
+  it('does not flag a chart that has real current-period points', () => {
+    const view = drawable(buildTileRenderView(tile({ type: 'bar' }), {
+      ok: true,
+      series: [
+        { bucket_date: '2026-01-01', period: 'current', ad_spend: 4 },
+        ...previousOnlyRows,
+      ],
+    }));
+    expect(view.isEmpty).toBe(false);
+  });
+
+  it('treats a genuine zero in the current period as present, not empty', () => {
+    const view = drawable(
+      buildTileRenderView(tile({ type: 'big_number' }), {
+        ok: true,
+        series: [{ bucket_date: '2026-01-01', period: 'current', ad_spend: 0 }],
+      }),
+    );
+    expect(view.isEmpty).toBe(false);
+    expect(view.kind === 'big_number' && view.value).toBe(0);
+  });
+
+  it('still flags a table with no rows, and a funnel whose steps come from config', () => {
+    expect(drawable(buildTileRenderView(tile({ type: 'table' }), { ok: true, series: [] })).isEmpty).toBe(true);
+    // A funnel emits one step per configured metric, so step count can never signal emptiness.
+    const funnel = drawable(buildTileRenderView(tile({ type: 'funnel', metricNames: ['a', 'b'] }), { ok: true, series: [] }));
+    expect(funnel.isEmpty).toBe(true);
+    expect(funnel.kind === 'funnel' && funnel.steps).toHaveLength(2);
+  });
+});
