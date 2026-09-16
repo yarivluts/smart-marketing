@@ -226,6 +226,37 @@ a deliberately deferred tradeoff (same posture as the schema-registry active-ver
 }
 ```
 
+When anything was **not** accepted, the same response carries a `rejected` array with the
+reason per record — you do not need a second call to find out what went wrong:
+
+```jsonc
+{
+  "batch_id": "b_790",
+  "kind": "event",
+  "accepted": 0,
+  "quarantined": 1,
+  "duplicates": 0,
+  "total": 1,
+  "rejected": [
+    {
+      "client_id": "evt_1",
+      "status": "quarantined",           // "quarantined" | "duplicate"
+      "reasons": ["unknown_schema:signup"]
+    }
+  ]
+}
+```
+
+`rejected` is **absent** when every record was accepted, so its presence is itself the signal.
+It lists only the records that were not accepted, so the response stays proportional to what
+went wrong rather than to batch size.
+
+> **The status code is still `202`, including when `accepted` is `0`.** A batch that rejected
+> every record is not a transport failure, and the endpoint has always answered 202 for it —
+> so a client checking only `res.ok` will read success. Check `accepted`, or the presence of
+> `rejected`. Whether a wholly-rejected batch should answer non-2xx is an open API decision
+> (it would break existing callers), not an oversight.
+
 ### 8.2 `GET /v1/ingest/batches/{batch_id}` — per-record results
 
 Scoped to the calling key's own org/project/environment — a batch id from another environment

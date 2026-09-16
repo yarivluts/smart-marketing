@@ -18,6 +18,19 @@ interface IngestBatchResponse {
   quarantined: number;
   duplicates: number;
   total: number;
+  /**
+   * The records that were not accepted, each with the reason.
+   *
+   * Counts alone cannot be acted on. A sender whose event name is not registered, or whose
+   * payload carries one undeclared property, previously read `202` with `accepted: 0` and had
+   * to know to call `GET /v1/ingest/batches/{id}` - an endpoint nothing in the response
+   * mentions - to find out why. The reasons were computed during validation and discarded at
+   * this boundary.
+   *
+   * Absent when nothing was rejected, so a clean batch is unchanged from a caller's point of
+   * view and the field's presence is itself the signal.
+   */
+  rejected?: { client_id: string; status: string; reasons?: string[] }[];
 }
 
 /** `ApiKeyAuthGuard` always populates this before a route handler runs (it throws first if authentication fails), so a missing context here would mean the guard was bypassed, not a caller error. */
@@ -87,6 +100,7 @@ export class IngestController {
         quarantined: summary.quarantined,
         duplicates: summary.duplicates,
         total: summary.total,
+        ...(summary.rejected.length > 0 ? { rejected: summary.rejected } : {}),
       };
     } catch (error) {
       if (error instanceof EmptyIngestBatchError || error instanceof IngestBatchTooLargeError) {

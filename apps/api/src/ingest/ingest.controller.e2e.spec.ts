@@ -143,9 +143,28 @@ describe('IngestController (e2e)', () => {
       }),
     });
     expect(postRes.status).toBe(202);
-    const posted = (await postRes.json()) as { batch_id: string; accepted: number; quarantined: number };
+    const posted = (await postRes.json()) as {
+      batch_id: string;
+      accepted: number;
+      quarantined: number;
+      rejected?: { client_id: string; status: string; reasons?: string[] }[];
+    };
     expect(posted.accepted).toBe(1);
     expect(posted.quarantined).toBe(1);
+
+    /*
+      The reason comes back inline, on the POST itself.
+
+      It was computed during validation and then dropped at the controller boundary, so a
+      caller read 202 with quarantined: 1 and had to already know that
+      GET /v1/ingest/batches/{id} existed - nothing in the response mentions it - to find out
+      what was wrong. That is the difference between a sender who fixes their payload and one
+      who ships a silent integration.
+    */
+    expect(posted.rejected).toHaveLength(1);
+    expect(posted.rejected?.[0].client_id).toBe('ord_5002-evt');
+    expect(posted.rejected?.[0].status).toBe('quarantined');
+    expect(posted.rejected?.[0].reasons?.length ?? 0).toBeGreaterThan(0);
 
     const getRes = await fetch(`${baseUrl}/v1/ingest/batches/${posted.batch_id}`, {
       headers: { Authorization: `Bearer ${rawKey}` },

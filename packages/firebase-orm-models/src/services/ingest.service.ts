@@ -54,6 +54,20 @@ export interface IngestBatchSummary {
   accepted: number;
   quarantined: number;
   duplicates: number;
+  /**
+   * The records that were NOT accepted, with the reason each was rejected.
+   *
+   * The counts alone cannot be acted on: "quarantined: 1" tells a sender that something was
+   * wrong without saying what, and the per-record reasons were already computed here and then
+   * dropped on the way out - they were readable only by a second call to
+   * `GET /v1/ingest/batches/{id}`, which nothing in the response points at. So the common
+   * failure was a caller POSTing, reading a 202, and never learning that an unregistered event
+   * name or one stray property had rejected the whole batch.
+   *
+   * Only the rejected records, not every record: a fully accepted batch adds nothing to the
+   * response, and the payload stays proportional to what went wrong rather than to batch size.
+   */
+  rejected: IngestRecordResult[];
 }
 
 interface PreparedRecord {
@@ -493,6 +507,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
     accepted: batch.accepted_count,
     quarantined: batch.quarantined_count,
     duplicates: batch.duplicate_count,
+    rejected: recordResults.filter((result) => result.status !== 'accepted'),
   };
 }
 
