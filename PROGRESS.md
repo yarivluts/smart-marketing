@@ -17,6 +17,58 @@ Template for each entry:
 
 ---
 
+## 2026-09-16 - Hourly quality pass #5: ingest health (clean) + copilot panel
+
+- **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/ingest-health`. **No defects found.**
+  Every figure comes from a real query; `batches.length === 0` renders a real empty state;
+  `freshnessMinutes === null` renders "No batches ingested yet" rather than a zero; and every
+  compound query behind it (`pipeline_messages` status+enqueued_at in both directions,
+  `quarantined_records` status+created_at) has its index declared in `firestore.indexes.json`,
+  with the single-field orderBy queries needing none. Reporting a page as clean is a real
+  outcome - manufacturing a finding to justify the pass would be worse. One cosmetic nit left
+  unfixed: the "Based on the {count} most recent ingest batches" note renders under the empty
+  state as "Based on the 0 most recent", which is accurate but redundant.
+- **Also confirmed closed:** the defect class from passes #3 and #4 - a page constructing
+  view-model input inline from literals - no longer appears anywhere under `app/[locale]`.
+  The automation page was the last one.
+- **Substantive work: KAN-92**, which was already queued. The copilot chat panel carried a
+  private duplicate of `lib/ai/copilot-engine` - 106 lines of `queryLower.includes()` branches
+  returning canned replies ("I identified an optimization opportunity...", "I've analyzed your
+  query") attached to proposals against hardcoded ids like `tgt-meta-retargeting`, which
+  `handleApprove` POSTs to the real automation endpoint. Deleted and routed through the engine
+  fixed in #393, with optional `targets`/`funnelSteps` props so it has real context. PR #399.
+- **Merged this pass:** #398 (KAN-107 Done). #397 had a PROGRESS conflict against #398;
+  resolved - see the note below.
+- **Mistake worth recording:** I pushed that conflict resolution with the markers still in the
+  file. My resolution script had failed on a path error, but the commit was chained behind a
+  later command with `&&` and I read a plausible-looking `grep -c` count as confirmation.
+  Repaired in a follow-up commit. Verify the artefact, not a proxy for it.
+
+### Pages reviewed so far (rotate, do not repeat)
+
+| Page / surface | Pass | Outcome |
+|---|---|---|
+| Campaigns cockpit | #392 | metrics derived from budget |
+| Executive blended report | #392 | spend/revenue/churn invented under a "Live" badge |
+| Creative preview gallery | #392 | synthesized ad creatives |
+| Top-level /automation route | #392 | invented proposals + fake org ids; now redirects |
+| Copilot chat + engine | #393, #399 | canned replies; panel had its own duplicate engine |
+| Onboarding wizard | #395 | key existence treated as data flowing |
+| Board tiles + TV war room | #396 | empty-state derived from the wrong thing |
+| Funnel cockpit | #397 | sample funnel unlabelled; 5 literal KPIs |
+| Project automation page | #398 | literal performance input bypassing the #392 guard |
+| Ingest health | #5 | **clean - no changes** |
+
+**Not yet reviewed:** goals, keys, settings, metric-defs, schema-defs, segments, customers,
+hooks, experiments, cohorts, plugins, resources, record-feed, win-rules, cost-guardrails,
+churn-reasons, field-mappings, demos, feedback, firmographics, intent-quality, insights,
+session-replay, support, rep-collections, billing-ops-feed, campaign-ops.
+
+- **Next step:** next pass takes the next unreviewed page.
+- **Waiting on human:** the primary checkout still holds ~164 uncommitted session-B files and
+  cannot be pulled; the CAC join-key decision; KAN-43; the tracking snippet on the real EasySign
+  site; revoking the old Jira token in Atlassian.
+
 ## 2026-09-16 - Hourly quality pass #4: project automation page
 
 - **Page reviewed:** `/orgs/[orgId]/projects/[projectId]/automation` - the real automation page
