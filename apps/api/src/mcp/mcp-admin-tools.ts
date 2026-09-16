@@ -180,11 +180,11 @@ const metricDefinitionInputShape = {
 
 const schemaDefinitionInputShape = {
   kind: z.string().describe('One of: event, entity, measure. An event is something that happened; an entity is a thing with a stable id; a measure is a numeric reading with a value and a timestamp.'),
-  name: z.string().min(1).describe('Schema name, e.g. "signup" or "subscription_state_change". This is the value the ingest envelope carries, and for measure/entity kinds it is also the table name a metric can query.'),
+  name: z.string().min(1).describe('Schema name, e.g. "signup" or "subscription_state_change". This is the value the ingest envelope carries, and for measure/entity kinds it is also the table name a metric can query. A schema is registered project-wide, so one call covers every environment.'),
   fields: z
     .unknown()
     .describe(
-      'Array of { name, type, is_required?, is_pii?, is_identity_key? }. type is one of: string, number, boolean, timestamp. A record carrying a property this list does not declare is rejected into quarantine, so declare every property you intend to send.',
+      'Array of { name, type, is_required?, is_pii?, is_identity_key? }. type is one of: string, number, boolean, timestamp, object, array. A record carrying a property this list does not declare is rejected into quarantine, so declare every property you intend to send. Note that anon_id and customer_id ride on the envelope and must NOT be declared here.',
     ),
 };
 
