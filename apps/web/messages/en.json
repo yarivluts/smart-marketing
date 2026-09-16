@@ -386,6 +386,8 @@
     "consentError": "Something went wrong approving this connection. Please try again."
   },
   "Hooks": {
+    "queueNotIngestedNote": "A received delivery is stored for review - it is not ingested, and nothing measures it. It becomes data only when a field mapping is applied to it, which turns its payload into records. Marking a delivery reviewed or discarded does not ingest anything.",
+    "queueFieldMappingsLink": "Set up a field mapping",
     "metaTitle": "Inbound hooks",
     "title": "Inbound hooks for {projectName}",
     "existingEndpointsHeading": "Hook endpoints",
