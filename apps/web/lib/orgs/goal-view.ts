@@ -52,6 +52,15 @@ export type GoalThermometerView =
       projectedFinalValue: number;
       isGoalMet: boolean;
     }
+  /**
+   * The metric returned no rows over the goal's window, so there is no pace to report.
+   *
+   * Distinct from `ok` with a zero value: `actualValue` is a sum, so a metric that has never
+   * received a record sums to 0 exactly as one measured at zero does. Pace computed against
+   * that 0 renders "off track" in red at 0% - a project that has not started reporting shown
+   * exactly like one that is failing, when the two call for opposite responses.
+   */
+  | { kind: 'no_measurements' }
   | { kind: 'warehouse_not_configured' }
   | { kind: 'quota_exceeded'; message: string }
   | { kind: 'not_yet_backed'; message: string }
@@ -74,6 +83,10 @@ export function buildGoalThermometerView(outcome: GoalProgressOutcome): GoalTher
       return { kind: 'warehouse_not_configured' };
     }
     return { kind: outcome.reason, message: outcome.message };
+  }
+
+  if (!outcome.hasMeasurements) {
+    return { kind: 'no_measurements' };
   }
 
   const { progress, actualValue } = outcome;

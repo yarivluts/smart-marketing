@@ -1353,6 +1353,7 @@
     "expectedAtNowLabel": "Expected by now",
     "projectedFinalValueLabel": "Projected at deadline",
     "thermometerUnavailableReason": {
+      "no_measurements": "No data for this metric yet - pace cannot be judged",
       "warehouse_not_configured": "Warehouse not configured yet",
       "quota_exceeded": "Daily query quota reached",
       "not_yet_backed": "Not backed by real data yet",
