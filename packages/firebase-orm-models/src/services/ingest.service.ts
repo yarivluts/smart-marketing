@@ -221,9 +221,13 @@ export { IMPLICIT_EVENT_ENVELOPE_FIELDS } from './schema-registry.service';
  * dropped (plan `08 §2`). Exported so `quarantine.service.ts`'s replay path can re-run the identical
  * check against the current (possibly since-evolved) active schema, rather than duplicating it.
  * `kind` gates {@link IMPLICIT_EVENT_ENVELOPE_FIELDS} — only `event` records carry snippet-attached
- * identity properties; entity/measure validation is unchanged.
+ * identity properties; entity/measure validation is unchanged. It is REQUIRED rather than optional
+ * on purpose: omitting it silently empties that implicit list, so an event's envelope identity
+ * properties would come back as `unregistered_field` and quarantine the record. Every record being
+ * validated has a kind, so there is no honest reason to omit one, and making the compiler insist
+ * turns an invariant that had to be re-checked by hand across call sites into one it enforces.
  */
-export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: readonly SchemaFieldDef[], kind?: SchemaDefKind): string[] {
+export function validateAgainstSchema(fields: Record<string, unknown>, fieldDefs: readonly SchemaFieldDef[], kind: SchemaDefKind): string[] {
   const reasons: string[] = [];
   const declared = new Set(fieldDefs.map((field) => field.name));
 
