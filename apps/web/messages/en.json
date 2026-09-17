@@ -719,14 +719,15 @@
     "landedAtLine": "Landed {landedAt}",
     "clientIdLine": "id {clientId}",
     "capNote": "Showing the {count} most recent records.",
+    "capNoteTruncated": "Showing the {count} most recent records — more exist than are shown.",
     "filterFieldLabel": "Filter by field",
     "filterFieldPlaceholder": "Choose a field",
     "filterValueLabel": "Value",
     "filterValuePlaceholder": "Exact value",
     "filterApply": "Filter",
     "filterClear": "Clear filter",
-    "filterActiveNote": "Filtered to records where {field} is {value}.",
-    "filterEmpty": "No records match this filter."
+    "filterActiveNote": "Filtered to records where {field} is {value}, applied across the {window} most recent records for this schema.",
+    "filterEmpty": "No records match this filter in the {window} most recent records for this schema. A matching record older than that window is not searched — narrow by schema or check a more recent window rather than reading this as \"no such record\"."
   },
   "Customers": {
     "metaTitle": "Customer search",
@@ -1070,6 +1071,7 @@
     "logEntryCost": "Estimated cost: {cost}",
     "logEntryCostUnknown": "Estimated cost: not available",
     "logCapNote": "Showing the {count} most recent query cost log entries.",
+    "logCapNoteTruncated": "Showing the {count} most recent query cost log entries — more exist than are shown, so any total read from this list is a lower bound.",
     "outcomeExecuted": "Executed",
     "outcomeBlockedQuotaExceeded": "Blocked — quota exceeded",
     "outcomeWarehouseNotConfigured": "Executed (no warehouse configured yet)"
@@ -1081,7 +1083,8 @@
     "chainInvalid": "Integrity check failed at entry {entryId}. This log may have been tampered with.",
     "noEntries": "No audited changes recorded for this organization yet.",
     "actorLine": "{actorType} {actorId} · {action}",
-    "listCapNote": "Showing the {count} most recent entries."
+    "listCapNote": "Showing the {count} most recent entries.",
+    "listCapNoteTruncated": "Showing the {count} most recent entries — more exist than are shown, so this is a window onto the log, not the whole of it."
   },
   "PluginRegistry": {
     "metaTitle": "Plugin registry",

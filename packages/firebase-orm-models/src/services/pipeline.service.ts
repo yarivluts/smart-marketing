@@ -297,7 +297,17 @@ export interface ListRecentRecordsForSchemasParams {
 }
 
 /** Same "over-fetch a candidate window, then filter" posture as `CHURN_FEED_CANDIDATE_WINDOW` — Firestore has no native way to filter on an arbitrary `payload` field server-side without a dedicated per-field index, so a `fieldFilter` widens the per-schema fetch to this many candidates (newest first) before filtering, rather than filtering only within `limit`'s own narrow window. A project with more than this many records landed more recently than its oldest unscanned match would miss that match — the same known, documented limitation every other Firestore-backed feed in this file already carries. */
-const RECORD_FIELD_FILTER_CANDIDATE_WINDOW = 500;
+/**
+ * How many recent records a field filter is applied ACROSS, not how many it returns.
+ *
+ * Exported because the UI has to say it. The filter is applied in memory over this
+ * many most-recent records and then capped, so a matching record older than the
+ * window is invisible and "no records match this filter" actually means "none in
+ * the last 500". A filter that silently searches a window while appearing to
+ * search the dataset is the same defect as KAN-140's "no comments landed": the
+ * empty state names the wrong cause.
+ */
+export const RECORD_FIELD_FILTER_CANDIDATE_WINDOW = 500;
 
 /** Same stringification convention `record-feed-view.ts`'s `stringifyPayloadValue` renders with, kept as its own copy here since filter-matching (server-side, never rendered) and PII-redacted display (client-facing) are different concerns that happen to share a shape. */
 function stringifyPayloadFieldValue(value: unknown): string {

@@ -370,9 +370,10 @@ export async function listRecentRecordsForSchema(
   kind: SchemaDefKind,
   schemaName: string,
   fieldFilter?: RecordFieldFilter,
+  limit?: number,
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
-  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName], fieldFilter });
+  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName], fieldFilter, ...(limit !== undefined ? { limit } : {}) });
 }
 
 export async function listRecentChurnedSubscriptionsForProject(
