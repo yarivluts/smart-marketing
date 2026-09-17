@@ -115,12 +115,12 @@ const approveActionInputShape = {
 };
 
 const createGoalInputShape = {
-  name: z.string().min(1),
+  name: z.string().min(1).describe('Human-readable goal name, shown wherever the goal appears. Not an identifier — it does not have to be unique.'),
   metric_name: z.string().min(1).describe('Must be a currently registered and active metric (see list_metrics).'),
   direction: z.string().describe('One of: maximize, minimize, range.'),
   target_value: z.number().optional().describe('Required for maximize/minimize.'),
   range_min: z.number().optional().describe('Required for range, together with range_max.'),
-  range_max: z.number().optional(),
+  range_max: z.number().optional().describe('Required for range, together with range_min. The upper bound of the band the metric should stay inside.'),
   start_date: z.string().min(1).describe('YYYY-MM-DD, inclusive.'),
   deadline: z.string().min(1).describe('YYYY-MM-DD, inclusive, must be after start_date.'),
   rhythm: z.string().describe('One of: even, work_week_weekend.'),
@@ -128,7 +128,7 @@ const createGoalInputShape = {
 };
 
 const createSegmentInputShape = {
-  name: z.string().min(1),
+  name: z.string().min(1).describe('Human-readable segment name, shown wherever the segment appears.'),
   schema_name: z.string().min(1).describe('A registered and active entity schema name, e.g. "customer".'),
   filters: z.unknown().optional().describe('Array of { field, op, value } — op is one of =, !=, >, >=, <, <=, contains. ANDed together. May be omitted/empty if event_conditions is non-empty.'),
   event_conditions: z
