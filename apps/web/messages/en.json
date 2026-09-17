@@ -766,8 +766,7 @@
     "filterAllActivity": "All Activity",
     "filterPurchases": "Purchases",
     "filterSignIns": "Sign-ins",
-    "legendLabel": "Retention",
-    "cohortHealthPositiveNotice": "Cohort retention trending +4% above target"
+    "legendLabel": "Retention"
   },
   "Funnel": {
     "metaTitle": "Funnel",
@@ -2005,7 +2004,7 @@
     "keywordsLabel": "Keywords",
     "noCreativesFound": "No creatives found matching your filter.",
     "proactiveRecommendationHeading": "AI Growth Recommendation",
-    "proactiveRecommendationDesc": "Meta Retargeting ROAS is 4.8x — Increase daily budget by 20% (+18% projected conversions).",
+    "proactiveRecommendationDesc": "{campaignLabel} has the highest measured ROAS at {roas}x. Applying raises its daily budget from ${currentBudget} to ${nextBudget}, a 20% increase. No conversion lift is projected — none is measured.",
     "applyRecommendationButton": "1-Click Apply",
     "recommendationApplied": "Recommendation applied successfully!",
     "statusActive": "Active",
