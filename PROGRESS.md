@@ -17,6 +17,75 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #25: the scheduled warehouse refresh
+
+### Surface reviewed: a claim, not a page
+
+Swept every user-facing string for capped-list completeness claims - the class that is now seven
+surfaces deep - and found **fifteen**. Most are the known shape. Two were different, and following
+the second one led out of the UI entirely.
+
+- `IngestHealth.batchCapNote` reads "**Based on** the {count} most recent ingest batches" - the
+  ingest-health summary is genuinely computed over a capped sample, but it says so. That framing is
+  the honest version of the whole class, and worth copying: "based on N" states a basis, where
+  "showing N" asserts a total.
+- `IngestHealth.warehouseFreshnessLine` claims "Refreshed hourly by the scheduled warehouse job."
+  A claim about production behaviour is checkable, so I checked it.
+
+### KAN-147: the claim is true, and the thing it describes is declared nowhere
+
+- `dbt-refresh-hourly` exists - cron `0 * * * *`, `Etc/UTC`, ENABLED - and triggers a Cloud Run Job
+  `dbt-refresh`. **Neither is in `infra/terraform`. There is no scheduler `.tf` file at all.**
+- Enumerated rather than assumed: 1 scheduler job live / 0 declared, 1 Cloud Run Job live / 0
+  declared. Cloud Run *services* are covered by a `for_each`, so the gap is exactly the two
+  resources that keep the warehouse fresh.
+- **Why it is worse than an ordinary undeclared resource:** every metric, cohort, funnel and
+  attribution figure is a query against tables this job rebuilds. If it stops, nothing errors -
+  every page keeps rendering yesterday's numbers while ingest-health keeps asserting the refresh is
+  hourly. **A stale warehouse is indistinguishable from a quiet week**, which is the same failure
+  shape as KAN-124 and KAN-137.
+- Mirror of KAN-129/130: that was declared-but-never-deployed, this is live-but-never-declared.
+  `terraform plan` is the detector, and it cannot notice a resource absent from the configuration -
+  which is the whole argument for declaring it.
+- **Declared, not applied** (PR #431). Transcribed from the live project rather than guessed, with
+  `import` blocks so it adopts rather than creates, and a prominent note that `plan` must show *no
+  changes* first - an omitted field would surface as a diff, and applying that would modify the job
+  the warehouse depends on.
+- `ignore_changes` narrowed to the container image alone: `cloud_run.tf` also ignores
+  client/labels/annotations, but those attributes differ between the service and job resources and
+  no terraform binary exists here to check. **Listing one that does not exist would fail the plan
+  for whoever adopts this - narrow and correct beats broad and guessed.**
+- **KAN-148, filed not changed:** both resources run as the default compute service account with
+  full `cloud-platform` scope. The declaration transcribes that deliberately, so writing the
+  configuration down does not smuggle in a permission change. Narrowing it has a real failure mode -
+  wrong roles stop the refresh, which fails silently for the reasons above.
+
+### What this pass says about method
+
+The last several passes found things by reading pages. This one found the largest gap by taking a
+sentence the UI asserts and checking whether it is true. The sentence *was* true - and verifying it
+surfaced that the mechanism behind it exists only in production. **Worth repeating: any UI claim
+about system behaviour ("refreshed hourly", "synced nightly", "updated in real time") is a testable
+proposition about infrastructure, and the infrastructure is where the answer lives.**
+
+### Merged this pass
+
+#429 (KAN-145/146) and #430 (PROGRESS #24). Both closed.
+
+### Blocked - unchanged, all four are Yariv's
+
+Secret read for `easysign-prod-selfserve-mcp-key`; go-ahead for the 9 schema registrations; the
+dev-scoped purge; the rotation of the two keys reported burned. Product decisions: KAN-97, KAN-117,
+KAN-130, KAN-143 follow-up.
+
+### Next
+
+PR #431 in CI. **Still owed from the sweep:** five surfaces with unfixed capped-list claims -
+RecordFeed, CostGuardrails, AuditLog, Segments members, WinRules history. `splitOverFetchedFeed`
+exists now, so each is small. Next unreviewed page: campaign-ops.
+
+---
+
 ## 2026-09-18 - Hourly quality pass #24: billing ops feed
 
 ### Surface reviewed: billing-ops-feed
@@ -584,7 +653,8 @@ trial pipeline widget (#13), the test harness itself (#14), experiments (#15), t
 pipeline end to end (#16), CI and the emulator transport (#17), a live customer project's real
 state (#18), customers / Customer 360 (#19), CI / the web emulator transport (#20),
 churn-reasons (#21), cohorts + a repo-wide fabricated-claim sweep (#22),
-campaigns (#23), **billing-ops-feed (#24)**. Not yet reviewed:
+campaigns (#23), billing-ops-feed (#24),
+**the scheduled warehouse refresh (#25)**. Not yet reviewed:
 billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
