@@ -76,6 +76,5 @@ describe('CohortRetentionMatrix Component', () => {
     );
 
     expect(screen.getByText('Retention:')).toBeInTheDocument();
-    expect(screen.getByText('Cohort retention trending +4% above target')).toBeInTheDocument();
   });
 });

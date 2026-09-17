@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useTranslations } from 'next-intl';
-import { Users, TrendingUp, Filter } from 'lucide-react';
+import { Users, Filter } from 'lucide-react';
 import type { CohortHeatmapRow } from '@/lib/orgs/funnel-goals-synthesizer';
 
 export interface CohortRetentionMatrixProps {
@@ -170,10 +170,6 @@ export function CohortRetentionMatrix({
           </span>
         </div>
 
-        <div className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
-          <TrendingUp className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>{t('cohortHealthPositiveNotice')}</span>
-        </div>
       </div>
     </div>
   );
