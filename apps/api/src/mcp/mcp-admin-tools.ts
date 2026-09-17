@@ -35,6 +35,7 @@ import {
   queryGoalProgress,
   reexportRawRecordsToWarehouse,
   registerMetricDefinition,
+  previewSchemaDefinition,
   registerSchemaDefinition,
   setGoalStatus,
   setHookEndpointSigningSecret,
@@ -189,6 +190,21 @@ const schemaDefinitionInputShape = {
 };
 
 /**
+ * `register_schema` only — deliberately not on the shared shape, which
+ * `evolve_schema` also uses. Advertising a flag a tool silently ignores is its
+ * own kind of lie; evolve has no preview path yet (see KAN-119).
+ */
+const registerSchemaInputShape = {
+  ...schemaDefinitionInputShape,
+  dry_run: z
+    .boolean()
+    .optional()
+    .describe(
+      'Validate and report what would be created, writing nothing. Use this first: a schema cannot be deleted or archived, and evolve_schema is additive-only, so a misspelled field name is permanent. A name that is already taken comes back as would_conflict rather than an error, so a whole batch can be previewed in one pass.',
+    ),
+};
+
+/**
  * Normalises the tool's loosely-typed `fields` argument into the service's SchemaFieldInput.
  *
  * The three booleans default to false rather than being required: the common case is a plain
@@ -281,7 +297,17 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
             name: schema.name,
             kind: schema.kind,
             version: schema.version,
-            fields: schema.field_defs.map((field) => ({ name: field.name, type: field.type, required: field.is_required })),
+            // `is_pii`/`is_identity_key` are echoed because they are otherwise
+            // write-only: a caller could set them on register_schema and had no
+            // way to read back that they took. The first integrator to mark a
+            // field PII is exactly the one who needs to confirm it.
+            fields: schema.field_defs.map((field) => ({
+              name: field.name,
+              type: field.type,
+              required: field.is_required,
+              is_pii: field.is_pii,
+              is_identity_key: field.is_identity_key,
+            })),
           })),
       });
     }),
@@ -292,19 +318,31 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
     {
       title: 'Register schema',
       description:
-        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. Requires "schema.write".',
-      inputSchema: toolInputSchema(schemaDefinitionInputShape),
+        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. There is no delete or archive path for a schema and evolve_schema is additive-only, so a mistake here is permanent: pass dry_run first to check your work. Requires "schema.write".',
+      inputSchema: toolInputSchema(registerSchemaInputShape),
     },
     auditedToolHandler(auth, 'register_schema', async (args: any) =>
       runAdminTool(auth, 'schema.write', args, async (a: any) => {
-        const schemaDef = await registerSchemaDefinition({
+        const request = {
           organizationId: auth.organizationId,
           projectId: auth.projectId,
           kind: String(a.kind),
           name: String(a.name),
           fields: toSchemaFields(a),
           createdByUserId: actorId(auth),
-        });
+        };
+
+        if (a.dry_run === true) {
+          const preview = await previewSchemaDefinition(request);
+          return textResult({
+            dry_run: true,
+            created: false,
+            would_create: { name: preview.name, kind: preview.kind, version: preview.version, fields: preview.fields },
+            would_conflict: preview.wouldConflict,
+          });
+        }
+
+        const schemaDef = await registerSchemaDefinition(request);
         return textResult({ name: schemaDef.name, kind: schemaDef.kind, version: schemaDef.version, status: schemaDef.status });
       }),
     ),
