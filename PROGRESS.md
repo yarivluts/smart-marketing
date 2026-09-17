@@ -17,6 +17,55 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #21: Churn Reasons
+
+### Surface reviewed: the churn-reasons page and its free-text theme digest
+
+- **KAN-140, and the second half asserts something untrue.** The digest clusters comments with a
+  **fixed English keyword lexicon** of six themes. A comment matching no keyword was dropped and
+  the return value kept no record it existed, so the page rendered the survivors under "What
+  customers say" with no coverage figure. A reader saw "Pricing - 12 comments" unable to tell 12
+  of 15 from 12 of 300 - and the second is not a finding about pricing, it is a finding about the
+  lexicon.
+- **The worse half:** the empty state read "No cancellation comments landed yet." That branch fired
+  on `clusters.length === 0`, which is **also** the state when hundreds of comments landed and none
+  matched. A project whose customers write in any language other than English - EasySign's, for
+  instance - would see the page claim nobody had commented while the comments sat in the warehouse.
+- Same species as KAN-137, KAN-132 and KAN-124: **a system that cannot distinguish "nothing is
+  there" from "nothing could match", defaulting to the reading that sounds like a settled fact.**
+  That is now four surfaces with the identical shape, which suggests it is worth treating as a
+  design rule rather than four bugs: any empty state computed from a filtered set has to say which
+  of the two it is.
+- **Fixed (PR #423):** the clusterer returns `totalComments`, `matchedComments` and
+  `uncategorizedComments` alongside the clusters. The page separates the two empty states, and when
+  coverage is partial it says so *and names the cause*, rather than leaving a reader to conclude
+  their customers had little to say.
+- **Deliberately not changed:** the taxonomy. It is a documented deterministic stand-in for LLM
+  clustering. What was wrong was not the heuristic but presenting its output as complete - worth
+  separating, because "replace it with a model" would have been a much larger change that did not
+  fix the actual defect.
+
+### A rule of this repo I broke and caught
+
+My first version of the new tests used Hebrew string literals to demonstrate the non-English case.
+CLAUDE.md forbids Hebrew in `.ts` source - translation files only. Replaced with French before
+committing. Worth recording that the violation was *natural*: the test is about non-English input
+and the nearest non-English language to hand was the one the rule names. A rule is easiest to break
+where the reason for breaking it looks like a good one.
+
+### Merged this pass
+
+#421 (KAN-103's last exposed path, apps/web Playwright) and #422 (PROGRESS #20). #419 had conflicted
+with #420 on `search_customers`' description; resolved by keeping both improvements - the
+"lookup, not a search" framing and the `has_more`/entity-kind notes - rather than picking a side.
+
+### Next
+
+PRs #419, #423 in CI. Next unreviewed page: cohorts. KAN-128 (apps/api emulator transport) is the
+last KAN-103 remnant.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #20: CI again, and a generalisation of mine that was false
 
 ### Surface reviewed: the last exposed KAN-103 path, found because a docs-only PR failed
@@ -353,8 +402,8 @@ health + copilot panel (#5), API keys (#6), hook endpoints (#7), metric catalog 
 response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-registration (#12),
 trial pipeline widget (#13), the test harness itself (#14), experiments (#15), the identity
 pipeline end to end (#16), CI and the emulator transport (#17), a live customer project's real
-state (#18), customers / Customer 360 (#19), **CI / the web emulator transport (#20)**. Not yet
-reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+state (#18), customers / Customer 360 (#19), CI / the web emulator transport (#20),
+**churn-reasons (#21)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
 
