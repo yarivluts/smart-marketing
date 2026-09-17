@@ -150,7 +150,18 @@ export function AdsPerformanceDashboard({
                   {t('proactiveRecommendationHeading')}
                 </h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t('proactiveRecommendationDesc')}
+                  {/* Built from the campaign actually selected above, not a fixed
+                      string. This sits beside a button that raises a real daily
+                      budget on a real ad account, so every number it states has to
+                      be one that was measured — and the lift it does NOT state is
+                      the point: nothing here can predict a conversion change, so
+                      it says so rather than inventing one. */}
+                  {t('proactiveRecommendationDesc', {
+                    campaignLabel: topCampaign.label,
+                    roas: topCampaign.roas.toFixed(1),
+                    currentBudget: topCampaign.dailyBudgetUsd,
+                    nextBudget: Math.round(topCampaign.dailyBudgetUsd * 1.2),
+                  })}
                 </p>
               </div>
             </div>

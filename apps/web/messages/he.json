@@ -766,8 +766,7 @@
     "filterAllActivity": "כל הפעילות",
     "filterPurchases": "רכישות",
     "filterSignIns": "כניסות משתמש",
-    "legendLabel": "שימור",
-    "cohortHealthPositiveNotice": "שימור הקבוצות במגמת עלייה של 4%+ מעל היעד"
+    "legendLabel": "שימור"
   },
   "Funnel": {
     "metaTitle": "משפך המרות",
@@ -2005,7 +2004,7 @@
     "keywordsLabel": "מילות מפתח",
     "noCreativesFound": "לא נמצאו קריאייטיבים התואמים לסינון.",
     "proactiveRecommendationHeading": "המלצת צמיחה של AI",
-    "proactiveRecommendationDesc": "ה-ROAS בקמפיין הריטרגטינג הוא 4.8x — הגדל את התקציב היומי ב-20% (+18% המרות חזויות).",
+    "proactiveRecommendationDesc": "ל-{campaignLabel} ה-ROAS הנמדד הגבוה ביותר, {roas}x. הפעלה תעלה את התקציב היומי מ-${currentBudget} ל-${nextBudget}, עלייה של 20%. לא נחזית עלייה בהמרות — אין מדידה כזו.",
     "applyRecommendationButton": "החל בלחיצה אחת",
     "recommendationApplied": "ההמלצה הוחלה בהצלחה!",
     "statusActive": "פעיל",
