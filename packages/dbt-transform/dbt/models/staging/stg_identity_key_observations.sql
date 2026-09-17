@@ -52,9 +52,20 @@ with event_records as (
         -- converted. Confirmed against production: stg_raw_records already holds
         -- rows of both shapes.
         --
-        -- Properties wins on conflict because that is the shape the tracker emits
-        -- and the one schema validation type-checks. Being a view, this also
-        -- recovers already-landed records rather than only fixing new ones.
+        -- Properties wins on conflict, and the precedence is settled by the wire
+        -- contract rather than by taste: `IngestEventRecord` is
+        -- `{event_id, event, ts, properties}` and declares no top-level identity
+        -- field at all. So `properties` is the only position the API defines, the
+        -- only one schema validation type-checks, and the only one the tracker
+        -- emits — while a top-level copy is an undeclared extra that ingest
+        -- tolerates and stores verbatim. The fallback below is therefore a
+        -- RECOVERY path for records that arrived in a shape the contract never
+        -- specified, not a second source of equal standing, which is exactly why
+        -- the contract-defined location must win when the two disagree.
+        --
+        -- Being a view, this also recovers already-landed records. Normalising at
+        -- ingest instead would only shape future writes, leaving the rows already
+        -- in the warehouse unreadable unless separately backfilled.
         coalesce(
             {{ json_text_field(json_object_field('payload', "'properties'"), "'anon_id'") }},
             {{ json_text_field('payload', "'anon_id'") }}
