@@ -2021,7 +2021,6 @@
     "undoError": "לא ניתן לבטל את הפעולה. אנא נסה שוב.",
     "guardrailBlockedError": "הפעולה נחסמה: {reason}",
     "quickActionPermissionDenied": "נדרשת הרשאת מפעיל או מנהל לעריכת קמפיין.",
-    "roasTargetHint": "יעד: {target}",
     "ctrBenchmarkComparison": "‎{diff} מעל הממוצע",
     "liveDeliveryCount": "{count} פעילים בשידור",
     "analyticsSpendByChannel": "הוצאה לפי ערוץ",

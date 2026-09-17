@@ -118,4 +118,36 @@ describe('ExecutiveReportingSynthesizer Unit Tests', () => {
     expect(report.channels[0].roas).toBeNull();
     expect(report.channels[0].cacUsd).toBeNull();
   });
+
+  it('never derives per-channel conversions or ROAS, even when blended figures exist', () => {
+    // The previous code derived both, and they were invisible only because their
+    // inputs happened to be null - a fabrication armed rather than fixed, which
+    // would have started rendering the day a real source landed. Supplying
+    // blended figures here is exactly that day.
+    const report = buildExecutiveReportData({
+      targets: [META_TARGET, GOOGLE_TARGET],
+      spendOutcome: {
+        ok: true,
+        rows: [
+          { campaignId: 'meta/campaigns/1', actualSpend: 1500, monthlyBudget: 3000, status: 'on_target' },
+          { campaignId: 'google/campaigns/1', actualSpend: 500, monthlyBudget: 4500, status: 'on_target' },
+        ],
+      },
+      overrides: { totalConversions: 400, blendedRoas: 3.2 },
+    });
+
+    expect(report.metrics.totalConversions).toBe(400);
+    expect(report.metrics.blendedRoas).toBe(3.2);
+    for (const channel of report.channels) {
+      // Splitting 400 conversions by spend share would attribute them by cost,
+      // which is not attribution; copying 3.2x onto both channels would show the
+      // same number for each and be true of neither.
+      expect(channel.conversions).toBeNull();
+      expect(channel.roas).toBeNull();
+      expect(channel.cacUsd).toBeNull();
+    }
+    // Spend and its split are measured, so they survive.
+    expect(report.channels[0].spendUsd).toBe(1500);
+    expect(report.channels.reduce((acc, c) => acc + c.percentage, 0)).toBe(100);
+  });
 });

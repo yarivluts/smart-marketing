@@ -2021,7 +2021,6 @@
     "undoError": "Could not undo action. Please try again.",
     "guardrailBlockedError": "Action blocked: {reason}",
     "quickActionPermissionDenied": "Requires Operator or Admin role to modify campaign.",
-    "roasTargetHint": "Target: {target}",
     "ctrBenchmarkComparison": "{diff} vs benchmark",
     "liveDeliveryCount": "{count} live delivery",
     "analyticsSpendByChannel": "Spend by Channel",

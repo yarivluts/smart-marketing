@@ -34,7 +34,10 @@ describe('AdsKpiScorecards', () => {
     // 2. Blended ROAS
     expect(screen.getByText('Blended ROAS')).toBeInTheDocument();
     expect(screen.getByText('4.2x')).toBeInTheDocument();
-    expect(screen.getByText('Target: 3.5x')).toBeInTheDocument();
+    // Deliberately asserts ABSENCE: the card used to show "Target: 3.5x" with a
+    // progress bar against it, a benchmark no project ever set. This assertion
+    // previously pinned the fabrication in place, which is how it survived.
+    expect(screen.queryByText('Target: 3.5x')).not.toBeInTheDocument();
 
     // 3. Impressions & Clicks
     expect(screen.getByText('Impressions & Clicks')).toBeInTheDocument();
