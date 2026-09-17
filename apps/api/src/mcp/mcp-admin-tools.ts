@@ -207,10 +207,10 @@ function toSchemaFields(args: any): { name: string; type: string; isRequired: bo
 }
 
 const archiveMetricInputShape = { name: z.string().min(1).describe('The metric family to retire. Refused while an active formula still references it.') };
-const metricVersionsInputShape = { name: z.string().min(1).describe('The metric name whose version history to list — every version, not just the active one.') };
-const goalIdInputShape = { goal_id: z.string().min(1).describe('Id of the goal, as returned by list_goals.') };
+const metricVersionsInputShape = { name: z.string().min(1) };
+const goalIdInputShape = { goal_id: z.string().min(1) };
 const goalStatusInputShape = {
-  goal_id: z.string().min(1).describe('Id of the goal, as returned by list_goals.'),
+  goal_id: z.string().min(1),
   status: z.string().describe('One of: active, paused. A paused goal stops being tracked without being deleted.'),
 };
 const projectSettingsInputShape = {
@@ -221,18 +221,18 @@ const projectSettingsInputShape = {
 };
 const archiveProjectInputShape = { archived: z.boolean().describe('true archives this project (hiding it from every listing without deleting anything); false restores it.') };
 const createHookInputShape = {
-  name: z.string().min(1).describe('Human-readable name for this receiver, e.g. "Stripe webhooks" — how it is identified in listings and audit entries.'),
+  name: z.string().min(1),
   environment_id: z.string().optional().describe('Defaults to the environment this connection is bound to, or the project\'s prod environment for an OAuth connection.'),
   signature_mode: z.string().optional().describe('One of: none, hmac_sha256. Defaults to hmac_sha256 — prefer it, and set a secret straight after.'),
   signature_header_name: z.string().optional().describe('Required for hmac_sha256, e.g. X-GrowthOS-Signature or X-Hub-Signature-256. The sender must put hex HMAC-SHA256(secret, raw_body) there, optionally prefixed "sha256=".'),
 };
 const setHookSecretInputShape = {
-  hook_endpoint_id: z.string().min(1).describe('Id of the hook endpoint, as returned by list_hook_endpoints or create_hook_endpoint.'),
+  hook_endpoint_id: z.string().min(1),
   signing_secret: z.string().min(16).describe('The shared secret the sender signs with. Rotating keeps the previous secret valid for a short grace window.'),
 };
 const reexportInputShape = {
   schema_name: z.string().optional().describe('Restrict the backfill to one schema; omit for every schema, newest-landed first.'),
-  limit: z.number().int().positive().optional().describe('Maximum records to re-export in this call. Re-exporting is idempotent, so a large backfill can be run as repeated bounded calls.'),
+  limit: z.number().int().positive().optional(),
 };
 const purgeInputShape = {
   confirm_project_id: z.string().min(1).describe('Must exactly equal this connection\'s own project id. A deliberate guard: this deletes landed data irreversibly.'),
