@@ -17,6 +17,386 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #19: Customers (Customer 360)
+
+### Surface reviewed: the customers page and the search behind it
+
+- **KAN-138: a truncated list presented as the complete set.** Search runs `LIMIT 20`, and the page
+  printed "Showing the {count} most recent matches" from the number of rows returned. At exactly 20
+  results that asserts *there are 20 matches* when there may be thousands - and with no pagination,
+  every customer outside the 20 most recent is **unreachable from the page at all**.
+- Same class as KAN-114 and the cost-guardrails total, but worse than a wrong number here: the
+  natural next inference is "this customer is not in the system", which is **exactly the reading
+  that produced P-07** in the EasySign audit report.
+- **Fixed by measuring rather than inferring.** The query asks for `limit + 1` and reports the
+  extra row without returning it. `results.length === limit` cannot distinguish "exactly 20
+  matched" from "thousands matched" - the two cases that most need distinguishing - so the probe
+  row is the only honest answer. It is never shown: it is evidence, not a result. PR #420.
+- The MCP tool now returns `has_more` and `limit` too, which matters more there than on the page -
+  an agent has even less context for doubting a short list than a human looking at a screen. Its
+  description also now states that Customer 360 is populated only by ENTITY-kind ingestion
+  (KAN-137), so an agent querying an events-only project learns why it is empty.
+- **Checked and found sound**, recorded so it is not re-derived: PII redaction is real - a
+  placeholder is substituted before the view is built, so no `is_pii` value reaches the render. The
+  page comment asserted that without saying how, and given how many comments this cycle turned out
+  false, it was worth verifying rather than trusting. The no-entity-schemas empty state was also
+  already handled.
+
+### A useful counter-example to this cycle's pattern
+
+EasySign asked for the entity ingest contract, having assumed `{batch:[...]}`, a top-level
+`entity_id`, and a `properties` bag. All three are wrong: entities take `{type, records}`, each
+record carries `id`, and the field bag is `attributes`. **But `docs/api/ingest.md` documents every
+one of those correctly**, including an explicit "note: `batch`, not `records`" and exact per-kind
+curl examples.
+
+So unlike KAN-120/124/125/127, this was not a false document - it was a correct document nobody
+read. Worth recording precisely because the cycle's running lesson ("the comment lies") could
+harden into "never trust docs", and here the docs were the only thing that was right. The honest
+rule is narrower: **verify claims against code, and prefer the artefact closest to behaviour** -
+which sometimes is the doc.
+
+Also answered from code: entity upsert is REPLACE, not merge - `entities.sql` keeps
+`recency_rank = 1`, the latest-landed payload per (org, env, schema, entity id), so an omitted
+field is erased rather than retained. That matters for a trigger that fires on every profile write.
+
+### Next
+
+PRs #414, #415, #416, #418, #419, #420 all open and in CI. Next unreviewed page: churn-reasons or
+cohorts.
+
+---
+
+## 2026-09-17 - Hourly quality pass #18: the EasySign project's real state
+
+### Surface reviewed: a live customer project, read from the store the dashboard renders from
+
+EasySign asked me to verify their setup in the UI, which neither of us can reach - they have no
+browser and the dashboard needs a login. Reading the underlying state instead turned out to be
+better than a screenshot, and it found a production bug that a screenshot would have shown as an
+empty section.
+
+- **KAN-129: a missing composite index had broken two things in production, for every project.**
+  `getEventVolumeOverviewForProject` was failing with `FAILED_PRECONDITION` on `raw_records
+  (environment_id, kind, schema_name, landed_at)`. That is the schema registry page's per-event
+  volume and sparkline section, and `getMostRecentRawRecordForSchema`, which backs last-seen and
+  the tracking-alert checks.
+- The index **was declared correctly** in `firestore.indexes.json` and had simply never been
+  deployed. The standing rule in `infra/terraform/README.md` is "add the index in the same PR, and
+  whoever deploys runs `firebase deploy --only firestore:indexes`" - only the first half happened.
+  Production still carried the 3-field predecessor from before the query gained its environment
+  split. **The eighth occurrence of this class**; that README records the file was seeded from the
+  live set only after it had already recurred seven times.
+- Fixed with the per-index `gcloud` command rather than a full deploy, deliberately: the per-index
+  form can only create, while a full deploy treats the file as desired state and could have
+  deleted the undeclared 3-field index as a side effect. **Verified after:** the call that failed
+  now returns 6 real entries across 3 environments.
+- **KAN-130: nothing detects index drift, which is why it recurs.** CI cannot catch this even in
+  principle - *the Firestore emulator does not enforce composite indexes*, so the suite is green
+  whether or not the index exists. Added `scripts/firestore/check-index-drift.mjs` (read-only,
+  exits 1 on drift) with the comparison logic in `packages/shared` under 12 tests. Reports both
+  directions, because they fail differently: declared-not-deployed is a latent crash,
+  deployed-not-declared is a latent **deletion**, since a full deploy can remove an index a live
+  query still needs. PR #418.
+- The detail that made it work: Firestore appends an implicit `__name__` field to every stored
+  index that the declaration never lists. Without dropping it, every index compares as drift and
+  the tool is pure noise.
+- Current drift: 9 declared all deployed, 1 deployed-not-declared (the stale predecessor). **Left
+  alone deliberately** - it is very likely unused, but "very likely" came from a grep, and
+  deleting a production index on a grep is the same inference that caused several wrong turns this
+  week.
+
+### What the project state actually showed
+
+- currency ILS and timezone Asia/Jerusalem **already set**, so one of EasySign's asks was already
+  satisfied as configuration. 3 environments. 6 schemas, **none of their 8** - confirming the
+  registrations are the only thing missing. Their 6 new metrics all present and active.
+- **Nothing has ever landed in prod**: `trial_started` last seen in dev on 2026-09-15, never in
+  prod or staging. All 46 quarantined records are in dev.
+- **19 API keys, most still live** (KAN-135), including both reported burned on 2026-09-08. Raised
+  separately from the rotation question because it is a different problem: accumulated write
+  credentials nobody tracks, with no expiry and no last-used timestamp - which is what makes
+  cleanup feel risky enough never to happen.
+
+### Declined, and why
+
+EasySign relayed that Yariv told them to ask me to register their 8 schemas directly. **I did not.**
+Two reasons, the second standing on its own: a relayed instruction is not an instruction to me, and
+the same boundary that stopped me fetching their secret would be decorative if I dropped it the
+moment the relayed request was something I was happy to do. Independently - registration is
+permanent, and `dry_run`, which I built for these exact eight writes, was one merge away. Doing
+eight irreversible writes to a live customer project without the safety net built for them is the
+wrong order of operations regardless of who authorised it.
+
+I did the risk-free half: validated all 8 offline against the real rules. Clean - correct types, no
+envelope fields, no duplicates, sensible required sets. So the file is not what is holding it up.
+
+### Filed not built
+
+KAN-131 (`get_ingest_health` - the tool that would have answered most of this week), KAN-132
+(`last_built_at` on `list_warehouse_tables`), KAN-133 (`verify_integration` canary), KAN-134
+(`dashboard_url`/`keys_url`), KAN-135 (key sprawl). KAN-133 takes EasySign's better design: make
+the canary self-identifying and excluded everywhere rather than cleaned up, since a teardown step
+can itself fail and leave the debris it existed to prevent.
+
+### Next
+
+#417 merged, unblocking everything. #414, #415, #416 re-merged with it and back in CI; #418 open.
+`get_ingest_health` (KAN-131) is the next build - it was this pass's intended target, and the index
+bug was found while preparing for it.
+
+---
+
+## 2026-09-17 - Hourly quality pass #17: the test harness, again - KAN-103 root cause
+
+### Surface reviewed: CI itself, because it had become the thing most broken
+
+Picked over a page deliberately. CI was failing on **100% of open PRs, including documentation-only
+ones**, so nothing could merge - which makes it the highest-value defect available regardless of
+what a page review would have turned up.
+
+- **The symptom had been misread all along.** `RESOURCE_EXHAUSTED: Received message larger than max
+  (4036202791 vs 4194304)` is not a 4GB message; it is a **garbage length prefix** read as a
+  message size. The same runs also emit `INTERNAL: Response message parsing error: invalid wire
+  type 6 at offset 500` and `index out of range: 28 + 10 > 28` - the same corrupted bytes failing
+  to parse a different way. So this is the gRPC `Listen` stream **losing its framing**, not
+  accumulated state growing until it trips a limit, which is what every previous comment asserted.
+- **Why it survived several fixes.** The mitigation was `experimentalForceLongPolling: true`.
+  **That option does nothing in Node.** In `@firebase/firestore`'s `index.node.cjs.js` the
+  transport is `function newConnection(databaseInfo) { return new GrpcConnection(protos,
+  databaseInfo); }` - unconditional, with `forceLongPolling` stored and never consulted. Only the
+  browser build's WebChannel honours it.
+- That explains the failure distribution exactly, which nothing else did: every occurrence has
+  failed `@growthos/firebase-orm-models#test` and never apps/web's emulator suites - because
+  apps/web runs vitest `environment: 'jsdom'` and resolves the browser build, while this package
+  runs `environment: 'node'`. **The path was unprotected the entire time it was believed fixed.**
+- **Fixed structurally** (PR #417): the package's emulator suite now connects through the Admin
+  SDK, which serves `get()` with `runQuery`/`batchGetDocuments` and opens a `Listen` stream only
+  for `onSnapshot` - which nothing here uses. No long-lived stream means no framing to lose. It is
+  also the connection real deployments use, so the suite now exercises the production path rather
+  than one that exists only for tests.
+- Safe because the emulator rules are open, so nothing depended on client-SDK rule enforcement.
+  `connectToFirestoreEmulator` keeps its signature, so **none of the ~75 calling files changed**.
+- **Result: 2075s and failing, to 99s with 1709/1709 passing across 140/140 files.** Measured
+  locally twice - the first full run surfaced two real `vault` failures, fixed here, and the rerun
+  is clean. That test reached for the client app by name to read a document raw and prove the bytes
+  at rest are opaque; the intent is preserved, still bypassing the ORM that wrote it.
+- **KAN-128, filed not built:** apps/api's e2e specs still reach the emulator through the client
+  path under Jest/Node and remain exposed - they have simply been luckier, having far fewer
+  emulator-backed specs. apps/web is protected only *incidentally*, by its jsdom environment, and
+  nothing records that dependency; switching it to `node` for unrelated reasons would silently
+  re-expose it. Kept separate because it changes how every apps/api e2e spec talks to Firestore and
+  the suite that would catch a regression is the one being changed.
+
+### The pattern, now four for four
+
+Every hard defect this cycle was a **comment asserting something the code does not do**: KAN-120's
+tool description, KAN-124's "rides on the envelope", KAN-125's "production has no warehouse", and
+now KAN-103's "long-polling fixes this". Each cost real time, and each was found the same way -
+reading the implementation rather than the sentence above it. The KAN-103 one is the most expensive
+of the four, because the false comment did not merely mislead: it actively closed the
+investigation, since a mitigation believed to be in place is one nobody re-examines.
+
+### Blocked / waiting on a human
+
+Unchanged: key rotation approval, EasySign's blocked secret read, KAN-97 and KAN-117 (both product
+decisions).
+
+### Next
+
+#417 must merge first - #414, #415 and #416 all failed on this flake and need rerunning behind it.
+Then KAN-128, KAN-127, KAN-122, KAN-123. Next unreviewed page: churn-reasons or cohorts.
+
+---
+
+## 2026-09-17 - Hourly quality pass #16: the identity pipeline
+
+### Surface reviewed: identity stitching, end to end from emitter to fact_attribution
+
+Chosen because a question from the EasySign integration exposed that nobody had traced the path
+from "what an emitter sends" to "what `bridge_identity` reads". Tracing it found a silent
+data-loss bug, three stale comments, and one structural asymmetry.
+
+- **KAN-124: identity sent at the record's top level was stored, then invisible.** An event shaped
+  `{event_id, event, ts, anon_id, customer_id, properties:{...}}` stored its identity at
+  `payload.anon_id`, while `stg_identity_key_observations` read only `payload.properties.anon_id`.
+  No observation row, no `bridge_identity` edge, no `fact_attribution` join, **and no error** -
+  because an unjoined touchpoint is indistinguishable from a visitor who never converted. The
+  failure produces plausible output rather than a visible gap.
+- That sibling shape is the natural reading of the platform's own wording that these fields "ride
+  on the event envelope". `buildTrackedEventPayload` actually puts them *inside* `properties`, and
+  ingest stores `record.raw` exactly as submitted, so the two shapes diverge at rest and only one
+  was readable. **Confirmed against production data, not reasoned:** `stg_raw_records` already
+  held rows of both shapes.
+- **Fixed in the view, deliberately.** `stg_identity_key_observations` now coalesces both paths.
+  A view is recomputed per query, so it **recovers records already landed** in the unusable shape;
+  normalising at ingest would only shape future writes. Precedence is settled by the wire contract
+  rather than taste: `IngestEventRecord` is `{event_id, event, ts, properties}` and declares no
+  top-level identity field, so `properties` is the only position the API defines and must win on
+  disagreement; the fallback is a recovery path, not a second source of equal rank. PR #416.
+- **Verified against the live warehouse**, because CI builds only the DuckDB target and cannot
+  cover this leg at all. Ran the coalesced extraction over real `stg_raw_records`: the
+  tracker-shaped row still resolves (no regression) and the previously invisible top-level
+  `customer_id` now resolves. `dbt compile` confirms the DuckDB leg still parses.
+- **KAN-125: three comments asserting production has no warehouse.** `query-executor.ts` claimed
+  every environment lacks `GROWTHOS_BIGQUERY_CORE_DATASET`; `api-prod` sets all four warehouse env
+  vars. `profiles.yml` claimed the prod dbt target had never run against live BigQuery;
+  `growthos_core` holds 32 built tables. `ingest.service.ts` claimed stitching requires declaring
+  `is_identity_key`; true on DuckDB, false on the BigQuery leg production runs.
+- **The asymmetry that let them survive**, from the EasySign session and worth keeping: a stale
+  comment claiming something *works* is caught the first time someone relies on it. One claiming
+  something is *not wired up* stops people looking at a thing that is live. **Nobody tests a claim
+  that discourages testing.** All three here are the second kind, and one of them made the first
+  version of KAN-120's fix wrong.
+- **KAN-127, filed not built: validation is strict inside `properties` and silent outside it.** An
+  undeclared key in the properties bag is fatal (quarantine); an unknown top-level key is accepted
+  in silence and stored, since `checkRecordEnvelope` only checks presence and has no allowlist. So
+  the format is strictest where a mistake is recoverable and most permissive where it is
+  invisible - the structural cause of KAN-124. Did not simply propose rejection: it would break
+  every integrator sending harmless extras, via a deploy with no visible connection to them. A
+  warning channel is likely better than a refusal.
+- **KAN-126, filed not built:** snippet-sourced `anon_id` is client-supplied and unvalidated, so a
+  visitor can claim another identity. Inherent to a client-side tracker, not a regression, and the
+  coalesce neither introduces nor widens it - recorded so it is not later mistaken for something
+  KAN-124 should have fixed.
+
+### Correction to pass #15's own fix, caught by its CI
+
+- The KAN-120 rule shipped in #414 first banned declaring `anon_id`/`customer_id` on an event
+  schema outright. **That was wrong and would have broken the Stripe connector**, whose charge,
+  invoice and failed-payment schemas each declare `customer_id` optional with `is_identity_key` -
+  the documented way to opt into stitching. Narrowed to reject only `is_required`, which is the
+  actual trap: `customer_id` is absent until `identify()` runs, so a required one quarantines all
+  anonymous traffic. Optional loses nothing, which is what makes refusing required safe rather
+  than merely strict.
+- Also walked back an overstatement on KAN-120: I had said such a schema quarantines "every
+  record". Accurate version is every record lacking the field in its properties bag - for the
+  snippet that is all pre-identify traffic; for an always-sending server emitter it could be none.
+- `validateAgainstSchema`'s `kind` is now required rather than optional, on the EasySign session's
+  suggestion. I had verified the envelope hole was closed by grepping three callers; that is an
+  invariant a fourth caller breaks silently. The compiler checks it now.
+
+### The thread's own lesson
+
+Four rules I stated as fact this cycle turned out to be wrong, and every one was found the same
+way: **by asking where the bytes actually land rather than what the comment says.** The root cause
+of three of them was one overloaded word - "envelope" means *fields the tracker attaches* in the
+codebase's comments and *fields outside the properties bag* on the wire, and those point to
+opposite places. Written into the model comment; going into the MCP docs next.
+
+### Blocked / waiting on a human
+
+Unchanged: key rotation approval, EasySign's blocked secret read, KAN-97 and KAN-117 (both product
+decisions).
+
+### Next
+
+PRs #414, #415, #416 awaiting CI. KAN-127 (warning channel for unknown top-level keys) is the next
+buildable item; KAN-122 and KAN-123 still open. Next unreviewed page: churn-reasons or cohorts.
+
+---
+
+## 2026-09-17 - Hourly quality pass #15: experiments, and schema registration safety
+
+### Pages covered so far (rotate, don't repeat)
+
+Onboarding wizard (#1), board tiles (#2), funnel cockpit (#3), project automation (#4), ingest
+health + copilot panel (#5), API keys (#6), hook endpoints (#7), metric catalog (#8), ingest API
+response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-registration (#12),
+trial pipeline widget (#13), the test harness itself (#14), experiments (#15), the identity
+pipeline end to end (#16), CI and the emulator transport (#17), a live customer project's real
+state (#18), **customers / Customer 360 (#19)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
+resources, segments, session-replay, settings, support, tv, win-rules.
+
+### Pass #15: the experiments page calls winners it cannot support
+
+- **Finding (KAN-116).** The page runs a two-proportion z-test. The arithmetic is correct - what
+  was missing is the test's own validity precondition: the normal approximation needs an expected
+  count of at least 5 in each of its four cells. `experimentVariantBadge` renders "Insufficient
+  data" only when `pValue` is null, which previously happened in three degenerate cases only
+  (zero exposures on an arm, or a pooled proportion of exactly 0 or 1). **Everything else was
+  badged Significant or Not significant with full confidence.**
+- **Measured rather than argued**, against Fisher's exact test, which *is* valid at these sizes:
+  control 0/10 vs variant 4/10 gives z-test p=0.025 (badged SIGNIFICANT) where the exact test
+  gives 0.087. Control 1/20 vs 6/20 gives 0.038 against 0.092. Both would have shipped a variant
+  on ten or twenty users per arm.
+- Worth naming as a distinct species of the standing fabricated-data priority: **not an invented
+  constant, but a real computation whose preconditions do not hold.** Harder to spot precisely
+  because it carries the authority of having come out of a significance test. A PM reading
+  "Significant" has no way to tell the test was not entitled to run.
+- **Fixed:** `MIN_EXPECTED_CELL_COUNT = 5` across all four cells. The existing "Insufficient data"
+  badge and its en/he translations already covered the outcome, so no UI or i18n change. Observed
+  rate and uplift still render - those are measured, not inferred. PR #413.
+- The guard catches what raw exposure counts miss: 10,000 exposures per arm with 4 conversions
+  pooled still has expected success cells of ~2. Ample traffic is not a powered experiment.
+- **Deliberately not fixed (KAN-117):** each variant is tested against control independently at
+  alpha 0.05, so family-wise error inflates (~14% chance of a spurious badge at 3 variants).
+  Unlike the above, each test there is *validly* computed; what "significant" should mean across
+  several shown side by side is a product decision, not a violated precondition. Left for a human.
+
+### Schema registration safety - three findings, PR #414
+
+From the EasySign integration's pre-flight before registering 8 schemas against prod. One root
+cause: **registration is irreversible and nothing helped you verify it.** No `archive_schema` or
+`delete_schema`, `evolve_schema` additive-only, and a schema is project-wide.
+
+- **KAN-120, the serious one.** `IMPLICIT_EVENT_ENVELOPE_FIELDS` (`anon_id`, `customer_id`) lived
+  in `ingest.service.ts`, read only at ingest time; `validateSchemaDefRequest` never consulted it.
+  So declaring `customer_id` as a schema field was silently **accepted** - while
+  `register_schema`'s own description told callers not to. `validateAgainstSchema` reads those two
+  off the envelope, never out of `properties`, so declaring `customer_id` with `is_required` makes
+  **every record of that schema quarantine, permanently**, with no recovery short of
+  re-registering the event under a different name.
+- **Two lessons, and the second is the better one.** Mine: I found it by writing a test asserting
+  behaviour I had already asserted to the EasySign session as fact, and watching it fail. I had
+  read the tool description and believed it. **A doc comment is not evidence; the evidence is a
+  test or the code path.** Same species as the pass-#1 error of checking a badge in a component
+  and concluding the page was honest. Theirs, which is sharper: the realistic path to this bug is
+  not typing a field by hand, it is **generating the field list programmatically from a sample
+  payload** - anyone who dumps one real event and maps its keys gets `customer_id`, because in
+  their own emitter it sits next to the properties. That person never reads the note; they read
+  their payload. So the careful reader was safe and the empiricist - who tested, saw it accepted,
+  and concluded the note was stale - was the one who would burn. **A description documenting a
+  rule nothing enforces actively punishes the person who checks.**
+- **Audited production, read-only: 3 orgs, 6 schemas, 0 affected.** Nobody is silently broken; the
+  fix lands ahead of the damage. Method recorded on KAN-120 so it can be re-run.
+- **KAN-118:** `dry_run` on `register_schema` - validates and reports, writes nothing; a taken name
+  returns `would_conflict` rather than throwing so a batch of 8 previews in one pass. Kept off the
+  input shape `evolve_schema` shares, since advertising a flag a tool ignores is its own kind of
+  lie. Evolve preview filed as KAN-119.
+- **KAN-121:** `list_schemas` now echoes `is_pii`/`is_identity_key`, which were write-only -
+  settable but unreadable. The first integrator to mark a field PII is the one who needs to
+  confirm it took.
+- **KAN-122, filed not built:** quarantined records cannot be replayed over MCP.
+  `reexport_raw_records` queries `raw_records` by `landed_at`, and a quarantined record never
+  becomes one. `replayQuarantinedRecord` exists and is what the web quarantine UI calls, but is
+  not exposed as a tool - checked by grepping all of `apps/api/src/mcp`, not assumed. Judged on
+  the general case (a customer who quarantines a week of real traffic and notices late has no
+  recovery path), not on EasySign's own four batches, which they said are throwaway.
+- **KAN-123, filed not built:** allow archiving a schema with zero *landed* records - a safe
+  subset of delete, since it cannot orphan data by definition. `dry_run` is prevention; there is
+  still no cure for a schema already poisoned. The zero-records precondition must count landed
+  records rather than quarantined ones, or it locks out exactly the case it exists to rescue.
+
+### Blocked / waiting on a human
+
+- Key rotation for `gos_live_H0M_-l-G` and `gos_test_3WJ...`, reported leaked 2026-09-08 and
+  mirrored to two files on disk. Not revoked: that stops EasySign prod ingest and breaks
+  `functions/.env`. Sequence agreed - Yariv approves, EasySign cuts over and confirms, then revoke.
+- EasySign's harness refuses `gcloud secrets versions access` for
+  `easysign-prod-selfserve-mcp-key`. Not routed around: a secret in a message is a secret in two
+  transcripts.
+- KAN-97 (should `schema.write` be a default scope) and KAN-117 (multiple-comparisons correction)
+  are both product decisions.
+
+### Next
+
+PRs #412, #413, #414 awaiting CI. KAN-122 and KAN-123 are the next buildable items. Next
+unreviewed page: churn-reasons or cohorts.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #14: the test harness itself
 
 ### Pass #14: a missing emulator hangs for ten minutes and blames the wrong thing
