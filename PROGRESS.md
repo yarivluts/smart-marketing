@@ -17,6 +17,56 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #19: Customers (Customer 360)
+
+### Surface reviewed: the customers page and the search behind it
+
+- **KAN-138: a truncated list presented as the complete set.** Search runs `LIMIT 20`, and the page
+  printed "Showing the {count} most recent matches" from the number of rows returned. At exactly 20
+  results that asserts *there are 20 matches* when there may be thousands - and with no pagination,
+  every customer outside the 20 most recent is **unreachable from the page at all**.
+- Same class as KAN-114 and the cost-guardrails total, but worse than a wrong number here: the
+  natural next inference is "this customer is not in the system", which is **exactly the reading
+  that produced P-07** in the EasySign audit report.
+- **Fixed by measuring rather than inferring.** The query asks for `limit + 1` and reports the
+  extra row without returning it. `results.length === limit` cannot distinguish "exactly 20
+  matched" from "thousands matched" - the two cases that most need distinguishing - so the probe
+  row is the only honest answer. It is never shown: it is evidence, not a result. PR #420.
+- The MCP tool now returns `has_more` and `limit` too, which matters more there than on the page -
+  an agent has even less context for doubting a short list than a human looking at a screen. Its
+  description also now states that Customer 360 is populated only by ENTITY-kind ingestion
+  (KAN-137), so an agent querying an events-only project learns why it is empty.
+- **Checked and found sound**, recorded so it is not re-derived: PII redaction is real - a
+  placeholder is substituted before the view is built, so no `is_pii` value reaches the render. The
+  page comment asserted that without saying how, and given how many comments this cycle turned out
+  false, it was worth verifying rather than trusting. The no-entity-schemas empty state was also
+  already handled.
+
+### A useful counter-example to this cycle's pattern
+
+EasySign asked for the entity ingest contract, having assumed `{batch:[...]}`, a top-level
+`entity_id`, and a `properties` bag. All three are wrong: entities take `{type, records}`, each
+record carries `id`, and the field bag is `attributes`. **But `docs/api/ingest.md` documents every
+one of those correctly**, including an explicit "note: `batch`, not `records`" and exact per-kind
+curl examples.
+
+So unlike KAN-120/124/125/127, this was not a false document - it was a correct document nobody
+read. Worth recording precisely because the cycle's running lesson ("the comment lies") could
+harden into "never trust docs", and here the docs were the only thing that was right. The honest
+rule is narrower: **verify claims against code, and prefer the artefact closest to behaviour** -
+which sometimes is the doc.
+
+Also answered from code: entity upsert is REPLACE, not merge - `entities.sql` keeps
+`recency_rank = 1`, the latest-landed payload per (org, env, schema, entity id), so an omitted
+field is erased rather than retained. That matters for a trigger that fires on every profile write.
+
+### Next
+
+PRs #414, #415, #416, #418, #419, #420 all open and in CI. Next unreviewed page: churn-reasons or
+cohorts.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #18: the EasySign project's real state
 
 ### Surface reviewed: a live customer project, read from the store the dashboard renders from
@@ -254,8 +304,8 @@ Onboarding wizard (#1), board tiles (#2), funnel cockpit (#3), project automatio
 health + copilot panel (#5), API keys (#6), hook endpoints (#7), metric catalog (#8), ingest API
 response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-registration (#12),
 trial pipeline widget (#13), the test harness itself (#14), experiments (#15), the identity
-pipeline end to end (#16), CI and the emulator transport (#17), **a live customer project's real
-state (#18)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+pipeline end to end (#16), CI and the emulator transport (#17), a live customer project's real
+state (#18), **customers / Customer 360 (#19)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
 
