@@ -17,6 +17,106 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #15: experiments, and schema registration safety
+
+### Pages covered so far (rotate, don't repeat)
+
+Onboarding wizard (#1), board tiles (#2), funnel cockpit (#3), project automation (#4), ingest
+health + copilot panel (#5), API keys (#6), hook endpoints (#7), metric catalog (#8), ingest API
+response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-registration (#12),
+trial pipeline widget (#13), the test harness itself (#14), **experiments (#15)**. Not yet
+reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
+resources, segments, session-replay, settings, support, tv, win-rules.
+
+### Pass #15: the experiments page calls winners it cannot support
+
+- **Finding (KAN-116).** The page runs a two-proportion z-test. The arithmetic is correct - what
+  was missing is the test's own validity precondition: the normal approximation needs an expected
+  count of at least 5 in each of its four cells. `experimentVariantBadge` renders "Insufficient
+  data" only when `pValue` is null, which previously happened in three degenerate cases only
+  (zero exposures on an arm, or a pooled proportion of exactly 0 or 1). **Everything else was
+  badged Significant or Not significant with full confidence.**
+- **Measured rather than argued**, against Fisher's exact test, which *is* valid at these sizes:
+  control 0/10 vs variant 4/10 gives z-test p=0.025 (badged SIGNIFICANT) where the exact test
+  gives 0.087. Control 1/20 vs 6/20 gives 0.038 against 0.092. Both would have shipped a variant
+  on ten or twenty users per arm.
+- Worth naming as a distinct species of the standing fabricated-data priority: **not an invented
+  constant, but a real computation whose preconditions do not hold.** Harder to spot precisely
+  because it carries the authority of having come out of a significance test. A PM reading
+  "Significant" has no way to tell the test was not entitled to run.
+- **Fixed:** `MIN_EXPECTED_CELL_COUNT = 5` across all four cells. The existing "Insufficient data"
+  badge and its en/he translations already covered the outcome, so no UI or i18n change. Observed
+  rate and uplift still render - those are measured, not inferred. PR #413.
+- The guard catches what raw exposure counts miss: 10,000 exposures per arm with 4 conversions
+  pooled still has expected success cells of ~2. Ample traffic is not a powered experiment.
+- **Deliberately not fixed (KAN-117):** each variant is tested against control independently at
+  alpha 0.05, so family-wise error inflates (~14% chance of a spurious badge at 3 variants).
+  Unlike the above, each test there is *validly* computed; what "significant" should mean across
+  several shown side by side is a product decision, not a violated precondition. Left for a human.
+
+### Schema registration safety - three findings, PR #414
+
+From the EasySign integration's pre-flight before registering 8 schemas against prod. One root
+cause: **registration is irreversible and nothing helped you verify it.** No `archive_schema` or
+`delete_schema`, `evolve_schema` additive-only, and a schema is project-wide.
+
+- **KAN-120, the serious one.** `IMPLICIT_EVENT_ENVELOPE_FIELDS` (`anon_id`, `customer_id`) lived
+  in `ingest.service.ts`, read only at ingest time; `validateSchemaDefRequest` never consulted it.
+  So declaring `customer_id` as a schema field was silently **accepted** - while
+  `register_schema`'s own description told callers not to. `validateAgainstSchema` reads those two
+  off the envelope, never out of `properties`, so declaring `customer_id` with `is_required` makes
+  **every record of that schema quarantine, permanently**, with no recovery short of
+  re-registering the event under a different name.
+- **Two lessons, and the second is the better one.** Mine: I found it by writing a test asserting
+  behaviour I had already asserted to the EasySign session as fact, and watching it fail. I had
+  read the tool description and believed it. **A doc comment is not evidence; the evidence is a
+  test or the code path.** Same species as the pass-#1 error of checking a badge in a component
+  and concluding the page was honest. Theirs, which is sharper: the realistic path to this bug is
+  not typing a field by hand, it is **generating the field list programmatically from a sample
+  payload** - anyone who dumps one real event and maps its keys gets `customer_id`, because in
+  their own emitter it sits next to the properties. That person never reads the note; they read
+  their payload. So the careful reader was safe and the empiricist - who tested, saw it accepted,
+  and concluded the note was stale - was the one who would burn. **A description documenting a
+  rule nothing enforces actively punishes the person who checks.**
+- **Audited production, read-only: 3 orgs, 6 schemas, 0 affected.** Nobody is silently broken; the
+  fix lands ahead of the damage. Method recorded on KAN-120 so it can be re-run.
+- **KAN-118:** `dry_run` on `register_schema` - validates and reports, writes nothing; a taken name
+  returns `would_conflict` rather than throwing so a batch of 8 previews in one pass. Kept off the
+  input shape `evolve_schema` shares, since advertising a flag a tool ignores is its own kind of
+  lie. Evolve preview filed as KAN-119.
+- **KAN-121:** `list_schemas` now echoes `is_pii`/`is_identity_key`, which were write-only -
+  settable but unreadable. The first integrator to mark a field PII is the one who needs to
+  confirm it took.
+- **KAN-122, filed not built:** quarantined records cannot be replayed over MCP.
+  `reexport_raw_records` queries `raw_records` by `landed_at`, and a quarantined record never
+  becomes one. `replayQuarantinedRecord` exists and is what the web quarantine UI calls, but is
+  not exposed as a tool - checked by grepping all of `apps/api/src/mcp`, not assumed. Judged on
+  the general case (a customer who quarantines a week of real traffic and notices late has no
+  recovery path), not on EasySign's own four batches, which they said are throwaway.
+- **KAN-123, filed not built:** allow archiving a schema with zero *landed* records - a safe
+  subset of delete, since it cannot orphan data by definition. `dry_run` is prevention; there is
+  still no cure for a schema already poisoned. The zero-records precondition must count landed
+  records rather than quarantined ones, or it locks out exactly the case it exists to rescue.
+
+### Blocked / waiting on a human
+
+- Key rotation for `gos_live_H0M_-l-G` and `gos_test_3WJ...`, reported leaked 2026-09-08 and
+  mirrored to two files on disk. Not revoked: that stops EasySign prod ingest and breaks
+  `functions/.env`. Sequence agreed - Yariv approves, EasySign cuts over and confirms, then revoke.
+- EasySign's harness refuses `gcloud secrets versions access` for
+  `easysign-prod-selfserve-mcp-key`. Not routed around: a secret in a message is a secret in two
+  transcripts.
+- KAN-97 (should `schema.write` be a default scope) and KAN-117 (multiple-comparisons correction)
+  are both product decisions.
+
+### Next
+
+PRs #412, #413, #414 awaiting CI. KAN-122 and KAN-123 are the next buildable items. Next
+unreviewed page: churn-reasons or cohorts.
+
+---
+
 ## 2026-09-16 - Hourly quality passes #12 and #13
 
 ### Pass #13: trial pipeline widget
