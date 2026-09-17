@@ -230,7 +230,7 @@ const cohortInputShape = {
 };
 
 const searchCustomersInputShape = {
-  query: z.string().min(1).describe('Free-text search across the identifying fields of the entity — its id and any field registered as an identity key on its schema. Matching is substring, not fuzzy.'),
+  query: z.string().min(1).describe('Substring to look for. Matched with SQL LIKE against the entity id and against the whole properties object serialised to JSON — so it also matches property NAMES, not just values, and a short query like "e" will match almost every row. Not fuzzy and not tokenised: use a distinctive fragment.'),
   schema_name: z.string().optional().describe('Restrict to one entity schema, e.g. "customer".'),
   limit: z.number().int().positive().optional().describe('Maximum matching customers to return.'),
 };
