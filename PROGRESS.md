@@ -17,6 +17,57 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #24: billing ops feed
+
+### Surface reviewed: billing-ops-feed
+
+- **KAN-145: a $49.99 charge displayed as "4999 USD".** The feed rendered
+  `{amount} {currency}`, and Stripe reports amounts in the currency's **smallest unit** - so every
+  figure read 100x larger than it is, on the page where that matters most.
+- **The value was correct and the decision not to convert was also correct**, and already
+  documented: the divisor differs by currency (JPY has none), so a hardcoded `/100` would be
+  silently wrong for some currencies. Verified in `mappers.ts` (`amount: charge.amount`) rather
+  than trusting the view's own comment.
+- What was missing was *saying so*. **The number was accurate and the unit invisible, which from
+  the reader's side is the same defect as a fabricated figure: what is displayed does not mean what
+  it appears to mean.** Fixed by labelling, not converting - `(smallest unit)` plus a note giving
+  the `$49.99 -> 4999 USD` example and why no conversion happens. No guessing introduced.
+- **KAN-146: three capped lists each presented as complete.** Billing events, churned subscriptions
+  and dunning each fetch 100 and printed "Showing the {count} most recent ..." from the number
+  returned. At exactly 100 that asserts there *are* 100. The billing-specific consequence: **an
+  operator reconciling payments cannot tell a complete ledger from a window onto one**, and the
+  page reads as the former.
+- Fixed the KAN-138 way - over-fetch by one, so truncation is measured rather than inferred.
+  Extracted as `splitOverFetchedFeed` rather than repeated inline three times; the page is a server
+  component with no unit test around this logic, so **the extraction is what makes it testable at
+  all**.
+
+### The pattern is now seven surfaces
+
+KAN-114, 124, 132, 137, 138, 140 and 146: a system unable to distinguish a bounded or filtered
+result from a complete one. At seven this is no longer a recurring bug, it is a **missing
+primitive** - which is why this fix left behind a generic helper rather than a third inline slice.
+The next feed should reuse it. Worth considering whether the same treatment belongs on the record
+feed and the quarantine list, both of which are capped lists I have not yet checked.
+
+### Merged this pass
+
+#427 (KAN-143/144) and #428 (PROGRESS #23). KAN-143 and KAN-144 closed.
+
+### Blocked - all four are Yariv's, and EasySign is fully ready
+
+The secret read for `easysign-prod-selfserve-mcp-key`; the go-ahead to register the 9 schemas
+(irreversible, validated clean, `dry_run` now merged); the dev-scoped purge of 46 stale quarantine
+rows; and the rotation of the two keys reported burned on 2026-09-08. Product decisions still open:
+KAN-97, KAN-117, KAN-130, KAN-143's follow-up.
+
+### Next
+
+PR #429 in CI. Next unreviewed page: campaign-ops. KAN-128 (apps/api emulator transport) remains
+the last KAN-103 remnant.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #23: the Campaigns page
 
 ### Surface reviewed: campaigns - the page KAN-141 was found on, reviewed properly
@@ -533,7 +584,7 @@ trial pipeline widget (#13), the test harness itself (#14), experiments (#15), t
 pipeline end to end (#16), CI and the emulator transport (#17), a live customer project's real
 state (#18), customers / Customer 360 (#19), CI / the web emulator transport (#20),
 churn-reasons (#21), cohorts + a repo-wide fabricated-claim sweep (#22),
-**campaigns (#23)**. Not yet reviewed:
+campaigns (#23), **billing-ops-feed (#24)**. Not yet reviewed:
 billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
