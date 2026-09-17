@@ -200,7 +200,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import type {
   CancellationReasonCodeCount,
-  CancellationReasonThemeCluster,
+  CancellationReasonThemeDigest,
   FeedbackThemeCluster,
   FirmographicIndustryCount,
   FunnelStepSuggestion,
@@ -542,7 +542,7 @@ export async function getCancellationReasonThemeDigestForProject(
   organizationId: string,
   projectId: string,
   options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
-): Promise<CancellationReasonThemeCluster[]> {
+): Promise<CancellationReasonThemeDigest> {
   await ensureFirestoreOrm();
   return getCancellationReasonThemeDigestForProjectInOrganization(organizationId, projectId, options);
 }

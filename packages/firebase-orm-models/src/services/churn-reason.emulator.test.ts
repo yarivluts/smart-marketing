@@ -128,8 +128,14 @@ describe('getCancellationReasonThemeDigestForProject', () => {
 
     const digest = await getCancellationReasonThemeDigestForProject(organization.id, project.id, { now, windowDays: 30 });
 
-    expect(digest[0]).toMatchObject({ theme: 'pricing', commentCount: 2 });
-    expect(digest[1]).toMatchObject({ theme: 'support', commentCount: 1 });
+    expect(digest.clusters[0]).toMatchObject({ theme: 'pricing', commentCount: 2 });
+    expect(digest.clusters[1]).toMatchObject({ theme: 'support', commentCount: 1 });
+    // The record with no comment at all never reaches the clusterer, so it is
+    // not counted as uncategorized either - absent input and unmatched input are
+    // different things and only the second is a gap in the taxonomy.
+    expect(digest.totalComments).toBe(3);
+    expect(digest.matchedComments).toBe(3);
+    expect(digest.uncategorizedComments).toBe(0);
   });
 
   it('excludes comments landed outside the window', async () => {
@@ -140,7 +146,11 @@ describe('getCancellationReasonThemeDigestForProject', () => {
     await landCancellationReason({ organizationId: organization.id, projectId: project.id, environmentId, reasonCode: 'technical_issues', comment: 'The app crashes constantly, so many bugs', landedAt: '2026-01-01T09:00:00.000Z' });
 
     const digest = await getCancellationReasonThemeDigestForProject(organization.id, project.id, { now, windowDays: 30 });
-    expect(digest).toEqual([]);
+    // Out-of-window comments are filtered before clustering, so this is a true
+    // "nothing to say" - totalComments 0, not 1 uncategorized. The page renders
+    // those two states differently and relies on the distinction.
+    expect(digest.clusters).toEqual([]);
+    expect(digest.totalComments).toBe(0);
   });
 });
 
