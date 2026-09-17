@@ -891,6 +891,8 @@
     "reasonCodeCount": "{count, plural, one {ביטול #} other {# ביטולים}}",
     "themeDigestHeading": "מה הלקוחות אומרים",
     "themeDigestEmpty": "טרם נקלטו הערות ביטול.",
+    "themeDigestNoneMatched": "{count, plural, one {התקבלה תגובה #} other {התקבלו # תגובות}}, אך אף אחת לא תאמה את הטקסונומיה — זוהי רשימת מילות מפתח קבועה באנגלית, כך שתגובות בשפה אחרת או בניסוח שאינו ברשימה אינן מסווגות.",
+    "themeDigestCoverage": "הנושאים מכסים {matched} מתוך {total} תגובות. השאר לא תאמו אף מילת מפתח בטקסונומיה הקבועה ואינם נכללים למעלה.",
     "themeCommentCount": "{count, plural, one {תגובה #} other {# תגובות}}",
     "themeExampleComment": "“{comment}”",
     "byPlanHeading": "לפי תוכנית",

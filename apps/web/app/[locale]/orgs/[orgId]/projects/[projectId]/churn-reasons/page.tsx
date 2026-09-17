@@ -110,15 +110,26 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
             ))}
           </ul>
         )}
+        {themeDigest.uncategorizedComments > 0 && themeDigest.clusters.length > 0 ? (
+          <p className="text-xs text-muted-foreground">
+            {t('themeDigestCoverage', { matched: themeDigest.matchedComments, total: themeDigest.totalComments })}
+          </p>
+        ) : null}
       </section>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{t('themeDigestHeading')}</h2>
-        {themeDigest.length === 0 ? (
+        {themeDigest.totalComments === 0 ? (
           <p className="text-muted-foreground">{t('themeDigestEmpty')}</p>
+        ) : themeDigest.clusters.length === 0 ? (
+          // Distinct from "nothing landed": comments DID arrive and the fixed
+          // English keyword lexicon matched none of them. Rendering the same
+          // "no comments landed yet" line for both told a project whose
+          // customers write in another language that nobody had commented.
+          <p className="text-muted-foreground">{t('themeDigestNoneMatched', { count: themeDigest.totalComments })}</p>
         ) : (
           <ul className="flex flex-col gap-2">
-            {themeDigest.map((cluster) => (
+            {themeDigest.clusters.map((cluster) => (
               <li key={cluster.theme} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
                 <div className="flex items-center justify-between gap-3">
                   <span className="font-medium">{t(cancellationReasonThemeLabelKey(cluster.theme))}</span>

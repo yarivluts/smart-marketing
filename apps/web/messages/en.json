@@ -891,6 +891,8 @@
     "reasonCodeCount": "{count, plural, one {# cancellation} other {# cancellations}}",
     "themeDigestHeading": "What customers say",
     "themeDigestEmpty": "No cancellation comments landed yet.",
+    "themeDigestNoneMatched": "{count, plural, one {# comment landed} other {# comments landed}}, but none matched the keyword taxonomy — it is a fixed English keyword list, so comments in another language or phrased outside it are not categorised.",
+    "themeDigestCoverage": "Themes cover {matched} of {total} comments. The rest matched no keyword in the fixed taxonomy and are not counted above.",
     "themeCommentCount": "{count, plural, one {# comment} other {# comments}}",
     "themeExampleComment": "“{comment}”",
     "byPlanHeading": "By plan",

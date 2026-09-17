@@ -3,10 +3,10 @@ import {
   CANCELLATION_REASON_SCHEMA_KIND,
   CANCELLATION_REASON_SCHEMA_NAME,
   clusterCancellationReasonComments,
+  type CancellationReasonThemeDigest,
   computeCancellationReasonCodeBreakdown,
   MetricCompilerError,
   type CancellationReasonCodeCount,
-  type CancellationReasonThemeCluster,
 } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import type { RawRecordModel } from '../models/raw-record.model';
@@ -174,12 +174,18 @@ function startOfUtcDayMs(ms: number): number {
  * trailing window, clustered by `clusterCancellationReasonComments`
  * (KAN-84's deterministic stand-in for a real LLM theme-clustering call,
  * same posture `getFeedbackThemeDigestForProject`/KAN-82 established).
+ *
+ * Returns the digest rather than the bare clusters so a caller can tell how much
+ * of the window the themes actually account for — the keyword lexicon is fixed
+ * and English, so a project whose customers write in another language produces
+ * clusters covering almost none of its comments, and the clusters alone cannot
+ * say so.
  */
 export async function getCancellationReasonThemeDigestForProject(
   organizationId: string,
   projectId: string,
   options?: { limit?: number; now?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
-): Promise<CancellationReasonThemeCluster[]> {
+): Promise<CancellationReasonThemeDigest> {
   await requireProjectInOrg(organizationId, projectId);
   const limit = options?.limit ?? DEFAULT_CANCELLATION_REASON_RECORD_LIMIT;
   const windowDays = options?.windowDays ?? DEFAULT_CANCELLATION_REASON_WINDOW_DAYS;
