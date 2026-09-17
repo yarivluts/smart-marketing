@@ -744,7 +744,8 @@
     "resultEntityIdLine": "id {entityId}",
     "resultLastSeenLine": "Last seen {lastSeenAt}",
     "resultFieldLine": "{name}: {value}",
-    "capNote": "Showing the {count} most recent matches."
+    "capNote": "Showing the {count} most recent matches.",
+    "capNoteTruncated": "Showing the {count} most recent matches — more matched than are shown, so narrow the search rather than reading this as the full set."
   },
   "CohortRetention": {
     "metaTitle": "Cohort retention",

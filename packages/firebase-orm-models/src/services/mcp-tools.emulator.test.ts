@@ -63,16 +63,17 @@ describe('searchProjectCustomers', () => {
       { entity_id: 'cust_1', schema_name: 'customer', properties: '{"email":"a@example.com"}', last_seen_at: '2026-07-10T00:00:00Z' },
     ]);
 
-    const results = await searchProjectCustomers({
+    const page = await searchProjectCustomers({
       organizationId: organization.id,
       projectId: project.id,
       query: 'a@example.com',
       executor,
     });
 
-    expect(results).toEqual([
+    expect(page.results).toEqual([
       { entityId: 'cust_1', schemaName: 'customer', properties: { email: 'a@example.com' }, lastSeenAt: '2026-07-10T00:00:00Z' },
     ]);
+    expect(page.hasMore).toBe(false);
     expect(executor.calls).toHaveLength(1);
     expect(executor.calls[0].sql).toContain('FROM entities');
     expect(executor.calls[0].sql).toContain('entity_id LIKE @likeQuery');
@@ -99,6 +100,54 @@ describe('searchProjectCustomers', () => {
     expect(executor.calls[0].params.likeQuery).toBe('%50\\%\\_off\\\\deal%');
   });
 
+  it('asks for one row beyond the limit, so truncation is measured rather than guessed', async () => {
+    // results.length === limit cannot distinguish "exactly 20 matched" from
+    // "thousands matched". Over-fetching by one answers it exactly.
+    const { organization, project } = await setupOrgWithProject('Search Customers Overfetch Org');
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', limit: 5, executor });
+
+    expect(executor.calls[0].sql).toContain('LIMIT 6');
+  });
+
+  it('reports hasMore and withholds the extra row when the warehouse had more', async () => {
+    const { organization, project } = await setupOrgWithProject('Search Customers HasMore Org');
+    const rows = Array.from({ length: 6 }, (_unused, index) => ({
+      entity_id: `cust_${index}`,
+      schema_name: 'customer',
+      properties: '{}',
+      last_seen_at: '2026-07-10T00:00:00Z',
+    }));
+    const executor = new FakeWarehouseQueryExecutor(rows);
+
+    const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', limit: 5, executor });
+
+    expect(page.hasMore).toBe(true);
+    expect(page.limit).toBe(5);
+    // The probe row must never be shown - it is evidence, not a result.
+    expect(page.results).toHaveLength(5);
+    expect(page.results.map((result) => result.entityId)).not.toContain('cust_5');
+  });
+
+  it('reports hasMore false when the warehouse returned exactly the limit', async () => {
+    // The case the old length-based guess got wrong: exactly `limit` rows is a
+    // COMPLETE answer, not a truncated one.
+    const { organization, project } = await setupOrgWithProject('Search Customers Exact Org');
+    const rows = Array.from({ length: 5 }, (_unused, index) => ({
+      entity_id: `cust_${index}`,
+      schema_name: 'customer',
+      properties: '{}',
+      last_seen_at: '2026-07-10T00:00:00Z',
+    }));
+    const executor = new FakeWarehouseQueryExecutor(rows);
+
+    const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', limit: 5, executor });
+
+    expect(page.hasMore).toBe(false);
+    expect(page.results).toHaveLength(5);
+  });
+
   it('rejects an empty query without ever calling the executor', async () => {
     const { organization, project } = await setupOrgWithProject('Search Customers Empty Org');
     const executor = new FakeWarehouseQueryExecutor([]);
@@ -115,8 +164,8 @@ describe('searchProjectCustomers', () => {
       { entity_id: 'cust_2', schema_name: 'customer', properties: 'not-json', last_seen_at: '2026-07-10T00:00:00Z' },
     ]);
 
-    const results = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
-    expect(results[0].properties).toBe('not-json');
+    const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'cust', executor });
+    expect(page.results[0].properties).toBe('not-json');
   });
 });
 
@@ -131,6 +180,8 @@ describe('searchProjectCustomersForAdmin (KAN-108)', () => {
 
     expect(outcome).toEqual({
       ok: true,
+      hasMore: false,
+      limit: 20,
       results: [{ entityId: 'cust_1', schemaName: 'customer', properties: { email: 'a@example.com' }, lastSeenAt: '2026-07-10T00:00:00Z' }],
     });
   });

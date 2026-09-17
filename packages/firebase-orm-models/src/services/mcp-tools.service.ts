@@ -91,7 +91,24 @@ function rowToCustomerResult(row: WarehouseRow): CustomerSearchResult {
 }
 
 /** `search_customers` (plan `12 §6.2`, Customer 360): substring search over the `entities` core dbt table's latest-snapshot rows, environment-scoped like every other warehouse read since session-B's mixing catch (2026-08-19) — see `QueryMetricsParams.environmentId`. */
-export async function searchProjectCustomers(params: SearchProjectCustomersParams): Promise<CustomerSearchResult[]> {
+/**
+ * One page of customer search results, plus whether the warehouse held more.
+ *
+ * `hasMore` is MEASURED rather than guessed: the query asks for `limit + 1` rows
+ * and reports the extra one without returning it. Inferring truncation from
+ * `results.length === limit` cannot distinguish "exactly `limit` matched" from
+ * "thousands matched", which is the difference between a complete answer and a
+ * silently truncated one — and a caller shown a capped list with no signal will
+ * reasonably read it as the whole set.
+ */
+export interface CustomerSearchPage {
+  results: CustomerSearchResult[];
+  hasMore: boolean;
+  /** The cap actually applied, after clamping — so a caller can say what it is rather than guess. */
+  limit: number;
+}
+
+export async function searchProjectCustomers(params: SearchProjectCustomersParams): Promise<CustomerSearchPage> {
   const trimmedQuery = params.query.trim();
   if (trimmedQuery.length === 0) {
     throw new InvalidMcpToolRequestError('query must not be empty.');
@@ -120,16 +137,19 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
     queryParams.schemaName = params.schemaName;
   }
 
-  const sql = `SELECT entity_id, schema_name, properties, last_seen_at FROM entities WHERE ${filters.join(' AND ')} ORDER BY last_seen_at DESC LIMIT ${limit}`;
+  // `limit + 1`: the extra row is never returned, it only answers "was there
+  // more?". See CustomerSearchPage.
+  const sql = `SELECT entity_id, schema_name, properties, last_seen_at FROM entities WHERE ${filters.join(' AND ')} ORDER BY last_seen_at DESC LIMIT ${limit + 1}`;
   const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'search_customers' }, () =>
     executor.execute({ sql, params: queryParams }),
   );
-  return rows.map(rowToCustomerResult);
+  const hasMore = rows.length > limit;
+  return { results: rows.slice(0, limit).map(rowToCustomerResult), hasMore, limit };
 }
 
 /** Mirrors `SegmentMemberCountOutcome`/`SegmentMemberListOutcome`'s exact ok/degraded shape and reason vocabulary (`segment.service.ts`) — `searchProjectCustomersForAdmin` below backs a page's own search box, not an MCP tool call that can just error out, so the same three expected-not-buggy warehouse failure modes degrade instead of throwing. */
 export type CustomerSearchOutcome =
-  | { ok: true; results: CustomerSearchResult[] }
+  | { ok: true; results: CustomerSearchResult[]; hasMore: boolean; limit: number }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'query_error'; message: string };
 
 /**
@@ -145,8 +165,8 @@ export type CustomerSearchOutcome =
  */
 export async function searchProjectCustomersForAdmin(params: SearchProjectCustomersParams): Promise<CustomerSearchOutcome> {
   try {
-    const results = await searchProjectCustomers(params);
-    return { ok: true, results };
+    const page = await searchProjectCustomers(params);
+    return { ok: true, results: page.results, hasMore: page.hasMore, limit: page.limit };
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { ok: false, reason: 'warehouse_not_configured', message: error.message };

@@ -367,14 +367,16 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     'search_customers',
     {
       title: 'Search customers',
-      description: "Substring-search this project's customer/entity records (Customer 360) by id or property value.",
+      description: "Substring-search this project's customer/entity records (Customer 360) by id or property value. Returns the most recently seen matches up to limit, with has_more set when more matched than were returned — narrow the query rather than assuming the list is complete. Customer 360 is populated only by ENTITY-kind ingestion: a project that sends only events has no rows here however much data it sends.",
       inputSchema: toolInputSchema(searchCustomersInputShape),
     },
     auditedToolHandler(auth, 'search_customers', async (args: any) => {
       const { query, schema_name: schemaName, limit } = args as { query: string; schema_name?: string; limit?: number };
       try {
-        const results = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), query, schemaName, limit });
-        return textResult({ results });
+        const page = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), query, schemaName, limit });
+        // has_more is reported because a truncated list that looks complete is
+        // how a caller concludes "no such customer" from "I only saw 20 of them".
+        return textResult({ results: page.results, has_more: page.hasMore, limit: page.limit });
       } catch (error) {
         return errorResult(describeMetricsError(error));
       }
