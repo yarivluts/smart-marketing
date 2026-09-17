@@ -175,11 +175,19 @@ export function buildExecutiveReportData(
     const googleSpend = metrics.googleSpendUsd ?? 0;
     const metaPct = Math.round((metaSpend / total) * 100);
 
-    const splitConversions = (share: number): number | null =>
-      metrics.totalConversions === null ? null : Math.round(metrics.totalConversions * share);
-
-    const metaConversions = splitConversions(metaPct / 100);
-    const googleConversions = splitConversions(1 - metaPct / 100);
+    // Per-channel conversions and ROAS are NOT derived. Both were, and both were
+    // assumptions dressed as measurements that happen to be invisible today only
+    // because their inputs are null:
+    //
+    // - conversions were `totalConversions * spendShare`, which attributes
+    //   conversions to a channel by how much it cost. That is not attribution; a
+    //   channel can take half the budget and none of the conversions.
+    // - roas was `metrics.blendedRoas` on BOTH channels, so Meta and Google would
+    //   have shown the same number and neither would have been theirs.
+    //
+    // They would have started rendering the moment totalConversions or
+    // blendedRoas got a real source - a fabrication armed rather than fixed. Spend
+    // and its percentage split are real and stay.
 
     channels.push(
       {
@@ -187,9 +195,9 @@ export function buildExecutiveReportData(
         label: 'Meta Ads',
         spendUsd: metaSpend,
         percentage: metaPct,
-        roas: metrics.blendedRoas,
-        conversions: metaConversions,
-        cacUsd: metaConversions === null ? null : calculateBlendedCac(metaSpend, metaConversions),
+        roas: null,
+        conversions: null,
+        cacUsd: null,
         colorClass: 'bg-blue-600',
       },
       {
@@ -197,10 +205,9 @@ export function buildExecutiveReportData(
         label: 'Google Ads',
         spendUsd: googleSpend,
         percentage: 100 - metaPct,
-        roas: metrics.blendedRoas,
-        conversions: googleConversions,
-        cacUsd:
-          googleConversions === null ? null : calculateBlendedCac(googleSpend, googleConversions),
+        roas: null,
+        conversions: null,
+        cacUsd: null,
         colorClass: 'bg-emerald-600',
       },
     );
