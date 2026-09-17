@@ -17,6 +17,93 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #16: the identity pipeline
+
+### Surface reviewed: identity stitching, end to end from emitter to fact_attribution
+
+Chosen because a question from the EasySign integration exposed that nobody had traced the path
+from "what an emitter sends" to "what `bridge_identity` reads". Tracing it found a silent
+data-loss bug, three stale comments, and one structural asymmetry.
+
+- **KAN-124: identity sent at the record's top level was stored, then invisible.** An event shaped
+  `{event_id, event, ts, anon_id, customer_id, properties:{...}}` stored its identity at
+  `payload.anon_id`, while `stg_identity_key_observations` read only `payload.properties.anon_id`.
+  No observation row, no `bridge_identity` edge, no `fact_attribution` join, **and no error** -
+  because an unjoined touchpoint is indistinguishable from a visitor who never converted. The
+  failure produces plausible output rather than a visible gap.
+- That sibling shape is the natural reading of the platform's own wording that these fields "ride
+  on the event envelope". `buildTrackedEventPayload` actually puts them *inside* `properties`, and
+  ingest stores `record.raw` exactly as submitted, so the two shapes diverge at rest and only one
+  was readable. **Confirmed against production data, not reasoned:** `stg_raw_records` already
+  held rows of both shapes.
+- **Fixed in the view, deliberately.** `stg_identity_key_observations` now coalesces both paths.
+  A view is recomputed per query, so it **recovers records already landed** in the unusable shape;
+  normalising at ingest would only shape future writes. Precedence is settled by the wire contract
+  rather than taste: `IngestEventRecord` is `{event_id, event, ts, properties}` and declares no
+  top-level identity field, so `properties` is the only position the API defines and must win on
+  disagreement; the fallback is a recovery path, not a second source of equal rank. PR #416.
+- **Verified against the live warehouse**, because CI builds only the DuckDB target and cannot
+  cover this leg at all. Ran the coalesced extraction over real `stg_raw_records`: the
+  tracker-shaped row still resolves (no regression) and the previously invisible top-level
+  `customer_id` now resolves. `dbt compile` confirms the DuckDB leg still parses.
+- **KAN-125: three comments asserting production has no warehouse.** `query-executor.ts` claimed
+  every environment lacks `GROWTHOS_BIGQUERY_CORE_DATASET`; `api-prod` sets all four warehouse env
+  vars. `profiles.yml` claimed the prod dbt target had never run against live BigQuery;
+  `growthos_core` holds 32 built tables. `ingest.service.ts` claimed stitching requires declaring
+  `is_identity_key`; true on DuckDB, false on the BigQuery leg production runs.
+- **The asymmetry that let them survive**, from the EasySign session and worth keeping: a stale
+  comment claiming something *works* is caught the first time someone relies on it. One claiming
+  something is *not wired up* stops people looking at a thing that is live. **Nobody tests a claim
+  that discourages testing.** All three here are the second kind, and one of them made the first
+  version of KAN-120's fix wrong.
+- **KAN-127, filed not built: validation is strict inside `properties` and silent outside it.** An
+  undeclared key in the properties bag is fatal (quarantine); an unknown top-level key is accepted
+  in silence and stored, since `checkRecordEnvelope` only checks presence and has no allowlist. So
+  the format is strictest where a mistake is recoverable and most permissive where it is
+  invisible - the structural cause of KAN-124. Did not simply propose rejection: it would break
+  every integrator sending harmless extras, via a deploy with no visible connection to them. A
+  warning channel is likely better than a refusal.
+- **KAN-126, filed not built:** snippet-sourced `anon_id` is client-supplied and unvalidated, so a
+  visitor can claim another identity. Inherent to a client-side tracker, not a regression, and the
+  coalesce neither introduces nor widens it - recorded so it is not later mistaken for something
+  KAN-124 should have fixed.
+
+### Correction to pass #15's own fix, caught by its CI
+
+- The KAN-120 rule shipped in #414 first banned declaring `anon_id`/`customer_id` on an event
+  schema outright. **That was wrong and would have broken the Stripe connector**, whose charge,
+  invoice and failed-payment schemas each declare `customer_id` optional with `is_identity_key` -
+  the documented way to opt into stitching. Narrowed to reject only `is_required`, which is the
+  actual trap: `customer_id` is absent until `identify()` runs, so a required one quarantines all
+  anonymous traffic. Optional loses nothing, which is what makes refusing required safe rather
+  than merely strict.
+- Also walked back an overstatement on KAN-120: I had said such a schema quarantines "every
+  record". Accurate version is every record lacking the field in its properties bag - for the
+  snippet that is all pre-identify traffic; for an always-sending server emitter it could be none.
+- `validateAgainstSchema`'s `kind` is now required rather than optional, on the EasySign session's
+  suggestion. I had verified the envelope hole was closed by grepping three callers; that is an
+  invariant a fourth caller breaks silently. The compiler checks it now.
+
+### The thread's own lesson
+
+Four rules I stated as fact this cycle turned out to be wrong, and every one was found the same
+way: **by asking where the bytes actually land rather than what the comment says.** The root cause
+of three of them was one overloaded word - "envelope" means *fields the tracker attaches* in the
+codebase's comments and *fields outside the properties bag* on the wire, and those point to
+opposite places. Written into the model comment; going into the MCP docs next.
+
+### Blocked / waiting on a human
+
+Unchanged: key rotation approval, EasySign's blocked secret read, KAN-97 and KAN-117 (both product
+decisions).
+
+### Next
+
+PRs #414, #415, #416 awaiting CI. KAN-127 (warning channel for unknown top-level keys) is the next
+buildable item; KAN-122 and KAN-123 still open. Next unreviewed page: churn-reasons or cohorts.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #15: experiments, and schema registration safety
 
 ### Pages covered so far (rotate, don't repeat)
@@ -24,8 +111,8 @@ Template for each entry:
 Onboarding wizard (#1), board tiles (#2), funnel cockpit (#3), project automation (#4), ingest
 health + copilot panel (#5), API keys (#6), hook endpoints (#7), metric catalog (#8), ingest API
 response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-registration (#12),
-trial pipeline widget (#13), the test harness itself (#14), **experiments (#15)**. Not yet
-reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+trial pipeline widget (#13), the test harness itself (#14), experiments (#15), **the identity
+pipeline end to end (#16)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
 
