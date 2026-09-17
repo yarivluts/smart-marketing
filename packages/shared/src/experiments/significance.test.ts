@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeExperimentResult, SIGNIFICANCE_ALPHA } from './significance';
+import { computeExperimentResult } from './significance';
 
 describe('computeExperimentResult', () => {
   it('throws on an empty variant list', () => {
@@ -74,14 +74,18 @@ describe('computeExperimentResult', () => {
     expect(treatment.upliftVsControlPct).toBeCloseTo(100, 5); // 10% is a 100% relative lift over 5%
   });
 
-  it('a small sample with a modest difference does not reach significance', () => {
+  it('a small sample with a modest difference is not significant — and is not even testable', () => {
     const result = computeExperimentResult('lp_headline', [
       { variantKey: 'control', exposures: 20, conversions: 2 }, // 10%
       { variantKey: 'treatment', exposures: 20, conversions: 3 }, // 15%
     ]);
     const treatment = result.variants.find((v) => v.variantKey === 'treatment')!;
-    expect(treatment.pValue).not.toBeNull();
-    expect(treatment.pValue!).toBeGreaterThan(SIGNIFICANCE_ALPHA);
+    // This used to assert a real p-value above alpha. The guarantee the test
+    // exists to protect — that this is not called significant — still holds, and
+    // now holds for the stronger reason: pooled rate 0.125 over 20 exposures per
+    // arm puts the expected success cells at 2.5, under the z-test's own
+    // precondition, so there is no valid p-value to report in the first place.
+    expect(treatment.pValue).toBeNull();
     expect(treatment.isSignificant).toBe(false);
   });
 
@@ -124,5 +128,81 @@ describe('computeExperimentResult', () => {
     const treatment = result.variants.find((v) => v.variantKey === 'treatment')!;
     expect(treatment.upliftVsControlPct).toBeCloseTo(-50, 5);
     expect(treatment.isSignificant).toBe(true);
+  });
+
+  describe('the normal-approximation precondition', () => {
+    // These two are the cases the page used to call outright winners. The
+    // z-test's arithmetic is fine; its precondition is not met, and the number
+    // it produces is too small in exactly the direction that ships a variant.
+    // Checked against Fisher's exact test on the same counts, which is valid at
+    // these sizes and disagrees.
+    it('does not call a winner on 10 exposures per arm (z-test said p=0.025, exact test says 0.087)', () => {
+      const result = computeExperimentResult('lp_headline', [
+        { variantKey: 'control', exposures: 10, conversions: 0 },
+        { variantKey: 'treatment', exposures: 10, conversions: 4 },
+      ]);
+      const treatment = result.variants.find((v) => v.variantKey === 'treatment')!;
+      expect(treatment.pValue).toBeNull();
+      expect(treatment.isSignificant).toBe(false);
+    });
+
+    it('does not call a winner on 20 exposures per arm (z-test said p=0.038, exact test says 0.092)', () => {
+      const result = computeExperimentResult('lp_headline', [
+        { variantKey: 'control', exposures: 20, conversions: 1 },
+        { variantKey: 'treatment', exposures: 20, conversions: 6 },
+      ]);
+      const treatment = result.variants.find((v) => v.variantKey === 'treatment')!;
+      expect(treatment.pValue).toBeNull();
+      expect(treatment.isSignificant).toBe(false);
+    });
+
+    it('plenty of exposures still cannot rescue too few conversions', () => {
+      // 4 conversions pooled across 20,000 exposures: the expected success cells
+      // are ~2 each, far under the threshold, even though the traffic looks ample.
+      const result = computeExperimentResult('lp_headline', [
+        { variantKey: 'control', exposures: 10_000, conversions: 0 },
+        { variantKey: 'treatment', exposures: 10_000, conversions: 4 },
+      ]);
+      const treatment = result.variants.find((v) => v.variantKey === 'treatment')!;
+      expect(treatment.pValue).toBeNull();
+      expect(treatment.isSignificant).toBe(false);
+    });
+
+    it('still reports the observed uplift, which is measured rather than inferred', () => {
+      // Suppressing the inferential claim must not suppress the descriptive one:
+      // 4/10 against 2/10 really did happen, and hiding it would be its own
+      // dishonesty.
+      const result = computeExperimentResult('lp_headline', [
+        { variantKey: 'control', exposures: 10, conversions: 2 },
+        { variantKey: 'treatment', exposures: 10, conversions: 4 },
+      ]);
+      const treatment = result.variants.find((v) => v.variantKey === 'treatment')!;
+      expect(treatment.pValue).toBeNull();
+      expect(treatment.conversionRate).toBeCloseTo(0.4, 5);
+      expect(treatment.upliftVsControlPct).toBeCloseTo(100, 5);
+    });
+
+    it('computes a p-value once every expected cell reaches the threshold', () => {
+      // 50/50 exposures, pooled rate 0.2 — expected cells are 10 and 40 per arm,
+      // all at or above MIN_EXPECTED_CELL_COUNT, so the test is valid to run.
+      const result = computeExperimentResult('lp_headline', [
+        { variantKey: 'control', exposures: 50, conversions: 5 },
+        { variantKey: 'treatment', exposures: 50, conversions: 15 },
+      ]);
+      const treatment = result.variants.find((v) => v.variantKey === 'treatment')!;
+      expect(treatment.pValue).not.toBeNull();
+      expect(treatment.pValue!).toBeGreaterThan(0);
+      expect(treatment.pValue!).toBeLessThan(1);
+    });
+
+    it('leaves a large, clearly-powered experiment untouched', () => {
+      const result = computeExperimentResult('lp_headline', [
+        { variantKey: 'control', exposures: 1000, conversions: 100 },
+        { variantKey: 'treatment', exposures: 1000, conversions: 150 },
+      ]);
+      const treatment = result.variants.find((v) => v.variantKey === 'treatment')!;
+      expect(treatment.pValue).not.toBeNull();
+      expect(treatment.isSignificant).toBe(true);
+    });
   });
 });
