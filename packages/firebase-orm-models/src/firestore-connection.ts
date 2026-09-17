@@ -96,24 +96,28 @@ export async function connectFirestoreOrm(options: FirestoreConnectionOptions): 
     initializeApp({ apiKey: options.apiKey ?? 'demo-api-key', projectId: options.projectId }, appName);
 
   /*
-    Against the emulator, force the long-polling transport — the same fix
-    `test-utils/emulator.ts` already applies, which this path never received.
+    Against the emulator, ask for the long-polling transport.
 
-    The client SDK's default gRPC transport multiplexes every read, even a one-shot
-    `getDocs()`, as a target on one shared `Listen` stream per Firestore instance. Across a
-    suite of emulator-backed test files sharing one emulator, the accumulated target state on
-    that stream grows without bound until it trips gRPC's 4MB limit, and the error surfaces as
-    a nonsense `RESOURCE_EXHAUSTED: Received message larger than max (2812728582 vs 4194304)`
-    on whichever test happens to be reading at the time. A multi-gigabyte "message" is the
-    tell: nothing in these tests is remotely that size.
+    READ THIS BEFORE RELYING ON IT: `experimentalForceLongPolling` is honoured ONLY by the
+    client SDK's browser build, whose WebChannel transport implements it. In the Node build
+    (`@firebase/firestore/dist/index.node.cjs.js`) the transport is chosen by
+    `function newConnection(databaseInfo) { return new GrpcConnection(protos, databaseInfo); }`
+    — unconditional, with `forceLongPolling` stored on the database info and never consulted.
+    So this line is a no-op under `vitest --environment node` or Jest, and load-bearing only
+    where the browser build is resolved (apps/web's suites run `environment: 'jsdom'`).
 
-    Everything reaching Firestore through `connectFirestoreOrm` was on the unfixed path —
-    apps/web's `lib/orgs` suites and every apps/api e2e spec — which is why the flake kept
-    reappearing after the other path was fixed. Long-polling issues one request per read and
-    accumulates nothing.
+    It is kept because that jsdom case is real, not because it protects every caller. What it
+    does NOT do is prevent KAN-103: the emulator's gRPC `Listen` stream losing its framing,
+    after which reads come back as `RESOURCE_EXHAUSTED: Received message larger than max
+    (4036202791 vs 4194304)` — a garbage length prefix, not a real 4GB message — or as
+    `INTERNAL: Response message parsing error: invalid wire type 6 at offset 500`. This comment
+    previously asserted the opposite, which is why the flake outlived several attempts to fix
+    it. `packages/firebase-orm-models`' own emulator suite now sidesteps the whole class by
+    connecting through the Admin SDK instead (see `test-utils/emulator.ts`); apps/api's e2e
+    specs still reach the emulator through this client path under Node and remain exposed.
 
-    Production keeps gRPC: it is the faster transport, and the problem is specific to many
-    short-lived test connections against a single shared emulator.
+    Production keeps gRPC regardless: it is the faster transport, and the corruption is
+    specific to many short-lived test connections against one shared emulator.
   */
   const firestore = options.emulatorHost
     ? initializeFirestore(app, { experimentalForceLongPolling: true })
