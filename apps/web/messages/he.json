@@ -744,7 +744,8 @@
     "resultEntityIdLine": "מזהה {entityId}",
     "resultLastSeenLine": "נראה לאחרונה {lastSeenAt}",
     "resultFieldLine": "{name}: {value}",
-    "capNote": "מוצגות {count} ההתאמות העדכניות ביותר."
+    "capNote": "מוצגות {count} ההתאמות העדכניות ביותר.",
+    "capNoteTruncated": "מוצגות {count} ההתאמות האחרונות — נמצאו התאמות נוספות שאינן מוצגות, לכן יש לצמצם את החיפוש ולא להתייחס לרשימה כמלאה."
   },
   "CohortRetention": {
     "metaTitle": "שימור קבוצות",

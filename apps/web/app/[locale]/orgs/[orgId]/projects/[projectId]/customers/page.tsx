@@ -151,7 +151,9 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
                     </li>
                   ))}
                 </ul>
-                <p className="text-xs text-muted-foreground">{t('capNote', { count: view.entries.length })}</p>
+                <p className="text-xs text-muted-foreground">
+                  {view.hasMore ? t('capNoteTruncated', { count: view.entries.length }) : t('capNote', { count: view.entries.length })}
+                </p>
               </>
             )}
           </section>
