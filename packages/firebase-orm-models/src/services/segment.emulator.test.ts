@@ -83,11 +83,12 @@ async function registerCustomerSchema(organizationId: string, projectId: string,
 
 // No `customer_id` here, unlike the two entity schemas below: this is an `event`
 // schema, and `customer_id` rides on the event envelope rather than in its
-// properties bag (see IMPLICIT_EVENT_ENVELOPE_FIELDS). Declaring it as a required
-// field would make every real record fail `missing_required_field` and quarantine
-// — KAN-120, which now rejects it at registration. Nothing here needs it: the
-// cross-schema condition joins on `ev.entity_id = entities.entity_id`, never on
-// customer_id.
+// properties bag (see IMPLICIT_EVENT_ENVELOPE_FIELDS). Declaring it required
+// would make every record from an unidentified visitor fail
+// `missing_required_field` and quarantine — registration warns about that now
+// rather than refusing it (KAN-120). Dropped here because nothing needed it in
+// the first place: the cross-schema condition joins on
+// `ev.entity_id = entities.entity_id`, never on customer_id.
 const demoEventFieldsV1: SchemaFieldInput[] = [
   { name: 'stage', type: 'string', isRequired: true, isPii: false, isIdentityKey: false },
 ];

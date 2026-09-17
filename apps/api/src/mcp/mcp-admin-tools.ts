@@ -35,6 +35,7 @@ import {
   queryGoalProgress,
   reexportRawRecordsToWarehouse,
   registerMetricDefinition,
+  describeSchemaDefinitionWarnings,
   previewSchemaDefinition,
   registerSchemaDefinition,
   setGoalStatus,
@@ -318,7 +319,7 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
     {
       title: 'Register schema',
       description:
-        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. There is no delete or archive path for a schema and evolve_schema is additive-only, so a mistake here is permanent: pass dry_run first to check your work. Requires "schema.write".',
+        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. There is no delete or archive path for a schema and evolve_schema is additive-only, so a mistake here is permanent: pass dry_run first to check your work, and read the warnings it returns. Requires "schema.write".',
       inputSchema: toolInputSchema(registerSchemaInputShape),
     },
     auditedToolHandler(auth, 'register_schema', async (args: any) =>
@@ -339,11 +340,17 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
             created: false,
             would_create: { name: preview.name, kind: preview.kind, version: preview.version, fields: preview.fields },
             would_conflict: preview.wouldConflict,
+            warnings: preview.warnings,
           });
         }
 
         const schemaDef = await registerSchemaDefinition(request);
-        return textResult({ name: schemaDef.name, kind: schemaDef.kind, version: schemaDef.version, status: schemaDef.status });
+        // Warnings ride on the success response rather than blocking it: the
+        // consequences they describe are legal configurations someone may intend,
+        // but registration is irreversible, so this is the last moment they are
+        // useful.
+        const warnings = describeSchemaDefinitionWarnings(schemaDef.kind, schemaDef.field_defs);
+        return textResult({ name: schemaDef.name, kind: schemaDef.kind, version: schemaDef.version, status: schemaDef.status, warnings });
       }),
     ),
   );

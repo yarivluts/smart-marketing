@@ -12,6 +12,7 @@ import {
   listSchemaDefinitionsForProject,
   listSchemaDefinitionVersions,
   ProjectNotFoundError,
+  describeSchemaDefinitionWarnings,
   previewSchemaDefinition,
   registerSchemaDefinition,
   SchemaDefNotFoundError,
@@ -487,63 +488,58 @@ describe('previewSchemaDefinition', () => {
     ).rejects.toThrow();
   });
 
-  it('rejects an envelope field in a preview exactly as the real call would', async () => {
-    const { owner, organization, project } = await setupOrgWithProject('Schema Preview Envelope Org');
-    await expect(
-      previewSchemaDefinition({
-        organizationId: organization.id,
-        projectId: project.id,
-        kind: 'event',
-        name: 'signup',
-        fields: [{ name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true }],
-        createdByUserId: owner.id,
-      }),
-    ).rejects.toThrow();
-  });
 });
 
-describe('envelope fields cannot be declared on an event schema', () => {
-  it('rejects a required customer_id, the mistake that would quarantine all anonymous traffic', async () => {
+describe('envelope fields declared required are warned about, not refused', () => {
+  it('registers a required customer_id but warns that it will quarantine unidentified traffic', async () => {
+    // Blocking this was tried and was wrong by its own justification: "optional
+    // loses nothing" is false for a sender that always supplies the field and
+    // wants the guarantee. So the consequence is made loud instead, at the last
+    // moment it is useful, since registration cannot be undone.
     const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Org');
-    await expect(
-      registerSchemaDefinition({
-        organizationId: organization.id,
-        projectId: project.id,
-        kind: 'event',
-        name: 'signup',
-        // The natural thing for an integrator to write: customer_id feels
-        // required. It is read off the envelope, never out of `properties`, so
-        // `is_required` here means every event fails missing_required_field.
-        fields: [
-          { name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false },
-          { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
-        ],
-        createdByUserId: owner.id,
-      }),
-    ).rejects.toThrow(/customer_id/);
+    const schemaDef = await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'signup',
+      fields: [
+        { name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false },
+        { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+      ],
+      createdByUserId: owner.id,
+    });
 
-    expect(await listSchemaDefinitionsForProject(organization.id, project.id)).toHaveLength(0);
+    expect(schemaDef.field_defs.find((f) => f.name === 'customer_id')?.is_required).toBe(true);
+    const warnings = describeSchemaDefinitionWarnings(schemaDef.kind, schemaDef.field_defs);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('customer_id');
+    expect(warnings[0]).toContain('identify()');
+    expect(warnings[0]).toContain('cannot be undone');
   });
 
-  it('rejects a required anon_id on an event schema too', async () => {
+  it('warns differently about a required anon_id, because it is absent for a different reason', async () => {
+    // anon_id is attached to every event once an anon id exists, so requiring it
+    // is a much smaller risk than customer_id and a real project does configure
+    // it that way - see touchpoint-capture.emulator.test.ts. The warning says
+    // which risk it is rather than treating the two as the same.
     const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Anon Org');
-    await expect(
-      registerSchemaDefinition({
-        organizationId: organization.id,
-        projectId: project.id,
-        kind: 'event',
-        name: 'page_view',
-        fields: [{ name: 'anon_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
-        createdByUserId: owner.id,
-      }),
-    ).rejects.toThrow(/anon_id/);
+    const schemaDef = await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'page_view',
+      fields: [{ name: 'anon_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true }],
+      createdByUserId: owner.id,
+    });
+
+    const warnings = describeSchemaDefinitionWarnings(schemaDef.kind, schemaDef.field_defs);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('anon_id');
+    expect(warnings[0]).toContain('first event');
+    expect(warnings[0]).not.toContain('identify()');
   });
 
-  it('ALLOWS an optional envelope field, which is how identity stitching is opted into', async () => {
-    // The Stripe connector's event schemas do exactly this: customer_id
-    // optional, is_identity_key true. Rejecting it would break that connector
-    // and the documented stitching opt-in, so this test exists to stop the rule
-    // being widened back.
+  it('says nothing about an optional envelope field, which is the ordinary stitching opt-in', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Optional Org');
     const schemaDef = await registerSchemaDefinition({
       organizationId: organization.id,
@@ -557,14 +553,10 @@ describe('envelope fields cannot be declared on an event schema', () => {
       createdByUserId: owner.id,
     });
 
-    expect(schemaDef.field_defs.find((f) => f.name === 'customer_id')?.is_identity_key).toBe(true);
-    expect(schemaDef.field_defs.find((f) => f.name === 'customer_id')?.is_required).toBe(false);
+    expect(describeSchemaDefinitionWarnings(schemaDef.kind, schemaDef.field_defs)).toEqual([]);
   });
 
-  it('allows the same names on an entity schema, where they are not envelope fields', async () => {
-    // The implicit-envelope rule is gated on `kind === 'event'` in
-    // validateAgainstSchema, so entity/measure schemas must stay free to declare
-    // a column called customer_id — narrowing that would be a regression.
+  it('says nothing about an entity schema, where these are ordinary columns', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Entity Org');
     const schemaDef = await registerSchemaDefinition({
       organizationId: organization.id,
@@ -575,6 +567,22 @@ describe('envelope fields cannot be declared on an event schema', () => {
       createdByUserId: owner.id,
     });
 
-    expect(schemaDef.field_defs.map((f) => f.name)).toEqual(['customer_id']);
+    expect(describeSchemaDefinitionWarnings(schemaDef.kind, schemaDef.field_defs)).toEqual([]);
+  });
+
+  it('surfaces the same warning from a dry run, before anything is written', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Preview Org');
+    const preview = await previewSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'signup',
+      fields: [{ name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true }],
+      createdByUserId: owner.id,
+    });
+
+    expect(preview.warnings).toHaveLength(1);
+    expect(preview.warnings[0]).toContain('customer_id');
+    expect(await listSchemaDefinitionsForProject(organization.id, project.id)).toHaveLength(0);
   });
 });

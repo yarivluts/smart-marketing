@@ -73,9 +73,54 @@ export interface SchemaFieldInput {
  *
  * Defined here rather than in `ingest.service.ts` (which re-exports it under
  * this same name) only because that module already imports from this one;
- * putting it here lets registration reject these names without a cycle.
+ * putting it here lets registration warn about these names without a cycle.
  */
 export const IMPLICIT_EVENT_ENVELOPE_FIELDS = ['anon_id', 'customer_id'] as const;
+
+/**
+ * Non-fatal warnings about a schema definition: things that are legal, that a
+ * caller may well intend, and that have a consequence worth knowing before an
+ * irreversible write.
+ *
+ * Warnings rather than rejections, after trying it the other way. Declaring an
+ * envelope field `is_required` on an event schema is the trap that motivated
+ * this — `customer_id` is absent until `identify()` has run, so requiring it
+ * quarantines every event from an unidentified visitor, permanently, since a
+ * schema cannot be deleted and `evolveSchemaDefinition` is additive-only.
+ *
+ * But blocking it was wrong, and wrong by the very argument used to justify it.
+ * That argument was "optional loses nothing, so required is never the only way
+ * to express an intent". It is false: a project that wants every signup to carry
+ * stitching evidence *or be rejected* can only say that with `is_required`, and
+ * `touchpoint-capture.emulator.test.ts` documents exactly that configuration as
+ * the intended one. The same holds for `customer_id` on a server-side emitter
+ * that always sends it. A rule that forbids a configuration the system documents
+ * elsewhere as correct is not a safety rail, it is a bug.
+ *
+ * So the honest treatment is to make the consequence loud at the moment of the
+ * irreversible action and let the caller decide — the same posture KAN-127
+ * argues for with unknown top-level keys, for the same reason: rejection would
+ * break legitimate senders, while silence is how the trap kept catching people.
+ */
+export function describeSchemaDefinitionWarnings(kind: SchemaDefKind, fields: readonly SchemaFieldDef[]): string[] {
+  if (kind !== 'event') {
+    return [];
+  }
+  const warnings: string[] = [];
+  for (const field of fields) {
+    if (!field.is_required || !(IMPLICIT_EVENT_ENVELOPE_FIELDS as readonly string[]).includes(field.name)) {
+      continue;
+    }
+    const absence =
+      field.name === 'customer_id'
+        ? 'it is absent until identify() has run, so every event from an unidentified visitor will be quarantined'
+        : 'the tracker omits it until an anon id has been persisted, so the very first event from a new visitor may be quarantined';
+    warnings.push(
+      `Field "${field.name}" rides on the event envelope and is declared required: ${absence}. This cannot be undone — a schema cannot be deleted or archived and evolve_schema is additive-only. Declare it optional unless every sender is guaranteed to include it.`,
+    );
+  }
+  return warnings;
+}
 
 function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind): SchemaFieldDef[] {
   const reasons: string[] = [];
@@ -84,21 +129,6 @@ function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind
   }
 
   const reservedNames: readonly string[] = MART_KINDS.includes(kind) ? martIntrinsicColumnNames(kind) : [];
-  // Declaring an envelope field as REQUIRED on an event schema is a trap with no
-  // way back. The snippet attaches `anon_id` always but `customer_id` only once
-  // `identify()` has run, so a required `customer_id` fails
-  // `missing_required_field` on every event from a not-yet-identified visitor —
-  // i.e. all anonymous traffic — and quarantines it permanently, since a schema
-  // cannot be deleted or archived and `evolveSchemaDefinition` is additive-only.
-  //
-  // Declaring one OPTIONAL is legitimate and must keep working: it is the
-  // documented way to enrol a field in identity stitching (see
-  // IMPLICIT_EVENT_ENVELOPE_FIELDS' own doc comment, and the Stripe connector's
-  // event schemas, which declare `customer_id` optional with
-  // `is_identity_key`). Optional loses nothing — the field still type-checks
-  // when present and still participates in stitching — so `required` is never
-  // the only way to express an intent, which is what makes refusing it safe.
-  const envelopeNames: readonly string[] = kind === 'event' ? IMPLICIT_EVENT_ENVELOPE_FIELDS : [];
   const seen = new Set<string>();
   for (const field of fields) {
     const name = field.name.trim();
@@ -121,11 +151,6 @@ function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind
     // alongside this function, not by a live failure — see that function's
     // own doc comment for the sibling bug this mirrors: an unqualified mart
     // source table, session-B QA, 2026-08-20).
-    if (envelopeNames.includes(name) && field.isRequired) {
-      reasons.push(
-        `Field "${name}" rides on the event envelope and cannot be declared required — it is absent until identify() runs, so every anonymous event would quarantine, permanently. Declare it optional instead; it still type-checks and still participates in identity stitching.`,
-      );
-    }
     if (reservedNames.includes(name)) {
       reasons.push(`Field "${name}" is reserved by the generated warehouse mart view and cannot be declared on a "${kind}" schema.`);
     }
@@ -310,6 +335,8 @@ export interface SchemaDefinitionPreview {
   fields: SchemaFieldDef[];
   /** True when a schema family of this (kind, name) already exists, so the real call would throw `DuplicateSchemaDefinitionError`. Reported rather than thrown: a caller previewing a batch wants every answer, not the first failure. */
   wouldConflict: boolean;
+  /** Non-fatal consequences worth knowing before committing — see {@link describeSchemaDefinitionWarnings}. */
+  warnings: string[];
 }
 
 /**
@@ -330,7 +357,7 @@ export interface SchemaDefinitionPreview {
 export async function previewSchemaDefinition(params: RegisterSchemaDefinitionParams): Promise<SchemaDefinitionPreview> {
   const { kind, name, fields } = await validateSchemaDefRequest(params);
   const wouldConflict = await schemaFamilyHasAnyVersion(params.organizationId, params.projectId, kind, name);
-  return { kind, name, version: 1, fields, wouldConflict };
+  return { kind, name, version: 1, fields, wouldConflict, warnings: describeSchemaDefinitionWarnings(kind, fields) };
 }
 
 export async function registerSchemaDefinition(params: RegisterSchemaDefinitionParams): Promise<SchemaDefModel> {
