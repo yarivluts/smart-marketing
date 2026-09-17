@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #17: the test harness, again - KAN-103 root cause
+
+### Surface reviewed: CI itself, because it had become the thing most broken
+
+Picked over a page deliberately. CI was failing on **100% of open PRs, including documentation-only
+ones**, so nothing could merge - which makes it the highest-value defect available regardless of
+what a page review would have turned up.
+
+- **The symptom had been misread all along.** `RESOURCE_EXHAUSTED: Received message larger than max
+  (4036202791 vs 4194304)` is not a 4GB message; it is a **garbage length prefix** read as a
+  message size. The same runs also emit `INTERNAL: Response message parsing error: invalid wire
+  type 6 at offset 500` and `index out of range: 28 + 10 > 28` - the same corrupted bytes failing
+  to parse a different way. So this is the gRPC `Listen` stream **losing its framing**, not
+  accumulated state growing until it trips a limit, which is what every previous comment asserted.
+- **Why it survived several fixes.** The mitigation was `experimentalForceLongPolling: true`.
+  **That option does nothing in Node.** In `@firebase/firestore`'s `index.node.cjs.js` the
+  transport is `function newConnection(databaseInfo) { return new GrpcConnection(protos,
+  databaseInfo); }` - unconditional, with `forceLongPolling` stored and never consulted. Only the
+  browser build's WebChannel honours it.
+- That explains the failure distribution exactly, which nothing else did: every occurrence has
+  failed `@growthos/firebase-orm-models#test` and never apps/web's emulator suites - because
+  apps/web runs vitest `environment: 'jsdom'` and resolves the browser build, while this package
+  runs `environment: 'node'`. **The path was unprotected the entire time it was believed fixed.**
+- **Fixed structurally** (PR #417): the package's emulator suite now connects through the Admin
+  SDK, which serves `get()` with `runQuery`/`batchGetDocuments` and opens a `Listen` stream only
+  for `onSnapshot` - which nothing here uses. No long-lived stream means no framing to lose. It is
+  also the connection real deployments use, so the suite now exercises the production path rather
+  than one that exists only for tests.
+- Safe because the emulator rules are open, so nothing depended on client-SDK rule enforcement.
+  `connectToFirestoreEmulator` keeps its signature, so **none of the ~75 calling files changed**.
+- **Result: 2075s and failing, to 99s with 1709/1709 passing across 140/140 files.** Measured
+  locally twice - the first full run surfaced two real `vault` failures, fixed here, and the rerun
+  is clean. That test reached for the client app by name to read a document raw and prove the bytes
+  at rest are opaque; the intent is preserved, still bypassing the ORM that wrote it.
+- **KAN-128, filed not built:** apps/api's e2e specs still reach the emulator through the client
+  path under Jest/Node and remain exposed - they have simply been luckier, having far fewer
+  emulator-backed specs. apps/web is protected only *incidentally*, by its jsdom environment, and
+  nothing records that dependency; switching it to `node` for unrelated reasons would silently
+  re-expose it. Kept separate because it changes how every apps/api e2e spec talks to Firestore and
+  the suite that would catch a regression is the one being changed.
+
+### The pattern, now four for four
+
+Every hard defect this cycle was a **comment asserting something the code does not do**: KAN-120's
+tool description, KAN-124's "rides on the envelope", KAN-125's "production has no warehouse", and
+now KAN-103's "long-polling fixes this". Each cost real time, and each was found the same way -
+reading the implementation rather than the sentence above it. The KAN-103 one is the most expensive
+of the four, because the false comment did not merely mislead: it actively closed the
+investigation, since a mitigation believed to be in place is one nobody re-examines.
+
+### Blocked / waiting on a human
+
+Unchanged: key rotation approval, EasySign's blocked secret read, KAN-97 and KAN-117 (both product
+decisions).
+
+### Next
+
+#417 must merge first - #414, #415 and #416 all failed on this flake and need rerunning behind it.
+Then KAN-128, KAN-127, KAN-122, KAN-123. Next unreviewed page: churn-reasons or cohorts.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #16: the identity pipeline
 
 ### Surface reviewed: identity stitching, end to end from emitter to fact_attribution
@@ -111,8 +173,8 @@ buildable item; KAN-122 and KAN-123 still open. Next unreviewed page: churn-reas
 Onboarding wizard (#1), board tiles (#2), funnel cockpit (#3), project automation (#4), ingest
 health + copilot panel (#5), API keys (#6), hook endpoints (#7), metric catalog (#8), ingest API
 response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-registration (#12),
-trial pipeline widget (#13), the test harness itself (#14), experiments (#15), **the identity
-pipeline end to end (#16)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+trial pipeline widget (#13), the test harness itself (#14), experiments (#15), the identity
+pipeline end to end (#16), **CI and the emulator transport (#17)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
 
