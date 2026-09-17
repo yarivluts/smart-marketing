@@ -1,6 +1,5 @@
 import 'reflect-metadata';
-import { getApp } from 'firebase/app';
-import { doc, getDoc, getFirestore } from 'firebase/firestore';
+import { getFirestore } from 'firebase-admin/firestore';
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
   clearSharedCredentialSecret,
@@ -48,9 +47,18 @@ async function setupOrgWithCredential(orgName: string) {
   return { owner, organization, credential };
 }
 
+/**
+ * Reads the stored document directly, deliberately bypassing the ORM that wrote
+ * it: the point of these tests is that the BYTES AT REST are opaque, which a
+ * read back through the writing layer could not demonstrate.
+ *
+ * Uses the Admin SDK because the emulator suite now connects that way (KAN-103 —
+ * the client SDK's gRPC Listen stream was corrupting against the emulator). This
+ * previously grabbed the client app by name, which no longer exists; the raw-read
+ * intent is unchanged.
+ */
 async function readRawCredentialDoc(organizationId: string, credentialId: string): Promise<Record<string, unknown>> {
-  const firestore = getFirestore(getApp(APP_NAME));
-  const snapshot = await getDoc(doc(firestore, `organizations/${organizationId}/shared_credentials/${credentialId}`));
+  const snapshot = await getFirestore().doc(`organizations/${organizationId}/shared_credentials/${credentialId}`).get();
   return snapshot.data() as Record<string, unknown>;
 }
 

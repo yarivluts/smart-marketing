@@ -17,6 +17,52 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #14: the test harness itself
+
+### Pass #14: a missing emulator hangs for ten minutes and blames the wrong thing
+
+- **Found by accident, which is the point.** Chasing 8 local test failures against a green CI, the
+  answer was that my own invocation was wrong: `pnpm test:unit` is bare vitest, while the command
+  that starts an emulator is `test:unit:emulator`. No product bug. But the *failure mode* was a
+  real defect, and it cost most of an hour to reach a one-line conclusion.
+- **What it looked like:** with no emulator, the Firestore client SDK retries under its own
+  backoff, so nothing is reported at all while it spins. `win-feed-stream.test.ts` sat past **400
+  seconds with zero output** - it waits out `WIN_FEED_MAX_STREAM_DURATION_MS`, ten minutes - and
+  then produced assertion failures that never mention the emulator. The visible symptom pointed
+  away from the cause, which is the expensive kind of wrong.
+- **Fixed:** a TCP probe in `ensureFirestoreOrm` before connecting, throwing a message that names
+  the command that works. That function is the right chokepoint precisely because of what does
+  *not* call it: pure view-function tests never touch Firestore, so they keep running standalone.
+  A vitest `globalSetup` would have been easier and would have broken them. PR #411, KAN-115.
+- Verified in both directions rather than one: without an emulator, 400s+ -> **12s** and one
+  sentence; with an emulator, 34 tests across 4 files pass, `win-feed-stream` among them.
+- An unparseable `FIRESTORE_EMULATOR_HOST` skips the probe rather than failing, so a malformed
+  setting cannot replace a real SDK error with a parsing one.
+
+### KAN-103 (emulator flake) - sharper diagnosis, no new speculative fix
+
+- PR #411's first CI run failed in `@growthos/firebase-orm-models`, unrelated to the change. The
+  signature was **not** the `RESOURCE_EXHAUSTED` variant the current mitigations target: it was
+  `INTERNAL ASSERTION FAILED (ID: 27ce)` from `fromResourceName` <- `fromWatchChange` <-
+  `PersistentListenStream.onNext`. The emulator returned a watch change whose resource name the
+  client could not parse.
+- This rules out both mitigations currently in place. `testTimeout: 120_000` exists so a hit can
+  clear inside one attempt via SDK backoff - but a `hardAssert` is terminal and no waiting heals
+  it. `retry: 1` cannot help either, for a stronger reason: it arrives as an **unhandled
+  rejection** escaping the SDK's async queue, already at process level, outside any test's await
+  chain. Re-running the test body only adds attach/detach cycles against an already-sick emulator.
+- `src/test-utils/firestore-emulator-cleanup.ts` already documents assertion 27ce and was written
+  to prevent it (`terminate()` before `deleteApp()`). It is in place and the assertion fired
+  anyway, *during* a test rather than during teardown - so this is not only a teardown race.
+- **Deliberately not attempting another client-side fix.** The previous one did not hold, each
+  iteration costs a 35-minute CI run, and the evidence says the remaining client-side levers are
+  the wrong shape. The untried option is structural: one emulator per shard instead of one shared
+  across parallel workers. `fileParallelism: false` is the cheap version but the suite already
+  takes 35 minutes at ~2.4x parallelism, so serialising it is probably too slow to accept.
+  Recorded on the ticket; costing out the sharded option is the next step.
+
+---
+
 ## 2026-09-16 - Hourly quality passes #12 and #13
 
 ### Pass #13: trial pipeline widget
