@@ -17,6 +17,54 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #20: CI again, and a generalisation of mine that was false
+
+### Surface reviewed: the last exposed KAN-103 path, found because a docs-only PR failed
+
+- **A documentation-only PR (#419) failed CI.** `createOrganization` timed out waiting for a
+  heading, with `RESOURCE_EXHAUSTED: Received message larger than max (462029080 vs 4194304)` in
+  the same log - the KAN-103 signature. The page could not read Firestore, and nothing about the
+  symptom said so.
+- **The generalisation I had made was false, and I had stated it twice.** I claimed apps/web was
+  protected because vitest runs it with `environment: 'jsdom'`, resolving the client SDK's browser
+  build where `experimentalForceLongPolling` is honoured. True of the **unit** tests and only of
+  them: the **Playwright** tests boot the real Next server, which runs in real Node, resolves the
+  gRPC build, and took the client-SDK emulator branch. apps/web has two test environments and I
+  had reasoned about one.
+- **Fixed (PR #421):** transport follows the *runtime*, not the package. Real Node gets the Admin
+  SDK (no long-lived `Listen` stream to corrupt); jsdom keeps the client SDK.
+- **A dead end worth recording**, because it is the obvious next idea: switching apps/web to Admin
+  *unconditionally* fails five suites at module scope with `initializeAdminApp can only be called
+  in a Node.js environment, not in the browser`. The ORM refuses the moment it sees a browser
+  global. The runtime check is not a stylistic choice - it is the only shape that works. Found by
+  trying the simpler thing first and reading the failure rather than assuming it would work.
+- **Verified:** web unit suite 2517/2517 across 387 files (the broken intermediate run showed 952
+  "skipped", which is what a module-scope failure does to the rest of a file), and both the spec
+  that failed in CI and the one that flaked pass locally with no `RESOURCE_EXHAUSTED` in the run.
+- KAN-128's remaining scope is now apps/api alone.
+
+### Merged this pass
+
+#414 (KAN-118/120/121 schema registration safety), #416 (KAN-124/125 identity + stale comments),
+#418 (KAN-129/130 index drift), #420 (KAN-138 search truncation), #415 (PROGRESS #15-19). Eight
+issues moved to Done.
+
+### The pattern, restated more carefully
+
+Earlier passes recorded "a comment asserting something the code does not do". This pass adds a
+second species that is not the same: **a conclusion I reasoned to correctly from incomplete
+evidence.** Nothing lied here - `environment: 'jsdom'` really is what apps/web's vitest config
+says. I simply never asked whether apps/web had another test runner. The corrective is different
+too: for a false comment, read the code; for a false generalisation, look for the cases the
+generalisation does not cover before relying on it.
+
+### Next
+
+#419 needs a rerun behind #421. PRs #419, #421 open. Next unreviewed page: churn-reasons or
+cohorts - both still untouched, and this is the second pass diverted to CI rather than a page.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #19: Customers (Customer 360)
 
 ### Surface reviewed: the customers page and the search behind it
@@ -305,7 +353,8 @@ health + copilot panel (#5), API keys (#6), hook endpoints (#7), metric catalog 
 response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-registration (#12),
 trial pipeline widget (#13), the test harness itself (#14), experiments (#15), the identity
 pipeline end to end (#16), CI and the emulator transport (#17), a live customer project's real
-state (#18), **customers / Customer 360 (#19)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+state (#18), customers / Customer 360 (#19), **CI / the web emulator transport (#20)**. Not yet
+reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
 
