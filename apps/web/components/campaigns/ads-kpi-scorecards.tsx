@@ -62,12 +62,14 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         title={t('metricBlendedRoas')}
         value={summary.blendedRoas === null ? noData : `${summary.blendedRoas.toFixed(1)}x`}
         icon={TrendingUp}
-        targetHint={summary.blendedRoas === null ? undefined : t('roasTargetHint', { target: '3.5x' })}
-        progress={
-          summary.blendedRoas === null
-            ? undefined
-            : Math.min(Math.round((summary.blendedRoas / 3.5) * 100), 100)
-        }
+        // No target and no progress bar. Both used to be rendered against a
+        // hardcoded 3.5x that no project ever set: the card showed
+        // "Target: 3.5x" beside a bar filled to roas/3.5, capped at 100, so a
+        // project at 7x read as having exactly met a goal it never chose. The
+        // ROAS itself is measured and stays; the benchmark was invented.
+        // A real target belongs here once a goal can supply one (KAN-143) —
+        // until then the honest card states the number and claims nothing about
+        // whether it is good.
       />
 
       {/* 3. Impressions & Clicks */}
