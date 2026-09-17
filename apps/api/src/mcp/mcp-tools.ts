@@ -367,7 +367,8 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     'search_customers',
     {
       title: 'Search customers',
-      description: "Substring-search this project's customer/entity records (Customer 360) by id or property value.",
+      description:
+        "Look a customer up by identifier. Despite the name this is NOT a general-purpose search: it matches a substring against the entity id or against the whole attributes object serialised to JSON, which includes the KEY names — so every row containing a field called \"plan\" matches the query \"plan\", and any short or common query matches nearly everything. Use it with a distinctive identifier (a uid, an external id, an exact value); do not use it to explore. Returns the most recently seen matches up to limit, with has_more set when more matched than were returned. Customer 360 is populated only by ENTITY-kind ingestion: a project sending only events has no rows here however much data it sends.",
       inputSchema: toolInputSchema(searchCustomersInputShape),
     },
     auditedToolHandler(auth, 'search_customers', async (args: any) => {
