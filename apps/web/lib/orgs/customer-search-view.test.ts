@@ -63,6 +63,8 @@ describe('buildCustomerSearchView', () => {
   it('resolves each result\'s own schema field_defs by its own schemaName — a search can span more than one schema', () => {
     const outcome = {
       ok: true as const,
+      hasMore: false,
+      limit: 20,
       results: [
         searchResult({ entityId: 'cust_1', schemaName: 'customer', properties: { email: 'alice@example.com', plan: 'pro' } }),
         searchResult({ entityId: 'lead_1', schemaName: 'lead', properties: { source: 'ads' } }),
@@ -79,6 +81,8 @@ describe('buildCustomerSearchView', () => {
 
     expect(view).toEqual({
       kind: 'ok',
+      hasMore: false,
+      limit: 20,
       entries: [
         {
           entityId: 'cust_1',
@@ -100,10 +104,12 @@ describe('buildCustomerSearchView', () => {
   });
 
   it('renders no fields when the schema lookup misses (never throws)', () => {
-    const outcome = { ok: true as const, results: [searchResult({ entityId: 'cust_1' })] };
+    const outcome = { ok: true as const, hasMore: false, limit: 20, results: [searchResult({ entityId: 'cust_1' })] };
     const view = buildCustomerSearchView(outcome, new Map());
     expect(view).toEqual({
       kind: 'ok',
+      hasMore: false,
+      limit: 20,
       entries: [{ entityId: 'cust_1', schemaName: 'customer', lastSeenAt: '2026-08-20T00:00:00.000Z', fields: [] }],
     });
   });
@@ -118,5 +124,20 @@ describe('buildCustomerSearchView', () => {
     expect(buildCustomerSearchView({ ok: false, reason: 'query_error', message: 'table not found' }, new Map())).toEqual({
       kind: 'query_error',
     });
+  });
+
+  it('carries hasMore through, so the page can say the list is not the whole set', () => {
+    // The page renders a different note when this is true. Losing it here would
+    // silently turn a truncated list back into one that looks complete.
+    const outcome = { ok: true as const, hasMore: true, limit: 20, results: [searchResult({ entityId: 'cust_1' })] };
+    const view = buildCustomerSearchView(outcome, new Map());
+    expect(view).toMatchObject({ kind: 'ok', hasMore: true, limit: 20 });
+  });
+
+  it('carries the applied limit rather than assuming a default', () => {
+    // The cap is clamped server-side, so the page must be told what it was
+    // instead of hardcoding the number it believes was used.
+    const outcome = { ok: true as const, hasMore: true, limit: 100, results: [] };
+    expect(buildCustomerSearchView(outcome, new Map())).toMatchObject({ limit: 100 });
   });
 });

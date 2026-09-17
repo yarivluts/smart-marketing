@@ -39,8 +39,41 @@ with event_records as (
             {{ growthos_try_cast(json_text_field('payload', "'ts'"), dbt.type_timestamp()) }},
             landed_at
         ) as observed_at,
-        {{ json_text_field(json_object_field('payload', "'properties'"), "'anon_id'") }} as anon_id_value,
-        {{ json_text_field(json_object_field('payload', "'properties'"), "'customer_id'") }} as customer_id_value
+        -- Read from the properties bag FIRST, then fall back to the record's top
+        -- level. The platform's own tracker (`buildTrackedEventPayload`) puts
+        -- anon_id inside `properties`, but a server-side integrator reading
+        -- "these ride on the event envelope" reasonably sends them as siblings of
+        -- `properties` instead, and ingest persists `record.raw` exactly as
+        -- submitted. Before this coalesce, those records stored their identity at
+        -- `payload.anon_id`, this view looked only at `payload.properties.anon_id`,
+        -- and the identity was invisible — no observation row, no bridge_identity
+        -- edge, no fact_attribution join, and no error anywhere, because an
+        -- unjoined touchpoint is indistinguishable from a visitor who never
+        -- converted. Confirmed against production: stg_raw_records already holds
+        -- rows of both shapes.
+        --
+        -- Properties wins on conflict, and the precedence is settled by the wire
+        -- contract rather than by taste: `IngestEventRecord` is
+        -- `{event_id, event, ts, properties}` and declares no top-level identity
+        -- field at all. So `properties` is the only position the API defines, the
+        -- only one schema validation type-checks, and the only one the tracker
+        -- emits — while a top-level copy is an undeclared extra that ingest
+        -- tolerates and stores verbatim. The fallback below is therefore a
+        -- RECOVERY path for records that arrived in a shape the contract never
+        -- specified, not a second source of equal standing, which is exactly why
+        -- the contract-defined location must win when the two disagree.
+        --
+        -- Being a view, this also recovers already-landed records. Normalising at
+        -- ingest instead would only shape future writes, leaving the rows already
+        -- in the warehouse unreadable unless separately backfilled.
+        coalesce(
+            {{ json_text_field(json_object_field('payload', "'properties'"), "'anon_id'") }},
+            {{ json_text_field('payload', "'anon_id'") }}
+        ) as anon_id_value,
+        coalesce(
+            {{ json_text_field(json_object_field('payload', "'properties'"), "'customer_id'") }},
+            {{ json_text_field('payload', "'customer_id'") }}
+        ) as customer_id_value
     from {{ ref('stg_raw_records') }}
     where kind = 'event'
 )

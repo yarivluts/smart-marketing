@@ -368,14 +368,16 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Search customers',
       description:
-        "Look a customer up by identifier. Despite the name this is NOT a general-purpose search: it matches a substring against the entity id or against the whole attributes object serialised to JSON, which includes the KEY names — so every row containing a field called \"plan\" matches the query \"plan\", and any short or common query matches nearly everything. Use it with a distinctive identifier (a uid, an external id, an exact value); do not use it to explore. Returns the most recently seen matches up to limit, with has_more set when more matched than were returned. Customer 360 is populated only by ENTITY-kind ingestion: a project sending only events has no rows here however much data it sends.",
+        "Look a customer up by identifier. Despite the name this is NOT a general-purpose search: it matches a substring against the entity id or against the whole attributes object serialised to JSON, which includes the KEY names — so every row with a field called \"plan\" matches the query \"plan\", and any short or common query matches nearly everything. Use a distinctive identifier (a uid, an external id, an exact value); do not use it to explore. Returns the most recently seen matches up to limit, with has_more set when more matched than were returned — narrow the query rather than assuming the list is complete. Customer 360 is populated only by ENTITY-kind ingestion: a project sending only events has no rows here however much data it sends.",
       inputSchema: toolInputSchema(searchCustomersInputShape),
     },
     auditedToolHandler(auth, 'search_customers', async (args: any) => {
       const { query, schema_name: schemaName, limit } = args as { query: string; schema_name?: string; limit?: number };
       try {
-        const results = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), query, schemaName, limit });
-        return textResult({ results });
+        const page = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), query, schemaName, limit });
+        // has_more is reported because a truncated list that looks complete is
+        // how a caller concludes "no such customer" from "I only saw 20 of them".
+        return textResult({ results: page.results, has_more: page.hasMore, limit: page.limit });
       } catch (error) {
         return errorResult(describeMetricsError(error));
       }

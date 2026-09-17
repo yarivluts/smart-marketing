@@ -163,6 +163,15 @@ payload but are neither validated nor rejected**. Putting a schema field at the 
 instead of inside `properties`/`attributes`/`dimensions` means it will not be validated and
 will not populate the warehouse column for that field.
 
+> **Validation is strict inside the sub-object and silent outside it — and that is backwards.**
+> An undeclared key inside `properties` is fatal and loud: the record quarantines with
+> `unregistered_field:<name>`, so you find out immediately. An unknown key *outside* it is
+> accepted, stored, and never looked at again — no error, no warning, no rejected entry. So the
+> format is strictest exactly where a mistake announces itself, and most permissive exactly where
+> it cannot. **If a field seems to be accepted but never appears anywhere downstream, check
+> whether you put it at the top level instead of in the sub-object.** This bit real integrations
+> (KAN-124) before it was written down here.
+
 ## 5. Validation & quarantine
 
 A schema for the record's kind + name must be **registered and active** (Schema Registry,
@@ -191,9 +200,34 @@ On **event** records only, `anon_id` and `customer_id` are accepted inside `prop
 without being declared on the schema (they are validated as strings if present). The platform's
 own tracking snippet (KAN-57) attaches them to every event it fires; without this implicit
 acceptance, any hand-registered event schema would quarantine 100% of real snippet traffic with
-`unregistered_field:anon_id`. To make either field participate in identity stitching (KAN-56),
-still declare it explicitly with `is_identity_key`. This implicit acceptance applies to events
-only — entity/measure validation is unchanged.
+`unregistered_field:anon_id`. This implicit acceptance applies to events only — entity/measure
+validation is unchanged.
+
+**Send them inside `properties`, not at the top level.** "Envelope" here means *the tracker
+attaches them to every event*, not *they sit outside the `properties` bag* — the two readings
+point to opposite places and the wrong one fails silently. `IngestEventRecord` is
+`{event_id, event, ts, properties}` and declares no top-level identity field: a top-level
+`anon_id` is tolerated, not supported. It is stored verbatim, never validated, and — before
+KAN-124 — was invisible to identity stitching entirely, producing no `bridge_identity` edge and
+no `fact_attribution` join, with no error, because an unjoined touchpoint is indistinguishable
+from a visitor who never converted. The warehouse now falls back to the top-level position to
+recover such records, but that is a recovery path for data already landed, **not a supported
+shape to build against**.
+
+**You do not need to declare them to get identity stitching.** On the BigQuery warehouse that
+production runs, `stg_identity_key_observations` reads `anon_id` and `customer_id` from
+`properties` by fixed path, whether or not the schema declares them — so declaring them buys
+nothing there. (The DuckDB leg used in dev/CI *does* join the registered-identity-key seed, which
+is where the "declare it with `is_identity_key`" rule this section used to state comes from; it
+is true there and misleading for these two fields on the live warehouse. Project-registered
+*custom* identity keys — `user_id`, `email_hash`, … — do still need the declaration, and today
+participate on the DuckDB leg only.)
+
+**Never declare either one `is_required` on an event schema.** `customer_id` is absent until
+`identify()` has run, so a required declaration quarantines every event from a not-yet-identified
+visitor — all anonymous traffic — and a schema cannot be deleted or archived, with `evolve_schema`
+additive-only, so the mistake is permanent. Registration now rejects this (KAN-120). Declaring
+either field *optional* is fine and has always been.
 
 ## 7. Idempotency & dedup
 

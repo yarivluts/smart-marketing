@@ -134,11 +134,16 @@ export function resolveWarehouseQueryExecutorFromEnv(env: NodeJS.ProcessEnv = pr
 }
 
 /**
- * Resolved once at module load from real `process.env` — every environment
- * today (including CI) has no `GROWTHOS_BIGQUERY_CORE_DATASET` set, so this
- * stays the inert {@link NotConfiguredWarehouseQueryExecutor} until KAN-18's
- * `infra/terraform/bigquery.tf` is applied and a deploy sets the three env
- * vars {@link readWarehouseEnvConfig} reads. Frozen at import time rather
+ * Resolved once at module load from real `process.env`. CI and local dev set
+ * none of the warehouse env vars, so both get the inert
+ * {@link NotConfiguredWarehouseQueryExecutor}; **production does not** —
+ * `api-prod` sets `GOOGLE_CLOUD_PROJECT`, `GROWTHOS_BIGQUERY_RAW_DATASET`,
+ * `GROWTHOS_BIGQUERY_CORE_DATASET` and `GROWTHOS_BIGQUERY_LOCATION`, so it
+ * resolves a real {@link BigQueryWarehouseQueryExecutor} against the built
+ * `growthos_core` dataset. (This comment previously said every environment was
+ * unconfigured and would stay inert until KAN-18's terraform was applied. That
+ * stopped being true when it was applied, and reading it would lead someone to
+ * build a workaround for a warehouse that is live.) Frozen at import time rather
  * than re-read per call, matching how Cloud Run env vars are only ever set
  * at deploy time, never mutated at runtime.
  */

@@ -35,6 +35,8 @@ import {
   queryGoalProgress,
   reexportRawRecordsToWarehouse,
   registerMetricDefinition,
+  describeSchemaDefinitionWarnings,
+  previewSchemaDefinition,
   registerSchemaDefinition,
   setGoalStatus,
   setHookEndpointSigningSecret,
@@ -184,7 +186,22 @@ const schemaDefinitionInputShape = {
   fields: z
     .unknown()
     .describe(
-      'Array of { name, type, is_required?, is_pii?, is_identity_key? }. type is one of: string, number, boolean, timestamp, object, array. A record carrying a property this list does not declare is rejected into quarantine, so declare every property you intend to send. Note that anon_id and customer_id ride on the envelope and must NOT be declared here.',
+      'Array of { name, type, is_required?, is_pii?, is_identity_key? }. type is one of: string, number, boolean, timestamp, object, array. A record carrying a property this list does not declare is rejected into quarantine, so declare every property you intend to send. anon_id and customer_id ride on the event envelope and are accepted without being declared - declare them only to enrol them in identity stitching, and then only with is_required false, since customer_id is absent until identify() runs and a required one would quarantine every anonymous event.',
+    ),
+};
+
+/**
+ * `register_schema` only — deliberately not on the shared shape, which
+ * `evolve_schema` also uses. Advertising a flag a tool silently ignores is its
+ * own kind of lie; evolve has no preview path yet (see KAN-119).
+ */
+const registerSchemaInputShape = {
+  ...schemaDefinitionInputShape,
+  dry_run: z
+    .boolean()
+    .optional()
+    .describe(
+      'Validate and report what would be created, writing nothing. Use this first: a schema cannot be deleted or archived, and evolve_schema is additive-only, so a misspelled field name is permanent. A name that is already taken comes back as would_conflict rather than an error, so a whole batch can be previewed in one pass.',
     ),
 };
 
@@ -281,7 +298,17 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
             name: schema.name,
             kind: schema.kind,
             version: schema.version,
-            fields: schema.field_defs.map((field) => ({ name: field.name, type: field.type, required: field.is_required })),
+            // `is_pii`/`is_identity_key` are echoed because they are otherwise
+            // write-only: a caller could set them on register_schema and had no
+            // way to read back that they took. The first integrator to mark a
+            // field PII is exactly the one who needs to confirm it.
+            fields: schema.field_defs.map((field) => ({
+              name: field.name,
+              type: field.type,
+              required: field.is_required,
+              is_pii: field.is_pii,
+              is_identity_key: field.is_identity_key,
+            })),
           })),
       });
     }),
@@ -292,20 +319,38 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
     {
       title: 'Register schema',
       description:
-        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. Requires "schema.write".',
-      inputSchema: toolInputSchema(schemaDefinitionInputShape),
+        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. There is no delete or archive path for a schema and evolve_schema is additive-only, so a mistake here is permanent: pass dry_run first to check your work, and read the warnings it returns. Requires "schema.write".',
+      inputSchema: toolInputSchema(registerSchemaInputShape),
     },
     auditedToolHandler(auth, 'register_schema', async (args: any) =>
       runAdminTool(auth, 'schema.write', args, async (a: any) => {
-        const schemaDef = await registerSchemaDefinition({
+        const request = {
           organizationId: auth.organizationId,
           projectId: auth.projectId,
           kind: String(a.kind),
           name: String(a.name),
           fields: toSchemaFields(a),
           createdByUserId: actorId(auth),
-        });
-        return textResult({ name: schemaDef.name, kind: schemaDef.kind, version: schemaDef.version, status: schemaDef.status });
+        };
+
+        if (a.dry_run === true) {
+          const preview = await previewSchemaDefinition(request);
+          return textResult({
+            dry_run: true,
+            created: false,
+            would_create: { name: preview.name, kind: preview.kind, version: preview.version, fields: preview.fields },
+            would_conflict: preview.wouldConflict,
+            warnings: preview.warnings,
+          });
+        }
+
+        const schemaDef = await registerSchemaDefinition(request);
+        // Warnings ride on the success response rather than blocking it: the
+        // consequences they describe are legal configurations someone may intend,
+        // but registration is irreversible, so this is the last moment they are
+        // useful.
+        const warnings = describeSchemaDefinitionWarnings(schemaDef.kind, schemaDef.field_defs);
+        return textResult({ name: schemaDef.name, kind: schemaDef.kind, version: schemaDef.version, status: schemaDef.status, warnings });
       }),
     ),
   );
@@ -688,7 +733,7 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
     {
       title: 'Purge landed data',
       description:
-        'Irreversibly delete every landed record and its bookkeeping for this project — raw records, pipeline messages, ingest batches, quarantined records, dedup keys, win events and tracking alerts — so real data can start clean. Configuration is untouched: metrics, goals, segments, win rules, schemas, keys, hook endpoints, boards and automation targets all survive. The warehouse copy needs a separate raw-table delete plus a dbt rebuild. Requires "ingest.write" and an explicit confirm_project_id.',
+        'Irreversibly delete landed records and their bookkeeping — raw records, pipeline messages, ingest batches, quarantined records, dedup keys, win events and tracking alerts — so real data can start clean. Scope it with environment_id to clear one environment (e.g. dev probe debris) and leave the others untouched; omit environment_id to clear the whole project. Configuration is untouched: metrics, goals, segments, win rules, schemas, keys, hook endpoints, boards and automation targets all survive. The warehouse copy needs a separate raw-table delete plus a dbt rebuild. Requires "ingest.write" and an explicit confirm_project_id.',
       inputSchema: toolInputSchema(purgeInputShape),
     },
     auditedToolHandler(auth, 'purge_project_data', async (args: any) =>
