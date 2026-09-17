@@ -11,7 +11,12 @@ import {
   listRecentChurnedSubscriptionsForProject,
   listRecentDunningSubscriptionsForProject,
 } from '@/lib/orgs/queries';
-import { billingOpsFeedEntryTypeLabelKey, toBillingOpsFeedEntryView } from '@/lib/orgs/billing-ops-view';
+import {
+  DEFAULT_BILLING_OPS_FEED_LIMIT,
+  DEFAULT_CHURN_FEED_LIMIT,
+  DEFAULT_DUNNING_FEED_LIMIT,
+} from '@growthos/firebase-orm-models';
+import { billingOpsFeedEntryTypeLabelKey, splitOverFetchedFeed, toBillingOpsFeedEntryView } from '@/lib/orgs/billing-ops-view';
 import { toChurnFeedEntryView } from '@/lib/orgs/churn-feed-view';
 import { dunningFeedEntryStatusLabelKey, toDunningFeedEntryView } from '@/lib/orgs/dunning-feed-view';
 
@@ -59,11 +64,16 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     notFound();
   }
 
+  // Each feed is fetched one row beyond its cap so truncation is MEASURED rather
+  // than inferred. `entries.length === cap` cannot distinguish "exactly 100
+  // landed" from "thousands landed", and on a billing page those read very
+  // differently: the second means the operator is looking at a window, not a
+  // ledger. The extra row is never rendered - it is evidence, not an entry.
   const [projects, rawRecords, churnRecords, dunningRecords, environments] = await Promise.all([
     listOrgProjects(orgId),
-    listRecentBillingEventsForProject(orgId, projectId),
-    listRecentChurnedSubscriptionsForProject(orgId, projectId),
-    listRecentDunningSubscriptionsForProject(orgId, projectId),
+    listRecentBillingEventsForProject(orgId, projectId, DEFAULT_BILLING_OPS_FEED_LIMIT + 1),
+    listRecentChurnedSubscriptionsForProject(orgId, projectId, DEFAULT_CHURN_FEED_LIMIT + 1),
+    listRecentDunningSubscriptionsForProject(orgId, projectId, DEFAULT_DUNNING_FEED_LIMIT + 1),
     listEnvironmentsForProject(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
@@ -71,9 +81,15 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const entries = rawRecords.map(toBillingOpsFeedEntryView);
-  const churnEntries = churnRecords.map(toChurnFeedEntryView);
-  const dunningEntries = dunningRecords.map(toDunningFeedEntryView);
+  const billingPage = splitOverFetchedFeed(rawRecords, DEFAULT_BILLING_OPS_FEED_LIMIT);
+  const churnPage = splitOverFetchedFeed(churnRecords, DEFAULT_CHURN_FEED_LIMIT);
+  const dunningPage = splitOverFetchedFeed(dunningRecords, DEFAULT_DUNNING_FEED_LIMIT);
+  const billingTruncated = billingPage.truncated;
+  const churnTruncated = churnPage.truncated;
+  const dunningTruncated = dunningPage.truncated;
+  const entries = billingPage.rows.map(toBillingOpsFeedEntryView);
+  const churnEntries = churnPage.rows.map(toChurnFeedEntryView);
+  const dunningEntries = dunningPage.rows.map(toDunningFeedEntryView);
 
   const t = await getTranslations('BillingOpsFeed');
   const tEnv = await getTranslations('EnvBadge');
@@ -112,7 +128,10 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
             ))}
           </ul>
         )}
-        <p className="text-xs text-muted-foreground">{t('capNote', { count: entries.length })}</p>
+        <p className="text-xs text-muted-foreground">
+          {billingTruncated ? t('capNoteTruncated', { count: entries.length }) : t('capNote', { count: entries.length })}
+        </p>
+        <p className="text-xs text-muted-foreground">{t('amountUnitNote')}</p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -148,7 +167,9 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
             ))}
           </ul>
         )}
-        <p className="text-xs text-muted-foreground">{t('churnCapNote', { count: churnEntries.length })}</p>
+        <p className="text-xs text-muted-foreground">
+          {churnTruncated ? t('churnCapNoteTruncated', { count: churnEntries.length }) : t('churnCapNote', { count: churnEntries.length })}
+        </p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -180,7 +201,9 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
             ))}
           </ul>
         )}
-        <p className="text-xs text-muted-foreground">{t('dunningCapNote', { count: dunningEntries.length })}</p>
+        <p className="text-xs text-muted-foreground">
+          {dunningTruncated ? t('dunningCapNoteTruncated', { count: dunningEntries.length }) : t('dunningCapNote', { count: dunningEntries.length })}
+        </p>
       </section>
     </main>
   );

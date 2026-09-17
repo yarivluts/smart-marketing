@@ -76,3 +76,20 @@ export function billingOpsFeedEntryTypeLabelKey(type: BillingOpsFeedEntryType): 
       return 'typeCharge';
   }
 }
+
+/**
+ * Splits an over-fetched feed into the page it renders and whether more existed.
+ *
+ * The caller asks the service for `cap + 1` rows; this returns the first `cap`
+ * and reports whether the extra one came back. That extra row is evidence, never
+ * an entry - it is not returned and must not be rendered.
+ *
+ * Measuring beats inferring here for the reason KAN-138 established: `rows.length
+ * === cap` cannot tell "exactly `cap` landed" from "thousands landed", and on a
+ * billing feed those read very differently. The first is a complete ledger; the
+ * second is a window onto one, and an operator reconciling payments needs to know
+ * which they are looking at.
+ */
+export function splitOverFetchedFeed<T>(rows: readonly T[], cap: number): { rows: T[]; truncated: boolean } {
+  return { rows: rows.slice(0, cap), truncated: rows.length > cap };
+}
