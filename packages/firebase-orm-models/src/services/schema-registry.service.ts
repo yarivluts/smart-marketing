@@ -84,13 +84,20 @@ function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind
   }
 
   const reservedNames: readonly string[] = MART_KINDS.includes(kind) ? martIntrinsicColumnNames(kind) : [];
-  // Declaring an envelope field on an event schema is a trap with no way back.
-  // `validateAgainstSchema` reads these off the envelope, not out of
-  // `properties`, so a declaration of `customer_id` with `is_required: true`
-  // makes every single event fail `missing_required_field` and quarantine —
-  // permanently, since a schema cannot be deleted or archived and
-  // `evolveSchemaDefinition` is additive-only. The tool surface already tells
-  // callers not to do this; until now nothing enforced it.
+  // Declaring an envelope field as REQUIRED on an event schema is a trap with no
+  // way back. The snippet attaches `anon_id` always but `customer_id` only once
+  // `identify()` has run, so a required `customer_id` fails
+  // `missing_required_field` on every event from a not-yet-identified visitor —
+  // i.e. all anonymous traffic — and quarantines it permanently, since a schema
+  // cannot be deleted or archived and `evolveSchemaDefinition` is additive-only.
+  //
+  // Declaring one OPTIONAL is legitimate and must keep working: it is the
+  // documented way to enrol a field in identity stitching (see
+  // IMPLICIT_EVENT_ENVELOPE_FIELDS' own doc comment, and the Stripe connector's
+  // event schemas, which declare `customer_id` optional with
+  // `is_identity_key`). Optional loses nothing — the field still type-checks
+  // when present and still participates in stitching — so `required` is never
+  // the only way to express an intent, which is what makes refusing it safe.
   const envelopeNames: readonly string[] = kind === 'event' ? IMPLICIT_EVENT_ENVELOPE_FIELDS : [];
   const seen = new Set<string>();
   for (const field of fields) {
@@ -114,9 +121,9 @@ function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind
     // alongside this function, not by a live failure — see that function's
     // own doc comment for the sibling bug this mirrors: an unqualified mart
     // source table, session-B QA, 2026-08-20).
-    if (envelopeNames.includes(name)) {
+    if (envelopeNames.includes(name) && field.isRequired) {
       reasons.push(
-        `Field "${name}" rides on the event envelope and must not be declared as a schema field — declaring it would quarantine every record of this schema, and a schema cannot be removed once registered.`,
+        `Field "${name}" rides on the event envelope and cannot be declared required — it is absent until identify() runs, so every anonymous event would quarantine, permanently. Declare it optional instead; it still type-checks and still participates in identity stitching.`,
       );
     }
     if (reservedNames.includes(name)) {

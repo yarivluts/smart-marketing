@@ -185,7 +185,7 @@ const schemaDefinitionInputShape = {
   fields: z
     .unknown()
     .describe(
-      'Array of { name, type, is_required?, is_pii?, is_identity_key? }. type is one of: string, number, boolean, timestamp, object, array. A record carrying a property this list does not declare is rejected into quarantine, so declare every property you intend to send. Note that anon_id and customer_id ride on the envelope and must NOT be declared here.',
+      'Array of { name, type, is_required?, is_pii?, is_identity_key? }. type is one of: string, number, boolean, timestamp, object, array. A record carrying a property this list does not declare is rejected into quarantine, so declare every property you intend to send. anon_id and customer_id ride on the event envelope and are accepted without being declared - declare them only to enrol them in identity stitching, and then only with is_required false, since customer_id is absent until identify() runs and a required one would quarantine every anonymous event.',
     ),
 };
 

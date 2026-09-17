@@ -503,7 +503,7 @@ describe('previewSchemaDefinition', () => {
 });
 
 describe('envelope fields cannot be declared on an event schema', () => {
-  it('rejects customer_id, the mistake that would quarantine every record forever', async () => {
+  it('rejects a required customer_id, the mistake that would quarantine all anonymous traffic', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Org');
     await expect(
       registerSchemaDefinition({
@@ -525,7 +525,7 @@ describe('envelope fields cannot be declared on an event schema', () => {
     expect(await listSchemaDefinitionsForProject(organization.id, project.id)).toHaveLength(0);
   });
 
-  it('rejects anon_id on an event schema too', async () => {
+  it('rejects a required anon_id on an event schema too', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Anon Org');
     await expect(
       registerSchemaDefinition({
@@ -533,10 +533,32 @@ describe('envelope fields cannot be declared on an event schema', () => {
         projectId: project.id,
         kind: 'event',
         name: 'page_view',
-        fields: [{ name: 'anon_id', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        fields: [{ name: 'anon_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
         createdByUserId: owner.id,
       }),
     ).rejects.toThrow(/anon_id/);
+  });
+
+  it('ALLOWS an optional envelope field, which is how identity stitching is opted into', async () => {
+    // The Stripe connector's event schemas do exactly this: customer_id
+    // optional, is_identity_key true. Rejecting it would break that connector
+    // and the documented stitching opt-in, so this test exists to stop the rule
+    // being widened back.
+    const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Optional Org');
+    const schemaDef = await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'charge_succeeded',
+      fields: [
+        { name: 'charge_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+        { name: 'customer_id', type: 'string', isRequired: false, isPii: false, isIdentityKey: true },
+      ],
+      createdByUserId: owner.id,
+    });
+
+    expect(schemaDef.field_defs.find((f) => f.name === 'customer_id')?.is_identity_key).toBe(true);
+    expect(schemaDef.field_defs.find((f) => f.name === 'customer_id')?.is_required).toBe(false);
   });
 
   it('allows the same names on an entity schema, where they are not envelope fields', async () => {
