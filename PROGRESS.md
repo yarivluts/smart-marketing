@@ -17,6 +17,86 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #18: the EasySign project's real state
+
+### Surface reviewed: a live customer project, read from the store the dashboard renders from
+
+EasySign asked me to verify their setup in the UI, which neither of us can reach - they have no
+browser and the dashboard needs a login. Reading the underlying state instead turned out to be
+better than a screenshot, and it found a production bug that a screenshot would have shown as an
+empty section.
+
+- **KAN-129: a missing composite index had broken two things in production, for every project.**
+  `getEventVolumeOverviewForProject` was failing with `FAILED_PRECONDITION` on `raw_records
+  (environment_id, kind, schema_name, landed_at)`. That is the schema registry page's per-event
+  volume and sparkline section, and `getMostRecentRawRecordForSchema`, which backs last-seen and
+  the tracking-alert checks.
+- The index **was declared correctly** in `firestore.indexes.json` and had simply never been
+  deployed. The standing rule in `infra/terraform/README.md` is "add the index in the same PR, and
+  whoever deploys runs `firebase deploy --only firestore:indexes`" - only the first half happened.
+  Production still carried the 3-field predecessor from before the query gained its environment
+  split. **The eighth occurrence of this class**; that README records the file was seeded from the
+  live set only after it had already recurred seven times.
+- Fixed with the per-index `gcloud` command rather than a full deploy, deliberately: the per-index
+  form can only create, while a full deploy treats the file as desired state and could have
+  deleted the undeclared 3-field index as a side effect. **Verified after:** the call that failed
+  now returns 6 real entries across 3 environments.
+- **KAN-130: nothing detects index drift, which is why it recurs.** CI cannot catch this even in
+  principle - *the Firestore emulator does not enforce composite indexes*, so the suite is green
+  whether or not the index exists. Added `scripts/firestore/check-index-drift.mjs` (read-only,
+  exits 1 on drift) with the comparison logic in `packages/shared` under 12 tests. Reports both
+  directions, because they fail differently: declared-not-deployed is a latent crash,
+  deployed-not-declared is a latent **deletion**, since a full deploy can remove an index a live
+  query still needs. PR #418.
+- The detail that made it work: Firestore appends an implicit `__name__` field to every stored
+  index that the declaration never lists. Without dropping it, every index compares as drift and
+  the tool is pure noise.
+- Current drift: 9 declared all deployed, 1 deployed-not-declared (the stale predecessor). **Left
+  alone deliberately** - it is very likely unused, but "very likely" came from a grep, and
+  deleting a production index on a grep is the same inference that caused several wrong turns this
+  week.
+
+### What the project state actually showed
+
+- currency ILS and timezone Asia/Jerusalem **already set**, so one of EasySign's asks was already
+  satisfied as configuration. 3 environments. 6 schemas, **none of their 8** - confirming the
+  registrations are the only thing missing. Their 6 new metrics all present and active.
+- **Nothing has ever landed in prod**: `trial_started` last seen in dev on 2026-09-15, never in
+  prod or staging. All 46 quarantined records are in dev.
+- **19 API keys, most still live** (KAN-135), including both reported burned on 2026-09-08. Raised
+  separately from the rotation question because it is a different problem: accumulated write
+  credentials nobody tracks, with no expiry and no last-used timestamp - which is what makes
+  cleanup feel risky enough never to happen.
+
+### Declined, and why
+
+EasySign relayed that Yariv told them to ask me to register their 8 schemas directly. **I did not.**
+Two reasons, the second standing on its own: a relayed instruction is not an instruction to me, and
+the same boundary that stopped me fetching their secret would be decorative if I dropped it the
+moment the relayed request was something I was happy to do. Independently - registration is
+permanent, and `dry_run`, which I built for these exact eight writes, was one merge away. Doing
+eight irreversible writes to a live customer project without the safety net built for them is the
+wrong order of operations regardless of who authorised it.
+
+I did the risk-free half: validated all 8 offline against the real rules. Clean - correct types, no
+envelope fields, no duplicates, sensible required sets. So the file is not what is holding it up.
+
+### Filed not built
+
+KAN-131 (`get_ingest_health` - the tool that would have answered most of this week), KAN-132
+(`last_built_at` on `list_warehouse_tables`), KAN-133 (`verify_integration` canary), KAN-134
+(`dashboard_url`/`keys_url`), KAN-135 (key sprawl). KAN-133 takes EasySign's better design: make
+the canary self-identifying and excluded everywhere rather than cleaned up, since a teardown step
+can itself fail and leave the debris it existed to prevent.
+
+### Next
+
+#417 merged, unblocking everything. #414, #415, #416 re-merged with it and back in CI; #418 open.
+`get_ingest_health` (KAN-131) is the next build - it was this pass's intended target, and the index
+bug was found while preparing for it.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #17: the test harness, again - KAN-103 root cause
 
 ### Surface reviewed: CI itself, because it had become the thing most broken
@@ -174,7 +254,8 @@ Onboarding wizard (#1), board tiles (#2), funnel cockpit (#3), project automatio
 health + copilot panel (#5), API keys (#6), hook endpoints (#7), metric catalog (#8), ingest API
 response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-registration (#12),
 trial pipeline widget (#13), the test harness itself (#14), experiments (#15), the identity
-pipeline end to end (#16), **CI and the emulator transport (#17)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+pipeline end to end (#16), CI and the emulator transport (#17), **a live customer project's real
+state (#18)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
 
