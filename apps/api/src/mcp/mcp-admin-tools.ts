@@ -726,7 +726,7 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
     {
       title: 'Purge landed data',
       description:
-        'Irreversibly delete every landed record and its bookkeeping for this project — raw records, pipeline messages, ingest batches, quarantined records, dedup keys, win events and tracking alerts — so real data can start clean. Configuration is untouched: metrics, goals, segments, win rules, schemas, keys, hook endpoints, boards and automation targets all survive. The warehouse copy needs a separate raw-table delete plus a dbt rebuild. Requires "ingest.write" and an explicit confirm_project_id.',
+        'Irreversibly delete landed records and their bookkeeping — raw records, pipeline messages, ingest batches, quarantined records, dedup keys, win events and tracking alerts — so real data can start clean. Scope it with environment_id to clear one environment (e.g. dev probe debris) and leave the others untouched; omit environment_id to clear the whole project. Configuration is untouched: metrics, goals, segments, win rules, schemas, keys, hook endpoints, boards and automation targets all survive. The warehouse copy needs a separate raw-table delete plus a dbt rebuild. Requires "ingest.write" and an explicit confirm_project_id.',
       inputSchema: toolInputSchema(purgeInputShape),
     },
     auditedToolHandler(auth, 'purge_project_data', async (args: any) =>
