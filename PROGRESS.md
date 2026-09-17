@@ -17,6 +17,73 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #22: cohorts, and a sweep for fabricated claims
+
+### Surface reviewed: cohorts - which led to a repo-wide string sweep
+
+Reviewing the cohorts page turned up a hardcoded claim in its matrix component, so rather than fix
+one instance I swept **every user-facing string** for hardcoded numeric or comparative claims: any
+literal number or comparison in a translation value with **no ICU placeholder**. Sixteen matched.
+Most are legitimate headings (`# vs $`, `Uplift vs. control`, `vs prev period`). **Two were
+fabricated data.**
+
+- **KAN-141 - the worst thing found this cycle, because the action is real.** The Campaigns page
+  renders a banner headed "AI Growth Recommendation" whose body was a **constant**: *"Meta
+  Retargeting ROAS is 4.8x - Increase daily budget by 20% (+18% projected conversions)."* It
+  rendered whenever any campaign existed, named Meta Retargeting whichever campaign was actually
+  selected, stated 4.8x regardless of measured ROAS, and projected a lift nothing computes.
+- Beside it is a **1-Click Apply** button that POSTs a real `budget_change`, raising that
+  campaign's daily budget by 20% **on a real ad account**. A user read a confident numeric
+  justification and clicked a button that spends money. The justification was invented; the spend
+  is not.
+- The selection underneath was *already* honest - `topCampaign` requires a measured ROAS and says
+  why in a comment. So the right campaign was chosen and then described with someone else's
+  numbers. **Fixing the synthesizer in an earlier pass did not reach this, because this text never
+  went through it.**
+- **Fixed:** built from the selected campaign's real label, ROAS, current and resulting budget, and
+  the invented projection replaced with an explicit "no conversion lift is projected - none is
+  measured". That sentence is the substance: what separates an honest recommendation from a
+  fabricated one is whether it claims to know the outcome.
+- **Why it survived review:** the test fixture's top campaign is named "Meta Retargeting Leads", so
+  the fabricated copy read as correct against the test data. **A fabrication that matches the
+  fixture is invisible to whoever reads the test.**
+- **KAN-142:** `CohortRetentionMatrix` rendered, unconditionally and in green with an up-arrow,
+  "Cohort retention trending +4% above target" - not derived from any prop, identical whether
+  retention was climbing or collapsing, and there is no "target" in the cohort model at all. It was
+  **asserted by a passing test**, which made the fabrication a specified requirement; the next
+  person would have read removing it as breaking a test. The component is rendered by no page, so
+  no user saw it - fixed anyway, since dead code carrying a fabricated claim plus a test
+  legitimising it is one wiring-up away from shipping.
+- Removed the claim rather than the component: the redesigned matrix may be mid-integration, and
+  the defect is the line, not the file.
+
+### The sweep is the reusable part
+
+A literal number or comparative in a translation string **with no ICU placeholder** is a strong
+signal that something is being asserted rather than measured. It took one pass over `en.json` and
+found both instances, including one nobody had reached through code review. Worth re-running
+whenever new UI copy lands - and it is cheap enough to be a lint rule if this recurs.
+
+### Also reviewed, and sound
+
+The cohorts page proper handles its degraded warehouse states honestly and the retention view
+rounds only at display. Two things noted but not changed: a blank matrix cell cannot distinguish
+"cohort too young to have reached this period" from "no data", and `Math.round` can render a real
+retained customer as `0%`. Both are the four-instance pattern again, milder; recorded rather than
+fixed because the page shows only percentages and the fix wants a product decision about what a
+retention cell should say.
+
+### Merged this pass
+
+#419 (KAN-136 parameter descriptions), #423 (KAN-140 churn digest), #424 (PROGRESS #21).
+
+### Next
+
+PR #425 in CI. Next unreviewed page: billing-ops-feed or campaign-ops. KAN-128 (apps/api emulator
+transport) remains the last KAN-103 remnant.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #21: Churn Reasons
 
 ### Surface reviewed: the churn-reasons page and its free-text theme digest
@@ -403,7 +470,8 @@ response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-reg
 trial pipeline widget (#13), the test harness itself (#14), experiments (#15), the identity
 pipeline end to end (#16), CI and the emulator transport (#17), a live customer project's real
 state (#18), customers / Customer 360 (#19), CI / the web emulator transport (#20),
-**churn-reasons (#21)**. Not yet reviewed: billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
+churn-reasons (#21), **cohorts + a repo-wide fabricated-claim sweep (#22)**. Not yet reviewed:
+billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
 
