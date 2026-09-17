@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-09-17 - Hourly quality pass #23: the Campaigns page
+
+### Surface reviewed: campaigns - the page KAN-141 was found on, reviewed properly
+
+- **KAN-143: ROAS progress against a target nobody set.** The Blended ROAS scorecard rendered
+  "Target: 3.5x" beside a progress bar filled to `roas / 3.5`, capped at 100. That target is a
+  literal in the component. A project at 2.8x saw a bar at 80%; **a project at 7x saw a full bar
+  reading 100%**, implying it had exactly met a goal it never chose. The ROAS is measured and
+  stays; the benchmark was invented, and a progress bar is a strong visual claim.
+- **Third instance this cycle of a test locking a fabrication in place** (after KAN-142, and
+  KAN-141's fixture). Worth naming as its own pattern: *a fabrication with a passing test is harder
+  to remove than one without, because removing it reads as breaking something.* All three now
+  assert the **absence** of the fabricated value instead.
+- Deliberately not replaced with a real target: GrowthOS has a goals system with a real
+  `target_value` per metric, which is where this belongs, but plumbing it in touches the page's data
+  fetching and a project may have no ROAS goal. Filed rather than guessed.
+- **KAN-144: a fabrication that was armed, not fixed - a new shape.** `buildExecutiveReportData`
+  derived per-channel conversions as `totalConversions * spendShare` (attributing conversions by
+  *cost*, which is not attribution) and per-channel ROAS as `metrics.blendedRoas` on **both**
+  channels (so Meta and Google would show the same number, true of neither).
+- Neither rendered, because the executive synthesizer was cleaned in an earlier pass and returns
+  null for everything unsourced. **But the derivations survived that cleanup.** The day a real
+  source lands, the page silently starts showing assumptions as measurements.
+- That shape is worse than an ordinary fabrication. An ordinary one is visible on the page. **This
+  one is invisible until data arrives, at which point it looks like a new feature working - and
+  nobody re-audits a number that has only just started rendering.** Removed outright; the test
+  supplies blended figures explicitly, simulating the day the trap would have fired.
+
+### Two sweeps run, one clean
+
+Swept components for numeric literals rendered directly in JSX - the other hiding place after last
+pass's translation-string sweep. Five matched, all colour-scale legend labels on the cohort matrix,
+all legitimate. So the JSX-literal form is clean; the translation-string and
+derived-from-the-wrong-thing forms are where the fabrications actually lived.
+
+### Also checked, and sound - recorded so they are not re-investigated
+
+`periodComparison` (the "vs prev period" deltas) is only ever set via `overrides`, whose sole caller
+is a test, so it never renders in production. `rebalancingRecommendation` is never produced and its
+render is guarded. Both are previously-fabricated features that were correctly neutered. The rest of
+`AdsKpiScorecards` handles every null honestly and had already had its trend deltas removed for want
+of a baseline.
+
+### A process slip worth recording
+
+I branched from a stale `origin/main` without fetching, concluded from the missing entry that #425
+and #426 had never merged, and was one step from re-doing merged work. They had merged; my local ref
+was old. Second time this exact slip has happened. **`git fetch` before branching is now
+non-negotiable** - and the tell was that I checked the *file* rather than `gh pr view`, which is the
+authoritative source for whether a PR merged.
+
+### Merged this pass
+
+#425 (KAN-141/142) and #426 (PROGRESS #22). KAN-141 and KAN-142 closed.
+
+### Next
+
+PR #427 in CI. Next unreviewed page: billing-ops-feed or campaign-ops. Still open: KAN-128 (apps/api
+emulator transport), KAN-143's follow-up (wire a real goal target), KAN-122/123/127/131-135/139.
+
+---
+
 ## 2026-09-17 - Hourly quality pass #22: cohorts, and a sweep for fabricated claims
 
 ### Surface reviewed: cohorts - which led to a repo-wide string sweep
@@ -470,7 +532,8 @@ response (#9), schema registry (#10), cost guardrails (#11), MCP schema self-reg
 trial pipeline widget (#13), the test harness itself (#14), experiments (#15), the identity
 pipeline end to end (#16), CI and the emulator transport (#17), a live customer project's real
 state (#18), customers / Customer 360 (#19), CI / the web emulator transport (#20),
-churn-reasons (#21), **cohorts + a repo-wide fabricated-claim sweep (#22)**. Not yet reviewed:
+churn-reasons (#21), cohorts + a repo-wide fabricated-claim sweep (#22),
+**campaigns (#23)**. Not yet reviewed:
 billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
