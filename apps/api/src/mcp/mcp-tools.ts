@@ -226,17 +226,17 @@ const cohortInputShape = {
     .string()
     .optional()
     .describe('Which event must fire again for a customer to count as "retained" in a later period. Omit for "any activity that period" (the default).'),
-  limit: z.number().int().positive().optional(),
+  limit: z.number().int().positive().optional().describe('Maximum cohort rows to return, newest cohort first.'),
 };
 
 const searchCustomersInputShape = {
-  query: z.string().min(1),
+  query: z.string().min(1).describe('Free-text search across the identifying fields of the entity — its id and any field registered as an identity key on its schema. Matching is substring, not fuzzy.'),
   schema_name: z.string().optional().describe('Restrict to one entity schema, e.g. "customer".'),
-  limit: z.number().int().positive().optional(),
+  limit: z.number().int().positive().optional().describe('Maximum matching customers to return.'),
 };
 
 const listInsightsInputShape = {
-  limit: z.number().int().positive().optional(),
+  limit: z.number().int().positive().optional().describe('Maximum insights to return, most recent first.'),
 };
 
 const describeMetricInputShape = {
