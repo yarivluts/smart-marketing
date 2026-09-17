@@ -12,6 +12,7 @@ import {
   listSchemaDefinitionsForProject,
   listSchemaDefinitionVersions,
   ProjectNotFoundError,
+  previewSchemaDefinition,
   registerSchemaDefinition,
   SchemaDefNotFoundError,
   type SchemaFieldInput,
@@ -410,5 +411,148 @@ describe('listSchemaDefinitionsForProject', () => {
 
     const otherDefs = await listSchemaDefinitionsForProject(organization.id, otherProject.id);
     expect(otherDefs).toHaveLength(1);
+  });
+});
+
+describe('previewSchemaDefinition', () => {
+  it('reports what would be created and writes nothing', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Preview Org');
+    const preview = await previewSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'order_completed',
+      fields: orderFieldsV1,
+      createdByUserId: owner.id,
+    });
+
+    expect(preview.version).toBe(1);
+    expect(preview.kind).toBe('event');
+    expect(preview.name).toBe('order_completed');
+    expect(preview.wouldConflict).toBe(false);
+    expect(preview.fields.map((f) => f.name)).toEqual(['order_id', 'user_id', 'net']);
+    expect(preview.fields.find((f) => f.name === 'user_id')?.is_identity_key).toBe(true);
+
+    // The whole point: a preview must not spend the one chance the caller has.
+    expect(await listSchemaDefinitionsForProject(organization.id, project.id)).toHaveLength(0);
+  });
+
+  it('previewing twice still creates nothing, so a batch can be re-run', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Preview Twice Org');
+    const request = {
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'order_completed',
+      fields: orderFieldsV1,
+      createdByUserId: owner.id,
+    };
+    await previewSchemaDefinition(request);
+    const second = await previewSchemaDefinition(request);
+
+    expect(second.wouldConflict).toBe(false);
+    expect(await listSchemaDefinitionsForProject(organization.id, project.id)).toHaveLength(0);
+  });
+
+  it('reports a name already taken as wouldConflict rather than throwing', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Preview Conflict Org');
+    const request = {
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'order_completed',
+      fields: orderFieldsV1,
+      createdByUserId: owner.id,
+    };
+    await registerSchemaDefinition(request);
+
+    // Thrown, this would stop a caller previewing 8 schemas at the first
+    // collision and hide the other 7 answers.
+    const preview = await previewSchemaDefinition(request);
+    expect(preview.wouldConflict).toBe(true);
+    expect(await listSchemaDefinitionsForProject(organization.id, project.id)).toHaveLength(1);
+  });
+
+  it('still throws on genuinely invalid input, because that error is the report', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Preview Invalid Org');
+    await expect(
+      previewSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'not_a_kind',
+        name: 'order_completed',
+        fields: orderFieldsV1,
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('rejects an envelope field in a preview exactly as the real call would', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Preview Envelope Org');
+    await expect(
+      previewSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name: 'signup',
+        fields: [{ name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true }],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow();
+  });
+});
+
+describe('envelope fields cannot be declared on an event schema', () => {
+  it('rejects customer_id, the mistake that would quarantine every record forever', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Org');
+    await expect(
+      registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name: 'signup',
+        // The natural thing for an integrator to write: customer_id feels
+        // required. It is read off the envelope, never out of `properties`, so
+        // `is_required` here means every event fails missing_required_field.
+        fields: [
+          { name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false },
+          { name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true },
+        ],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(/customer_id/);
+
+    expect(await listSchemaDefinitionsForProject(organization.id, project.id)).toHaveLength(0);
+  });
+
+  it('rejects anon_id on an event schema too', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Anon Org');
+    await expect(
+      registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name: 'page_view',
+        fields: [{ name: 'anon_id', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: owner.id,
+      }),
+    ).rejects.toThrow(/anon_id/);
+  });
+
+  it('allows the same names on an entity schema, where they are not envelope fields', async () => {
+    // The implicit-envelope rule is gated on `kind === 'event'` in
+    // validateAgainstSchema, so entity/measure schemas must stay free to declare
+    // a column called customer_id — narrowing that would be a regression.
+    const { owner, organization, project } = await setupOrgWithProject('Schema Envelope Entity Org');
+    const schemaDef = await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'subscription',
+      fields: [{ name: 'customer_id', type: 'string', isRequired: true, isPii: false, isIdentityKey: true }],
+      createdByUserId: owner.id,
+    });
+
+    expect(schemaDef.field_defs.map((f) => f.name)).toEqual(['customer_id']);
   });
 });

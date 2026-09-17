@@ -7,7 +7,7 @@ import {
 import { IngestDedupKeyModel } from '../models/ingest-dedup-key.model';
 import { QuarantinedRecordModel } from '../models/quarantined-record.model';
 import type { SchemaDefKind, SchemaFieldDef, SchemaFieldType } from '../models/schema-def.model';
-import { getActiveSchemaDefinition } from './schema-registry.service';
+import { getActiveSchemaDefinition, IMPLICIT_EVENT_ENVELOPE_FIELDS } from './schema-registry.service';
 import { enqueueAcceptedRecordsForPipeline, landPipelineMessages } from './pipeline.service';
 import { evaluateRecordAgainstWinRules } from './win-rule.service';
 
@@ -210,7 +210,10 @@ const FIELD_TYPE_VALIDATORS: Record<SchemaFieldType, (value: unknown) => boolean
  * identity stitching (KAN-56) still declares it explicitly with
  * `is_identity_key`, same as before.
  */
-export const IMPLICIT_EVENT_ENVELOPE_FIELDS = ['anon_id', 'customer_id'] as const;
+// Defined in `schema-registry.service.ts` so registration can reject these names
+// without an import cycle (this module already imports from that one). Re-exported
+// here because this is where callers expect to find it.
+export { IMPLICIT_EVENT_ENVELOPE_FIELDS } from './schema-registry.service';
 
 /**
  * Reject-list validation against a schema's registered fields: every required field must be present

@@ -66,6 +66,17 @@ export interface SchemaFieldInput {
  * `client_id` is a perfectly fine event field name, while a measure's mart
  * additionally carries the envelope's own `value`/`ts`.
  */
+/**
+ * Identity properties an `event` record carries on its envelope rather than in
+ * its `properties` bag — see `validateAgainstSchema`, which accepts them
+ * implicitly for events.
+ *
+ * Defined here rather than in `ingest.service.ts` (which re-exports it under
+ * this same name) only because that module already imports from this one;
+ * putting it here lets registration reject these names without a cycle.
+ */
+export const IMPLICIT_EVENT_ENVELOPE_FIELDS = ['anon_id', 'customer_id'] as const;
+
 function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind): SchemaFieldDef[] {
   const reasons: string[] = [];
   if (fields.length === 0) {
@@ -73,6 +84,14 @@ function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind
   }
 
   const reservedNames: readonly string[] = MART_KINDS.includes(kind) ? martIntrinsicColumnNames(kind) : [];
+  // Declaring an envelope field on an event schema is a trap with no way back.
+  // `validateAgainstSchema` reads these off the envelope, not out of
+  // `properties`, so a declaration of `customer_id` with `is_required: true`
+  // makes every single event fail `missing_required_field` and quarantine —
+  // permanently, since a schema cannot be deleted or archived and
+  // `evolveSchemaDefinition` is additive-only. The tool surface already tells
+  // callers not to do this; until now nothing enforced it.
+  const envelopeNames: readonly string[] = kind === 'event' ? IMPLICIT_EVENT_ENVELOPE_FIELDS : [];
   const seen = new Set<string>();
   for (const field of fields) {
     const name = field.name.trim();
@@ -95,6 +114,11 @@ function validateFields(fields: readonly SchemaFieldInput[], kind: SchemaDefKind
     // alongside this function, not by a live failure — see that function's
     // own doc comment for the sibling bug this mirrors: an unqualified mart
     // source table, session-B QA, 2026-08-20).
+    if (envelopeNames.includes(name)) {
+      reasons.push(
+        `Field "${name}" rides on the event envelope and must not be declared as a schema field — declaring it would quarantine every record of this schema, and a schema cannot be removed once registered.`,
+      );
+    }
     if (reservedNames.includes(name)) {
       reasons.push(`Field "${name}" is reserved by the generated warehouse mart view and cannot be declared on a "${kind}" schema.`);
     }
@@ -269,6 +293,39 @@ export interface RegisterSchemaDefinitionParams {
  * story; flagged here as a known, deliberately-deferred gap rather than
  * papered over.
  */
+/** What {@link previewSchemaDefinition} reports: exactly the v1 that {@link registerSchemaDefinition} would write, plus whether that write would be refused. */
+export interface SchemaDefinitionPreview {
+  kind: SchemaDefKind;
+  name: string;
+  /** Always 1 — a preview is only ever of a first registration. */
+  version: number;
+  /** The normalized field list as it would be stored, so a caller can diff it against what they meant to send. */
+  fields: SchemaFieldDef[];
+  /** True when a schema family of this (kind, name) already exists, so the real call would throw `DuplicateSchemaDefinitionError`. Reported rather than thrown: a caller previewing a batch wants every answer, not the first failure. */
+  wouldConflict: boolean;
+}
+
+/**
+ * Validates a registration and reports what it would create, writing nothing.
+ *
+ * Registration is the sharpest edge in the self-serve surface: it is
+ * project-wide, there is no delete or archive path for a schema, and
+ * `evolveSchemaDefinition` is additive-only. So a field-name typo becomes
+ * permanent — the real property then rejects as an unregistered field until the
+ * correct one is evolved in beside the mistake, which also cannot be removed. A
+ * caller gets exactly one chance per schema, and before this had no way to check
+ * their work that did not spend it.
+ *
+ * Invalid input still throws, because for a dry run the validation error *is*
+ * the report. A duplicate comes back as `wouldConflict` instead, so previewing a
+ * batch yields every answer rather than stopping at the first collision.
+ */
+export async function previewSchemaDefinition(params: RegisterSchemaDefinitionParams): Promise<SchemaDefinitionPreview> {
+  const { kind, name, fields } = await validateSchemaDefRequest(params);
+  const wouldConflict = await schemaFamilyHasAnyVersion(params.organizationId, params.projectId, kind, name);
+  return { kind, name, version: 1, fields, wouldConflict };
+}
+
 export async function registerSchemaDefinition(params: RegisterSchemaDefinitionParams): Promise<SchemaDefModel> {
   const { kind, name, fields } = await validateSchemaDefRequest(params);
 
