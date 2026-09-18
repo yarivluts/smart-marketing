@@ -7,6 +7,7 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listBillingCollectionSignalsForProject, listOrgPeople, listOrgProjects, listRepCollectionEntriesForProject } from '@/lib/orgs/queries';
 import { repCollectionTypeLabelKey, toRepCollectionBillingSignalRow, toRepCollectionEntryRow, toRepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
+import { projectLedgerCurrency, signalCurrencyMatchesLedger } from '@/lib/orgs/rep-collection-currency';
 import { CreateRepCollectionEntryForm } from '@/components/orgs/create-rep-collection-entry-form';
 import { RepCollectionEntryControls } from '@/components/orgs/rep-collection-entry-controls';
 
@@ -50,6 +51,10 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
     notFound();
   }
 
+  // `null` when the project has not configured one — the page then says the
+  // amounts are unlabelled rather than picking a currency on its behalf.
+  const ledgerCurrency = projectLedgerCurrency(project.currency);
+
   // Fetched once and reused for both leaderboard periods (via the pure
   // `aggregateRepCollectionLeaderboard`) and the billing-signal linked-id
   // check, rather than four independent full-ledger reads per page load.
@@ -76,6 +81,13 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+      {/* The ledger stores `amount` as a bare number with no currency of its own,
+          so every total below is shown in the project's configured currency —
+          an assumption, stated as one, rather than a formatted number implying
+          the system knows (KAN-171). */}
+      <p className="text-xs text-muted-foreground">
+        {ledgerCurrency === null ? t('amountCurrencyUnsetNote') : t('amountCurrencyNote', { currency: ledgerCurrency })}
+      </p>
       <p className="text-sm text-muted-foreground">{t('description')}</p>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -92,13 +104,21 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
                 {view.rows.map((row, index) => (
                   <li key={row.orgPersonId} className="flex items-baseline justify-between gap-4 text-sm">
                     <span className="font-medium">{t('leaderboardRank', { rank: index + 1, name: row.name })}</span>
-                    <span className="tabular-nums text-muted-foreground">{t('leaderboardRowSummary', { amount: row.totalAmount.toLocaleString(locale), count: row.entryCount })}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {ledgerCurrency === null
+                        ? t('leaderboardRowSummaryNoCurrency', { amount: row.totalAmount.toLocaleString(locale), count: row.entryCount })
+                        : t('leaderboardRowSummary', { amount: row.totalAmount.toLocaleString(locale), currency: ledgerCurrency, count: row.entryCount })}
+                    </span>
                   </li>
                 ))}
               </ol>
             )}
             {view.unattributedCount > 0 ? (
-              <p className="text-xs text-muted-foreground">{t('leaderboardUnattributed', { amount: view.unattributedTotal.toLocaleString(locale), count: view.unattributedCount })}</p>
+              <p className="text-xs text-muted-foreground">
+                {ledgerCurrency === null
+                  ? t('leaderboardUnattributedNoCurrency', { amount: view.unattributedTotal.toLocaleString(locale), count: view.unattributedCount })
+                  : t('leaderboardUnattributed', { amount: view.unattributedTotal.toLocaleString(locale), currency: ledgerCurrency, count: view.unattributedCount })}
+              </p>
             ) : null}
           </section>
         ))}
@@ -115,6 +135,11 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
                 <span className="text-xs text-muted-foreground">
                   {t('signalSummary', { customerId: signal.customerId, amount: signal.amount.toLocaleString(locale), currency: signal.currency.toUpperCase() })}
                 </span>
+                {signalCurrencyMatchesLedger(signal.currency, ledgerCurrency) ? null : (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    {t('signalCurrencyMismatch', { signalCurrency: signal.currency.toUpperCase(), projectCurrency: ledgerCurrency ?? '' })}
+                  </p>
+                )}
                 <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} signal={signal} />
               </li>
             ))}

@@ -1900,8 +1900,8 @@
     },
     "leaderboardEmpty": "No attributed collections yet.",
     "leaderboardRank": "{rank}. {name}",
-    "leaderboardRowSummary": "{amount} ({count, plural, one {# entry} other {# entries}})",
-    "leaderboardUnattributed": "Plus {amount} not yet attributed to a rep ({count, plural, one {# entry} other {# entries}})",
+    "leaderboardRowSummary": "{amount} {currency} ({count, plural, one {# entry} other {# entries}})",
+    "leaderboardUnattributed": "Plus {amount} {currency} not yet attributed to a rep ({count, plural, one {# entry} other {# entries}})",
     "signalsHeading": "Suggested from billing",
     "noSignals": "No unattributed billing charges to suggest right now.",
     "signalSummary": "Customer {customerId}: {amount} {currency}",
@@ -1944,7 +1944,12 @@
     "deleteConfirm": "Delete this ledger entry? This cannot be undone.",
     "deleteButton": "Delete",
     "deleteError": "Could not delete this entry. Please try again.",
-    "amountInputLabel": "Amount"
+    "amountInputLabel": "Amount",
+    "leaderboardRowSummaryNoCurrency": "{amount} ({count, plural, one {# entry} other {# entries}})",
+    "leaderboardUnattributedNoCurrency": "Plus {amount} not yet attributed to a rep ({count, plural, one {# entry} other {# entries}})",
+    "amountCurrencyNote": "Amounts are recorded as plain numbers with no currency of their own, so they are shown in this project currency ({currency}). Entries typed in another currency are added to the same totals.",
+    "amountCurrencyUnsetNote": "This project has no currency set, so ledger amounts are unlabelled numbers. Set one on the project settings page to give these totals a unit.",
+    "signalCurrencyMismatch": "This charge is in {signalCurrency}, but the ledger is kept in {projectCurrency}. Adding it mixes currencies in the leaderboard total - convert the amount before saving."
   },
   "RepCollectionLeaderboard": {
     "heading": "Top collections this week",
