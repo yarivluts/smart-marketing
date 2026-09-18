@@ -7,6 +7,7 @@ import type { SchemaDefKind } from '../models/schema-def.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { getActiveSchemaDefinition } from './schema-registry.service';
+import { resolveFeedEnvironmentId } from './pipeline.service';
 
 export class InvalidWinRuleError extends Error {
   constructor(public readonly reasons: readonly string[]) {
@@ -341,22 +342,35 @@ export async function evaluateRecordAgainstWinRules(params: EvaluateRecordAgains
   );
 }
 
-/** The most recent wins in a project, newest-first — the admin feed's initial page render. */
+/**
+ * The win-event query for one project, scoped to one environment — the project's `prod` one
+ * unless the caller names another (KAN-99). Wins fire at ingest for every environment, stamped
+ * with the key's own, so a `gos_test_` key's synthetic signup that matched a rule used to
+ * celebrate on the prod win feed and TV board as though a real customer had arrived.
+ */
+async function winEventQueryForEnvironment(organizationId: string, projectId: string, environmentId?: string) {
+  const resolved = await resolveFeedEnvironmentId(organizationId, projectId, environmentId);
+  const query = WinEventModel.initPath({ organization_id: organizationId, project_id: projectId }).query();
+  return resolved === null ? query : query.where('environment_id', '==', resolved);
+}
+
+/** The most recent wins in one environment of a project (`prod` by default), newest-first — the admin feed's initial page render. */
 export async function listRecentWinEventsForProject(
   organizationId: string,
   projectId: string,
   limit: number = DEFAULT_WIN_EVENT_LIST_LIMIT,
+  environmentId?: string,
 ): Promise<WinEventModel[]> {
   await requireProjectInOrg(organizationId, projectId);
-  return WinEventModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  return (await winEventQueryForEnvironment(organizationId, projectId, environmentId))
     .orderBy('created_at', 'desc')
     .limit(Math.min(limit, DEFAULT_WIN_EVENT_LIST_LIMIT))
     .get();
 }
 
 /**
- * Every win created at-or-after `sinceIso` (inclusive), oldest-first — the
+ * Every win created at-or-after `sinceIso` (inclusive) in one environment
+ * (`prod` by default, see `winEventQueryForEnvironment`), oldest-first — the
  * live feed's incremental-poll building block (`apps/web`'s win-feed SSE
  * stream stands in for a real WebSocket push subscription; see that route's
  * own doc comment). Oldest-first (unlike {@link listRecentWinEventsForProject})
@@ -380,10 +394,10 @@ export async function listWinEventsSince(
   projectId: string,
   sinceIso: string,
   limit: number = DEFAULT_WIN_EVENT_LIST_LIMIT,
+  environmentId?: string,
 ): Promise<WinEventModel[]> {
   await requireProjectInOrg(organizationId, projectId);
-  return WinEventModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  return (await winEventQueryForEnvironment(organizationId, projectId, environmentId))
     .where('created_at', '>=', sinceIso)
     .orderBy('created_at')
     .limit(Math.min(limit, DEFAULT_WIN_EVENT_LIST_LIMIT))

@@ -18,6 +18,7 @@ import {
 } from '../plugin-runtime/stripe/schemas';
 import { recordAuditLogEntry } from './audit-log.service';
 import { ProjectNotFoundError } from './resource-library.service';
+import { resolveDefaultQueryEnvironment } from './organization.service';
 
 /** Same "404-not-403, real project + wrong org indistinguishable from nonexistent" check every other project-scoped service uses — see `orchestration.service.ts`'s own copy for the KAN-26 reasoning. */
 async function requireProjectInOrg(organizationId: string, projectId: string): Promise<void> {
@@ -294,6 +295,27 @@ export interface ListRecentRecordsForSchemasParams {
   limit?: number;
   /** Restricts the feed to records whose declared `fieldName` value stringifies to exactly `value`. See `RECORD_FIELD_FILTER_CANDIDATE_WINDOW` for how this is applied. */
   fieldFilter?: RecordFieldFilter;
+  /**
+   * The environment whose records this feed shows. Omitted, the project's default (`prod`)
+   * environment is resolved — the same rule `queryMetrics` applies, so a page built on this feed
+   * and a metric tile beside it count the same traffic. See {@link resolveFeedEnvironmentId}.
+   */
+  environmentId?: string;
+}
+
+/**
+ * The environment a human-facing Firestore feed reads when the caller names none: the project's
+ * `prod` environment, via the same {@link resolveDefaultQueryEnvironment} metric queries use.
+ *
+ * These feeds used to fold every environment together (KAN-99). A `gos_test_` key's synthetic
+ * signups therefore appeared on the prod quality-score, feedback, sales, support and billing pages
+ * while the metric tiles beside them — environment-scoped since 2026-08-19 — correctly did not, so
+ * the same page disagreed with itself and nothing said why. `null` only for a project whose
+ * provisioning partially failed and has no environments at all, where there is nothing to scope to.
+ */
+export async function resolveFeedEnvironmentId(organizationId: string, projectId: string, environmentId?: string): Promise<string | null> {
+  if (environmentId !== undefined) return environmentId;
+  return (await resolveDefaultQueryEnvironment(organizationId, projectId))?.id ?? null;
 }
 
 /** Same "over-fetch a candidate window, then filter" posture as `CHURN_FEED_CANDIDATE_WINDOW` — Firestore has no native way to filter on an arbitrary `payload` field server-side without a dedicated per-field index, so a `fieldFilter` widens the per-schema fetch to this many candidates (newest first) before filtering, rather than filtering only within `limit`'s own narrow window. A project with more than this many records landed more recently than its oldest unscanned match would miss that match — the same known, documented limitation every other Firestore-backed feed in this file already carries. */
@@ -343,9 +365,9 @@ function matchesFieldFilter(record: RawRecordModel, filter: RecordFieldFilter): 
 }
 
 /**
- * The most recent raw records landed for one or more schemas of the same `kind` in a project, newest
- * first, folded across every environment — same "whole project, one admin view" posture as
- * `listRecentIngestBatchesForProject`. One bounded query per schema name (Firestore has no native
+ * The most recent raw records landed for one or more schemas of the same `kind` in one environment
+ * of a project (the `prod` environment unless `environmentId` says otherwise — see
+ * {@link resolveFeedEnvironmentId}), newest first. One bounded query per schema name (Firestore has no native
  * "kind == X AND schema_name IN [...]" + orderBy composite this ORM exposes), merged and re-sorted
  * client-side, then (optionally field-filtered and) trimmed to `limit` — so a burst in one schema can't
  * silently starve the merged feed of another's more recent records purely by fetch order. Each
@@ -360,16 +382,21 @@ export async function listRecentRecordsForSchemas(params: ListRecentRecordsForSc
   await requireProjectInOrg(params.organizationId, params.projectId);
   const limit = params.limit ?? DEFAULT_RECORD_FEED_LIMIT;
   const fetchLimit = params.fieldFilter ? Math.max(limit, RECORD_FIELD_FILTER_CANDIDATE_WINDOW) : limit;
+  const environmentId = await resolveFeedEnvironmentId(params.organizationId, params.projectId, params.environmentId);
 
   const perSchemaResults = await Promise.all(
-    params.schemaNames.map((schemaName) =>
-      RawRecordModel.initPath({ organization_id: params.organizationId, project_id: params.projectId })
+    params.schemaNames.map((schemaName) => {
+      let query = RawRecordModel.initPath({ organization_id: params.organizationId, project_id: params.projectId }).query();
+      if (environmentId !== null) {
+        query = query.where('environment_id', '==', environmentId);
+      }
+      return query
         .where('kind', '==', params.kind)
         .where('schema_name', '==', schemaName)
         .orderBy('landed_at', 'desc')
         .limit(fetchLimit)
-        .get(),
-    ),
+        .get();
+    }),
   );
 
   const merged = perSchemaResults
@@ -437,7 +464,7 @@ function isChurnSignal(record: RawRecordModel): boolean {
 /**
  * The most recently landed Stripe subscriptions showing a churn signal — already canceled
  * (`canceled_at` set) or scheduled to cancel at the end of the current billing period
- * (`cancel_at_period_end`) — newest first, folded across every environment (KAN-81). See
+ * (`cancel_at_period_end`) — newest first, in the project's `prod` environment (KAN-81, KAN-99). See
  * `CHURN_FEED_CANDIDATE_WINDOW` for why this over-fetches before filtering.
  */
 export async function listRecentChurnedSubscriptionsForProject(
@@ -475,9 +502,9 @@ function isDunningSignal(record: RawRecordModel): boolean {
 }
 
 /**
- * The most recently landed Stripe subscriptions currently in dunning (KAN-94) — newest first, folded
- * across every environment. Same `CHURN_FEED_ENTITY_SCHEMA_NAMES`/candidate-window/fold-across-
- * environments posture as `listRecentChurnedSubscriptionsForProject`: a dunning subscription is just a
+ * The most recently landed Stripe subscriptions currently in dunning (KAN-94) — newest first, in the
+ * project's `prod` environment. Same `CHURN_FEED_ENTITY_SCHEMA_NAMES`/candidate-window/environment
+ * posture as `listRecentChurnedSubscriptionsForProject`: a dunning subscription is just a
  * different predicate over the same landed `stripe_subscription` snapshots, so it reuses that
  * function's own over-fetch-before-filter reasoning rather than duplicating it.
  */
