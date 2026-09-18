@@ -22,22 +22,30 @@ let connectionPromise: Promise<void> | undefined;
  * (462029080 vs 4194304)`, which is a corrupted length prefix rather than a real
  * message size.
  *
- * `packages/firebase-orm-models`' own suite was moved off that path, and this
- * app's UNIT tests were never exposed because vitest runs them with
- * `environment: 'jsdom'`, which resolves the client SDK's browser build where
- * `experimentalForceLongPolling` is real. Its PLAYWRIGHT tests are a different
- * matter: they boot the actual Next server, which runs in Node, resolves the
- * gRPC build, and took this branch. That is how a docs-only PR failed with
- * `createOrganization` timing out waiting for a heading — the page could not
- * read Firestore, and nothing about the symptom said so.
- *
- * So real Node now gets the Admin SDK, which serves `get()` with
+ * Real Node gets the Admin SDK, which serves `get()` with
  * `runQuery`/`batchGetDocuments` and opens a `Listen` stream only for
  * `onSnapshot` — nothing here uses one, so there is no long-lived stream whose
- * framing can be lost. jsdom keeps the client SDK, both because it is already
- * safe there and because the Admin SDK cannot run there at all:
- * `initializeAdminApp` throws "can only be called in a Node.js environment" the
- * moment it sees a browser global.
+ * framing can be lost.
+ *
+ * This comment used to claim that the app's unit tests "were never exposed
+ * because vitest runs them with `environment: 'jsdom'`, which resolves the
+ * client SDK's browser build where `experimentalForceLongPolling` is real".
+ * **That was false** (KAN-165). jsdom supplies DOM globals and does not change
+ * module resolution conditions: `require.resolve('firebase/firestore')` under
+ * vitest returns `dist/index.cjs.js`, the gRPC build, where that option is read
+ * and never consulted. So every emulator-backed test in this app took the
+ * client branch below, on the unprotected transport, for as long as it was
+ * believed protected — surfacing eventually as a 120s timeout with the
+ * corrupted-stream signature on a PR that touched only a workflow file.
+ *
+ * The fix was the test environment, not this branch: `app/api/**` and
+ * `lib/orgs/**` now run under `node` (see `vitest.config.ts`), so they reach
+ * the Admin path and exercise the connection production uses. The branch stays
+ * because the other half of the old claim is true and load-bearing — the ORM's
+ * `initializeAdminApp` does refuse under a browser global, so a jsdom-hosted
+ * caller has no Admin option. Note that `firebase-admin`'s own `initializeApp`
+ * initializes fine under jsdom; probing that one instead is how you conclude
+ * this branch is removable when it is not.
  *
  * Safe against the emulator because its rules are open
  * (`apps/web/firestore.rules`), so nothing depended on the client SDK being
