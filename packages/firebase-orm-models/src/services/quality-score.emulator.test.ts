@@ -42,8 +42,8 @@ async function setupOrgWithProject(orgName: string) {
   const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('firebase-uid'), email: uniqueEmail('owner') });
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
-  const devEnvironment = environments.find((environment) => environment.name === 'dev')!;
-  return { owner, organization, project, environmentId: devEnvironment.id };
+  const prodEnvironment = environments.find((environment) => environment.name === 'prod')!;
+  return { owner, organization, project, environmentId: prodEnvironment.id };
 }
 
 async function landOnboardingSurvey(params: {

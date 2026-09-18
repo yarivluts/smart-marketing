@@ -393,7 +393,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     },
     auditedToolHandler(auth, 'list_insights', async (args: any) => {
       const { limit } = args as { limit?: number };
-      const insights = await listProjectInsights({ organizationId: auth.organizationId, projectId: auth.projectId, limit });
+      const insights = await listProjectInsights({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), limit });
       return textResult({ insights });
     }),
   );

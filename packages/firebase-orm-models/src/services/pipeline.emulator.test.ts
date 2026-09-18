@@ -537,7 +537,11 @@ async function landRawRecord(params: {
 }
 
 describe('listRecentBillingEventsForProject (KAN-80 billing-ops feed)', () => {
-  it('returns only the billing event schemas, newest first, folded across every environment', async () => {
+  /**
+   * KAN-99: this feed used to fold every environment together, so a `gos_test_` key's synthetic
+   * failed payment sat on the prod billing-ops page as though a real customer's card had declined.
+   */
+  it('returns only the billing event schemas, newest first, in the prod environment only', async () => {
     const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Billing Ops Org');
 
     await landRawRecord({
@@ -576,8 +580,9 @@ describe('listRecentBillingEventsForProject (KAN-80 billing-ops feed)', () => {
 
     const entries = await listRecentBillingEventsForProject(organization.id, project.id);
 
-    expect(entries.map((entry) => entry.schema_name)).toEqual(['stripe_refund', 'stripe_failed_payment', 'stripe_charge']);
-    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id, devEnvironment.id, prodEnvironment.id]);
+    expect(entries.map((entry) => entry.schema_name)).toEqual(['stripe_refund', 'stripe_charge']);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id, prodEnvironment.id]);
+    expect(entries.some((entry) => entry.environment_id === devEnvironment.id)).toBe(false);
   });
 
   it('bounds each schema to `limit` and trims the merged, re-sorted result to `limit` overall', async () => {
@@ -611,7 +616,7 @@ describe('listRecentBillingEventsForProject (KAN-80 billing-ops feed)', () => {
 });
 
 describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
-  it('scopes to exactly the given schema name(s) and kind, newest first, folded across every environment', async () => {
+  it('scopes to exactly the given schema name(s), kind and environment (prod by default, KAN-99), newest first', async () => {
     const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Record Feed Org');
 
     await landRawRecord({
@@ -647,8 +652,17 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
       schemaNames: ['signup_completed'],
     });
 
-    expect(entries.map((entry) => entry.schema_name)).toEqual(['signup_completed', 'signup_completed']);
-    expect(entries.map((entry) => entry.environment_id)).toEqual([devEnvironment.id, prodEnvironment.id]);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id]);
+
+    // A caller that names an environment gets that one — and only that one.
+    const devEntries = await listRecentRecordsForSchemas({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      schemaNames: ['signup_completed'],
+      environmentId: devEnvironment.id,
+    });
+    expect(devEntries.map((entry) => entry.environment_id)).toEqual([devEnvironment.id]);
   });
 
   it('folds multiple schema names into one merged, re-sorted feed, bounded to limit', async () => {
@@ -826,7 +840,7 @@ describe('listRecentRecordsForSchemas (KAN-81 generic record feed)', () => {
 });
 
 describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
-  it('surfaces only subscriptions with a churn signal, newest first, folded across every environment', async () => {
+  it('surfaces only subscriptions with a churn signal, newest first, in the prod environment only (KAN-99)', async () => {
     const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Churn Feed Org');
 
     // Healthy, active subscription -- no churn signal, must never show up in the feed.
@@ -878,8 +892,8 @@ describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
 
     const entries = await listRecentChurnedSubscriptionsForProject(organization.id, project.id);
 
-    expect(entries.map((entry) => (entry.payload.attributes as Record<string, unknown>).customer_id)).toEqual(['cus_canceled', 'cus_scheduled']);
-    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id, devEnvironment.id]);
+    expect(entries.map((entry) => (entry.payload.attributes as Record<string, unknown>).customer_id)).toEqual(['cus_canceled']);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id]);
   });
 
   it('bounds the merged, filtered result to `limit`', async () => {
@@ -913,7 +927,7 @@ describe('listRecentChurnedSubscriptionsForProject (KAN-81 churn feed)', () => {
 });
 
 describe('listRecentDunningSubscriptionsForProject (KAN-94 dunning feed)', () => {
-  it('surfaces only subscriptions in dunning (past_due/unpaid), newest first, folded across every environment', async () => {
+  it('surfaces only subscriptions in dunning (past_due/unpaid), newest first, in the prod environment only (KAN-99)', async () => {
     const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Dunning Feed Org');
 
     // Healthy, active subscription -- no dunning signal, must never show up in the feed.
@@ -969,8 +983,8 @@ describe('listRecentDunningSubscriptionsForProject (KAN-94 dunning feed)', () =>
 
     const entries = await listRecentDunningSubscriptionsForProject(organization.id, project.id);
 
-    expect(entries.map((entry) => (entry.payload.attributes as Record<string, unknown>).customer_id)).toEqual(['cus_unpaid', 'cus_past_due']);
-    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id, devEnvironment.id]);
+    expect(entries.map((entry) => (entry.payload.attributes as Record<string, unknown>).customer_id)).toEqual(['cus_unpaid']);
+    expect(entries.map((entry) => entry.environment_id)).toEqual([prodEnvironment.id]);
   });
 
   it('bounds the merged, filtered result to `limit`', async () => {

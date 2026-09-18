@@ -45,7 +45,8 @@ async function setupProjectWithRule(orgName: string) {
     filters: [],
     createdByUserId: owner.id,
   });
-  return { organization, project, environmentId: environments[0].id };
+  // The TV board streams the prod environment (KAN-99), so the wins it should show fire there.
+  return { organization, project, environmentId: environments.find((environment) => environment.name === 'prod')!.id };
 }
 
 /** Two rules watching the same schema — one `evaluateRecordAgainstWinRules` call against a matching record fires both, sharing one millisecond-resolution `created_at` (the same-timestamp collision `listWinEventsSince`'s own doc comment describes). */
@@ -71,7 +72,8 @@ async function setupProjectWithTwoRulesOnSameSchema(orgName: string) {
       createdByUserId: owner.id,
     });
   }
-  return { organization, project, environmentId: environments[0].id };
+  // The TV board streams the prod environment (KAN-99), so the wins it should show fire there.
+  return { organization, project, environmentId: environments.find((environment) => environment.name === 'prod')!.id };
 }
 
 /** Reads SSE chunks off `stream` until `predicate` matches decoded text so far, or `timeoutMs` elapses. */

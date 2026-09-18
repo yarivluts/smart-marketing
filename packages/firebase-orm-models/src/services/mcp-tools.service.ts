@@ -435,6 +435,8 @@ export interface ListProjectInsightsParams {
   organizationId: string;
   projectId: string;
   limit?: number;
+  /** Whose wins to include: an API key's own bound environment; omitted (a human caller), the project's `prod` one (KAN-99). */
+  environmentId?: string;
 }
 
 const DEFAULT_INSIGHTS_LIMIT = 20;
@@ -465,7 +467,7 @@ export async function listProjectInsights(params: ListProjectInsightsParams): Pr
 
   const [alerts, wins, metricProblems] = await Promise.all([
     listActiveTrackingAlertsForProject(params.organizationId, params.projectId),
-    listRecentWinEventsForProject(params.organizationId, params.projectId, limit),
+    listRecentWinEventsForProject(params.organizationId, params.projectId, limit, params.environmentId),
     auditMetricCatalogHealth(params.organizationId, params.projectId),
   ]);
 
