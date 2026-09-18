@@ -17,6 +17,74 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #43: settings - THE ROTATION IS COMPLETE
+
+Settings was the last unreviewed surface. **Every page in the product has now been reviewed at least
+once this cycle.** The rotation restarts next pass.
+
+### KAN-176: CLAUDE.md claimed a lint rule enforced something no lint rule enforced
+
+- CLAUDE.md, under **non-negotiable engineering rules**: *"No hard-coded UI strings ... **A lint rule
+  enforces this.**"* `apps/web/eslint.config.mjs` sets `'react/jsx-no-literals': 'off'`. The only
+  mechanical check the contract names is switched off.
+- **183 hard-coded strings** across `apps/web`, concentrated in the directories from one bulk UI
+  commit (`components/settings` 36, `components/billing` 29, `components/goals` 26).
+- **This is the most consequential instance of the cycle's central defect class, because of where it
+  lives.** Every finding so far was a false claim made to a *user*. This one is a false claim made
+  to *every future agent run*, in the file they are instructed to read first. It does not merely
+  mislead - it redirects attention away from the thing it claims to cover, which is why 183 of them
+  accumulated without anything objecting. A guarantee nobody checks is worse than no guarantee.
+- Fixed with a **ratchet, not the lint rule**: the count may go down and never up. Enabling
+  `jsx-no-literals` would fail CI on merged work and flags punctuation as eagerly as prose - and *a
+  rule that must be disabled to get work done is exactly how this guarantee became decorative the
+  first time*. Re-enabling it would plausibly end the same way.
+- **Verified it bites** before keeping it: added one string, watched it fail, and the failure names
+  the offending directories. Also asserts it scans >50 files, so a broken scan cannot pass
+  vacuously - the always-false-check shape this codebase has been bitten by before.
+- The regex is a stated **floor**, not a completeness claim; it will miss a `title=` attribute an AST
+  pass would catch. An approximate check that runs beats an exact one that is off.
+
+### KAN-177: a settings card configuring notifications that nothing delivers
+
+- Six alert toggles with copy like *"Instant notification when daily campaign spend reaches 90% of
+  maximum quota"*. The settings it writes appear in **exactly two files**: the component and its own
+  type. Nothing reads them; **no email, Slack or digest delivery exists anywhere in GrowthOS.**
+- `onSave` was **optional**, so mounting it would have produced six switches that flip, look saved
+  and persist nothing.
+- **Caught ahead of the damage** - it is mounted nowhere, and both settings pages render
+  `components/orgs/` instead. First finding this cycle fixed before a user ever saw it.
+- `onSave` is now required: silent no-op becomes a compile error at the moment someone wires it in,
+  which is when "where does this actually go?" is the question that needs asking. Deliberately **not
+  deleted** - `components/settings/` looks like an in-progress UI direction, and deleting unfinished
+  work to make a point is not a fix.
+
+### What the completed rotation showed
+
+The single most repeated defect across 43 passes: **a claim the code does not support** - in a
+metric, a label, a comment, a doc, a test name, and finally in the contract file itself. The
+variants differed; the shape did not. And the highest-yield review move turned out not to be reading
+the surface's own code but reading **what the codebase says about itself nearby** - the sibling
+connector, the type's own comment, the neighbouring function, CLAUDE.md. Three consecutive passes
+(KAN-168, KAN-173, KAN-174) found a rule already written down and not inherited; this one found a
+rule written down and not true.
+
+- **Last completed:** KAN-176 as PR #471 and KAN-177 as PR #472. Merged #468 (deploy runbook), #469
+  (KAN-175 dry-run scope) and #470.
+- **In progress (exact stopping point):** #471 and #472 awaiting CI. **#469 is merged but not live** -
+  nothing deploys on merge, so EasySign still cannot dry-run until `api-prod` is redeployed. Tell
+  them when it is live, not when it merged.
+- **Blocked + why:** KAN-170's automation half (deploy-on-merge or a loud drift check) stays open by
+  design. Then: the `easysign-prod-selfserve-mcp-key` secret read, the go-ahead on EasySign's nine
+  schemas, the dev-scoped purge of 46 stale quarantine rows, and rotation of the two burned keys.
+  KAN-147 stays open by design.
+- **Next step:** the rotation restarts, but the standing backlog is now better value than a second
+  lap: the sweep for tests whose names assert a fabrication (five found incidentally), lowering the
+  183 baseline, KAN-159 (shared date formatter), KAN-155 (mixed-currency firmographic MRR) and the
+  per-entry currency KAN-171 stands in for.
+- **Waiting on human:** the items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up are
+  product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #42: the MCP schema-registration scope (+ the api-prod deploy)
 
 Settings was next in the rotation and is **still the last unreviewed surface** - deliberately
