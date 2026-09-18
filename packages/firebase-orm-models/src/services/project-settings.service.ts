@@ -25,10 +25,22 @@ export interface SetProjectSessionReplayUrlTemplateParams {
  *
  * Validation goes through the *same* `buildSessionReplayLink` the renderer
  * uses, with a throwaway sample page, rather than a second hand-rolled URL
- * check: a template that this rejects is exactly a template that would have
- * rendered no link, so an admin can never save something that silently does
- * nothing (or, worse, a `javascript:` href — see that function's own note on
- * why the scheme check is the security boundary here).
+ * check: a template this rejects is exactly a template that would have
+ * rendered no link (or, worse, a `javascript:` href — see that function's own
+ * note on why the scheme check is the security boundary here).
+ *
+ * That covers templates which render NO link. It does not cover the other way
+ * a template disappoints: one with no `{landing_page}` placeholder renders a
+ * link on every row that opens the *same* unfiltered page. This comment used
+ * to claim "an admin can never save something that silently does nothing",
+ * which was false for exactly that case — and that case is reachable by a
+ * typo (`{landingpage}`), because a typo'd template is still a valid https URL
+ * and so passes every check there is.
+ *
+ * Refusing it would be wrong: a plain "open my replay tool" link is a
+ * legitimate thing to configure, and the renderer deliberately supports it. So
+ * the caller is told which kind it saved, and the admin form says so
+ * (KAN-160). Warning, not refusal — the same call KAN-120 settled on.
  */
 export async function setProjectSessionReplayUrlTemplate(
   params: SetProjectSessionReplayUrlTemplateParams,
