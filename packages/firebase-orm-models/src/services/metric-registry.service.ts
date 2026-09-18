@@ -446,6 +446,19 @@ export interface MetricHealthProblem {
   name: string;
   version: number;
   reasons: string[];
+  /**
+   * The definition's own `created_at` — the moment the broken definition
+   * entered the catalog, which is what `list_insights` dates a `metric_health`
+   * insight by.
+   *
+   * Carried here rather than looked up by the caller because this function
+   * already holds the definition. `listProjectInsights` used to re-read the
+   * entire metric-definition collection purely to rebuild this one field, and
+   * fall back to the epoch when a lookup missed — a duplicate read of the
+   * collection this function just queried, and a fabricated timestamp whenever
+   * the two reads disagreed (KAN-157).
+   */
+  createdAt: string;
 }
 
 /**
@@ -486,7 +499,7 @@ export async function auditMetricCatalogHealth(organizationId: string, projectId
       validateFormulaDimensions(def.dimensions, referencedActive, reasons);
     }
     if (reasons.length > 0) {
-      problems.push({ metricDefId: def.id, name: def.name, version: def.version, reasons });
+      problems.push({ metricDefId: def.id, name: def.name, version: def.version, reasons, createdAt: def.created_at });
     }
   }
 
