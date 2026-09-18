@@ -118,6 +118,12 @@ describe('Operations & Settings Components (Milestone 3)', () => {
     expect(handleArchive).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * Worth stating what this does and does not prove (KAN-177): it shows the
+   * switches call `onSave`, not that anything persists or delivers. Nothing in
+   * the repo reads these settings and no email/Slack/digest machinery exists,
+   * so a green test here must not be read as "notifications work".
+   */
   it('renders NotificationSettingsCard and handles toggle switches', () => {
     const handleSave = vi.fn();
     renderWithIntl(<NotificationSettingsCard onSave={handleSave} />);
