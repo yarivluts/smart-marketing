@@ -127,9 +127,20 @@ export interface MetaCreateCustomAudienceResult {
   audienceId: string;
 }
 
-/** How many of an `addContactsToCustomAudience` call's contact rows Meta actually accepted onto the audience — mirrors `SinkPluginPushResult.pushed`'s own "how many did the remote system actually take" semantics for the KAN-73-follow-up Custom Audience connector. */
+/**
+ * How many of an `addContactsToCustomAudience` call's contact rows Meta
+ * actually accepted onto the audience — `null` when Meta's response carried no
+ * `num_received` at all.
+ *
+ * `null` rather than a substitute (KAN-174). This used to fall back to
+ * `contacts.length`, which reports the number we SENT under a name that means
+ * the number Meta TOOK, and reaches the user as "Last synced N records". Meta
+ * routinely accepts fewer rows than it is given — unmatched or malformed hashes
+ * are dropped — so the count is the one interesting thing about the call, and
+ * the fallback made it impossible for that number to ever reveal a shortfall.
+ */
 export interface MetaAddHashedEmailsResult {
-  numReceived: number;
+  numReceived: number | null;
 }
 
 export interface MetaCreateLookalikeAudienceParams {
@@ -578,7 +589,9 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
     const result = await this.request<{ num_received?: number }>(`${audienceId}/users`, {
       payload: JSON.stringify({ schema, data }),
     });
-    return { numReceived: result.num_received ?? contacts.length };
+    // Never `?? contacts.length`: that is the number we sent, and this field
+    // names the number Meta took (KAN-174).
+    return { numReceived: result.num_received ?? null };
   }
 
   async createLookalikeAudience(adAccountId: string, params: MetaCreateLookalikeAudienceParams): Promise<MetaCreateLookalikeAudienceResult> {

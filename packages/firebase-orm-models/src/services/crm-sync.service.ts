@@ -396,7 +396,11 @@ export async function syncSegmentToCrm(params: SyncSegmentToCrmParams): Promise<
       retryOptions,
     );
     run.attempts = attempts;
-    run.records_pushed = result.pushed;
+    // Left unset when the remote reported no count, so "unknown" stays
+    // distinguishable from zero downstream — the field is already optional, and
+    // storing a substitute here is what made the UI able to claim a number Meta
+    // never gave (KAN-174).
+    run.records_pushed = result.pushed ?? undefined;
     run.status = 'succeeded';
     run.finished_at = new Date().toISOString();
 
