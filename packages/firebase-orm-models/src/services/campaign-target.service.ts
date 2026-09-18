@@ -106,11 +106,12 @@ export async function listCampaignTargetsForProject(organizationId: string, proj
     .get();
 }
 
-export type CampaignSpendStatus = 'no_target' | 'on_target' | 'over_target';
+export type CampaignSpendStatus = 'no_target' | 'on_target' | 'over_target' | 'no_spend_data';
 
 export interface CampaignSpendRow {
   campaignId: string;
-  actualSpend: number;
+  /** `null` when the project has no spend data at all for the window, which is NOT the same as spending nothing — see the status doc below. */
+  actualSpend: number | null;
   monthlyBudget: number | null;
   status: CampaignSpendStatus;
 }
@@ -146,7 +147,18 @@ function toDateOnly(ms: number): string {
  * over the trailing {@link CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS} days, merged
  * with every saved {@link CampaignTargetModel} in the project. A campaign
  * with a saved target but zero spend in the window still gets a row
- * (`actualSpend: 0`); a campaign with spend but no saved target gets
+ * (`actualSpend: 0`) — but only when the project HAS spend data and this
+ * campaign is simply absent from it. If the whole series came back empty, no
+ * campaign has spend data and every targeted one reports
+ * `actualSpend: null, status: 'no_spend_data'` instead of a measured zero.
+ *
+ * That distinction matters because the alternative is green reassurance derived
+ * from absence: a project whose ad connector has never synced would otherwise
+ * show every campaign as "0 spent against a $5,000 target — On target", which
+ * reads as being comfortably under budget rather than as having no idea. The two
+ * are distinguishable here (an empty series means nobody has data, a missing
+ * campaign within a populated series really did spend nothing), so they are
+ * distinguished. A campaign with spend but no saved target gets
  * `monthlyBudget: null, status: 'no_target'` rather than being dropped —
  * a human needs to *see* an untargeted campaign to decide whether to target
  * it. Never throws for an expected, per-query-recoverable outcome — mirrors
@@ -181,13 +193,27 @@ export async function getCampaignSpendBreakdownForProject(
     const targetByCampaign = new Map(targets.map((target) => [target.campaign_id, target.monthly_budget]));
     const everyCampaignId = new Set([...actualByCampaign.keys(), ...targetByCampaign.keys()]);
 
+    // An empty series means the project has no spend data at all, not that every
+    // campaign spent nothing.
+    const hasAnySpendData = actualByCampaign.size > 0;
+
     const rows: CampaignSpendRow[] = [...everyCampaignId].map((campaignId) => {
-      const actualSpend = actualByCampaign.get(campaignId) ?? 0;
+      const measured = actualByCampaign.get(campaignId);
       const monthlyBudget = targetByCampaign.get(campaignId) ?? null;
-      const status: CampaignSpendStatus = monthlyBudget === null ? 'no_target' : actualSpend > monthlyBudget ? 'over_target' : 'on_target';
+      const actualSpend = measured ?? (hasAnySpendData ? 0 : null);
+      const status: CampaignSpendStatus =
+        monthlyBudget === null
+          ? 'no_target'
+          : actualSpend === null
+            ? 'no_spend_data'
+            : actualSpend > monthlyBudget
+              ? 'over_target'
+              : 'on_target';
       return { campaignId, actualSpend, monthlyBudget, status };
     });
-    rows.sort((a, b) => b.actualSpend - a.actualSpend);
+    // Unmeasured campaigns sort last: they are not "the smallest spend", they are
+    // the ones nothing is known about.
+    rows.sort((a, b) => (b.actualSpend ?? -1) - (a.actualSpend ?? -1));
 
     return { ok: true, rows };
   } catch (error) {

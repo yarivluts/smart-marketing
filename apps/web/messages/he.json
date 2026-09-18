@@ -1039,6 +1039,8 @@
     "statusOverTarget": "מעל היעד",
     "statusOnTarget": "בתוך היעד",
     "statusNoTarget": "לא הוגדר יעד",
+    "statusNoSpendData": "אין נתוני הוצאה",
+    "spendNoData": "אין נתונים",
     "targetUpdateError": "עדכון היעד נכשל. נסו שוב.",
     "targetInputLabel": "יעד הוצאה עבור {campaignId}",
     "targetInputPlaceholder": "ללא יעד"
