@@ -1293,7 +1293,8 @@
       "not_yet_backed": "עדיין לא מגובה בנתונים אמיתיים",
       "query_error": "לא ניתן היה לטעון אריח זה"
     },
-    "sessionReplayLinkTitle": "צפייה בהקלטות של דף הנחיתה הזה"
+    "sessionReplayLinkTitle": "צפייה בהקלטות של דף הנחיתה הזה",
+    "sessionReplayLinkTitleUnfiltered": "פתחו את כלי הקלטות הסשנים. תבנית הפרויקט אינה מסננת לדף יחיד, ולכן הקישור פותח את אותה תצוגה עבור כל שורה."
   },
   "Goals": {
     "metaTitle": "יעדים",
@@ -1828,13 +1829,14 @@
   "SessionReplaySettings": {
     "metaTitle": "הקלטות סשן",
     "title": "הקלטות סשן — {projectName}",
-    "intro": "חברו את הפרויקט לכלי ההקלטות/heatmap שלכם (Microsoft Clarity, Hotjar, FullStory ועוד). שורות של דפי נחיתה בלוחות יקשרו ישירות להקלטות של אותו דף.",
+    "intro": "הפנו את הפרויקט הזה לכלי הקלטות הסשנים / מפות החום שלכם (Microsoft Clarity, Hotjar, FullStory ואחרים). שורות של דפי נחיתה בלוחות שלכם יקשרו אליו - מסוננות לאותו דף כאשר התבנית שלכם כוללת את הסימון '{landing_page}', ואל הכלי עצמו כאשר לא.",
     "templateLabel": "תבנית קישור",
-    "templatePlaceholder": "https://clarity.microsoft.com/projects/view/PROJECT/impressions?Url={landing_page}",
-    "templateHelp": "הדביקו כתובת מתוך כלי ההקלטות שלכם. ‏{landing_page} יוחלף בכתובת הדף. השאירו ריק כדי לא להציג קישור.",
+    "templatePlaceholder": "https://clarity.microsoft.com/projects/view/PROJECT/impressions?Url='{landing_page}'",
+    "templateHelp": "הדביקו כתובת מכלי ההקלטות שלכם. הסימון '{landing_page}' מוחלף בכתובת הדף - בלעדיו כל שורה תקשר לאותו דף לא מסונן. השאירו ריק כדי לא להציג קישור.",
     "save": "שמירה",
     "saved": "נשמר.",
-    "saveError": "שמירת התבנית נכשלה. ודאו שזו כתובת http(s) תקינה."
+    "saveError": "שמירת התבנית נכשלה. ודאו שזו כתובת http(s) תקינה.",
+    "savedWithoutPlaceholder": "נשמר, אך בתבנית הזו אין את הסימון '{landing_page}', ולכן כל שורת דף נחיתה תקשר לאותו דף לא מסונן. הוסיפו את הסימון אם התכוונתם לסנן לכל דף בנפרד."
   },
   "OrganizationSettings": {
     "metaTitle": "הגדרות ארגון",
