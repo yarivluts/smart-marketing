@@ -1494,7 +1494,8 @@
     "editSegment": "Edit",
     "saveSegment": "Save",
     "cancelEditSegment": "Cancel",
-    "editSegmentError": "Could not update the segment. Please try again."
+    "editSegmentError": "Could not update the segment. Please try again.",
+    "crmSyncLastRunSucceededUnknownCount": "Last sync succeeded. The destination did not report how many records it accepted."
   },
   "WinRules": {
     "metaTitle": "Win rules",

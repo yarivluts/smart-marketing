@@ -424,13 +424,27 @@ describe('MetaAdsHttpApiClient', () => {
     });
   });
 
-  it('falls back to the contact count when the response omits num_received', async () => {
+  /**
+   * This test used to assert the opposite — that a response without
+   * `num_received` falls back to the contact count — which pinned a
+   * fabrication in place (KAN-174).
+   *
+   * `numReceived` names the number Meta TOOK, and it reaches the user as "Last
+   * synced N records". Substituting the number we SENT means the figure can
+   * never show a shortfall, and audience uploads routinely drop unmatched or
+   * malformed hashes, so the shortfall is the one interesting thing about the
+   * call. `null` says we do not know, which is true and which the UI can
+   * render honestly.
+   */
+  it('reports null, never the submitted count, when the response omits num_received', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({}));
     vi.stubGlobal('fetch', fetchMock);
 
-    const result = await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [{ emailHash: 'hash-a' }]);
+    const result = await new MetaAdsHttpApiClient(OPTIONS).addContactsToCustomAudience('audience-1', [{ emailHash: 'hash-a' }, { emailHash: 'hash-b' }]);
 
-    expect(result).toEqual({ numReceived: 1 });
+    // Two contacts sent. The old behaviour returned 2 here, which is exactly
+    // the number that must not appear.
+    expect(result).toEqual({ numReceived: null });
   });
 
   it('adds already-hashed MADID-only contacts to a Custom Audience as a MADID-schema payload', async () => {

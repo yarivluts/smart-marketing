@@ -71,7 +71,12 @@ export function SegmentCrmSyncControls({ orgId, projectId, segmentId, actionInst
       ) : latestRun ? (
         <p className="text-xs text-muted-foreground">
           {latestRun.status === 'succeeded'
-            ? t('crmSyncLastRunSucceeded', { count: latestRun.recordsPushed ?? 0 })
+            ? /* `?? 0` here used to turn "the destination never told us how many
+                 it took" into "synced 0 records" — a confident, alarming, and
+                 wrong claim about a run that in fact succeeded (KAN-174). */
+              latestRun.recordsPushed === null
+              ? t('crmSyncLastRunSucceededUnknownCount')
+              : t('crmSyncLastRunSucceeded', { count: latestRun.recordsPushed })
             : latestRun.status === 'failed'
               ? t('crmSyncLastRunFailed')
               : t('crmSyncLastRunRunning')}

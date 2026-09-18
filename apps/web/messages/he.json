@@ -1494,7 +1494,8 @@
     "editSegment": "ערוך",
     "saveSegment": "שמור",
     "cancelEditSegment": "ביטול",
-    "editSegmentError": "לא ניתן היה לעדכן את הפלח. נסה שוב."
+    "editSegmentError": "לא ניתן היה לעדכן את הפלח. נסה שוב.",
+    "crmSyncLastRunSucceededUnknownCount": "הסנכרון האחרון הצליח. היעד לא דיווח כמה רשומות קיבל."
   },
   "WinRules": {
     "metaTitle": "כללי ניצחון",
