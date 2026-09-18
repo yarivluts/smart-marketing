@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { buildSessionReplayLink } from '@growthos/shared';
+import { buildSessionReplayLink, sessionReplayTemplateFiltersByPage } from '@growthos/shared';
 import type { TileFreshness, TileRenderView, TimeSeries } from '@/lib/orgs/board-view';
 import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
 
@@ -298,6 +298,7 @@ function TableView({
 }): React.ReactElement {
   const t = useTranslations('Boards');
   const [prefs, setPrefs] = useState<TableColumnPrefs>(() => readTableColumnPrefs(tileId));
+  const replayFiltersByPage = sessionReplayTemplateFiltersByPage(sessionReplayUrlTemplate);
 
   useEffect(() => {
     writeTableColumnPrefs(tileId, prefs);
@@ -389,6 +390,11 @@ function TableView({
               <tr key={index}>
                 {columns.map((column) => {
                   const value = row[column] ?? '';
+                  // Both kinds of template render an identical-looking link, so
+                  // the tooltip is the only thing that can distinguish them. A
+                  // template with no `{landing_page}` opens the same unfiltered
+                  // page from every row, and must not claim to open "the
+                  // recordings for this landing page" (KAN-160).
                   const replayLink = LANDING_PAGE_COLUMNS.has(column)
                     ? buildSessionReplayLink(sessionReplayUrlTemplate, String(value))
                     : null;
@@ -399,7 +405,7 @@ function TableView({
                           href={replayLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          title={t('sessionReplayLinkTitle')}
+                          title={t(replayFiltersByPage ? 'sessionReplayLinkTitle' : 'sessionReplayLinkTitleUnfiltered')}
                           className="underline underline-offset-2 hover:text-primary"
                         >
                           {value}
