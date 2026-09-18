@@ -11,6 +11,25 @@ function messageKeys(value: unknown, prefix = ''): string[] {
   );
 }
 
+/**
+ * Reads one `Namespace.key` message out of a locale bundle.
+ *
+ * Not a cast: the bundles are nested deeper than two levels in places, so
+ * asserting `Record<string, Record<string, string>>` over the whole thing is a
+ * type error, and casting through `unknown` to silence it would also silence a
+ * key that no longer exists. Throwing instead means a renamed or moved key
+ * fails as "this key is gone" rather than as an assertion against `undefined`,
+ * which reads like the string merely has the wrong content.
+ */
+function messageAt(messages: unknown, namespace: string, key: string): string {
+  const section = (messages as Record<string, unknown>)[namespace];
+  const value = typeof section === 'object' && section !== null ? (section as Record<string, unknown>)[key] : undefined;
+  if (typeof value !== 'string') {
+    throw new Error(`${namespace}.${key} is not a string message — this test points at a key that was renamed or moved.`);
+  }
+  return value;
+}
+
 function leafValues(value: unknown): unknown[] {
   if (typeof value !== 'object' || value === null) {
     return [value];
@@ -74,7 +93,7 @@ describe('Firmographics strings claim only the classification the code performs'
       ['en', en],
       ['he', he],
     ] as const) {
-      const text = (messages as Record<string, Record<string, string>>)[namespace][key];
+      const text = messageAt(messages, namespace, key);
       for (const claim of FALSE_CLAIMS) {
         expect({ locale, namespace, key, matched: claim.source, text: claim.test(text) ? text : null }).toEqual({
           locale,
@@ -112,7 +131,7 @@ describe('money strings disclose the unit their amount is actually in', () => {
     ['BillingOpsFeed', 'amountLine'],
     ['Firmographics', 'compositionMrr'],
   ])('%s.%s discloses the unit in en and asserts no currency symbol in either locale', (namespace, key) => {
-    const read = (messages: unknown) => (messages as Record<string, Record<string, string>>)[namespace][key];
+    const read = (messages: unknown) => messageAt(messages, namespace, key);
 
     expect({ key: `${namespace}.${key}`, discloses: read(en).includes('(smallest unit)') }).toEqual({
       key: `${namespace}.${key}`,
