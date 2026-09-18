@@ -1453,6 +1453,7 @@
     "memberLastSeenLine": "Last seen {lastSeenAt}",
     "memberFieldLine": "{name}: {value}",
     "membersCapNote": "Showing the {count} most recent members.",
+    "membersCapNoteOfTotal": "Showing {count} of {total} members.",
     "deleteConfirm": "Delete this segment? This cannot be undone.",
     "deleteButton": "Delete",
     "deleteError": "Could not delete the segment. Please try again.",
@@ -1537,7 +1538,8 @@
     "feedItem": "{winRuleName} — {schemaName} ({clientId})",
     "historyHeading": "Win history",
     "historyEmpty": "No wins recorded yet.",
-    "historyListCapNote": "Showing the most recent {count} win(s)."
+    "historyListCapNote": "Showing the most recent {count} win(s).",
+    "historyListCapNoteTruncated": "Showing the most recent {count} win(s) — more exist than are shown."
   },
   "TrialPipeline": {
     "heading": "Trial pipeline",

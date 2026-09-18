@@ -16,10 +16,10 @@ const event: WinEventFeedItem = {
   createdAt: '2026-07-11T00:00:00.000Z',
 };
 
-function renderList(events: WinEventFeedItem[]): void {
+function renderList(events: WinEventFeedItem[], truncated = false): void {
   render(
     <NextIntlClientProvider locale="en" messages={messages}>
-      <WinEventHistoryList events={events} />
+      <WinEventHistoryList events={events} truncated={truncated} />
     </NextIntlClientProvider>,
   );
 }
@@ -45,5 +45,18 @@ describe('WinEventHistoryList', () => {
   it('shows a cap note with the count once there is at least one event', () => {
     renderList([event, { ...event, id: 'win-2' }]);
     expect(screen.getByText('Showing the most recent 2 win(s).')).toBeInTheDocument();
+  });
+
+  it('says more wins exist when the page measured truncation', () => {
+    // `truncated` is measured by the page over-fetching one row past the cap.
+    // Inferring it from events.length here would be wrong for the same reason it
+    // was everywhere else: exactly-at-cap is a complete list, not a truncated one.
+    renderList([event], true);
+    expect(screen.getByText(/more exist than are shown/i)).toBeInTheDocument();
+  });
+
+  it('does not claim more exist when nothing was truncated', () => {
+    renderList([event]);
+    expect(screen.queryByText(/more exist than are shown/i)).not.toBeInTheDocument();
   });
 });

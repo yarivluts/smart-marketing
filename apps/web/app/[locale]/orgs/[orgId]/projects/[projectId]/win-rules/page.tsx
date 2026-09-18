@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { DEFAULT_WIN_EVENT_LIST_LIMIT } from '@growthos/firebase-orm-models';
+import { splitOverFetchedFeed } from '@/lib/orgs/capped-list-view';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -65,13 +67,14 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
     listWinRulesForProject(orgId, projectId),
     listActiveEventSchemaNames(orgId, projectId),
     getTrialPipelineSummary(orgId, projectId),
-    listRecentWinEventsForProject(orgId, projectId),
+    listRecentWinEventsForProject(orgId, projectId, DEFAULT_WIN_EVENT_LIST_LIMIT + 1),
     getRepCollectionLeaderboardForProject(orgId, projectId, 'week'),
     listOrgPeople(orgId),
   ]);
   const winRuleViews = winRules.map(toWinRuleSummaryView);
   const trialPipelineView = toTrialPipelineWidgetView(trialPipelineOutcome);
-  const winEventHistoryViews = recentWinEvents.map(toWinEventFeedItem);
+  const winEventPage = splitOverFetchedFeed(recentWinEvents, DEFAULT_WIN_EVENT_LIST_LIMIT);
+  const winEventHistoryViews = winEventPage.rows.map(toWinEventFeedItem);
   const repCollectionLeaderboardView = toRepCollectionLeaderboardView(
     repCollectionLeaderboard,
     new Map(people.map((person) => [person.id, person.name])),
@@ -90,7 +93,7 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
         — this section is the page-load render of the same `win_events` collection so nothing is
         missed. `listRecentWinEventsForProject` was already built and wired for exactly this
         purpose but never actually rendered anywhere until now. */}
-      <WinEventHistoryList events={winEventHistoryViews} />
+      <WinEventHistoryList events={winEventHistoryViews} truncated={winEventPage.truncated} />
 
       <LiveWinFeed orgId={orgId} projectId={projectId} />
 
