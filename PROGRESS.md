@@ -17,6 +17,74 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #26: clearing the capped-list debt
+
+### Chose debt over a new page, deliberately
+
+Last pass left an explicit list of five surfaces carrying unfixed capped-list claims. Reviewing a
+sixth novel page would have found new things while known defects sat; the standing priority is
+honest data, not coverage breadth. Cleared three, found a worse one while doing it, and left the
+remaining two named rather than quietly dropped.
+
+### KAN-149: a filter that searches a window and says otherwise
+
+- The record feed's field filter is **not applied to a schema's records** - it is applied to the
+  **500 most recent** ones. `listRecentRecordsForSchemas` fetches
+  `RECORD_FIELD_FILTER_CANDIDATE_WINDOW` rows, filters in memory, then slices.
+- So a matching record sitting 501st is never examined, and the page says **"No records match this
+  filter."** The active-filter note said "Filtered to records where X is Y", which describes
+  filtering the dataset.
+- **The concrete harm:** someone debugging an integration - the use this page exists for - types a
+  client id, reads "no records match", and concludes the record never landed. It may have landed
+  last week. Same shape as KAN-140 and KAN-137: an empty state naming the wrong cause, and naming
+  the one that sounds like a settled fact.
+- Fixed by stating the window in both strings, with the constant **exported rather than duplicated**
+  so the number cannot drift from the query enforcing it. The windowing itself is unchanged - it is
+  a deliberate cost decision, and what was wrong was the silence, not the window.
+
+### KAN-150: audit log, cost guardrails, record feed
+
+- **Audit log is the worst of these.** It caps at 200 and is the surface people consult
+  specifically to establish that something did or did not happen. A window reading as the whole log
+  is the wrong answer to that exact question.
+- **Cost guardrails** also sums a spend total across the listed entries. KAN-112 had already scoped
+  that wording honestly ("across these entries"), but the scoping is only interpretable once the
+  reader knows the list is a window. The slice now happens **before** the total is summed, so the
+  figure matches what renders.
+- All three now over-fetch by one and report measured truncation.
+
+### The helper moved, and that is the point
+
+`splitOverFetchedFeed` left `billing-ops-view` for its own `capped-list-view` module. This is the
+**eighth** surface to need it. At that count it is a missing primitive rather than a repeated fix,
+and putting it somewhere neutral is what makes the ninth caller reuse it instead of re-deriving it.
+**A pattern noticed is worth less than a pattern made cheap to follow.**
+
+### A bug I introduced and caught
+
+My first cut of the record-feed cap note compared `records.length > entries.length` - always false,
+since `entries` is `records.map(...)`. The service slices internally, so the page could not detect
+truncation at all without plumbing a limit through the wrapper. Caught by reading what I had
+written rather than by a test, because an always-false condition renders as "no truncation" and
+looks correct.
+
+### Still owed, named rather than dropped
+
+Segment members and win-rule history carry the same claim. Both need their list functions checked
+for a limit parameter first.
+
+### Merged this pass
+
+#431 (KAN-147 declaration) and #432 (PROGRESS #25). **KAN-147 deliberately left OPEN** - the
+configuration merged but the adoption did not, and marking it Done would record the gap as closed
+when terraform still holds no state for those two resources.
+
+### Next
+
+PR #433 in CI. Next unreviewed page: campaign-ops. Blocked items unchanged - all four are Yariv's.
+
+---
+
 ## 2026-09-18 - Hourly quality pass #25: the scheduled warehouse refresh
 
 ### Surface reviewed: a claim, not a page
@@ -654,7 +722,8 @@ pipeline end to end (#16), CI and the emulator transport (#17), a live customer 
 state (#18), customers / Customer 360 (#19), CI / the web emulator transport (#20),
 churn-reasons (#21), cohorts + a repo-wide fabricated-claim sweep (#22),
 campaigns (#23), billing-ops-feed (#24),
-**the scheduled warehouse refresh (#25)**. Not yet reviewed:
+the scheduled warehouse refresh (#25),
+**the capped-list class: record feed / audit log / cost guardrails (#26)**. Not yet reviewed:
 billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
