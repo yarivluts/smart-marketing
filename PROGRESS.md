@@ -17,6 +17,82 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #37: intent & quality
+
+### Surface reviewed: intent-quality (score distribution, quality-adjusted CAC/CPS, mix alerts)
+
+### KAN-168: the headline CAC is wrong for a quarter of every year
+
+- The two figures were read straight off `series[0]`, which is the whole answer **only when the
+  query returns exactly one bucket**.
+- `grain: 'year'` was chosen to make that likely. But the window is a trailing **90 days**, so it
+  crosses a calendar-year boundary for every window ending between **1 January and 31 March** - a
+  quarter of the year, not an edge case. On those days there are two buckets, and `series[0]`,
+  ordered by `bucket_date` ascending, is the **older** one.
+- So for three months a year the headline "Quality-adjusted CAC" described only the part of the
+  window falling in the previous year, silently. **The error grows the deeper into Q1 it runs**: by
+  late March that is a handful of December days standing in for ninety, three months stale, labelled
+  as current.
+- No grain fixes it - `year` is the coarsest the compiler has, so any trailing window can straddle.
+  What fixes it is a rule **this module already documents elsewhere**: a formula-kind ratio cannot
+  be re-averaged across buckets, but a sum-shaped metric folds by addition. The three components
+  (`ad_spend`, `signup_quality_score_sum`, `paying_signup_quality_score_sum`) are all sums, so they
+  fold over every bucket and the ratios are computed once from the totals.
+- **The rule was already written down, one function away, and this one did not follow it.** Worth
+  noting as its own pattern: a codebase that has learned something states it in a doc comment, and
+  the next place that needed it did not inherit it. Grepping for the *reasoning* rather than the
+  symptom is what finds those.
+- The fixture is built so cost-per-signup is **identical** under both implementations, so that leg
+  cannot distinguish them. The CAC leg does: the old code reports 10 against a true 5 - exactly
+  twice the cost of acquisition, presented as current.
+
+### KAN-169: the figures had no period and no explanation
+
+"Quality-adjusted CAC: $40.25" rendered with no horizon. 90 days is a choice the code makes,
+documented only in a constant, and a CAC without a period is not interpretable - lifetime and
+last-quarter differ by more than most decisions taken from it. "Quality-adjusted" likewise names an
+adjustment without saying what it does. Both now stated, with the day count read from the constant
+so the sentence cannot drift from the query.
+
+### Noted, not changed
+
+`distribution.averageScore !== null ? ... : 0` renders an unknown average as **0** - the worst
+possible quality score. Unreachable today (`averageScore` is null only when `totalResponses === 0`,
+which the branch above already handles), so a latent default rather than a live defect. Recorded
+because it is the KAN-152/KAN-166 shape and would become live the moment that invariant changed.
+
+### Two mistakes of mine this pass
+
+- **I marked KAN-160/161/162 Done before #447 merged** - and its CI had in fact failed. Moved them
+  back to In Review. "Done when the fix merges" means checking the PR state, not remembering having
+  written the fix.
+- **#447 failed because of my own change**: the session-replay POST gained `filtersByPage` and the
+  route test asserts the whole body with `toEqual`. That is the **second time this cycle** - pass
+  #33 was a string change that left the only e2e reading it asserting the old text. The rule, now
+  twice-earned: **changing a response shape or a user-facing string means grepping for whatever
+  reads it**, because the type checker sees neither a JSON body compared with `toEqual` nor a
+  literal inside `getByText`.
+
+### Stack fully unblocked
+
+Merged #444, #446, #456, then retargeted every remaining stacked PR to `main` **before** merging
+their bases, and merged `main` into each branch so it carries the CI workflow. All six now have real
+check runs - the first time this cycle every open PR is actually being tested.
+
+- **Last completed:** KAN-168 and KAN-169 as PR #458. Merged #444 (insights), #446 (journal #31)
+  and #456 (feedback); closed KAN-156/157/158/167 as Done. Fixed #447's CI failure.
+- **In progress (exact stopping point):** #458 and #447 running CI; the docs chain (#448, #451,
+  #453, #455, #457) all now target `main` with checks running.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #447 and #458 once green, then the docs chain in order. Then KAN-159 (shared
+  date formatter) and KAN-155 (mixed-currency firmographic MRR). Unreviewed surfaces remaining:
+  field-mappings, plugins, rep-collections, resources, settings, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #36: feedback (the sampling family closed)
 
 ### Surface reviewed: feedback (NPS score, daily trend, theme digest, dimension breakdowns)
