@@ -17,6 +17,99 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #33: demos (+ a CI trigger gap found on the way in)
+
+### KAN-163: CI never ran on stacked PRs, and did not re-run on retarget
+
+Found while checking why #444, #446, #447 and #448 had **no CI runs at all**.
+
+- `on.pull_request.branches: [main]` filters on the PR's **base**, so a PR stacked on another
+  branch matched nothing and received **no checks**. Not pending, not failing - an empty checks
+  list, which in `gh pr list --json statusCheckRollup` renders **identically to a green one**, and
+  which nothing anywhere flags as never-to-be-checked.
+- **Three PRs merged to `main` that way in a single afternoon** (#438, #440, #442), each reported
+  here as merged-when-green. They were docs-only so nothing broke, but the rule was not satisfied
+  for any of them, and I reported that it was.
+- `edited` is the second half: it is the event fired when a PR's base changes, and it is absent
+  from the default type set, so **retargeting a stacked PR onto `main` started no CI either**. The
+  obvious fix for the first problem silently did not work, which is why #444 and #446 sat
+  retargeted with nothing running.
+- **The generalisable trap:** an empty result and a passing result look the same through a tool
+  that reports "no failures". Same shape as the always-false truncation check and as
+  `exit 0`-with-errors-in-the-log: absence of a negative signal is not a positive one. The habit
+  that catches it is asking "what would this look like if the check never ran?" - and here, the
+  answer was "exactly like this".
+- Fixed by dropping the base filter and adding `edited`. The `push:` trigger keeps its own
+  `branches: [main]`, which filters the pushed ref rather than a PR base and is unaffected.
+
+### Surface reviewed: demos (sales demo pipeline)
+
+Right first: the page is honest about scope in its doc comment, correctly excludes `canceled`
+demos from both the funnel and the per-rep rows, degrades properly before a dbt build has run, and
+`DemoFunnelResult`'s field comments are carefully worded - "every distinct `demo_id` **this read
+saw**".
+
+### KAN-164: the funnel and show rate are a 500-record sample rendered as project totals
+
+- Demos scheduled, held, no-show and the show rate all come from the **500 most recent** landed
+  `demo_event` records, rendered as four large figures with nothing saying so. **The service knew;
+  the renderer had no way to find out.** The honest field comment never reached a user.
+- **The show rate misleads hardest, and cannot be fixed by aggregating better.** The window is the
+  most recent N **events**, not demos, and one demo emits `scheduled` and then `held`/`no_show`
+  days later - so the window cuts across demo lifecycles at both ends. Past the cap the ratio stops
+  describing the project and starts describing an arbitrary recency slice of events.
+- The emulator test pins that distortion directly: a two-record window keeps a demo's `held` and
+  drops its `scheduled`, so the funnel reports a demo held it never saw scheduled. Inherent to a
+  recency window - which is exactly why it must be disclosed rather than silently corrected.
+- The per-rep breakdown compounds it: a rep whose events fall outside the window **disappears from
+  the leaderboard**, which reads as "did no demos" rather than "not in this sample".
+- Measured by over-fetching one record, never `length === cap` - that cannot tell "exactly 500
+  exist" (complete) from "fifty thousand exist" (a sample). **Both sides are tested**, so the
+  notice cannot start firing on complete data either.
+- `precomputedRecords` callers must now state their own cap: a **union, not an optional field**, so
+  the answer cannot be omitted. Defaulting it to "complete" would assert the very thing this change
+  exists to stop asserting. No caller passes records today, so it costs nothing now and shuts that
+  door.
+
+### A new shape of the bounded-data class
+
+Every prior instance (KAN-114/124/132/137/138/140/146/149/150/151) was a **list** rendered short.
+This is the first where the bound corrupts a **derived statistic**. A short list at least looks
+like a list; a ratio computed over a truncated, lifecycle-straddling window looks exactly like a
+ratio. Worth carrying into the remaining surfaces: wherever a page divides one bounded count by
+another, the quotient is the finding, not the counts.
+
+### Sibling surfaces flagged, not touched
+
+`aggregateSupportLeaderboard` (KAN-90) and `getNpsOverviewForProject` (KAN-82) share the
+fetch-bounded-then-aggregate shape and probably the same gap. Support and Feedback are both still
+unreviewed, so they get their own passes rather than a drive-by here.
+
+### Process note
+
+I started the demos work on the CI branch by mistake and caught it before committing - the changes
+moved cleanly onto `review/demos` with a `git checkout -b`, and `ci/stacked-pr-coverage` kept only
+its own commit. Checking `git rev-parse --abbrev-ref HEAD` before the first commit of a new piece
+of work would have caught it earlier.
+
+- **Last completed:** KAN-163 (CI triggers) as PR #449 and KAN-164 (demos sampling) as PR #450,
+  both targeting `main` and both with CI actually running - the first PRs this cycle where that is
+  verified rather than assumed.
+- **In progress (exact stopping point):** #444, #446, #447, #448 still have **no CI runs**. Once
+  #449 merges, a push to each will fire `synchronize` and they will finally get checked; they
+  should not be merged before that.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #449, then push to #444/#446/#447/#448 to trigger their first CI run, then
+  merge in order. After that: KAN-159 (shared date formatter), KAN-155 (mixed-currency
+  firmographic MRR), and the support/feedback sampling siblings. Unreviewed surfaces remaining:
+  feedback, field-mappings, intent-quality, plugins, rep-collections, resources, settings, support,
+  tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #32: session replay
 
 ### Surface reviewed: session-replay (settings page + its board link-out)
