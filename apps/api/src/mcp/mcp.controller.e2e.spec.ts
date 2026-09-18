@@ -74,11 +74,11 @@ function uniqueEmail(prefix: string): string {
 }
 
 /** A minimal, real `WinEventModel` (Firestore-backed, so `list_insights` genuinely reads it back) for the KAN-77 cross-project isolation tests below. */
-async function seedWinEvent(organizationId: string, projectId: string, label: string): Promise<WinEventModel> {
+async function seedWinEvent(organizationId: string, projectId: string, environmentId: string, label: string): Promise<WinEventModel> {
   const win = new WinEventModel();
   win.organization_id = organizationId;
   win.project_id = projectId;
-  win.environment_id = 'env-1';
+  win.environment_id = environmentId;
   win.win_rule_id = unique('rule');
   win.win_rule_name = label;
   win.win_type = 'generic';
@@ -109,7 +109,8 @@ async function setupProjectWithKey(
     scopes,
     createdByUserId: owner.id,
   });
-  return { owner, organization, project, rawKey };
+  const devEnvironment = environments.find((e) => e.name === 'dev')!;
+  return { owner, organization, project, rawKey, environmentId: prodEnvironment.id, devEnvironmentId: devEnvironment.id };
 }
 
 async function connectedClient(rawKey: string): Promise<Client> {
@@ -670,8 +671,8 @@ describe('McpController (e2e)', () => {
     it("list_insights never surfaces another project's win events — the AC's own \"project-A token cannot list/query anything of project B\"", async () => {
       const projectA = await setupProjectWithKey('MCP Isolation Org A');
       const projectB = await setupProjectWithKey('MCP Isolation Org B');
-      const winA = await seedWinEvent(projectA.organization.id, projectA.project.id, 'Project A win');
-      const winB = await seedWinEvent(projectB.organization.id, projectB.project.id, 'Project B win');
+      const winA = await seedWinEvent(projectA.organization.id, projectA.project.id, projectA.environmentId, 'Project A win');
+      const winB = await seedWinEvent(projectB.organization.id, projectB.project.id, projectB.environmentId, 'Project B win');
 
       const clientA = await connectedClient(projectA.rawKey);
       try {
@@ -697,10 +698,46 @@ describe('McpController (e2e)', () => {
       }
     });
 
+    /**
+     * KAN-99, the same isolation one level down: a key bound to one environment must not see wins
+     * another environment's key produced in the same project. A `gos_test_` key's synthetic
+     * signup used to appear to a `gos_live_` caller as a real win.
+     */
+    it("list_insights never surfaces another environment's win events in the same project", async () => {
+      const project = await setupProjectWithKey('MCP Env Isolation Org');
+      const prodWin = await seedWinEvent(project.organization.id, project.project.id, project.environmentId, 'Prod win');
+      const devWin = await seedWinEvent(project.organization.id, project.project.id, project.devEnvironmentId, 'Dev win');
+      // A dev-bound key, deliberately: a prod-bound key would pass even if the handler ignored the
+      // key's environment, because the default it would fall back to is also prod.
+      const { rawKey: devKey } = await mintApiKey({
+        organizationId: project.organization.id,
+        projectId: project.project.id,
+        environmentId: project.devEnvironmentId,
+        name: 'e2e dev mcp key',
+        scopes: ['mcp.read'],
+        createdByUserId: project.owner.id,
+      });
+
+      const idsFor = async (rawKey: string) => {
+        const client = await connectedClient(rawKey);
+        try {
+          const result = await client.callTool({ name: 'list_insights', arguments: {} });
+          expect(result.isError).not.toBe(true);
+          const body = JSON.parse((result.content as Array<{ type: string; text: string }>)[0].text) as { insights: Array<{ id: string }> };
+          return body.insights.map((insight) => insight.id);
+        } finally {
+          await client.close();
+        }
+      };
+
+      expect(await idsFor(project.rawKey)).toEqual([prodWin.id]);
+      expect(await idsFor(devKey)).toEqual([devWin.id]);
+    });
+
     it('no tool argument can override the credential-derived organizationId/projectId scope', async () => {
       const projectA = await setupProjectWithKey('MCP Isolation Args Org A');
       const projectB = await setupProjectWithKey('MCP Isolation Args Org B');
-      const winB = await seedWinEvent(projectB.organization.id, projectB.project.id, 'Project B win');
+      const winB = await seedWinEvent(projectB.organization.id, projectB.project.id, projectB.environmentId, 'Project B win');
 
       const clientA = await connectedClient(projectA.rawKey);
       try {

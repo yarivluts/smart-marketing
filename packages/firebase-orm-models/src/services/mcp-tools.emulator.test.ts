@@ -501,7 +501,25 @@ describe('listProjectInsights', () => {
     win.setPathParams({ organization_id: organization.id, project_id: project.id });
     await win.save();
 
-    const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id });
+    // A win another environment's key produced (KAN-99): a caller bound to env-1 must not see it.
+    const otherEnvironmentWin = new WinEventModel();
+    otherEnvironmentWin.organization_id = organization.id;
+    otherEnvironmentWin.project_id = project.id;
+    otherEnvironmentWin.environment_id = 'env-2';
+    otherEnvironmentWin.win_rule_id = 'rule-2';
+    otherEnvironmentWin.win_rule_name = 'Test signup';
+    otherEnvironmentWin.win_type = 'generic';
+    otherEnvironmentWin.schema_name = 'order_completed';
+    otherEnvironmentWin.raw_record_id = 'record-2';
+    otherEnvironmentWin.client_id = 'client-2';
+    otherEnvironmentWin.payload = {};
+    otherEnvironmentWin.occurred_at = '2026-07-14T00:00:00.000Z';
+    otherEnvironmentWin.created_at = '2026-07-14T00:00:00.000Z';
+    otherEnvironmentWin.setPathParams({ organization_id: organization.id, project_id: project.id });
+    await otherEnvironmentWin.save();
+
+    // The key's own environment, as `list_insights` passes it.
+    const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, environmentId: 'env-1' });
 
     expect(insights).toHaveLength(2);
     // Newest first: the win (2026-07-13) before the alert (2026-07-12).
@@ -585,7 +603,7 @@ describe('listProjectInsights', () => {
       await win.save();
     }
 
-    const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, limit });
+    const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, limit, environmentId: 'env-1' });
 
     expect(insights).toHaveLength(limit);
     expect({ keptTheAlert: insights.some((insight) => insight.kind === 'tracking_alert') }).toEqual({ keptTheAlert: true });
