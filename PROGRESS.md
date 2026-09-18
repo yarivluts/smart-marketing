@@ -17,6 +17,70 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #41: plugins
+
+### Surface reviewed: plugins (gallery, installs, built-in packs, source runtime, lookalikes)
+
+Checked and found **real**, recorded so it is not re-investigated: the Meta Lookalike Audience
+creation genuinely POSTs `act_<id>/customaudiences` with a `LOOKALIKE` subtype against the live
+Graph API - it is not a stub with a button in front of it. The finding is one layer down.
+
+### KAN-174: the contacts we sent, reported as the contacts Meta accepted
+
+- `addContactsToCustomAudience` returned `numReceived: result.num_received ?? contacts.length`.
+  When Meta's response omits the count, that substitutes **the number we SENT** under a field whose
+  own comment says it is the number Meta *"actually accepted"* - and it surfaces as **"Last synced N
+  records"** on the Segments page.
+- Meta routinely accepts fewer rows than it is given; unmatched and malformed hashes are dropped. So
+  the accept-count is the single interesting thing about the call, and the fallback **guaranteed the
+  figure could never reveal a shortfall**. A sync that matched none of its audience reported full
+  success.
+- **The codebase already knew.** The Google Ads client's comment says its own count is *"'accepted',
+  not 'matched' (Google Ads has no synchronous match-count response, unlike Meta's
+  `num_received`)"* - it names Meta as the case where a real count IS available, and the Meta client
+  then fell back to the Google-style number without saying so.
+- Mirror-image bug in the UI: `recordsPushed ?? 0` rendered an unknown count as **"Last synced 0
+  records"** - a confident, alarming, wrong claim about a run that succeeded. Zero and unknown are
+  different answers and only one sends someone hunting a broken sync.
+- Fixed by making the unknown case expressible: `numReceived` and `SinkPluginPushResult.pushed` are
+  `number | null`, and `records_pushed` is left unset. **The model field was already optional** - the
+  representation existed and was simply never used, which is the same shape as KAN-173's envelope
+  comparison.
+
+### Three passes, three inherited-rule misses
+
+KAN-168 (a folding rule documented one function away), KAN-173 (a comparison documented on the type
+itself), and now KAN-174 (a distinction documented in the sibling connector). In each case the
+codebase had already reasoned it out **and written it down**, and the code that needed it did not
+inherit it. Reading the doc comments *around* a surface - the sibling implementation, the type, the
+neighbouring function - is now clearly the single highest-yield move in these reviews, above reading
+the surface's own code.
+
+### A fifth test pinning a fabrication
+
+One existing test asserted the old behaviour **by name**: *"falls back to the contact count when the
+response omits num_received"*. A test that documents wrong behaviour makes it look deliberate, and
+is why nobody revisited it. Rewritten to assert `null`, with a two-contact fixture so the number that
+must not appear is distinct from the one that should. **Reading test names alone** is usually enough
+to spot this class - worth a dedicated sweep rather than waiting to trip over them one surface at a
+time.
+
+- **Last completed:** KAN-174 as PR #466. Merged #464 (resource library secret state) and #465;
+  closed KAN-173 as Done.
+- **In progress (exact stopping point):** #466 running CI. Nothing else open.
+- **Blocked + why:** **KAN-170 still leads** - `api-prod` is 117 commits behind `main` with no
+  deploy runbook, which is why EasySign's `dry_run` is missing despite #414 having merged. That one
+  redeploy unblocks their schema registration without anyone having to approve the registration
+  itself. Then: the `easysign-prod-selfserve-mcp-key` secret read, the dev-scoped purge of 46 stale
+  quarantine rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** **settings is the last unreviewed surface** - after it, this cycle has covered every
+  page and the rotation restarts. Standing backlog behind it: a sweep for tests whose names assert a
+  fabrication, KAN-159 (shared date formatter), KAN-155 (mixed-currency firmographic MRR) and the
+  per-entry currency KAN-171 stands in for.
+- **Waiting on human:** the items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up are
+  product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #40: resources (org resource library)
 
 ### Surface reviewed: resources - shared credentials, templates, people, attachment requests
