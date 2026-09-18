@@ -1,7 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
-import { QUALITY_SCORE_PACK_PLUGIN_ID, type SignupQualityScoreBreakdownDimension } from '@growthos/firebase-orm-models';
+import {
+  DEFAULT_QUALITY_ADJUSTED_METRICS_WINDOW_DAYS,
+  QUALITY_SCORE_PACK_PLUGIN_ID,
+  type SignupQualityScoreBreakdownDimension,
+} from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -121,6 +125,11 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
 
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{t('adjustedMetricsHeading')}</h2>
+        {/* A CAC with no period attached is not interpretable — 90 days is a
+            choice this code makes, and the reader has no way to know it. The
+            quality weighting is stated for the same reason: "quality-adjusted"
+            names the adjustment without saying what it does (KAN-169). */}
+        <p className="text-xs text-muted-foreground">{t('adjustedMetricsWindowNote', { days: DEFAULT_QUALITY_ADJUSTED_METRICS_WINDOW_DAYS })}</p>
         {!adjustedMetrics.ok ? (
           <p className="text-muted-foreground">{t('adjustedMetricsEmpty')}</p>
         ) : (

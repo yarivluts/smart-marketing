@@ -956,7 +956,8 @@
     "byCohortHeading": "By signup cohort",
     "byCohortEmpty": "No cohort breakdown available yet — connect a data warehouse to see this.",
     "dimensionValueUnknown": "Unknown",
-    "dimensionAverageScore": "Avg {average} ({count, plural, one {# signup} other {# signups}})"
+    "dimensionAverageScore": "Avg {average} ({count, plural, one {# signup} other {# signups}})",
+    "adjustedMetricsWindowNote": "Over the last {days} days. Both figures weight each signup by its quality score, so a signup scored 50 counts as half a signup."
   },
   "Firmographics": {
     "metaTitle": "Firmographics",
