@@ -17,6 +17,77 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #35: support
+
+### Surface reviewed: support (agent leaderboard + open-ticket backlog)
+
+Followed through on the sampling sibling flagged in #450. Same family as KAN-164, and the backlog
+makes it materially worse.
+
+### KAN-166: a clamped zero rendered as the open-ticket backlog
+
+- `openBacklog` was `Math.max(0, opened - resolved)`, both counts taken from the **500 most recent**
+  landed ticket events, rendered as **the single largest number on the page**.
+- A ticket is opened and resolved days or weeks apart, while the window is the most recent N
+  *events*. On any established project the `opened` events of older tickets age out while their
+  `resolved` events remain - so the subtraction runs over two sets describing **different
+  populations of tickets**.
+- **The clamp is what made it dangerous rather than merely wrong.** That window makes `resolved`
+  exceed `opened` routinely, which is exactly when the clamp fires. So the one detectable signal
+  that the read is inconsistent became a confident **0**, in 4xl type, telling a support manager
+  there is no backlog.
+- Absence rendered as reassurance - the KAN-152 shape - **in the biggest typography on the surface,
+  on the number the page exists to show.** KAN-152 was a green "On target"; this is a large
+  friendly zero. Both are the same defect: a guard that converts "cannot know" into "all is well".
+- The old comment attributed negatives to "a connector backfill gap", i.e. malformed data. Real,
+  but rare. The window is the common cause and is *structural rather than anomalous*, so the guard
+  was catching the wrong thing and hiding the right one. **A defensive clamp written against the
+  rare cause will fire mostly on the common one** - worth checking, wherever one exists, which case
+  actually trips it.
+- Fixed: `openBacklog` is `null` when the read was capped. The clamp survives for the uncapped case,
+  where a negative genuinely does mean a backfill gap, and both sides are tested so the number is
+  not disabled for projects that can support it.
+- `sampledFrom` also qualifies **the ranking**, which is a stronger claim than a count: "1." says
+  *best*, not *most within an arbitrary recency window*. An agent whose resolved tickets fall
+  outside the window places lower or vanishes, and nothing in the rendered list distinguishes that
+  from having resolved nothing.
+- Verified the test fails on the old code first: `expected +0 to be null` - the reassuring answer
+  itself, not a row count.
+
+### The bounded-data class, third shape
+
+- KAN-114/138/146 and friends: a **list** rendered short.
+- KAN-164 (demos): a **derived statistic** over a truncated window - a ratio that still looks like a
+  ratio.
+- KAN-166 (support): a **subtraction across two lifecycle stages**, where the window clips opposite
+  ends of the same entity, plus a clamp that converts the resulting inconsistency into reassurance.
+
+Each is harder to see than the last, because each looks more like an ordinary number. The rule that
+generalises: **wherever a page combines two bounded counts, the combination is the finding, not the
+counts.**
+
+### Still outstanding in this family
+
+`getNpsOverviewForProject` (KAN-82) shares the fetch-bounded-then-aggregate shape. Feedback is still
+unreviewed, so it gets its own pass rather than a drive-by.
+
+- **Last completed:** KAN-166 as PR #454. Merged #452 (KAN-165 emulator transport) and closed
+  KAN-165 as Done. Merged `origin/main` into `ci/stacked-pr-coverage` so #449 re-runs against the
+  transport fix rather than replaying the same commit.
+- **In progress (exact stopping point):** #449 and #454 both running CI against `main`. #444, #446,
+  #447, #448, #451, #453 still have **no CI runs at all** - that is exactly what #449 fixes, so it
+  merges first, then a push to each of the others starts their first check.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #449, then #454, then unblock and merge the stalled stack in order. After
+  that: feedback (the last member of this sampling family), then KAN-159 (shared date formatter)
+  and KAN-155 (mixed-currency firmographic MRR). Unreviewed surfaces remaining: feedback,
+  field-mappings, intent-quality, plugins, rep-collections, resources, settings, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #34: the apps/web Firestore transport (KAN-103 reopened)
 
 No page review this pass. Diagnosing #449's CI failure turned up something worth the whole hour:
