@@ -967,7 +967,7 @@
     "byRegionEmpty": "הרכב לפי אזור עדיין לא זמין — חבר מחסן נתונים כדי לראות זאת.",
     "dimensionValueUnknown": "לא ידוע",
     "compositionCount": "{count, plural, one {פרופיל #} other {# פרופילים}}",
-    "compositionMrr": "{amount}$ הכנסה חודשית",
+    "compositionMrr": "{amount} MRR (יחידה קטנה)",
     "alertsHeading": "התראות על שינוי בהרכב",
     "alertsEmpty": "אין התראות פעילות על שינוי בהרכב.",
     "alertShift": "השתנה מ-{baseline}% ל-{current}% מהפרופילים החדשים",

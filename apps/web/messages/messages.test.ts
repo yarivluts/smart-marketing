@@ -87,3 +87,53 @@ describe('Firmographics strings claim only the classification the code performs'
     }
   });
 });
+
+describe('money strings disclose the unit their amount is actually in', () => {
+  /**
+   * `Firmographics.compositionMrr` renders `firmographic_mrr_total`, which sums
+   * `dim_subscription.mrr` <- `properties.mrr_normalized` <-
+   * `computeSubscriptionMrrNormalized`, which divides a Stripe price's
+   * `unit_amount` by its billing-cycle length and converts no units. Stripe
+   * quotes `unit_amount` in the currency's smallest unit, so a $99/mo plan
+   * arrives as 9900.
+   *
+   * The string used to read `${amount} MRR`, which is worse than an unlabelled
+   * number: the `$` positively asserts dollars, so 9900 reads as ninety-nine
+   * hundred dollars rather than as an ambiguous figure a reader might question.
+   *
+   * The fix follows KAN-145's precedent on the Billing Ops feed exactly —
+   * disclose the unit, do not convert. The divisor differs by currency (JPY has
+   * none), so dividing by 100 here would be wrong more quietly than not
+   * dividing. Asserting the same marker both places is what keeps the two
+   * surfaces from drifting apart again.
+   */
+  it.each([
+    ['BillingOpsFeed', 'mrrLine'],
+    ['BillingOpsFeed', 'amountLine'],
+    ['Firmographics', 'compositionMrr'],
+  ])('%s.%s discloses the unit in en and asserts no currency symbol in either locale', (namespace, key) => {
+    const read = (messages: unknown) => (messages as Record<string, Record<string, string>>)[namespace][key];
+
+    expect({ key: `${namespace}.${key}`, discloses: read(en).includes('(smallest unit)') }).toEqual({
+      key: `${namespace}.${key}`,
+      discloses: true,
+    });
+
+    // Any currency symbol at all, in either locale, and not just one leading the
+    // placeholder: Hebrew's own version of this string carried the `$` *after*
+    // the amount (`{amount}$ ...`), which a leading-symbol pattern would have
+    // passed while reading just as falsely. A currency *code* rendered from the
+    // data (`{currency}`) stays fine — that is reported, not asserted.
+    for (const [locale, messages] of [
+      ['en', en],
+      ['he', he],
+    ] as const) {
+      const text = read(messages);
+      expect({ locale, key: `${namespace}.${key}`, currencySymbol: /[$€£¥₪]/.test(text) ? text : null }).toEqual({
+        locale,
+        key: `${namespace}.${key}`,
+        currencySymbol: null,
+      });
+    }
+  });
+});

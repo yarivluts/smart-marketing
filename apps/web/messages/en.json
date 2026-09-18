@@ -967,7 +967,7 @@
     "byRegionEmpty": "No region composition available yet — connect a data warehouse to see this.",
     "dimensionValueUnknown": "Unknown",
     "compositionCount": "{count, plural, one {# profile} other {# profiles}}",
-    "compositionMrr": "${amount} MRR",
+    "compositionMrr": "{amount} MRR (smallest unit)",
     "alertsHeading": "Composition-shift alerts",
     "alertsEmpty": "No active composition-shift alerts.",
     "alertShift": "Shifted from {baseline}% to {current}% of new profiles",
