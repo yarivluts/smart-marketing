@@ -17,6 +17,12 @@ RUN pnpm --filter "@growthos/api^..." --filter "!@growthos/dbt-transform" build 
 FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=8080
+# The commit this image was built from, reported on /v1/health so production
+# can be compared against main with no credentials (KAN-180). Left empty when
+# unset: the API then reports `buildSha: null`, meaning "not stamped", rather
+# than inventing a value.
+ARG GIT_SHA=""
+ENV GIT_SHA=$GIT_SHA
 COPY --from=build /app /app
 WORKDIR /app/apps/api
 EXPOSE 8080

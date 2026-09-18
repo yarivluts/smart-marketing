@@ -32,3 +32,4 @@ export * from './rep-collections';
 export * from './support';
 export * from './sales';
 export * from './firestore/index-drift';
+export * from './deploy/prod-drift';

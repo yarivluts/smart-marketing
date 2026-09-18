@@ -1,0 +1,60 @@
+name: Production drift
+
+# Hourly: is api-prod running what main says it should? (KAN-180)
+#
+# Nothing deploys on merge, and until this nothing noticed when production fell
+# behind — twice in one week an integrator was blocked on a fix that was merged,
+# green and simply not deployed. This makes the owed deploy visible: a red run
+# and a single tracking issue that closes itself once production catches up.
+#
+# It holds NO production credentials. It reads the public /v1/health endpoint,
+# where the API reports its build SHA, and compares that to git history. The
+# only permission it needs beyond reading the repo is managing that one issue.
+# A drift check able to deploy would be a far larger thing to trust than one
+# that can only look.
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: prod-drift
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: api-prod vs main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          # `git log A..B` on a shallow clone reports nothing, which would read
+          # as "production is current". Full history or the check lies.
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Build the drift logic
+        run: |
+          pnpm install --frozen-lockfile --filter @growthos/shared...
+          pnpm --filter @growthos/shared build
+
+      - name: Compare production with main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/deploy/check-prod-drift.mjs

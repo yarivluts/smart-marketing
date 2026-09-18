@@ -45,9 +45,14 @@ git status --porcelain      # must be empty; a stray file ships too
 
 gcloud builds submit --async \
   --config deploy/cloudbuild.api.yaml \
-  --substitutions _IMAGE=me-west1-docker.pkg.dev/growthos-g2w84/growthos/api:main-$SHA \
+  --substitutions _IMAGE=me-west1-docker.pkg.dev/growthos-g2w84/growthos/api:main-$SHA,_GIT_SHA=$SHA \
   --project growthos-g2w84 .
 ```
+
+**Always pass `_GIT_SHA`.** It is stamped into the image and reported on
+`/v1/health` as `buildSha`, which is what `.github/workflows/prod-drift.yml`
+compares against `main` every hour (KAN-180). Omit it and production reports
+`buildSha: null` - honest, but the drift check can then only say it cannot tell.
 
 `--async` returns a build id immediately. Follow it with:
 
@@ -113,11 +118,18 @@ The previous revision is the one you recorded before starting. On 2026-09-18 tha
 was `api-prod-00015-msw` (image `api:main-6f50355`), superseded by
 `api-prod-00016-jqx`.
 
-## What is still missing
+## Drift is now detected, not prevented
 
-Nothing automates or schedules this, and nothing reports how far the running
-revision has drifted from `main` — which is exactly how production sat 151
-commits behind with a merged, tested fix that an integrator was blocked on. A
-deploy-on-merge workflow, or at minimum a drift check that fails loudly, is the
-real fix; this document is the stopgap that makes the manual path repeatable and
-correct in the meantime.
+`.github/workflows/prod-drift.yml` runs hourly and compares production's
+`/v1/health` `buildSha` with `main` (KAN-180). Once a merged commit has waited
+more than six hours undeployed, the run goes red and a single tracking issue -
+*"Production api-prod has drifted behind main"* - opens, updates as the gap
+grows, and closes itself once production catches up.
+
+It holds **no production credentials**: it reads a public endpoint and git
+history, and cannot deploy anything. That is deliberate, and a test pins it.
+
+What it does not do is deploy. Nothing deploys on merge, so a red drift run
+still needs a human to run the sequence above. Deploy-on-merge would remove
+that step, but it means giving CI write access to production - a decision to
+make on purpose, not something to slide into by extending this workflow.

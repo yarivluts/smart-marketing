@@ -17,6 +17,43 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Deploy + KAN-180: nothing noticed production falling behind main
+
+Yariv directly authorised a redeploy and asked for the underlying cause to be fixed.
+
+### The deploy
+
+- `api-prod` now serves **`main-62d2115` as revision `api-prod-00017-2q4`** (health 200). It ships
+  #469 (dry-run on a read-only key) and #476/#477. Not tip `835cab1`: its CI was only queued, and the
+  runbook deploys the newest *green* main SHA. Rollback target: `api-prod-00016-jqx`.
+- EasySign (`easy-sign-5f`) confirmed: all nine schemas dry-run clean field by field, and the gate
+  holds in two layers - no `dry_run` still gets the `schema.write` refusal, and string `"true"` is
+  rejected by the input schema before the scope check. Registration itself is still Yariv's call.
+
+### KAN-180: the cause
+
+- There is no deploy-on-merge and nothing compared production with main. Twice this week a merged,
+  green fix waited undeployed while an integrator was blocked on it. **Nobody knew a deploy was owed.**
+- `/v1/health` now reports `buildSha`, stamped from a `_GIT_SHA` Cloud Build substitution. Values
+  that are not a hex SHA (empty, an unexpanded `$SHORT_SHA`) read as `null`, never as a SHA.
+- `.github/workflows/prod-drift.yml` runs hourly. Once a merged commit has waited more than 6 hours
+  undeployed, the run goes red and one tracking issue opens, updates, and closes itself on catch-up.
+  Measured from the **oldest** undeployed commit, so a trickle of merges cannot reset the clock.
+- **It cannot deploy, and a test pins that**: no custom secrets, no GCP auth, no OIDC, no deploy
+  command, only `contents: read` + `issues: write`. The test was verified to fail when a deploy step
+  is appended. Deploy-on-merge means CI write access to production - left to Yariv on purpose.
+- Verified live: real production reports `[unstamped]` (correct - `00017` predates stamping); a local
+  stand-in with an old SHA reported 175 commits behind, 52h, exit 1.
+
+- **Last completed:** deploy of 62d2115; KAN-179 closed; KAN-180 as PR #478.
+- **In progress (exact stopping point):** #478 awaiting CI, then merge and close KAN-180.
+- **Blocked + why:** the alarm reports `unstamped` until the next deploy passes `_GIT_SHA` (runbook
+  updated). Deploy-on-merge is a credentials decision for Yariv. Earlier items stand: the
+  `easysign-prod-selfserve-mcp-key` read, the nine-schema go-ahead, the 46-row dev purge, rotation of
+  the two burned keys.
+- **Next step:** next deploy with `_GIT_SHA` activates the alarm. Then KAN-159, KAN-155.
+- **Waiting on human:** the above; KAN-97, KAN-117, KAN-130, KAN-143 follow-up.
+
 ## 2026-09-18 - Hourly quality pass #45: the dbt warehouse layer
 
 The last unreviewed surface of any size: 29 dbt models, never examined as a surface, and **every
