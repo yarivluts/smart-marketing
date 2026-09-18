@@ -141,6 +141,13 @@ export const CORE_TABLE_CATALOG: Readonly<Record<string, CoreTableColumns>> = Ob
     collected_revenue_14d: 'FLOAT64',
     collected_revenue_30d: 'FLOAT64',
     collected_revenue_40d: 'FLOAT64',
+    // Whether each window has elapsed (KAN-179). `is_paying_customer` above is
+    // also a boolean carried as STRING — the metric filter compares against the
+    // literal 'true', so the two stay consistent.
+    window_7d_complete: 'STRING',
+    window_14d_complete: 'STRING',
+    window_30d_complete: 'STRING',
+    window_40d_complete: 'STRING',
   }),
   fact_demo_event: table({
     demo_event_key: 'STRING',
@@ -196,6 +203,8 @@ export const CORE_TABLE_CATALOG: Readonly<Record<string, CoreTableColumns>> = Ob
     is_paying_customer: 'STRING',
     collected_revenue_7d: 'FLOAT64',
     collected_revenue_40d: 'FLOAT64',
+    window_7d_complete: 'STRING',
+    window_40d_complete: 'STRING',
     ts: 'TIMESTAMP',
   }),
   fact_revenue_event: table({

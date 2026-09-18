@@ -49,9 +49,9 @@ describe('ensureCampaignOpsPackRegistered — metric definitions', () => {
     return getActiveMetricDefinition(organizationId, projectId, name);
   }
 
-  it('registers all fourteen metrics as active v1', async () => {
+  it('registers all sixteen metrics as active v1', async () => {
     const defs = await listMetricDefinitionsForProject(organizationId, projectId);
-    expect(defs).toHaveLength(14);
+    expect(defs).toHaveLength(16);
     expect(defs.every((def) => def.version === 1 && def.status === 'active')).toBe(true);
   });
 
@@ -128,7 +128,13 @@ describe('ensureCampaignOpsPackRegistered — metric definitions', () => {
 
   it.each([
     ['quality_calibration_paying_rate', 'quality_calibration_paying_signups / quality_calibration_signups'],
-    ['quality_calibration_avg_collected_revenue_40d', 'quality_calibration_collected_revenue_40d / quality_calibration_signups'],
+    // Both operands are the MATURED pair (KAN-179). Dividing the unfiltered
+    // revenue by the unfiltered signup count counted customers whose 40 days
+    // had not elapsed in the denominator while they contributed almost nothing
+    // to the numerator — understating payback in proportion to how fast the
+    // project was acquiring. Filtering one side only would have moved the
+    // number further from the truth while looking like a fix.
+    ['quality_calibration_avg_collected_revenue_40d', 'quality_calibration_matured_revenue_40d / quality_calibration_matured_signups_40d'],
   ])('registers %s as a formula over the phase-1 calibration aggregations', async (name, formula) => {
     const metric = await activeMetric(name);
     expect(metric?.definition_kind).toBe('formula');
@@ -138,7 +144,7 @@ describe('ensureCampaignOpsPackRegistered — metric definitions', () => {
 });
 
 describe('ensureCampaignOpsPackRegistered — idempotency and isolation', () => {
-  it('partially idempotent: a metric pre-registered by a human is left alone, the other thirteen still register', async () => {
+  it('partially idempotent: a metric pre-registered by a human is left alone, the other fifteen still register', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Partial Idempotent Org');
     await registerMetricDefinition({
       organizationId: organization.id,
@@ -153,7 +159,7 @@ describe('ensureCampaignOpsPackRegistered — idempotency and isolation', () => 
     const result = await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
 
     expect(result.alreadyRegistered).toEqual(['collection_7d']);
-    expect(result.registered).toHaveLength(13);
+    expect(result.registered).toHaveLength(15);
     expect(result.registered).not.toContain('collection_7d');
   });
 
@@ -171,10 +177,10 @@ describe('ensureCampaignOpsPackRegistered — idempotency and isolation', () => 
 
     const second = await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
     expect(second.registered).toEqual([]);
-    expect(second.alreadyRegistered).toHaveLength(14);
+    expect(second.alreadyRegistered).toHaveLength(16);
 
     const defs = await listMetricDefinitionsForProject(organization.id, project.id);
-    expect(defs).toHaveLength(14);
+    expect(defs).toHaveLength(16);
     expect(defs.every((def) => def.version === 1)).toBe(true);
   }, 300_000);
 

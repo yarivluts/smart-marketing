@@ -137,11 +137,59 @@ const QUALITY_CALIBRATION_COLLECTED_REVENUE_40D: CampaignOpsPackMetricDefinition
   },
 };
 
+/**
+ * The two halves of the 40-day average, each restricted to customers whose
+ * 40-day window has actually elapsed (KAN-179).
+ *
+ * `collected_revenue_40d` sums charges within 40 days of acquisition, and
+ * nothing checked that 40 days had passed — so a customer acquired yesterday
+ * contributed a "40-day revenue" of one day. Dividing the unfiltered sum by the
+ * unfiltered signup count made that worse than incomplete: every immature
+ * customer added one to the denominator and roughly nothing to the numerator,
+ * so the faster a project acquires, the worse its payback appears. Exactly
+ * backwards.
+ *
+ * Both metrics carry the same filter on purpose. Filtering only the numerator
+ * would shrink the revenue while leaving the denominator inflated, which moves
+ * the number further from the truth while looking like a fix.
+ */
+const QUALITY_CALIBRATION_MATURED_SIGNUPS_40D: CampaignOpsPackMetricDefinition = {
+  name: 'quality_calibration_matured_signups_40d',
+  dimensions: ['quality_tier'],
+  definition: {
+    kind: 'aggregation',
+    aggregation: {
+      function: 'count_distinct',
+      table: 'fact_quality_calibration',
+      column: 'customer_id',
+      timeColumn: 'ts',
+      filters: [{ field: 'window_40d_complete', operator: '=', value: 'true' }],
+    },
+  },
+};
+
+const QUALITY_CALIBRATION_MATURED_REVENUE_40D: CampaignOpsPackMetricDefinition = {
+  name: 'quality_calibration_matured_revenue_40d',
+  dimensions: ['quality_tier'],
+  definition: {
+    kind: 'aggregation',
+    aggregation: {
+      function: 'sum',
+      table: 'fact_quality_calibration',
+      column: 'collected_revenue_40d',
+      timeColumn: 'ts',
+      filters: [{ field: 'window_40d_complete', operator: '=', value: 'true' }],
+    },
+  },
+};
+
 /** Phase 1 (aggregations): must all finish registering before the phase-2 formulas below. */
 export const CAMPAIGN_OPS_PACK_CALIBRATION_AGGREGATION_METRICS: readonly CampaignOpsPackMetricDefinition[] = [
   QUALITY_CALIBRATION_SIGNUPS,
   QUALITY_CALIBRATION_PAYING_SIGNUPS,
   QUALITY_CALIBRATION_COLLECTED_REVENUE_40D,
+  QUALITY_CALIBRATION_MATURED_SIGNUPS_40D,
+  QUALITY_CALIBRATION_MATURED_REVENUE_40D,
 ];
 
 const QUALITY_CALIBRATION_PAYING_RATE: CampaignOpsPackMetricDefinition = {
@@ -150,10 +198,20 @@ const QUALITY_CALIBRATION_PAYING_RATE: CampaignOpsPackMetricDefinition = {
   definition: { kind: 'formula', formula: 'quality_calibration_paying_signups / quality_calibration_signups' },
 };
 
+/**
+ * Average 40-day collected revenue per signup, over signups whose 40 days have
+ * elapsed (KAN-179).
+ *
+ * Both operands are the matured pair. The unfiltered
+ * `quality_calibration_collected_revenue_40d` and `quality_calibration_signups`
+ * are kept registered because they are meaningful on their own — total revenue
+ * booked so far, and total signups scored — but they must not be divided by one
+ * another, which is what this metric used to do.
+ */
 const QUALITY_CALIBRATION_AVG_COLLECTED_REVENUE_40D: CampaignOpsPackMetricDefinition = {
   name: 'quality_calibration_avg_collected_revenue_40d',
   dimensions: ['quality_tier'],
-  definition: { kind: 'formula', formula: 'quality_calibration_collected_revenue_40d / quality_calibration_signups' },
+  definition: { kind: 'formula', formula: 'quality_calibration_matured_revenue_40d / quality_calibration_matured_signups_40d' },
 };
 
 /** Phase 2 (formulas): reference only the phase-1 aggregations above. */
