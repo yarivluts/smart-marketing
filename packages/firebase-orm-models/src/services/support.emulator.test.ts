@@ -143,8 +143,57 @@ describe('getSupportLeaderboardForProject', () => {
     precomputed.payload = { event: 'support_ticket_event', event_id: unique('event'), ts: '2026-09-02T08:00:00.000Z', properties: { ticket_id: 'precomputed', stage: 'opened' } };
     precomputed.landed_at = '2026-09-02T08:00:00.000Z';
 
-    const result = await getSupportLeaderboardForProject(organization.id, project.id, { precomputedRecords: [precomputed] });
+    const result = await getSupportLeaderboardForProject(organization.id, project.id, { precomputedRecords: [precomputed], sampledFrom: null });
     expect(result.ticketsOpened).toBe(1);
+  });
+
+  /**
+   * The backlog is a subtraction across a recency window, and that is not a
+   * computable quantity (KAN-166).
+   *
+   * A ticket is opened and resolved days or weeks apart, while the window is the
+   * most recent N *events*. This fixture is the minimum that reproduces it: with
+   * a two-record window, `t1`'s `opened` ages out while its `resolved` stays, so
+   * the read sees one resolution and zero openings. The old code computed
+   * `Math.max(0, 0 - 1)` and rendered a confident **0** in the largest type on
+   * the page, telling a support manager there is no backlog.
+   *
+   * The clamp is what made it dangerous rather than merely wrong: the window
+   * makes `resolved` exceed `opened` routinely, which is exactly when the clamp
+   * fires, so the one detectable signal that the window is inconsistent became
+   * reassurance. Its own comment blamed "a connector backfill gap" — real but
+   * rare, where the window is common and structural.
+   */
+  it('reports no backlog figure at all when the read was capped, rather than a clamped zero', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Support Backlog Window Org');
+    await ensureSupportTicketSchemaRegistered({ organizationId: organization.id, projectId: project.id, createdByUserId: owner.id });
+
+    await landTicketEvent({ organizationId: organization.id, projectId: project.id, environmentId, ticketId: 't1', stage: 'opened', landedAt: '2026-09-01T08:00:00.000Z' });
+    await landTicketEvent({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId,
+      ticketId: 't1',
+      stage: 'resolved',
+      agentOrgPersonId: 'agent_1',
+      resolutionSeconds: 3600,
+      landedAt: '2026-09-01T09:00:00.000Z',
+    });
+    await landTicketEvent({ organizationId: organization.id, projectId: project.id, environmentId, ticketId: 't2', stage: 'opened', landedAt: '2026-09-01T10:00:00.000Z' });
+
+    const sampled = await getSupportLeaderboardForProject(organization.id, project.id, { limit: 2 });
+    expect(sampled.sampledFrom).toBe(2);
+    // The window kept t2/opened and t1/resolved, dropping t1/opened: one opening,
+    // one resolution, describing two different tickets. The old arithmetic gave
+    // max(0, 1 - 1) = 0 here, which is the reassuring answer and the wrong one.
+    expect(sampled.openBacklog).toBeNull();
+
+    // Uncapped, the subtraction is valid and still computed — the fix must not
+    // disable the number for every project, only for the reads that cannot
+    // support it.
+    const complete = await getSupportLeaderboardForProject(organization.id, project.id, { limit: 3 });
+    expect(complete.sampledFrom).toBeNull();
+    expect(complete.openBacklog).toBe(1);
   });
 
   it('throws ProjectNotFoundError for a project id that does not exist', async () => {

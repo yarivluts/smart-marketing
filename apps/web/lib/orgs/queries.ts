@@ -52,6 +52,7 @@ import {
   getNpsOverviewForProject as getNpsOverviewForProjectInOrganization,
   getNpsDimensionBreakdownForProject as getNpsDimensionBreakdownForProjectInOrganization,
   listSurveyResponseRecordsForProject as listSurveyResponseRecordsForProjectInOrganization,
+  type GetNpsOverviewOptions,
   type NpsOverview,
   type NpsBreakdownDimension,
   type NpsDimensionBreakdownOutcome,
@@ -370,9 +371,10 @@ export async function listRecentRecordsForSchema(
   kind: SchemaDefKind,
   schemaName: string,
   fieldFilter?: RecordFieldFilter,
+  limit?: number,
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
-  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName], fieldFilter });
+  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName], fieldFilter, ...(limit !== undefined ? { limit } : {}) });
 }
 
 export async function listRecentChurnedSubscriptionsForProject(
@@ -465,7 +467,7 @@ export async function getEventVolumeOverviewForProject(
 export async function getNpsOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
+  options?: GetNpsOverviewOptions,
 ): Promise<NpsOverview> {
   await ensureFirestoreOrm();
   return getNpsOverviewForProjectInOrganization(organizationId, projectId, options);
@@ -1009,9 +1011,9 @@ export async function listWinRulesForProject(organizationId: string, projectId: 
   return listWinRulesForProjectInOrganization(organizationId, projectId);
 }
 
-export async function listRecentWinEventsForProject(organizationId: string, projectId: string): Promise<WinEventModel[]> {
+export async function listRecentWinEventsForProject(organizationId: string, projectId: string, limit?: number): Promise<WinEventModel[]> {
   await ensureFirestoreOrm();
-  return listRecentWinEventsForProjectInOrganization(organizationId, projectId);
+  return listRecentWinEventsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 /** The live win feed's incremental-poll building block — see `feed/route.ts`'s own doc comment. */

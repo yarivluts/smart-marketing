@@ -719,14 +719,15 @@
     "landedAtLine": "נקלט ב-{landedAt}",
     "clientIdLine": "מזהה {clientId}",
     "capNote": "מוצגות {count} הרשומות האחרונות.",
+    "capNoteTruncated": "מוצגות {count} הרשומות האחרונות — קיימות עוד מעבר למוצג.",
     "filterFieldLabel": "סינון לפי שדה",
     "filterFieldPlaceholder": "בחר שדה",
     "filterValueLabel": "ערך",
     "filterValuePlaceholder": "ערך מדויק",
     "filterApply": "סנן",
     "filterClear": "נקה סינון",
-    "filterActiveNote": "מסונן לרשומות שבהן {field} הוא {value}.",
-    "filterEmpty": "אין רשומות התואמות לסינון זה."
+    "filterActiveNote": "סונן לרשומות שבהן {field} הוא {value}, על פני {window} הרשומות האחרונות בסכמה זו.",
+    "filterEmpty": "אין רשומות התואמות לסינון מתוך {window} הרשומות האחרונות בסכמה זו. רשומה תואמת ישנה יותר מהחלון הזה אינה נסרקת — יש לצמצם לפי סכמה ולא להתייחס לכך כ\"אין רשומה כזו\"."
   },
   "Customers": {
     "metaTitle": "חיפוש לקוחות",
@@ -847,7 +848,9 @@
     "themePerformance": "ביצועים",
     "themeMissingFeatures": "פיצ'רים חסרים",
     "themeOnboarding": "הצטרפות",
-    "themeUsability": "שימושיות"
+    "themeUsability": "שימושיות",
+    "trendPointNotRead": "לא נקרא - מעבר למגבלת התשובות",
+    "trendTruncatedNotice": "המגמה שלמה רק החל מ-{from} ואילך. לפרויקט הזה יש יותר מ-{limit} תשובות, ולכן הקריאה נעצרה לפני תחילת החלון - הימים הקודמים אינם ידועים, ולא ריקים."
   },
   "Support": {
     "metaTitle": "תמיכה",
@@ -863,7 +866,9 @@
     "rowValueUnavailable": "—",
     "durationSeconds": "{value} שניות",
     "durationMinutes": "{value} דקות",
-    "durationHours": "{value} שעות"
+    "durationHours": "{value} שעות",
+    "sampledNotice": "המספרים האלה מכסים את {limit} אירועי הפניות האחרונים, ולא את כל ההיסטוריה שלכם - קיימים אירועים נוספים. הדירוג הוא דירוג בתוך החלון הזה: נציג שהפניות שפתר נמצאות מחוצה לו ידורג נמוך יותר, או לא יופיע כלל.",
+    "backlogUnavailable": "לא ניתן לחישוב מקריאה מוגבלת. פנייה נפתחת ונפתרת בהפרש של שבועות, ולכן חלון של אירועים אחרונים מכיל פתרונות שהפתיחות שלהם כבר יצאו מהחלון - חיסור אחד מהשני לא יספור פניות פתוחות."
   },
   "Demos": {
     "metaTitle": "הדגמות",
@@ -883,7 +888,8 @@
     "recentDemosIntro": "עיין/י ברשומות הדגמה בודדות:",
     "recentDemosLinkLabel": "הדגמות אחרונות",
     "workListIntro": "רוצה למצוא לקוחות משלמים שמעולם לא קיבלו הדגמה?",
-    "workListLinkLabel": "בנה/י את הרשימה הזו בדף הסגמנטים"
+    "workListLinkLabel": "בנה/י את הרשימה הזו בדף הסגמנטים",
+    "sampledNotice": "המספרים האלה מכסים את {limit} אירועי הדמו האחרונים, ולא את כל ההיסטוריה שלכם - קיימים אירועים נוספים. התייחסו לספירות כאל רף תחתון, ולשיעור ההגעה בזהירות: החלון נמדד באירועים, ודמו נקבע באירוע אחד ומתקיים או מוחמץ באירוע אחר, כך שדמו יכול ליפול חלקית מחוץ לחלון."
   },
   "ChurnReasons": {
     "metaTitle": "סיבות נטישה",
@@ -1040,6 +1046,8 @@
     "statusOverTarget": "מעל היעד",
     "statusOnTarget": "בתוך היעד",
     "statusNoTarget": "לא הוגדר יעד",
+    "statusNoSpendData": "אין נתוני הוצאה",
+    "spendNoData": "אין נתונים",
     "targetUpdateError": "עדכון היעד נכשל. נסו שוב.",
     "targetInputLabel": "יעד הוצאה עבור {campaignId}",
     "targetInputPlaceholder": "ללא יעד"
@@ -1071,6 +1079,7 @@
     "logEntryCost": "עלות משוערת: {cost}",
     "logEntryCostUnknown": "עלות משוערת: לא זמינה",
     "logCapNote": "מוצגות {count} רשומות יומן העלות האחרונות.",
+    "logCapNoteTruncated": "מוצגות {count} רשומות עלות השאילתות האחרונות — קיימות עוד מעבר למוצג, ולכן כל סכום שנקרא מרשימה זו הוא חסם תחתון.",
     "outcomeExecuted": "בוצע",
     "outcomeBlockedQuotaExceeded": "נחסם — חריגה ממכסה",
     "outcomeWarehouseNotConfigured": "בוצע (עדיין לא הוגדר מחסן נתונים)"
@@ -1082,7 +1091,8 @@
     "chainInvalid": "בדיקת התקינות נכשלה ברשומה {entryId}. ייתכן שהיומן הזה שובש.",
     "noEntries": "עדיין לא נרשמו שינויים מבוקרים עבור ארגון זה.",
     "actorLine": "{actorType} {actorId} · {action}",
-    "listCapNote": "מוצגות {count} הרשומות האחרונות."
+    "listCapNote": "מוצגות {count} הרשומות האחרונות.",
+    "listCapNoteTruncated": "מוצגות {count} הרשומות האחרונות — קיימות עוד מעבר למוצג, כך שזהו חלון אל היומן ולא היומן כולו."
   },
   "PluginRegistry": {
     "metaTitle": "מרשם תוספים",
@@ -1450,6 +1460,7 @@
     "memberLastSeenLine": "נראה לאחרונה {lastSeenAt}",
     "memberFieldLine": "{name}: {value}",
     "membersCapNote": "מוצגים {count} החברים העדכניים ביותר.",
+    "membersCapNoteOfTotal": "מוצגים {count} מתוך {total} חברים.",
     "deleteConfirm": "למחוק את הפלח הזה? לא ניתן לבטל פעולה זו.",
     "deleteButton": "מחק",
     "deleteError": "לא ניתן היה למחוק את הפלח. נסה שוב.",
@@ -1534,7 +1545,8 @@
     "feedItem": "{winRuleName} — {schemaName} ({clientId})",
     "historyHeading": "היסטוריית ניצחונות",
     "historyEmpty": "טרם נרשמו ניצחונות.",
-    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים."
+    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים.",
+    "historyListCapNoteTruncated": "מוצגים {count} הזכיות האחרונות — קיימות עוד מעבר למוצג."
   },
   "TrialPipeline": {
     "heading": "צינור ניסיונות",

@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
-import { FEEDBACK_PACK_PLUGIN_ID, type NpsBreakdownDimension } from '@growthos/firebase-orm-models';
+import { DEFAULT_NPS_OVERVIEW_RECORD_LIMIT, FEEDBACK_PACK_PLUGIN_ID, type NpsBreakdownDimension } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -27,6 +27,9 @@ export async function generateMetadata({ params }: PageProps) {
   const t = await getTranslations({ locale, namespace: 'Feedback' });
   return { title: t('metaTitle') };
 }
+
+/** The shared read's cap. Named from the service's own default so the page and the service cannot drift to different numbers while both call it "the limit". */
+const FEEDBACK_RECORD_LIMIT = DEFAULT_NPS_OVERVIEW_RECORD_LIMIT;
 
 const DIMENSIONS: readonly { key: NpsBreakdownDimension; headingKey: string; emptyKey: string }[] = [
   { key: 'plan_interval', headingKey: 'byPlanHeading', emptyKey: 'byPlanEmpty' },
@@ -89,9 +92,16 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
     );
   }
 
-  const surveyResponseRecords = await listSurveyResponseRecordsForProject(orgId, projectId);
+  // One read shared by both consumers (that is why `precomputedRecords` exists),
+  // over-fetched by one so the cap is measured here rather than guessed by
+  // either of them. `length === cap` cannot tell "exactly this many exist" from
+  // "far more exist" (KAN-167).
+  const fetchedRecords = await listSurveyResponseRecordsForProject(orgId, projectId, FEEDBACK_RECORD_LIMIT + 1);
+  const sampledFrom = fetchedRecords.length > FEEDBACK_RECORD_LIMIT ? FEEDBACK_RECORD_LIMIT : null;
+  const surveyResponseRecords = fetchedRecords.slice(0, FEEDBACK_RECORD_LIMIT);
+
   const [overview, themeDigest, dimensionOutcomes] = await Promise.all([
-    getNpsOverviewForProject(orgId, projectId, { precomputedRecords: surveyResponseRecords }),
+    getNpsOverviewForProject(orgId, projectId, { precomputedRecords: surveyResponseRecords, sampledFrom }),
     getFeedbackThemeDigestForProject(orgId, projectId, { precomputedRecords: surveyResponseRecords }),
     Promise.all(DIMENSIONS.map((dimension) => getNpsDimensionBreakdownForProject(orgId, projectId, dimension.key))),
   ]);
@@ -119,15 +129,26 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
           </div>
         )}
         <ul className="flex flex-wrap gap-1" aria-label={t('trendSparklineLabel')}>
-          {overview.dailyTrend.map((point) => (
-            <li
-              key={point.date}
-              title={`${point.date}: ${point.breakdown.totalResponses === 0 ? t('trendPointEmpty') : point.breakdown.npsScore}`}
-              className="h-6 w-2 rounded-sm bg-muted"
-              style={point.breakdown.totalResponses > 0 ? { opacity: 0.4 + Math.min(point.breakdown.totalResponses, 5) * 0.12 } : undefined}
-            />
-          ))}
+          {overview.dailyTrend.map((point) => {
+            // A day before `trendReliableFrom` is a day the read never reached,
+            // which is not the same as a day nobody answered. Saying "no
+            // responses" there asserts something about data that was never
+            // looked at — and a run of them at the left edge draws a rising
+            // trend that is an artefact of the fetch limit (KAN-167).
+            const notRead = overview.trendReliableFrom !== null && point.date < overview.trendReliableFrom;
+            return (
+              <li
+                key={point.date}
+                title={`${point.date}: ${notRead ? t('trendPointNotRead') : point.breakdown.totalResponses === 0 ? t('trendPointEmpty') : point.breakdown.npsScore}`}
+                className={notRead ? 'h-6 w-2 rounded-sm border border-dashed border-muted-foreground/40' : 'h-6 w-2 rounded-sm bg-muted'}
+                style={!notRead && point.breakdown.totalResponses > 0 ? { opacity: 0.4 + Math.min(point.breakdown.totalResponses, 5) * 0.12 } : undefined}
+              />
+            );
+          })}
         </ul>
+        {overview.trendReliableFrom !== null ? (
+          <p className="text-xs text-muted-foreground">{t('trendTruncatedNotice', { from: overview.trendReliableFrom, limit: overview.sampledFrom ?? 0 })}</p>
+        ) : null}
       </section>
 
       <section className="flex flex-col gap-3">
