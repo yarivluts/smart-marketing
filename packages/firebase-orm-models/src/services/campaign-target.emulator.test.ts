@@ -169,6 +169,26 @@ describe('getCampaignSpendBreakdownForProject', () => {
     expect(byId.get('untargeted_campaign')).toEqual({ campaignId: 'untargeted_campaign', actualSpend: 40, monthlyBudget: null, status: 'no_target' });
     expect(outcome.rows).toHaveLength(4);
   });
+
+  it('reports no_spend_data rather than a measured zero when the project has no spend at all', async () => {
+    // The case that was quietly wrong: a project whose ad connector has never
+    // synced has targets but an empty series. Every targeted campaign used to
+    // render "0 spent against your target - On target", which reads as
+    // comfortably under budget rather than as having no idea.
+    const { owner, organization, project } = await setupOrgWithProject('Campaign Spend No Data Org');
+    await ensureSaasMetricPackSchemasRegistered(organization.id, project.id, owner.id);
+    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
+    await setCampaignTargetBudget({ organizationId: organization.id, projectId: project.id, campaignId: 'never_synced_campaign', monthlyBudget: 5000, updatedByUserId: owner.id });
+    const executor = new FakeWarehouseQueryExecutor([]);
+
+    const outcome = await getCampaignSpendBreakdownForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+
+    expect(outcome.rows).toEqual([
+      { campaignId: 'never_synced_campaign', actualSpend: null, monthlyBudget: 5000, status: 'no_spend_data' },
+    ]);
+  });
 });
 
 describe('getPaybackOverviewForProject', () => {

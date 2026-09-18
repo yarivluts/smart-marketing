@@ -1039,6 +1039,8 @@
     "statusOverTarget": "Over target",
     "statusOnTarget": "On target",
     "statusNoTarget": "No target set",
+    "statusNoSpendData": "No spend data",
+    "spendNoData": "No data",
     "targetUpdateError": "Couldn't update the target. Please try again.",
     "targetInputLabel": "Spend target for {campaignId}",
     "targetInputPlaceholder": "No target"
