@@ -2,7 +2,7 @@ import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQu
 import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
-import { auditMetricCatalogHealth, listMetricDefinitionsForProject } from './metric-registry.service';
+import { auditMetricCatalogHealth } from './metric-registry.service';
 import { getOnboardingState } from './onboarding.service';
 import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 
@@ -453,26 +453,35 @@ const MAX_INSIGHTS_LIMIT = 100;
  *
  * A `metric_health` insight's `occurredAt` is the definition's own
  * `created_at` (the moment the broken definition entered the catalog), so
- * it sorts as old news rather than crowding out today's wins — and stays
- * stable across calls, the same way an alert's `detected_at` does.
+ * it reads as long-standing rather than as news, and stays stable across
+ * calls the same way an alert's `detected_at` does. It is deliberately NOT
+ * what decides whether the insight survives the limit — see the
+ * warnings-before-wins note at the bottom of this function, which exists
+ * because dating them that way used to guarantee they were the first thing
+ * dropped.
  */
 export async function listProjectInsights(params: ListProjectInsightsParams): Promise<ProjectInsight[]> {
   const limit = clampLimit(params.limit, DEFAULT_INSIGHTS_LIMIT, MAX_INSIGHTS_LIMIT);
 
-  const [alerts, wins, metricProblems, metricDefs] = await Promise.all([
+  const [alerts, wins, metricProblems] = await Promise.all([
     listActiveTrackingAlertsForProject(params.organizationId, params.projectId),
     listRecentWinEventsForProject(params.organizationId, params.projectId, limit),
     auditMetricCatalogHealth(params.organizationId, params.projectId),
-    listMetricDefinitionsForProject(params.organizationId, params.projectId),
   ]);
-  const createdAtByDefId = new Map(metricDefs.map((def) => [def.id, def.created_at] as const));
 
   const metricHealthInsights: ProjectInsight[] = metricProblems.map((problem) => ({
     kind: 'metric_health',
     id: `metric-health:${problem.metricDefId}`,
     title: `Metric "${problem.name}" cannot be queried as defined`,
     detail: problem.reasons.join(' '),
-    occurredAt: createdAtByDefId.get(problem.metricDefId) ?? new Date(0).toISOString(),
+    // Straight off the problem, which carries the definition's own `created_at`.
+    // This used to be a lookup into a second read of the same collection, with
+    // `?? new Date(0).toISOString()` behind it — so a lookup miss rendered a
+    // 1970 timestamp to the user as if it were the real one, and (being the
+    // oldest possible date, under a newest-first sort) put the insight at the
+    // very back of the queue to be dropped. A safety net that hid the thing it
+    // was protecting.
+    occurredAt: problem.createdAt,
     severity: 'warning',
     metricName: problem.name,
     version: problem.version,
@@ -502,7 +511,33 @@ export async function listProjectInsights(params: ListProjectInsightsParams): Pr
     clientId: win.client_id,
   }));
 
-  return [...alertInsights, ...winInsights, ...metricHealthInsights]
-    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
-    .slice(0, limit);
+  const newestFirst = (a: ProjectInsight, b: ProjectInsight) => b.occurredAt.localeCompare(a.occurredAt);
+
+  // Warnings claim their slots before wins do, rather than every kind competing
+  // on recency alone (KAN-156).
+  //
+  // Merging all three and slicing by date looked neutral and was not. A
+  // `metric_health` insight is dated by the *definition's* `created_at` — old
+  // by construction, deliberately so, "so it sorts as old news rather than
+  // crowding out today's wins". Under a newest-first slice that guarantees it
+  // is dropped first. A project with `limit` recent wins therefore showed
+  // nothing else at all: not one broken metric, not one silent schema. The
+  // tracking alerts that led this list were pushed out the same way once they
+  // aged past a day of wins.
+  //
+  // That is the exact failure EasySign's P-03 audit reported — 32 of 40 metrics
+  // failing at query time while `list_insights` "reported nothing" — and fixing
+  // the audit (which added this kind) did not fix it, because the insight was
+  // computed correctly and then discarded before it was returned.
+  //
+  // The asymmetry is the point: a win is a nice-to-know that recurs, a warning
+  // is something broken that stays broken until someone acts. Losing the
+  // newest win costs a scroll; losing the only warning costs the reason the
+  // page exists. Both source lists are independently bounded upstream
+  // (`DEFAULT_TRACKING_ALERT_LIST_LIMIT`, and one problem per active metric),
+  // so warnings-first cannot itself grow unboundedly.
+  const warnings = [...alertInsights, ...metricHealthInsights].sort(newestFirst).slice(0, limit);
+  const winsThatFit = winInsights.sort(newestFirst).slice(0, Math.max(0, limit - warnings.length));
+
+  return [...warnings, ...winsThatFit].sort(newestFirst);
 }

@@ -4,6 +4,8 @@ import { can } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
+import { DEFAULT_QUERY_COST_LOG_LIST_LIMIT } from '@growthos/firebase-orm-models';
+import { splitOverFetchedFeed } from '@/lib/orgs/capped-list-view';
 import { checkProjectQueryQuota, getProjectCostQuota, listOrgProjects, listQueryCostLogEntriesForProject } from '@/lib/orgs/queries';
 import { formatEstimatedCostUsd, formatLabels, outcomeLabelKey, summariseLoggedCost, toProjectCostQuotaView, toQueryCostLogEntryView } from '@/lib/orgs/cost-guardrail-view';
 import { SetCostQuotaForm } from '@/components/orgs/set-cost-quota-form';
@@ -46,7 +48,7 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
   const [projects, quota, logEntries] = await Promise.all([
     listOrgProjects(orgId),
     getProjectCostQuota(orgId, projectId),
-    listQueryCostLogEntriesForProject(orgId, projectId),
+    listQueryCostLogEntriesForProject(orgId, projectId, DEFAULT_QUERY_COST_LOG_LIST_LIMIT + 1),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -57,7 +59,13 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
   const quotaStatus = await checkProjectQueryQuota(orgId, projectId, quota);
 
   const quotaView = toProjectCostQuotaView(quota);
-  const logViews = logEntries.map(toQueryCostLogEntryView);
+  // Sliced BEFORE the total is computed, so "across these entries" means exactly
+  // the entries rendered. Over-fetching by one measures truncation instead of
+  // guessing it from length - and the truncation note is what makes the total's
+  // own scoping ("across these entries") interpretable, since a reader who
+  // believes the list is complete reads that total as the project's spend.
+  const costPage = splitOverFetchedFeed(logEntries, DEFAULT_QUERY_COST_LOG_LIST_LIMIT);
+  const logViews = costPage.rows.map(toQueryCostLogEntryView);
 
   /*
     What these queries actually cost.
@@ -134,7 +142,9 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
             ) : null}
           </div>
         ) : null}
-        <p className="text-xs text-muted-foreground">{t('logCapNote', { count: logViews.length })}</p>
+        <p className="text-xs text-muted-foreground">
+          {costPage.truncated ? t('logCapNoteTruncated', { count: logViews.length }) : t('logCapNote', { count: logViews.length })}
+        </p>
       </section>
     </main>
   );

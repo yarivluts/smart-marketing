@@ -246,7 +246,19 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
                                 </li>
                               ))}
                             </ul>
-                            <p className="text-xs text-muted-foreground">{t('membersCapNote', { count: memberListView.entries.length })}</p>
+                            {/* This panel has something the other capped lists do
+                                not: an authoritative total, already fetched for the
+                                segment's own member count. So it states "N of M"
+                                rather than flagging truncation - knowing you are
+                                seeing 50 of 4,312 is strictly more useful than
+                                knowing there are more. Falls back to the bare count
+                                only when the count query itself degraded, since
+                                then no total exists to compare against. */}
+                            <p className="text-xs text-muted-foreground">
+                              {memberCountView?.kind === 'ok'
+                                ? t('membersCapNoteOfTotal', { count: memberListView.entries.length, total: memberCountView.count })
+                                : t('membersCapNote', { count: memberListView.entries.length })}
+                            </p>
                           </>
                         )
                       ) : memberListView.kind === 'warehouse_not_configured' ? (

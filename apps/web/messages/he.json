@@ -719,14 +719,15 @@
     "landedAtLine": "נקלט ב-{landedAt}",
     "clientIdLine": "מזהה {clientId}",
     "capNote": "מוצגות {count} הרשומות האחרונות.",
+    "capNoteTruncated": "מוצגות {count} הרשומות האחרונות — קיימות עוד מעבר למוצג.",
     "filterFieldLabel": "סינון לפי שדה",
     "filterFieldPlaceholder": "בחר שדה",
     "filterValueLabel": "ערך",
     "filterValuePlaceholder": "ערך מדויק",
     "filterApply": "סנן",
     "filterClear": "נקה סינון",
-    "filterActiveNote": "מסונן לרשומות שבהן {field} הוא {value}.",
-    "filterEmpty": "אין רשומות התואמות לסינון זה."
+    "filterActiveNote": "סונן לרשומות שבהן {field} הוא {value}, על פני {window} הרשומות האחרונות בסכמה זו.",
+    "filterEmpty": "אין רשומות התואמות לסינון מתוך {window} הרשומות האחרונות בסכמה זו. רשומה תואמת ישנה יותר מהחלון הזה אינה נסרקת — יש לצמצם לפי סכמה ולא להתייחס לכך כ\"אין רשומה כזו\"."
   },
   "Customers": {
     "metaTitle": "חיפוש לקוחות",
@@ -804,8 +805,8 @@
   "Insights": {
     "metaTitle": "תובנות",
     "title": "תובנות עבור {projectName}",
-    "description": "ממצאים בולטים ואחרונים עבור פרויקט זה: מעקב שעלול להיות תקול ונצחונות שכללי הניצחון שלך זיהו זה עתה.",
-    "empty": "אין עדיין תובנות. הרשימה תתמלא ברגע שתתריע התראת מעקב או שכלל ניצחון יתאים.",
+    "description": "ממצאים בולטים אחרונים בפרויקט הזה: מעקב שייתכן שנשבר, מדדים שכבר לא ניתן לתשאל כפי שהוגדרו, וזכיות שכללי הזכייה שלכם זיהו.",
+    "empty": "אין עדיין תובנות. התוכן יופיע כאשר תתריע התראת מעקב, יתאים כלל זכייה, או כאשר מדד רשום יפסיק להיות ניתן לתשאול.",
     "trackingAlertTitle": "המעקב עלול להיות תקול: \"{schemaName}\" השתתק",
     "trackingAlertDetail": "לא נקלטו רשומות \"{schemaName}\" חדשות מאז {lastSeenAt}.",
     "winEventTitle": "ניצחון: {winRuleName}",
@@ -815,7 +816,8 @@
     "severityLabel": {
       "info": "מידע",
       "warning": "אזהרה"
-    }
+    },
+    "truncated": "מוצגות {count} התובנות האחרונות. אזהרות מופיעות לפני זכיות, כך ששום תקלה אינה מוסתרת מאחורי רצף זכיות - אך רשומות ישנות יותר מעבר לנקודה הזו אינן מוצגות."
   },
   "Feedback": {
     "metaTitle": "משוב ו-NPS",
@@ -846,7 +848,9 @@
     "themePerformance": "ביצועים",
     "themeMissingFeatures": "פיצ'רים חסרים",
     "themeOnboarding": "הצטרפות",
-    "themeUsability": "שימושיות"
+    "themeUsability": "שימושיות",
+    "trendPointNotRead": "לא נקרא - מעבר למגבלת התשובות",
+    "trendTruncatedNotice": "המגמה שלמה רק החל מ-{from} ואילך. לפרויקט הזה יש יותר מ-{limit} תשובות, ולכן הקריאה נעצרה לפני תחילת החלון - הימים הקודמים אינם ידועים, ולא ריקים."
   },
   "Support": {
     "metaTitle": "תמיכה",
@@ -862,7 +866,9 @@
     "rowValueUnavailable": "—",
     "durationSeconds": "{value} שניות",
     "durationMinutes": "{value} דקות",
-    "durationHours": "{value} שעות"
+    "durationHours": "{value} שעות",
+    "sampledNotice": "המספרים האלה מכסים את {limit} אירועי הפניות האחרונים, ולא את כל ההיסטוריה שלכם - קיימים אירועים נוספים. הדירוג הוא דירוג בתוך החלון הזה: נציג שהפניות שפתר נמצאות מחוצה לו ידורג נמוך יותר, או לא יופיע כלל.",
+    "backlogUnavailable": "לא ניתן לחישוב מקריאה מוגבלת. פנייה נפתחת ונפתרת בהפרש של שבועות, ולכן חלון של אירועים אחרונים מכיל פתרונות שהפתיחות שלהם כבר יצאו מהחלון - חיסור אחד מהשני לא יספור פניות פתוחות."
   },
   "Demos": {
     "metaTitle": "הדגמות",
@@ -882,7 +888,8 @@
     "recentDemosIntro": "עיין/י ברשומות הדגמה בודדות:",
     "recentDemosLinkLabel": "הדגמות אחרונות",
     "workListIntro": "רוצה למצוא לקוחות משלמים שמעולם לא קיבלו הדגמה?",
-    "workListLinkLabel": "בנה/י את הרשימה הזו בדף הסגמנטים"
+    "workListLinkLabel": "בנה/י את הרשימה הזו בדף הסגמנטים",
+    "sampledNotice": "המספרים האלה מכסים את {limit} אירועי הדמו האחרונים, ולא את כל ההיסטוריה שלכם - קיימים אירועים נוספים. התייחסו לספירות כאל רף תחתון, ולשיעור ההגעה בזהירות: החלון נמדד באירועים, ודמו נקבע באירוע אחד ומתקיים או מוחמץ באירוע אחר, כך שדמו יכול ליפול חלקית מחוץ לחלון."
   },
   "ChurnReasons": {
     "metaTitle": "סיבות נטישה",
@@ -954,8 +961,8 @@
   "Firmographics": {
     "metaTitle": "נתונים פירמוגרפיים",
     "title": "נתונים פירמוגרפיים עבור {projectName}",
-    "description": "סיווג ענף, גודל חברה ואזור באמצעות בינה מלאכותית, עם לוחות מחוונים להרכב לקוחות (# מול $) והתראות על שינוי בהרכב.",
-    "setupIntro": "התקן את חבילת ההעשרה הפירמוגרפית כדי להתחיל לסווג פרופילים עסקיים שדווחו על ידי הלקוחות.",
+    "description": "תחום, גודל ואזור של החברה מתוך אירועי company_firmographic שלכם, עם לוחות הרכב # מול $ והתראות על שינוי הרכב. התחום נקבע משם החברה והדומיין לפי רשימת מילות מפתח קבועה ב-SDK המעקב — לא על ידי מודל AI ולא על ידי שירות העשרה חיצוני.",
+    "setupIntro": "התקינו את חבילת Firmographic כדי לרשום את סכמת company_firmographic ואת שתי מטריקות ההרכב. אתם מספקים שם חברה, דומיין, גודל ואזור; התחום נקבע מהשם ומהדומיין לפי רשימת מילות מפתח קבועה, עם נפילה לקטגוריה אחר. אין פנייה לשום מקור נתונים חיצוני.",
     "industryHeading": "לקוחות לפי ענף",
     "industryEmpty": "עדיין לא נקלטו פרופילים פירמוגרפיים עבור פרויקט זה.",
     "industryCount": "{count, plural, one {פרופיל #} other {# פרופילים}}",
@@ -967,7 +974,7 @@
     "byRegionEmpty": "הרכב לפי אזור עדיין לא זמין — חבר מחסן נתונים כדי לראות זאת.",
     "dimensionValueUnknown": "לא ידוע",
     "compositionCount": "{count, plural, one {פרופיל #} other {# פרופילים}}",
-    "compositionMrr": "{amount}$ הכנסה חודשית",
+    "compositionMrr": "{amount} MRR (יחידה קטנה)",
     "alertsHeading": "התראות על שינוי בהרכב",
     "alertsEmpty": "אין התראות פעילות על שינוי בהרכב.",
     "alertShift": "השתנה מ-{baseline}% ל-{current}% מהפרופילים החדשים",
@@ -1039,6 +1046,8 @@
     "statusOverTarget": "מעל היעד",
     "statusOnTarget": "בתוך היעד",
     "statusNoTarget": "לא הוגדר יעד",
+    "statusNoSpendData": "אין נתוני הוצאה",
+    "spendNoData": "אין נתונים",
     "targetUpdateError": "עדכון היעד נכשל. נסו שוב.",
     "targetInputLabel": "יעד הוצאה עבור {campaignId}",
     "targetInputPlaceholder": "ללא יעד"
@@ -1070,6 +1079,7 @@
     "logEntryCost": "עלות משוערת: {cost}",
     "logEntryCostUnknown": "עלות משוערת: לא זמינה",
     "logCapNote": "מוצגות {count} רשומות יומן העלות האחרונות.",
+    "logCapNoteTruncated": "מוצגות {count} רשומות עלות השאילתות האחרונות — קיימות עוד מעבר למוצג, ולכן כל סכום שנקרא מרשימה זו הוא חסם תחתון.",
     "outcomeExecuted": "בוצע",
     "outcomeBlockedQuotaExceeded": "נחסם — חריגה ממכסה",
     "outcomeWarehouseNotConfigured": "בוצע (עדיין לא הוגדר מחסן נתונים)"
@@ -1081,7 +1091,8 @@
     "chainInvalid": "בדיקת התקינות נכשלה ברשומה {entryId}. ייתכן שהיומן הזה שובש.",
     "noEntries": "עדיין לא נרשמו שינויים מבוקרים עבור ארגון זה.",
     "actorLine": "{actorType} {actorId} · {action}",
-    "listCapNote": "מוצגות {count} הרשומות האחרונות."
+    "listCapNote": "מוצגות {count} הרשומות האחרונות.",
+    "listCapNoteTruncated": "מוצגות {count} הרשומות האחרונות — קיימות עוד מעבר למוצג, כך שזהו חלון אל היומן ולא היומן כולו."
   },
   "PluginRegistry": {
     "metaTitle": "מרשם תוספים",
@@ -1172,7 +1183,7 @@
     "builtinPackQualityScoreTitle": "ניקוד כוונה ואיכות",
     "builtinPackQualityScoreDescription": "ציון איכות בעת ההרשמה, עלות רכישה/הרשמה מותאמת איכות, והתראות שינוי תמהיל לפי ערוץ.",
     "builtinPackFirmographicTitle": "העשרת נתונים פירמוגרפיים",
-    "builtinPackFirmographicDescription": "סיווג ענף, גודל חברה ואזור באמצעות בינה מלאכותית, עם לוחות מחוונים להרכב לקוחות (# מול $) והתראות על שינוי בהרכב.",
+    "builtinPackFirmographicDescription": "רושמת את סכמת company_firmographic ואת מטריקות ההרכב # מול $ על הפרופילים שאתם שולחים. התחום נקבע משם החברה והדומיין לפי רשימת מילות מפתח קבועה — לא מודל AI ולא שירות העשרה חיצוני.",
     "builtinPackExperimentTitle": "ניסויים",
     "builtinPackExperimentDescription": "חשיפות והמרות בניסויי A/B לפי וריאנט, כולל בדיקת מובהקות סטטיסטית מול קבוצת ביקורת.",
     "builtinPackSupportTitle": "תמיכת לקוחות",
@@ -1448,6 +1459,7 @@
     "memberLastSeenLine": "נראה לאחרונה {lastSeenAt}",
     "memberFieldLine": "{name}: {value}",
     "membersCapNote": "מוצגים {count} החברים העדכניים ביותר.",
+    "membersCapNoteOfTotal": "מוצגים {count} מתוך {total} חברים.",
     "deleteConfirm": "למחוק את הפלח הזה? לא ניתן לבטל פעולה זו.",
     "deleteButton": "מחק",
     "deleteError": "לא ניתן היה למחוק את הפלח. נסה שוב.",
@@ -1532,7 +1544,8 @@
     "feedItem": "{winRuleName} — {schemaName} ({clientId})",
     "historyHeading": "היסטוריית ניצחונות",
     "historyEmpty": "טרם נרשמו ניצחונות.",
-    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים."
+    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים.",
+    "historyListCapNoteTruncated": "מוצגים {count} הזכיות האחרונות — קיימות עוד מעבר למוצג."
   },
   "TrialPipeline": {
     "heading": "צינור ניסיונות",
