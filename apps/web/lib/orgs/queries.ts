@@ -52,6 +52,7 @@ import {
   getNpsOverviewForProject as getNpsOverviewForProjectInOrganization,
   getNpsDimensionBreakdownForProject as getNpsDimensionBreakdownForProjectInOrganization,
   listSurveyResponseRecordsForProject as listSurveyResponseRecordsForProjectInOrganization,
+  type GetNpsOverviewOptions,
   type NpsOverview,
   type NpsBreakdownDimension,
   type NpsDimensionBreakdownOutcome,
@@ -370,9 +371,10 @@ export async function listRecentRecordsForSchema(
   kind: SchemaDefKind,
   schemaName: string,
   fieldFilter?: RecordFieldFilter,
+  limit?: number,
 ): Promise<RawRecordModel[]> {
   await ensureFirestoreOrm();
-  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName], fieldFilter });
+  return listRecentRecordsForSchemasInOrganization({ organizationId, projectId, kind, schemaNames: [schemaName], fieldFilter, ...(limit !== undefined ? { limit } : {}) });
 }
 
 export async function listRecentChurnedSubscriptionsForProject(
@@ -465,7 +467,7 @@ export async function getEventVolumeOverviewForProject(
 export async function getNpsOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
+  options?: GetNpsOverviewOptions,
 ): Promise<NpsOverview> {
   await ensureFirestoreOrm();
   return getNpsOverviewForProjectInOrganization(organizationId, projectId, options);
@@ -992,12 +994,16 @@ export async function queryProjectFunnelSteps(
 }
 
 /**
- * Recent noteworthy findings for a project (active tracking-broke alerts + fired win-rule events,
- * newest first) — the `list_insights` MCP tool's web admin counterpart, for the Insights page.
+ * Recent noteworthy findings for a project (active tracking-broke alerts, metrics that can no
+ * longer be queried as defined, and fired win-rule events, newest first) — the `list_insights` MCP
+ * tool's web admin counterpart, for the Insights page.
+ *
+ * `limit` is forwarded so the page can over-fetch by one and report truncation it has measured
+ * rather than inferred — see `splitOverFetchedFeed`. Omitted, the service applies its own default.
  */
-export async function listProjectInsights(organizationId: string, projectId: string): Promise<ProjectInsight[]> {
+export async function listProjectInsights(organizationId: string, projectId: string, limit?: number): Promise<ProjectInsight[]> {
   await ensureFirestoreOrm();
-  return listProjectInsightsInOrganization({ organizationId, projectId });
+  return listProjectInsightsInOrganization({ organizationId, projectId, limit });
 }
 
 export async function listWinRulesForProject(organizationId: string, projectId: string): Promise<WinRuleModel[]> {
@@ -1005,9 +1011,9 @@ export async function listWinRulesForProject(organizationId: string, projectId: 
   return listWinRulesForProjectInOrganization(organizationId, projectId);
 }
 
-export async function listRecentWinEventsForProject(organizationId: string, projectId: string): Promise<WinEventModel[]> {
+export async function listRecentWinEventsForProject(organizationId: string, projectId: string, limit?: number): Promise<WinEventModel[]> {
   await ensureFirestoreOrm();
-  return listRecentWinEventsForProjectInOrganization(organizationId, projectId);
+  return listRecentWinEventsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 /** The live win feed's incremental-poll building block — see `feed/route.ts`'s own doc comment. */

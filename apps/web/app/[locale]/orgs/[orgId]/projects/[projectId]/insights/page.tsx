@@ -6,10 +6,14 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, listProjectInsights } from '@/lib/orgs/queries';
 import { buildInsightsView } from '@/lib/orgs/insights-view';
+import { splitOverFetchedFeed } from '@/lib/orgs/billing-ops-view';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
 }>;
+
+/** How many insights this page renders. Matches `listProjectInsights`'s own default so the page shows what the MCP tool would return for the same project. */
+const INSIGHTS_PAGE_SIZE = 20;
 
 export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
@@ -51,8 +55,15 @@ export default async function InsightsPage({ params }: PageProps): Promise<React
     notFound();
   }
 
-  const insights = await listProjectInsights(orgId, projectId);
-  const view = buildInsightsView(insights);
+  // Over-fetch by one so truncation is measured, not inferred: `length === cap`
+  // cannot tell "exactly this many exist" from "far more exist", and this page
+  // is read as the list of everything wrong with the project. A capped list of
+  // problems with nothing saying it is capped is read as the full set of
+  // problems — the same defect class as KAN-114/138/146, but here the thing
+  // being under-reported is what the user is supposed to act on.
+  const fetched = await listProjectInsights(orgId, projectId, INSIGHTS_PAGE_SIZE + 1);
+  const { rows, truncated } = splitOverFetchedFeed(fetched, INSIGHTS_PAGE_SIZE);
+  const view = buildInsightsView(rows);
 
   const t = await getTranslations('Insights');
 
@@ -79,6 +90,8 @@ export default async function InsightsPage({ params }: PageProps): Promise<React
           ))}
         </ul>
       )}
+
+      {truncated ? <p className="text-xs text-muted-foreground">{t('truncated', { count: INSIGHTS_PAGE_SIZE })}</p> : null}
     </main>
   );
 }

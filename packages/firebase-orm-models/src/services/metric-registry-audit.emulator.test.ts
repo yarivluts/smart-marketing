@@ -213,4 +213,30 @@ describe('auditMetricCatalogHealth (P-03)', () => {
     await archiveMetricDefinition({ organizationId: organization.id, projectId: project.id, name: 'ad_spend', archivedByUserId: owner.id });
     expect(await auditMetricCatalogHealth(organization.id, project.id)).toEqual([]);
   });
+
+  /**
+   * `createdAt` is the definition's real `created_at` (KAN-157). It used to be
+   * rebuilt inside `listProjectInsights` from a second read of this same
+   * collection, behind `?? new Date(0).toISOString()` — so a lookup miss
+   * rendered 1970-01-01 to the user as though it were the moment the metric
+   * broke and, being the oldest date expressible, sorted the insight to the
+   * back of a newest-first list where the limit dropped it first.
+   *
+   * The epoch is asserted against explicitly, not just the equality: the
+   * equality alone would still pass if a fallback returned for some row the
+   * fixture does not cover.
+   */
+  it('carries the definition own created_at, never an epoch placeholder', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Registry Health Timestamp Org');
+    await registerMetricDefinition({ organizationId: organization.id, projectId: project.id, name: 'ad_spend', definition: fixtureAdSpend, dimensions: [], createdByUserId: owner.id });
+
+    const [problem] = await auditMetricCatalogHealth(organization.id, project.id);
+    const definition = await getActiveMetricDefinition(organization.id, project.id, 'ad_spend');
+
+    expect(problem.createdAt).toBe(definition?.created_at);
+    expect({ createdAt: problem.createdAt, isEpoch: Date.parse(problem.createdAt) === 0 }).toEqual({
+      createdAt: problem.createdAt,
+      isEpoch: false,
+    });
+  });
 });

@@ -1,10 +1,27 @@
 name: CI
 
+# `pull_request` deliberately carries no `branches:` filter, and names `edited`
+# among its types. Both matter, and this repo was paying for neither (KAN-163).
+#
+# `branches: [main]` filters on the PR's BASE, so a PR stacked on another
+# branch matched nothing and got no CI at all — not a pending check, not a
+# failing one, but an empty checks list, which in `gh pr list` output is
+# indistinguishable from a green one. Three PRs merged that way in one
+# afternoon.
+#
+# `edited` is what fires when a PR's base branch changes. It is not in the
+# default set (`opened`, `synchronize`, `reopened`), so retargeting a stacked
+# PR onto `main` — the standard way to unstack before merging — still left it
+# with no CI, and nothing said so.
+#
+# Stacked PRs are normal here: a page review sits on the previous one whenever
+# both touch `apps/web/messages`. Running CI on every PR costs a few minutes
+# per branch; not running it costs a merge to `main` nobody checked.
 on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    types: [opened, synchronize, reopened, edited]
 
 concurrency:
   group: ci-${{ github.ref }}
