@@ -17,6 +17,96 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #34: the apps/web Firestore transport (KAN-103 reopened)
+
+No page review this pass. Diagnosing #449's CI failure turned up something worth the whole hour:
+**KAN-103 was reported closed across the repo, and was never closed for `apps/web`.** I reported it
+closed. It was not.
+
+### KAN-165: every emulator-backed test in apps/web ran on the corrupting transport
+
+- #449 touched **one GitHub workflow file** and failed with a 120s timeout in a credentials route
+  test, carrying the unmistakable signature: `RESOURCE_EXHAUSTED: Received message larger than max
+  (537396242 vs 4194304)` - a corrupted length prefix, not a real message size - alongside
+  `INTERNAL ASSERTION FAILED: Unexpected state` with binary noise in its context.
+- `ensureFirestoreOrm` branches on `typeof window === 'undefined'`: Admin SDK in Node, client SDK
+  otherwise. Its doc comment justified that with *"this app's UNIT tests were never exposed because
+  vitest runs them with `environment: 'jsdom'`, which resolves the client SDK's browser build where
+  `experimentalForceLongPolling` is real."*
+- **That sentence is false.** jsdom supplies DOM globals; it does not change module resolution
+  conditions. Under vitest `require.resolve('firebase/firestore')` returns `dist/index.cjs.js` -
+  the gRPC build, where `forceLongPolling` is stored on the database info and never consulted.
+- So the whole app's emulator suite sat on the unprotected path **for as long as it was believed
+  protected**, and the belief was written down, which is why nobody looked again. Same class as
+  KAN-120/124/125/127 (a comment asserting what the code does not do), except this one kept a live
+  bug alive rather than merely misdescribing a working one.
+
+### The fix is the test environment, not the branch
+
+`app/api/**` and `lib/orgs/**` now run under `node`, so they reach the Admin SDK - no long-lived
+`Listen` stream, nothing to corrupt - and exercise the connection production uses, which was
+KAN-103's own argument everywhere else. Every file under those globs was checked for DOM use first;
+the only match anywhere was `document.cookie` inside an XSS payload string.
+
+### I got it wrong first, and the emulator corrected me
+
+I probed `firebase-admin`'s own `initializeApp` under jsdom, saw it initialize fine, concluded the
+second half of the old comment was also false, and **deleted the branch entirely**. The emulator run
+failed immediately: `initializeAdminApp can only be called in a Node.js environment`. The ORM's
+entry point carries its own browser guard; the raw package's does not.
+
+**Measuring the wrong function is how you conclude a branch is removable when it is not.** The test
+now pins both facts side by side - jsdom resolves the gRPC build, *and* the ORM's admin connect
+refuses under jsdom - so the next person measures the right one. Worth noting the asymmetry: the
+false claim and the true claim sat in the same paragraph, and I checked neither before acting on
+both.
+
+### Verified by the artefact, not the exit code - again
+
+Switching `app/api` alone still left corrupted-stream lines in the log **while the suite reported
+2526 passing**. `lib/orgs`'s five emulator files were still on gRPC, and a green exit said nothing
+about them. This is the KAN-128 lesson repeating almost exactly, so the check here is a grep over
+the run log rather than the exit status:
+
+```
+grep -cE 'GrpcConnection|RESOURCE_EXHAUSTED|INTERNAL ASSERTION'  ->  0
+Test Files 388 passed | Tests 2526 passed
+```
+
+Three times now this cycle the exit code has been the wrong instrument. The habit that works:
+**decide what the fix should make disappear from the output, then grep for it.**
+
+### Left alone deliberately
+
+`testTimeout: 120_000` and `retry: 1` were mitigations for this exact flake and now protect nothing
+they were written for. Kept anyway: these tests still hit a real emulator over the network and
+Playwright boots a real Next server, and removing a safety net in the same change that removes its
+justification would leave two possible explanations for the next timeout instead of one. The comment
+now says so, and says what measurement should settle it later.
+
+### Process note, repeated
+
+I started this work on `docs/progress-33` by mistake - the same wrong-branch slip as pass #33, one
+pass after writing the lesson down. Caught before committing both times, but a note is evidently not
+a habit. The check is `git rev-parse --abbrev-ref HEAD` **before the first edit**, not before the
+first commit.
+
+- **Last completed:** KAN-165 as PR #452. Merged #450 (demos sampling) and closed KAN-164 as Done.
+- **In progress (exact stopping point):** #449 (CI triggers) failed on this very flake and needs a
+  re-run once #452 merges - its own change is unrelated and sound. #444, #446, #447, #448, #451
+  still have no CI runs at all; that is what #449 fixes, so it wants merging first.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #452, re-run #449, merge it, then push to the stalled PRs so they finally
+  get checked, and merge in order. Then back to page review: KAN-159 (shared date formatter) and
+  KAN-155 (mixed-currency firmographic MRR) are the best standing work. Unreviewed surfaces
+  remaining: feedback, field-mappings, intent-quality, plugins, rep-collections, resources,
+  settings, support, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #33: demos (+ a CI trigger gap found on the way in)
 
 ### KAN-163: CI never ran on stacked PRs, and did not re-run on retarget
