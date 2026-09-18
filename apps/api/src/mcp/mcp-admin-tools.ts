@@ -121,6 +121,32 @@ function actorId(auth: McpAuthContext): string {
 }
 
 /** Shared body for every admin tool — identical shape to `mcp-act-tools.ts`'s `runActTool`, with this module's own error vocabulary. */
+/**
+ * Which permission a `register_schema` call needs — `mcp.read` for a dry run,
+ * `schema.write` to actually create the schema (KAN-175).
+ *
+ * A dry run writes nothing, and gating it at write level made the safety net
+ * exactly as hard to reach as the thing it protects against: anyone who could
+ * preview could already commit, and anyone who could not commit could not even
+ * look. The person checking whether their schema file is correct — in order to
+ * decide whether to ask for write access — was precisely who the preview was
+ * built for, and precisely who could not run it. It also made a scope problem
+ * present as a validation problem, since the refusal arrives where a schema
+ * error would.
+ *
+ * The information-disclosure objection does not survive contact with
+ * `list_schemas`, which needs only `mcp.read` and already returns every active
+ * schema's name, kind, version and fields. A dry run's "would this name
+ * conflict" is strictly less than that, over the same namespace.
+ *
+ * Reads the RAW args, not the parsed ones: the permission check runs before the
+ * handler, so anything other than a literal `true` here must fall through to
+ * `schema.write` rather than be coerced into a dry run.
+ */
+export function requiredRegisterSchemaPermission(args: unknown): Permission {
+  return (args as { dry_run?: unknown } | null | undefined)?.dry_run === true ? 'mcp.read' : 'schema.write';
+}
+
 async function runAdminTool<Args>(auth: McpAuthContext, permission: Permission, args: unknown, handler: (args: Args) => Promise<ToolResult>): Promise<ToolResult> {
   if (!(await mcpCallerHasPermission(auth, permission))) {
     return errorResult(insufficientPermissionMessage(auth, permission));
@@ -319,11 +345,11 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
     {
       title: 'Register schema',
       description:
-        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. There is no delete or archive path for a schema and evolve_schema is additive-only, so a mistake here is permanent: pass dry_run first to check your work, and read the warnings it returns. Requires "schema.write".',
+        'Register the first version (v1) of an event, entity or measure schema for this project. Until a schema exists, every record of that kind is rejected into quarantine - so this is the step that has to happen before any tracking data can land. A measure or entity schema also becomes queryable as a metric table under its own name. There is no delete or archive path for a schema and evolve_schema is additive-only, so a mistake here is permanent: pass dry_run first to check your work, and read the warnings it returns. Committing requires "schema.write"; a dry run needs only "mcp.read", so you can check a schema before you have permission to create one.',
       inputSchema: toolInputSchema(registerSchemaInputShape),
     },
     auditedToolHandler(auth, 'register_schema', async (args: any) =>
-      runAdminTool(auth, 'schema.write', args, async (a: any) => {
+      runAdminTool(auth, requiredRegisterSchemaPermission(args), args, async (a: any) => {
         const request = {
           organizationId: auth.organizationId,
           projectId: auth.projectId,

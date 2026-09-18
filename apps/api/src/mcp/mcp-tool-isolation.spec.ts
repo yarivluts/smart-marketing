@@ -20,7 +20,11 @@ import path from 'node:path';
  * `mcp.controller.e2e.spec.ts` (see that file's own "cross-project isolation" describe block).
  */
 
-type ToolGate = { kind: 'connection-scope'; permission: 'mcp.read' } | { kind: 'per-call-permission'; permission: string };
+type ToolGate =
+  | { kind: 'connection-scope'; permission: 'mcp.read' }
+  | { kind: 'per-call-permission'; permission: string }
+  /** A tool whose required permission depends on what the call does — see `register_schema` (KAN-175). */
+  | { kind: 'per-call-permission-varies'; writePermission: string; readOnlyPermission: 'mcp.read'; readOnlyWhen: string };
 
 const EXPECTED_TOOLS: Record<string, ToolGate> = {
   list_metrics: { kind: 'connection-scope', permission: 'mcp.read' },
@@ -47,7 +51,9 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   list_goals: { kind: 'connection-scope', permission: 'mcp.read' },
   get_goal_progress: { kind: 'connection-scope', permission: 'mcp.read' },
   delete_goal: { kind: 'per-call-permission', permission: 'dashboards.write' },
-  register_schema: { kind: 'per-call-permission', permission: 'schema.write' },
+  // Dual-gated: a dry run writes nothing and needs only `mcp.read`, so the
+  // preview is reachable by someone deciding whether to ask for write access.
+  register_schema: { kind: 'per-call-permission-varies', writePermission: 'schema.write', readOnlyPermission: 'mcp.read', readOnlyWhen: 'dry_run === true' },
   evolve_schema: { kind: 'per-call-permission', permission: 'schema.write' },
   register_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
   evolve_metric: { kind: 'per-call-permission', permission: 'metrics.write' },
@@ -99,6 +105,21 @@ describe('MCP tool registry is a maintained, isolation-gated inventory (KAN-77)'
     expect(actToolGates.length).toBeGreaterThan(0);
     for (const gate of actToolGates) {
       expect(gate.permission).not.toBe('mcp.read');
+    }
+  });
+
+  /**
+   * A dual-gated tool still has to put a real permission in front of the half
+   * that writes — the read-level path exists for previews only, and must never
+   * become the gate on the mutating branch (KAN-175).
+   */
+  it('a tool whose permission varies still gates its writing path above mcp.read', () => {
+    const varying = Object.values(EXPECTED_TOOLS).filter((gate) => gate.kind === 'per-call-permission-varies');
+    expect(varying.length).toBeGreaterThan(0);
+    for (const gate of varying) {
+      expect(gate.writePermission).not.toBe('mcp.read');
+      expect(gate.readOnlyPermission).toBe('mcp.read');
+      expect(gate.readOnlyWhen.length).toBeGreaterThan(0);
     }
   });
 
