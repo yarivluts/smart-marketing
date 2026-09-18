@@ -121,8 +121,47 @@ describe('getDemoFunnelForProject', () => {
     precomputed.payload = { event: 'demo_event', event_id: unique('event'), ts: '2026-09-02T08:00:00.000Z', properties: { demo_id: 'precomputed', stage: 'scheduled' } };
     precomputed.landed_at = '2026-09-02T08:00:00.000Z';
 
-    const result = await getDemoFunnelForProject(organization.id, project.id, { precomputedRecords: [precomputed] });
+    const result = await getDemoFunnelForProject(organization.id, project.id, { precomputedRecords: [precomputed], sampledFrom: null });
     expect(result.demosScheduled).toBe(1);
+  });
+
+  /**
+   * Every number this page renders comes from a bounded read of the most recent
+   * raw events, and until KAN-164 nothing carried that fact out of the service —
+   * so the page showed a sample as the project's totals.
+   *
+   * The show rate is the one that misleads hardest. The window is the most
+   * recent N *events*, not demos, and one demo emits `scheduled` and then
+   * `held`/`no_show` later, so the window cuts across demo lifecycles at both
+   * ends. Here `d3`'s `scheduled` is the oldest event and falls outside a
+   * two-record window, while its `held` stays inside: the funnel reports a demo
+   * held that it never saw scheduled. That is not a bug to fix in the
+   * aggregation — it is inherent to a recency window — which is exactly why it
+   * has to be disclosed instead.
+   *
+   * `sampledFrom` is asserted to be the cap rather than merely truthy, because
+   * the page prints it.
+   */
+  it('reports the cap it sampled under, and reports null when it saw everything', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('Sales Funnel Sampling Org');
+    await ensureDemoEventSchemaRegistered({ organizationId: organization.id, projectId: project.id, createdByUserId: owner.id });
+
+    await landDemoEvent({ organizationId: organization.id, projectId: project.id, environmentId, demoId: 'd3', stage: 'scheduled', repOrgPersonId: 'rep_1', landedAt: '2026-09-01T08:00:00.000Z' });
+    await landDemoEvent({ organizationId: organization.id, projectId: project.id, environmentId, demoId: 'd3', stage: 'held', repOrgPersonId: 'rep_1', landedAt: '2026-09-01T09:00:00.000Z' });
+    await landDemoEvent({ organizationId: organization.id, projectId: project.id, environmentId, demoId: 'd4', stage: 'scheduled', repOrgPersonId: 'rep_1', landedAt: '2026-09-01T10:00:00.000Z' });
+
+    const sampled = await getDemoFunnelForProject(organization.id, project.id, { limit: 2 });
+    expect(sampled.sampledFrom).toBe(2);
+    // The window kept d4/scheduled and d3/held, and dropped d3/scheduled — so a
+    // held demo appears with no scheduled event behind it. Pinned deliberately:
+    // it is the distortion the notice exists to warn about.
+    expect({ scheduled: sampled.demosScheduled, held: sampled.demosHeld }).toEqual({ scheduled: 1, held: 1 });
+
+    // A limit at the record count is NOT sampling — the read saw everything.
+    // Inferring from `length === limit` would call this a sample and warn falsely.
+    const exact = await getDemoFunnelForProject(organization.id, project.id, { limit: 3 });
+    expect(exact.sampledFrom).toBeNull();
+    expect({ scheduled: exact.demosScheduled, held: exact.demosHeld }).toEqual({ scheduled: 2, held: 1 });
   });
 
   it('throws ProjectNotFoundError for a project id that does not exist', async () => {
