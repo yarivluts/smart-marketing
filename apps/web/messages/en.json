@@ -805,8 +805,8 @@
   "Insights": {
     "metaTitle": "Insights",
     "title": "Insights for {projectName}",
-    "description": "Recent noteworthy findings for this project: tracking that may be broken and wins your win rules just caught.",
-    "empty": "No insights yet. This fills in once a tracking alert fires or a win rule matches.",
+    "description": "Recent noteworthy findings for this project: tracking that may be broken, metrics that can no longer be queried as defined, and wins your win rules just caught.",
+    "empty": "No insights yet. This fills in once a tracking alert fires, a win rule matches, or a registered metric stops being queryable.",
     "trackingAlertTitle": "Tracking may be broken: \"{schemaName}\" has gone silent",
     "trackingAlertDetail": "No new \"{schemaName}\" records landed since {lastSeenAt}.",
     "winEventTitle": "Win: {winRuleName}",
@@ -816,7 +816,8 @@
     "severityLabel": {
       "info": "Info",
       "warning": "Warning"
-    }
+    },
+    "truncated": "Showing the {count} most recent insights. Warnings are listed before wins, so nothing broken is hidden behind a run of wins - but older entries beyond this point are not shown."
   },
   "Feedback": {
     "metaTitle": "Feedback & NPS",
