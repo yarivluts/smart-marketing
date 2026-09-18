@@ -3,7 +3,7 @@ import { randomBytes, createHmac } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
-  connectFirestoreOrm,
+  connectFirestoreOrmAdmin,
   createHookEndpoint,
   createOrganizationWithOwner,
   createProject,
@@ -34,7 +34,14 @@ let localCurrentKeyId: string;
 beforeAll(async () => {
   process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8100';
   process.env.FIREBASE_PROJECT_ID = 'demo-growthos-test';
-  await connectFirestoreOrm({ projectId: 'demo-growthos-test', emulatorHost: '127.0.0.1:8100' });
+  // Admin SDK, not the client SDK (KAN-128). These specs previously called
+  // connectFirestoreOrm against the emulator, which is the gRPC Listen stream
+  // that corrupts - the signature being RESOURCE_EXHAUSTED with a nonsense
+  // multi-gigabyte size, a garbage length prefix rather than a real message. It
+  // failed CI on documentation-only pull requests. The Admin SDK reads
+  // FIRESTORE_EMULATOR_HOST from the environment itself and opens no long-lived
+  // stream, so there is no framing to lose.
+  await connectFirestoreOrmAdmin({ projectId: 'demo-growthos-test' });
 
   const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
   localKeyRing = keyRing;
