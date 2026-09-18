@@ -1900,8 +1900,8 @@
     },
     "leaderboardEmpty": "עדיין אין גבייה משויכת.",
     "leaderboardRank": "{rank}. {name}",
-    "leaderboardRowSummary": "{amount} ({count, plural, one {רשומה אחת} other {# רשומות}})",
-    "leaderboardUnattributed": "בנוסף {amount} שטרם שויכו לנציג ({count, plural, one {רשומה אחת} other {# רשומות}})",
+    "leaderboardRowSummary": "{amount} {currency} ({count, plural, one {רשומה אחת} other {# רשומות}})",
+    "leaderboardUnattributed": "בנוסף {amount} {currency} שטרם שויכו לנציג ({count, plural, one {רשומה אחת} other {# רשומות}})",
     "signalsHeading": "הצעות מחיוב",
     "noSignals": "אין כרגע חיובים לא משויכים להצעה.",
     "signalSummary": "לקוח {customerId}: {amount} {currency}",
@@ -1944,7 +1944,12 @@
     "deleteConfirm": "למחוק את רשומת היומן? לא ניתן לבטל פעולה זו.",
     "deleteButton": "מחיקה",
     "deleteError": "מחיקת הרשומה נכשלה. נסו שוב.",
-    "amountInputLabel": "סכום"
+    "amountInputLabel": "סכום",
+    "leaderboardRowSummaryNoCurrency": "{amount} ({count, plural, one {רשומה אחת} other {# רשומות}})",
+    "leaderboardUnattributedNoCurrency": "בנוסף {amount} שטרם שויכו לנציג ({count, plural, one {רשומה אחת} other {# רשומות}})",
+    "amountCurrencyNote": "הסכומים נשמרים כמספרים בלבד ללא מטבע משלהם, ולכן הם מוצגים במטבע הפרויקט ({currency}). רשומות שהוזנו במטבע אחר נספרות באותם סכומים.",
+    "amountCurrencyUnsetNote": "לא הוגדר מטבע לפרויקט הזה, ולכן סכומי היומן הם מספרים ללא יחידה. הגדירו מטבע בהגדרות הפרויקט כדי לתת לסכומים האלה יחידה.",
+    "signalCurrencyMismatch": "החיוב הזה הוא ב-{signalCurrency}, אך היומן מנוהל ב-{projectCurrency}. הוספתו מערבבת מטבעות בסכום הדירוג - המירו את הסכום לפני השמירה."
   },
   "RepCollectionLeaderboard": {
     "heading": "מובילי הגבייה השבוע",
