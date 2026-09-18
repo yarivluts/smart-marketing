@@ -185,7 +185,9 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
               {spendOutcome.rows.map((row) => (
                 <tr key={row.campaignId} className="border-b border-input last:border-0">
                   <td className="py-2 pe-3 font-medium">{row.campaignId}</td>
-                  <td className="py-2 pe-3 tabular-nums">{row.actualSpend.toLocaleString(locale)}</td>
+                  <td className="py-2 pe-3 tabular-nums">
+                    {row.actualSpend === null ? t('spendNoData') : row.actualSpend.toLocaleString(locale)}
+                  </td>
                   <td className="py-2 pe-3">
                     <CampaignTargetInput orgId={orgId} projectId={projectId} campaignId={row.campaignId} monthlyBudget={row.monthlyBudget} />
                   </td>

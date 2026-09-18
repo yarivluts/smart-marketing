@@ -529,6 +529,70 @@ describe('listProjectInsights', () => {
     const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, limit: 2 });
     expect(insights).toHaveLength(2);
   });
+
+  /**
+   * A warning is never evicted by wins, however recent the wins are (KAN-156).
+   *
+   * The merge used to sort all three kinds by date and slice, which reads as
+   * neutral and is not: wins are the only kind that arrives continuously, so on
+   * any active project they fill every slot. A tracking alert from last week and
+   * a `metric_health` insight — dated by the definition's `created_at`, old by
+   * construction — were both pushed out by this week's wins and never shown.
+   *
+   * That is the page's whole purpose failing silently, and it is the shape of
+   * EasySign's P-03 report: metrics failing at query time while `list_insights`
+   * "reported nothing". The audit that added the kind did not fix it, because
+   * the insight was computed correctly and then discarded on the way out.
+   *
+   * The fixture is the minimum that reproduces it: `limit` wins, all newer than
+   * the one alert. Under the old sort the alert is element `limit` and is
+   * sliced off, so this fails on the old code for the right reason rather than
+   * by counting rows.
+   */
+  it('keeps a warning that every win outranks by date', async () => {
+    const { organization, project } = await setupOrgWithProject('Warning Eviction Org');
+    const limit = 2;
+
+    const alert = new TrackingAlertModel();
+    alert.organization_id = organization.id;
+    alert.project_id = project.id;
+    alert.environment_id = 'env-1';
+    alert.schema_name = 'checkout_completed';
+    alert.status = 'active';
+    alert.trigger = 'manual';
+    alert.detected_at = '2026-07-01T00:00:00.000Z';
+    alert.last_seen_at = '2026-06-30T00:00:00.000Z';
+    alert.last_checked_at = '2026-07-01T00:00:00.000Z';
+    alert.setPathParams({ organization_id: organization.id, project_id: project.id });
+    await alert.save();
+
+    for (let i = 0; i < limit; i += 1) {
+      const win = new WinEventModel();
+      win.organization_id = organization.id;
+      win.project_id = project.id;
+      win.environment_id = 'env-1';
+      win.win_rule_id = `rule-${i}`;
+      win.win_rule_name = `Big order ${i}`;
+      win.win_type = 'generic';
+      win.schema_name = 'order_completed';
+      win.raw_record_id = `record-${i}`;
+      win.client_id = `client-${i}`;
+      win.payload = { amount: 500 };
+      // Every win is newer than the alert — the condition that used to erase it.
+      win.occurred_at = `2026-08-0${i + 1}T00:00:00.000Z`;
+      win.created_at = `2026-08-0${i + 1}T00:00:00.000Z`;
+      win.setPathParams({ organization_id: organization.id, project_id: project.id });
+      await win.save();
+    }
+
+    const insights = await listProjectInsights({ organizationId: organization.id, projectId: project.id, limit });
+
+    expect(insights).toHaveLength(limit);
+    expect({ keptTheAlert: insights.some((insight) => insight.kind === 'tracking_alert') }).toEqual({ keptTheAlert: true });
+    // Display order is still newest-first: warnings win the slot, not the sort.
+    const occurredAts = insights.map((insight) => insight.occurredAt);
+    expect(occurredAts).toEqual([...occurredAts].sort().reverse());
+  });
 });
 
 describe('KAN-39 cost-guardrail quota, wired via runQuotaGatedWarehouseQuery', () => {
