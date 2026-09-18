@@ -120,16 +120,57 @@ describe('getSignupQualityScoreAdjustedMetricsForProject', () => {
     expect(outcome.ok === false && outcome.reason).toBe('warehouse_not_configured');
   });
 
-  it('reads both ratios straight off the compiled query row when a warehouse executor is wired up', async () => {
+  it('computes both ratios from the folded sum components when a warehouse executor is wired up', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Adjusted Metrics Wired Org');
     await ensureQualityScorePackRegistered(organization.id, project.id, owner.id);
-    const executor = new StaticWarehouseQueryExecutor([{ quality_adjusted_cost_per_signup: 12.5, quality_adjusted_cac: 40.25 }]);
+    // 1000 spend over 8000/100 = 80 weighted signups and 2000/100 = 20 weighted
+    // new-paying: 12.5 and 50.
+    const executor = new StaticWarehouseQueryExecutor([
+      { ad_spend: 1000, signup_quality_score_sum: 8000, paying_signup_quality_score_sum: 2000 },
+    ]);
 
     const outcome = await getSignupQualityScoreAdjustedMetricsForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
 
     expect(outcome.ok).toBe(true);
     if (!outcome.ok) throw new Error('unreachable');
-    expect(outcome.metrics).toEqual({ costPerSignup: 12.5, cac: 40.25 });
+    expect(outcome.metrics).toEqual({ costPerSignup: 12.5, cac: 50 });
+  });
+
+  /**
+   * The headline figures used to be read off `series[0]`, which is only the
+   * whole answer when the query returns exactly one bucket (KAN-168).
+   *
+   * `grain: 'year'` was picked to make that likely, but the window is a
+   * trailing 90 days, so it crosses a calendar-year boundary for every window
+   * ending between 1 January and 31 March — a quarter of the year. On those
+   * days there are two buckets and `series[0]`, ordered by `bucket_date`
+   * ascending, is the OLDER one: the figure described only the part of the
+   * window in the previous year, silently, and got worse the deeper into Q1 it
+   * ran. By late March that is a few December days standing in for ninety.
+   *
+   * This fixture is that situation: the old year holds a tenth of the spend and
+   * a tenth of the quality, the new year the rest. Reading `series[0]` gives
+   * 10/(800/100) = 1.25; folding both buckets gives the true 100/(8000/100) =
+   * 1.25 — deliberately equal, so the ratio alone cannot distinguish the two
+   * implementations. The CAC leg is what separates them: the old year's paying
+   * quality is disproportionately low, so `series[0]` reports 10/(100/100) = 10
+   * where the folded answer is 100/(2000/100) = 5. Twice the true cost of
+   * acquisition, presented as current.
+   */
+  it('folds every bucket when the window straddles a year boundary, rather than reporting the oldest', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Adjusted Metrics Year Straddle Org');
+    await ensureQualityScorePackRegistered(organization.id, project.id, owner.id);
+    const executor = new StaticWarehouseQueryExecutor([
+      // Ordered oldest-first, as `ORDER BY bucket_date` returns them.
+      { bucket_date: '2026-01-01', ad_spend: 10, signup_quality_score_sum: 800, paying_signup_quality_score_sum: 100 },
+      { bucket_date: '2027-01-01', ad_spend: 90, signup_quality_score_sum: 7200, paying_signup_quality_score_sum: 1900 },
+    ]);
+
+    const outcome = await getSignupQualityScoreAdjustedMetricsForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('unreachable');
+    expect(outcome.metrics).toEqual({ costPerSignup: 1.25, cac: 5 });
   });
 
   it('reports null for either ratio when the series comes back empty (e.g. zero signups in the window)', async () => {

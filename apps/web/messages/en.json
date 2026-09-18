@@ -956,7 +956,8 @@
     "byCohortHeading": "By signup cohort",
     "byCohortEmpty": "No cohort breakdown available yet — connect a data warehouse to see this.",
     "dimensionValueUnknown": "Unknown",
-    "dimensionAverageScore": "Avg {average} ({count, plural, one {# signup} other {# signups}})"
+    "dimensionAverageScore": "Avg {average} ({count, plural, one {# signup} other {# signups}})",
+    "adjustedMetricsWindowNote": "Over the last {days} days. Both figures weight each signup by its quality score, so a signup scored 50 counts as half a signup."
   },
   "Firmographics": {
     "metaTitle": "Firmographics",
@@ -1303,7 +1304,8 @@
       "not_yet_backed": "Not backed by real data yet",
       "query_error": "Couldn't load this tile"
     },
-    "sessionReplayLinkTitle": "Open the session recordings for this landing page"
+    "sessionReplayLinkTitle": "Open the session recordings for this landing page",
+    "sessionReplayLinkTitleUnfiltered": "Open your session-replay tool. This project template does not filter to a single page, so this opens the same view for every row."
   },
   "Goals": {
     "metaTitle": "Goals",
@@ -1840,13 +1842,14 @@
   "SessionReplaySettings": {
     "metaTitle": "Session replay",
     "title": "Session replay — {projectName}",
-    "intro": "Point this project at your session-replay / heatmap tool (Microsoft Clarity, Hotjar, FullStory, ...). Landing-page rows on your boards will then link straight to the recordings for that page.",
+    "intro": "Point this project at your session-replay / heatmap tool (Microsoft Clarity, Hotjar, FullStory, ...). Landing-page rows on your boards then link into it - filtered to that page when your template includes the '{landing_page}' placeholder, and to the tool itself when it does not.",
     "templateLabel": "Deep-link URL template",
-    "templatePlaceholder": "https://clarity.microsoft.com/projects/view/PROJECT/impressions?Url={landing_page}",
-    "templateHelp": "Paste a URL from your replay tool. {landing_page} is replaced with the page URL. Leave empty to show no link.",
+    "templatePlaceholder": "https://clarity.microsoft.com/projects/view/PROJECT/impressions?Url='{landing_page}'",
+    "templateHelp": "Paste a URL from your replay tool. '{landing_page}' is replaced with the page URL - without it, every row links to the same unfiltered page. Leave empty to show no link.",
     "save": "Save",
     "saved": "Saved.",
-    "saveError": "Could not save the template. Check that it is an http(s) URL."
+    "saveError": "Could not save the template. Check that it is an http(s) URL.",
+    "savedWithoutPlaceholder": "Saved, but this template has no '{landing_page}' placeholder, so every landing-page row will link to the same unfiltered page. Add the placeholder if you meant to filter to each page."
   },
   "OrganizationSettings": {
     "metaTitle": "Organization settings",

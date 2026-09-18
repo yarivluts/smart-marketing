@@ -212,15 +212,57 @@ export async function getSignupQualityScoreAdjustedMetricsForProject(
       executor: options?.executor,
       cache: options?.cache,
       request: {
-        metrics: ['quality_adjusted_cost_per_signup', 'quality_adjusted_cac'],
+      // The three SUM-shaped components, not the two ratio metrics (KAN-168).
+      //
+      // `grain: 'year'` was chosen to make a single bucket likely, and the
+      // ratios were then read straight off `series[0]`. But a trailing 90-day
+      // window crosses a calendar-year boundary for every window ending between
+      // 1 January and 31 March — a quarter of the year, not an edge case — and
+      // on those days the query returns two buckets, while `series[0]`, ordered
+      // by `bucket_date` ascending, is the OLDER one. The headline figure then
+      // described only the part of the window falling in the previous year, and
+      // said nothing about it: by late March that is a handful of December days
+      // standing in for ninety, three months stale, labelled as current CAC.
+      // The error grew the further into Q1 it ran.
+      //
+      // No grain fixes it — `year` is the coarsest the compiler has, so any
+      // trailing window can straddle. What fixes it is the distinction this
+      // module already documents elsewhere: a formula-kind ratio cannot be
+      // re-averaged across buckets, but a sum-shaped metric folds by addition.
+      // All three of these are sums, so they are folded over every bucket and
+      // the ratios computed once from the totals. Identical results whenever
+      // there was one bucket; correct ones when there is more than one.
+        metrics: ['ad_spend', 'signup_quality_score_sum', 'paying_signup_quality_score_sum'],
         dimensions: [],
         time: { start, end, grain: 'year' },
       },
     });
-    const row = result.series[0];
-    const costPerSignup = row && row.quality_adjusted_cost_per_signup !== null ? toWarehouseNumber(row.quality_adjusted_cost_per_signup) : null;
-    const cac = row && row.quality_adjusted_cac !== null ? toWarehouseNumber(row.quality_adjusted_cac) : null;
-    return { ok: true, metrics: { costPerSignup, cac } };
+
+    let adSpend = 0;
+    let scoreSum = 0;
+    let payingScoreSum = 0;
+    for (const row of result.series) {
+      adSpend += toWarehouseNumber(row.ad_spend);
+      scoreSum += toWarehouseNumber(row.signup_quality_score_sum);
+      payingScoreSum += toWarehouseNumber(row.paying_signup_quality_score_sum);
+    }
+
+    // `/ 100` is `quality_weighted_signups`'/`quality_weighted_new_paying`'s own
+    // definition: a signup scored 100 counts as one signup-equivalent.
+    const weightedSignups = scoreSum / 100;
+    const weightedNewPaying = payingScoreSum / 100;
+
+    // `null`, not zero, for an absent denominator — what the compiled
+    // `SAFE_DIVIDE` produced, and what the page renders as unavailable. A zero
+    // would read as free acquisition: the most favourable number on the page
+    // standing in for the absence of one.
+    return {
+      ok: true,
+      metrics: {
+        costPerSignup: weightedSignups > 0 ? adSpend / weightedSignups : null,
+        cac: weightedNewPaying > 0 ? adSpend / weightedNewPaying : null,
+      },
+    };
   } catch (error) {
     return classifyMetricQueryError(error) as SignupQualityScoreAdjustedMetricsOutcome;
   }

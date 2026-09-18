@@ -30,6 +30,7 @@ export function SessionReplaySettingsForm({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [filtersByPage, setFiltersByPage] = useState(true);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -46,6 +47,13 @@ export function SessionReplaySettingsForm({
         setError(t('saveError'));
         return;
       }
+      // Read the flag off the response rather than re-deriving it from the
+      // local input: what matters is what was stored, and the server trims
+      // before saving. Defaults to "it filters" only when the field is absent
+      // entirely, so an older API shape stays silent rather than warning
+      // wrongly about a template that is fine.
+      const body = (await response.json().catch(() => null)) as { filtersByPage?: boolean } | null;
+      setFiltersByPage(body?.filtersByPage ?? true);
       setSaved(true);
       router.refresh();
     } finally {
@@ -70,6 +78,13 @@ export function SessionReplaySettingsForm({
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {saved && !error ? <p className="text-sm text-muted-foreground">{t('saved')}</p> : null}
+      {/* Saving succeeded either way — this says WHICH of the two was saved. A
+          template with no placeholder is a valid choice, so this is a note, not
+          an error, and it is the only place the difference is visible: on the
+          board both kinds render as an ordinary link on every row. */}
+      {saved && !error && !filtersByPage && template.trim() ? (
+        <p className="text-sm text-muted-foreground">{t('savedWithoutPlaceholder')}</p>
+      ) : null}
 
       <div>
         <Button type="submit" disabled={submitting}>
