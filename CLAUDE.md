@@ -19,7 +19,12 @@ scheduled Claude agent. This file is the contract every run follows. Read it fir
 - **Firestore only via `@growthos/firebase-orm-models`** (which wraps `@arbel/firebase-orm`). Never
   import the raw Firebase SDK in app/feature code. New collections = new models in that package.
 - **No hard-coded UI strings.** All user-facing text lives in translation resource files
-  (`next-intl`, en + he). A lint rule enforces this.
+  (`next-intl`, en + he). Enforced by a ratchet test, not a lint rule:
+  `apps/web/messages/hardcoded-strings.test.ts` counts hard-coded JSX text and fails if the total
+  rises. `react/jsx-no-literals` is deliberately `off` — it flags punctuation as eagerly as prose,
+  and a rule that has to be disabled to get work done is how this guarantee became decorative once
+  already (KAN-176: the rule was off, this file claimed it was not, and 183 strings accumulated).
+  The baseline goes down, never up; moving strings into `en.json`/`he.json` is how you lower it.
 - **No Hebrew in code files.** Hebrew belongs only in translation resource files, never in `.ts`/
   `.tsx`/config/source.
 - **Everything user-manageable gets an admin surface.** If a human needs to view or change it, build
