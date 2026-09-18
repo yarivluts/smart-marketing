@@ -115,7 +115,7 @@ describe('Tier 1: High-Impact TV Billboard & War Room Display Mode (R2.6)', () =
     };
 
     await act(async () => {
-      renderWithIntl(<TvRotationScreen deviceToken="tv-token-123" manifest={mockManifest} />);
+      renderWithIntl(<TvRotationScreen deviceToken="tv-token-123" manifest={mockManifest} lastManifestAt={Date.now()} pollIntervalMs={90_000} />);
     });
 
     expect(screen.getByText('HQ War Room Billboard')).toBeInTheDocument();
@@ -163,7 +163,7 @@ describe('Tier 1: High-Impact TV Billboard & War Room Display Mode (R2.6)', () =
     vi.spyOn(tvClient, 'fetchTvBoardFrame').mockResolvedValue({ id: 'b1', name: 'Main Sales Board', tiles: [] });
 
     await act(async () => {
-      renderWithIntl(<TvRotationScreen deviceToken="tv-token-123" manifest={mockManifest} />);
+      renderWithIntl(<TvRotationScreen deviceToken="tv-token-123" manifest={mockManifest} lastManifestAt={Date.now()} pollIntervalMs={90_000} />);
     });
 
     // Initial frame: Board 1
@@ -243,7 +243,7 @@ describe('Tier 1: High-Impact TV Billboard & War Room Display Mode (R2.6)', () =
       repCollectionLeaderboard: EMPTY_LEADERBOARD,
     };
 
-    renderWithIntl(<TvRotationScreen deviceToken="tv-token-123" manifest={emptyManifest} />);
+    renderWithIntl(<TvRotationScreen deviceToken="tv-token-123" manifest={emptyManifest} lastManifestAt={Date.now()} pollIntervalMs={90_000} />);
     expect(screen.getByText(enMessages.TvMode.noFrames)).toBeInTheDocument();
   });
 });

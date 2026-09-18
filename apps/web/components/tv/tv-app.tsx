@@ -36,6 +36,7 @@ export function TvApp(): React.ReactElement {
   const [deviceToken, setDeviceToken] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const [manifest, setManifest] = useState<TvRotationManifest | null>(null);
+  const [lastManifestAt, setLastManifestAt] = useState<number | null>(null);
   const [resetCounter, setResetCounter] = useState(0);
 
   // Ensures a device token exists — resumes an already-claimed pairing from
@@ -104,6 +105,10 @@ export function TvApp(): React.ReactElement {
             knownPhase = 'claimed';
             setManifest(nextManifest);
             setPhase('claimed');
+            // Stamped only on SUCCESS. The failure path below deliberately
+            // leaves the last good manifest on screen, so this timestamp is the
+            // only thing that can tell a blip from an outage (KAN-172).
+            setLastManifestAt(Date.now());
           }
         } else {
           if (typeof window !== 'undefined') {
@@ -138,7 +143,7 @@ export function TvApp(): React.ReactElement {
   }, [deviceToken]);
 
   if (phase === 'claimed' && manifest && deviceToken) {
-    return <TvRotationScreen deviceToken={deviceToken} manifest={manifest} />;
+    return <TvRotationScreen deviceToken={deviceToken} manifest={manifest} lastManifestAt={lastManifestAt} pollIntervalMs={CLAIMED_POLL_INTERVAL_MS} />;
   }
 
   if (phase === 'error') {

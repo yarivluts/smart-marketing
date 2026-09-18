@@ -7,10 +7,15 @@ import { BoardTileView } from '@/components/orgs/board-tile-view';
 import { RepCollectionLeaderboardWidget } from '@/components/orgs/rep-collection-leaderboard-widget';
 import { WarRoomWinOverlay } from '@/components/tv/war-room-win-overlay';
 import { fetchTvBoardFrame, type TvBoardFrame, type TvRotationManifest } from '@/lib/tv/tv-client';
+import { isTvDisplayStale, minutesSinceLastUpdate } from '@/lib/tv/tv-staleness';
 
 export interface TvRotationScreenProps {
   deviceToken: string;
   manifest: TvRotationManifest;
+  /** When the manifest was last fetched SUCCESSFULLY, or `null` before the first one lands. Drives the stale banner (KAN-172). */
+  lastManifestAt: number | null;
+  /** The manifest poll cadence, so the staleness threshold is expressed in missed polls rather than a second hard-coded duration that could drift from it. */
+  pollIntervalMs: number;
 }
 
 type RotationFrame = { kind: 'board'; boardId: string; name: string } | { kind: 'goals' } | { kind: 'leaderboard' };
@@ -54,7 +59,7 @@ function buildFrames(manifest: TvRotationManifest): RotationFrame[] {
  * manifest refresh in `tv-app.tsx` that added/removed a board) — the AC's own
  * "runs 24h without leak" bar applied to the one timer this screen owns.
  */
-export function TvRotationScreen({ deviceToken, manifest }: TvRotationScreenProps): React.ReactElement {
+export function TvRotationScreen({ deviceToken, manifest, lastManifestAt, pollIntervalMs }: TvRotationScreenProps): React.ReactElement {
   const t = useTranslations('TvMode');
   const frames = buildFrames(manifest);
   const [frameIndex, setFrameIndex] = useState(0);
@@ -113,6 +118,17 @@ export function TvRotationScreen({ deviceToken, manifest }: TvRotationScreenProp
   return (
     <main className="flex min-h-screen flex-col gap-8 bg-background p-12">
       <WarRoomWinOverlay deviceToken={deviceToken} reducedMotion={manifest.reducedMotion} />
+
+      {/* Evaluated on every render, and the rotation timer guarantees one at
+          least every `rotationSeconds`, so the banner appears without needing a
+          clock of its own. Deliberately placed above the header: on a wall
+          display the question "are these numbers current?" outranks every
+          number under it (KAN-172). */}
+      {isTvDisplayStale(lastManifestAt, Date.now(), pollIntervalMs) && lastManifestAt !== null ? (
+        <p className="rounded-lg border border-amber-500/60 bg-amber-500/10 px-6 py-3 text-2xl font-semibold text-amber-600 dark:text-amber-400">
+          {t('staleBanner', { minutes: minutesSinceLastUpdate(lastManifestAt, Date.now()) })}
+        </p>
+      ) : null}
 
       <header className="flex items-center justify-between">
         <h1 className="text-4xl font-bold tracking-tight">{manifest.label}</h1>
