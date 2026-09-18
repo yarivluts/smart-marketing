@@ -19,6 +19,7 @@ import { EditCredentialForm } from '@/components/orgs/edit-credential-form';
 import { EditPersonForm } from '@/components/orgs/edit-person-form';
 import { EditTemplateForm } from '@/components/orgs/edit-template-form';
 import { PendingAttachmentRequests } from '@/components/orgs/pending-attachment-requests';
+import { describeSecretKeyState } from '@/lib/vault/kms-provider';
 import { SetCredentialSecretForm } from '@/components/orgs/set-credential-secret-form';
 import { PushAttachmentForm } from '@/components/orgs/push-attachment-form';
 import { ArchiveToggleButton } from '@/components/orgs/archive-toggle-button';
@@ -114,6 +115,11 @@ export default async function ResourceLibraryPage({
                       orgId={orgId}
                       credentialId={credential.id}
                       hasSecret={Boolean(credential.encrypted_secret)}
+                      /* Ciphertext existing is not the same as the secret being
+                         readable: a key retired from the ring leaves a stored
+                         secret that nothing can decrypt, and "Secret set" said
+                         the same thing either way (KAN-173). */
+                      secretKeyState={describeSecretKeyState(credential.encrypted_secret)}
                     />
                   ) : null}
                   {canManageResources ? (
