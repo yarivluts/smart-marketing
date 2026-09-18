@@ -17,6 +17,113 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #31: insights
+
+### Surface reviewed: insights
+
+Three findings, and the most consequential of this cycle so far - not because the bug was subtle,
+but because it silently defeated a fix an earlier pass had already shipped.
+
+### KAN-156: wins evicted every warning from the list
+
+- `listProjectInsights` merged all three insight kinds, sorted newest-first, and sliced to the
+  limit (default 20).
+- Wins are the only kind that arrives **continuously**, so on an active project they fill every
+  slot. Tracking alerts age out after a day or two of wins. `metric_health` insights never appeared
+  at all: they are dated by the **definition's own `created_at`** - old by construction, and
+  deliberately so, per the comment saying it should sort "as old news rather than crowding out
+  today's wins". Under a newest-first slice that stops being a display preference and **becomes
+  deletion**.
+- A project with 20 recent wins showed **nothing else**: not one broken metric, not one silent
+  schema.
+- **This is the exact failure EasySign's P-03 audit reported** - 32 of 40 metrics failing at query
+  time while `list_insights` "reported nothing". Adding the `metric_health` kind did not fix it,
+  because the insight was computed correctly and then **discarded on the way out**. The audit
+  closed the detection gap and left the delivery gap open, and nothing noticed because from inside
+  the audit the fix looked complete.
+- **Worth generalising:** a correct computation plus a lossy delivery step reads exactly like a
+  correct feature. The P-03 work tested that the problem was *detected*; nothing tested that it was
+  *shown*. Detection and delivery need separate assertions.
+- Fixed: warnings claim their slots first, wins fill the remainder, result still sorted
+  newest-first so display order is unchanged. Both warning sources are independently bounded
+  upstream, so warnings-first cannot grow without limit.
+
+### KAN-157: a fabricated 1970 timestamp behind a duplicate read
+
+- `occurredAt` was `createdAtByDefId.get(id) ?? new Date(0).toISOString()`, where the map came from
+  **re-reading the entire metric-definition collection that `auditMetricCatalogHealth` had just
+  queried**.
+- The page renders `occurredAt` directly, so a lookup miss showed the user **1970-01-01** as the
+  moment their metric broke. And the epoch being the oldest date expressible, a miss moved the
+  insight to the back of a newest-first list - where KAN-156's slice dropped it first. **A safety
+  net that hid the thing it was protecting.**
+- Fixed by carrying `createdAt` on `MetricHealthProblem` from the definition the audit already
+  holds. That removes the duplicate Firestore read *and* the fabricated value: there is no longer a
+  second snapshot for the first to disagree with.
+
+### KAN-158: copy describing two of three kinds, and a cap that looked complete
+
+- `description` promised "tracking that may be broken and wins your win rules just caught"; `empty`
+  said the page "fills in once a tracking alert fires or a win rule matches". Both predate
+  `metric_health` and neither was updated when it landed.
+- On an **empty** page that omission does real work: an admin is told the two things that would
+  populate it, so a project whose metrics are quietly unqueryable reads as a project with nothing
+  to report - from the one surface that exists to say otherwise.
+- The list was also rendered with nothing saying 20 was a cap. Same class as KAN-114/138/146,
+  except the under-reported thing here is **the list of what is broken**. Now over-fetches by one
+  and reports measured truncation via the existing `splitOverFetchedFeed`.
+
+### Tests
+
+- **Both behavioural fixes were verified to fail on the old code before being kept.** The eviction
+  test reports `keptTheAlert: false` against the old merge - the defect itself, not a row count -
+  and the copy test fails on the old strings while naming the offending sentence in its own failure
+  message. Continuing the KAN-128 discipline: a test passing is not evidence it would have caught
+  anything.
+- The copy test keys off the `titleKey` union rather than a hand-written list, so a fourth insight
+  kind fails until the page copy mentions it.
+
+### KAN-159 filed, not fixed: raw ISO timestamps
+
+Insights and rep-collections both render `occurredAt` as a raw `2026-09-18T04:45:15.123Z`.
+`getFormatter`/`useFormatter` appear **nowhere** in `apps/web`, so this is a missing shared
+primitive rather than a defect on one page - the same way `splitOverFetchedFeed` turned out to be at
+its eighth caller. Establishing an app-wide display convention inside a single page review would
+either stay a one-off or become the convention without anyone deciding it was.
+
+### Two git-workflow lessons, both mine, both worth not repeating
+
+- **`gh pr merge --delete-branch` closes anything stacked on the deleted branch, irreversibly.**
+  Merging #433 auto-closed #435, and `gh pr reopen` refuses once the base branch is gone ("Cannot
+  change the base branch of a closed pull request"). Recreated as #443. Retarget dependent PRs to
+  `main` *before* merging their base.
+- **A stack must be merged bottom-up, and its bottom must target `main`.** The docs stack was
+  #438 (`progress-28` -> `progress-27`), #440 (`-29` -> `-28`), #442 (`-30` -> `-29`). Merging them
+  top-down moved content *along* the stack without any of it reaching `main`: `progress-27` ended
+  up with only #438's content, while `progress-29` accumulated everything. Landed with a single PR
+  (#445) from `docs/progress-29` to `main`. The check that would have caught it immediately is
+  `git merge-base --is-ancestor origin/<branch> origin/main` - "the PR merged" and "the content is
+  on main" are different claims.
+
+- **Last completed:** KAN-156, KAN-157 and KAN-158 fixed, tested and pushed as PR #444 (three
+  commits, one per finding). KAN-159 filed. #433 merged; #435 recreated as #443; the docs chain
+  consolidated into #445.
+- **In progress (exact stopping point):** #441 (firmographics, KAN-153/154) and #443 awaiting CI
+  against `main`. #444 is stacked on #441 and needs retargeting to `main` once that merges. #445
+  lands passes #28-#30 of this journal.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design: the declaration is
+  merged, adoption needs a human `terraform plan` showing no changes.
+- **Next step:** merge #445, #441 and #443, then retarget and merge #444. KAN-159 is the best next
+  piece of real work - a shared primitive, so it pays off across surfaces rather than one. KAN-155
+  (mixed-currency firmographic MRR) is the other. Unreviewed surfaces remaining: demos, feedback,
+  field-mappings, intent-quality, plugins, rep-collections, resources, session-replay, settings,
+  support, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  (wiring a real goal target) are product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #30: firmographics
 
 ### Surface reviewed: firmographics
