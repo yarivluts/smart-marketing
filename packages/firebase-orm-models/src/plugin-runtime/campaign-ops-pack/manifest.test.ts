@@ -32,6 +32,6 @@ describe('CAMPAIGN_OPS_PACK_MANIFEST_YAML', () => {
     const manifest = parsePluginManifest(CAMPAIGN_OPS_PACK_MANIFEST_YAML);
     expect(new Set(manifest.registers.metrics)).toEqual(new Set(ALL_PACK_METRIC_NAMES));
     expect(manifest.registers.metrics).not.toContain('ad_spend');
-    expect(manifest.registers.metrics).toHaveLength(13);
+    expect(manifest.registers.metrics).toHaveLength(15);
   });
 });

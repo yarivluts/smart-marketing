@@ -66,6 +66,16 @@ calibration as (
         q.is_paying_customer,
         coalesce(p.collected_revenue_7d, 0) as collected_revenue_7d,
         coalesce(p.collected_revenue_40d, 0) as collected_revenue_40d,
+        -- Carried through so the calibration metrics can exclude customers
+        -- whose window has not elapsed (KAN-179). A signup from last week has
+        -- not "collected $0 in 40 days"; it has not had 40 days.
+        --
+        -- `false` for a scored signup with no payback row at all: that customer
+        -- produced no revenue events, so nothing establishes their acquisition
+        -- date here, and counting them as mature would reintroduce the bias
+        -- this flag exists to remove.
+        coalesce(p.window_7d_complete, false) as window_7d_complete,
+        coalesce(p.window_40d_complete, false) as window_40d_complete,
         q.ts
     from latest_scored_signup q
     left join {{ ref('fact_customer_payback') }} p
@@ -89,5 +99,7 @@ select
     is_paying_customer,
     collected_revenue_7d,
     collected_revenue_40d,
+    window_7d_complete,
+    window_40d_complete,
     ts
 from calibration

@@ -440,6 +440,27 @@ models:
       - name: collected_revenue_40d
         tests:
           - not_null
+      - name: window_7d_complete
+        description: >
+          Whether 7 days have actually elapsed since `acquired_at`. The
+          `collected_revenue_*d` columns sum charges within the window without
+          checking the window has passed, so a recently-acquired customer's
+          figure covers less time than its name says (KAN-179).
+        tests:
+          - not_null
+      - name: window_14d_complete
+        tests:
+          - not_null
+      - name: window_30d_complete
+        tests:
+          - not_null
+      - name: window_40d_complete
+        description: >
+          The one that matters most: `quality_calibration_avg_collected_revenue_40d`
+          divides by a signup count, so counting immature customers in the
+          denominator understates payback in proportion to acquisition rate.
+        tests:
+          - not_null
 
   - name: fact_cancellation_reason
     description: >
@@ -555,6 +576,14 @@ models:
           - accepted_values:
               values: ['true', 'false']
       - name: collected_revenue_40d
+        tests:
+          - not_null
+      - name: window_7d_complete
+        description: Carried from `fact_customer_payback`; `false` when no payback row exists, so an unmatured signup is never counted as matured (KAN-179).
+        tests:
+          - not_null
+      - name: window_40d_complete
+        description: What `quality_calibration_matured_signups_40d` and `quality_calibration_matured_revenue_40d` filter on, so both halves of the average share one population.
         tests:
           - not_null
       - name: ts
