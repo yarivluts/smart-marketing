@@ -105,6 +105,16 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
       <p className="text-sm text-muted-foreground">{t('description')}</p>
 
+      {/* Every number on this page comes from a bounded read of the most recent
+          raw events. Below the cap that read is the whole history and the counts
+          are totals; above it they are a sample, and the show rate in particular
+          stops describing the project at all — the window is the most recent N
+          *events*, so it cuts across demo lifecycles at both ends (KAN-164).
+          Said once, at the top, rather than per tile: it qualifies all of them. */}
+      {funnel.sampledFrom !== null ? (
+        <p className="rounded-md border border-input px-3 py-2 text-sm text-muted-foreground">{t('sampledNotice', { limit: funnel.sampledFrom })}</p>
+      ) : null}
+
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{t('funnelHeading')}</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -9,6 +9,8 @@ export function campaignSpendStatusLabelKey(status: CampaignSpendStatus): string
       return 'statusOnTarget';
     case 'no_target':
       return 'statusNoTarget';
+    case 'no_spend_data':
+      return 'statusNoSpendData';
     default: {
       const exhaustive: never = status;
       throw new Error(`Unknown campaign spend status "${exhaustive as string}".`);

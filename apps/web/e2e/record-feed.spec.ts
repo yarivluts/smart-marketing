@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { RECORD_FIELD_FILTER_CANDIDATE_WINDOW } from '@growthos/firebase-orm-models';
 import { seedIngestFixture } from './test-utils/seed-ingest';
 
 function uniqueEmail(prefix: string): string {
@@ -73,7 +74,17 @@ test.describe('Record feed (KAN-81)', () => {
     await page.getByLabel('Value').fill('42');
     await page.getByRole('button', { name: 'Filter' }).click();
 
-    await expect(page.getByText('Filtered to records where amount is 42.')).toBeVisible();
+    // The window half is asserted, not just the "filtered to" half: stating the
+    // filter without the window is precisely the defect this note was added to
+    // fix, so an assertion that passes on the old sentence would not have
+    // noticed. The constant is imported rather than spelled out so the two
+    // cannot drift apart. `toLocaleString` because next-intl formats a numeric
+    // placeholder through `Intl.NumberFormat`, so a window raised past 999 would
+    // render "5,000" and a bare template literal would stop matching.
+    const window = RECORD_FIELD_FILTER_CANDIDATE_WINDOW.toLocaleString('en-US');
+    await expect(
+      page.getByText(`Filtered to records where amount is 42, applied across the ${window} most recent records for this schema.`),
+    ).toBeVisible();
     await expect(page.getByText('id ord-1')).toBeVisible();
     await expect(page.getByText('id ord-2')).not.toBeVisible();
 

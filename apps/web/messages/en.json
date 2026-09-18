@@ -719,14 +719,15 @@
     "landedAtLine": "Landed {landedAt}",
     "clientIdLine": "id {clientId}",
     "capNote": "Showing the {count} most recent records.",
+    "capNoteTruncated": "Showing the {count} most recent records — more exist than are shown.",
     "filterFieldLabel": "Filter by field",
     "filterFieldPlaceholder": "Choose a field",
     "filterValueLabel": "Value",
     "filterValuePlaceholder": "Exact value",
     "filterApply": "Filter",
     "filterClear": "Clear filter",
-    "filterActiveNote": "Filtered to records where {field} is {value}.",
-    "filterEmpty": "No records match this filter."
+    "filterActiveNote": "Filtered to records where {field} is {value}, applied across the {window} most recent records for this schema.",
+    "filterEmpty": "No records match this filter in the {window} most recent records for this schema. A matching record older than that window is not searched — narrow by schema or check a more recent window rather than reading this as \"no such record\"."
   },
   "Customers": {
     "metaTitle": "Customer search",
@@ -804,8 +805,8 @@
   "Insights": {
     "metaTitle": "Insights",
     "title": "Insights for {projectName}",
-    "description": "Recent noteworthy findings for this project: tracking that may be broken and wins your win rules just caught.",
-    "empty": "No insights yet. This fills in once a tracking alert fires or a win rule matches.",
+    "description": "Recent noteworthy findings for this project: tracking that may be broken, metrics that can no longer be queried as defined, and wins your win rules just caught.",
+    "empty": "No insights yet. This fills in once a tracking alert fires, a win rule matches, or a registered metric stops being queryable.",
     "trackingAlertTitle": "Tracking may be broken: \"{schemaName}\" has gone silent",
     "trackingAlertDetail": "No new \"{schemaName}\" records landed since {lastSeenAt}.",
     "winEventTitle": "Win: {winRuleName}",
@@ -815,7 +816,8 @@
     "severityLabel": {
       "info": "Info",
       "warning": "Warning"
-    }
+    },
+    "truncated": "Showing the {count} most recent insights. Warnings are listed before wins, so nothing broken is hidden behind a run of wins - but older entries beyond this point are not shown."
   },
   "Feedback": {
     "metaTitle": "Feedback & NPS",
@@ -846,7 +848,9 @@
     "themePerformance": "Performance",
     "themeMissingFeatures": "Missing features",
     "themeOnboarding": "Onboarding",
-    "themeUsability": "Usability"
+    "themeUsability": "Usability",
+    "trendPointNotRead": "not read - beyond the response limit",
+    "trendTruncatedNotice": "The trend is complete only from {from} onward. This project has more than {limit} responses, so the read stopped before reaching the start of the window - earlier days are unknown, not empty."
   },
   "Support": {
     "metaTitle": "Support",
@@ -862,7 +866,9 @@
     "rowValueUnavailable": "—",
     "durationSeconds": "{value}s",
     "durationMinutes": "{value}m",
-    "durationHours": "{value}h"
+    "durationHours": "{value}h",
+    "sampledNotice": "These numbers cover the {limit} most recent ticket events, not your full history - more exist. The ranking is a ranking within that window: an agent whose resolved tickets fall outside it places lower, or does not appear at all.",
+    "backlogUnavailable": "Not computable from a capped read. A ticket is opened and resolved weeks apart, so a window of recent events holds resolutions whose openings have already aged out - subtracting one from the other would not count outstanding tickets."
   },
   "Demos": {
     "metaTitle": "Demos",
@@ -882,7 +888,8 @@
     "recentDemosIntro": "Browse individual demo records:",
     "recentDemosLinkLabel": "recent demos",
     "workListIntro": "Want to find paying customers who never got a demo?",
-    "workListLinkLabel": "Build that list on the Segments page"
+    "workListLinkLabel": "Build that list on the Segments page",
+    "sampledNotice": "These numbers cover the {limit} most recent demo events, not your full history - more exist. Treat the counts as a floor, and the show rate with care: the window is measured in events, and a demo is booked in one event and held or missed in another, so a demo can fall partly outside it."
   },
   "ChurnReasons": {
     "metaTitle": "Churn reasons",
@@ -954,8 +961,8 @@
   "Firmographics": {
     "metaTitle": "Firmographics",
     "title": "Firmographics for {projectName}",
-    "description": "AI-classified company industry, size, and region, with # vs $ composition dashboards and composition-shift alerts.",
-    "setupIntro": "Install the Firmographic Enrichment pack to start classifying self-reported company profiles.",
+    "description": "Company industry, size and region from your own company_firmographic events, with # vs $ composition dashboards and composition-shift alerts. Industry is matched from the company name and domain by a fixed keyword list in the tracking SDK - not by an AI model and not by a third-party enrichment service.",
+    "setupIntro": "Install the Firmographic pack to register the company_firmographic schema and its two composition metrics. You supply company name, domain, size and region; industry is matched from the name and domain by a fixed keyword list, falling back to Other. No outside data source is consulted.",
     "industryHeading": "Customers by industry",
     "industryEmpty": "No firmographic profiles landed for this project yet.",
     "industryCount": "{count, plural, one {# profile} other {# profiles}}",
@@ -967,7 +974,7 @@
     "byRegionEmpty": "No region composition available yet — connect a data warehouse to see this.",
     "dimensionValueUnknown": "Unknown",
     "compositionCount": "{count, plural, one {# profile} other {# profiles}}",
-    "compositionMrr": "${amount} MRR",
+    "compositionMrr": "{amount} MRR (smallest unit)",
     "alertsHeading": "Composition-shift alerts",
     "alertsEmpty": "No active composition-shift alerts.",
     "alertShift": "Shifted from {baseline}% to {current}% of new profiles",
@@ -1039,6 +1046,8 @@
     "statusOverTarget": "Over target",
     "statusOnTarget": "On target",
     "statusNoTarget": "No target set",
+    "statusNoSpendData": "No spend data",
+    "spendNoData": "No data",
     "targetUpdateError": "Couldn't update the target. Please try again.",
     "targetInputLabel": "Spend target for {campaignId}",
     "targetInputPlaceholder": "No target"
@@ -1070,6 +1079,7 @@
     "logEntryCost": "Estimated cost: {cost}",
     "logEntryCostUnknown": "Estimated cost: not available",
     "logCapNote": "Showing the {count} most recent query cost log entries.",
+    "logCapNoteTruncated": "Showing the {count} most recent query cost log entries — more exist than are shown, so any total read from this list is a lower bound.",
     "outcomeExecuted": "Executed",
     "outcomeBlockedQuotaExceeded": "Blocked — quota exceeded",
     "outcomeWarehouseNotConfigured": "Executed (no warehouse configured yet)"
@@ -1081,7 +1091,8 @@
     "chainInvalid": "Integrity check failed at entry {entryId}. This log may have been tampered with.",
     "noEntries": "No audited changes recorded for this organization yet.",
     "actorLine": "{actorType} {actorId} · {action}",
-    "listCapNote": "Showing the {count} most recent entries."
+    "listCapNote": "Showing the {count} most recent entries.",
+    "listCapNoteTruncated": "Showing the {count} most recent entries — more exist than are shown, so this is a window onto the log, not the whole of it."
   },
   "PluginRegistry": {
     "metaTitle": "Plugin registry",
@@ -1172,7 +1183,7 @@
     "builtinPackQualityScoreTitle": "Intent & Quality Scoring",
     "builtinPackQualityScoreDescription": "At-signup quality score, quality-adjusted CAC/CPS, and channel mix-shift alerts.",
     "builtinPackFirmographicTitle": "Firmographic Enrichment",
-    "builtinPackFirmographicDescription": "AI-classified company industry, size, and region, with # vs $ composition dashboards and composition-shift alerts.",
+    "builtinPackFirmographicDescription": "Registers the company_firmographic schema and the # vs $ composition metrics over the profiles you send. Industry is matched from the company name and domain by a fixed keyword list - not an AI model and not a third-party enrichment service.",
     "builtinPackExperimentTitle": "Experiments",
     "builtinPackExperimentDescription": "A/B experiment exposures and conversions by variant, with significance testing against a control.",
     "builtinPackSupportTitle": "Customer Support",
@@ -1448,6 +1459,7 @@
     "memberLastSeenLine": "Last seen {lastSeenAt}",
     "memberFieldLine": "{name}: {value}",
     "membersCapNote": "Showing the {count} most recent members.",
+    "membersCapNoteOfTotal": "Showing {count} of {total} members.",
     "deleteConfirm": "Delete this segment? This cannot be undone.",
     "deleteButton": "Delete",
     "deleteError": "Could not delete the segment. Please try again.",
@@ -1532,7 +1544,8 @@
     "feedItem": "{winRuleName} — {schemaName} ({clientId})",
     "historyHeading": "Win history",
     "historyEmpty": "No wins recorded yet.",
-    "historyListCapNote": "Showing the most recent {count} win(s)."
+    "historyListCapNote": "Showing the most recent {count} win(s).",
+    "historyListCapNoteTruncated": "Showing the most recent {count} win(s) — more exist than are shown."
   },
   "TrialPipeline": {
     "heading": "Trial pipeline",

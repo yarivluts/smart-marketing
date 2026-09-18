@@ -14,9 +14,12 @@ export interface SupportLeaderboardRowView {
 
 export interface SupportLeaderboardView {
   ticketsOpened: number;
-  openBacklog: number;
+  /** `null` when the read was capped, because the backlog subtraction is not computable from a recency window — see `SupportLeaderboardResult.openBacklog` (KAN-166). */
+  openBacklog: number | null;
   /** Sorted highest-`ticketsResolved`-first. */
   rows: SupportLeaderboardRowView[];
+  /** The record cap these numbers were computed under, or `null` when the read saw everything. Qualifies the ranking as well as the backlog. */
+  sampledFrom: number | null;
 }
 
 /** The `Support` translation key whose message supplies the unit word for a {@link formatDurationSeconds} magnitude — same "helper returns a bare number/unit-key pair, the message string supplies the unit word" posture `formatMinutesAgo`/`freshnessLabel` (ingest-health) establish, so the unit itself is never a hard-coded literal outside translation resources. */
@@ -42,6 +45,7 @@ export function toSupportLeaderboardView(
   return {
     ticketsOpened: result.ticketsOpened,
     openBacklog: result.openBacklog,
+    sampledFrom: result.sampledFrom,
     rows: result.rows.map((row) => {
       const person = peopleById.get(row.agentOrgPersonId);
       return {

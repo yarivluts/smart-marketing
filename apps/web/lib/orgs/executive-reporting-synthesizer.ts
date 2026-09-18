@@ -70,7 +70,12 @@ function sumRealSpendByPlatform(
   const spendByCampaignId = new Map<string, number>();
   if (spendOutcome && spendOutcome.ok) {
     for (const row of spendOutcome.rows) {
-      spendByCampaignId.set(row.campaignId, row.actualSpend);
+      // Skipped rather than counted as zero: a null actualSpend means the
+      // project has no spend data for the window, and folding that in as 0 would
+      // make an unmeasured campaign look like a free one.
+      if (row.actualSpend !== null) {
+        spendByCampaignId.set(row.campaignId, row.actualSpend);
+      }
     }
   }
 
