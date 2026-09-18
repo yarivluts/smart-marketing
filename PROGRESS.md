@@ -17,6 +17,77 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #44: the test suite as a surface, and what it led to
+
+The page rotation finished last pass. Rather than start a second lap, this took the one surface
+never reviewed **as** a surface: the test suite, via the sweep for test names asserting a fabrication
+that three earlier passes had queued.
+
+### The sweep came back clean, which is a result worth recording
+
+6,034 test names across 629 files. 123 flagged by a fabrication-marker filter; on inspection
+essentially all of them are either false positives (`returns 400 x_required when missing` is correct
+validation, `fake org id` is correct isolation testing) or **tests asserting honesty that earlier
+passes in this cycle wrote** - "renders 'No data' for every unmeasured metric instead of a stand-in
+constant", "falls back to null rather than throwing", "treats a measured zero as a real estimate,
+not a missing one".
+
+No new fabrication found. The five caught earlier were caught incidentally, and a systematic pass
+turned up no sixth. That is worth stating plainly rather than manufacturing a finding to justify the
+hour.
+
+### The synthesizers are clean too
+
+Four `*-synthesizer.ts` modules - a name that invites suspicion. All four have already been fixed by
+earlier passes and now carry unusually good doc comments recording exactly what they used to
+invent: spend as `budget * 30 * 0.88 * factor`, ROAS as `3.2 * platformMultiplier`, revenue as
+`spend * 3.6`, a `periodComparison` lookup table of `12.4 / -8.5 / 15.2` keyed by time window rather
+than any comparison. All now null-until-measured. Checked rather than assumed.
+
+### KAN-178: two parallel component trees, and nothing says which is live
+
+Following the sweep's one interesting thread led here.
+
+- `components/orgs` (~17.5k lines) is rendered by pages all over `app/`. **Nine other directories -
+  `ai`, `automation`, `billing`, `funnel`, `goals`, `members`, `reporting`, `settings`, `shell`,
+  6,660 lines - are imported by no page at all.** Roughly 23% of the component tree renders nowhere.
+- The dead half came from one bulk commit ("comprehensive UI/UX overhaul across all 54 routes"), and
+  **it is the more modern-looking of the two**, so it reads as the current direction.
+  `components/shell/nav-shell.tsx` and `components/orgs/app-shell.tsx` both look like the app shell;
+  only the second is rendered. I checked `shell` specifically because "an app shell that is not
+  mounted" sounded wrong - it was worth checking, and it was right.
+- **This has already cost review time twice in one cycle**, both times from assuming the code was
+  live: KAN-177 and KAN-176. It materially changes KAN-176's severity - those 183 hard-coded strings
+  are almost entirely unreachable, so no user is seeing untranslated English from them today.
+- Recorded as a tested inventory rather than deleted. The unmounted tree is plausibly an in-progress
+  migration and deleting unfinished work to tidy a repo is not an improvement. Mounting one now
+  fails the test, which is the moment to ask whether it is finished - for `settings`, whether
+  notification delivery exists yet (it does not).
+
+### The pattern, restated
+
+Every finding this cycle has been *a claim the code does not support*. KAN-178 is the same shape one
+level up: **the repository's own structure claims that 6,660 lines are part of the product.** Not a
+comment, a label or a metric this time - the file tree itself. Which is why the fix is the same as
+it has been all cycle: not deletion, but making the truth checkable.
+
+- **Last completed:** KAN-178 as PR #474. Merged #471 (KAN-176 ratchet), #472 (KAN-177) and #473;
+  closed KAN-176 and KAN-177 as Done.
+- **In progress (exact stopping point):** #474 awaiting CI. **#469 (dry-run scope) is merged and
+  still not live** - nothing deploys on merge, so EasySign remains blocked on a redeploy, not on
+  code.
+- **Blocked + why:** an `api-prod` redeploy would ship #469 and unblock EasySign's dry runs; the
+  runbook is now in `docs/deploy-api.md`. KAN-170's automation half (deploy-on-merge or a loud drift
+  check) stays open by design. Then: the `easysign-prod-selfserve-mcp-key` secret read, the go-ahead
+  on the nine schemas, the dev-scoped purge of 46 stale quarantine rows, and rotation of the two
+  burned keys.
+- **Next step:** lowering the 183 baseline is now **lower** priority than it looked, since those
+  strings are unreachable - the mounted tree is what matters. KAN-159 (shared date formatter) and
+  KAN-155 (mixed-currency firmographic MRR) are the best remaining real work, both in mounted code.
+- **Waiting on human:** the items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up are
+  product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #43: settings - THE ROTATION IS COMPLETE
 
 Settings was the last unreviewed surface. **Every page in the product has now been reviewed at least
