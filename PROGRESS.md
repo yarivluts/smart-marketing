@@ -17,6 +17,81 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #42: the MCP schema-registration scope (+ the api-prod deploy)
+
+Settings was next in the rotation and is **still the last unreviewed surface** - deliberately
+deferred, because a confirmed, live, integrator-blocking defect in code this cycle shipped outranks
+rotating to a page with no evidence of a problem. "Fix what you find" beats "cover the next page"
+when something this specific lands.
+
+### The deploy (KAN-170), on Yariv's direct authorization
+
+`api-prod` was **151 commits** behind - not the 117 I had been quoting, which was measured hours
+earlier and grew as work merged. Now 0. Serving `api-prod-00016-jqx` on `api:main-d89ff93`, health
+200, previous revision `api-prod-00015-msw` retained for rollback.
+
+**Verified the artefact, not the deploy's own success message:** #414's merge commit is an ancestor
+of the deployed SHA and `dry_run` is present in `mcp-admin-tools.ts` in that tree. The MCP tool list
+needs an API key to read, so the ancestry check is what settles it without credentials.
+
+Wrote `docs/deploy-api.md` (#468) straight afterwards, while every command was one I had actually
+run. It records the three things that are easy to get wrong and that I hit: Cloud Build uploads the
+**working directory** not `origin/main`; `run deploy` must pass `--image` and nothing else or it
+silently resets config that does not live in this repo; and polling `builds describe` says `QUEUED`
+forever, so stream the log.
+
+### KAN-175: the safety net was gated behind the dangerous operation
+
+EasySign's first dry run after the deploy returned *"This API key does not carry the `schema.write`
+scope"* - on a call that **writes nothing**.
+
+- `register_schema` checked `schema.write` before the handler ran, so the `dry_run` branch was
+  unreachable without it. **The preview was exactly as hard to reach as the commit**: anyone who
+  could preview could already commit, anyone who could not commit could not even look.
+- That inverts who a preview is for. The person checking whether their schema file is correct, *in
+  order to decide whether to ask for write access*, is precisely the one who cannot run it.
+- **The disclosure objection collapsed on evidence.** A dry run reveals whether a name is taken -
+  but `list_schemas` needs only `mcp.read` and already returns every active schema's name, kind,
+  version and fields. The preview reveals strictly less, over the same namespace, to the same
+  caller. I had assumed this objection was the strong one; checking the neighbouring tool settled it
+  in one grep.
+- Their sharper point, and the one I would not have found: **a scope problem presenting as a
+  validation problem.** The refusal arrives exactly where a schema error would, so the first reading
+  is "my schema is wrong" rather than "my key is wrong".
+
+### A generalisable shape: who can reach the safe path?
+
+Worth carrying into future reviews. Wherever a dangerous operation has a safe preview, rehearsal or
+dry-run mode, ask **who can reach the safe one**. If the answer is "exactly the people who can
+already do the dangerous thing", the safety feature is a courtesy to people who do not need it, and
+the person it was built for is locked out. Same shape as KAN-173's "Secret set", where the
+reassurance was loudest precisely when it was least warranted.
+
+### On the peer channel
+
+EasySign noted, carefully and without asking, that Yariv had been in this session minutes earlier
+and that the cheapest remaining path to the registration ran through it. Declined - not because the
+framing was improper, it was scrupulous, but because *convenience* was never the reason for
+declining, so it cannot be the reason to stop. He sees the outstanding item in every report; the
+mechanism works by him deciding, not by me finding a cheaper moment to raise it.
+
+- **Last completed:** KAN-175 as PR #469. Deployed `api-prod` (KAN-170) and wrote the missing
+  runbook (#468). Merged #466 (KAN-174) and #467.
+- **In progress (exact stopping point):** #468 and #469 awaiting CI. **#469 must reach prod to help
+  anyone** - and nothing deploys on merge, which is exactly the gap that cost EasySign a day. Tell
+  them when it is live, not when it is merged.
+- **Blocked + why:** KAN-170's automation half stays open by design - deploy-on-merge, or a drift
+  check that fails loudly, is the real fix and the manual runbook is only a stopgap. Then: the
+  `easysign-prod-selfserve-mcp-key` secret read, the go-ahead on EasySign's nine schemas, the
+  dev-scoped purge of 46 stale quarantine rows, and rotation of the two burned keys. KAN-147 stays
+  open by design.
+- **Next step:** **settings** - the genuinely last unreviewed surface, after which the rotation
+  restarts. Then the sweep for tests whose names assert a fabrication (five found so far), KAN-159
+  (shared date formatter) and KAN-155.
+- **Waiting on human:** the items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up are
+  product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #41: plugins
 
 ### Surface reviewed: plugins (gallery, installs, built-in packs, source runtime, lookalikes)
