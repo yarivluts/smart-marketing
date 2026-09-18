@@ -992,12 +992,16 @@ export async function queryProjectFunnelSteps(
 }
 
 /**
- * Recent noteworthy findings for a project (active tracking-broke alerts + fired win-rule events,
- * newest first) — the `list_insights` MCP tool's web admin counterpart, for the Insights page.
+ * Recent noteworthy findings for a project (active tracking-broke alerts, metrics that can no
+ * longer be queried as defined, and fired win-rule events, newest first) — the `list_insights` MCP
+ * tool's web admin counterpart, for the Insights page.
+ *
+ * `limit` is forwarded so the page can over-fetch by one and report truncation it has measured
+ * rather than inferred — see `splitOverFetchedFeed`. Omitted, the service applies its own default.
  */
-export async function listProjectInsights(organizationId: string, projectId: string): Promise<ProjectInsight[]> {
+export async function listProjectInsights(organizationId: string, projectId: string, limit?: number): Promise<ProjectInsight[]> {
   await ensureFirestoreOrm();
-  return listProjectInsightsInOrganization({ organizationId, projectId });
+  return listProjectInsightsInOrganization({ organizationId, projectId, limit });
 }
 
 export async function listWinRulesForProject(organizationId: string, projectId: string): Promise<WinRuleModel[]> {
