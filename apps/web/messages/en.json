@@ -863,7 +863,9 @@
     "rowValueUnavailable": "—",
     "durationSeconds": "{value}s",
     "durationMinutes": "{value}m",
-    "durationHours": "{value}h"
+    "durationHours": "{value}h",
+    "sampledNotice": "These numbers cover the {limit} most recent ticket events, not your full history - more exist. The ranking is a ranking within that window: an agent whose resolved tickets fall outside it places lower, or does not appear at all.",
+    "backlogUnavailable": "Not computable from a capped read. A ticket is opened and resolved weeks apart, so a window of recent events holds resolutions whose openings have already aged out - subtracting one from the other would not count outstanding tickets."
   },
   "Demos": {
     "metaTitle": "Demos",
