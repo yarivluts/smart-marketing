@@ -17,6 +17,66 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #39: war-room TV
+
+### Surface reviewed: tv (pairing page + the unattended rotation display)
+
+### KAN-172: a TV that has stopped updating looks exactly like one that is working
+
+- Both fetch paths here swallow their errors **deliberately**, and that is right for a blip: the
+  rotation screen's board fetch and `tv-app`'s 90-second manifest poll each leave the last good data
+  on screen and retry next tick, rather than flashing an error over a wall display because one
+  request timed out.
+- Neither distinguishes a blip from an **outage**. A TV whose token expired, whose network died, or
+  whose API is down keeps showing its last-loaded numbers **indefinitely, and identically to a
+  healthy one**.
+- **The unattended-ness is the whole point.** Every other surface this cycle had a person in front
+  of it who could notice something looked wrong. A wallboard's entire job is to be believed at a
+  glance by people who are not investigating it - so the same silent-degradation posture that is
+  correct on a desktop page is dangerous here. Same code, opposite conclusion, because the audience
+  differs.
+- Sharpest on the goals and leaderboard frames: a board tile carries a freshness badge (KAN-69)
+  whose timestamp visibly ages, but goals and the collections leaderboard ride along in the manifest
+  with **no signal at all** - and they are the motivational frames. A thermometer frozen just short
+  of target, or a leaderboard frozen with yesterday's name on top, is not a neutral stale number.
+  **It is a wrong statement about people, left up in front of them.**
+- Driven by the last **successful** fetch, never the last attempt - counting attempts would make a
+  permanently broken TV look permanently fresh. Threshold in **missed polls** rather than a second
+  hard-coded duration that could drift from the poll interval; three, because one missed poll is
+  weather and three is ~4.5 minutes of silence. A warning that fires in normal operation is one the
+  room learns to ignore, which costs more than showing nothing.
+
+### A wrong hypothesis, checked before acting on it
+
+I assumed board tiles lost their freshness badge on TV, which would have been a neat second finding.
+`BoardTileView` renders the badge itself, and its doc comment already says both consumers "get the
+badge for free - there's no TV-specific rendering fork to keep in sync." Checking cost one grep;
+writing the fix first would have cost a wrong PR and a false entry here.
+
+### On keeping a threshold in one place
+
+My first component test sat **exactly on** the tolerance and failed - correctly, since the helper
+treats the limit as not-yet-stale. Moved the component test past the boundary and left the boundary
+itself to the helper's unit test. A component test that also happens to pin a threshold makes the
+threshold hard to change deliberately later, because you cannot tell which assertions are about the
+number and which are about the behaviour.
+
+- **Last completed:** KAN-172 as PR #462. Merged #460 (rep-collections) and #461; closed KAN-171
+  as Done.
+- **In progress (exact stopping point):** #462 running CI. Nothing else open.
+- **Blocked + why:** **KAN-170 still leads** - `api-prod` is 117 commits behind `main` with no
+  deploy runbook, which is why EasySign's `dry_run` is missing despite #414 having merged. That one
+  redeploy unblocks their schema registration without anyone having to approve the registration
+  itself. Then: the `easysign-prod-selfserve-mcp-key` secret read, the dev-scoped purge of 46 stale
+  quarantine rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** KAN-159 (shared date formatter - still no formatting convention anywhere in
+  `apps/web`) and KAN-155 (mixed-currency firmographic MRR, the same class as KAN-171 and with the
+  same real fix still pending). Unreviewed surfaces remaining: **plugins, resources, settings** -
+  three left, after which the cycle has covered every page.
+- **Waiting on human:** the items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up are
+  product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #38: field-mappings (clean) + rep-collections
 
 ### Surface reviewed: field-mappings - reviewed and found sound
