@@ -847,7 +847,9 @@
     "themePerformance": "ביצועים",
     "themeMissingFeatures": "פיצ'רים חסרים",
     "themeOnboarding": "הצטרפות",
-    "themeUsability": "שימושיות"
+    "themeUsability": "שימושיות",
+    "trendPointNotRead": "לא נקרא - מעבר למגבלת התשובות",
+    "trendTruncatedNotice": "המגמה שלמה רק החל מ-{from} ואילך. לפרויקט הזה יש יותר מ-{limit} תשובות, ולכן הקריאה נעצרה לפני תחילת החלון - הימים הקודמים אינם ידועים, ולא ריקים."
   },
   "Support": {
     "metaTitle": "תמיכה",

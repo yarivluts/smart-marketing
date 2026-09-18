@@ -52,6 +52,7 @@ import {
   getNpsOverviewForProject as getNpsOverviewForProjectInOrganization,
   getNpsDimensionBreakdownForProject as getNpsDimensionBreakdownForProjectInOrganization,
   listSurveyResponseRecordsForProject as listSurveyResponseRecordsForProjectInOrganization,
+  type GetNpsOverviewOptions,
   type NpsOverview,
   type NpsBreakdownDimension,
   type NpsDimensionBreakdownOutcome,
@@ -466,7 +467,7 @@ export async function getEventVolumeOverviewForProject(
 export async function getNpsOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { limit?: number; windowDays?: number; precomputedRecords?: RawRecordModel[] },
+  options?: GetNpsOverviewOptions,
 ): Promise<NpsOverview> {
   await ensureFirestoreOrm();
   return getNpsOverviewForProjectInOrganization(organizationId, projectId, options);

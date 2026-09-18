@@ -847,7 +847,9 @@
     "themePerformance": "Performance",
     "themeMissingFeatures": "Missing features",
     "themeOnboarding": "Onboarding",
-    "themeUsability": "Usability"
+    "themeUsability": "Usability",
+    "trendPointNotRead": "not read - beyond the response limit",
+    "trendTruncatedNotice": "The trend is complete only from {from} onward. This project has more than {limit} responses, so the read stopped before reaching the start of the window - earlier days are unknown, not empty."
   },
   "Support": {
     "metaTitle": "Support",
