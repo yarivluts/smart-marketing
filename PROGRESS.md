@@ -17,6 +17,224 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #30: firmographics
+
+### Surface reviewed: firmographics
+
+Two findings, both the standing priority: data presented as something it is not.
+
+### KAN-153: the UI claimed AI classification and third-party enrichment; the platform does neither
+
+- `Firmographics.description` and `ProjectPlugins.builtinPackFirmographicDescription` both read
+  "AI-classified company industry, size, and region". `Firmographics.setupIntro` said installing
+  the pack would "start classifying self-reported company profiles" - internally contradictory on
+  its own terms, since "self-reported" means the values already arrived.
+- What actually runs is `classifyCompanyIndustry` (`@growthos/shared`): a fixed **nine-bucket
+  keyword list** over the company name with a domain-TLD fallback, executed by the **tracking SDK
+  in the visitor's own browser** before the event is ever sent. Its own doc comment says so - "a
+  buildable-today, deterministic stand-in for a real AI/LLM industry-classification call" - and the
+  pack manifest records that a real third-party connector "needs a human-provisioned API key ...
+  and is deferred". **Both halves of the claim were false**, and the pack's display name
+  ("Firmographic Enrichment") points the same wrong way.
+- The cost runs both directions. A buyer reading that sentence is buying a model that does not
+  exist. A user already on it is trusting a nine-keyword match to the accuracy of one - and the
+  classifier falls back to `other` silently, so a wrongly bucketed company looks exactly like a
+  correctly bucketed one on the composition dashboard.
+- **New shape for this cycle.** Every prior provenance finding was a comment or a tool description
+  lying to a developer or an integrator (KAN-120/124/125/127). This is the first where the false
+  claim is in **product copy the paying user reads**, which is the audience least able to check it.
+- Fixed in en and he. The mapper's own doc comment described the taxonomy by quoting the acceptance
+  criterion; it now says what the code does instead.
+
+### KAN-154: an unconverted Stripe smallest-unit amount rendered with a dollar sign
+
+- `Firmographics.compositionMrr` was the literal `${amount} MRR`; Hebrew carried the same `$`
+  trailing the amount.
+- The amount is `firmographic_mrr_total` <- `dim_subscription.mrr` <- `properties.mrr_normalized`
+  <- `computeSubscriptionMrrNormalized`, which divides a Stripe `unit_amount` by its billing-cycle
+  length and **converts no units**. Stripe quotes `unit_amount` in the currency's smallest unit, so
+  a $99/mo plan renders as **"$9900 MRR"**.
+- **Worse than KAN-145's unlabelled amounts.** An unlabelled 9900 is ambiguous enough that a reader
+  might question it; the `$` positively asserts the unit, and nothing on the page contradicts it.
+  The bigger the customer, the bigger the overstatement.
+- Fixed to KAN-145's precedent rather than a second convention: **disclose the unit, do not
+  convert.** The divisor differs by currency (JPY has none), so dividing by 100 would be wrong more
+  quietly than not dividing.
+- Swept all seven `$`-prefixed money placeholders while here. The five `Campaigns.*` strings are
+  **correct** - Google Ads micros are converted on both sides (`usdToMicros` on write,
+  `/ 1_000_000` on read) - and `IntentQuality.adjustedMetricsValue` renders cost-per-signup and CAC,
+  which are spend divided by a count and so genuinely major units. Recording that so a later pass
+  does not re-open them.
+
+### Tests
+
+- The provenance test asserts **absence of the claim**, not exact prose, so wording stays editable
+  and only the claim is pinned. If a real classifier is ever wired in, deleting that test belongs
+  in the same PR - the claim and the capability have to move together. **It caught a first draft of
+  my own replacement string**, which used "enriched" inside a negation.
+- The money test pins all three money strings together so Billing Ops and Firmographics cannot
+  drift apart, and rejects a currency symbol **anywhere in either locale** rather than only one
+  leading the placeholder - Hebrew's `{amount}$ ...` is exactly what a leading-symbol pattern would
+  wave through while reading just as falsely.
+
+### KAN-155 filed, not fixed: mixed-currency summation
+
+`fact_company_firmographic` joins `dim_subscription` but selects only `mrr`, dropping the
+`currency` that model exposes; `firmographic_mrr_total` is then a plain `sum` with no currency
+dimension. A project billing in more than one currency has smallest units of different currencies
+**added together**, and the resulting percentage split across industries is wrong invisibly.
+Single-currency projects are unaffected, which is why it has gone unnoticed. The fix is a dbt
+column, a metric dimension and a page change - it does not belong in a string-only PR.
+
+### PR #433 diagnosed and fixed - it was my own break, not flake
+
+`record-feed.spec.ts` was failing **all three retries**, so not flake. Commit `1ee8f31` on that
+branch rewrote `RecordFeed.filterActiveNote` to state the 500-record search window; the e2e still
+asserted the sentence it replaced. **The branch changed a string and did not update the only test
+that read it.**
+
+- Corrected the assertion to cover the **window clause**, not only the "filtered to" half - a
+  prefix match would pass against the old sentence too, leaving the very defect the branch existed
+  to fix untested.
+- Imported `RECORD_FIELD_FILTER_CANDIDATE_WINDOW` rather than spelling out 500, and formatted it
+  through `toLocaleString` because next-intl renders numeric placeholders via `Intl.NumberFormat` -
+  a window raised past 999 would render "5,000" and a bare template literal would silently stop
+  matching.
+- **Verified by rendering the message through next-intl's own `createTranslator`** rather than by
+  eye, because reading a message template and predicting its output is exactly how the original
+  assertion went stale.
+- Worth recording as a rule: a PR that edits a user-facing string should grep the e2e specs for it.
+  The type checker cannot see inside a `getByText` literal.
+
+- **Last completed:** KAN-153 and KAN-154 fixed, tested and pushed as PR #441 (two commits, one per
+  finding). PR #433's real failure diagnosed and fixed on its own branch; CI re-running.
+- **In progress (exact stopping point):** #441 open against `main`, awaiting CI. #433 CI in flight
+  after the e2e fix; #435, #438 and #440 stacked behind it and unblocked only once #433 merges.
+- **Blocked + why:** unchanged and all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design: the declaration is
+  merged but adoption needs a human `terraform plan` showing no changes.
+- **Next step:** merge #433 once green, then the stack in order, then #441. KAN-155 is the next
+  piece of real work on this surface. Unreviewed surfaces remaining: demos, feedback,
+  field-mappings, insights, intent-quality, plugins, rep-collections, resources, session-replay,
+  settings, support, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  (wiring a real goal target) are product decisions, not engineering blocks.
+
+
+## 2026-09-18 - Hourly quality pass #29: campaign ops
+
+### Surface reviewed: campaign-ops - deferred twice, finally reached
+
+Most of this page is genuinely well built, and two things are worth recording as **correct** so a
+later pass does not re-litigate them:
+
+- The red/green spend status derives from a **user-set** `monthly_budget`, with `no_target` when
+  none exists. That is the right shape, and the exact contrast with KAN-143's fabricated 3.5x ROAS
+  target - a threshold the user chose versus one the code invented.
+- `computeSignupQualityScore` is a declared rubric over three **real** survey answers, returning its
+  full breakdown "so a caller can show its own working, not just the number". A transparent model
+  over real inputs is not a fabrication.
+- The page copy discloses its attribution model in passing - "attributed via each customer's own
+  last-touch marketing channel" - which is the kind of sentence most of this cycle's findings were
+  missing.
+
+### KAN-152: absence rendered as green reassurance
+
+- `getCampaignSpendBreakdownForProject` did `actualByCampaign.get(campaignId) ?? 0`, so a campaign
+  with a saved budget but **no spend rows** got a measured zero and, being under budget, the status
+  `on_target`.
+- A project whose ad connector never synced saw every targeted campaign render as **"0 spent
+  against a $5,000 target - On target", in green.** That is not a missing value rendering as blank;
+  it is **absence rendering as active reassurance.** Someone checking whether they are overspending
+  was told they are fine.
+- Same family as KAN-137, KAN-140 and KAN-149, but **the first where the confident reading is a
+  green status rather than an empty state** - which makes it the most costly form of the class so
+  far.
+- **Distinguishable, which is what made it fixable:** an empty series means no campaign has spend
+  data; a campaign missing from a populated series really did spend nothing. Measured zero in the
+  second case, `null` and a new `no_spend_data` status in the first.
+- `actualSpend` became `number | null` and **the compiler found every consumer** - the page and both
+  synthesizers. Both now skip unmeasured rows rather than folding them in as zero, because counting
+  an unmeasured campaign as free would understate blended spend and therefore **overstate ROAS** -
+  the same figure KAN-143 was about.
+- Unmeasured campaigns now sort last. They had been sorted as the smallest spend, putting the
+  campaigns nothing is known about beside genuinely tiny ones.
+- The existing zero-spend test passes **unchanged**, which is the point: that case has other
+  campaigns with data, so its zero is a measurement.
+
+### Same trap twice in one pass
+
+My first draft of the new test invented `ensureSaasPackRegistered` and `saveCampaignTarget`; the
+file uses `ensureSaasMetricPackRegistered` and `setCampaignTargetBudget`. That is the second time in
+two passes, and the same shape as the cycle's recurring defect - **assuming an interface instead of
+reading it.** Worth noting that I keep catching it by reading rather than by running, which means
+the habit is working but the instinct has not changed.
+
+### Merged this pass
+
+#437 (KAN-128). #433 and #436 were rerun and then had main merged into them, since a rerun replays
+the same commit without the fix - a mistake made earlier in this cycle and avoided here.
+
+### Next
+
+PRs #439, #433, #435, #436, #438 in flight. Next unreviewed page: demos, feedback, field-mappings,
+firmographics, insights, intent-quality, plugins, rep-collections, resources, session-replay,
+settings, support, tv. Blocked items unchanged: all four are Yariv's.
+
+---
+
+## 2026-09-18 - Hourly quality pass #28: KAN-128, the last KAN-103 remnant
+
+### Surface reviewed: CI, because a documentation-only PR failed again
+
+- PR #436 changes only `PROGRESS.md`, and it failed with `mcp.controller.e2e.spec.ts` reporting
+  `RESOURCE_EXHAUSTED: Received message larger than max (704820226 vs 4194304)` - a garbage length
+  prefix, the KAN-103 signature. **A docs-only PR failing is proof the change is not the cause**,
+  which is why it is worth diagnosing rather than rerunning.
+- apps/api was simpler than apps/web: it runs entirely under Jest in Node, with no jsdom case where
+  the client SDK's browser build is safe. No runtime branch - one path, the one production uses.
+
+### The near-miss worth recording
+
+- Changing `connectFirestoreOrmForApi` was **not enough**. The five e2e specs do not go through the
+  bootstrap at all; each calls `connectFirestoreOrm` directly in its own `beforeAll`. **I fixed the
+  layer that looked responsible and left the layer that actually was.**
+- Caught because after that change the suite passed with **exit 0 while the log still contained
+  `GrpcConnection` `RESOURCE_EXHAUSTED` lines**. A green run with corruption in the log means the
+  corruption did not happen to land on an assertion that time.
+- **Reading the log rather than the exit code is the only reason this is a fix and not a half-fix
+  reported as closed.** Same lesson as the PROGRESS conflict-marker incident early in this cycle:
+  verify the artefact, not the proxy. The exit code is a proxy.
+
+### Result, measured rather than asserted
+
+18/18 suites, 147/147 tests, and **zero** `GrpcConnection`/`RESOURCE_EXHAUSTED` lines against many
+before. 26s against an estimated 73s, because the client SDK had been spending that in retry
+backoff.
+
+**KAN-103 is now closed across the repo**: `packages/firebase-orm-models`, apps/web unit (jsdom,
+safe by accident), apps/web Playwright, apps/api. Four passes traced it, and one root cause -
+`experimentalForceLongPolling` being a no-op in Node - explained all four.
+
+### One more inverted assertion
+
+The bootstrap spec pinned the client-SDK-against-emulator branch, making the defect a specified
+requirement. That is the **fourth** test this cycle found asserting the thing that was wrong.
+
+### Merged this pass
+
+None. #433, #435 and #436 were all blocked behind this same flake, which is what made fixing it the
+pass rather than reviewing campaign-ops.
+
+### Next
+
+PR #437 should unblock #433/#435/#436; rerun them behind it. **campaign-ops remains the next
+unreviewed page** - deferred twice, both times because CI was failing on something unrelated to the
+pending work. Blocked items unchanged: all four are Yariv's.
+
+---
+
 ## 2026-09-18 - Hourly quality pass #27: closing the capped-list class
 
 ### Finished the debt rather than leaving two named items open
@@ -776,7 +994,9 @@ churn-reasons (#21), cohorts + a repo-wide fabricated-claim sweep (#22),
 campaigns (#23), billing-ops-feed (#24),
 the scheduled warehouse refresh (#25),
 the capped-list class: record feed / audit log / cost guardrails (#26),
-**segment members + win-rule history, class closed (#27)**. Not yet reviewed:
+segment members + win-rule history, class closed (#27),
+apps/api emulator transport, KAN-103 closed (#28),
+**campaign-ops (#29)**. Not yet reviewed:
 billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
