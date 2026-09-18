@@ -59,6 +59,40 @@ export async function decryptSecret(envelope: SecretEnvelope, tenantId: string, 
 }
 
 /**
+ * What a stored secret's wrapping key means for whether it still works.
+ *
+ * `current`     - wrapped under the provider's current key. Healthy.
+ * `rotatable`   - wrapped under an older key the provider still holds. Reads
+ *                 fine today; `rotateSecretEnvelopeKey` re-wraps it.
+ * `unreadable`  - wrapped under a key the provider no longer holds.
+ *                 `unwrapDek` throws `UnknownKmsKeyError`, so every connector
+ *                 using this secret is broken.
+ */
+export type SecretEnvelopeKeyState = 'current' | 'rotatable' | 'unreadable';
+
+/**
+ * Classifies an envelope's wrapping key without decrypting anything.
+ *
+ * The comparison itself is one line and `SecretEnvelope.keyId`'s own comment
+ * already describes it ("compare against `KmsProvider.currentKeyId` to tell
+ * whether this envelope needs rotating") — but nothing ever surfaced it, so
+ * the resource library showed "Secret set" for all three states alike
+ * (KAN-173). An admin debugging a dead connector saw a credential that looked
+ * fine and ruled it out, when an unreadable secret was the fault.
+ *
+ * Takes no tenant id and does no crypto on purpose: a page listing every
+ * credential in an org has to be able to ask this for each one cheaply, and
+ * anything requiring an unwrap would make the status itself expensive enough
+ * to skip.
+ */
+export function classifySecretEnvelopeKey(envelope: SecretEnvelope, kms: KmsProvider): SecretEnvelopeKeyState {
+  if (envelope.keyId === kms.currentKeyId) {
+    return 'current';
+  }
+  return kms.knowsKeyId(envelope.keyId) ? 'rotatable' : 'unreadable';
+}
+
+/**
  * Cheap KMS-key rotation: unwraps the DEK under its current (about to be
  * retired) key and re-wraps it under the provider's new current key,
  * without ever touching `ciphertext` — the whole point of envelope

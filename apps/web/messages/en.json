@@ -303,7 +303,10 @@
     "archive": "Archive",
     "unarchive": "Restore",
     "archiveError": "Couldn't archive this resource. Please try again.",
-    "unarchiveError": "Couldn't restore this resource. Please try again."
+    "unarchiveError": "Couldn't restore this resource. Please try again.",
+    "secretKeyUnreadable": "Cannot be decrypted - the key that sealed it is no longer configured. Any connector using this credential is failing. Set a new secret to restore it.",
+    "secretKeyRotatable": "Sealed under an older key - still readable, but rotate it before that key is retired.",
+    "secretKeyVaultNotConfigured": "Cannot be decrypted - no vault keys are configured on this deployment, so no stored secret can be read."
   },
   "ProjectResources": {
     "metaTitle": "Project resources",

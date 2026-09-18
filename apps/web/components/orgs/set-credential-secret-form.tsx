@@ -10,6 +10,11 @@ export interface SetCredentialSecretFormProps {
   orgId: string;
   credentialId: string;
   hasSecret: boolean;
+  /**
+   * Whether the stored secret is actually readable, not merely present
+   * (KAN-173). `null` when there is no secret.
+   */
+  secretKeyState: 'current' | 'rotatable' | 'unreadable' | 'vault_not_configured' | null;
 }
 
 /**
@@ -24,7 +29,7 @@ export interface SetCredentialSecretFormProps {
  * `DeleteGoalButton` already take — it immediately breaks any plugin sync
  * relying on this credential and the removed ciphertext can't be recovered.
  */
-export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetCredentialSecretFormProps): React.ReactElement {
+export function SetCredentialSecretForm({ orgId, credentialId, hasSecret, secretKeyState }: SetCredentialSecretFormProps): React.ReactElement {
   const t = useTranslations('ResourceLibrary');
   const router = useRouter();
   const [secret, setSecret] = useState('');
@@ -96,6 +101,16 @@ export function SetCredentialSecretForm({ orgId, credentialId, hasSecret }: SetC
   return (
     <form className="flex flex-wrap items-end gap-3" onSubmit={handleSubmit} noValidate>
       <span className="text-xs text-muted-foreground">{hasSecret ? t('secretSet') : t('secretNotSet')}</span>
+      {/* Only ever shown alongside "Secret set" — the point is that the reassuring
+          label was, on its own, not enough to tell a working credential from a
+          broken one. */}
+      {secretKeyState === 'unreadable' || secretKeyState === 'vault_not_configured' ? (
+        <span className="text-xs font-medium text-destructive">
+          {secretKeyState === 'unreadable' ? t('secretKeyUnreadable') : t('secretKeyVaultNotConfigured')}
+        </span>
+      ) : secretKeyState === 'rotatable' ? (
+        <span className="text-xs font-medium text-amber-600 dark:text-amber-400">{t('secretKeyRotatable')}</span>
+      ) : null}
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium" htmlFor={`credential-secret-${credentialId}`}>
           {t('secretLabel')}

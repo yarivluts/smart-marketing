@@ -106,6 +106,10 @@ export class LocalKmsProvider implements KmsProvider {
     return { keyId: this.currentKeyId, ciphertext: seal(kek, tenantId, plaintextDek) };
   }
 
+  knowsKeyId(keyId: string): boolean {
+    return Object.hasOwn(this.keyRing, keyId);
+  }
+
   async unwrapDek(wrapped: WrappedDek, tenantId: string): Promise<Buffer> {
     const kek = this.keyRing[wrapped.keyId];
     if (!kek) {

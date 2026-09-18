@@ -25,4 +25,16 @@ export interface KmsProvider {
   readonly currentKeyId: string;
   wrapDek(plaintextDek: Buffer, tenantId: string): Promise<WrappedDek>;
   unwrapDek(wrapped: WrappedDek, tenantId: string): Promise<Buffer>;
+  /**
+   * Whether this provider can still unwrap under `keyId` at all — i.e. whether
+   * a secret sealed under it is readable, or merely present.
+   *
+   * Separate from `currentKeyId` because "needs rotating" and "cannot be
+   * decrypted" are different problems with different urgency, and an admin
+   * looking at a stored secret could previously tell neither apart from a
+   * healthy one (KAN-173). Answerable without the wrapped DEK, the tenant id,
+   * or any crypto, so a status display can ask it for every credential on a
+   * page without doing real unwrap work.
+   */
+  knowsKeyId(keyId: string): boolean;
 }
