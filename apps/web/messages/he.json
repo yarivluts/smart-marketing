@@ -1601,7 +1601,8 @@
     "loadingBoard": "טוען לוח…",
     "goalsFrameHeading": "יעדים",
     "leaderboardFrameHeading": "לוח מובילי הגבייה",
-    "winOverlayHeading": "ניצחון חדש!"
+    "winOverlayHeading": "ניצחון חדש!",
+    "staleBanner": "אין עדכון - רענון אחרון לפני {minutes, plural, one {דקה אחת} other {# דקות}}. המספרים למטה קפואים מאותו רגע ואינם עדכניים."
   },
   "Automation": {
     "metaTitle": "אוטומציה",

@@ -1601,7 +1601,8 @@
     "loadingBoard": "Loading board…",
     "goalsFrameHeading": "Goals",
     "leaderboardFrameHeading": "Collections leaderboard",
-    "winOverlayHeading": "New win!"
+    "winOverlayHeading": "New win!",
+    "staleBanner": "Not updating - last refreshed {minutes, plural, one {# minute} other {# minutes}} ago. The numbers below are frozen at that point, not current."
   },
   "Automation": {
     "metaTitle": "Automation",
