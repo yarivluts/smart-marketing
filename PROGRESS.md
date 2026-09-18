@@ -17,6 +17,89 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #32: session replay
+
+### Surface reviewed: session-replay (settings page + its board link-out)
+
+Worth recording what is **right** here first, because it is the most honest surface reviewed this
+cycle: the page is a link-out config, and its doc comment says plainly why recording DOM mutations
+is deliberately not built ("a whole separate product ... the incumbents already do it well"). The
+link builder handles the XSS boundary correctly and documents why the scheme check exists. The save
+path validates through the *same* function the renderer uses rather than a second hand-rolled check.
+
+All three findings are in the gap between what that machinery promises and what it delivers.
+
+### KAN-162: the page rendered two of its own message keys as raw key paths
+
+- The input placeholder showed the literal text `SessionReplaySettings.templatePlaceholder`. The
+  help text showed `SessionReplaySettings.templateHelp`.
+- ICU reads `{landing_page}` as an **argument reference**. No caller passes an argument by that
+  name - it is documentation, not interpolation - so next-intl throws `FORMATTING_ERROR` and
+  renders its fallback, which is the key path.
+- **The lost sentence is the only place the UI ever names the `{landing_page}` token.** So the page
+  documented its own template syntax nowhere, while looking merely untranslated rather than broken.
+- **Why nothing caught it:** every existing check passes. The key exists. en and he agree. The
+  value is non-empty. The i18n lint rule is satisfied - the string *is* in the resource file.
+  TypeScript cannot see inside a message string. It is visible **only once the message is actually
+  formatted**, and until this pass nothing in the suite formatted one.
+- **This is a new class for the cycle:** not a wrong string, but a string that never reaches the
+  user at all. Every prior i18n finding assumed the text renders and asked whether it was true.
+- Fixed with ICU apostrophe-quoting, **verified against next-intl's own `createTranslator`** rather
+  than reasoned about from the spec - four candidate escapes tested, three work, one does not. A
+  sweep of every message found the token nowhere else, so it is contained.
+
+### KAN-160: a template that does not filter, while three surfaces promise it does
+
+- A template with no `{landing_page}` saves successfully and renders a link on every landing-page
+  row - **all opening the same unfiltered page.**
+- Three things said otherwise: the intro promised rows "link straight to the recordings for that
+  page"; every tooltip read "Open the session recordings for this landing page"; and the save
+  service's own comment claimed validating through `buildSessionReplayLink` meant "an admin can
+  never save something that silently does nothing" - true for templates that render *no* link,
+  false for this case, which is the one an admin actually hits.
+- **Reachable by a typo.** `{landingpage}` is a valid https URL: it passes the scheme check, passes
+  save, renders links. And until KAN-162 the help text naming the correct token did not render, so
+  the typo had nothing to correct it against. **The two findings compound** - that is the part
+  worth remembering, since each looks minor alone.
+- Fixed as **warning, not refusal** (the KAN-120 call): a plain "open my replay tool" link is
+  legitimate and the renderer deliberately supports it. The save response now reports
+  `filtersByPage`, the form says which of the two was saved, the board picks a tooltip that does
+  not promise a page-specific recording, and the copy describes both cases.
+
+### KAN-161: an empty clickable cell
+
+A filtering template plus a blank `landing_page` substituted to a filter for the empty string,
+rendered on a table cell that is itself blank - an empty clickable cell whose only tell was the
+cursor changing. A row with no landing page has nothing to watch. Scoped to filtering templates
+only, so a plain link-out keeps its link.
+
+### The generalisable lesson
+
+**A test that reads a translation file is not a test that the translation renders.** `messages.test.ts`
+has been asserting key parity and non-emptiness for many passes and would never have caught this;
+the new `icu-rendering.test.ts` formats messages through the real translator. The same distinction
+as KAN-156's: computing a thing correctly and delivering it are separate claims needing separate
+assertions.
+
+- **Last completed:** KAN-160, KAN-161 and KAN-162 fixed, tested and pushed as PR #447 (three
+  commits). Merged #441 (firmographics), #443 (remaining capped lists) and #445 (journal passes
+  #28-#30), and closed KAN-153/154 as Done.
+- **In progress (exact stopping point):** #444 (insights) and #446 (journal #31) retargeted to
+  `main`, CI running. #447 is stacked on #444 and needs retargeting once that merges. This entry is
+  #448, stacked on #446.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design: declaration merged,
+  adoption needs a human `terraform plan` showing no changes.
+- **Next step:** merge #444, #446, then retarget and merge #447 and #448. KAN-159 (a shared date
+  formatter - no date-formatting convention exists anywhere in `apps/web`) is the best next piece
+  of real work, with KAN-155 (mixed-currency firmographic MRR) after it. Unreviewed surfaces
+  remaining: demos, feedback, field-mappings, intent-quality, plugins, rep-collections, resources,
+  settings, support, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  (wiring a real goal target) are product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #31: insights
 
 ### Surface reviewed: insights
