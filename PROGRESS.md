@@ -17,6 +17,68 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #29: campaign ops
+
+### Surface reviewed: campaign-ops - deferred twice, finally reached
+
+Most of this page is genuinely well built, and two things are worth recording as **correct** so a
+later pass does not re-litigate them:
+
+- The red/green spend status derives from a **user-set** `monthly_budget`, with `no_target` when
+  none exists. That is the right shape, and the exact contrast with KAN-143's fabricated 3.5x ROAS
+  target - a threshold the user chose versus one the code invented.
+- `computeSignupQualityScore` is a declared rubric over three **real** survey answers, returning its
+  full breakdown "so a caller can show its own working, not just the number". A transparent model
+  over real inputs is not a fabrication.
+- The page copy discloses its attribution model in passing - "attributed via each customer's own
+  last-touch marketing channel" - which is the kind of sentence most of this cycle's findings were
+  missing.
+
+### KAN-152: absence rendered as green reassurance
+
+- `getCampaignSpendBreakdownForProject` did `actualByCampaign.get(campaignId) ?? 0`, so a campaign
+  with a saved budget but **no spend rows** got a measured zero and, being under budget, the status
+  `on_target`.
+- A project whose ad connector never synced saw every targeted campaign render as **"0 spent
+  against a $5,000 target - On target", in green.** That is not a missing value rendering as blank;
+  it is **absence rendering as active reassurance.** Someone checking whether they are overspending
+  was told they are fine.
+- Same family as KAN-137, KAN-140 and KAN-149, but **the first where the confident reading is a
+  green status rather than an empty state** - which makes it the most costly form of the class so
+  far.
+- **Distinguishable, which is what made it fixable:** an empty series means no campaign has spend
+  data; a campaign missing from a populated series really did spend nothing. Measured zero in the
+  second case, `null` and a new `no_spend_data` status in the first.
+- `actualSpend` became `number | null` and **the compiler found every consumer** - the page and both
+  synthesizers. Both now skip unmeasured rows rather than folding them in as zero, because counting
+  an unmeasured campaign as free would understate blended spend and therefore **overstate ROAS** -
+  the same figure KAN-143 was about.
+- Unmeasured campaigns now sort last. They had been sorted as the smallest spend, putting the
+  campaigns nothing is known about beside genuinely tiny ones.
+- The existing zero-spend test passes **unchanged**, which is the point: that case has other
+  campaigns with data, so its zero is a measurement.
+
+### Same trap twice in one pass
+
+My first draft of the new test invented `ensureSaasPackRegistered` and `saveCampaignTarget`; the
+file uses `ensureSaasMetricPackRegistered` and `setCampaignTargetBudget`. That is the second time in
+two passes, and the same shape as the cycle's recurring defect - **assuming an interface instead of
+reading it.** Worth noting that I keep catching it by reading rather than by running, which means
+the habit is working but the instinct has not changed.
+
+### Merged this pass
+
+#437 (KAN-128). #433 and #436 were rerun and then had main merged into them, since a rerun replays
+the same commit without the fix - a mistake made earlier in this cycle and avoided here.
+
+### Next
+
+PRs #439, #433, #435, #436, #438 in flight. Next unreviewed page: demos, feedback, field-mappings,
+firmographics, insights, intent-quality, plugins, rep-collections, resources, session-replay,
+settings, support, tv. Blocked items unchanged: all four are Yariv's.
+
+---
+
 ## 2026-09-18 - Hourly quality pass #28: KAN-128, the last KAN-103 remnant
 
 ### Surface reviewed: CI, because a documentation-only PR failed again
@@ -828,7 +890,8 @@ campaigns (#23), billing-ops-feed (#24),
 the scheduled warehouse refresh (#25),
 the capped-list class: record feed / audit log / cost guardrails (#26),
 segment members + win-rule history, class closed (#27),
-**apps/api emulator transport, KAN-103 closed (#28)**. Not yet reviewed:
+apps/api emulator transport, KAN-103 closed (#28),
+**campaign-ops (#29)**. Not yet reviewed:
 billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
