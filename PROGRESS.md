@@ -17,6 +17,406 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #37: intent & quality
+
+### Surface reviewed: intent-quality (score distribution, quality-adjusted CAC/CPS, mix alerts)
+
+### KAN-168: the headline CAC is wrong for a quarter of every year
+
+- The two figures were read straight off `series[0]`, which is the whole answer **only when the
+  query returns exactly one bucket**.
+- `grain: 'year'` was chosen to make that likely. But the window is a trailing **90 days**, so it
+  crosses a calendar-year boundary for every window ending between **1 January and 31 March** - a
+  quarter of the year, not an edge case. On those days there are two buckets, and `series[0]`,
+  ordered by `bucket_date` ascending, is the **older** one.
+- So for three months a year the headline "Quality-adjusted CAC" described only the part of the
+  window falling in the previous year, silently. **The error grows the deeper into Q1 it runs**: by
+  late March that is a handful of December days standing in for ninety, three months stale, labelled
+  as current.
+- No grain fixes it - `year` is the coarsest the compiler has, so any trailing window can straddle.
+  What fixes it is a rule **this module already documents elsewhere**: a formula-kind ratio cannot
+  be re-averaged across buckets, but a sum-shaped metric folds by addition. The three components
+  (`ad_spend`, `signup_quality_score_sum`, `paying_signup_quality_score_sum`) are all sums, so they
+  fold over every bucket and the ratios are computed once from the totals.
+- **The rule was already written down, one function away, and this one did not follow it.** Worth
+  noting as its own pattern: a codebase that has learned something states it in a doc comment, and
+  the next place that needed it did not inherit it. Grepping for the *reasoning* rather than the
+  symptom is what finds those.
+- The fixture is built so cost-per-signup is **identical** under both implementations, so that leg
+  cannot distinguish them. The CAC leg does: the old code reports 10 against a true 5 - exactly
+  twice the cost of acquisition, presented as current.
+
+### KAN-169: the figures had no period and no explanation
+
+"Quality-adjusted CAC: $40.25" rendered with no horizon. 90 days is a choice the code makes,
+documented only in a constant, and a CAC without a period is not interpretable - lifetime and
+last-quarter differ by more than most decisions taken from it. "Quality-adjusted" likewise names an
+adjustment without saying what it does. Both now stated, with the day count read from the constant
+so the sentence cannot drift from the query.
+
+### Noted, not changed
+
+`distribution.averageScore !== null ? ... : 0` renders an unknown average as **0** - the worst
+possible quality score. Unreachable today (`averageScore` is null only when `totalResponses === 0`,
+which the branch above already handles), so a latent default rather than a live defect. Recorded
+because it is the KAN-152/KAN-166 shape and would become live the moment that invariant changed.
+
+### Two mistakes of mine this pass
+
+- **I marked KAN-160/161/162 Done before #447 merged** - and its CI had in fact failed. Moved them
+  back to In Review. "Done when the fix merges" means checking the PR state, not remembering having
+  written the fix.
+- **#447 failed because of my own change**: the session-replay POST gained `filtersByPage` and the
+  route test asserts the whole body with `toEqual`. That is the **second time this cycle** - pass
+  #33 was a string change that left the only e2e reading it asserting the old text. The rule, now
+  twice-earned: **changing a response shape or a user-facing string means grepping for whatever
+  reads it**, because the type checker sees neither a JSON body compared with `toEqual` nor a
+  literal inside `getByText`.
+
+### Stack fully unblocked
+
+Merged #444, #446, #456, then retargeted every remaining stacked PR to `main` **before** merging
+their bases, and merged `main` into each branch so it carries the CI workflow. All six now have real
+check runs - the first time this cycle every open PR is actually being tested.
+
+- **Last completed:** KAN-168 and KAN-169 as PR #458. Merged #444 (insights), #446 (journal #31)
+  and #456 (feedback); closed KAN-156/157/158/167 as Done. Fixed #447's CI failure.
+- **In progress (exact stopping point):** #458 and #447 running CI; the docs chain (#448, #451,
+  #453, #455, #457) all now target `main` with checks running.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #447 and #458 once green, then the docs chain in order. Then KAN-159 (shared
+  date formatter) and KAN-155 (mixed-currency firmographic MRR). Unreviewed surfaces remaining:
+  field-mappings, plugins, rep-collections, resources, settings, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
+## 2026-09-18 - Hourly quality pass #36: feedback (the sampling family closed)
+
+### Surface reviewed: feedback (NPS score, daily trend, theme digest, dimension breakdowns)
+
+The last member of the `fetch-bounded-then-aggregate` family, and the worst of the three - it
+renders a wrong **shape** rather than a wrong number.
+
+### KAN-167: the NPS trend asserts "no responses" for days the read never reached
+
+- Two bounds compose: the read takes the **500 most recent** `survey_response` records, and the
+  daily trend then slices **30 days** out of whatever that read happened to reach.
+- A project with more than 500 responses inside the window exhausts its read before reaching the
+  window's start. The oldest days come back empty **because the fetch stopped**, not because nobody
+  answered - and each bucket's tooltip said, in words, **"no responses"**.
+- **The shape is the damage.** A run of blank days followed by filled ones reads as "we started
+  collecting recently" or "volume is growing", which is the one thing a sparkline is for. *The
+  busier the project, the more of its history disappears, and the healthier the trend looks* - the
+  failure scales with the success it is supposed to measure.
+- `trendReliableFrom` is derived from **the oldest record actually read**, so it states what the
+  data supports instead of estimating: every day from that date forward was fully covered, anything
+  before it is unknown. The sparkline draws those days as an outline rather than a filled cell and
+  says "not read - beyond the response limit".
+- Measured once at the page, which already does a single shared read for both consumers - so the
+  cap is measured where it is known rather than guessed twice.
+- Verified the test fails without the disclosure: `expected null to be '2026-06-04'`, three days the
+  read never reached being indistinguishable from three days nobody answered. Both sides covered, so
+  an uncapped read still warns about nothing.
+
+### The family, closed
+
+| Issue | Surface | What the bound corrupted |
+|---|---|---|
+| KAN-164 | demos | a **ratio** over a truncated window |
+| KAN-166 | support | a **subtraction** across two lifecycle stages, clamped into a reassuring zero |
+| KAN-167 | feedback | a **time series** whose missing tail is asserted as absence |
+
+All three came from the same shape, and each was harder to see than the last **because each looked
+more like an ordinary rendering**. The list versions (KAN-114/138/146) at least looked like lists.
+
+The rule that now covers all of them: **a bound is a property of the read, and every derived value
+inherits it.** Wherever a page computes something from a bounded read - a ratio, a difference, a
+series, a rank - the derived value carries the bound, and it is the derived value that needs the
+disclosure, not the counts.
+
+### CI unblocked
+
+#449 merged (after merging `main` in so it re-ran against the KAN-165 transport fix rather than
+replaying the same commit), and #444/#446 immediately got their first-ever check runs. Worth
+recording an addendum to KAN-163: **a `pull_request` workflow is read from the PR's HEAD branch, not
+from `main`.** Merging the trigger fix to `main` does not retroactively give an existing stacked PR
+a workflow that can fire - those branches need `main` merged into them. That is why #447, #448,
+#451, #453 and #455 still show no checks.
+
+- **Last completed:** KAN-167 as PR #456. Merged #449 (CI triggers) and #454 (support backlog), and
+  closed KAN-163 and KAN-166 as Done. Pushed trigger commits to the six stalled PRs; the two that
+  target `main` now have CI.
+- **In progress (exact stopping point):** #456, #444 and #446 running CI. The stacked docs chain
+  (#448 -> #451 -> #453 -> #455) and #447 need `main` merged into each branch before they can get a
+  check run at all - see the addendum above.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #444, #446, #456; then merge `main` into each stacked branch so it gets a
+  workflow, retarget to `main` before merging its base, and land the docs chain. Then KAN-159
+  (shared date formatter) and KAN-155 (mixed-currency firmographic MRR). Unreviewed surfaces
+  remaining: field-mappings, intent-quality, plugins, rep-collections, resources, settings, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
+## 2026-09-18 - Hourly quality pass #35: support
+
+### Surface reviewed: support (agent leaderboard + open-ticket backlog)
+
+Followed through on the sampling sibling flagged in #450. Same family as KAN-164, and the backlog
+makes it materially worse.
+
+### KAN-166: a clamped zero rendered as the open-ticket backlog
+
+- `openBacklog` was `Math.max(0, opened - resolved)`, both counts taken from the **500 most recent**
+  landed ticket events, rendered as **the single largest number on the page**.
+- A ticket is opened and resolved days or weeks apart, while the window is the most recent N
+  *events*. On any established project the `opened` events of older tickets age out while their
+  `resolved` events remain - so the subtraction runs over two sets describing **different
+  populations of tickets**.
+- **The clamp is what made it dangerous rather than merely wrong.** That window makes `resolved`
+  exceed `opened` routinely, which is exactly when the clamp fires. So the one detectable signal
+  that the read is inconsistent became a confident **0**, in 4xl type, telling a support manager
+  there is no backlog.
+- Absence rendered as reassurance - the KAN-152 shape - **in the biggest typography on the surface,
+  on the number the page exists to show.** KAN-152 was a green "On target"; this is a large
+  friendly zero. Both are the same defect: a guard that converts "cannot know" into "all is well".
+- The old comment attributed negatives to "a connector backfill gap", i.e. malformed data. Real,
+  but rare. The window is the common cause and is *structural rather than anomalous*, so the guard
+  was catching the wrong thing and hiding the right one. **A defensive clamp written against the
+  rare cause will fire mostly on the common one** - worth checking, wherever one exists, which case
+  actually trips it.
+- Fixed: `openBacklog` is `null` when the read was capped. The clamp survives for the uncapped case,
+  where a negative genuinely does mean a backfill gap, and both sides are tested so the number is
+  not disabled for projects that can support it.
+- `sampledFrom` also qualifies **the ranking**, which is a stronger claim than a count: "1." says
+  *best*, not *most within an arbitrary recency window*. An agent whose resolved tickets fall
+  outside the window places lower or vanishes, and nothing in the rendered list distinguishes that
+  from having resolved nothing.
+- Verified the test fails on the old code first: `expected +0 to be null` - the reassuring answer
+  itself, not a row count.
+
+### The bounded-data class, third shape
+
+- KAN-114/138/146 and friends: a **list** rendered short.
+- KAN-164 (demos): a **derived statistic** over a truncated window - a ratio that still looks like a
+  ratio.
+- KAN-166 (support): a **subtraction across two lifecycle stages**, where the window clips opposite
+  ends of the same entity, plus a clamp that converts the resulting inconsistency into reassurance.
+
+Each is harder to see than the last, because each looks more like an ordinary number. The rule that
+generalises: **wherever a page combines two bounded counts, the combination is the finding, not the
+counts.**
+
+### Still outstanding in this family
+
+`getNpsOverviewForProject` (KAN-82) shares the fetch-bounded-then-aggregate shape. Feedback is still
+unreviewed, so it gets its own pass rather than a drive-by.
+
+- **Last completed:** KAN-166 as PR #454. Merged #452 (KAN-165 emulator transport) and closed
+  KAN-165 as Done. Merged `origin/main` into `ci/stacked-pr-coverage` so #449 re-runs against the
+  transport fix rather than replaying the same commit.
+- **In progress (exact stopping point):** #449 and #454 both running CI against `main`. #444, #446,
+  #447, #448, #451, #453 still have **no CI runs at all** - that is exactly what #449 fixes, so it
+  merges first, then a push to each of the others starts their first check.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #449, then #454, then unblock and merge the stalled stack in order. After
+  that: feedback (the last member of this sampling family), then KAN-159 (shared date formatter)
+  and KAN-155 (mixed-currency firmographic MRR). Unreviewed surfaces remaining: feedback,
+  field-mappings, intent-quality, plugins, rep-collections, resources, settings, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
+## 2026-09-18 - Hourly quality pass #34: the apps/web Firestore transport (KAN-103 reopened)
+
+No page review this pass. Diagnosing #449's CI failure turned up something worth the whole hour:
+**KAN-103 was reported closed across the repo, and was never closed for `apps/web`.** I reported it
+closed. It was not.
+
+### KAN-165: every emulator-backed test in apps/web ran on the corrupting transport
+
+- #449 touched **one GitHub workflow file** and failed with a 120s timeout in a credentials route
+  test, carrying the unmistakable signature: `RESOURCE_EXHAUSTED: Received message larger than max
+  (537396242 vs 4194304)` - a corrupted length prefix, not a real message size - alongside
+  `INTERNAL ASSERTION FAILED: Unexpected state` with binary noise in its context.
+- `ensureFirestoreOrm` branches on `typeof window === 'undefined'`: Admin SDK in Node, client SDK
+  otherwise. Its doc comment justified that with *"this app's UNIT tests were never exposed because
+  vitest runs them with `environment: 'jsdom'`, which resolves the client SDK's browser build where
+  `experimentalForceLongPolling` is real."*
+- **That sentence is false.** jsdom supplies DOM globals; it does not change module resolution
+  conditions. Under vitest `require.resolve('firebase/firestore')` returns `dist/index.cjs.js` -
+  the gRPC build, where `forceLongPolling` is stored on the database info and never consulted.
+- So the whole app's emulator suite sat on the unprotected path **for as long as it was believed
+  protected**, and the belief was written down, which is why nobody looked again. Same class as
+  KAN-120/124/125/127 (a comment asserting what the code does not do), except this one kept a live
+  bug alive rather than merely misdescribing a working one.
+
+### The fix is the test environment, not the branch
+
+`app/api/**` and `lib/orgs/**` now run under `node`, so they reach the Admin SDK - no long-lived
+`Listen` stream, nothing to corrupt - and exercise the connection production uses, which was
+KAN-103's own argument everywhere else. Every file under those globs was checked for DOM use first;
+the only match anywhere was `document.cookie` inside an XSS payload string.
+
+### I got it wrong first, and the emulator corrected me
+
+I probed `firebase-admin`'s own `initializeApp` under jsdom, saw it initialize fine, concluded the
+second half of the old comment was also false, and **deleted the branch entirely**. The emulator run
+failed immediately: `initializeAdminApp can only be called in a Node.js environment`. The ORM's
+entry point carries its own browser guard; the raw package's does not.
+
+**Measuring the wrong function is how you conclude a branch is removable when it is not.** The test
+now pins both facts side by side - jsdom resolves the gRPC build, *and* the ORM's admin connect
+refuses under jsdom - so the next person measures the right one. Worth noting the asymmetry: the
+false claim and the true claim sat in the same paragraph, and I checked neither before acting on
+both.
+
+### Verified by the artefact, not the exit code - again
+
+Switching `app/api` alone still left corrupted-stream lines in the log **while the suite reported
+2526 passing**. `lib/orgs`'s five emulator files were still on gRPC, and a green exit said nothing
+about them. This is the KAN-128 lesson repeating almost exactly, so the check here is a grep over
+the run log rather than the exit status:
+
+```
+grep -cE 'GrpcConnection|RESOURCE_EXHAUSTED|INTERNAL ASSERTION'  ->  0
+Test Files 388 passed | Tests 2526 passed
+```
+
+Three times now this cycle the exit code has been the wrong instrument. The habit that works:
+**decide what the fix should make disappear from the output, then grep for it.**
+
+### Left alone deliberately
+
+`testTimeout: 120_000` and `retry: 1` were mitigations for this exact flake and now protect nothing
+they were written for. Kept anyway: these tests still hit a real emulator over the network and
+Playwright boots a real Next server, and removing a safety net in the same change that removes its
+justification would leave two possible explanations for the next timeout instead of one. The comment
+now says so, and says what measurement should settle it later.
+
+### Process note, repeated
+
+I started this work on `docs/progress-33` by mistake - the same wrong-branch slip as pass #33, one
+pass after writing the lesson down. Caught before committing both times, but a note is evidently not
+a habit. The check is `git rev-parse --abbrev-ref HEAD` **before the first edit**, not before the
+first commit.
+
+- **Last completed:** KAN-165 as PR #452. Merged #450 (demos sampling) and closed KAN-164 as Done.
+- **In progress (exact stopping point):** #449 (CI triggers) failed on this very flake and needs a
+  re-run once #452 merges - its own change is unrelated and sound. #444, #446, #447, #448, #451
+  still have no CI runs at all; that is what #449 fixes, so it wants merging first.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #452, re-run #449, merge it, then push to the stalled PRs so they finally
+  get checked, and merge in order. Then back to page review: KAN-159 (shared date formatter) and
+  KAN-155 (mixed-currency firmographic MRR) are the best standing work. Unreviewed surfaces
+  remaining: feedback, field-mappings, intent-quality, plugins, rep-collections, resources,
+  settings, support, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
+## 2026-09-18 - Hourly quality pass #33: demos (+ a CI trigger gap found on the way in)
+
+### KAN-163: CI never ran on stacked PRs, and did not re-run on retarget
+
+Found while checking why #444, #446, #447 and #448 had **no CI runs at all**.
+
+- `on.pull_request.branches: [main]` filters on the PR's **base**, so a PR stacked on another
+  branch matched nothing and received **no checks**. Not pending, not failing - an empty checks
+  list, which in `gh pr list --json statusCheckRollup` renders **identically to a green one**, and
+  which nothing anywhere flags as never-to-be-checked.
+- **Three PRs merged to `main` that way in a single afternoon** (#438, #440, #442), each reported
+  here as merged-when-green. They were docs-only so nothing broke, but the rule was not satisfied
+  for any of them, and I reported that it was.
+- `edited` is the second half: it is the event fired when a PR's base changes, and it is absent
+  from the default type set, so **retargeting a stacked PR onto `main` started no CI either**. The
+  obvious fix for the first problem silently did not work, which is why #444 and #446 sat
+  retargeted with nothing running.
+- **The generalisable trap:** an empty result and a passing result look the same through a tool
+  that reports "no failures". Same shape as the always-false truncation check and as
+  `exit 0`-with-errors-in-the-log: absence of a negative signal is not a positive one. The habit
+  that catches it is asking "what would this look like if the check never ran?" - and here, the
+  answer was "exactly like this".
+- Fixed by dropping the base filter and adding `edited`. The `push:` trigger keeps its own
+  `branches: [main]`, which filters the pushed ref rather than a PR base and is unaffected.
+
+### Surface reviewed: demos (sales demo pipeline)
+
+Right first: the page is honest about scope in its doc comment, correctly excludes `canceled`
+demos from both the funnel and the per-rep rows, degrades properly before a dbt build has run, and
+`DemoFunnelResult`'s field comments are carefully worded - "every distinct `demo_id` **this read
+saw**".
+
+### KAN-164: the funnel and show rate are a 500-record sample rendered as project totals
+
+- Demos scheduled, held, no-show and the show rate all come from the **500 most recent** landed
+  `demo_event` records, rendered as four large figures with nothing saying so. **The service knew;
+  the renderer had no way to find out.** The honest field comment never reached a user.
+- **The show rate misleads hardest, and cannot be fixed by aggregating better.** The window is the
+  most recent N **events**, not demos, and one demo emits `scheduled` and then `held`/`no_show`
+  days later - so the window cuts across demo lifecycles at both ends. Past the cap the ratio stops
+  describing the project and starts describing an arbitrary recency slice of events.
+- The emulator test pins that distortion directly: a two-record window keeps a demo's `held` and
+  drops its `scheduled`, so the funnel reports a demo held it never saw scheduled. Inherent to a
+  recency window - which is exactly why it must be disclosed rather than silently corrected.
+- The per-rep breakdown compounds it: a rep whose events fall outside the window **disappears from
+  the leaderboard**, which reads as "did no demos" rather than "not in this sample".
+- Measured by over-fetching one record, never `length === cap` - that cannot tell "exactly 500
+  exist" (complete) from "fifty thousand exist" (a sample). **Both sides are tested**, so the
+  notice cannot start firing on complete data either.
+- `precomputedRecords` callers must now state their own cap: a **union, not an optional field**, so
+  the answer cannot be omitted. Defaulting it to "complete" would assert the very thing this change
+  exists to stop asserting. No caller passes records today, so it costs nothing now and shuts that
+  door.
+
+### A new shape of the bounded-data class
+
+Every prior instance (KAN-114/124/132/137/138/140/146/149/150/151) was a **list** rendered short.
+This is the first where the bound corrupts a **derived statistic**. A short list at least looks
+like a list; a ratio computed over a truncated, lifecycle-straddling window looks exactly like a
+ratio. Worth carrying into the remaining surfaces: wherever a page divides one bounded count by
+another, the quotient is the finding, not the counts.
+
+### Sibling surfaces flagged, not touched
+
+`aggregateSupportLeaderboard` (KAN-90) and `getNpsOverviewForProject` (KAN-82) share the
+fetch-bounded-then-aggregate shape and probably the same gap. Support and Feedback are both still
+unreviewed, so they get their own passes rather than a drive-by here.
+
+### Process note
+
+I started the demos work on the CI branch by mistake and caught it before committing - the changes
+moved cleanly onto `review/demos` with a `git checkout -b`, and `ci/stacked-pr-coverage` kept only
+its own commit. Checking `git rev-parse --abbrev-ref HEAD` before the first commit of a new piece
+of work would have caught it earlier.
+
+- **Last completed:** KAN-163 (CI triggers) as PR #449 and KAN-164 (demos sampling) as PR #450,
+  both targeting `main` and both with CI actually running - the first PRs this cycle where that is
+  verified rather than assumed.
+- **In progress (exact stopping point):** #444, #446, #447, #448 still have **no CI runs**. Once
+  #449 merges, a push to each will fire `synchronize` and they will finally get checked; they
+  should not be merged before that.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #449, then push to #444/#446/#447/#448 to trigger their first CI run, then
+  merge in order. After that: KAN-159 (shared date formatter), KAN-155 (mixed-currency
+  firmographic MRR), and the support/feedback sampling siblings. Unreviewed surfaces remaining:
+  feedback, field-mappings, intent-quality, plugins, rep-collections, resources, settings, support,
+  tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #32: session replay
 
 ### Surface reviewed: session-replay (settings page + its board link-out)
