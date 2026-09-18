@@ -1006,9 +1006,9 @@ export async function listWinRulesForProject(organizationId: string, projectId: 
   return listWinRulesForProjectInOrganization(organizationId, projectId);
 }
 
-export async function listRecentWinEventsForProject(organizationId: string, projectId: string): Promise<WinEventModel[]> {
+export async function listRecentWinEventsForProject(organizationId: string, projectId: string, limit?: number): Promise<WinEventModel[]> {
   await ensureFirestoreOrm();
-  return listRecentWinEventsForProjectInOrganization(organizationId, projectId);
+  return listRecentWinEventsForProjectInOrganization(organizationId, projectId, limit);
 }
 
 /** The live win feed's incremental-poll building block — see `feed/route.ts`'s own doc comment. */

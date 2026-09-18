@@ -5,6 +5,8 @@ import type { WinEventFeedItem } from '@/lib/orgs/win-rule-view';
 
 export interface WinEventHistoryListProps {
   events: WinEventFeedItem[];
+  /** True when more wins exist than were fetched. Measured by the page over-fetching one row past the cap, not inferred from `events.length`. */
+  truncated?: boolean;
 }
 
 /**
@@ -15,7 +17,7 @@ export interface WinEventHistoryListProps {
  * that's the whole point of it existing alongside the live feed rather than
  * instead of it.
  */
-export function WinEventHistoryList({ events }: WinEventHistoryListProps): React.ReactElement {
+export function WinEventHistoryList({ events, truncated = false }: WinEventHistoryListProps): React.ReactElement {
   const t = useTranslations('WinRules');
 
   return (
@@ -40,7 +42,11 @@ export function WinEventHistoryList({ events }: WinEventHistoryListProps): React
           ))}
         </ul>
       )}
-      {events.length > 0 ? <p className="text-xs text-muted-foreground">{t('historyListCapNote', { count: events.length })}</p> : null}
+      {events.length > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {truncated ? t('historyListCapNoteTruncated', { count: events.length }) : t('historyListCapNote', { count: events.length })}
+        </p>
+      ) : null}
     </section>
   );
 }

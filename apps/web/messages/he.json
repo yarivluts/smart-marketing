@@ -1451,6 +1451,7 @@
     "memberLastSeenLine": "נראה לאחרונה {lastSeenAt}",
     "memberFieldLine": "{name}: {value}",
     "membersCapNote": "מוצגים {count} החברים העדכניים ביותר.",
+    "membersCapNoteOfTotal": "מוצגים {count} מתוך {total} חברים.",
     "deleteConfirm": "למחוק את הפלח הזה? לא ניתן לבטל פעולה זו.",
     "deleteButton": "מחק",
     "deleteError": "לא ניתן היה למחוק את הפלח. נסה שוב.",
@@ -1535,7 +1536,8 @@
     "feedItem": "{winRuleName} — {schemaName} ({clientId})",
     "historyHeading": "היסטוריית ניצחונות",
     "historyEmpty": "טרם נרשמו ניצחונות.",
-    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים."
+    "historyListCapNote": "מוצגים {count} הניצחונות האחרונים.",
+    "historyListCapNoteTruncated": "מוצגים {count} הזכיות האחרונות — קיימות עוד מעבר למוצג."
   },
   "TrialPipeline": {
     "heading": "צינור ניסיונות",
