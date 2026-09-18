@@ -132,9 +132,57 @@ describe('getNpsOverviewForProject', () => {
     precomputed.payload = { event: 'survey_response', event_id: unique('event'), ts: '2026-06-05T09:00:00.000Z', properties: { survey_type: 'nps', score: 10 } };
     precomputed.landed_at = '2026-06-05T09:00:00.000Z';
 
-    const overview = await getNpsOverviewForProject(organization.id, project.id, { now, precomputedRecords: [precomputed] });
+    const overview = await getNpsOverviewForProject(organization.id, project.id, { now, precomputedRecords: [precomputed], sampledFrom: null });
     expect(overview.overall.totalResponses).toBe(1);
     expect(overview.overall.promoters).toBe(1);
+  });
+
+  /**
+   * Two bounds compose here, and the composition is the defect (KAN-167): the
+   * read takes the most recent N *responses*, and the trend then slices
+   * `windowDays` out of whatever that read happened to reach. A project with
+   * more than N responses inside the window exhausts its read before reaching
+   * the window's start, so the OLDEST days come back empty because the fetch
+   * stopped — not because nobody answered.
+   *
+   * Worse than a wrong number, because it renders a wrong SHAPE: a run of blank
+   * days followed by filled ones is read as "we started collecting recently" or
+   * "volume is growing", which is the one thing a sparkline is for. And the
+   * empty bucket's tooltip said, in words, "no responses".
+   *
+   * This fixture is the minimum that reproduces it: five days of responses, a
+   * five-day window, and a read capped at two records. The read reaches back
+   * only to day 4, so days 1-3 are unknown rather than empty, and
+   * `trendReliableFrom` must say so.
+   */
+  it('reports how far back the trend is actually reliable when the read was capped', async () => {
+    const { owner, organization, project, environmentId } = await setupOrgWithProject('NPS Trend Truncation Org');
+    await ensureSurveyResponseSchemaRegistered({ organizationId: organization.id, projectId: project.id, createdByUserId: owner.id });
+
+    const now = Date.parse('2026-06-05T12:00:00.000Z');
+    for (const day of ['01', '02', '03', '04', '05']) {
+      await landNpsResponse({ organizationId: organization.id, projectId: project.id, environmentId, score: 10, landedAt: `2026-06-${day}T09:00:00.000Z` });
+    }
+
+    const capped = await getNpsOverviewForProject(organization.id, project.id, { now, windowDays: 5, limit: 2 });
+    expect(capped.sampledFrom).toBe(2);
+    // The two most recent responses are the 4th and 5th, so nothing before the
+    // 4th was looked at. Every bucket in the window still renders, which is why
+    // the page needs this date to tell "unknown" from "empty".
+    expect(capped.trendReliableFrom).toBe('2026-06-04');
+    expect(capped.dailyTrend).toHaveLength(5);
+    expect(capped.dailyTrend.filter((point) => point.breakdown.totalResponses === 0).map((point) => point.date)).toEqual([
+      '2026-06-01',
+      '2026-06-02',
+      '2026-06-03',
+    ]);
+
+    // An uncapped read genuinely covers the window, so there is nothing to
+    // disclose and the page must not warn. Without this side, a fix that always
+    // reported a date would look correct.
+    const complete = await getNpsOverviewForProject(organization.id, project.id, { now, windowDays: 5, limit: 50 });
+    expect(complete.sampledFrom).toBeNull();
+    expect(complete.trendReliableFrom).toBeNull();
   });
 
   it('ignores non-nps survey_type responses (a future CSAT survey landing under the same schema)', async () => {

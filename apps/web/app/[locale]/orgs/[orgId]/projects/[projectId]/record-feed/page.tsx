@@ -5,6 +5,8 @@ import { activeSchemaNamesForKind } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
+import { DEFAULT_RECORD_FEED_LIMIT, RECORD_FIELD_FILTER_CANDIDATE_WINDOW } from '@growthos/firebase-orm-models';
+import { splitOverFetchedFeed } from '@/lib/orgs/capped-list-view';
 import { listEnvironmentsForProject, listOrgProjects, listRecentRecordsForSchema, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
 import { toRecordFeedEntryView } from '@/lib/orgs/record-feed-view';
 import { Link } from '@/i18n/navigation';
@@ -69,8 +71,14 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
   const filterValue = filterFieldName && valueParam ? valueParam : undefined;
   const fieldFilter = filterFieldName && filterValue ? { fieldName: filterFieldName, value: filterValue } : undefined;
 
-  const records = selectedSchemaName ? await listRecentRecordsForSchema(orgId, projectId, 'event', selectedSchemaName, fieldFilter) : [];
-  const entries = records.map((record) => toRecordFeedEntryView(record, selectedSchemaDef?.field_defs ?? []));
+  // Over-fetched by one so the cap note can say whether more exist. Note this is
+  // a different question from the FILTER WINDOW below: this measures "are there
+  // more records than we show", the window is "how far back did we look at all".
+  const records = selectedSchemaName
+    ? await listRecentRecordsForSchema(orgId, projectId, 'event', selectedSchemaName, fieldFilter, DEFAULT_RECORD_FEED_LIMIT + 1)
+    : [];
+  const recordPage = splitOverFetchedFeed(records, DEFAULT_RECORD_FEED_LIMIT);
+  const entries = recordPage.rows.map((record) => toRecordFeedEntryView(record, selectedSchemaDef?.field_defs ?? []));
 
   const t = await getTranslations('RecordFeed');
   const tEnv = await getTranslations('EnvBadge');
@@ -153,9 +161,19 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
           ) : null}
 
           <section className="flex flex-col gap-3">
-            {fieldFilter ? <p className="text-xs text-muted-foreground">{t('filterActiveNote', { field: fieldFilter.fieldName, value: fieldFilter.value })}</p> : null}
+            {/* The window is stated because the filter does not search the schema, it
+                 searches the most recent slice of it - a matching record older than
+                 the window is never examined. Saying "filtered to X" without that
+                 makes an empty result read as "no such record". */}
+            {fieldFilter ? (
+              <p className="text-xs text-muted-foreground">
+                {t('filterActiveNote', { field: fieldFilter.fieldName, value: fieldFilter.value, window: RECORD_FIELD_FILTER_CANDIDATE_WINDOW })}
+              </p>
+            ) : null}
             {entries.length === 0 ? (
-              <p className="text-muted-foreground">{fieldFilter ? t('filterEmpty') : t('empty')}</p>
+              <p className="text-muted-foreground">
+                {fieldFilter ? t('filterEmpty', { window: RECORD_FIELD_FILTER_CANDIDATE_WINDOW }) : t('empty')}
+              </p>
             ) : (
               <ul className="flex flex-col gap-2">
                 {entries.map((entry) => (
@@ -176,7 +194,9 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
                 ))}
               </ul>
             )}
-            <p className="text-xs text-muted-foreground">{t('capNote', { count: entries.length })}</p>
+            <p className="text-xs text-muted-foreground">
+              {recordPage.truncated ? t('capNoteTruncated', { count: entries.length }) : t('capNote', { count: entries.length })}
+            </p>
           </section>
         </>
       )}

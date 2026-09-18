@@ -91,11 +91,25 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
       <p className="text-sm text-muted-foreground">{t('description')}</p>
 
+      {/* Stated once, at the top, because it qualifies everything below: the
+          backlog, the per-agent counts, and above all the ranking. Said here
+          rather than per tile for the same reason the Demos page does it
+          (KAN-164). */}
+      {leaderboard.sampledFrom !== null ? (
+        <p className="rounded-md border border-input px-3 py-2 text-sm text-muted-foreground">{t('sampledNotice', { limit: leaderboard.sampledFrom })}</p>
+      ) : null}
+
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{t('backlogHeading')}</h2>
         <div className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
-          <span className="text-4xl font-bold tracking-tight">{leaderboard.openBacklog}</span>
-          <span className="text-sm text-muted-foreground">{t('backlogLine', { opened: leaderboard.ticketsOpened })}</span>
+          {/* A capped read cannot produce this number at all: opened and resolved
+              are counted over a window that clips either end of a ticket's
+              lifecycle. It used to render a clamped 0 here, which reads as "no
+              backlog" in the largest type on the page (KAN-166). */}
+          <span className="text-4xl font-bold tracking-tight">{leaderboard.openBacklog === null ? t('rowValueUnavailable') : leaderboard.openBacklog}</span>
+          <span className="text-sm text-muted-foreground">
+            {leaderboard.openBacklog === null ? t('backlogUnavailable') : t('backlogLine', { opened: leaderboard.ticketsOpened })}
+          </span>
         </div>
       </section>
 

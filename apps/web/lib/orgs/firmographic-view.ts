@@ -39,7 +39,12 @@ export function toFirmographicCompositionRows(rows: readonly WarehouseRow[], dim
 
 /**
  * Translation key for one industry value from `INDUSTRY_CATEGORIES`
- * (`@growthos/shared`) — the AC's "AI industry classification" taxonomy.
+ * (`@growthos/shared`). That taxonomy is what KAN-87's AC calls "AI industry
+ * classification", but nothing classifies with a model: the values are
+ * produced by `classifyCompanyIndustry`, a fixed keyword list over the company
+ * name with a TLD fallback, running in the tracking SDK in the visitor's own
+ * browser. Naming that here because the UI strings this mapper feeds said
+ * otherwise until KAN-153.
  * Falls back to the raw value for a category this mapper doesn't
  * recognize, same "map a fixed data-driven category through i18n" posture
  * `cancellationReasonCodeLabelKey` (KAN-84) establishes.
