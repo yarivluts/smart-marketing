@@ -17,6 +17,57 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #28: KAN-128, the last KAN-103 remnant
+
+### Surface reviewed: CI, because a documentation-only PR failed again
+
+- PR #436 changes only `PROGRESS.md`, and it failed with `mcp.controller.e2e.spec.ts` reporting
+  `RESOURCE_EXHAUSTED: Received message larger than max (704820226 vs 4194304)` - a garbage length
+  prefix, the KAN-103 signature. **A docs-only PR failing is proof the change is not the cause**,
+  which is why it is worth diagnosing rather than rerunning.
+- apps/api was simpler than apps/web: it runs entirely under Jest in Node, with no jsdom case where
+  the client SDK's browser build is safe. No runtime branch - one path, the one production uses.
+
+### The near-miss worth recording
+
+- Changing `connectFirestoreOrmForApi` was **not enough**. The five e2e specs do not go through the
+  bootstrap at all; each calls `connectFirestoreOrm` directly in its own `beforeAll`. **I fixed the
+  layer that looked responsible and left the layer that actually was.**
+- Caught because after that change the suite passed with **exit 0 while the log still contained
+  `GrpcConnection` `RESOURCE_EXHAUSTED` lines**. A green run with corruption in the log means the
+  corruption did not happen to land on an assertion that time.
+- **Reading the log rather than the exit code is the only reason this is a fix and not a half-fix
+  reported as closed.** Same lesson as the PROGRESS conflict-marker incident early in this cycle:
+  verify the artefact, not the proxy. The exit code is a proxy.
+
+### Result, measured rather than asserted
+
+18/18 suites, 147/147 tests, and **zero** `GrpcConnection`/`RESOURCE_EXHAUSTED` lines against many
+before. 26s against an estimated 73s, because the client SDK had been spending that in retry
+backoff.
+
+**KAN-103 is now closed across the repo**: `packages/firebase-orm-models`, apps/web unit (jsdom,
+safe by accident), apps/web Playwright, apps/api. Four passes traced it, and one root cause -
+`experimentalForceLongPolling` being a no-op in Node - explained all four.
+
+### One more inverted assertion
+
+The bootstrap spec pinned the client-SDK-against-emulator branch, making the defect a specified
+requirement. That is the **fourth** test this cycle found asserting the thing that was wrong.
+
+### Merged this pass
+
+None. #433, #435 and #436 were all blocked behind this same flake, which is what made fixing it the
+pass rather than reviewing campaign-ops.
+
+### Next
+
+PR #437 should unblock #433/#435/#436; rerun them behind it. **campaign-ops remains the next
+unreviewed page** - deferred twice, both times because CI was failing on something unrelated to the
+pending work. Blocked items unchanged: all four are Yariv's.
+
+---
+
 ## 2026-09-18 - Hourly quality pass #27: closing the capped-list class
 
 ### Finished the debt rather than leaving two named items open
@@ -776,7 +827,8 @@ churn-reasons (#21), cohorts + a repo-wide fabricated-claim sweep (#22),
 campaigns (#23), billing-ops-feed (#24),
 the scheduled warehouse refresh (#25),
 the capped-list class: record feed / audit log / cost guardrails (#26),
-**segment members + win-rule history, class closed (#27)**. Not yet reviewed:
+segment members + win-rule history, class closed (#27),
+**apps/api emulator transport, KAN-103 closed (#28)**. Not yet reviewed:
 billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
