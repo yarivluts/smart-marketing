@@ -17,6 +17,76 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #36: feedback (the sampling family closed)
+
+### Surface reviewed: feedback (NPS score, daily trend, theme digest, dimension breakdowns)
+
+The last member of the `fetch-bounded-then-aggregate` family, and the worst of the three - it
+renders a wrong **shape** rather than a wrong number.
+
+### KAN-167: the NPS trend asserts "no responses" for days the read never reached
+
+- Two bounds compose: the read takes the **500 most recent** `survey_response` records, and the
+  daily trend then slices **30 days** out of whatever that read happened to reach.
+- A project with more than 500 responses inside the window exhausts its read before reaching the
+  window's start. The oldest days come back empty **because the fetch stopped**, not because nobody
+  answered - and each bucket's tooltip said, in words, **"no responses"**.
+- **The shape is the damage.** A run of blank days followed by filled ones reads as "we started
+  collecting recently" or "volume is growing", which is the one thing a sparkline is for. *The
+  busier the project, the more of its history disappears, and the healthier the trend looks* - the
+  failure scales with the success it is supposed to measure.
+- `trendReliableFrom` is derived from **the oldest record actually read**, so it states what the
+  data supports instead of estimating: every day from that date forward was fully covered, anything
+  before it is unknown. The sparkline draws those days as an outline rather than a filled cell and
+  says "not read - beyond the response limit".
+- Measured once at the page, which already does a single shared read for both consumers - so the
+  cap is measured where it is known rather than guessed twice.
+- Verified the test fails without the disclosure: `expected null to be '2026-06-04'`, three days the
+  read never reached being indistinguishable from three days nobody answered. Both sides covered, so
+  an uncapped read still warns about nothing.
+
+### The family, closed
+
+| Issue | Surface | What the bound corrupted |
+|---|---|---|
+| KAN-164 | demos | a **ratio** over a truncated window |
+| KAN-166 | support | a **subtraction** across two lifecycle stages, clamped into a reassuring zero |
+| KAN-167 | feedback | a **time series** whose missing tail is asserted as absence |
+
+All three came from the same shape, and each was harder to see than the last **because each looked
+more like an ordinary rendering**. The list versions (KAN-114/138/146) at least looked like lists.
+
+The rule that now covers all of them: **a bound is a property of the read, and every derived value
+inherits it.** Wherever a page computes something from a bounded read - a ratio, a difference, a
+series, a rank - the derived value carries the bound, and it is the derived value that needs the
+disclosure, not the counts.
+
+### CI unblocked
+
+#449 merged (after merging `main` in so it re-ran against the KAN-165 transport fix rather than
+replaying the same commit), and #444/#446 immediately got their first-ever check runs. Worth
+recording an addendum to KAN-163: **a `pull_request` workflow is read from the PR's HEAD branch, not
+from `main`.** Merging the trigger fix to `main` does not retroactively give an existing stacked PR
+a workflow that can fire - those branches need `main` merged into them. That is why #447, #448,
+#451, #453 and #455 still show no checks.
+
+- **Last completed:** KAN-167 as PR #456. Merged #449 (CI triggers) and #454 (support backlog), and
+  closed KAN-163 and KAN-166 as Done. Pushed trigger commits to the six stalled PRs; the two that
+  target `main` now have CI.
+- **In progress (exact stopping point):** #456, #444 and #446 running CI. The stacked docs chain
+  (#448 -> #451 -> #453 -> #455) and #447 need `main` merged into each branch before they can get a
+  check run at all - see the addendum above.
+- **Blocked + why:** unchanged, all four on Yariv - the `easysign-prod-selfserve-mcp-key` secret
+  read, the go-ahead to register EasySign's 9 schemas, the dev-scoped purge of 46 stale quarantine
+  rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** merge #444, #446, #456; then merge `main` into each stacked branch so it gets a
+  workflow, retarget to `main` before merging its base, and land the docs chain. Then KAN-159
+  (shared date formatter) and KAN-155 (mixed-currency firmographic MRR). Unreviewed surfaces
+  remaining: field-mappings, intent-quality, plugins, rep-collections, resources, settings, tv.
+- **Waiting on human:** the four items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up
+  are product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #35: support
 
 ### Surface reviewed: support (agent leaderboard + open-ticket backlog)
