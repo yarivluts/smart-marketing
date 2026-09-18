@@ -17,6 +17,64 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #40: resources (org resource library)
+
+### Surface reviewed: resources - shared credentials, templates, people, attachment requests
+
+### KAN-173: "Secret set" for a credential that cannot be decrypted
+
+- The label was `Boolean(credential.encrypted_secret)` - true whenever ciphertext exists. That is a
+  claim about **presence**, not about whether the secret can be **decrypted**.
+- Envelope encryption wraps each secret's data key under a versioned KMS key, and `unwrapDek` throws
+  `UnknownKmsKeyError` for a key the provider no longer holds. Retiring a key from
+  `GROWTHOS_VAULT_KEYS` without rotating the secrets sealed under it leaves credentials that are
+  present and useless - reported **exactly as healthy ones**.
+- **The reassurance lands at the worst moment.** An admin debugging a dead connector opens the
+  resource library, sees the credential configured, and rules it out - when the credential is the
+  fault. Every other instance of this class this cycle wasted a reader's trust; this one actively
+  misdirects a diagnosis.
+- Three states now, where there was one label: `current` (silent - a warning on healthy rows is one
+  people stop reading), `rotatable` (gentle; notable because **the "Rotate key" button was already
+  sitting next to it** with nothing ever saying which rows needed pressing it), and `unreadable`
+  (every connector using it is failing).
+- A deployment with **no vault keys at all** gets its own message rather than an exception: this is
+  a read-only status on a page that also renders people, templates and attachment requests, none of
+  which need a vault, so it must not take the page down. That state is worth saying too - with no
+  keys configured, no stored secret is readable.
+- The classification does **no crypto and takes no tenant id** on purpose: the page asks it once per
+  row, and anything needing a real unwrap would be expensive enough that the status would get
+  dropped rather than shown. `knowsKeyId` is the single addition to `KmsProvider` that makes it
+  possible, and it is what separates *needs rotating* from *cannot be decrypted*.
+
+### The comparison was already written down
+
+`SecretEnvelope.keyId`'s own doc comment says: *"compare against `KmsProvider.currentKeyId` to tell
+whether this envelope needs rotating."* The one-line comparison it describes was never surfaced
+anywhere. **Second time in three passes** that the codebase had already worked something out in a
+comment and no caller inherited it (KAN-168 was the other - a folding rule documented one function
+away). Reading the doc comments *near* a surface, not just the code on it, is turning out to be one
+of the higher-yield review moves.
+
+### Nothing secret is touched
+
+Only the key **id** is compared, and even that is not rendered - no secret material and no key
+material is read or displayed by this change.
+
+- **Last completed:** KAN-173 as PR #464. Merged #462 (TV staleness) and #463; closed KAN-172 as
+  Done.
+- **In progress (exact stopping point):** #464 running CI. Nothing else open.
+- **Blocked + why:** **KAN-170 still leads** - `api-prod` is 117 commits behind `main` with no
+  deploy runbook, which is why EasySign's `dry_run` is missing despite #414 having merged. That one
+  redeploy unblocks their schema registration without anyone having to approve the registration
+  itself. Then: the `easysign-prod-selfserve-mcp-key` secret read, the dev-scoped purge of 46 stale
+  quarantine rows, and rotation of the two burned keys. KAN-147 stays open by design.
+- **Next step:** **two surfaces left** - plugins and settings - after which this cycle has covered
+  every page. Then the standing backlog: KAN-159 (shared date formatter), KAN-155 (mixed-currency
+  firmographic MRR) and the per-entry currency the KAN-171 disclosure stands in for.
+- **Waiting on human:** the items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up are
+  product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #39: war-room TV
 
 ### Surface reviewed: tv (pairing page + the unattended rotation display)
