@@ -17,6 +17,69 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #45: the dbt warehouse layer
+
+The last unreviewed surface of any size: 29 dbt models, never examined as a surface, and **every
+number on every page traces through them**.
+
+### What was clean, recorded so it is not re-swept
+
+- **No magic multipliers.** A sweep for numeric constants in measure expressions found nothing but a
+  comment. Contrast the TypeScript synthesizers, which used to be full of them.
+- **`coalesce` substitutes honest markers**, not plausible values: `'unknown'`, `'(unknown)'`,
+  `'(none)'`, `'unattributed'`. That is the right shape - it says *we do not know* rather than
+  inventing something that reads as measured.
+- `fact_cohort_retention`'s zero-fill is a **true measurement**: a cohort with no returners genuinely
+  retained zero, and `cohort_size` is known independently.
+
+### KAN-179: 40-day payback counts customers who have not had 40 days
+
+- `fact_customer_payback` sums charges where `days_since_acquisition <= 40` and **nothing checked
+  that 40 days had passed**. A customer acquired yesterday contributed a "40-day collected revenue"
+  measuring one day.
+- Alone that is incomplete. Averaged it is worse:
+  `quality_calibration_avg_collected_revenue_40d` divided unfiltered revenue by unfiltered signups,
+  so every immature customer added **one to the denominator and ~nothing to the numerator**.
+- **The faster a project acquires, the worse its payback looks.** Exactly backwards, and worst
+  precisely when someone is checking whether a campaign is working. This is the first finding this
+  cycle whose error *grows with the customer's success* - all the others were constant or random.
+- It also poisons the mart's own purpose: `fact_quality_calibration` exists to answer "did
+  high-scored signups actually pay more?", and the bias lands unevenly across tiers when acquisition
+  mix shifts, so the calibration conclusion can **invert**.
+- Fixed by making maturity filterable: `window_*_complete` flags, carried through, with matured-only
+  aggregations the average divides. **Both halves carry the same filter** - filtering only the
+  numerator shrinks revenue while leaving the denominator inflated, which moves the number further
+  from the truth while looking fixed. **Flags rather than nulling revenue** - `sum` skips nulls but
+  `count_distinct` would still count the customer.
+
+### A guard I built earlier caught me mid-change
+
+The metric registry refused to register a filter on `window_40d_complete` because its core-table
+catalog did not know that column. That is **KAN-168's own validation working on me**: it named the
+missing column instead of letting the metric fail silently at query time. First time this cycle a
+guard from an earlier pass has caught a later pass's change - which is the point of building them.
+
+### The shape, at the warehouse layer
+
+Same as everywhere else: a number labelled as something it is not. "40-day revenue" that is not
+40 days old. The layer changed; the defect did not.
+
+- **Last completed:** KAN-179 as PR #476. Merged #474 (KAN-178 inventory) and #475; closed KAN-178.
+- **In progress (exact stopping point):** #476 awaiting CI. **#469 (dry-run scope) is merged and
+  still not live** - EasySign remains blocked on a redeploy, not on code.
+- **Blocked + why:** an `api-prod` redeploy ships #469 and unblocks EasySign's dry runs; runbook is
+  in `docs/deploy-api.md`. KAN-170's automation half stays open by design. Then: the
+  `easysign-prod-selfserve-mcp-key` secret read, the go-ahead on the nine schemas, the dev-scoped
+  purge of 46 stale quarantine rows, and rotation of the two burned keys.
+- **Next step:** the `7d`/`14d`/`30d` averages have no matured counterpart yet - only `40d` had an
+  average metric to fix, but the same flags are now available if those are ever averaged. Then
+  KAN-159 (shared date formatter) and KAN-155 (mixed-currency firmographic MRR), both in mounted
+  code. Surfaces are now all reviewed at least once; further passes should follow evidence rather
+  than rotation.
+- **Waiting on human:** the items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up are
+  product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #44: the test suite as a surface, and what it led to
 
 The page rotation finished last pass. Rather than start a second lap, this took the one surface
