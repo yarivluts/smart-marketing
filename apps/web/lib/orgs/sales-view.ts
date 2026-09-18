@@ -20,6 +20,12 @@ export interface DemoFunnelView {
   showRate: number | null;
   /** Sorted highest-`demosHeld`-first. */
   rows: DemoFunnelRepRowView[];
+  /**
+   * The record cap these numbers were computed under, or `null` when the read
+   * saw every landed `demo_event`. Carried through to the page so a sampled
+   * funnel can say so rather than render as the project's totals (KAN-164).
+   */
+  sampledFrom: number | null;
 }
 
 /** Resolves a funnel's per-rep rows against the org's people registry — `peopleById` is built once per page render, the same "server-mapped plain data in, plain data out" join `toSupportLeaderboardView` performs at the page layer rather than re-fetching per row. */
@@ -32,6 +38,7 @@ export function toDemoFunnelView(
     demosHeld: result.demosHeld,
     demosNoShow: result.demosNoShow,
     showRate: result.showRate,
+    sampledFrom: result.sampledFrom,
     rows: result.rows.map((row) => {
       const person = peopleById.get(row.repOrgPersonId);
       return {

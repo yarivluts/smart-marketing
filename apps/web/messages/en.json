@@ -883,7 +883,8 @@
     "recentDemosIntro": "Browse individual demo records:",
     "recentDemosLinkLabel": "recent demos",
     "workListIntro": "Want to find paying customers who never got a demo?",
-    "workListLinkLabel": "Build that list on the Segments page"
+    "workListLinkLabel": "Build that list on the Segments page",
+    "sampledNotice": "These numbers cover the {limit} most recent demo events, not your full history - more exist. Treat the counts as a floor, and the show rate with care: the window is measured in events, and a demo is booked in one event and held or missed in another, so a demo can fall partly outside it."
   },
   "ChurnReasons": {
     "metaTitle": "Churn reasons",
