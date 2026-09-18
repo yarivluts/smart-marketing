@@ -17,6 +17,84 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #38: field-mappings (clean) + rep-collections
+
+### Surface reviewed: field-mappings - reviewed and found sound
+
+Recorded as **right** so a later pass does not re-litigate it:
+
+- Suggestions are **staged into the create form, never saved directly** - the "user confirms" step is
+  real, and "Apply all" populates rows the user still edits and submits.
+- `confidence` is correctly scaled to a percentage at the render site and labelled **"% match"**,
+  not "confidence" - it does not borrow the authority of a model probability, and the type's own
+  comment says plainly it is a deterministic name/type-similarity heuristic rather than an LLM call.
+- `applyFieldMappingToDelivery` revalidates before applying, refuses a disabled mapping, a discarded
+  delivery and an already-applied one, records the batch id and an audit entry, and reports the real
+  `ingestBatch` counts rather than assumed ones.
+
+Finding nothing here is the honest outcome. Worth stating rather than manufacturing an issue to
+make the pass look productive - a review that always finds something is a review nobody can trust.
+
+### Surface reviewed: rep-collections
+
+### KAN-171: a money leaderboard with no unit
+
+- `RepCollectionEntryModel` stores `amount` as a bare `number` with **no currency field**. The
+  leaderboard sums those amounts and ranks reps by the total, rendered as an unlabelled number - on
+  the one surface where money is attributed to **named people**.
+- **The page already proved it knew better.** The "suggested from billing" section directly below
+  renders `{amount} {currency}` for every Stripe charge. Only the totals pretended currency did not
+  exist. An inconsistency inside one page is a stronger signal than an omission across two - the
+  data to do it right was in scope, a dozen lines away.
+- A billing signal carries its own currency and **loses it on conversion** into a ledger entry, so a
+  EUR charge appended to a USD ledger makes the total a sum of two currencies: a number in no unit
+  at all, used to rank people.
+- Fixed by disclosure, not invention: totals are shown in the project's configured currency, stated
+  as the assumption it is; a project with no currency set is told its amounts are unlabelled and
+  where to set one, rather than being handed a guessed default; and a signal whose currency differs
+  now says so before it can be added, without hiding the signal.
+- **Deliberately incomplete, and said so in the PR:** the model still has no per-entry currency, so
+  this discloses the assumption rather than removing it. The real fix is a field, carried from the
+  signal, with the leaderboard grouped by currency.
+
+### I nearly reintroduced KAN-162
+
+I made `amountInputLabel` take `{currency}`, and its only call site passes no arguments - which under
+ICU throws and renders the key path. **That is exactly the defect I fixed two passes ago**, in the
+same file type, by the same mechanism.
+
+Caught before committing only because KAN-162 had taught me the failure mode well enough to go
+looking. So the habit that saved it was the write-up, not the test - the `icu-rendering` test only
+guards the `{landing_page}` token, not every new string. Every string touched this pass is now
+verified to render through next-intl's own `createTranslator` in both locales.
+
+**Generalised:** adding an argument to an existing message is a breaking change to every call site,
+and neither TypeScript nor the key-parity test can see it. Grep the call sites, or render it.
+
+### Merge queue cleared
+
+Every open PR merged this pass - #447, #458, and the whole docs chain. The chain conflicted after
+the first merge (PROGRESS.md, as always), and rather than resolve the same conflict four more times
+I merged `docs/progress-37` (which contained 33-37) and closed the intermediate PRs as superseded,
+after verifying on `main` that passes #30-#37 were all present. **Eight PRs open at the start of the
+pass, zero at the end** - the first time this cycle the queue has been empty.
+
+- **Last completed:** KAN-171 as PR #460. Merged #447, #458, #448 and #459; closed
+  KAN-160/161/162/168/169 as Done. Closed #451/#453/#455 as superseded.
+- **In progress (exact stopping point):** #460 running CI. Nothing else open.
+- **Blocked + why:** unchanged, and **KAN-170 now leads it** - `api-prod` is 117 commits behind
+  `main` and has no deploy runbook, which is why EasySign's `dry_run` is missing despite #414 having
+  merged a day ago. That redeploy unblocks their schema registration without anyone having to
+  approve the registration itself. Then: the `easysign-prod-selfserve-mcp-key` secret read, the
+  dev-scoped purge of 46 stale quarantine rows, and rotation of the two burned keys. KAN-147 stays
+  open by design.
+- **Next step:** KAN-159 (shared date formatter - still no formatting convention anywhere in
+  `apps/web`) and KAN-155 (mixed-currency firmographic MRR, the same class as KAN-171 and with the
+  same real fix pending). Unreviewed surfaces remaining: plugins, resources, settings, tv.
+- **Waiting on human:** the items above; KAN-97, KAN-117, KAN-130 and the KAN-143 follow-up are
+  product decisions, not engineering blocks.
+
+
 ## 2026-09-18 - Hourly quality pass #37: intent & quality
 
 ### Surface reviewed: intent-quality (score distribution, quality-adjusted CAC/CPS, mix alerts)
