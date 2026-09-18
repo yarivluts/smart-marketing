@@ -5,6 +5,8 @@ import { OrgShell } from '@/components/orgs/org-shell';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
+import { DEFAULT_AUDIT_LOG_LIST_LIMIT } from '@growthos/firebase-orm-models';
+import { splitOverFetchedFeed } from '@/lib/orgs/capped-list-view';
 import { listAuditLogEntriesForOrg, verifyAuditLogChainForOrg } from '@/lib/orgs/queries';
 import { toAuditLogEntryView } from '@/lib/orgs/audit-log-view';
 
@@ -41,10 +43,15 @@ export default async function AuditLogPage({ params }: PageProps): Promise<React
   }
 
   const [entries, chain] = await Promise.all([
-    listAuditLogEntriesForOrg(orgId),
+    listAuditLogEntriesForOrg(orgId, DEFAULT_AUDIT_LOG_LIST_LIMIT + 1),
     verifyAuditLogChainForOrg(orgId),
   ]);
-  const views = entries.map(toAuditLogEntryView);
+  // Over-fetched by one so truncation is measured, not inferred from length.
+  // An audit log that silently shows a window while reading as the whole log is
+  // the worst place for this defect: it is the surface people consult precisely
+  // to establish that something did or did not happen.
+  const auditPage = splitOverFetchedFeed(entries, DEFAULT_AUDIT_LOG_LIST_LIMIT);
+  const views = auditPage.rows.map(toAuditLogEntryView);
 
   const t = await getTranslations('AuditLog');
 
@@ -93,7 +100,9 @@ export default async function AuditLogPage({ params }: PageProps): Promise<React
             ))}
           </ul>
         )}
-        <p className="text-xs text-muted-foreground">{t('listCapNote', { count: views.length })}</p>
+        <p className="text-xs text-muted-foreground">
+          {auditPage.truncated ? t('listCapNoteTruncated', { count: views.length }) : t('listCapNote', { count: views.length })}
+        </p>
       </main>
     </OrgShell>
   );
