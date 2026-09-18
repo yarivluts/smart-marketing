@@ -17,6 +17,38 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - KAN-99 re-diagnosed: metrics were isolated, the Firestore-direct pages were not
+
+EasySign asked, before running its E2E with the dev key, whether its synthetic data would reach
+Yariv's prod dashboards. The honest answer took two layers.
+
+- **Metrics: isolated since 2026-08-19.** Every compiled query carries `environment_id =
+  @tenant_environment_id`, the cache key includes the environment, and in BigQuery every core table
+  and schema mart has `environment_id`, all tagged. KAN-99's 75.5 evidence was a seed row ingested
+  into both environments, diagnosed on 09-08 in this file and **never written back to Jira**. So the
+  issue kept claiming a leak that did not exist, and EasySign's audit repeated it.
+- **Firestore-direct pages: not isolated.** `listRecentRecordsForSchemas` was documented as "folded
+  across every environment" and feeds ten pages (quality score, feedback, sales, rep collections,
+  support, churn reasons, firmographics, billing-ops/churn/dunning). The win feed, TV board and
+  `list_insights` folded too. A dev key's signups would have sat beside metric tiles that correctly
+  excluded them.
+- Fixed in **#479** (merged 45af161): those readers default to prod, like `queryMetrics`;
+  `list_insights` uses the key's own environment. The MCP e2e uses a dev-bound key because a
+  prod-bound one passes even when the key is ignored; verified it fails with the fix reverted.
+- `firestore.indexes.json` also declares the live `raw_records (kind, schema_name, landed_at)`
+  index, which was missing from the file, so a full index deploy would have deleted it.
+
+- **Last completed:** #479 merged; KAN-99 In Review with the re-diagnosis.
+- **In progress (exact stopping point):** not deployed. **Order matters:** build `win_events
+  (environment_id, created_at)` ASC and DESC in prod first (none exist today), then api-prod and
+  web-prod from main with `_GIT_SHA`, which also brings the KAN-180 alarm online.
+- **Blocked + why:** that deploy needs Yariv's go-ahead; it is a new change, not the one he
+  authorised. EasySign's E2E is gated on it being live, not merged.
+- **Next step:** after deploy, EasySign runs the E2E and checks the prod quality-score page stays
+  clean; then KAN-99 → Done. Follow-up: an environment picker on the raw record feed, which is now
+  prod-only.
+- **Waiting on human:** the deploy; earlier items unchanged.
+
 ## 2026-09-18 - Deploy + KAN-180: nothing noticed production falling behind main
 
 Yariv directly authorised a redeploy and asked for the underlying cause to be fixed.
