@@ -17,6 +17,58 @@ Template for each entry:
 
 ---
 
+## 2026-09-18 - Hourly quality pass #27: closing the capped-list class
+
+### Finished the debt rather than leaving two named items open
+
+- **KAN-151.** Segment members and win-rule history were the two surfaces named but not fixed last
+  pass. Both printed "Showing the {count} ..." from the rows returned, so at exactly the cap the
+  sentence asserted a total.
+- **Win-rule history** needed a limit plumbed through its web wrapper, which did not accept one. It
+  now over-fetches by one and passes a **measured** `truncated` flag into the component rather than
+  letting the component infer it from `events.length` - inferring would be wrong for the same
+  reason it was wrong everywhere else: exactly-at-cap is a complete list, not a truncated one.
+- **Segment members got a better fix than the rest of the class**, because this page has something
+  the others do not: an authoritative total. It already fans out `countSegmentMembers` per segment
+  for its member-count column, so the exact number is in hand when the inline list renders. It now
+  says **"Showing 50 of 4,312 members"** rather than flagging truncation.
+
+### The rule this class converged on
+
+**Prefer a real total when one is available; a measured truncation flag when it is not; never a
+bare count that reads as both.** The flag was never the goal - it is the fallback for when no total
+exists. Worth holding onto, because the instinct after building a helper is to apply it everywhere,
+and on the one page with a real count that would have been the worse answer.
+
+### Class closed
+
+Every surface the sweep found now distinguishes a window from a complete set: record feed, audit
+log, cost guardrails, billing ops feed (three lists), customer search, segment members, win-rule
+history. Eleven lists across eight pages, from KAN-114 through KAN-151.
+
+### Two process notes
+
+- My first draft of the win-rule tests invented helpers (`renderWithIntl`, `winEvent()`) that the
+  file does not have; it defines `renderList` and a shared `event`. Caught by reading the file
+  rather than by running, and worth noting as the same species as everything else this cycle:
+  **assuming an interface instead of checking it.**
+- PR #435 is stacked on #433 rather than branched from main, because it uses the helper #433
+  introduces. Branching from main would have compiled against a module that does not exist there
+  yet - which is exactly what the first typecheck said.
+
+### Merged this pass
+
+#434 (PROGRESS #26). #433's first CI run failed on two e2e specs (`experiments`, `omnisearch`) that
+this branch does not touch, with the `toHaveURL` navigation-timing shape seen flaking before -
+rerun issued rather than assumed either way.
+
+### Next
+
+PRs #433 and #435 in CI, #435 stacked. Next unreviewed page: **campaign-ops** - genuinely next,
+now that the class is closed. Blocked items unchanged: all four are Yariv's.
+
+---
+
 ## 2026-09-18 - Hourly quality pass #26: clearing the capped-list debt
 
 ### Chose debt over a new page, deliberately
@@ -723,7 +775,8 @@ state (#18), customers / Customer 360 (#19), CI / the web emulator transport (#2
 churn-reasons (#21), cohorts + a repo-wide fabricated-claim sweep (#22),
 campaigns (#23), billing-ops-feed (#24),
 the scheduled warehouse refresh (#25),
-**the capped-list class: record feed / audit log / cost guardrails (#26)**. Not yet reviewed:
+the capped-list class: record feed / audit log / cost guardrails (#26),
+**segment members + win-rule history, class closed (#27)**. Not yet reviewed:
 billing-ops-feed, campaign-ops, churn-reasons, cohorts, customers, demos, feedback,
 field-mappings, firmographics, insights, intent-quality, plugins, record-feed, rep-collections,
 resources, segments, session-replay, settings, support, tv, win-rules.
