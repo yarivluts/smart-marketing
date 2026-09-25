@@ -218,6 +218,19 @@ describe('proposeOnboardingFunnelSteps + confirmOnboardingFunnelSteps', () => {
     expect(state.step).toBe('board');
   });
 
+  it('does not advance the wizard when advanceWizard is false (editing an already-confirmed funnel, KAN-199)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Onboarding Funnel Edit Org');
+    const state = await confirmOnboardingFunnelSteps({
+      organizationId: organization.id,
+      projectId: project.id,
+      userId: owner.id,
+      steps: [{ eventSchemaName: 'signup', stageKey: 'signup', order: 0 }],
+      advanceWizard: false,
+    });
+    expect(state.step).toBe('pack');
+    expect(state.funnel_steps).toEqual([{ eventSchemaName: 'signup', stageKey: 'signup', order: 0 }]);
+  });
+
   it('returns an empty proposal for a project with no registered event schemas yet', async () => {
     const { organization, project } = await setupOrgWithProject('Onboarding No Schemas Org');
     expect(await proposeOnboardingFunnelSteps(organization.id, project.id)).toEqual([]);

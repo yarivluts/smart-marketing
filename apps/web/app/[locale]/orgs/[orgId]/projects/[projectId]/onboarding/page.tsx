@@ -19,7 +19,7 @@ import {
 } from '@/lib/orgs/queries';
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
 import { hasActiveInstall, pluginTypeForInstall, toPluginInstallView, toPluginManifestView } from '@/lib/orgs/plugin-view';
-import { toOnboardingStateView } from '@/lib/orgs/onboarding-view';
+import { buildFunnelEditorRows, toOnboardingStateView, type OnboardingStateView } from '@/lib/orgs/onboarding-view';
 import { StartOnboardingButton } from '@/components/orgs/start-onboarding-button';
 import { OnboardingPackStep } from '@/components/orgs/onboarding-pack-step';
 import { OnboardingSourceContinueButton } from '@/components/orgs/onboarding-source-continue-button';
@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
+  searchParams?: Promise<{ editFunnel?: string }>;
 }>;
 
 export async function generateMetadata({ params }: PageProps) {
@@ -49,8 +50,9 @@ export async function generateMetadata({ params }: PageProps) {
  * them and tracks progress. Gated on `project.manage`, the same permission every constituent action is
  * already reachable through for a `project_admin`.
  */
-export default async function OnboardingPage({ params }: PageProps): Promise<React.ReactElement> {
+export default async function OnboardingPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
+  const { editFunnel } = (await searchParams) ?? {};
   setRequestLocale(locale);
 
   const session = await getServerSession();
@@ -83,6 +85,11 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
   }
 
   const view = toOnboardingStateView(state);
+  // The funnel editor is the wizard's own step, but a confirmed funnel stays editable from any later
+  // step too (KAN-199): it can be set over MCP `set_funnel` at any time, so a human must be able to
+  // review and change it here without restarting the wizard.
+  const showFunnelEditor = view.step === 'funnel' || editFunnel === '1';
+  const onboardingHref = `/orgs/${orgId}/projects/${projectId}/onboarding`;
 
   return (
     <main className="container mx-auto flex max-w-2xl flex-col gap-8 py-16">
@@ -97,11 +104,18 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
 
       {view.step === 'sources' ? <SourcesStep orgId={orgId} projectId={projectId} /> : null}
 
-      {view.step === 'funnel' ? (
+      {showFunnelEditor ? (
         <section className="flex flex-col gap-3">
           <h2 className="text-lg font-semibold">{t('funnelStepHeading')}</h2>
-          <OnboardingFunnelStep orgId={orgId} projectId={projectId} proposal={await proposeOnboardingFunnelSteps(orgId, projectId)} />
+          <OnboardingFunnelStep
+            orgId={orgId}
+            projectId={projectId}
+            proposal={buildFunnelEditorRows(view.funnelSteps, await proposeOnboardingFunnelSteps(orgId, projectId))}
+            {...(view.step === 'funnel' ? {} : { confirmedHref: onboardingHref })}
+          />
         </section>
+      ) : view.funnelSteps.length > 0 ? (
+        <ConfirmedFunnelSummary orgId={orgId} projectId={projectId} funnelSteps={view.funnelSteps} editHref={`${onboardingHref}?editFunnel=1`} />
       ) : null}
 
       {view.step === 'board' || view.step === 'done' ? <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} /> : null}
@@ -226,6 +240,53 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
       ) : (
         <p className="text-sm text-muted-foreground">{t('sourceStepContinueHint')}</p>
       )}
+    </section>
+  );
+}
+
+/**
+ * The project's confirmed funnel, read-only, with a way into the editor (KAN-199). Shown on every
+ * wizard step except the funnel step itself, since a funnel can now be confirmed outside the wizard's
+ * own sequence - by an agent over MCP `set_funnel` - and must not be invisible to the humans here.
+ */
+async function ConfirmedFunnelSummary({
+  orgId,
+  projectId,
+  funnelSteps,
+  editHref,
+}: {
+  orgId: string;
+  projectId: string;
+  funnelSteps: OnboardingStateView['funnelSteps'];
+  editHref: string;
+}): Promise<React.ReactElement> {
+  const t = await getTranslations('Onboarding');
+  const tStage = await getTranslations('Onboarding.funnelStage');
+  const ordered = [...funnelSteps].sort((a, b) => a.order - b.order);
+
+  return (
+    <section className="flex flex-col gap-3" data-testid="onboarding-confirmed-funnel">
+      <h2 className="text-lg font-semibold">{t('confirmedFunnelHeading')}</h2>
+      <p className="text-sm text-muted-foreground">{t('confirmedFunnelIntro')}</p>
+      <ol className="flex flex-col gap-1 text-sm">
+        {ordered.map((step, index) => (
+          <li key={step.eventSchemaName} className="flex items-center gap-2 rounded-md border border-input px-3 py-2">
+            <span className="w-6 text-center text-muted-foreground">{index + 1}</span>
+            <span className="font-medium" dir="ltr">
+              {step.eventSchemaName}
+            </span>
+            <span className="text-muted-foreground">{tStage(step.stageKey)}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="flex flex-wrap gap-4">
+        <Link className="text-sm underline" href={editHref}>
+          {t('confirmedFunnelEdit')}
+        </Link>
+        <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${projectId}/funnel`}>
+          {t('confirmedFunnelViewConversion')}
+        </Link>
+      </div>
     </section>
   );
 }

@@ -238,13 +238,17 @@ export interface ConfirmOnboardingFunnelStepsParams {
   projectId: string;
   userId: string;
   steps: readonly OnboardingFunnelStep[];
+  /** `false` when the funnel is being edited from outside the wizard's own funnel step (KAN-199: the confirmed-funnel summary's "Edit funnel"), so re-editing it never skips the wizard past steps the human has not done. Defaults to `true`, the wizard's own confirm. */
+  advanceWizard?: boolean;
 }
 
 /** Persists the human-confirmed funnel step order (KAN-68 AC: "user confirms") — the proposal from {@link proposeOnboardingFunnelSteps} edited/reordered/pruned by the human, verbatim. */
 export async function confirmOnboardingFunnelSteps(params: ConfirmOnboardingFunnelStepsParams): Promise<OnboardingStateModel> {
   const state = await getOrCreateOnboardingState(params.organizationId, params.projectId, params.userId);
   state.funnel_steps = params.steps.map((step, index) => ({ ...step, order: index }));
-  advanceStep(state, 'board');
+  if (params.advanceWizard !== false) {
+    advanceStep(state, 'board');
+  }
   state.updated_at = new Date().toISOString();
   await state.save();
 

@@ -211,6 +211,10 @@
     "funnelStepConfirm": "Confirm funnel",
     "funnelStepMoveUp": "Move up",
     "funnelStepMoveDown": "Move down",
+    "confirmedFunnelHeading": "Your confirmed funnel",
+    "confirmedFunnelIntro": "The steps your funnel counts customers through, in order. It can be confirmed here or set by a connected agent, and both show up in the same place.",
+    "confirmedFunnelEdit": "Edit funnel",
+    "confirmedFunnelViewConversion": "View conversion",
     "funnelStage": {
       "awareness": "Awareness",
       "signup": "Signup",
