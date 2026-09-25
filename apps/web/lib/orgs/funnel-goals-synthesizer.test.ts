@@ -362,6 +362,7 @@ describe('funnel-goals-synthesizer', () => {
       expect(cockpit.proactiveRecommendation).toBeNull();
       expect(cockpit.summary).toEqual({
         overallFunnelConversionPct: null,
+        funnelEntrants: null,
         topFunnelDropOffPct: null,
         activeGoalsCount: 0,
         goalsMeasuredCount: 0,
@@ -387,6 +388,17 @@ describe('funnel-goals-synthesizer', () => {
         beforeDiff: '60% drop-off',
         projectedImpact: '',
       });
+      // B22: named by both ends - the leak is BETWEEN two steps, not "past" the later one.
+      expect(cockpit.proactiveRecommendation?.description).toMatch(/^60% of the people who reached ".+" did not go on to ".+"\.$/);
+      expect(cockpit.summary.funnelEntrants).toBe(500);
+    });
+
+    it('recommends nothing on a funnel too small to support it (B22)', () => {
+      const tiny = { ...REAL_FUNNEL, steps: REAL_FUNNEL.steps.map((step, i) => ({ ...step, customerCount: [4, 2, 2][i] ?? 2 })) };
+      const cockpit = buildFunnelGoalsCockpitData({ funnelOutcome: tiny, goals: [] });
+      expect(cockpit.funnelSteps.map((s) => s.customerCount)).toEqual([4, 2, 2]);
+      expect(cockpit.proactiveRecommendation).toBeNull();
+      expect(cockpit.summary.funnelEntrants).toBe(4);
     });
 
     it('builds the cohort heatmap from real cohort rows', () => {
