@@ -17,6 +17,50 @@ Template for each entry:
 
 ---
 
+## 2026-09-19..25 - The blocked-on-a-human queue, cleared
+
+Yariv gave standing authorization for GrowthOS production actions ("you have authorization for
+everything"), so the four items that had sat on him for a week were done here. Each is recorded
+because none of it is visible in the code.
+
+- **KAN-99 deployed and accepted.** api-prod-00018-x75 + web-prod-00027-gcn from `51fb5f6`, with the
+  two `win_events (environment_id, created_at)` indexes built READY **first** - the code queries them,
+  and a missing composite index is a production-only failure the emulator never shows. `web-prod` had
+  been on a 2026-09-09 image, so this also shipped ten days of merged web work.
+  **Acceptance, on live data:** EasySign's E2E landed 11 events, 1 `customer` entity and 1 win in dev;
+  the default prod view returned 0 of each. The win is the case the fix exists for - it would have
+  celebrated on the prod feed and TV board. EasySign confirmed the same on the warehouse path
+  (`query_metric`: dev has the rows, prod an empty series). KAN-99 Done.
+- **The nine EasySign schemas registered.** Their harness cannot read Secret Manager, so this ran from
+  here with `easysign-prod-selfserve-mcp-key` held in memory only. Each dry-run again first (all clean,
+  0 pre-existing), then registered: v1 active, 0 warnings, 9 of 9. Registration is irreversible and
+  `evolve_schema` is additive-only, which is why the second dry run was worth the minute.
+- **47 stale dev quarantined records dismissed**, not deleted - `dismissQuarantinedRecord` keeps the
+  record and writes an audit entry, which a purge would not. All were EasySign's 09-15..17
+  contract-mapping probes. Queue at 0.
+- **Keys: 19 -> 4 active** (KAN-135). 7 QA leftovers revoked after checking none had been used since
+  09-01; the two keys burned on 09-08 replaced (new keys minted straight into Secret Manager, never
+  printed) and revoked once idle for 22h. **The burned keys were not the prod ingest keys** - they were
+  the agent's MCP keys, a correction to the earlier note that revoking would stop EasySign's prod.
+
+### What this changed about how the work flows
+
+The standing authorization is the same problem KAN-180 attacked from the other side: the alarm made an
+owed deploy *visible*, and this made it *actionable* without a human round-trip. The alarm has now run
+hourly for five days, stayed green and opened nothing, with prod at main.
+
+- **Last completed:** all four blocked items; KAN-99 Done.
+- **In progress (exact stopping point):** nothing open here.
+- **Blocked + why:** two items are genuinely outside this repo. EasySign's `growthos` MCP client
+  connections still hold the revoked keys and need `/mcp` in *their* session (low priority - raw HTTP
+  covers their checks). And **no real EasySign production data has ever reached GrowthOS**:
+  `gos_live_Jz47ju3m` unused since 09-14, because the functions were never deployed to the real
+  projects. A prod dashboard reading empty is therefore correct, not broken - worth knowing before
+  someone debugs it as a fault.
+- **Next step:** KAN-159 (shared date formatter) and KAN-155 (mixed-currency firmographic MRR), both
+  in mounted code. Also open: an environment picker on the raw record feed, now prod-only.
+- **Waiting on human:** KAN-97, KAN-117, KAN-130, KAN-143 follow-up - product decisions, not blocks.
+
 ## 2026-09-18 - KAN-99 re-diagnosed: metrics were isolated, the Firestore-direct pages were not
 
 EasySign asked, before running its E2E with the dev key, whether its synthetic data would reach
