@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
     return error;
   }
 
-  const parsed = await parseJsonBody<{ steps?: unknown }>(request);
+  const parsed = await parseJsonBody<{ steps?: unknown; advanceWizard?: unknown }>(request);
   if (parsed.error) {
     return parsed.error;
   }
@@ -50,7 +50,10 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
   }
 
   try {
-    const state = await confirmOnboardingFunnelSteps({ organizationId: orgId, projectId, userId: user.id, steps });
+    // Only a literal `false` holds the wizard's step still (an edit from the confirmed-funnel
+    // summary, KAN-199); anything else is the wizard's own confirm and advances it as before.
+    const advanceWizard = parsed.body.advanceWizard !== false;
+    const state = await confirmOnboardingFunnelSteps({ organizationId: orgId, projectId, userId: user.id, steps, advanceWizard });
     return NextResponse.json({ state: toOnboardingStateView(state) });
   } catch (err) {
     if (err instanceof ProjectNotFoundError) {

@@ -61,6 +61,9 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   set_goal_status: { kind: 'per-call-permission', permission: 'dashboards.write' },
   update_project_settings: { kind: 'per-call-permission', permission: 'project.configure' },
   archive_project: { kind: 'per-call-permission', permission: 'project.configure' },
+  // KAN-199: same dry-run split as register_schema. Writes only the caller's own project's
+  // funnel, validated against that project's own schema registry.
+  set_funnel: { kind: 'per-call-permission-varies', writePermission: 'project.configure', readOnlyPermission: 'mcp.read', readOnlyWhen: 'dry_run === true' },
   create_hook_endpoint: { kind: 'per-call-permission', permission: 'ingest.write' },
   set_hook_signing_secret: { kind: 'per-call-permission', permission: 'ingest.write' },
   reexport_raw_records: { kind: 'per-call-permission', permission: 'ingest.write' },

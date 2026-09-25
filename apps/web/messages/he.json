@@ -211,6 +211,10 @@
     "funnelStepConfirm": "אישור המשפך",
     "funnelStepMoveUp": "הזזה למעלה",
     "funnelStepMoveDown": "הזזה למטה",
+    "confirmedFunnelHeading": "המשפך המאושר שלכם",
+    "confirmedFunnelIntro": "השלבים שהמשפך סופר בהם לקוחות, לפי סדר. אפשר לאשר אותו כאן או להגדיר אותו דרך סוכן מחובר, ושניהם מופיעים באותו מקום.",
+    "confirmedFunnelEdit": "עריכת המשפך",
+    "confirmedFunnelViewConversion": "צפייה בהמרות",
     "funnelStage": {
       "awareness": "מודעות",
       "signup": "הרשמה",

@@ -14,9 +14,11 @@ import {
   queryProjectCohortRetentionForAdmin,
   queryProjectFunnelSteps,
   queryProjectFunnelStepsForAdmin,
+  registerSchemaDefinition,
   searchProjectCustomers,
   searchProjectCustomersForAdmin,
   setProjectCostQuota,
+  setProjectFunnel,
   TrackingAlertModel,
   WarehouseNotConfiguredError,
   WarehouseQueryFailedError,
@@ -334,9 +336,9 @@ describe('queryProjectFunnelSteps', () => {
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
 
     expect(rows).toEqual([
-      { stageKey: 'signup', stepOrder: 0, customerCount: 5, conversionRateFromFirst: 1 },
-      { stageKey: 'activation', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.4 },
-      { stageKey: 'conversion', stepOrder: 2, customerCount: 2, conversionRateFromFirst: 0.4 },
+      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 5, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.4 },
+      { eventSchemaName: 'purchase', stageKey: 'conversion', stepOrder: 2, customerCount: 2, conversionRateFromFirst: 0.4 },
     ]);
     expect(executor.calls[0].sql).toContain('FROM events');
     expect(executor.calls[0].sql).toContain('COUNT(DISTINCT entity_id) AS customer_count');
@@ -361,9 +363,9 @@ describe('queryProjectFunnelSteps', () => {
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
 
     expect(rows).toEqual([
-      { stageKey: 'signup', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
-      { stageKey: 'activation', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0 },
-      { stageKey: 'conversion', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0 },
+      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0 },
+      { eventSchemaName: 'purchase', stageKey: 'conversion', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0 },
     ]);
   });
 
@@ -376,6 +378,41 @@ describe('queryProjectFunnelSteps', () => {
 
     expect(executor.calls[0].sql).toContain('environment_id = @environmentId');
     expect(executor.calls[0].params.environmentId).toBe('env-test');
+  });
+
+  it('reads a funnel set by setProjectFunnel (MCP set_funnel) exactly like a wizard-confirmed one, even when two steps share a stage key', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Funnel Set Via Mcp Org');
+    for (const name of ['document_sent', 'document_signed']) {
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name,
+        fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: owner.id,
+      });
+    }
+    await setProjectFunnel({
+      organizationId: organization.id,
+      projectId: project.id,
+      actorType: 'api_key',
+      actorId: 'key-1',
+      steps: [
+        { eventSchemaName: 'document_sent', stageKey: 'other' },
+        { eventSchemaName: 'document_signed', stageKey: 'other' },
+      ],
+    });
+    const executor = new FakeWarehouseQueryExecutor([
+      { event_type: 'document_sent', customer_count: 8 },
+      { event_type: 'document_signed', customer_count: 2 },
+    ]);
+
+    const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
+
+    expect(rows).toEqual([
+      { eventSchemaName: 'document_sent', stageKey: 'other', stepOrder: 0, customerCount: 8, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'document_signed', stageKey: 'other', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.25 },
+    ]);
   });
 
   it('returns an empty list, without touching the warehouse, when no funnel is confirmed', async () => {
@@ -415,8 +452,8 @@ describe('queryProjectFunnelStepsForAdmin', () => {
     expect(outcome).toEqual({
       ok: true,
       steps: [
-        { stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 },
-        { stageKey: 'activation', stepOrder: 1, customerCount: 5, conversionRateFromFirst: 0.5 },
+        { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 },
+        { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 5, conversionRateFromFirst: 0.5 },
       ],
     });
   });

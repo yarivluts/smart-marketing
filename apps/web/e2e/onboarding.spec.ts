@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { seedFunnelSetOverMcp } from './test-utils/seed-funnel';
 
 function uniqueEmail(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}@example.com`;
@@ -84,5 +85,47 @@ test.describe('Onboarding wizard: pack -> connect a source -> confirm funnel -> 
 
     await page.getByRole('button', { name: 'Finish' }).click();
     await expect(page.getByText("You're all set!")).toBeVisible();
+  });
+
+  /*
+    KAN-199: a funnel can be set by an agent over MCP (set_funnel) for a project whose humans never
+    opened the wizard. It writes the wizard's own storage, so it must show up here - readable, and
+    editable without walking the wizard - and the Funnel page must treat it as defined.
+  */
+  test('a funnel set over MCP shows up in the wizard, is editable there, and counts as defined on the Funnel page', async ({ page }) => {
+    test.setTimeout(120_000);
+    const email = uniqueEmail('onboarding-mcp-funnel');
+    await signUp(page, email);
+    const orgId = await createOrganization(page, 'Onboarding MCP Funnel Org');
+
+    await page.getByRole('link', { name: 'New project' }).click();
+    await page.getByLabel('Project name').fill('Client Sigma');
+    await page.getByRole('button', { name: 'Create project' }).click();
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
+    const projectId = page.url().split('/').slice(-2)[0];
+
+    await seedFunnelSetOverMcp({ organizationId: orgId, projectId, ownerEmail: email, eventSchemaNames: ['touchpoint', 'signup', 'document_signed'] });
+    await page.reload();
+
+    const summary = page.getByTestId('onboarding-confirmed-funnel');
+    await expect(summary.getByRole('heading', { name: 'Your confirmed funnel' })).toBeVisible();
+    await expect(summary.getByRole('listitem')).toHaveText([/touchpoint/, /signup/, /document_signed/]);
+
+    // Editing starts from the confirmed funnel, not a fresh proposal: drop the middle step.
+    await summary.getByRole('link', { name: 'Edit funnel' }).click();
+    await expect(page).toHaveURL(/\/onboarding\?editFunnel=1$/);
+    await expect(page.getByRole('checkbox', { name: 'signup' })).toBeChecked();
+    await page.getByRole('checkbox', { name: 'signup' }).uncheck();
+    await page.getByRole('button', { name: 'Confirm funnel' }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/onboarding$`));
+    await expect(page.getByTestId('onboarding-confirmed-funnel').getByRole('listitem')).toHaveText([/touchpoint/, /document_signed/]);
+
+    // The Funnel page reads the same funnel: it may be unable to COUNT it (no warehouse in this
+    // environment), but it must not claim no funnel is defined.
+    await page.getByTestId('onboarding-confirmed-funnel').getByRole('link', { name: 'View conversion' }).click();
+    await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/funnel$`));
+    await expect(page.getByRole('heading', { name: 'Funnel, Goals & Revenue Health' })).toBeVisible();
+    await expect(page.getByText('No funnel is defined for this project yet')).toHaveCount(0);
   });
 });

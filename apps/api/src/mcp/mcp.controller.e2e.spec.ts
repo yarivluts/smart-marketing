@@ -13,6 +13,7 @@ import {
   ensureAutomationTargetSeeded,
   ensureUserForFirebaseSession,
   exchangeMcpAuthorizationCode,
+  getOnboardingState,
   InMemoryTokenBucketRateLimiter,
   issueMcpAuthorizationCode,
   listAuditLogEntriesForOrg,
@@ -224,6 +225,7 @@ describe('McpController (e2e)', () => {
           'register_metric',
           'register_schema',
           'evolve_schema',
+          'set_funnel',
           'set_goal_status',
           'set_hook_signing_secret',
           'update_project_settings',
@@ -668,6 +670,175 @@ describe('McpController (e2e)', () => {
         expect(approved.status).toBe('approved');
       } finally {
         await client.close();
+      }
+    });
+  });
+
+  /*
+    KAN-199, reported by EasySign: query_funnel returned a bare {"steps":[]} for a project that had
+    never confirmed a funnel, and no MCP tool could confirm one - the only way was the web onboarding
+    wizard, which an API-key integrator never opens. So the integrator had no funnel, and nothing said
+    why.
+  */
+  describe('KAN-199 set_funnel + an honest query_funnel', () => {
+    const EASYSIGN_FUNNEL = ['touchpoint', 'signup', 'document_created', 'document_sent', 'document_signed'];
+    const textOf = (result: Awaited<ReturnType<Client['callTool']>>): string => (result.content as Array<{ text: string }>)[0].text;
+
+    async function setupEasySignProject(orgName: string, scopes: Parameters<typeof setupProjectWithKey>[1]) {
+      const setup = await setupProjectWithKey(orgName, scopes);
+      for (const name of EASYSIGN_FUNNEL) {
+        await registerSchemaDefinition({
+          organizationId: setup.organization.id,
+          projectId: setup.project.id,
+          kind: 'event',
+          name,
+          fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+          createdByUserId: setup.owner.id,
+        });
+      }
+      return setup;
+    }
+
+    it('query_funnel says no funnel is defined, and how to define one, instead of a bare empty list', async () => {
+      const { rawKey } = await setupProjectWithKey('Funnel Undefined Org');
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({ name: 'query_funnel', arguments: {} });
+        expect(result.isError ?? false).toBe(false);
+        const body = JSON.parse(textOf(result)) as { status: string; steps: unknown[]; message: string };
+        expect(body.status).toBe('no_funnel_defined');
+        expect(body.steps).toEqual([]);
+        expect(body.message).toContain('set_funnel');
+        expect(body.message).toContain('onboarding wizard');
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('a dry run needs only mcp.read, reports the resolved funnel, and writes nothing', async () => {
+      const { organization, project, rawKey } = await setupEasySignProject('Funnel Dry Run Org', ['mcp.read']);
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({ name: 'set_funnel', arguments: { steps: EASYSIGN_FUNNEL, dry_run: true } });
+        expect(result.isError ?? false).toBe(false);
+        const body = JSON.parse(textOf(result)) as { dry_run: boolean; saved: boolean; would_set: Array<{ order: number; event_schema_name: string; stage_key: string }>; previous_steps: unknown[]; changed: boolean };
+        expect(body).toMatchObject({ dry_run: true, saved: false, previous_steps: [], changed: true });
+        expect(body.would_set.map((step) => step.event_schema_name)).toEqual(EASYSIGN_FUNNEL);
+        expect(body.would_set.map((step) => step.order)).toEqual([0, 1, 2, 3, 4]);
+        expect(body.would_set[1].stage_key).toBe('signup');
+
+        expect(await getOnboardingState(organization.id, project.id)).toBeNull();
+        expect(JSON.parse(textOf(await client.callTool({ name: 'query_funnel', arguments: {} }))).status).toBe('no_funnel_defined');
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('refuses to commit without project.configure, and saves nothing', async () => {
+      const { organization, project, rawKey } = await setupEasySignProject('Funnel No Scope Org', ['mcp.read', 'schema.write', 'dashboards.write']);
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({ name: 'set_funnel', arguments: { steps: EASYSIGN_FUNNEL } });
+        expect(result.isError).toBe(true);
+        expect(textOf(result)).toContain('project.configure');
+        expect(await getOnboardingState(organization.id, project.id)).toBeNull();
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('commits with project.configure into the same storage the onboarding wizard uses, audited, and query_funnel then counts it', async () => {
+      const { organization, project, rawKey } = await setupEasySignProject('Funnel Commit Org', ['mcp.read', 'project.configure']);
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({
+          name: 'set_funnel',
+          arguments: { steps: [{ event_schema_name: 'touchpoint', stage_key: 'awareness' }, ...EASYSIGN_FUNNEL.slice(1)] },
+        });
+        expect(result.isError ?? false).toBe(false);
+        const body = JSON.parse(textOf(result)) as { saved: boolean; steps: Array<{ event_schema_name: string; stage_key: string }>; previous_steps: unknown[]; changed: boolean };
+        expect(body).toMatchObject({ saved: true, previous_steps: [], changed: true });
+        expect(body.steps.map((step) => step.event_schema_name)).toEqual(EASYSIGN_FUNNEL);
+        expect(body.steps[0].stage_key).toBe('awareness');
+
+        // The wizard's own singleton - what the web onboarding page and Funnel page read.
+        const state = await getOnboardingState(organization.id, project.id);
+        expect(state?.funnel_steps.map((step) => step.eventSchemaName)).toEqual(EASYSIGN_FUNNEL);
+        expect(state?.funnel_steps.map((step) => step.order)).toEqual([0, 1, 2, 3, 4]);
+
+        const entries = await listAuditLogEntriesForOrg(organization.id);
+        expect(entries.find((entry) => entry.action === 'funnel.set')).toMatchObject({ actor_type: 'api_key', project_id: project.id });
+
+        // query_funnel now reads the saved funnel. There is no warehouse in this environment
+        // (KAN-18), so counting it fails - but the failure names the funnel it tried to count,
+        // rather than reporting "no funnel".
+        const query = await client.callTool({ name: 'query_funnel', arguments: {} });
+        expect(query.isError).toBe(true);
+        expect(textOf(query)).toContain('The confirmed funnel is: touchpoint -> signup -> document_created -> document_sent -> document_signed.');
+        expect(textOf(query)).not.toContain('no_funnel_defined');
+
+        // Re-running the same funnel is reported as unchanged, with the previous funnel echoed back.
+        const again = JSON.parse(textOf(await client.callTool({ name: 'set_funnel', arguments: { steps: EASYSIGN_FUNNEL.map((name, index) => (index === 0 ? { event_schema_name: name, stage_key: 'awareness' } : name)), dry_run: true } }))) as { changed: boolean; previous_steps: unknown[] };
+        expect(again.changed).toBe(false);
+        expect(again.previous_steps).toHaveLength(5);
+      } finally {
+        await client.close();
+      }
+    });
+
+    it.each([
+      ['an unknown schema', ['touchpoint', 'signup', 'no_such_event'], '"no_such_event" is not a registered event schema'],
+      ['a duplicate step', ['signup', 'document_sent', 'signup'], '"signup" appears more than once (steps 1 and 3)'],
+      ['too few steps', ['signup'], 'at least 2 steps; got 1'],
+      ['an unknown stage key', ['touchpoint', { event_schema_name: 'signup', stage_key: 'bogus' }], 'stage key "bogus"'],
+    ])('refuses %s with a specific reason, the accepted names, and no write', async (_label, steps, reason) => {
+      const { organization, project, rawKey } = await setupEasySignProject(`Funnel Invalid Org ${_label}`, ['mcp.read', 'project.configure']);
+      const client = await connectedClient(rawKey);
+      try {
+        for (const dryRun of [true, false]) {
+          const result = await client.callTool({ name: 'set_funnel', arguments: { steps, ...(dryRun ? { dry_run: true } : {}) } });
+          expect(result.isError).toBe(true);
+          expect(textOf(result)).toContain(reason);
+          expect(textOf(result)).toContain('Registered event schemas you can use: document_created, document_sent, document_signed, signup, touchpoint.');
+          expect(textOf(result)).toContain('Nothing was saved.');
+        }
+        expect(await getOnboardingState(organization.id, project.id)).toBeNull();
+      } finally {
+        await client.close();
+      }
+    });
+
+    it("is isolated: a key can neither build a funnel from another project's schemas nor touch another project's funnel", async () => {
+      const projectA = await setupEasySignProject('Funnel Isolation Org A', ['mcp.read', 'project.configure']);
+      const projectB = await setupProjectWithKey('Funnel Isolation Org B', ['mcp.read']);
+      for (const name of ['b_only_start', 'b_only_end']) {
+        await registerSchemaDefinition({
+          organizationId: projectB.organization.id,
+          projectId: projectB.project.id,
+          kind: 'event',
+          name,
+          fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+          createdByUserId: projectB.owner.id,
+        });
+      }
+
+      const client = await connectedClient(projectA.rawKey);
+      try {
+        const foreign = await client.callTool({ name: 'set_funnel', arguments: { steps: ['b_only_start', 'b_only_end'] } });
+        expect(foreign.isError).toBe(true);
+        expect(textOf(foreign)).toContain('"b_only_start" is not a registered event schema');
+
+        expect((await client.callTool({ name: 'set_funnel', arguments: { steps: ['signup', 'document_signed'] } })).isError ?? false).toBe(false);
+      } finally {
+        await client.close();
+      }
+      expect(await getOnboardingState(projectB.organization.id, projectB.project.id)).toBeNull();
+
+      const clientB = await connectedClient(projectB.rawKey);
+      try {
+        expect(JSON.parse(textOf(await clientB.callTool({ name: 'query_funnel', arguments: {} }))).status).toBe('no_funnel_defined');
+      } finally {
+        await clientB.close();
       }
     });
   });

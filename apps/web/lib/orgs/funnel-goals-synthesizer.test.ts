@@ -59,9 +59,9 @@ function measured(overrides: Partial<{ actualValue: number; progressRatio: numbe
 const REAL_FUNNEL = {
   ok: true as const,
   steps: [
-    { stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
-    { stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
-    { stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
+    { eventSchemaName: 'sent_event', stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
+    { eventSchemaName: 'viewed_event', stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
+    { eventSchemaName: 'signed_event', stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
   ],
 };
 
@@ -124,8 +124,8 @@ describe('funnel-goals-synthesizer', () => {
       const data = buildVisualFunnelData({
         ok: true,
         steps: [
-          { stageKey: 'step_1', stepOrder: 1, customerCount: 800, conversionRateFromFirst: 1.0 },
-          { stageKey: 'step_2', stepOrder: 2, customerCount: 400, conversionRateFromFirst: 0.5 },
+          { eventSchemaName: 'step_1_event', stageKey: 'step_1', stepOrder: 1, customerCount: 800, conversionRateFromFirst: 1.0 },
+          { eventSchemaName: 'step_2_event', stageKey: 'step_2', stepOrder: 2, customerCount: 400, conversionRateFromFirst: 0.5 },
         ],
       });
       expect(data).toMatchObject({

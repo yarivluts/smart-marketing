@@ -94,11 +94,13 @@ export function VisualFunnelSteps({
       {/* Visual Pipeline Stages */}
       <div className="mt-2 flex flex-col gap-4">
         {steps.map((step, idx) => {
-          const isHighestDropOff = highestDropOffStep?.stageKey === step.stageKey && step.dropOffPercent > 0;
+          // Compared by position, not stage key: several steps can share a stage (e.g. three
+          // events all classified "other"), and each step is its own row (KAN-199).
+          const isHighestDropOff = highestDropOffStep?.stepOrder === step.stepOrder && step.dropOffPercent > 0;
 
           return (
             <div
-              key={step.stageKey}
+              key={step.stepOrder}
               data-testid={`funnel-step-${step.stageKey}`}
               className={`relative flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-xl border p-4 transition-all ${
                 isHighestDropOff
@@ -114,8 +116,19 @@ export function VisualFunnelSteps({
               {/* Progress & Label Bar */}
               <div className="flex-1 min-w-0 w-full">
                 <div className="flex items-center justify-between text-sm font-medium">
-                  <span className="truncate text-foreground font-semibold">
-                    {step.stageLabel}
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className="truncate text-foreground font-semibold">
+                      {step.stageLabel}
+                    </span>
+                    {step.eventSchemaName ? (
+                      <span
+                        data-testid={`event-${step.stepOrder}`}
+                        className="truncate font-mono text-xs font-normal text-muted-foreground"
+                        dir="ltr"
+                      >
+                        {step.eventSchemaName}
+                      </span>
+                    ) : null}
                   </span>
                   <span
                     data-testid={`count-${step.stageKey}`}

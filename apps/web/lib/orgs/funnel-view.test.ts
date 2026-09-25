@@ -3,12 +3,12 @@ import type { FunnelStepResult } from '@growthos/firebase-orm-models';
 import { buildFunnelView, toFunnelStepView } from './funnel-view';
 
 function step(overrides: Partial<FunnelStepResult> & Pick<FunnelStepResult, 'stageKey' | 'stepOrder'>): FunnelStepResult {
-  return { customerCount: 0, conversionRateFromFirst: 0, ...overrides };
+  return { eventSchemaName: 'some_event', customerCount: 0, conversionRateFromFirst: 0, ...overrides };
 }
 
 describe('toFunnelStepView', () => {
   it('rounds the raw conversion fraction to a whole-number percentage', () => {
-    expect(toFunnelStepView(step({ stageKey: 'activation', stepOrder: 1, customerCount: 40, conversionRateFromFirst: 0.4 }))).toEqual({
+    expect(toFunnelStepView(step({ eventSchemaName: 'activation_event', stageKey: 'activation', stepOrder: 1, customerCount: 40, conversionRateFromFirst: 0.4 }))).toEqual({
       stageKey: 'activation',
       stepOrder: 1,
       customerCount: 40,
@@ -17,12 +17,12 @@ describe('toFunnelStepView', () => {
   });
 
   it('rounds rather than truncates (0.405 -> 41, not 40)', () => {
-    const view = toFunnelStepView(step({ stageKey: 'conversion', stepOrder: 2, customerCount: 1, conversionRateFromFirst: 0.405 }));
+    const view = toFunnelStepView(step({ eventSchemaName: 'conversion_event', stageKey: 'conversion', stepOrder: 2, customerCount: 1, conversionRateFromFirst: 0.405 }));
     expect(view.conversionPercent).toBe(41);
   });
 
   it('renders 100% for a first step (conversion rate 1)', () => {
-    const view = toFunnelStepView(step({ stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 }));
+    const view = toFunnelStepView(step({ eventSchemaName: 'signup_event', stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 }));
     expect(view.conversionPercent).toBe(100);
   });
 });
@@ -32,8 +32,8 @@ describe('buildFunnelView', () => {
     const view = buildFunnelView({
       ok: true,
       steps: [
-        { stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 },
-        { stageKey: 'activation', stepOrder: 1, customerCount: 4, conversionRateFromFirst: 0.4 },
+        { eventSchemaName: 'signup_event', stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 },
+        { eventSchemaName: 'activation_event', stageKey: 'activation', stepOrder: 1, customerCount: 4, conversionRateFromFirst: 0.4 },
       ],
     });
 

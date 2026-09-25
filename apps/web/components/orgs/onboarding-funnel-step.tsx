@@ -15,7 +15,10 @@ export interface OnboardingFunnelStepRow {
 export interface OnboardingFunnelStepProps {
   orgId: string;
   projectId: string;
-  proposal: readonly { eventSchemaName: string; stageKey: FunnelStageKey }[];
+  /** The rows to start from. `included` defaults to true; `buildFunnelEditorRows` sets it false for proposed events outside an already-confirmed funnel. */
+  proposal: readonly { eventSchemaName: string; stageKey: FunnelStageKey; included?: boolean }[];
+  /** Set when editing an already-confirmed funnel from outside the wizard's funnel step: the wizard's own step is left where it is, and the page navigates here once saved. Omitted, confirming advances the wizard and refreshes the page. */
+  confirmedHref?: string;
 }
 
 function moved<T>(list: readonly T[], index: number, direction: -1 | 1): T[] {
@@ -29,12 +32,12 @@ function moved<T>(list: readonly T[], index: number, direction: -1 | 1): T[] {
 }
 
 /** The wizard's "confirm the AI-proposed funnel mapping" step (KAN-68 AC: "user confirms"). Every proposed step can be reordered, recategorized to a different stage, or excluded before confirming. */
-export function OnboardingFunnelStep({ orgId, projectId, proposal }: OnboardingFunnelStepProps): React.ReactElement {
+export function OnboardingFunnelStep({ orgId, projectId, proposal, confirmedHref }: OnboardingFunnelStepProps): React.ReactElement {
   const t = useTranslations('Onboarding');
   const tStage = useTranslations('Onboarding.funnelStage');
   const router = useRouter();
   const [rows, setRows] = useState<OnboardingFunnelStepRow[]>(
-    proposal.map((step) => ({ eventSchemaName: step.eventSchemaName, stageKey: step.stageKey, included: true })),
+    proposal.map((step) => ({ eventSchemaName: step.eventSchemaName, stageKey: step.stageKey, included: step.included ?? true })),
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(false);
@@ -61,13 +64,17 @@ export function OnboardingFunnelStep({ orgId, projectId, proposal }: OnboardingF
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/onboarding/funnel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ steps }),
+        body: JSON.stringify(confirmedHref ? { steps, advanceWizard: false } : { steps }),
       });
       if (!response.ok) {
         setError(true);
         return;
       }
-      router.refresh();
+      if (confirmedHref) {
+        router.replace(confirmedHref);
+      } else {
+        router.refresh();
+      }
     } finally {
       setSubmitting(false);
     }

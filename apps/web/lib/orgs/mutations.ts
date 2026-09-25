@@ -1612,6 +1612,7 @@ export interface ConfirmOnboardingFunnelStepsInput {
   projectId: string;
   userId: string;
   steps: readonly OnboardingFunnelStep[];
+  advanceWizard?: boolean;
 }
 
 /** The wizard's "confirm the AI-proposed funnel mapping" step. */
