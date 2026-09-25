@@ -26,6 +26,7 @@ import {
   listMetricDefinitionVersions,
   listOrgProjects,
   listSchemaDefinitionsForProject,
+  IMPLICIT_EVENT_ENVELOPE_FIELDS,
   MetricDefNotFoundError,
   MetricDefStillReferencedError,
   MissingSignatureHeaderNameError,
@@ -312,12 +313,23 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
     'list_schemas',
     {
       title: 'List registered schemas',
-      description: "List this project's registered event/entity/measure schemas and their declared fields. A measure or entity schema is queryable as a metric table by its own name; its columns are its fields plus the intrinsic ones.",
+      description: "List this project's registered event/entity/measure schemas and their declared fields. A measure or entity schema is queryable as a metric table by its own name; its columns are its fields plus the intrinsic ones. Event schemas also accept the fields in implicit_event_fields inside properties without declaring them; every other undeclared property quarantines the record.",
       inputSchema: {},
     },
     auditedToolHandler(auth, 'list_schemas', async () => {
       const schemas = await listSchemaDefinitionsForProject(auth.organizationId, auth.projectId);
       return textResult({
+        // Accepted on every EVENT schema without being declared (the tracking
+        // snippet attaches them to everything it sends), while any other
+        // undeclared property quarantines the record. An integrator probing the
+        // contract saw that asymmetry and could not tell a rule from a gap;
+        // stating it here makes the rule readable where the schemas are.
+        implicit_event_fields: IMPLICIT_EVENT_ENVELOPE_FIELDS.map((name) => ({
+          name,
+          type: 'string',
+          accepted_undeclared: true,
+          note: 'Accepted in properties on every event schema without being declared. Declare it explicitly (optional, is_identity_key) only to use it for identity stitching; never as required.',
+        })),
         schemas: schemas
           .filter((schema) => schema.status === 'active')
           .map((schema) => ({

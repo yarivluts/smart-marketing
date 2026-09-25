@@ -426,6 +426,8 @@ describe('McpController (e2e)', () => {
           schemas: Array<{ name: string; version: number }>;
         };
         expect(schemas.schemas.find((entry) => entry.name === 'signup')?.version).toBe(2);
+        // The undeclared-but-accepted event fields are stated, not left for a caller to discover by probing.
+        expect((schemas as unknown as { implicit_event_fields: Array<{ name: string }> }).implicit_event_fields.map((field) => field.name)).toEqual(['anon_id', 'customer_id']);
 
         // A metric written against that catalog registers; one naming a column the table lacks is refused with the reason.
         const registered = await client.callTool({
