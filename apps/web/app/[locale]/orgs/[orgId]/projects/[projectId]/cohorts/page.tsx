@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, queryCohortRetention } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildCohortRetentionView } from '@/lib/orgs/cohort-retention-view';
 import { Link } from '@/i18n/navigation';
 
@@ -59,9 +60,12 @@ export default async function CohortRetentionPage({ params, searchParams }: Page
     notFound();
   }
 
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
   const trimmedConversionEvent = conversionEventParam?.trim();
   const view = buildCohortRetentionView(
-    await queryCohortRetention(orgId, projectId, trimmedConversionEvent ? { conversionEvent: trimmedConversionEvent } : undefined),
+    await queryCohortRetention(orgId, projectId, trimmedConversionEvent ? { conversionEvent: trimmedConversionEvent, ...environmentScope } : environmentScope),
   );
   const t = await getTranslations('CohortRetention');
 

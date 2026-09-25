@@ -14,6 +14,7 @@ import {
   listSharedCredentials,
   queryProjectFunnelSteps,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
   toAutomationActionView,
   toAutomationConnectionOptions,
@@ -94,9 +95,10 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
     ROAS-driven recommendations correctly produce nothing. The funnel is the project's own or
     absent - never a stand-in.
   */
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
   let funnelOutcome: FunnelStepsOutcome | null = null;
   try {
-    funnelOutcome = await queryProjectFunnelSteps(orgId, projectId);
+    funnelOutcome = await queryProjectFunnelSteps(orgId, projectId, { environmentId: selectedEnvironment?.id });
   } catch {
     funnelOutcome = null;
   }

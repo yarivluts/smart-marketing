@@ -32,6 +32,8 @@ export interface CreateWinFeedStreamParams {
   projectId: string;
   /** ISO cursor to resume from — everything created at-or-after this is flushed (see `listWinEventsSince`'s own doc comment for why this is inclusive). */
   since: string;
+  /** Whose wins to stream (KAN-196's project environment picker); omitted, the project's `prod` ones. */
+  environmentId?: string;
   signal: AbortSignal;
   pollIntervalMs?: number;
   maxDurationMs?: number;
@@ -75,7 +77,7 @@ export interface CreateWinFeedStreamParams {
  * const export like a poll-interval constant fails the build.
  */
 export function createWinFeedStream(params: CreateWinFeedStreamParams): ReadableStream<Uint8Array> {
-  const { organizationId, projectId, signal } = params;
+  const { organizationId, projectId, environmentId, signal } = params;
   const pollIntervalMs = params.pollIntervalMs ?? WIN_FEED_POLL_INTERVAL_MS;
   const maxDurationMs = params.maxDurationMs ?? WIN_FEED_MAX_STREAM_DURATION_MS;
   let cursor = params.since;
@@ -103,7 +105,7 @@ export function createWinFeedStream(params: CreateWinFeedStreamParams): Readable
 
       while (!closed && !terminatedByError && !signal.aborted && Date.now() < deadline) {
         try {
-          const events = await listWinEventsSince(organizationId, projectId, cursor);
+          const events = await listWinEventsSince(organizationId, projectId, cursor, { environmentId });
           let flushedAny = false;
           for (const event of events) {
             if (event.created_at === cursor && seenIdsAtCursor.has(event.id)) {

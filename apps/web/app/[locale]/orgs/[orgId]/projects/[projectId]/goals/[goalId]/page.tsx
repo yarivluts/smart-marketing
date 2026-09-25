@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { getGoal, listMetricsCatalogForProject, listOrgPeople, listOrgProjects, queryGoalProgress } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildGoalThermometerView } from '@/lib/orgs/goal-view';
 import { GoalThermometer } from '@/components/orgs/goal-thermometer';
 import { DeleteGoalButton } from '@/components/orgs/delete-goal-button';
@@ -58,7 +59,10 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
     notFound();
   }
 
-  const outcome = await queryGoalProgress(orgId, projectId, goal);
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
+  const outcome = await queryGoalProgress(orgId, projectId, goal, environmentScope);
   const thermometerView = buildGoalThermometerView(outcome);
   const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
   const ownerName = peopleRows.find((person) => person.id === goal.owner_person_id)?.name ?? goal.owner_person_id;

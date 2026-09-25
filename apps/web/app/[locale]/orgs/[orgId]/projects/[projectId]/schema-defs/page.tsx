@@ -6,12 +6,12 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   getEventVolumeOverviewForProject,
-  listEnvironmentsForProject,
   listOrgProjects,
   listQuarantinedRecordsForProject,
   listSchemaDefinitionsForProject,
   listTrackingAlertsForProject,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { Link } from '@/i18n/navigation';
 import { toSchemaDefView, type SchemaDefView } from '@/lib/orgs/schema-def-view';
 import { toTrackingAlertView, trackingAlertStatusLabelKey } from '@/lib/orgs/tracking-alert-view';
@@ -77,11 +77,15 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
     notFound();
   }
 
-  const [projects, schemaDefs, trackingAlerts, environments] = await Promise.all([
+  // KAN-196: tracking alerts, event volume and the rejected-record tally are scoped to the
+  // environment picked in the project shell (prod by default). Schema definitions themselves are
+  // project-wide, shared by every environment, so they stay unscoped.
+  const { selected: selectedEnvironment, environments } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentId = selectedEnvironment?.id;
+  const [projects, schemaDefs, trackingAlerts] = await Promise.all([
     listOrgProjects(orgId),
     listSchemaDefinitionsForProject(orgId, projectId),
-    listTrackingAlertsForProject(orgId, projectId),
-    listEnvironmentsForProject(orgId, projectId),
+    listTrackingAlertsForProject(orgId, projectId, { environmentId }),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -91,7 +95,7 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
   // Reuses the schema-defs list just fetched above rather than a second, redundant
   // Firestore read of the same collection (same `precomputedQuota`-style pass-through
   // pattern the cost-guardrails page uses for its own equivalent duplicate fetch).
-  const eventVolumeOverview = await getEventVolumeOverviewForProject(orgId, projectId, { precomputedSchemaDefs: schemaDefs });
+  const eventVolumeOverview = await getEventVolumeOverviewForProject(orgId, projectId, { precomputedSchemaDefs: schemaDefs, environmentId });
 
   /*
     Rejected records, tallied per schema and environment.
@@ -111,7 +115,7 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
     as authoritative.
   */
   const QUARANTINE_SAMPLE_SIZE = 500;
-  const quarantinedSample = await listQuarantinedRecordsForProject(orgId, projectId, QUARANTINE_SAMPLE_SIZE);
+  const quarantinedSample = await listQuarantinedRecordsForProject(orgId, projectId, QUARANTINE_SAMPLE_SIZE, environmentId);
   const rejectedCountByKey = new Map<string, number>();
   for (const record of quarantinedSample) {
     const key = `${record.schema_name}:${record.environment_id}`;

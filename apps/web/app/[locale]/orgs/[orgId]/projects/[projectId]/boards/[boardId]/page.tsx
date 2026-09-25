@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTiles } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildTileRenderView, toBoardView, type TileRenderView } from '@/lib/orgs/board-view';
 import { resolveBoardFreshness } from '@/lib/orgs/board-freshness';
 import { BoardSettingsForm } from '@/components/orgs/board-settings-form';
@@ -76,7 +77,10 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
 
   const boardView = toBoardView(board);
 
-  const tileOutcomes = await queryBoardTiles(orgId, projectId, board);
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
+  const tileOutcomes = await queryBoardTiles(orgId, projectId, board, environmentScope);
   const renderViews: Record<string, TileRenderView> = {};
   board.tiles.forEach((tile, index) => {
     renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index], freshness);

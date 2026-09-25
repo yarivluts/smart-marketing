@@ -46,7 +46,12 @@ async function setupProjectWithRule(orgName: string) {
     createdByUserId: owner.id,
   });
   // The TV board streams the prod environment (KAN-99), so the wins it should show fire there.
-  return { organization, project, environmentId: environments.find((environment) => environment.name === 'prod')!.id };
+  return {
+    organization,
+    project,
+    environmentId: environments.find((environment) => environment.name === 'prod')!.id,
+    devEnvironmentId: environments.find((environment) => environment.name === 'dev')!.id,
+  };
 }
 
 /** Two rules watching the same schema — one `evaluateRecordAgainstWinRules` call against a matching record fires both, sharing one millisecond-resolution `created_at` (the same-timestamp collision `listWinEventsSince`'s own doc comment describes). */
@@ -249,6 +254,46 @@ describe('createWinFeedStream', () => {
     controller.abort();
     expect(done).toBe(true);
     expect(Date.now() - start).toBeLessThan(5000);
+  });
+
+  it("streams only the named environment's wins when environmentId is passed, and prod's when omitted (KAN-196)", async () => {
+    const { organization, project, environmentId: prodEnvironmentId, devEnvironmentId } = await setupProjectWithRule('Win Feed Stream Env Scope Org');
+    const before = new Date(Date.now() - 1000).toISOString();
+    for (const [environmentId, clientId] of [[prodEnvironmentId, 'evt_prod'], [devEnvironmentId, 'evt_dev']] as const) {
+      await evaluateRecordAgainstWinRules({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId,
+        kind: 'event',
+        schemaName: 'signup',
+        clientId,
+        payload: {},
+        rawRecordId: `raw_${clientId}`,
+        occurredAt: new Date().toISOString(),
+      });
+    }
+
+    async function streamedClientIds(environmentId?: string): Promise<string[]> {
+      const controller = new AbortController();
+      const stream = createWinFeedStream({
+        organizationId: organization.id,
+        projectId: project.id,
+        since: before,
+        ...(environmentId !== undefined ? { environmentId } : {}),
+        signal: controller.signal,
+        pollIntervalMs: 20,
+        maxDurationMs: 600,
+      });
+      const text = await readUntil(stream, () => false, 1500).catch((error) => (error as Error).message);
+      controller.abort();
+      return text
+        .split('\n')
+        .filter((line) => line.startsWith('data: '))
+        .map((line) => (JSON.parse(line.slice('data: '.length)) as WinEventFeedItem).clientId);
+    }
+
+    expect(await streamedClientIds(devEnvironmentId)).toEqual(['evt_dev']);
+    expect(await streamedClientIds()).toEqual(['evt_prod']);
   });
 
   it('stops enqueueing once the caller aborts', async () => {

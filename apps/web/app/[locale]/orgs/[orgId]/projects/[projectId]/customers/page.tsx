@@ -6,6 +6,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, listSchemaDefinitionsForProject, searchProjectCustomers } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildCustomerSearchView } from '@/lib/orgs/customer-search-view';
 import { Link } from '@/i18n/navigation';
 
@@ -57,6 +58,10 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
     notFound();
   }
 
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
+
   const entitySchemaNames = activeSchemaNamesForKind(schemaDefs, 'entity');
   const activeSchemaDefsByKindAndName = buildActiveSchemaDefsByKindAndName(schemaDefs);
   const selectedSchemaName = schemaParam && entitySchemaNames.includes(schemaParam) ? schemaParam : undefined;
@@ -65,7 +70,7 @@ export default async function CustomersPage({ params, searchParams }: PageProps)
   const view =
     trimmedQuery && trimmedQuery.length > 0
       ? buildCustomerSearchView(
-          await searchProjectCustomers(orgId, projectId, trimmedQuery, { schemaName: selectedSchemaName }),
+          await searchProjectCustomers(orgId, projectId, trimmedQuery, { schemaName: selectedSchemaName, ...environmentScope }),
           activeSchemaDefsByKindAndName,
         )
       : undefined;

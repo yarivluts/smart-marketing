@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, listProjectInsights } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildInsightsView } from '@/lib/orgs/insights-view';
 import { splitOverFetchedFeed } from '@/lib/orgs/billing-ops-view';
 
@@ -55,13 +56,19 @@ export default async function InsightsPage({ params }: PageProps): Promise<React
     notFound();
   }
 
+  // KAN-196: win insights are scoped to the environment picked in the project
+  // shell (prod by default). Tracking-alert and metric-health insights are
+  // project-wide in `listProjectInsights` itself, the same as for its MCP caller.
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
+
   // Over-fetch by one so truncation is measured, not inferred: `length === cap`
   // cannot tell "exactly this many exist" from "far more exist", and this page
   // is read as the list of everything wrong with the project. A capped list of
   // problems with nothing saying it is capped is read as the full set of
   // problems — the same defect class as KAN-114/138/146, but here the thing
   // being under-reported is what the user is supposed to act on.
-  const fetched = await listProjectInsights(orgId, projectId, INSIGHTS_PAGE_SIZE + 1);
+  const fetched = await listProjectInsights(orgId, projectId, INSIGHTS_PAGE_SIZE + 1, environmentScope);
   const { rows, truncated } = splitOverFetchedFeed(fetched, INSIGHTS_PAGE_SIZE);
   const view = buildInsightsView(rows);
 

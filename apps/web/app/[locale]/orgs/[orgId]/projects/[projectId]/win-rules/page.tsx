@@ -15,6 +15,7 @@ import {
   listRecentWinEventsForProject,
   listWinRulesForProject,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { toWinEventFeedItem, toWinRuleSummaryView } from '@/lib/orgs/win-rule-view';
 import { toTrialPipelineWidgetView } from '@/lib/orgs/trial-pipeline-view';
 import { toRepCollectionLeaderboardView } from '@/lib/orgs/rep-collection-view';
@@ -63,11 +64,14 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
     notFound();
   }
 
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
   const [winRules, eventSchemaNames, trialPipelineOutcome, recentWinEvents, repCollectionLeaderboard, people] = await Promise.all([
     listWinRulesForProject(orgId, projectId),
     listActiveEventSchemaNames(orgId, projectId),
-    getTrialPipelineSummary(orgId, projectId),
-    listRecentWinEventsForProject(orgId, projectId, DEFAULT_WIN_EVENT_LIST_LIMIT + 1),
+    getTrialPipelineSummary(orgId, projectId, environmentScope),
+    listRecentWinEventsForProject(orgId, projectId, DEFAULT_WIN_EVENT_LIST_LIMIT + 1, environmentScope),
     getRepCollectionLeaderboardForProject(orgId, projectId, 'week'),
     listOrgPeople(orgId),
   ]);

@@ -13,6 +13,7 @@ import {
   listSharedCredentials,
   queryCampaignSpend,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
   findCampaignDraftForTarget,
   toAutomationActionView,
@@ -93,7 +94,8 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
   // Same `campaign_resource_name ?? id` fallback the executors apply for a target seeded to
   // represent a pre-existing campaign — the spend rows' `campaign_id` dimension carries the
   // platform's own campaign id either way.
-  const spendOutcome = await queryCampaignSpend(orgId, projectId, target.campaignResourceName ?? target.id);
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const spendOutcome = await queryCampaignSpend(orgId, projectId, target.campaignResourceName ?? target.id, { environmentId: selectedEnvironment?.id });
   const spendView = spendOutcome.ok
     ? {
         ok: true as const,

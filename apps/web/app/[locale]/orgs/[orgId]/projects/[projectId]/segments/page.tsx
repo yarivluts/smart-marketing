@@ -15,8 +15,8 @@ import {
   listSchemaDefinitionsForProject,
   listSegmentMembers,
   listSegmentsForProject,
-  resolveDefaultQueryEnvironment,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildSegmentMemberCountView, buildSegmentMemberListView, toSegmentSummaryView, type SegmentMemberCountView, type SegmentMemberListView } from '@/lib/orgs/segment-view';
 import { toActionPluginInstallOptionView, toCrmSyncRunView, type CrmSyncRunView } from '@/lib/orgs/crm-sync-view';
 import { CreateSegmentForm } from '@/components/orgs/create-segment-form';
@@ -109,7 +109,8 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
   // flag for this spot. `latestCrmSyncRuns` below stays a genuine per-segment
   // fan-out — each is its own segment-scoped list query with no shared state
   // to hoist out.
-  const [environment, quota] = await Promise.all([resolveDefaultQueryEnvironment(orgId, projectId), getProjectCostQuota(orgId, projectId)]);
+  // KAN-196: the environment picked in the project shell (prod by default) rather than always prod.
+  const [{ selected: environment }, quota] = await Promise.all([resolveSelectedEnvironment(orgId, projectId), getProjectCostQuota(orgId, projectId)]);
   const memberCountViews = new Map<string, SegmentMemberCountView>(
     await Promise.all(
       segments.map(async (segment): Promise<[string, SegmentMemberCountView]> => [
