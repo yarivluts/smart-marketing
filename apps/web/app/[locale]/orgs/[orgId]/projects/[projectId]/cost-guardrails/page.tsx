@@ -41,7 +41,7 @@ export default async function CostGuardrailsPage({ params }: PageProps): Promise
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId, projectId })) {
     notFound();
   }
 

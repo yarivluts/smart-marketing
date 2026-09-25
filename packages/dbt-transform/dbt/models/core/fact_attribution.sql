@@ -42,7 +42,11 @@ with touchpoints as (
         project_id,
         environment_id,
         event_id as touchpoint_event_id,
-        entity_id as anon_id,
+        -- The visitor, not the event: the snippet sets a touchpoint's event_id
+        -- to the anon id, while an integrator following the documented
+        -- contract sends a per-event id and puts the anon id in properties
+        -- (B12). Read properties first so both land on the same visitor.
+        coalesce({{ json_text_field('properties', "'anon_id'") }}, entity_id) as anon_id,
         coalesce({{ json_text_field('properties', "'channel'") }}, 'unknown') as channel_id,
         {{ json_text_field('properties', "'utm_campaign'") }} as campaign_id,
         {{ json_text_field('properties', "'landing_page'") }} as landing_page,
@@ -57,7 +61,11 @@ conversions as (
         project_id,
         environment_id,
         event_id as conversion_event_id,
-        entity_id as customer_id,
+        -- The customer, not the event (B12): a declared properties.customer_id
+        -- wins over entity_id, which is the event's own id under the
+        -- documented contract.
+        coalesce({{ json_text_field('properties', "'customer_id'") }}, entity_id) as customer_id,
+        {{ json_text_field('properties', "'anon_id'") }} as anon_id,
         coalesce({{ json_text_field('properties', "'event_name'") }}, event_type) as conversion_event,
         occurred_at
     from {{ ref('events') }}
@@ -68,6 +76,39 @@ conversions as (
 -- any anon_id `bridge_identity` resolved to that customer, that happened
 -- at or before the conversion itself (a touchpoint after the fact can't
 -- have driven it).
+-- Two ways a conversion reaches its touchpoints:
+--   * through identity: its customer resolves (bridge_identity) to an anon id
+--     that landed - the path that crosses devices and sessions;
+--   * directly: the conversion itself declares the anon id that landed (an
+--     anonymous conversion such as a WhatsApp lead has no customer yet).
+-- `via_identity` records which path, because landing-page performance counts
+-- only conversions that reached a known customer (see that model).
+candidate_links as (
+    select
+        c.conversion_event_id,
+        bi.anon_id,
+        true as via_identity
+    from conversions c
+    inner join {{ ref('bridge_identity') }} bi
+        on bi.organization_id = c.organization_id
+        and bi.project_id = c.project_id
+        and bi.environment_id = c.environment_id
+        and bi.customer_id = c.customer_id
+    union all
+    select
+        c.conversion_event_id,
+        c.anon_id,
+        false as via_identity
+    from conversions c
+    where c.anon_id is not null
+),
+
+conversion_anons as (
+    select conversion_event_id, anon_id, max(case when via_identity then 1 else 0 end) = 1 as via_identity
+    from candidate_links
+    group by 1, 2
+),
+
 candidate_touchpoints as (
     select
         c.organization_id,
@@ -77,28 +118,23 @@ candidate_touchpoints as (
         c.customer_id,
         c.conversion_event,
         c.occurred_at as converted_at,
+        ca.via_identity,
         t.touchpoint_event_id,
         t.channel_id,
         t.campaign_id,
         t.landing_page,
         t.occurred_at as touched_at
     from conversions c
-    inner join {{ ref('bridge_identity') }} bi
-        on bi.organization_id = c.organization_id
-        and bi.project_id = c.project_id
-        and bi.environment_id = c.environment_id
-        and bi.customer_id = c.customer_id
+    inner join conversion_anons ca
+        on ca.conversion_event_id = c.conversion_event_id
     inner join touchpoints t
-        on t.organization_id = bi.organization_id
-        and t.project_id = bi.project_id
-        and t.environment_id = bi.environment_id
-        and t.anon_id = bi.anon_id
+        on t.organization_id = c.organization_id
+        and t.project_id = c.project_id
+        and t.environment_id = c.environment_id
+        and t.anon_id = ca.anon_id
     where t.occurred_at <= c.occurred_at
 ),
 
--- One winning row per conversion for each model. `touchpoint_event_id` is
--- the final, deterministic tiebreaker for two touchpoints landed at the
--- exact same instant.
 first_touch_winners as (
     select *
     from (
@@ -131,7 +167,7 @@ attributed as (
     select
         organization_id, project_id, environment_id, conversion_event_id,
         customer_id, conversion_event, converted_at,
-        'first_touch' as model, channel_id, campaign_id, landing_page
+        'first_touch' as model, channel_id, campaign_id, landing_page, via_identity
     from first_touch_winners
 
     union all
@@ -139,7 +175,7 @@ attributed as (
     select
         organization_id, project_id, environment_id, conversion_event_id,
         customer_id, conversion_event, converted_at,
-        'last_touch' as model, channel_id, campaign_id, landing_page
+        'last_touch' as model, channel_id, campaign_id, landing_page, via_identity
     from last_touch_winners
 ),
 
@@ -160,7 +196,8 @@ unattributed as (
         c.organization_id, c.project_id, c.environment_id, c.conversion_event_id,
         c.customer_id, c.conversion_event, c.occurred_at as converted_at,
         m.model, 'unattributed' as channel_id, cast(null as {{ dbt.type_string() }}) as campaign_id,
-        cast(null as {{ dbt.type_string() }}) as landing_page
+        cast(null as {{ dbt.type_string() }}) as landing_page,
+        false as via_identity
     from conversions c
     cross join model_names m
     left join attributed a
@@ -191,5 +228,9 @@ select
     channel_id,
     campaign_id,
     landing_page,
+    -- True when the crediting touchpoint was reached through the customer's
+    -- resolved identity, false when only through the conversion's own
+    -- anon_id (an anonymous conversion) or when unattributed.
+    via_identity,
     1.0 as credit
 from final

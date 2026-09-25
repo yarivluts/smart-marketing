@@ -53,10 +53,10 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
-  if (!membership || !can(bindings, principal, 'automation.execute', { orgId })) {
+  if (!membership || !can(bindings, principal, 'automation.execute', { orgId, projectId })) {
     notFound();
   }
-  const canApprove = can(bindings, principal, 'automation.approve', { orgId });
+  const canApprove = can(bindings, principal, 'automation.approve', { orgId, projectId });
 
   const [projects, killSwitchStatus, policy, targets, actions, activeAttachments, credentials] = await Promise.all([
     listOrgProjects(orgId),

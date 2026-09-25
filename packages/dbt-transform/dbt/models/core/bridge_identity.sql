@@ -13,9 +13,9 @@
 -- registered identity key is a "customer-side" identity.
 --
 -- Two kinds of evidence link an anon_id to a customer_id:
---   1. `anon_id_cooccurrence` (precedence 0, strongest): a record's own
---      payload declares `anon_id`, so that record's own `client_id` is an
---      explicit, first-party assertion of the resolved identity.
+--   1. `anon_id_cooccurrence` (precedence 0, strongest): a record declares
+--      both `anon_id` and `customer_id` in its properties - an explicit,
+--      first-party assertion of the resolved identity (see `direct_links`).
 --   2. `shared_key:<field_name>` (precedence 10+, ranked by field): an
 --      anon-side record and a customer-side record independently carry the
 --      same value for some other registered identity key (email_hash,
@@ -47,27 +47,41 @@ anon_client_ids as (
     where kind = 'event' and schema_name = 'touchpoint'
 ),
 
+-- A record links an anon to a customer when it declares BOTH, in its
+-- properties: `anon_id` (the visitor it came from) and `customer_id` (who that
+-- visitor turned out to be). That is the documented ingest contract
+-- ({event_id, event, ts, properties}) and what the platform snippet sends
+-- after `identify()`: `event_id` identifies the EVENT, never the person.
+--
+-- This used to read the record's own `client_id` as the customer (B12,
+-- 2026-09-25). Under the contract `client_id` is a per-event id, so every
+-- record carrying an anon_id - a page_view, a CTA click, the touchpoint
+-- itself - became a separate "customer"; the earliest won (usually the
+-- touchpoint), the anon resolved to an event id, no conversion ever matched
+-- it, and landing-page attribution credited nothing. It also meant an
+-- anonymous visitor's page_view could mint a phantom customer. Only test
+-- fixtures followed the old reading; they now declare `customer_id`.
+--
+-- A touchpoint is never the customer side: it is the anonymous side by
+-- definition.
 direct_links as (
     select
-        organization_id,
-        project_id,
-        environment_id,
-        field_value as anon_id,
-        client_id as customer_id,
+        a.organization_id,
+        a.project_id,
+        a.environment_id,
+        a.field_value as anon_id,
+        c.field_value as customer_id,
         'anon_id_cooccurrence' as method,
         0 as precedence,
-        observed_at
-    from observations
-    where field_name = 'anon_id'
+        a.observed_at
+    from observations a
+    inner join observations c
+        on c.raw_record_key = a.raw_record_key
+        and c.field_name = 'customer_id'
+    where a.field_name = 'anon_id'
+      and a.schema_name != 'touchpoint'
 ),
 
--- Relative strength of a non-`anon_id` identity-key field as stitching
--- evidence (lower = stronger). A directly-declared `user_id` is treated as
--- strong as an explicit identity assertion; `email_hash` next; click ids
--- (a shared link, not a shared person) next; device ids (a shared device,
--- not necessarily a shared person) weakest of the named types; any other
--- registered/custom field falls back to the weakest tier. Offset by 10 so
--- no shared-key link can ever outrank a `direct_links` (precedence 0) row.
 field_precedence as (
     select
         field_name,
@@ -81,7 +95,7 @@ field_precedence as (
             when 'device_id' then 4
             else 5
         end as precedence
-    from (select distinct field_name from observations where field_name != 'anon_id') distinct_fields
+    from (select distinct field_name from observations where field_name not in ('anon_id', 'customer_id')) distinct_fields
 ),
 
 shared_key_links as (
@@ -113,7 +127,9 @@ shared_key_links as (
         and bc.project_id = b.project_id
         and bc.environment_id = b.environment_id
         and bc.client_id = b.client_id
-    where a.field_name != 'anon_id'
+    -- customer_id is the identity itself (see direct_links), not evidence
+    -- shared between two records' client_ids, which are per-event ids.
+    where a.field_name not in ('anon_id', 'customer_id')
       -- The other side of the match must be a genuine customer-side
       -- identity, not another anonymous session (two anon visitors sharing
       -- a click id isn't evidence either resolves to a customer).

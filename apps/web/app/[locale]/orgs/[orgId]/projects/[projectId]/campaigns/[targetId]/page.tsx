@@ -63,10 +63,10 @@ export default async function CampaignDetailPage({ params }: PageProps): Promise
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
-  if (!membership || !can(bindings, principal, 'automation.execute', { orgId })) {
+  if (!membership || !can(bindings, principal, 'automation.execute', { orgId, projectId })) {
     notFound();
   }
-  const canApprove = can(bindings, principal, 'automation.approve', { orgId });
+  const canApprove = can(bindings, principal, 'automation.approve', { orgId, projectId });
 
   const [projects, targets, targetActions, attachments, credentials] = await Promise.all([
     listOrgProjects(orgId),

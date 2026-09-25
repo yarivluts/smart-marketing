@@ -67,7 +67,7 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })) {
     notFound();
   }
 
@@ -96,7 +96,7 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   const [funnelResult, people] = await Promise.all([getDemoFunnelForProject(orgId, projectId), listOrgPeople(orgId)]);
   const peopleById = new Map(people.map((person) => [person.id, { name: person.name, photoUrl: person.photo_url ?? null }]));
   const funnel = toDemoFunnelView(funnelResult, peopleById);
-  const canManageDashboards = can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId });
+  const canManageDashboards = can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId });
 
   const formatShowRate = (rate: number | null): string => (rate === null ? t('rowValueUnavailable') : t('showRateValue', { value: Math.round(rate * 100) }));
 
