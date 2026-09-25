@@ -26,7 +26,10 @@ import { assessProdDrift, DEFAULT_PROD_DRIFT_GRACE_HOURS } from '../../packages/
 
 const HEALTH_URL = process.env.PROD_HEALTH_URL ?? 'https://api-prod-1098891924957.me-west1.run.app/v1/health';
 const MAIN_REF = process.env.MAIN_REF ?? 'origin/main';
-const ISSUE_TITLE = 'Production api-prod has drifted behind main';
+// One tracking issue per watched service: the workflow runs this once per service, and each
+// must open, update and close its own issue without touching the other's.
+const SERVICE_NAME = process.env.SERVICE_NAME ?? 'api-prod';
+const ISSUE_TITLE = `Production ${SERVICE_NAME} has drifted behind main`;
 
 function git(...args) {
   return execFileSync('git', args, { encoding: 'utf8' }).trim();

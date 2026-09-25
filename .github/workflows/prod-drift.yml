@@ -28,8 +28,19 @@ concurrency:
 
 jobs:
   check:
-    name: api-prod vs main
+    name: ${{ matrix.service }} vs main
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: api-prod
+            health_url: https://api-prod-1098891924957.me-west1.run.app/v1/health
+          # api-preprod writes to the same Firestore and warehouse as api-prod (KAN-207), so
+          # an old build there corrupts production data just as surely - it silently dropped
+          # entity updates on 2026-09-25 while running an untracked build.
+          - service: api-preprod
+            health_url: https://api-preprod-5u3ypal2gq-zf.a.run.app/v1/health
     steps:
       - name: Checkout (full history)
         uses: actions/checkout@v4
@@ -54,7 +65,9 @@ jobs:
           pnpm install --frozen-lockfile --filter @growthos/shared...
           pnpm --filter @growthos/shared build
 
-      - name: Compare production with main
+      - name: Compare ${{ matrix.service }} with main
         env:
           GH_TOKEN: ${{ github.token }}
+          SERVICE_NAME: ${{ matrix.service }}
+          PROD_HEALTH_URL: ${{ matrix.health_url }}
         run: node scripts/deploy/check-prod-drift.mjs

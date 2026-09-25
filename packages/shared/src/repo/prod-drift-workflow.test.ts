@@ -70,6 +70,19 @@ describe('prod-drift workflow (KAN-180)', () => {
     expect({ fullHistory: /fetch-depth:\s*0\b/.test(read(WORKFLOW)) }).toEqual({ fullHistory: true });
   });
 
+  /**
+   * api-preprod shares api-prod's Firestore and warehouse (KAN-207): an old build there
+   * corrupts production data exactly as an old api-prod would, and on 2026-09-25 one did.
+   */
+  it('watches every service that writes to production data: api-prod and api-preprod', () => {
+    const workflow = read(WORKFLOW);
+    expect({
+      prod: /service: api-prod$/m.test(workflow),
+      preprod: /service: api-preprod$/m.test(workflow),
+      perServiceIssue: /SERVICE_NAME: \$\{\{ matrix\.service \}\}/.test(workflow) && /process\.env\.SERVICE_NAME/.test(read(SCRIPT)),
+    }).toEqual({ prod: true, preprod: true, perServiceIssue: true });
+  });
+
   it('never deploys from the script either', () => {
     const script = read(SCRIPT);
     expect({ deploys: /run\s+deploy|builds\s+submit|update-traffic/.test(script) }).toEqual({ deploys: false });
