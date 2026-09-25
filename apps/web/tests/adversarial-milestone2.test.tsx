@@ -98,11 +98,12 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
     });
 
     it('1.2 handles single-step funnel with 100% conversion and 0% drop-off', () => {
-      const raw = [{ stageKey: 'step_only', stepOrder: 1, customerCount: 450, conversionRateFromFirst: 1.0 }];
+      const raw = [{ eventSchemaName: 'step_only_event', stageKey: 'step_only', stepOrder: 1, customerCount: 450, conversionRateFromFirst: 1.0 }];
       const items = calculateFunnelStepItems(raw);
 
       expect(items).toHaveLength(1);
       expect(items[0]).toEqual({
+        eventSchemaName: 'step_only_event',
         stageKey: 'step_only',
         stageLabel: 'step_only',
         stepOrder: 1,
@@ -121,8 +122,8 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
 
     it('1.3 handles initial stage with 0 customers without NaN or throw', () => {
       const raw = [
-        { stageKey: 's1', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0 },
-        { stageKey: 's2', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0 },
+        { eventSchemaName: 's1_event', stageKey: 's1', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0 },
+        { eventSchemaName: 's2_event', stageKey: 's2', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0 },
       ];
       const items = calculateFunnelStepItems(raw);
 
@@ -140,9 +141,9 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
 
     it('1.4 handles total drop-off (100% loss after first step)', () => {
       const raw = [
-        { stageKey: 's1', stepOrder: 1, customerCount: 1000, conversionRateFromFirst: 1.0 },
-        { stageKey: 's2', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0.0 },
-        { stageKey: 's3', stepOrder: 3, customerCount: 0, conversionRateFromFirst: 0.0 },
+        { eventSchemaName: 's1_event', stageKey: 's1', stepOrder: 1, customerCount: 1000, conversionRateFromFirst: 1.0 },
+        { eventSchemaName: 's2_event', stageKey: 's2', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0.0 },
+        { eventSchemaName: 's3_event', stageKey: 's3', stepOrder: 3, customerCount: 0, conversionRateFromFirst: 0.0 },
       ];
       const items = calculateFunnelStepItems(raw);
 
@@ -166,8 +167,8 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
     it('1.5 handles inverted / expanding funnel stages (growth at later step)', () => {
       // e.g. viral expansion or multi-attendee invitations
       const raw = [
-        { stageKey: 's1', stepOrder: 1, customerCount: 100, conversionRateFromFirst: 1.0 },
-        { stageKey: 's2', stepOrder: 2, customerCount: 250, conversionRateFromFirst: 2.5 },
+        { eventSchemaName: 's1_event', stageKey: 's1', stepOrder: 1, customerCount: 100, conversionRateFromFirst: 1.0 },
+        { eventSchemaName: 's2_event', stageKey: 's2', stepOrder: 2, customerCount: 250, conversionRateFromFirst: 2.5 },
       ];
       const items = calculateFunnelStepItems(raw);
 
@@ -660,9 +661,9 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         funnelOutcome: {
         ok: true,
         steps: [
-          { stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
-          { stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
-          { stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
+          { eventSchemaName: 'sent_event', stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
+          { eventSchemaName: 'viewed_event', stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
+          { eventSchemaName: 'signed_event', stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
         ],
       },
         goals: [],

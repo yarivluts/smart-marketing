@@ -58,4 +58,23 @@ describe('VisualFunnelSteps Component', () => {
     expect(screen.getByTestId('funnel-dropoff-alert-card')).toBeInTheDocument();
     expect(screen.queryByTestId('ask-copilot-btn')).not.toBeInTheDocument();
   });
+  /*
+    KAN-199: a funnel set over MCP can have several steps in the same stage (EasySign's
+    document_created / document_sent / document_signed all classify as "other"). Each is its own
+    row, told apart by its event schema name, and the drop-off highlight lands on one step only.
+  */
+  it('renders every step of a funnel whose steps share a stage key, labelled by event name', () => {
+    const shared: FunnelStepItem[] = [
+      { eventSchemaName: 'signup', stageKey: 'signup', stageLabel: 'Signup', stepOrder: 0, customerCount: 100, conversionPercent: 100, dropOffPercent: 0 },
+      { eventSchemaName: 'document_sent', stageKey: 'other', stageLabel: 'Other', stepOrder: 1, customerCount: 50, conversionPercent: 50, dropOffPercent: 50 },
+      { eventSchemaName: 'document_signed', stageKey: 'other', stageLabel: 'Other', stepOrder: 2, customerCount: 40, conversionPercent: 40, dropOffPercent: 20 },
+    ];
+    renderWithIntl(<VisualFunnelSteps steps={shared} funnelName="EasySign" />);
+
+    expect(screen.getByTestId('event-0')).toHaveTextContent('signup');
+    expect(screen.getByTestId('event-1')).toHaveTextContent('document_sent');
+    expect(screen.getByTestId('event-2')).toHaveTextContent('document_signed');
+    expect(screen.getAllByTestId('funnel-step-other')).toHaveLength(2);
+    expect(screen.getAllByTestId('funnel-step-other').filter((row) => row.className.includes('border-amber-300'))).toHaveLength(1);
+  });
 });

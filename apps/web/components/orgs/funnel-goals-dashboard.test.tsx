@@ -25,9 +25,9 @@ beforeEach(() => {
 const REAL_FUNNEL = {
   ok: true as const,
   steps: [
-    { stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
-    { stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
-    { stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
+    { eventSchemaName: 'sent_event', stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
+    { eventSchemaName: 'viewed_event', stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
+    { eventSchemaName: 'signed_event', stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
   ],
 };
 

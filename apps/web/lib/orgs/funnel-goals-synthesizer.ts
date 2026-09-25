@@ -34,6 +34,8 @@ import type { GoalProgressUnavailableReason } from './goal-view';
 */
 
 export interface FunnelStepItem {
+  /** The event schema this step counts. Absent only for callers that never had one; the project's own funnel always carries it, and it is what tells apart two steps sharing a stage key (KAN-199). */
+  eventSchemaName?: string;
   stageKey: string;
   stageLabel: string;
   stepOrder: number;
@@ -224,7 +226,7 @@ export function calculateDaysRemaining(deadline: string): number {
  * Calculates drop-off and conversion rates from raw step results.
  */
 export function calculateFunnelStepItems(
-  rawSteps: { stageKey: string; stepOrder: number; customerCount: number; conversionRateFromFirst?: number }[],
+  rawSteps: { eventSchemaName?: string; stageKey: string; stepOrder: number; customerCount: number; conversionRateFromFirst?: number }[],
   stageLabelLookup?: (key: string) => string,
 ): FunnelStepItem[] {
   if (rawSteps.length === 0) return [];
@@ -249,6 +251,7 @@ export function calculateFunnelStepItems(
     const stageLabel = stageLabelLookup ? stageLabelLookup(step.stageKey) : step.stageKey;
 
     return {
+      ...(step.eventSchemaName !== undefined ? { eventSchemaName: step.eventSchemaName } : {}),
       stageKey: step.stageKey,
       stageLabel,
       stepOrder: step.stepOrder,
