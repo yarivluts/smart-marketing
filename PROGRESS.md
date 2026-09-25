@@ -17,6 +17,24 @@ Template for each entry:
 
 ---
 
+## 2026-09-25 - KAN-196: project environment picker (PR open, not merged)
+
+- **Last completed:** a dev/staging/prod picker in the project shell (default prod), stored in a
+  per-project `gos_env_<projectId>` cookie because layouts cannot read `searchParams`.
+  `resolveSelectedEnvironment` (apps/web/lib/orgs/selected-environment.ts) resolves it; record-feed,
+  customers, insights (wins), funnel, cohorts, campaigns, campaign detail, campaign-ops, goal detail,
+  board detail, automation, win-rules (page + live SSE feed), segments, schema-defs and ingest-health
+  now read the selected environment. The ingest-health/schema-defs lists that used to fold every
+  environment take an optional `environmentId` (omitted = old fold-all behaviour for other callers).
+- **Blocked + why:** nothing. Four new composite indexes in `firestore.indexes.json`
+  (ingest_batches, quarantined_records, pipeline_messages desc, tracking_alerts, all led by
+  `environment_id`) must be built in production BEFORE this deploys, or ingest-health and
+  schema-defs fail there (the emulator never enforces indexes).
+- **Next step:** follow-up to make the remaining project pages environment-aware: billing-ops-feed,
+  feedback, churn-reasons, intent-quality, firmographics, experiments, support, demos,
+  rep-collections. They still show prod whatever the picker says; the non-prod notice says so.
+- **Waiting on human:** PR review/merge, index build, deploy, Jira KAN-196 status.
+
 ## 2026-09-19..25 - The blocked-on-a-human queue, cleared
 
 Yariv gave standing authorization for GrowthOS production actions ("you have authorization for
