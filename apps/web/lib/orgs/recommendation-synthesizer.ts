@@ -34,7 +34,9 @@ export function synthesizeProactiveRecommendations(
       id: `rec-budget-${highRoasCampaign.targetId}`,
       category: 'budget',
       title: 'Scale High-Performing Campaign Budget',
-      description: `Campaign "${highRoasCampaign.label}" is performing at ${highRoasCampaign.roas.toFixed(1)}x ROAS with strong conversion headroom. Increase daily budget by 25% to capture incremental demand.`,
+      // States only the measured ROAS. "with strong conversion headroom" used to follow it -
+      // a claim about demand that nothing here measures.
+      description: `Campaign "${highRoasCampaign.label}" has a measured ${highRoasCampaign.roas.toFixed(1)}x ROAS. Increase its daily budget by 25%.`,
       beforeDiff: `$${highRoasCampaign.dailyBudgetUsd}/day`,
       afterDiff: `$${nextBudget}/day`,
       // No forecast: projecting one needs a performance baseline, and '+28%' was a literal.
@@ -68,7 +70,9 @@ export function synthesizeProactiveRecommendations(
       id: `rec-fatigue-${lowRoasCampaign.targetId}`,
       category: 'ad_fatigue',
       title: 'Pause Underperforming Campaign',
-      description: `Campaign "${lowRoasCampaign.label}" has generated ${lowRoasCampaign.roas.toFixed(1)}x ROAS over the last 30 days, falling below your 2.5x target threshold. Pause delivery to eliminate spend drain.`,
+      // No "target": this used to say the campaign was "falling below your 2.5x target
+      // threshold" - a target no project ever set (and not even the 1.8x this rule filters on).
+      description: `Campaign "${lowRoasCampaign.label}" has a measured ${lowRoasCampaign.roas.toFixed(1)}x ROAS over the last 30 days. Pause delivery to stop its spend.`,
       beforeDiff: `Status: ENABLED ($${lowRoasCampaign.dailyBudgetUsd}/day)`,
       afterDiff: 'Status: PAUSED ($0/day)',
       projectedImpact: `Saves ~$${(lowRoasCampaign.dailyBudgetUsd * 30).toLocaleString()}/month in inefficient spend`,
