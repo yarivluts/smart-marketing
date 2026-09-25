@@ -143,6 +143,10 @@
     "staging": "Staging",
     "prod": "Prod"
   },
+  "EnvironmentPicker": {
+    "label": "Environment",
+    "nonProdNotice": "Showing {environment} data, not production."
+  },
   "Members": {
     "roleAndStatus": "{role} ({status})",
     "statusLabel": "({status})",

@@ -1,11 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import { setRequestLocale, getTranslations } from 'next-intl/server';
-import { can } from '@growthos/shared';
+import { can, ENVIRONMENTS } from '@growthos/shared';
 import {
   AppShell,
   type AppShellNavItem,
   type AppShellNavSection,
 } from '@/components/orgs/app-shell';
+import { EnvironmentPicker } from '@/components/orgs/environment-picker';
 import { OmniSearchTrigger } from '@/components/orgs/omni-search';
 import { ProjectSwitcher } from '@/components/orgs/project-switcher';
 import { getServerSession } from '@/lib/auth/get-server-session';
@@ -13,6 +14,8 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { buildOmniSearchPageShortcuts } from '@/lib/orgs/omnisearch';
 import { listOrgProjects } from '@/lib/orgs/queries';
+import { DEFAULT_SELECTED_ENVIRONMENT } from '@/lib/orgs/environment-selection';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 
 type LayoutProps = Readonly<{
   children: React.ReactNode;
@@ -68,11 +71,19 @@ export default async function ProjectLayout({
   const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
   const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
 
-  const [t, tWinRules, tShell] = await Promise.all([
+  const [t, tWinRules, tShell, tEnvBadge, tEnvPicker, { selected: selectedEnvironment, environments }] = await Promise.all([
     getTranslations('OrgDetailPage'),
     getTranslations('WinRules'),
     getTranslations('AppShell'),
+    getTranslations('EnvBadge'),
+    getTranslations('EnvironmentPicker'),
+    resolveSelectedEnvironment(orgId, projectId),
   ]);
+  // KAN-196: every project page scopes its data reads to this environment (see
+  // `resolveSelectedEnvironment`); the picker below is how a viewer changes it.
+  const currentEnv = selectedEnvironment?.name ?? DEFAULT_SELECTED_ENVIRONMENT;
+  const environmentOptions = ENVIRONMENTS.filter((name) => environments.some((environment) => environment.name === name));
+  const environmentLabels = { dev: tEnvBadge('dev'), staging: tEnvBadge('staging'), prod: tEnvBadge('prod') };
 
   const base = `/orgs/${orgId}/projects/${projectId}`;
 
@@ -212,7 +223,15 @@ export default async function ProjectLayout({
             orgId={orgId}
             projects={projects}
             currentProjectId={projectId}
-            currentEnv="dev"
+            currentEnv={currentEnv}
+          />
+          <EnvironmentPicker
+            projectId={projectId}
+            options={environmentOptions}
+            current={selectedEnvironment?.name ?? null}
+            label={tEnvPicker('label')}
+            optionLabels={environmentLabels}
+            nonProdNotice={tEnvPicker('nonProdNotice', { environment: environmentLabels[currentEnv] })}
           />
         </>
       }
