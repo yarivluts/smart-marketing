@@ -58,7 +58,7 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'ingest.write', { orgId, projectId })) {
     notFound();
   }
 

@@ -60,7 +60,7 @@ export default async function OnboardingPage({ params }: PageProps): Promise<Rea
 
   const { user, memberships, bindings } = await resolveOrgSessionContext(session);
   const membership = findActiveMembership(memberships, orgId);
-  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId })) {
+  if (!membership || !can(bindings, { type: 'user', id: user.id }, 'project.manage', { orgId, projectId })) {
     notFound();
   }
 
