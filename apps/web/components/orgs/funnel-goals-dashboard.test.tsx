@@ -166,6 +166,23 @@ describe('FunnelGoalsDashboard Component', () => {
       expect(screen.getByTestId('ask-copilot-btn')).toBeInTheDocument();
       expect(screen.getByTestId('kpi-overall-conversion')).toHaveTextContent('30%');
       expect(screen.getByTestId('proactive-recommendation-card')).toBeInTheDocument();
+      // 500 entrants is a real sample: no low-sample marker.
+      expect(screen.queryByTestId('kpi-overall-conversion-low-sample')).not.toBeInTheDocument();
+    });
+
+    /*
+      B22 (EasySign): its first real funnel had 4 entrants. The rate is real but must say how
+      little it rests on, and nothing may recommend acting on it.
+    */
+    it('marks a rate on a handful of people and raises no alert or recommendation on it', () => {
+      const tiny = { ...REAL_FUNNEL, steps: REAL_FUNNEL.steps.map((step, i) => ({ ...step, customerCount: [4, 2, 2][i] })) };
+      renderDashboard(buildFunnelGoalsCockpitData({ funnelOutcome: tiny, goals: [] }));
+
+      expect(screen.getByTestId('kpi-overall-conversion')).toHaveTextContent('50%');
+      expect(screen.getByTestId('kpi-overall-conversion-low-sample')).toHaveTextContent('Based on 4 people - too few to rely on');
+      expect(screen.queryByTestId('funnel-dropoff-alert-card')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('ask-copilot-btn')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('proactive-recommendation-card')).not.toBeInTheDocument();
     });
 
     it('supports 1-click execution of the proactive drop-off recommendation', async () => {

@@ -39,7 +39,9 @@ describe('VisualFunnelSteps Component', () => {
     expect(screen.getByTestId('count-signed')).toHaveTextContent('150 people');
 
     expect(screen.getByTestId('pct-viewed')).toHaveTextContent('40%');
-    expect(screen.getByTestId('dropoff-viewed')).toHaveTextContent('-60% drop-off');
+    expect(screen.getByTestId('dropoff-viewed')).toHaveTextContent('60% drop-off');
+    // B22: the arrow says "down"; a minus sign on top read as a double negative.
+    expect(screen.getByTestId('dropoff-viewed')).not.toHaveTextContent('-60%');
     expect(screen.getByTestId('bar-sent')).toHaveStyle({ width: '100%' });
     expect(screen.getByTestId('bar-signed')).toHaveStyle({ width: '30%' });
   });
@@ -59,7 +61,10 @@ describe('VisualFunnelSteps Component', () => {
     expect(screen.getByTestId('count-awareness')).toHaveTextContent('4 people');
     expect(screen.getByTestId('count-signup')).toHaveTextContent('2 people');
     expect(screen.getByText('Overall Conversion:').parentElement).toHaveTextContent('50%');
-    expect(screen.getByTestId('dropoff-signup')).toHaveTextContent('-50% drop-off');
+    expect(screen.getByTestId('dropoff-signup')).toHaveTextContent('50% drop-off');
+    expect(screen.getByTestId('dropoff-signup')).not.toHaveTextContent('-50%');
+    // B22: 4 entrants are too few for an alert or a Copilot suggestion, however large the drop.
+    expect(screen.queryByTestId('funnel-dropoff-alert-card')).not.toBeInTheDocument();
     expect(screen.getByTestId('dropoff-other')).toHaveTextContent('0% drop-off');
     expect(screen.getByTestId('dropoff-other')).not.toHaveTextContent('-0%');
     // Nothing above 100% anywhere on the card.
@@ -95,6 +100,12 @@ describe('VisualFunnelSteps Component', () => {
     renderWithIntl(<VisualFunnelSteps steps={STEPS} funnelName="EasySign" onAskCopilot={handleAskCopilot} />);
 
     expect(screen.getByTestId('funnel-dropoff-alert-card')).toBeInTheDocument();
+    // B22: the loss is named by both ends - the step people left from and the one they never reached.
+    const from = STEPS[0].stageLabel;
+    const worst = [...STEPS].slice(1).sort((a, b) => b.dropOffPercent - a.dropOffPercent)[0];
+    const to = worst.stageLabel;
+    expect(screen.getByTestId('funnel-dropoff-alert-card')).toHaveTextContent(`did not go on to "${to}"`);
+    expect(screen.getByTestId('funnel-dropoff-alert-card')).toHaveTextContent(new RegExp(`reached "(${from}|${STEPS[STEPS.indexOf(worst) - 1].stageLabel})"`));
     fireEvent.click(screen.getByTestId('ask-copilot-btn'));
     expect(handleAskCopilot).toHaveBeenCalledTimes(1);
   });

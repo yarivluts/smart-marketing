@@ -25,6 +25,7 @@ import type {
   UnifiedGoalItem,
   WarehouseSectionKind,
 } from '@/lib/orgs/funnel-goals-synthesizer';
+import { MIN_FUNNEL_ENTRANTS_FOR_ALERT } from '@/lib/orgs/funnel-goals-synthesizer';
 
 export interface FunnelGoalsDashboardProps {
   orgId: string;
@@ -195,6 +196,12 @@ export function FunnelGoalsDashboard({
           <div className="mt-2 text-xl font-bold text-foreground" dir="ltr" data-testid="kpi-overall-conversion">
             {pct(summary.overallFunnelConversionPct)}
           </div>
+          {/* B22: a rate on 4 people looks exactly like a rate on 40,000 unless it says otherwise. */}
+          {summary.funnelEntrants !== null && summary.funnelEntrants > 0 && summary.funnelEntrants < MIN_FUNNEL_ENTRANTS_FOR_ALERT ? (
+            <span className="mt-1 text-[11px] text-amber-600 dark:text-amber-400" data-testid="kpi-overall-conversion-low-sample">
+              {t('kpiLowSample', { count: summary.funnelEntrants })}
+            </span>
+          ) : null}
         </div>
 
         {/* Goals on Track - out of the goals that were actually measured */}

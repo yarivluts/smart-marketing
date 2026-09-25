@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   ArrowDownRight,
 } from 'lucide-react';
-import { overallConversionPercent, type FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
+import { funnelSupportsDropOffAlert, largestDropOff, overallConversionPercent, type FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
 
 export interface VisualFunnelStepsProps {
   /** The project's own measured funnel steps. Must be non-empty - an absent funnel is the caller's empty state, never a sample. */
@@ -40,13 +40,11 @@ export function VisualFunnelSteps({
   const totalCompleted = steps[steps.length - 1]?.customerCount ?? 0;
   const overallConversion = overallConversionPercent(steps);
 
-  // Find biggest drop-off stage
-  let highestDropOffStep: FunnelStepItem | null = null;
-  for (let i = 1; i < steps.length; i++) {
-    if (!highestDropOffStep || steps[i].dropOffPercent > highestDropOffStep.dropOffPercent) {
-      highestDropOffStep = steps[i];
-    }
-  }
+  // The largest loss between two consecutive steps, named by both ends (B22). The alert needs a
+  // real sample: on a handful of entrants a drop-off is noise, not a reason to act.
+  const drop = largestDropOff(steps);
+  const highestDropOffStep: FunnelStepItem | null = drop?.to ?? null;
+  const showDropOffAlert = drop !== null && drop.percent >= 40 && funnelSupportsDropOffAlert(steps);
 
   return (
     <div
@@ -166,8 +164,8 @@ export function VisualFunnelSteps({
                     dir="ltr"
                   >
                     <ArrowDownRight className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    {/* A sign only on a real loss: "-0%" read as a negative drop-off. */}
-                    <span>{`${step.dropOffPercent > 0 ? '-' : ''}${step.dropOffPercent}% ${t('dropOffLabel')}`}</span>
+                    {/* The arrow already says "down"; a minus sign on top read as "-50% drop-off" (B22). */}
+                    <span>{`${step.dropOffPercent}% ${t('dropOffLabel')}`}</span>
                   </div>
                 )}
               </div>
@@ -177,7 +175,7 @@ export function VisualFunnelSteps({
       </div>
 
       {/* Proactive In-Context Drop-off AI Recommendation Card */}
-      {highestDropOffStep && highestDropOffStep.dropOffPercent >= 40 && (
+      {showDropOffAlert && drop && (
         <div
           data-testid="funnel-dropoff-alert-card"
           className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-xl border border-amber-300/80 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 dark:border-amber-800/60"
@@ -192,8 +190,9 @@ export function VisualFunnelSteps({
               </span>
               <p className="text-xs text-foreground/80 leading-relaxed mt-0.5">
                 {t('dropoffAlertMessage', {
-                  stage: highestDropOffStep.stageLabel,
-                  percent: highestDropOffStep.dropOffPercent,
+                  from: drop.from.stageLabel,
+                  to: drop.to.stageLabel,
+                  percent: drop.percent,
                 })}
               </p>
             </div>

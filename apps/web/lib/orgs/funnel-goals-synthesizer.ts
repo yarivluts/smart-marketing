@@ -167,6 +167,8 @@ export type WarehouseSectionKind =
  */
 export interface FunnelGoalsExecutiveSummary {
   overallFunnelConversionPct: number | null;
+  /** How many people entered the funnel (its first step), or null without a measured funnel - so a rate on a handful of people can say so (B22). */
+  funnelEntrants: number | null;
   topFunnelDropOffPct: number | null;
   activeGoalsCount: number;
   goalsMeasuredCount: number;
@@ -324,6 +326,34 @@ export function buildVisualFunnelData(
     biggestDropOffPercent,
     steps,
   };
+}
+
+/**
+ * The fewest people who must enter a funnel before GrowthOS raises a drop-off alert or recommends
+ * acting on it (B22). A drop-off measured on a handful of people - EasySign's first real funnel had
+ * 4 - is noise; recommending a retargeting campaign on it is advice built on nothing.
+ */
+export const MIN_FUNNEL_ENTRANTS_FOR_ALERT = 100;
+
+/**
+ * The single largest loss between two consecutive steps, named by BOTH ends (B22). The loss at step
+ * i is the share of people who reached step i-1 and did not go on to step i; describing it as a
+ * property of step i alone read as "people who reach signup do not continue past it", which blamed
+ * the step after the actual leak.
+ */
+export function largestDropOff(steps: readonly FunnelStepItem[]): { from: FunnelStepItem; to: FunnelStepItem; percent: number } | null {
+  let best: { from: FunnelStepItem; to: FunnelStepItem; percent: number } | null = null;
+  for (let i = 1; i < steps.length; i++) {
+    if (steps[i].dropOffPercent > 0 && (!best || steps[i].dropOffPercent > best.percent)) {
+      best = { from: steps[i - 1], to: steps[i], percent: steps[i].dropOffPercent };
+    }
+  }
+  return best;
+}
+
+/** Whether a funnel has enough entrants for its drop-off to support an alert or recommendation. */
+export function funnelSupportsDropOffAlert(steps: readonly FunnelStepItem[]): boolean {
+  return (steps[0]?.customerCount ?? 0) >= MIN_FUNNEL_ENTRANTS_FOR_ALERT;
 }
 
 /** The progress fields of an item whose progress was not measured. */
@@ -555,29 +585,28 @@ export function buildFunnelGoalsCockpitData(params: {
     The dashboard puts an Apply button on it that POSTs to the real automation endpoint, so a
     recommendation needs a real funnel with a real worst step; without one it is null.
   */
-  const worstStep =
-    funnelSteps.length > 0 ? [...funnelSteps].sort((a, b) => b.dropOffPercent - a.dropOffPercent)[0] : null;
+  const drop = funnelSupportsDropOffAlert(funnelSteps) ? largestDropOff(funnelSteps) : null;
 
-  const proactiveRecommendation: ProactiveFunnelGoalRecommendation | null =
-    worstStep && worstStep.dropOffPercent > 0
-      ? {
-          id: `rec-funnel-${worstStep.stageKey}`,
-          category: 'funnel_dropoff',
-          title: `Largest drop-off at ${worstStep.stageLabel}`,
-          description: `${worstStep.dropOffPercent}% of the visitors who reach "${worstStep.stageLabel}" do not continue past it.`,
-          beforeDiff: `${worstStep.dropOffPercent}% drop-off`,
-          afterDiff: 'Retargeting campaign draft',
-          // No projected impact: projecting one needs a model of the intervention's effect.
-          projectedImpact: '',
-          actionType: 'funnel_optimization',
-          targetId: `funnel_${worstStep.stageKey}`,
-          targetLabel: worstStep.stageLabel,
-        }
-      : null;
+  const proactiveRecommendation: ProactiveFunnelGoalRecommendation | null = drop
+    ? {
+        id: `rec-funnel-${drop.to.stageKey}`,
+        category: 'funnel_dropoff',
+        title: `Largest drop-off: ${drop.from.stageLabel} to ${drop.to.stageLabel}`,
+        description: `${drop.percent}% of the people who reached "${drop.from.stageLabel}" did not go on to "${drop.to.stageLabel}".`,
+        beforeDiff: `${drop.percent}% drop-off`,
+        afterDiff: 'Retargeting campaign draft',
+        // No projected impact: projecting one needs a model of the intervention's effect.
+        projectedImpact: '',
+        actionType: 'funnel_optimization',
+        targetId: `funnel_${drop.to.stageKey}`,
+        targetLabel: drop.to.stageLabel,
+      }
+    : null;
 
   return {
     summary: {
       overallFunnelConversionPct: overallConversionPct,
+      funnelEntrants: visualFunnel.kind === 'ok' ? visualFunnel.totalStarted : null,
       topFunnelDropOffPct,
       activeGoalsCount: goalsSummary.totalGoalsCount,
       goalsMeasuredCount: goalsSummary.measuredGoalsCount,
