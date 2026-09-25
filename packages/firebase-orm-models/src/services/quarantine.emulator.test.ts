@@ -36,7 +36,8 @@ async function setupProject(orgName: string) {
   const { organization } = await createOrganizationWithOwner({ name: orgName, ownerUserId: owner.id });
   const { project, environments } = await createProject({ organizationId: organization.id, name: 'Website' });
   const prodEnvironment = environments.find((e) => e.name === 'prod')!;
-  return { owner, organization, project, prodEnvironment };
+  const devEnvironment = environments.find((e) => e.name === 'dev')!;
+  return { owner, organization, project, prodEnvironment, devEnvironment };
 }
 
 describe('ingestBatch — durable quarantine records', () => {
@@ -437,5 +438,34 @@ describe('getIngestBatch after replay', () => {
       { client_id: 'e-immutable', status: 'quarantined', reasons: ['unregistered_field:referrer'] },
     ]);
     expect(batch?.quarantined_count).toBe(1);
+  });
+});
+
+describe('listQuarantinedRecordsForProject environment scoping (KAN-196)', () => {
+  it('returns only the named environment\'s quarantined records when environmentId is passed, and every environment\'s when omitted', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Quarantine Env Scope Org');
+
+    // No schema is registered, so both records quarantine as `schema_not_registered`.
+    await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: prodEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: 'e-prod', event: 'signup', ts: '2026-07-07T10:00:00Z' }] },
+    });
+    await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      input: { kind: 'event', records: [{ event_id: 'e-dev', event: 'signup', ts: '2026-07-07T10:01:00Z' }] },
+    });
+
+    const devOnly = await listQuarantinedRecordsForProject(organization.id, project.id, undefined, devEnvironment.id);
+    expect(devOnly.map((record) => record.client_id)).toEqual(['e-dev']);
+
+    const prodOnly = await listQuarantinedRecordsForProject(organization.id, project.id, undefined, prodEnvironment.id);
+    expect(prodOnly.map((record) => record.client_id)).toEqual(['e-prod']);
+
+    const everyEnvironment = await listQuarantinedRecordsForProject(organization.id, project.id);
+    expect(everyEnvironment.map((record) => record.client_id).sort()).toEqual(['e-dev', 'e-prod']);
   });
 });

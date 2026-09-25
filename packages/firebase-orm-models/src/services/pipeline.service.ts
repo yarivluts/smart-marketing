@@ -532,15 +532,20 @@ export async function listRecentDunningSubscriptionsForProject(
  * sits `queued` for the instant between publish and land (`ingestBatch` lands its own batch
  * synchronously), so anything showing up here has been stuck — e.g. the process crashed between
  * publish and land — and never got a `delivered`/`failed` terminal status. Oldest first, so the
- * longest-stuck messages are the ones an operator sees first.
+ * longest-stuck messages are the ones an operator sees first. `environmentId` (KAN-196's project
+ * environment picker) narrows the list to one environment; omitted, every environment is folded in.
  */
 export async function listQueuedPipelineMessagesForProject(
   organizationId: string,
   projectId: string,
   limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
+  environmentId?: string,
 ): Promise<PipelineMessageModel[]> {
-  return PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  let query = PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId }).query();
+  if (environmentId !== undefined) {
+    query = query.where('environment_id', '==', environmentId);
+  }
+  return query
     .where('status', '==', 'queued')
     .orderBy('enqueued_at')
     .limit(Math.min(limit, MAX_PIPELINE_DRAIN_BATCH_SIZE))
@@ -590,15 +595,20 @@ export async function sweepQueuedPipelineMessagesForProject(
 /**
  * The pipeline's dead-letter queue (KAN-34): every message a `landMessage` attempt has given up on,
  * across every environment in a project — same "fold every environment into one admin view" posture as
- * `listRecentIngestBatchesForProject`/`listApiKeysForProject`. Newest first.
+ * `listRecentIngestBatchesForProject`/`listApiKeysForProject`. Newest first. `environmentId` (KAN-196's
+ * project environment picker) narrows the list to one environment; omitted, every environment is folded in.
  */
 export async function listFailedPipelineMessagesForProject(
   organizationId: string,
   projectId: string,
   limit: number = MAX_PIPELINE_DRAIN_BATCH_SIZE,
+  environmentId?: string,
 ): Promise<PipelineMessageModel[]> {
-  return PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  let query = PipelineMessageModel.initPath({ organization_id: organizationId, project_id: projectId }).query();
+  if (environmentId !== undefined) {
+    query = query.where('environment_id', '==', environmentId);
+  }
+  return query
     .where('status', '==', 'failed')
     .orderBy('enqueued_at', 'desc')
     .limit(Math.min(limit, MAX_PIPELINE_DRAIN_BATCH_SIZE))

@@ -168,7 +168,7 @@ function toDateOnly(ms: number): string {
 export async function getCampaignSpendBreakdownForProject(
   organizationId: string,
   projectId: string,
-  options?: { now?: number; executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+  options?: { now?: number; executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache; environmentId?: string },
 ): Promise<CampaignSpendBreakdownOutcome> {
   const now = options?.now ?? Date.now();
   const windowStartMs = now - CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
@@ -185,6 +185,7 @@ export async function getCampaignSpendBreakdownForProject(
         },
         ...(options?.executor ? { executor: options.executor } : {}),
         ...(options?.cache ? { cache: options.cache } : {}),
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
       }),
       listCampaignTargetsForProject(organizationId, projectId),
     ]);
@@ -272,7 +273,7 @@ function sumMetricRows(rows: readonly WarehouseRow[], metricName: string): numbe
 export async function getPaybackOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache; environmentId?: string },
 ): Promise<PaybackOverviewOutcome> {
   try {
     const result = await queryMetrics({
@@ -285,6 +286,7 @@ export async function getPaybackOverviewForProject(
       },
       ...(options?.executor ? { executor: options.executor } : {}),
       ...(options?.cache ? { cache: options.cache } : {}),
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
     });
 
     const windows = COLLECTION_WINDOW_DAYS.map((windowDays) => ({
@@ -361,7 +363,7 @@ function toCampaignPaybackRow(row: WarehouseRow): CampaignPaybackRow | null {
 export async function getCampaignPaybackBreakdownForProject(
   organizationId: string,
   projectId: string,
-  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache; environmentId?: string },
 ): Promise<CampaignPaybackBreakdownOutcome> {
   try {
     const result = await queryMetrics({
@@ -374,6 +376,7 @@ export async function getCampaignPaybackBreakdownForProject(
       },
       ...(options?.executor ? { executor: options.executor } : {}),
       ...(options?.cache ? { cache: options.cache } : {}),
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
     });
 
     const rows = result.series.map(toCampaignPaybackRow).filter((row): row is CampaignPaybackRow => row !== null);
@@ -461,7 +464,7 @@ function foldCalibrationTierTotals(rows: readonly WarehouseRow[]): Map<string, Q
 export async function getQualityCalibrationBreakdownForProject(
   organizationId: string,
   projectId: string,
-  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache },
+  options?: { executor?: WarehouseQueryExecutor; cache?: MetricQueryResultCache; environmentId?: string },
 ): Promise<QualityCalibrationBreakdownOutcome> {
   try {
     const result = await queryMetrics({
@@ -474,6 +477,7 @@ export async function getQualityCalibrationBreakdownForProject(
       },
       ...(options?.executor ? { executor: options.executor } : {}),
       ...(options?.cache ? { cache: options.cache } : {}),
+      ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
     });
 
     const totalsByTier = foldCalibrationTierTotals(result.series);
