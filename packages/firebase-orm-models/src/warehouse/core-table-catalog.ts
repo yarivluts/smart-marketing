@@ -99,6 +99,7 @@ export const CORE_TABLE_CATALOG: Readonly<Record<string, CoreTableColumns>> = Ob
     channel_id: 'STRING',
     campaign_id: 'STRING',
     landing_page: 'STRING',
+    via_identity: 'BOOL',
     credit: 'FLOAT64',
   }),
   fact_cancellation_reason: table({

@@ -111,6 +111,14 @@ models:
           The crediting touchpoint's captured entry URL, or null when that
           touchpoint carried none (and always null for `unattributed`
           rows). Deliberately not coalesced here — see the model's doc comment.
+      - name: via_identity
+        description: >
+          True when the crediting touchpoint was reached through the
+          customer's resolved identity (bridge_identity), false when only
+          through the conversion's own anon_id or when unattributed.
+          Landing-page performance counts only the true rows as conversions.
+        tests:
+          - not_null
       - name: credit
         tests:
           - not_null
