@@ -143,6 +143,10 @@
     "staging": "בדיקות",
     "prod": "ייצור"
   },
+  "EnvironmentPicker": {
+    "label": "צפייה בנתוני",
+    "nonProdNotice": "מוצגים נתוני {environment}, לא נתוני ייצור. דפים שאינם תומכים בבחירת סביבה עדיין מציגים נתוני ייצור."
+  },
   "Members": {
     "roleAndStatus": "{role} ({status})",
     "statusLabel": "({status})",

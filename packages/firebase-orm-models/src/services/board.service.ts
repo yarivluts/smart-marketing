@@ -495,6 +495,11 @@ export interface QueryBoardTilesParams {
   board: Pick<BoardModel, 'date_range' | 'compare' | 'global_filters' | 'tiles'>;
   executor?: WarehouseQueryExecutor;
   cache?: MetricQueryResultCache;
+  /**
+   * The environment every tile counts (KAN-196's project environment picker). Omitted, the
+   * project's default (`prod`) environment is resolved once and shared across every tile.
+   */
+  environmentId?: string;
 }
 
 /**
@@ -531,7 +536,7 @@ export async function queryBoardTiles(params: QueryBoardTilesParams): Promise<Bo
   const [quota, metricDefs, environment] = await Promise.all([
     getProjectCostQuota(params.organizationId, params.projectId, project),
     listMetricDefinitionsForProject(params.organizationId, params.projectId),
-    resolveDefaultQueryEnvironment(params.organizationId, params.projectId),
+    params.environmentId !== undefined ? Promise.resolve({ id: params.environmentId }) : resolveDefaultQueryEnvironment(params.organizationId, params.projectId),
   ]);
   const precomputedActiveMetricDefsByName = new Map(metricDefs.filter((def) => def.status === 'active').map((def) => [def.name, def] as const));
 

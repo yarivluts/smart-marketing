@@ -47,15 +47,21 @@ export async function listActiveTrackingAlertsForProject(
 
 /**
  * A project's tracking-alert history (active and resolved episodes), ordered
- * by most-recently-checked first.
+ * by most-recently-checked first. `environmentId` (KAN-196's project
+ * environment picker) narrows it to one environment's alerts; omitted, every
+ * environment's alerts are returned together.
  */
 export async function listTrackingAlertsForProject(
   organizationId: string,
   projectId: string,
   limit: number = DEFAULT_TRACKING_ALERT_LIST_LIMIT,
+  environmentId?: string,
 ): Promise<TrackingAlertModel[]> {
-  return TrackingAlertModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  let query = TrackingAlertModel.initPath({ organization_id: organizationId, project_id: projectId }).query();
+  if (environmentId !== undefined) {
+    query = query.where('environment_id', '==', environmentId);
+  }
+  return query
     .orderBy('last_checked_at', 'desc')
     .limit(limit)
     .get();
@@ -152,20 +158,27 @@ async function computeEventVolumeEntry(
  * skip a redundant re-fetch of the same collection — the same
  * `precomputedQuota` pass-through pattern `checkProjectQueryQuota` (KAN-39)
  * already established for its own equivalent duplicate-fetch.
+ *
+ * `environmentId` (KAN-196's project environment picker) restricts the
+ * overview to that one environment's entries; omitted, every environment of
+ * the project gets its own entries, as before.
  */
 export async function getEventVolumeOverviewForProject(
   organizationId: string,
   projectId: string,
-  options?: { now?: number; windowDays?: number; precomputedSchemaDefs?: SchemaDefModel[] },
+  options?: { now?: number; windowDays?: number; precomputedSchemaDefs?: SchemaDefModel[]; environmentId?: string },
 ): Promise<EventVolumeOverviewEntry[]> {
   await requireProjectInOrg(organizationId, projectId);
   const now = options?.now ?? Date.now();
   const windowDays = options?.windowDays ?? DEFAULT_EVENT_VOLUME_WINDOW_DAYS;
 
-  const [schemaDefs, environments] = await Promise.all([
+  const [schemaDefs, projectEnvironments] = await Promise.all([
     options?.precomputedSchemaDefs ? Promise.resolve(options.precomputedSchemaDefs) : listSchemaDefinitionsForProject(organizationId, projectId),
     listEnvironmentsForProject(organizationId, projectId),
   ]);
+  const environmentId = options?.environmentId;
+  const environments =
+    environmentId === undefined ? projectEnvironments : projectEnvironments.filter((environment) => environment.id === environmentId);
   const eventNames = activeSchemaNamesForKind(schemaDefs, 'event');
 
   const entries = await Promise.all(

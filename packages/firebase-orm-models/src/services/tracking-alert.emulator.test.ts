@@ -384,3 +384,34 @@ describe('getEventVolumeOverviewForProject', () => {
     expect(prodEntry?.dailyCounts.every((bucket) => bucket.count === 0)).toBe(true);
   });
 });
+
+describe('tracking-alert reads: environment scoping (KAN-196)', () => {
+  it('listTrackingAlertsForProject returns only the named environment\'s alerts when environmentId is passed, and every environment\'s when omitted', async () => {
+    const { owner, organization, project, environmentId: devEnvironmentId, prodEnvironmentId } = await setupOrgWithProject('Tracking Alert Env Scope Org');
+    await registerEventSchema(organization.id, project.id, 'signup', owner.id);
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId: devEnvironmentId, schemaName: 'signup', landedAt: TWO_HOURS_AGO });
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId: prodEnvironmentId, schemaName: 'signup', landedAt: TWO_HOURS_AGO });
+    await checkTrackingAlertsForProject({ organizationId: organization.id, projectId: project.id, now: NOW });
+
+    const devOnly = await listTrackingAlertsForProject(organization.id, project.id, undefined, devEnvironmentId);
+    expect(devOnly.map((alert) => alert.environment_id)).toEqual([devEnvironmentId]);
+
+    const everyEnvironment = await listTrackingAlertsForProject(organization.id, project.id);
+    expect(everyEnvironment.map((alert) => alert.environment_id).sort()).toEqual([devEnvironmentId, prodEnvironmentId].sort());
+  });
+
+  it('getEventVolumeOverviewForProject returns only the named environment\'s entries when environmentId is passed, and one per environment when omitted', async () => {
+    const { owner, organization, project, environments, environmentId: devEnvironmentId, prodEnvironmentId } = await setupOrgWithProject('Event Volume Env Scope Org');
+    await registerEventSchema(organization.id, project.id, 'signup', owner.id);
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId: devEnvironmentId, schemaName: 'signup', landedAt: TEN_MINUTES_AGO });
+    await landRawRecord({ organizationId: organization.id, projectId: project.id, environmentId: prodEnvironmentId, schemaName: 'signup', landedAt: TWO_HOURS_AGO });
+
+    const devOnly = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7, environmentId: devEnvironmentId });
+    expect(devOnly).toHaveLength(1);
+    expect(devOnly[0].environmentId).toBe(devEnvironmentId);
+    expect(devOnly[0].lastSeenAt).toBe(TEN_MINUTES_AGO);
+
+    const everyEnvironment = await getEventVolumeOverviewForProject(organization.id, project.id, { now: NOW, windowDays: 7 });
+    expect(everyEnvironment).toHaveLength(environments.length);
+  });
+});

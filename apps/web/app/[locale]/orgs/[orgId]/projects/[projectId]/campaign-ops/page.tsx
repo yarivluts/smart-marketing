@@ -14,6 +14,7 @@ import {
   listOrgProjects,
   listPluginInstallsForProject,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
 import { campaignSpendStatusLabelKey } from '@/lib/orgs/campaign-ops-view';
 import { signupQualityScoreTierLabelKey } from '@/lib/orgs/quality-score-view';
@@ -70,11 +71,14 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
   const installViews = installs.map(toPluginInstallView);
   const paybackPackInstalled = hasActiveInstall(installViews, CAMPAIGN_OPS_PACK_PLUGIN_ID);
 
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
   const [paybackOutcome, campaignPaybackOutcome, spendOutcome, calibrationOutcome] = await Promise.all([
-    paybackPackInstalled ? getPaybackOverviewForProject(orgId, projectId) : Promise.resolve(null),
-    paybackPackInstalled ? getCampaignPaybackBreakdownForProject(orgId, projectId) : Promise.resolve(null),
-    getCampaignSpendBreakdownForProject(orgId, projectId),
-    paybackPackInstalled ? getQualityCalibrationBreakdownForProject(orgId, projectId) : Promise.resolve(null),
+    paybackPackInstalled ? getPaybackOverviewForProject(orgId, projectId, environmentScope) : Promise.resolve(null),
+    paybackPackInstalled ? getCampaignPaybackBreakdownForProject(orgId, projectId, environmentScope) : Promise.resolve(null),
+    getCampaignSpendBreakdownForProject(orgId, projectId, environmentScope),
+    paybackPackInstalled ? getQualityCalibrationBreakdownForProject(orgId, projectId, environmentScope) : Promise.resolve(null),
   ]);
 
   const t = await getTranslations('CampaignOps');

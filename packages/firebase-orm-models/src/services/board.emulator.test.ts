@@ -14,6 +14,7 @@ import {
   KNOWN_UNBUILT_WAREHOUSE_TABLES,
   listAuditLogEntriesForOrg,
   listBoardsForProject,
+  listEnvironmentsForProject,
   ProjectNotFoundError,
   queryBoardTile,
   queryBoardTiles,
@@ -909,5 +910,40 @@ describe('queryBoardTiles', () => {
         board: { date_range: { start: '2026-01-01', end: '2026-01-07', grain: 'day' }, compare: null, global_filters: [], tiles: [] },
       }),
     ).rejects.toThrow(ProjectNotFoundError);
+  });
+});
+
+describe('queryBoardTiles environment scoping (KAN-196)', () => {
+  it('queries every tile against the prod environment by default and against a caller-passed environment when one is given', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Board Env Scope Org');
+    await registerAdSpend(organization.id, project.id, owner.id);
+    await registerSignups(organization.id, project.id, owner.id);
+    const created = await createBoard({ organizationId: organization.id, projectId: project.id, name: 'Marketing', createdByUserId: owner.id });
+    await saveBoardTiles({
+      organizationId: organization.id,
+      projectId: project.id,
+      boardId: created.id,
+      tiles: [bigNumberTile({ metricNames: ['ad_spend'], title: 'Ad spend' }), bigNumberTile({ metricNames: ['signups'], title: 'Signups' })],
+      updatedByUserId: owner.id,
+    });
+    const board = (await getBoard(organization.id, project.id, created.id))!;
+    const environments = await listEnvironmentsForProject(organization.id, project.id);
+    const prodEnv = environments.find((environment) => environment.name === 'prod')!;
+    const stagingEnv = environments.find((environment) => environment.name === 'staging')!;
+
+    const capturedEnvironmentIds: unknown[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        capturedEnvironmentIds.push(query.params.tenant_environment_id);
+        return Promise.resolve([]);
+      },
+    };
+
+    await queryBoardTiles({ organizationId: organization.id, projectId: project.id, board, executor, cache: new InMemoryMetricQueryResultCache() });
+    expect(capturedEnvironmentIds).toEqual([prodEnv.id, prodEnv.id]);
+
+    capturedEnvironmentIds.length = 0;
+    await queryBoardTiles({ organizationId: organization.id, projectId: project.id, board, executor, cache: new InMemoryMetricQueryResultCache(), environmentId: stagingEnv.id });
+    expect(capturedEnvironmentIds).toEqual([stagingEnv.id, stagingEnv.id]);
   });
 });

@@ -7,7 +7,8 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { DEFAULT_RECORD_FEED_LIMIT, RECORD_FIELD_FILTER_CANDIDATE_WINDOW } from '@growthos/firebase-orm-models';
 import { splitOverFetchedFeed } from '@/lib/orgs/capped-list-view';
-import { listEnvironmentsForProject, listOrgProjects, listRecentRecordsForSchema, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
+import { listOrgProjects, listRecentRecordsForSchema, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { toRecordFeedEntryView } from '@/lib/orgs/record-feed-view';
 import { Link } from '@/i18n/navigation';
 
@@ -52,10 +53,10 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
     notFound();
   }
 
-  const [projects, schemaDefs, environments] = await Promise.all([
+  const [projects, schemaDefs, { selected: selectedEnvironment, environments }] = await Promise.all([
     listOrgProjects(orgId),
     listSchemaDefinitionsForProject(orgId, projectId),
-    listEnvironmentsForProject(orgId, projectId),
+    resolveSelectedEnvironment(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -75,7 +76,7 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
   // a different question from the FILTER WINDOW below: this measures "are there
   // more records than we show", the window is "how far back did we look at all".
   const records = selectedSchemaName
-    ? await listRecentRecordsForSchema(orgId, projectId, 'event', selectedSchemaName, fieldFilter, DEFAULT_RECORD_FEED_LIMIT + 1)
+    ? await listRecentRecordsForSchema(orgId, projectId, 'event', selectedSchemaName, fieldFilter, DEFAULT_RECORD_FEED_LIMIT + 1, selectedEnvironment?.id)
     : [];
   const recordPage = splitOverFetchedFeed(records, DEFAULT_RECORD_FEED_LIMIT);
   const entries = recordPage.rows.map((record) => toRecordFeedEntryView(record, selectedSchemaDef?.field_defs ?? []));

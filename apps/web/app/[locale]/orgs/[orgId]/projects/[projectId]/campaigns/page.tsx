@@ -12,6 +12,7 @@ import {
   listSharedCredentials,
   getCampaignSpendBreakdownForProject,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
   findCampaignDraftForTarget,
   toAutomationConnectionOptions,
@@ -59,9 +60,12 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
     notFound();
   }
 
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
   let spendOutcome: CampaignSpendBreakdownOutcome | null = null;
   try {
-    spendOutcome = await getCampaignSpendBreakdownForProject(orgId, projectId);
+    spendOutcome = await getCampaignSpendBreakdownForProject(orgId, projectId, environmentScope);
   } catch {
     spendOutcome = null;
   }

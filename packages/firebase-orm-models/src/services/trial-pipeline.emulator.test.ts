@@ -6,6 +6,7 @@ import {
   ensureUserForFirebaseSession,
   getTrialPipelineSummary,
   InMemoryMetricQueryResultCache,
+  listEnvironmentsForProject,
   registerMetricDefinition,
   setProjectCostQuota,
   type WarehouseQueryExecutor,
@@ -294,5 +295,28 @@ describe('getTrialPipelineSummary', () => {
 
     expect(outcome).toEqual({ ok: true, series: rows });
     expect(executor.callCount).toBe(1);
+  });
+});
+
+describe('getTrialPipelineSummary environment scoping (KAN-196)', () => {
+  it('queries the prod environment by default and a caller-passed environment when one is given', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Trial Pipeline Env Scope Org');
+    await registerTrialPipelineMetrics(organization.id, project.id, owner.id);
+    const environments = await listEnvironmentsForProject(organization.id, project.id);
+    const prodEnv = environments.find((environment) => environment.name === 'prod')!;
+    const devEnv = environments.find((environment) => environment.name === 'dev')!;
+
+    const capturedEnvironmentIds: unknown[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        capturedEnvironmentIds.push(query.params.tenant_environment_id);
+        return Promise.resolve([]);
+      },
+    };
+
+    await getTrialPipelineSummary({ organizationId: organization.id, projectId: project.id, executor, cache: new InMemoryMetricQueryResultCache() });
+    await getTrialPipelineSummary({ organizationId: organization.id, projectId: project.id, executor, cache: new InMemoryMetricQueryResultCache(), environmentId: devEnv.id });
+
+    expect(capturedEnvironmentIds).toEqual([prodEnv.id, devEnv.id]);
   });
 });

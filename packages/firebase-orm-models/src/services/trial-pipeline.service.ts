@@ -46,6 +46,8 @@ export interface GetTrialPipelineSummaryParams {
   executor?: WarehouseQueryExecutor;
   /** Defaults to {@link defaultMetricQueryResultCache} — overridable per-call for the same reason as `executor`. */
   cache?: MetricQueryResultCache;
+  /** The environment the widget counts (KAN-196's project environment picker). Omitted, `queryMetrics` resolves the project's `prod` one. */
+  environmentId?: string;
 }
 
 /**
@@ -77,6 +79,7 @@ export async function getTrialPipelineSummary(params: GetTrialPipelineSummaryPar
       request,
       ...(params.executor ? { executor: params.executor } : {}),
       ...(params.cache ? { cache: params.cache } : {}),
+      ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
     });
     return { ok: true, series: result.series };
   } catch (error) {

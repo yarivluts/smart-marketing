@@ -13,6 +13,7 @@ import {
   InvalidGoalError,
   KNOWN_UNBUILT_WAREHOUSE_TABLES,
   listAuditLogEntriesForOrg,
+  listEnvironmentsForProject,
   listGoalsForProject,
   ProjectNotFoundError,
   queryGoalProgress,
@@ -1092,5 +1093,43 @@ describe('queryGoalProgress', () => {
     // Never reaches the warehouse — an inverted [start_date, asOfDate] range
     // would otherwise throw a `MetricCompilerError` (`deriveTimeWindows`).
     expect(executor.callCount).toBe(0);
+  });
+});
+
+describe('queryGoalProgress environment scoping (KAN-196)', () => {
+  it('counts the prod environment by default and a caller-passed environment when one is given', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Env Scope Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Signups goal',
+      metricName: 'signups',
+      direction: 'maximize',
+      targetValue: 100,
+      startDate: '2026-01-01',
+      deadline: '2026-01-11',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+    const environments = await listEnvironmentsForProject(organization.id, project.id);
+    const prodEnv = environments.find((environment) => environment.name === 'prod')!;
+    const devEnv = environments.find((environment) => environment.name === 'dev')!;
+
+    const capturedEnvironmentIds: unknown[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        capturedEnvironmentIds.push(query.params.tenant_environment_id);
+        return Promise.resolve([]);
+      },
+    };
+    const cache = new InMemoryMetricQueryResultCache();
+
+    await queryGoalProgress({ organizationId: organization.id, projectId: project.id, goal, executor, cache, asOfDate: '2026-01-06' });
+    await queryGoalProgress({ organizationId: organization.id, projectId: project.id, goal, executor, cache, asOfDate: '2026-01-06', environmentId: devEnv.id });
+
+    expect(capturedEnvironmentIds).toEqual([prodEnv.id, devEnv.id]);
   });
 });

@@ -80,14 +80,13 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     // KAN-36: the registered event schema shows up in the volume/tracking-alerts
     // section, honestly reporting "never received a record" since this test never
     // ingests any real data — and a manual "Check now" leaves it that way (nothing
-    // to have "broken" yet). Every project gets a dev/staging/prod environment, and
-    // tracking is scoped per environment, so the sparkline list has one
-    // "<schemaName> (<environment>)" row per environment — scope to the `dev` row
-    // (first alphabetically) rather than asserting on the page as a whole, since
-    // "Never received a record." legitimately repeats once per environment row.
-    const devEventVolumeRow = page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev\)/ });
-    await expect(devEventVolumeRow).toBeVisible();
-    await expect(devEventVolumeRow.getByText('Never received a record.')).toBeVisible();
+    // to have "broken" yet). Tracking is scoped per environment, and the page shows
+    // the environment picked in the project shell (KAN-196) — prod by default — so
+    // the sparkline list has one "<schemaName> (<environment>)" row, the prod one.
+    const prodEventVolumeRow = page.getByRole('listitem').filter({ hasText: /^order_completed \(Prod\)/ });
+    await expect(prodEventVolumeRow).toBeVisible();
+    await expect(prodEventVolumeRow.getByText('Never received a record.')).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev\)/ })).toHaveCount(0);
     await expect(page.getByText('No tracking alerts for this project yet.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Check now' }).click();
@@ -104,5 +103,14 @@ test.describe('Schema Registry: register v1, evolve to v2, breaking change rejec
     await expect(page.getByText('The touchpoint schema is registered for this project.')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('button', { name: 'Set up touchpoint capture' })).toHaveCount(0);
     await expect(page.getByText('event: touchpoint')).toBeVisible();
+
+    // KAN-196: picking another environment in the project shell's picker re-scopes the
+    // page to it (a cookie + router refresh, no navigation), with a visible non-prod notice.
+    await expect(page.getByRole('radio', { name: 'Prod' })).toHaveAttribute('aria-checked', 'true');
+    await page.getByRole('radio', { name: 'Dev' }).click();
+    await expect(page.getByRole('radio', { name: 'Dev' })).toHaveAttribute('aria-checked', 'true', { timeout: 15_000 });
+    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Dev\)/ })).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: /^order_completed \(Prod\)/ })).toHaveCount(0);
+    await expect(page.getByText(/^Showing Dev data, not production\./)).toBeVisible();
   });
 });

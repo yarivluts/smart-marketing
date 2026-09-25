@@ -15,6 +15,7 @@ import {
   InMemoryMetricQueryResultCache,
   InvalidCampaignTargetError,
   listCampaignTargetsForProject,
+  listEnvironmentsForProject,
   ProjectNotFoundError,
   setCampaignTargetBudget,
   type WarehouseQueryExecutor,
@@ -304,5 +305,43 @@ describe('getQualityCalibrationBreakdownForProject', () => {
       { qualityTier: 'medium', signups: 0, payingSignups: 0, payingRate: null, collectedRevenue40d: 0, avgCollectedRevenue40d: null },
       { qualityTier: 'high', signups: 10, payingSignups: 8, payingRate: 0.8, collectedRevenue40d: 6000, avgCollectedRevenue40d: 600 },
     ]);
+  });
+});
+
+describe('campaign-ops warehouse reads: environment scoping (KAN-196)', () => {
+  it('every breakdown queries the prod environment by default and a caller-passed environment when one is given', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Campaign Ops Env Scope Org');
+    await ensureSaasMetricPackSchemasRegistered(organization.id, project.id, owner.id);
+    await ensureSaasMetricPackRegistered(organization.id, project.id, owner.id);
+    await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
+    const environments = await listEnvironmentsForProject(organization.id, project.id);
+    const prodEnv = environments.find((environment) => environment.name === 'prod')!;
+    const devEnv = environments.find((environment) => environment.name === 'dev')!;
+
+    const capturedEnvironmentIds: unknown[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        capturedEnvironmentIds.push(query.params.tenant_environment_id);
+        return Promise.resolve([]);
+      },
+    };
+    const readers = [
+      getCampaignSpendBreakdownForProject,
+      getPaybackOverviewForProject,
+      getCampaignPaybackBreakdownForProject,
+      getQualityCalibrationBreakdownForProject,
+    ] as const;
+
+    for (const read of readers) {
+      capturedEnvironmentIds.length = 0;
+      const byDefault = await read(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+      expect(byDefault.ok).toBe(true);
+      expect(capturedEnvironmentIds).toEqual([prodEnv.id]);
+
+      capturedEnvironmentIds.length = 0;
+      const scoped = await read(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache(), environmentId: devEnv.id });
+      expect(scoped.ok).toBe(true);
+      expect(capturedEnvironmentIds).toEqual([devEnv.id]);
+    }
   });
 });

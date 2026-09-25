@@ -1016,3 +1016,50 @@ describe('listRecentDunningSubscriptionsForProject (KAN-94 dunning feed)', () =>
     await expect(listRecentDunningSubscriptionsForProject(orgA.id, projectB.id)).rejects.toBeInstanceOf(ProjectNotFoundError);
   });
 });
+
+describe('pipeline admin lists: environment scoping (KAN-196)', () => {
+  const alwaysFailingSink: WarehouseSink = {
+    insertRawRecord: () => Promise.reject(new Error('simulated warehouse outage')),
+  };
+
+  it('listQueuedPipelineMessagesForProject returns only the named environment\'s messages when environmentId is passed, and every environment\'s when omitted', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Queued Env Scope Org');
+    for (const [environmentId, clientId] of [[prodEnvironment.id, 'evt-prod'], [devEnvironment.id, 'evt-dev']] as const) {
+      await enqueueAcceptedRecordsForPipeline({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId,
+        batchId: unique('batch'),
+        kind: 'event',
+        records: [{ clientId, schemaName: 'order_completed', payload: { net: 1 } }],
+      });
+    }
+
+    const devOnly = await listQueuedPipelineMessagesForProject(organization.id, project.id, undefined, devEnvironment.id);
+    expect(devOnly.map((message) => message.client_id)).toEqual(['evt-dev']);
+
+    const everyEnvironment = await listQueuedPipelineMessagesForProject(organization.id, project.id);
+    expect(everyEnvironment.map((message) => message.client_id).sort()).toEqual(['evt-dev', 'evt-prod']);
+  });
+
+  it('listFailedPipelineMessagesForProject returns only the named environment\'s messages when environmentId is passed, and every environment\'s when omitted', async () => {
+    const { organization, project, prodEnvironment, devEnvironment } = await setupProject('Failed Env Scope Org');
+    for (const [environmentId, clientId] of [[prodEnvironment.id, 'evt-prod'], [devEnvironment.id, 'evt-dev']] as const) {
+      await enqueueAcceptedRecordsForPipeline({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId,
+        batchId: unique('batch'),
+        kind: 'event',
+        records: [{ clientId, schemaName: 'order_completed', payload: { net: 1 } }],
+      });
+      await drainPendingPipelineMessages({ organizationId: organization.id, projectId: project.id, environmentId, sink: alwaysFailingSink });
+    }
+
+    const prodOnly = await listFailedPipelineMessagesForProject(organization.id, project.id, undefined, prodEnvironment.id);
+    expect(prodOnly.map((message) => message.client_id)).toEqual(['evt-prod']);
+
+    const everyEnvironment = await listFailedPipelineMessagesForProject(organization.id, project.id);
+    expect(everyEnvironment.map((message) => message.client_id).sort()).toEqual(['evt-dev', 'evt-prod']);
+  });
+});

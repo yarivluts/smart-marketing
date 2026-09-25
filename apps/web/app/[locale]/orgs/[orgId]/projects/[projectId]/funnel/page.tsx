@@ -15,6 +15,7 @@ import {
   getQualityCalibrationBreakdownForProject,
   queryGoalProgress,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildFunnelGoalsCockpitData } from '@/lib/orgs/funnel-goals-synthesizer';
 import { FunnelGoalsDashboard } from '@/components/orgs/funnel-goals-dashboard';
 import type {
@@ -68,31 +69,35 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     notFound();
   }
 
+  // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
+  const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentScope = { environmentId: selectedEnvironment?.id };
+
   let funnelOutcome: FunnelStepsOutcome | null = null;
   let cohortOutcome: CohortRetentionOutcome | null = null;
   let paybackOutcome: PaybackOverviewOutcome | null = null;
   let calibrationOutcome: QualityCalibrationBreakdownOutcome | null = null;
 
   try {
-    funnelOutcome = await queryProjectFunnelSteps(orgId, projectId);
+    funnelOutcome = await queryProjectFunnelSteps(orgId, projectId, environmentScope);
   } catch {
     funnelOutcome = null;
   }
 
   try {
-    cohortOutcome = await queryCohortRetention(orgId, projectId);
+    cohortOutcome = await queryCohortRetention(orgId, projectId, environmentScope);
   } catch {
     cohortOutcome = null;
   }
 
   try {
-    paybackOutcome = await getPaybackOverviewForProject(orgId, projectId);
+    paybackOutcome = await getPaybackOverviewForProject(orgId, projectId, environmentScope);
   } catch {
     paybackOutcome = null;
   }
 
   try {
-    calibrationOutcome = await getQualityCalibrationBreakdownForProject(orgId, projectId);
+    calibrationOutcome = await getQualityCalibrationBreakdownForProject(orgId, projectId, environmentScope);
   } catch {
     calibrationOutcome = null;
   }
@@ -110,7 +115,7 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     await Promise.all(
       goals.map(async (goal) => {
         try {
-          const outcome = await queryGoalProgress(orgId, projectId, goal);
+          const outcome = await queryGoalProgress(orgId, projectId, goal, environmentScope);
           goalOutcomes.set(goal.id, outcome);
         } catch {
           // Fallback to synthesizer standard progress calculation

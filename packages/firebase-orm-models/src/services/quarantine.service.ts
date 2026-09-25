@@ -26,16 +26,21 @@ export const DEFAULT_QUARANTINED_RECORD_LIST_LIMIT = 200;
 /**
  * The most recent quarantined records for a project, newest first — the durable-payload counterpart
  * of KAN-35's `listRecentIngestBatchesForProject` (which only ever exposed validation status, not the
- * payload). Not scoped to one environment, same "fold every environment into one admin view" posture
- * as that function and `listApiKeysForProject`.
+ * payload). With no `environmentId`, every environment is folded into one admin view, same posture as
+ * that function and `listApiKeysForProject`; given one (KAN-196's project environment picker), only that
+ * environment's records are returned.
  */
 export async function listQuarantinedRecordsForProject(
   organizationId: string,
   projectId: string,
   limit: number = DEFAULT_QUARANTINED_RECORD_LIST_LIMIT,
+  environmentId?: string,
 ): Promise<QuarantinedRecordModel[]> {
-  return QuarantinedRecordModel.initPath({ organization_id: organizationId, project_id: projectId })
-    .query()
+  let query = QuarantinedRecordModel.initPath({ organization_id: organizationId, project_id: projectId }).query();
+  if (environmentId !== undefined) {
+    query = query.where('environment_id', '==', environmentId);
+  }
+  return query
     .where('status', '==', 'quarantined')
     .orderBy('created_at', 'desc')
     .limit(limit)

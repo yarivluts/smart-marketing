@@ -143,6 +143,10 @@
     "staging": "Staging",
     "prod": "Prod"
   },
+  "EnvironmentPicker": {
+    "label": "Viewing data from",
+    "nonProdNotice": "Showing {environment} data, not production. Pages without environment support still show production."
+  },
   "Members": {
     "roleAndStatus": "{role} ({status})",
     "statusLabel": "({status})",

@@ -535,6 +535,8 @@ export interface QueryGoalProgressParams {
   cache?: MetricQueryResultCache;
   /** `YYYY-MM-DD`. Defaults to today (UTC) — overridable so callers/tests can pin "now". */
   asOfDate?: string;
+  /** The environment whose rows count toward the goal (KAN-196's project environment picker). Omitted, `queryMetrics` resolves the project's `prod` one. */
+  environmentId?: string;
 }
 
 function todayDateOnly(): string {
@@ -642,6 +644,7 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       request,
       ...(params.executor ? { executor: params.executor } : {}),
       ...(params.cache ? { cache: params.cache } : {}),
+      ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
     });
     const actualValue = sumMetricRows(result.series, goal.metric_name);
     const elapsedFraction = computeElapsedFraction(goal.start_date, goal.deadline, asOfDate, goal.rhythm);

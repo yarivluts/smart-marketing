@@ -6,7 +6,6 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   getWarehouseFreshnessForProject,
-  listEnvironmentsForProject,
   listFailedPipelineMessagesForProject,
   listOrchestrationRunsForProject,
   listOrgProjects,
@@ -14,6 +13,7 @@ import {
   listQueuedPipelineMessagesForProject,
   listRecentIngestBatchesForProject,
 } from '@/lib/orgs/queries';
+import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
   computeIngestHealthSummary,
   formatMinutesAgo,
@@ -71,24 +71,19 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
     notFound();
   }
 
-  const [
-    projects,
-    batches,
-    environments,
-    quarantinedRecords,
-    failedPipelineMessages,
-    queuedPipelineMessages,
-    orchestrationRuns,
-    warehouseFreshness,
-  ] = await Promise.all([
+  // KAN-196: every environment-stamped read below is scoped to the environment picked in the
+  // project shell (prod by default). Orchestration runs are project-wide (one dbt refresh covers
+  // every environment), so they stay unscoped.
+  const { selected: selectedEnvironment, environments } = await resolveSelectedEnvironment(orgId, projectId);
+  const environmentId = selectedEnvironment?.id;
+  const [projects, batches, quarantinedRecords, failedPipelineMessages, queuedPipelineMessages, orchestrationRuns, warehouseFreshness] = await Promise.all([
     listOrgProjects(orgId),
-    listRecentIngestBatchesForProject(orgId, projectId),
-    listEnvironmentsForProject(orgId, projectId),
-    listQuarantinedRecordsForProject(orgId, projectId),
-    listFailedPipelineMessagesForProject(orgId, projectId),
-    listQueuedPipelineMessagesForProject(orgId, projectId),
+    listRecentIngestBatchesForProject(orgId, projectId, undefined, environmentId),
+    listQuarantinedRecordsForProject(orgId, projectId, undefined, environmentId),
+    listFailedPipelineMessagesForProject(orgId, projectId, undefined, environmentId),
+    listQueuedPipelineMessagesForProject(orgId, projectId, undefined, environmentId),
     listOrchestrationRunsForProject(orgId, projectId),
-    getWarehouseFreshnessForProject({ organizationId: orgId, projectId }),
+    getWarehouseFreshnessForProject({ organizationId: orgId, projectId, environmentId }),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
