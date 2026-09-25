@@ -1,4 +1,12 @@
-import { defaultWarehouseQueryExecutor, WarehouseNotConfiguredError, WarehouseQueryFailedError, type WarehouseQueryExecutor, type WarehouseRow } from '../warehouse/query-executor';
+import type { CompiledMetricQuery } from '@growthos/shared';
+import {
+  defaultWarehouseQueryExecutor,
+  WarehouseNotConfiguredError,
+  WarehouseQueryFailedError,
+  type WarehouseQueryExecutor,
+  type WarehouseRow,
+  type WarehouseSqlDialect,
+} from '../warehouse/query-executor';
 import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
@@ -14,8 +22,9 @@ import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './c
  * `queryMetrics`, KAN-42) or `list_metrics`/`describe_metric` (the already-
  * built metrics catalog). All three hand-write parameterized SQL against a
  * dbt core table (`entities`, KAN-37; `fact_cohort_retention`, KAN-62;
- * `events`, KAN-37 — see `queryProjectFunnelSteps` for why the funnel reads
- * `events` directly rather than the `fact_funnel_step` model) and run it
+ * `events` + `bridge_identity`, KAN-37/KAN-56 — see `queryProjectFunnelSteps`
+ * for why the funnel reads those directly rather than the `fact_funnel_step`
+ * model) and run it
  * through the same {@link WarehouseQueryExecutor} the compiler-produced SQL in
  * `metrics-query.service.ts` uses — `CompiledMetricQuery` is just
  * `{ sql, params }`, so this is legitimate reuse of that interface's own
@@ -290,40 +299,142 @@ export interface FunnelStepResult {
   eventSchemaName: string;
   stageKey: string;
   stepOrder: number;
-  /** Distinct customers who ever reached this stage (`fact_funnel_step`'s own "first reached" grain — a customer can't inflate this by re-firing the same step event). */
+  /**
+   * PEOPLE (not events, and not only identified customers) who reached this step having reached every
+   * earlier step first, in order — see {@link buildFunnelStepsQuery}. Non-increasing along the funnel by
+   * construction. The name predates B20 and is kept so existing readers do not break.
+   */
   customerCount: number;
-  /** `customerCount` as a fraction of the funnel's first step's own `customerCount` (1.0 for the first step itself; 0 when the first step had nobody). Computed here, not in SQL — a single small division over an already-small result set. */
+  /** `customerCount` as a fraction of the funnel's first step's own `customerCount` (1.0 for the first step itself; 0 when the first step had nobody). Never above 1: the counts are sequential. */
   conversionRateFromFirst: number;
+  /** `customerCount` as a fraction of the previous step's (1.0 for the first step itself; 0 when the previous step had nobody). Never above 1, for the same reason. */
+  conversionRateFromPrevious: number;
+}
+
+export interface BuildFunnelStepsQueryParams {
+  organizationId: string;
+  projectId: string;
+  /** Omitted only when the project has no environment to default to — same as every other warehouse read here. */
+  environmentId?: string;
+  /** The funnel's event schema names, first step first. */
+  eventSchemaNames: readonly string[];
+  /** Defaults to `bigquery` (production). `duckdb` only so tests can run this exact query on a real engine. */
+  dialect?: WarehouseSqlDialect;
+}
+
+/** The schema name of the platform's anonymous-click stream — the one event whose own id is a visitor id when it declares no `anon_id` (`bridge_identity`/`fact_attribution` treat it the same way). */
+const TOUCHPOINT_EVENT_TYPE = 'touchpoint';
+
+/**
+ * A JSON text field of `events.properties`, mirroring the dbt `json_text_field` macro leg for leg (BigQuery's
+ * `lax_string(col[key])` is what `fact_attribution` already runs in production; DuckDB's
+ * `json_extract_string` is that macro's default leg). `key` is a fixed literal owned by this file, never input.
+ */
+function jsonTextField(dialect: WarehouseSqlDialect, column: string, key: 'customer_id' | 'anon_id'): string {
+  return dialect === 'bigquery' ? `LAX_STRING(${column}['${key}'])` : `json_extract_string(${column}, '$.${key}')`;
 }
 
 /**
- * The `query_funnel` half of plan `12 §6.2`'s "funnels/cohorts" tool:
- * per-stage distinct-customer counts for the project's own human-confirmed
- * funnel, in the confirmed step order, each stage's count also expressed as a
- * conversion rate off the first step.
+ * The `query_funnel` SQL: how many PEOPLE went through the funnel's steps IN ORDER (B20).
  *
- * The confirmed funnel lives in Firestore (`OnboardingStateModel.funnel_steps`,
- * KAN-68), NOT in the warehouse: the dbt `fact_funnel_step` model that would
- * otherwise hold it stays DuckDB-only because its `funnel_step_mappings` seed
- * has no real warehouse export yet (same posture #133 lifted for the identity
- * chain). So this reads the confirmed steps from Firestore and counts distinct
- * customers per step straight off the BigQuery-enabled `events` core table —
- * the same hand-written-SQL-over-`WarehouseQueryExecutor` pattern
- * `searchProjectCustomers`/`queryProjectCohortRetention` use. A step is keyed
- * by its `eventSchemaName` matched against `events.event_type` (the same
- * fixed-path narrowing #133 took for identity): the onboarding wizard proposes
- * funnel steps *from* event schemas, so this is the faithful key, and it keeps
- * every dynamic value a bound parameter rather than the DuckDB fixture model's
- * data-driven `coalesce(event_name, event_type)` label.
+ * It used to be `COUNT(DISTINCT entity_id) ... GROUP BY event_type`, which was wrong twice over on a project
+ * following the documented ingest contract (`{event_id, event, ts, properties}`, identity in properties):
+ * `entity_id` is the per-EVENT id there, so it counted events, not people; and every step was counted on its
+ * own, so a later step could exceed an earlier one. EasySign saw 4 → 6 → 6 → 6 → 6 (150% "conversion") where
+ * the truth was 4 → 2 → 2 → 2 → 2.
  *
- * `COUNT(DISTINCT entity_id)` is the distinct-customer count reaching each
- * step, so a customer re-firing the same step event can't inflate it — the
- * same "first reached" grain `fact_funnel_step` computes, without needing the
- * per-customer min-timestamp. One row per confirmed step (a step with no
- * events yet reports a real `0`, not a dropped row, so the funnel's drop-off
- * is visible end to end). A project whose funnel isn't confirmed yet (no
- * onboarding state, or an empty funnel) returns an empty list without touching
- * the warehouse.
+ * Who a person is — the same rules `bridge_identity`/`fact_attribution` apply:
+ *   1. an event declaring `properties.customer_id` belongs to that customer;
+ *   2. otherwise its visitor (`properties.anon_id`, or — for a touchpoint that declares none — the touchpoint's
+ *      own id, which the snippet sets to the anon id) resolves through `bridge_identity` to the customer that
+ *      visitor became, so the touchpoint and the signup it led to are ONE person;
+ *   3. a visitor nobody has resolved yet is a person in their own right (the anon id);
+ *   4. an event declaring neither id keeps `entity_id` — the older convention, where the event id named the
+ *      person.
+ *
+ * Sequential: a person counts at step N only when they reached every step 0..N in order — for each step, their
+ * earliest occurrence at or after the moment they reached the previous step (earliest is optimal: any later
+ * choice could only rule out more of the next step's occurrences). Ties count as in order, since two events
+ * written by one server request routinely share a timestamp. Counts are therefore non-increasing by
+ * construction, and overall conversion cannot exceed 100%.
+ *
+ * One query, every dynamic value a bound parameter (`@organizationId`, `@projectId`, `@environmentId`,
+ * `@funnelEvent<i>` per step). The step CTEs are generated per step because the funnel's length is per-project
+ * configuration held in Firestore — that is also why this lives here and not in a dbt model. Only structure
+ * (step indexes) is spliced into the SQL, never a value.
+ */
+export function buildFunnelStepsQuery(params: BuildFunnelStepsQueryParams): CompiledMetricQuery {
+  const dialect = params.dialect ?? 'bigquery';
+  const stepCount = params.eventSchemaNames.length;
+  if (stepCount === 0) {
+    throw new InvalidMcpToolRequestError('A funnel needs at least one step.');
+  }
+
+  const queryParams: Record<string, string> = {
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+  };
+  const filters = ['e.organization_id = @organizationId', 'e.project_id = @projectId'];
+  if (params.environmentId !== undefined) {
+    filters.push('e.environment_id = @environmentId');
+    queryParams.environmentId = params.environmentId;
+  }
+  const stepParams = params.eventSchemaNames.map((name, index) => {
+    queryParams[`funnelEvent${index}`] = name;
+    return `@funnelEvent${index}`;
+  });
+  filters.push(`e.event_type IN (${stepParams.join(', ')})`);
+
+  const customerId = jsonTextField(dialect, 'e.properties', 'customer_id');
+  const anonId = jsonTextField(dialect, 'e.properties', 'anon_id');
+
+  const personEvents = `funnel_events AS (
+  SELECT
+    e.event_type,
+    e.occurred_at,
+    COALESCE(${customerId}, b.customer_id, ${anonId}, e.entity_id) AS person_id
+  FROM events e
+  LEFT JOIN bridge_identity b
+    ON b.organization_id = e.organization_id
+    AND b.project_id = e.project_id
+    AND b.environment_id = e.environment_id
+    AND b.anon_id = COALESCE(${anonId}, CASE WHEN e.event_type = '${TOUCHPOINT_EVENT_TYPE}' THEN e.entity_id END)
+  WHERE ${filters.join('\n    AND ')}
+)`;
+
+  const stepCtes = stepParams.map((param, index) =>
+    index === 0
+      ? `step_0 AS (
+  SELECT person_id, MIN(occurred_at) AS reached_at
+  FROM funnel_events
+  WHERE event_type = ${param} AND person_id IS NOT NULL
+  GROUP BY person_id
+)`
+      : `step_${index} AS (
+  SELECT e.person_id, MIN(e.occurred_at) AS reached_at
+  FROM funnel_events e
+  INNER JOIN step_${index - 1} prev ON prev.person_id = e.person_id
+  WHERE e.event_type = ${param} AND e.occurred_at >= prev.reached_at
+  GROUP BY e.person_id
+)`,
+  );
+
+  const counts = stepParams.map((_, index) => `SELECT ${index} AS step_index, COUNT(*) AS people_count FROM step_${index}`);
+
+  const sql = `WITH ${[personEvents, ...stepCtes].join(',\n')}\n${counts.join('\nUNION ALL\n')}`;
+  return { sql, params: queryParams };
+}
+
+/**
+ * The `query_funnel` half of plan `12 §6.2`'s "funnels/cohorts" tool: for the project's own confirmed funnel,
+ * how many people reached each step having gone through every earlier one in order, with each step's count
+ * also expressed as a conversion rate off the first step and off the previous one.
+ *
+ * The confirmed funnel lives in Firestore (`OnboardingStateModel.funnel_steps`, KAN-68; `set_funnel`), NOT in
+ * the warehouse, so the dbt `fact_funnel_step` model cannot hold it; this reads the steps from Firestore and
+ * runs {@link buildFunnelStepsQuery} against the BigQuery `events` and `bridge_identity` core tables. One row
+ * per confirmed step (a step nobody reached reports a real `0`). A project whose funnel isn't confirmed yet
+ * returns an empty list without touching the warehouse (or the quota).
  */
 export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsParams): Promise<FunnelStepResult[]> {
   const steps = await getConfirmedFunnelSteps(params.organizationId, params.projectId);
@@ -334,47 +445,32 @@ export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsPar
   const executor = params.executor ?? defaultWarehouseQueryExecutor;
   const environmentId = params.environmentId ?? (await resolveDefaultQueryEnvironment(params.organizationId, params.projectId))?.id;
 
-  const filters = ['organization_id = @organizationId', 'project_id = @projectId'];
-  const queryParams: Record<string, string> = {
+  const query = buildFunnelStepsQuery({
     organizationId: params.organizationId,
     projectId: params.projectId,
-  };
-  if (environmentId !== undefined) {
-    filters.push('environment_id = @environmentId');
-    queryParams.environmentId = environmentId;
-  }
-
-  // The distinct event schema names across the confirmed steps, bound as
-  // parameters (never spliced into the SQL) — a funnel could in principle map
-  // two stages to the same event schema, so dedupe for the `IN` list and fan
-  // the count back out to every step below.
-  const schemaNames = [...new Set(steps.map((step) => step.eventSchemaName))];
-  const boundSchemaParams = schemaNames.map((name, index) => {
-    const paramName = `funnelEvent${index}`;
-    queryParams[paramName] = name;
-    return `@${paramName}`;
+    ...(environmentId !== undefined ? { environmentId } : {}),
+    eventSchemaNames: steps.map((step) => step.eventSchemaName),
+    ...(executor.dialect !== undefined ? { dialect: executor.dialect } : {}),
   });
-  filters.push(`event_type IN (${boundSchemaParams.join(', ')})`);
+  const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'query_funnel' }, () => executor.execute(query));
 
-  const sql = `SELECT event_type, COUNT(DISTINCT entity_id) AS customer_count FROM events WHERE ${filters.join(' AND ')} GROUP BY event_type`;
-  const rows = await runQuotaGatedWarehouseQuery(params.organizationId, params.projectId, { tool: 'query_funnel' }, () =>
-    executor.execute({ sql, params: queryParams }),
-  );
-
-  const countByEventType = new Map<string, number>();
+  const countByStepIndex = new Map<number, number>();
   for (const row of rows) {
-    countByEventType.set(String(row.event_type ?? ''), Number(row.customer_count ?? 0));
+    countByStepIndex.set(Number(row.step_index), Number(row.people_count ?? 0));
   }
 
-  const firstStepCount = countByEventType.get(steps[0].eventSchemaName) ?? 0;
-  return steps.map((step) => {
-    const customerCount = countByEventType.get(step.eventSchemaName) ?? 0;
+  const counts = steps.map((_, index) => countByStepIndex.get(index) ?? 0);
+  const firstStepCount = counts[0];
+  return steps.map((step, index) => {
+    const customerCount = counts[index];
+    const previousCount = index === 0 ? customerCount : counts[index - 1];
     return {
       eventSchemaName: step.eventSchemaName,
       stageKey: step.stageKey,
       stepOrder: step.order,
       customerCount,
       conversionRateFromFirst: firstStepCount > 0 ? customerCount / firstStepCount : 0,
+      conversionRateFromPrevious: previousCount > 0 ? customerCount / previousCount : 0,
     };
   });
 }
@@ -386,7 +482,7 @@ export type FunnelStepsOutcome =
 
 /**
  * The admin-page counterpart of {@link queryProjectFunnelSteps} (the `query_funnel` MCP tool) — same
- * "confirmed funnel from Firestore, distinct-customer counts from the warehouse" semantics, but wraps
+ * "confirmed funnel from Firestore, sequential people counts from the warehouse" semantics, but wraps
  * the warehouse call the same way {@link searchProjectCustomersForAdmin} does so a page rendering the
  * funnel can show a typed "why not" state instead of crashing. Closes the admin-surface gap this MCP
  * tool never got a human-facing home for: the onboarding wizard lets a human confirm a funnel mapping

@@ -13,7 +13,16 @@ export type WarehouseRow = Record<string, string | number | null>;
  */
 export interface WarehouseQueryExecutor {
   execute(query: CompiledMetricQuery): Promise<WarehouseRow[]>;
+  /**
+   * The SQL dialect this executor runs. Absent means BigQuery, the only production warehouse. `duckdb` exists so
+   * a test can run a query builder's real output on a real engine (B20: text-shape assertions alone let a funnel
+   * query that counted events instead of people ship); builders that must differ by dialect read it here.
+   */
+  readonly dialect?: WarehouseSqlDialect;
 }
+
+/** See {@link WarehouseQueryExecutor.dialect}. */
+export type WarehouseSqlDialect = 'bigquery' | 'duckdb';
 
 /** Per-execution metadata a {@link WarehouseQueryExecutorWithStats} can report alongside a query's rows — currently just a cost estimate (KAN-39), but shaped to grow (e.g. row/byte counts) without another interface bump. */
 export interface WarehouseQueryStats {
