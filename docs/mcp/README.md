@@ -154,7 +154,7 @@ Read tools (need only the connection-level `mcp.read`):
 | `compare_periods` | Same as `query_metric` plus a period-over-period comparison |
 | `decompose` | Same as `query_metric` broken down by one or more dimensions |
 | `query_cohort` | Signup-month × period-number retention matrix |
-| `query_funnel` | Per-stage distinct-customer counts for the project's confirmed funnel, with conversion rate off the first step |
+| `query_funnel` | Per-step distinct-customer counts for the project's confirmed funnel, with conversion rate off the first step. With no confirmed funnel yet it returns `status: "no_funnel_defined"` and a message pointing to `set_funnel` |
 | `search_customers` | Substring search over Customer 360 entity records |
 | `list_insights` | Recent tracking-broke alerts and fired win-rule events |
 
@@ -166,6 +166,7 @@ Act tools (each requires its own extra permission, re-checked on every call):
 | `approve_action` | `automation.approve` (OAuth/human only) | Approve an `awaiting_approval` action so it can execute |
 | `create_goal` | `dashboards.write` | Create a goal pinning a metric to a target/range and deadline |
 | `create_segment` | `dashboards.write` | Save a named customer segment filter definition |
+| `set_funnel` | `project.configure` (a `dry_run: true` preview needs only `mcp.read`) | Define or replace the project's confirmed funnel: an ordered list of at least 2 registered event schema names. Same funnel the web onboarding wizard confirms and the Funnel page charts |
 
 ## Safety & limits
 
