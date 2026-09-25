@@ -19,6 +19,7 @@ import {
   recordAuditLogEntry,
   searchProjectCustomers,
   WarehouseNotConfiguredError,
+  type FunnelStepResult,
 } from '@growthos/firebase-orm-models';
 import { MetricCompilerError } from '@growthos/shared';
 import { parseMetricQueryRequestBody } from '../metrics/metrics-request';
@@ -73,6 +74,49 @@ export function textResult(value: unknown): ToolResult {
 
 export function errorResult(message: string): ToolResult {
   return { content: [{ type: 'text', text: message }], isError: true };
+}
+
+/**
+ * One `query_funnel` step on the MCP surface (B21). Snake_case like every other MCP tool, so a step can be fed
+ * straight back into `set_funnel` (which reads `event_schema_name`/`stage_key`); the camelCase keys the tool
+ * used to return are kept, deprecated, for one release so existing readers do not break.
+ */
+export interface FunnelStepOutput {
+  event_schema_name: string;
+  stage_key: string;
+  step_order: number;
+  people_count: number;
+  conversion_rate_from_first: number;
+  conversion_rate_from_previous: number;
+  /** @deprecated Use `event_schema_name`. */
+  eventSchemaName: string;
+  /** @deprecated Use `stage_key`. */
+  stageKey: string;
+  /** @deprecated Use `step_order`. */
+  stepOrder: number;
+  /** @deprecated Use `people_count`. */
+  customerCount: number;
+  /** @deprecated Use `conversion_rate_from_first`. */
+  conversionRateFromFirst: number;
+}
+
+export function toFunnelStepOutputs(steps: readonly FunnelStepResult[]): FunnelStepOutput[] {
+  return steps.map((step, index) => {
+    const previousCount = index === 0 ? step.customerCount : steps[index - 1].customerCount;
+    return {
+      event_schema_name: step.eventSchemaName,
+      stage_key: step.stageKey,
+      step_order: step.stepOrder,
+      people_count: step.customerCount,
+      conversion_rate_from_first: step.conversionRateFromFirst,
+      conversion_rate_from_previous: previousCount > 0 ? step.customerCount / previousCount : 0,
+      eventSchemaName: step.eventSchemaName,
+      stageKey: step.stageKey,
+      stepOrder: step.stepOrder,
+      customerCount: step.customerCount,
+      conversionRateFromFirst: step.conversionRateFromFirst,
+    };
+  });
 }
 
 /** What `query_funnel` says when the project has no confirmed funnel yet (KAN-199). */
@@ -355,7 +399,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Query funnel',
       description:
-        "Query this project's confirmed funnel: distinct customer count per step, in step order, each step's count also expressed as a conversion rate off the first step. Each step names the event schema it counts (eventSchemaName) and its funnel stage (stageKey); several steps can share a stage. A project only has a funnel once one is confirmed - with set_funnel or in the web onboarding wizard. Until then this returns status \"no_funnel_defined\" with an empty steps list and a message saying so, rather than a bare empty list that would read as a funnel nobody entered.",
+        "Query this project's confirmed funnel: for each step, in step order, how many PEOPLE reached it having gone through every earlier step in order (people_count; a person is the customer, or the visitor before they identify - a visitor who later becomes a customer counts once), so counts never increase from one step to the next. Each step also carries conversion_rate_from_first and conversion_rate_from_previous (0..1), the event schema it counts (event_schema_name), its funnel stage (stage_key; several steps can share one) and its position (step_order). The steps can be passed straight back to set_funnel. The camelCase keys (eventSchemaName, stageKey, stepOrder, customerCount, conversionRateFromFirst) are DEPRECATED duplicates kept for one release; read the snake_case ones. A project only has a funnel once one is confirmed - with set_funnel or in the web onboarding wizard. Until then this returns status \"no_funnel_defined\" with an empty steps list and a message saying so, rather than a bare empty list that would read as a funnel nobody entered.",
       inputSchema: {},
     },
     auditedToolHandler(auth, 'query_funnel', async () => {
@@ -366,7 +410,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
           // integrator who never opened the web wizard had no way to learn a funnel must be set.
           return textResult({ status: 'no_funnel_defined', steps: [], message: NO_FUNNEL_DEFINED_MESSAGE });
         }
-        return textResult({ steps });
+        return textResult({ steps: toFunnelStepOutputs(steps) });
       } catch (error) {
         // The funnel exists but could not be counted: say which funnel, so a warehouse problem is not
         // mistaken for a missing or wrong funnel definition.

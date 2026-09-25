@@ -330,14 +330,19 @@ const setFunnelInputShape = {
     .array(
       z.union([
         z.string(),
+        // Both spellings are accepted (B21): query_funnel used to return only camelCase, so a step read from
+        // it could not be passed back here. Any other key on the object (query_funnel's step_order,
+        // people_count, rates) is ignored, so its steps round-trip as they are.
         z.object({
-          event_schema_name: z.string().describe('A registered event schema name of this project (see list_schemas).'),
+          event_schema_name: z.string().optional().describe('A registered event schema name of this project (see list_schemas).'),
           stage_key: z.string().optional().describe(`Optional funnel stage. One of: ${FUNNEL_STAGE_KEYS.join(', ')}. Inferred from the event name when omitted.`),
+          eventSchemaName: z.string().optional().describe('Same as event_schema_name (accepted so query_funnel output round-trips); event_schema_name wins if both are given.'),
+          stageKey: z.string().optional().describe('Same as stage_key; stage_key wins if both are given.'),
         }),
       ]),
     )
     .describe(
-      'The funnel, first step first, e.g. ["touchpoint", "signup", "document_created", "document_sent", "document_signed"]. Each entry is a registered event schema name, or { event_schema_name, stage_key } to also pick its stage. At least 2 steps, each event at most once, and every name must be an active EVENT schema of this project (entity/measure schemas cannot be funnel steps). Replaces the whole funnel; it is not merged with the current one.',
+      'The funnel, first step first, e.g. ["touchpoint", "signup", "document_created", "document_sent", "document_signed"]. Each entry is a registered event schema name, or { event_schema_name, stage_key } to also pick its stage (camelCase eventSchemaName/stageKey are accepted too, and the step objects query_funnel returns can be passed back as they are). At least 2 steps, each event at most once, and every name must be an active EVENT schema of this project (entity/measure schemas cannot be funnel steps). Replaces the whole funnel; it is not merged with the current one.',
     ),
   dry_run: z
     .boolean()
@@ -354,9 +359,10 @@ function toFunnelStepInputs(raw: unknown): FunnelStepInput[] {
     if (typeof entry === 'string') {
       return { eventSchemaName: entry };
     }
+    const stageKey = entry?.stage_key ?? entry?.stageKey;
     return {
-      eventSchemaName: String(entry?.event_schema_name ?? ''),
-      ...(entry?.stage_key !== undefined ? { stageKey: String(entry.stage_key) } : {}),
+      eventSchemaName: String(entry?.event_schema_name ?? entry?.eventSchemaName ?? ''),
+      ...(stageKey !== undefined ? { stageKey: String(stageKey) } : {}),
     };
   });
 }
