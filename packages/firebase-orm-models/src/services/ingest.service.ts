@@ -77,6 +77,8 @@ interface PreparedRecord {
   envelopeReasons: string[];
   /** The whole raw record as submitted (not just `fieldsToValidate`) — an accepted record's pipeline/warehouse payload (KAN-33) is the full envelope, e.g. an event's `event_id`/`ts` alongside its `properties`. */
   raw: Record<string, unknown>;
+  /** Entities only: {@link entityContentHash} of this version's attributes. */
+  contentHash?: string;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -140,6 +142,41 @@ function sortedJson(record: Record<string, unknown>): string {
 }
 
 /**
+ * A stable hash of an entity record's attributes, used to tell an identical resend of an entity
+ * (a retried batch, a no-op) from a new version of it (an upsert that must land). Exported so the
+ * quarantine replay path compares versions the same way ingest does.
+ */
+export function entityContentHash(fieldsToValidate: Record<string, unknown>): string {
+  return createHash('sha256').update(sortedJson(fieldsToValidate)).digest('hex');
+}
+
+/**
+ * Whether an incoming record repeats one an earlier batch already accepted (B13, 2026-09-25).
+ *
+ * For events and measures the dedup key IS the record's identity, so any existing claim means a
+ * repeat. An entity is different: its id names a row, and each upsert is a new version of that row
+ * ("upsert replaces the whole row, latest wins" - `entities.sql` keeps the latest by `landed_at`).
+ * Deduping entities on the id alone meant the first version won forever: every later upsert - a
+ * plan upgrade, a deactivation - was silently counted as a duplicate and dropped, and Customer 360
+ * froze at signup. So an entity repeats only when it matches the LATEST accepted version's content.
+ * Comparing with the latest (not with every version ever seen) is what lets a change back to an
+ * earlier value (free -> pro -> free) land too.
+ */
+export function isDuplicateOfClaim(
+  kind: SchemaDefKind,
+  claim: Pick<IngestDedupKeyModel, 'content_hash'> | null | undefined,
+  contentHash: string | undefined,
+): boolean {
+  if (!claim) {
+    return false;
+  }
+  if (kind !== 'entity') {
+    return true;
+  }
+  return claim.content_hash !== undefined && claim.content_hash === contentHash;
+}
+
+/**
  * Turns one raw record into its client-facing id, the schema family it
  * should validate against, and the field map to check — per plan `12
  * §2.1`/`§2.2`'s three sketches: an event's schema name is its own `event`
@@ -171,6 +208,7 @@ function prepareRecord(input: IngestBatchInput, record: unknown, index: number):
       fieldsToValidate,
       envelopeReasons,
       raw: r,
+      contentHash: entityContentHash(fieldsToValidate),
     };
   }
 
@@ -339,14 +377,17 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   );
 
   const recordResults: IngestRecordResult[] = [];
-  const acceptedClaims: { dedupId: string; clientId: string; schemaName: string; payload: Record<string, unknown> }[] = [];
+  const acceptedClaims: { dedupId: string; clientId: string; schemaName: string; payload: Record<string, unknown>; contentHash?: string }[] = [];
   // Every quarantined record's raw payload (KAN-34), persisted best-effort after the batch itself is
   // durable — see the comment on the `QuarantinedRecordModel` writes below.
   const quarantinedToPersist: { clientId: string; schemaName: string; payload: Record<string, unknown>; reasons: string[] }[] = [];
   // Two records in the *same* batch sharing a client id must also dedupe
   // against each other, not only against a claim already persisted by an
   // earlier batch — `existingClaims` alone can't catch that since neither
-  // has been saved yet at read time.
+  // has been saved yet at read time. For entities this means one version per
+  // entity per batch (the first): the warehouse keeps one row per
+  // (batch, client id) too, so a second version in the same batch could not
+  // land there anyway. Send later versions in later batches.
   const acceptedInThisBatch = new Set<string>();
 
   for (const record of preparedWithClaims) {
@@ -360,7 +401,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       });
       continue;
     }
-    if (record.existingClaim || acceptedInThisBatch.has(record.dedupId)) {
+    if (isDuplicateOfClaim(params.input.kind, record.existingClaim, record.contentHash) || acceptedInThisBatch.has(record.dedupId)) {
       recordResults.push({ client_id: record.clientId, status: 'duplicate' });
       continue;
     }
@@ -384,6 +425,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
         clientId: record.clientId,
         schemaName: record.schemaName,
         payload: record.raw,
+        contentHash: record.contentHash,
       });
       acceptedInThisBatch.add(record.dedupId);
     }
@@ -440,7 +482,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   // batches racing on the same client id — not a reason to turn an
   // otherwise-successful ingest into a 500 for the caller.
   await Promise.all(
-    acceptedClaims.map(async ({ dedupId, clientId }) => {
+    acceptedClaims.map(async ({ dedupId, clientId, contentHash }) => {
       const claim = new IngestDedupKeyModel();
       claim.organization_id = params.organizationId;
       claim.project_id = params.projectId;
@@ -449,6 +491,10 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       claim.client_id = clientId;
       claim.batch_id = batch.id;
       claim.created_at = batch.created_at;
+      if (contentHash !== undefined) {
+        // Overwrites the previous version's claim: the latest version is what the next upsert is compared with.
+        claim.content_hash = contentHash;
+      }
       claim.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
       try {
         await claim.save(dedupId);

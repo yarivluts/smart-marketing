@@ -1,6 +1,6 @@
 import { IngestDedupKeyModel } from '../models/ingest-dedup-key.model';
 import { QuarantinedRecordModel } from '../models/quarantined-record.model';
-import { checkRecordEnvelope, dedupKeyId, validateAgainstSchema } from './ingest.service';
+import { checkRecordEnvelope, dedupKeyId, entityContentHash, isDuplicateOfClaim, validateAgainstSchema } from './ingest.service';
 import { getActiveSchemaDefinition } from './schema-registry.service';
 import { enqueueAcceptedRecordsForPipeline, landPipelineMessages } from './pipeline.service';
 import { recordAuditLogEntry } from './audit-log.service';
@@ -105,7 +105,9 @@ export async function replayQuarantinedRecord(
     organization_id: organizationId,
     project_id: projectId,
   });
-  if (existingClaim) {
+  // Same version-aware rule as ingest (B13): a replayed entity is a duplicate only if it matches the latest accepted version.
+  const contentHash = record.kind === 'entity' ? entityContentHash(fieldsToValidate) : undefined;
+  if (isDuplicateOfClaim(record.kind, existingClaim, contentHash)) {
     record.status = 'replayed';
     record.replayed_at = new Date().toISOString();
     await record.save();
@@ -121,6 +123,9 @@ export async function replayQuarantinedRecord(
   claim.client_id = record.client_id;
   claim.batch_id = record.batch_id;
   claim.created_at = new Date().toISOString();
+  if (contentHash !== undefined) {
+    claim.content_hash = contentHash;
+  }
   claim.setPathParams({ organization_id: organizationId, project_id: projectId });
   try {
     await claim.save(dedupId);

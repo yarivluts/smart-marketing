@@ -289,6 +289,49 @@ describe('ingestBatch — entities', () => {
     expect(summary.accepted).toBe(1);
     expect(summary.quarantined).toBe(1);
   });
+
+  /**
+   * B13 (EasySign, 2026-09-25). An entity upsert is a new version of a row. Deduping on the id alone
+   * meant the first version won forever: a customer's plan change from free to pro came back as
+   * `duplicates: 1`, never landed, and Customer 360 froze at signup. A later batch must land a
+   * changed version, an identical resend must still be a no-op, and a change BACK to an earlier
+   * value must land too - which is why the comparison is with the latest version, not every version.
+   */
+  it('lands every changed version of an entity, dedupes only an identical resend of the latest', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Entity Upsert Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'customer',
+      fields: [{ name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+    const upsert = (plan: string) =>
+      ingestBatch({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: prodEnvironment.id,
+        input: { kind: 'entity', type: 'customer', records: [{ id: 'cust_1', attributes: { plan } }] },
+      });
+
+    const outcomes: Array<[string, number, number]> = [];
+    for (const plan of ['free', 'pro', 'pro', 'free']) {
+      const summary = await upsert(plan);
+      outcomes.push([plan, summary.accepted, summary.duplicates]);
+      if (summary.accepted === 1) {
+        const [landed] = await listRawRecordsForBatch(organization.id, project.id, summary.batchId);
+        expect((landed.payload.attributes as Record<string, unknown>).plan).toBe(plan);
+      }
+    }
+
+    expect(outcomes).toEqual([
+      ['free', 1, 0], // first version
+      ['pro', 1, 0], // the upgrade - the case that used to be dropped
+      ['pro', 0, 1], // identical resend of the latest: still a no-op
+      ['free', 1, 0], // back to an earlier value: must land, it is the newest version
+    ]);
+  });
 });
 
 describe('ingestBatch — measures', () => {

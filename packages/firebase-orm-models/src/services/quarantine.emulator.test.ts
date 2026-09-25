@@ -265,6 +265,41 @@ describe('replayQuarantinedRecord', () => {
     expect(result).toEqual({ outcome: 'duplicate' });
   });
 
+  /**
+   * B13 on the replay path: an entity is a duplicate only of the LATEST accepted version. A
+   * quarantined version whose content differs from what was accepted in the meantime is a new
+   * version and must land on replay - under id-only dedup it came back as "duplicate" and vanished.
+   */
+  it('lands a replayed entity version that differs from the one accepted meanwhile, and dedupes one that matches', async () => {
+    const { owner, organization, project, prodEnvironment } = await setupProject('Replay Entity Org');
+    const planOnly = [{ name: 'plan', type: 'string', isRequired: true, isPii: false, isIdentityKey: false }] as const;
+    await registerSchemaDefinition({ organizationId: organization.id, projectId: project.id, kind: 'entity', name: 'customer', fields: [...planOnly], createdByUserId: owner.id });
+    const upsert = (attributes: Record<string, unknown>) =>
+      ingestBatch({ organizationId: organization.id, projectId: project.id, environmentId: prodEnvironment.id, input: { kind: 'entity', type: 'customer', records: [{ id: 'cust_r', attributes }] } });
+
+    await upsert({ plan: 'pro', seats: 5 }); // quarantined: `seats` not registered yet
+    await upsert({ plan: 'free' }); // accepted meanwhile
+    await upsert({ plan: 'free', seats: 1 }); // quarantined too
+    await evolveSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'customer',
+      fields: [...planOnly, { name: 'seats', type: 'number', isRequired: false, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+
+    const quarantined = await listQuarantinedRecordsForProject(organization.id, project.id);
+    const bySeats = (seats: number) => quarantined.find((r) => (r.payload.attributes as Record<string, unknown>).seats === seats)!;
+    // Differs from the accepted {plan: free}: a new version, lands.
+    expect(await replayQuarantinedRecord(organization.id, project.id, bySeats(5).id, owner.id)).toEqual({ outcome: 'accepted' });
+    // Differs from the latest accepted version ({plan: pro, seats: 5}): lands as the newest.
+    expect(await replayQuarantinedRecord(organization.id, project.id, bySeats(1).id, owner.id)).toEqual({ outcome: 'accepted' });
+    // The replay recorded that version as the latest, so an identical resend through ingest is a no-op.
+    const resend = await upsert({ plan: 'free', seats: 1 });
+    expect({ accepted: resend.accepted, duplicates: resend.duplicates }).toEqual({ accepted: 0, duplicates: 1 });
+  });
+
   it('throws QuarantinedRecordNotFoundError for an id from a sibling project', async () => {
     const { owner, organization, project, prodEnvironment } = await setupProject('Isolation Org A');
     const other = await setupProject('Isolation Org B');
