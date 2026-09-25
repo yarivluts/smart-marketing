@@ -54,10 +54,12 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     // render identical counts — scope to the "Overall" row specifically to
     // avoid an ambiguous match across both.
     const overallRow = page.getByRole('listitem').filter({ hasText: 'Overall' });
-    await expect(overallRow).toContainText('4 records · 2 accepted · 1 quarantined · 1 duplicate');
+    await expect(overallRow).toContainText('4 records received · 2 accepted · 1 rejected on arrival · 1 duplicate');
+    // KAN-201: arrival counts never change, so the row also says how many are still open (1 here).
+    await expect(overallRow).toContainText('1 rejected record is still awaiting action below.');
     // Error rate counts quarantined records only (1/4), not the benign
     // duplicate — a retry storm must not read as a validation problem.
-    await expect(overallRow).toContainText('25.0% error rate');
+    await expect(overallRow).toContainText('25.0% rejected on arrival');
 
     await expect(page.getByText('ord-3 (Events, Prod)')).toBeVisible();
     await expect(page.getByText('Reasons: missing_required_field:amount')).toBeVisible();
@@ -69,7 +71,8 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     // Orchestration (KAN-38): before triggering a run, there's no history and no freshness snapshot yet.
     await expect(page.getByText('No runs started from this page yet. The hourly scheduled refresh runs separately and is not listed here.')).toBeVisible();
-    await expect(page.getByText('No run has been started from this page yet. The hourly scheduled refresh is not listed here - warehouse freshness above reflects it.')).toBeVisible();
+    // KAN-201: with no runs, one message rather than two near-identical ones.
+    await expect(page.getByText('No run has been started from this page yet. The hourly scheduled refresh is not listed here - warehouse freshness above reflects it.')).toHaveCount(0);
 
     // Triggering a run actually shells out to a real dbt build (KAN-37) against the buildable-today
     // DuckDB stand-in — normally a few seconds, but a generous 60s timeout here absorbs real subprocess
@@ -104,6 +107,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();
     await expect(page.getByText('No pipeline messages stuck in the queue.')).toBeVisible();
     await expect(page.getByText('No runs started from this page yet. The hourly scheduled refresh runs separately and is not listed here.')).toBeVisible();
-    await expect(page.getByText('No run has been started from this page yet. The hourly scheduled refresh is not listed here - warehouse freshness above reflects it.')).toBeVisible();
+    // KAN-201: with no runs, one message rather than two near-identical ones.
+    await expect(page.getByText('No run has been started from this page yet. The hourly scheduled refresh is not listed here - warehouse freshness above reflects it.')).toHaveCount(0);
   });
 });

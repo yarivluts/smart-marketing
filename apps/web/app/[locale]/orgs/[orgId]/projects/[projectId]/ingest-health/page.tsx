@@ -119,6 +119,11 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
         <span className="text-muted-foreground">
           {t('rateLine', { percent: rollup.errorRatePercent.toFixed(1), perMinute: formatThroughput(rollup.throughputPerMinute) })}
         </span>
+        {/* The counts above are what happened ON ARRIVAL and never change. Without this line, 47
+            probes dismissed long ago kept the page reading as 47 open problems (KAN-201, EasySign). */}
+        {rollup.kind === 'overall' && rollup.quarantinedCount > 0 ? (
+          <span className="text-muted-foreground">{t('openQuarantineLine', { open: quarantinedViews.length })}</span>
+        ) : null}
         <span className="text-muted-foreground">
           {rollup.freshnessMinutes === null
             ? t('neverIngestedLabel')
@@ -264,6 +269,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
           )}
         </div>
 
+        {orchestrationRunViews.length > 0 ? (
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium text-muted-foreground">{t('orchestrationFreshnessHeading')}</h3>
           {currentFreshness?.freshness ? (
@@ -282,6 +288,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
             <p className="text-muted-foreground">{t('orchestrationNoFreshnessYet')}</p>
           )}
         </div>
+        ) : null}
 
         <div className="flex flex-col gap-2">
           <h3 className="text-sm font-medium text-muted-foreground">{t('orchestrationHistoryHeading')}</h3>

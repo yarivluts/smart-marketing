@@ -29,3 +29,23 @@ describe('ingest-health warehouse freshness copy (B16)', () => {
     expect(en.IngestHealth.warehouseFreshnessLine).not.toMatch(/production/i);
   });
 });
+
+/**
+ * KAN-201 (EasySign): the arrival counts never change, so 47 probes dismissed long ago kept the
+ * page reading as 47 open problems. The overall row now also says how many are still open.
+ */
+describe('ingest-health open-quarantine line (KAN-201)', () => {
+  for (const [locale, messages] of [['en', en], ['he', he]] as const) {
+    const t = createTranslator({ locale, messages, namespace: 'IngestHealth' });
+    it(`${locale}: renders 0, 1 and many without falling back to the key`, () => {
+      const rendered = [0, 1, 47].map((open) => t('openQuarantineLine', { open }));
+      expect(rendered.every((line) => !line.includes('IngestHealth.'))).toBe(true);
+      expect(new Set(rendered).size).toBe(3);
+    });
+  }
+
+  it('en: calls the arrival count what it is', () => {
+    expect(en.IngestHealth.countsLine).toContain('rejected on arrival');
+    expect(en.IngestHealth.openQuarantineLine).toContain('still awaiting action');
+  });
+});
