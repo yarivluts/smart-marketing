@@ -688,30 +688,29 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
         7/30, 1.0 or 3.0, so the test confirmed the arithmetic of a fabrication. With no
         measurements there is nothing to scale and nothing to compare.
       */
-      const report30d = buildExecutiveReportData({ timeWindow: '30d', seed: 'test-scaling' });
-      const report7d = buildExecutiveReportData({ timeWindow: '7d', seed: 'test-scaling' });
-      const report90d = buildExecutiveReportData({ timeWindow: '90d', seed: 'test-scaling' });
+      const report30d = buildExecutiveReportData({ timeWindow: '30d' });
+      const report7d = buildExecutiveReportData({ timeWindow: '7d' });
+      const report90d = buildExecutiveReportData({ timeWindow: '90d' });
 
       for (const report of [report7d, report30d, report90d]) {
         expect(report.metrics.totalSpendUsd).toBeNull();
         expect(report.channels).toHaveLength(0);
       }
 
-      // Render ExecutiveBlendedReport and test time-window filter buttons
-      renderWithIntl(<ExecutiveBlendedReport seed="test-scaling" />);
+      /*
+        The component no longer offers 7 / 30 / 90 day pills. They changed nothing but their own
+        highlight - spend is only ever measured over a trailing 30 days - so "7 Days" relabelled
+        30-day spend. It now states the one window it has, and with no spend it shows neither a
+        "Live" badge nor the 50/50 channel split it used to fall back to.
+      */
+      renderWithIntl(<ExecutiveBlendedReport />);
 
-      const btn7d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window7d });
-      const btn30d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window30d });
-      const btn90d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window90d });
-
-      expect(btn7d).toBeInTheDocument();
-      expect(btn30d).toBeInTheDocument();
-      expect(btn90d).toBeInTheDocument();
-
-      // Click 7d
-      fireEvent.click(btn7d);
-      // Click 90d
-      fireEvent.click(btn90d);
+      expect(screen.queryByRole('button', { name: enMessages.ExecutiveReport.window7d })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: enMessages.ExecutiveReport.window90d })).not.toBeInTheDocument();
+      expect(screen.getByTestId('report-window-label')).toHaveTextContent(enMessages.ExecutiveReport.timeRange30d);
+      expect(screen.queryByTestId('zero-config-badge')).not.toBeInTheDocument();
+      expect(screen.getByTestId('channel-allocation-empty')).toBeInTheDocument();
+      expect(screen.queryByTestId('channel-split-bar')).not.toBeInTheDocument();
     });
   });
 });

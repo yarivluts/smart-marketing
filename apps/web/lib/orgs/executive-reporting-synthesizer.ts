@@ -58,7 +58,8 @@ export interface BuildExecutiveMetricsOptions {
   targets?: AutomationTargetView[];
   spendOutcome?: CampaignSpendBreakdownOutcome | null;
   timeWindow?: ExecutiveTimeWindow;
-  seed?: string;
+  // No `seed`: it only ever fed `getDeterministicFactor`, which scaled invented baselines per
+  // project so they looked like measurements. Nothing here is seeded any more.
   overrides?: Partial<ExecutiveBlendedMetrics>;
 }
 

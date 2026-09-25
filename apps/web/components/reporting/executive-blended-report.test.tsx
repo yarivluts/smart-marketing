@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { renderWithIntl, createMockExecutiveMetrics } from '../../tests/e2e/helpers/test-harness';
 import { ExecutiveBlendedReport } from './executive-blended-report';
 
@@ -29,21 +29,36 @@ describe('ExecutiveBlendedReport (Reporting Module)', () => {
     expect(screen.getByText('500 Total Conversions')).toBeInTheDocument();
   });
 
-  it('switches time windows (7d, 30d, 90d) accurately', () => {
+  /*
+    This used to click 7 / 30 / 90 day pills and assert only that the report still rendered.
+    The pills changed nothing but their highlight - spend is only measured over a trailing 30
+    days - so "7 Days" relabelled 30-day spend. The report now states its one real window.
+  */
+  it('states the one window it measures instead of offering pills that relabel it', () => {
     renderWithIntl(<ExecutiveBlendedReport canExecute={true} />);
 
-    const btn7d = screen.getByText('7 Days');
-    const btn30d = screen.getByText('30 Days');
-    const btn90d = screen.getByText('90 Days');
+    expect(screen.queryByText('7 Days')).not.toBeInTheDocument();
+    expect(screen.queryByText('90 Days')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-window-label')).toHaveTextContent('Last 30 Days');
+  });
 
-    expect(btn7d).toBeInTheDocument();
-    expect(btn30d).toBeInTheDocument();
-    expect(btn90d).toBeInTheDocument();
+  it('with no measured spend: no "Live" badge and no invented 50/50 channel split', () => {
+    renderWithIntl(<ExecutiveBlendedReport canExecute={true} />);
 
-    fireEvent.click(btn7d);
-    expect(screen.getByTestId('executive-blended-report')).toBeInTheDocument();
+    expect(screen.queryByTestId('zero-config-badge')).not.toBeInTheDocument();
+    expect(screen.getByTestId('channel-allocation-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('channel-split-bar')).not.toBeInTheDocument();
+    expect(screen.queryByText('(50%)')).not.toBeInTheDocument();
+    expect(screen.getByTestId('total-spend-val')).toHaveTextContent('No data');
+  });
 
-    fireEvent.click(btn90d);
-    expect(screen.getByTestId('executive-blended-report')).toBeInTheDocument();
+  it('with measured spend: shows the live badge and the real channel split', () => {
+    const metrics = createMockExecutiveMetrics({ metaSpendUsd: 750, googleSpendUsd: 250, totalSpendUsd: 1000 });
+    renderWithIntl(<ExecutiveBlendedReport metrics={metrics} />);
+
+    expect(screen.getByTestId('zero-config-badge')).toBeInTheDocument();
+    expect(screen.getByTestId('channel-split-bar')).toBeInTheDocument();
+    expect(screen.getByText('(75%)')).toBeInTheDocument();
+    expect(screen.getByText('(25%)')).toBeInTheDocument();
   });
 });
