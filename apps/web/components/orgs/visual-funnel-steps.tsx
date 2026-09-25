@@ -8,7 +8,7 @@ import {
   CheckCircle2,
   ArrowDownRight,
 } from 'lucide-react';
-import type { FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
+import { overallConversionPercent, type FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
 
 export interface VisualFunnelStepsProps {
   /** The project's own measured funnel steps. Must be non-empty - an absent funnel is the caller's empty state, never a sample. */
@@ -38,7 +38,7 @@ export function VisualFunnelSteps({
 
   const totalStarted = steps[0]?.customerCount ?? 0;
   const totalCompleted = steps[steps.length - 1]?.customerCount ?? 0;
-  const overallConversion = totalStarted > 0 ? Math.round((totalCompleted / totalStarted) * 100) : 0;
+  const overallConversion = overallConversionPercent(steps);
 
   // Find biggest drop-off stage
   let highestDropOffStep: FunnelStepItem | null = null;
@@ -135,7 +135,7 @@ export function VisualFunnelSteps({
                     className="text-xs text-muted-foreground"
                     dir="ltr"
                   >
-                    {`${step.customerCount} ${t('usersUnit')}`}
+                    {t('peopleCount', { count: step.customerCount })}
                   </span>
                 </div>
 
@@ -166,7 +166,8 @@ export function VisualFunnelSteps({
                     dir="ltr"
                   >
                     <ArrowDownRight className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    <span>{`-${step.dropOffPercent}% ${t('dropOffLabel')}`}</span>
+                    {/* A sign only on a real loss: "-0%" read as a negative drop-off. */}
+                    <span>{`${step.dropOffPercent > 0 ? '-' : ''}${step.dropOffPercent}% ${t('dropOffLabel')}`}</span>
                   </div>
                 )}
               </div>

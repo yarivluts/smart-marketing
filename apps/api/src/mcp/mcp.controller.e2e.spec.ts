@@ -21,10 +21,26 @@ import {
   registerMcpOAuthClient,
   registerMetricDefinition,
   registerSchemaDefinition,
+  queryProjectFunnelSteps,
   WinEventModel,
+  type WarehouseQueryExecutor,
 } from '@growthos/firebase-orm-models';
 import { AppModule } from '../app.module';
 import { MCP_RATE_LIMITER } from './mcp-auth.guard';
+
+// A pass-through wrapper, so every test here runs the real `queryProjectFunnelSteps` (and, with no warehouse in
+// this environment, gets its real "not configured" error) unless a test supplies a warehouse for one call.
+jest.mock('@growthos/firebase-orm-models', () => {
+  const actual = jest.requireActual('@growthos/firebase-orm-models');
+  return { ...actual, queryProjectFunnelSteps: jest.fn((...args: unknown[]) => actual.queryProjectFunnelSteps(...args)) };
+});
+const mockedQueryProjectFunnelSteps = queryProjectFunnelSteps as jest.MockedFunction<typeof queryProjectFunnelSteps>;
+const realQueryProjectFunnelSteps = jest.requireActual<typeof import('@growthos/firebase-orm-models')>('@growthos/firebase-orm-models').queryProjectFunnelSteps;
+
+/** Runs the next `query_funnel` call's REAL service (saved funnel from Firestore, real SQL) against `executor`. */
+function nextQueryFunnelUsesWarehouse(executor: WarehouseQueryExecutor): void {
+  mockedQueryProjectFunnelSteps.mockImplementationOnce((params) => realQueryProjectFunnelSteps({ ...params, executor }));
+}
 
 /**
  * Real Firestore-emulator-backed e2e coverage for KAN-75's MCP server —
@@ -781,6 +797,78 @@ describe('McpController (e2e)', () => {
         const again = JSON.parse(textOf(await client.callTool({ name: 'set_funnel', arguments: { steps: EASYSIGN_FUNNEL.map((name, index) => (index === 0 ? { event_schema_name: name, stage_key: 'awareness' } : name)), dry_run: true } }))) as { changed: boolean; previous_steps: unknown[] };
         expect(again.changed).toBe(false);
         expect(again.previous_steps).toHaveLength(5);
+      } finally {
+        await client.close();
+      }
+    });
+
+    /*
+      B21, reported by EasySign: set_funnel takes snake_case (event_schema_name) but query_funnel returned
+      camelCase (eventSchemaName), so a funnel read from one tool could not be handed to the other.
+      B20 in the same report: the counts were events per step, not people through the steps in order.
+    */
+    it("query_funnel's steps are snake_case people counts that feed straight back into set_funnel", async () => {
+      const { rawKey } = await setupEasySignProject('Funnel Round Trip Org', ['mcp.read', 'project.configure']);
+      const client = await connectedClient(rawKey);
+      try {
+        expect((await client.callTool({ name: 'set_funnel', arguments: { steps: EASYSIGN_FUNNEL } })).isError ?? false).toBe(false);
+
+        // EasySign dev's real sequential counts (proven on DuckDB and BigQuery for B20).
+        const warehouse = { calls: [] as string[], execute(query: { sql: string }) {
+          this.calls.push(query.sql);
+          return Promise.resolve([0, 1, 2, 3, 4].map((stepIndex) => ({ step_index: stepIndex, people_count: stepIndex === 0 ? 4 : 2 })));
+        } };
+        nextQueryFunnelUsesWarehouse(warehouse);
+        const query = await client.callTool({ name: 'query_funnel', arguments: {} });
+        expect(query.isError ?? false).toBe(false);
+        const body = JSON.parse(textOf(query)) as { steps: Array<Record<string, unknown>> };
+        expect(warehouse.calls[0]).toContain('LEFT JOIN bridge_identity');
+
+        expect(body.steps.map((step) => [step.event_schema_name, step.step_order, step.people_count, step.conversion_rate_from_first, step.conversion_rate_from_previous])).toEqual([
+          ['touchpoint', 0, 4, 1, 1],
+          ['signup', 1, 2, 0.5, 0.5],
+          ['document_created', 2, 2, 0.5, 1],
+          ['document_sent', 3, 2, 0.5, 1],
+          ['document_signed', 4, 2, 0.5, 1],
+        ]);
+        expect(body.steps[0]).toMatchObject({ stage_key: expect.any(String) });
+        // Deprecated camelCase duplicates, kept for one release.
+        expect(body.steps[1]).toMatchObject({ eventSchemaName: 'signup', stageKey: body.steps[1].stage_key, stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.5 });
+
+        // The round trip: query_funnel's own step objects, unmodified, are a valid set_funnel input.
+        const roundTrip = await client.callTool({ name: 'set_funnel', arguments: { steps: body.steps, dry_run: true } });
+        expect(roundTrip.isError ?? false).toBe(false);
+        const preview = JSON.parse(textOf(roundTrip)) as { would_set: Array<{ event_schema_name: string; stage_key: string }>; changed: boolean };
+        expect(preview.would_set.map((step) => step.event_schema_name)).toEqual(EASYSIGN_FUNNEL);
+        expect(preview.would_set.map((step) => step.stage_key)).toEqual(body.steps.map((step) => step.stage_key));
+        expect(preview.changed).toBe(false);
+      } finally {
+        await client.close();
+      }
+    });
+
+    it('set_funnel accepts camelCase step objects too, snake_case winning when both are given', async () => {
+      const { rawKey } = await setupEasySignProject('Funnel Camel Case Org', ['mcp.read']);
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({
+          name: 'set_funnel',
+          arguments: {
+            steps: [
+              { eventSchemaName: 'touchpoint', stageKey: 'awareness' },
+              { event_schema_name: 'signup', eventSchemaName: 'document_sent', stage_key: 'signup', stageKey: 'other' },
+              'document_signed',
+            ],
+            dry_run: true,
+          },
+        });
+        expect(result.isError ?? false).toBe(false);
+        const preview = JSON.parse(textOf(result)) as { would_set: Array<{ event_schema_name: string; stage_key: string }> };
+        expect(preview.would_set.map((step) => [step.event_schema_name, step.stage_key])).toEqual([
+          ['touchpoint', 'awareness'],
+          ['signup', 'signup'],
+          ['document_signed', expect.any(String)],
+        ]);
       } finally {
         await client.close();
       }

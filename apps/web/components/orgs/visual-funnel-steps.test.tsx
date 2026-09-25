@@ -3,7 +3,7 @@ import { screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 import { VisualFunnelSteps } from './visual-funnel-steps';
 import { renderWithIntl } from '../../tests/e2e/helpers/test-harness';
-import type { FunnelStepItem } from '../../lib/orgs/funnel-goals-synthesizer';
+import { calculateFunnelStepItems, type FunnelStepItem } from '../../lib/orgs/funnel-goals-synthesizer';
 
 const STEPS: FunnelStepItem[] = [
   { stageKey: 'sent', stageLabel: 'Sent', stepOrder: 1, customerCount: 500, conversionPercent: 100, dropOffPercent: 0 },
@@ -34,14 +34,60 @@ describe('VisualFunnelSteps Component', () => {
     renderWithIntl(<VisualFunnelSteps steps={STEPS} funnelName="EasySign" />);
 
     expect(screen.getByText('Conversion Funnel: EasySign')).toBeInTheDocument();
-    expect(screen.getByTestId('count-sent')).toHaveTextContent('500 users');
-    expect(screen.getByTestId('count-viewed')).toHaveTextContent('200 users');
-    expect(screen.getByTestId('count-signed')).toHaveTextContent('150 users');
+    expect(screen.getByTestId('count-sent')).toHaveTextContent('500 people');
+    expect(screen.getByTestId('count-viewed')).toHaveTextContent('200 people');
+    expect(screen.getByTestId('count-signed')).toHaveTextContent('150 people');
 
     expect(screen.getByTestId('pct-viewed')).toHaveTextContent('40%');
     expect(screen.getByTestId('dropoff-viewed')).toHaveTextContent('-60% drop-off');
     expect(screen.getByTestId('bar-sent')).toHaveStyle({ width: '100%' });
     expect(screen.getByTestId('bar-signed')).toHaveStyle({ width: '30%' });
+  });
+
+  /*
+    B20: EasySign's page showed "Total Started 4", every later step "6 users", "Overall Conversion 150%" and
+    "-0% drop-off". With the sequential people counts the query now returns, it reads 4 -> 2 -> 2 -> 2 -> 2.
+  */
+  it("renders EasySign's funnel in people: 50% overall, one real drop-off, no signed zero", () => {
+    const easySign = calculateFunnelStepItems([
+      { eventSchemaName: 'touchpoint', stageKey: 'awareness', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.5 },
+      { eventSchemaName: 'document_signed', stageKey: 'other', stepOrder: 2, customerCount: 2, conversionRateFromFirst: 0.5 },
+    ]);
+    renderWithIntl(<VisualFunnelSteps steps={easySign} funnelName="EasySign" />);
+
+    expect(screen.getByTestId('count-awareness')).toHaveTextContent('4 people');
+    expect(screen.getByTestId('count-signup')).toHaveTextContent('2 people');
+    expect(screen.getByText('Overall Conversion:').parentElement).toHaveTextContent('50%');
+    expect(screen.getByTestId('dropoff-signup')).toHaveTextContent('-50% drop-off');
+    expect(screen.getByTestId('dropoff-other')).toHaveTextContent('0% drop-off');
+    expect(screen.getByTestId('dropoff-other')).not.toHaveTextContent('-0%');
+    // Nothing above 100% anywhere on the card.
+    expect(screen.queryAllByText(/(^|\D)(10[1-9]|1[1-9]\d|[2-9]\d\d|\d{4,})%/)).toHaveLength(0);
+  });
+
+  it('says "1 person", not "1 people"', () => {
+    renderWithIntl(
+      <VisualFunnelSteps
+        steps={[{ stageKey: 'solo', stageLabel: 'Solo', stepOrder: 0, customerCount: 1, conversionPercent: 100, dropOffPercent: 0 }]}
+        funnelName="EasySign"
+      />,
+    );
+    expect(screen.getByTestId('count-solo')).toHaveTextContent('1 person');
+  });
+
+  it('never renders an overall conversion above 100%, even if handed counts that grow', () => {
+    renderWithIntl(
+      <VisualFunnelSteps
+        steps={calculateFunnelStepItems([
+          { stageKey: 'a', stepOrder: 0, customerCount: 4 },
+          { stageKey: 'b', stepOrder: 1, customerCount: 6 },
+        ])}
+        funnelName="EasySign"
+      />,
+    );
+    expect(screen.getByText('Overall Conversion:').parentElement).toHaveTextContent('100%');
+    expect(screen.queryByText('150%')).not.toBeInTheDocument();
   });
 
   it('shows the drop-off alert for a measured high drop-off and invokes onAskCopilot', () => {

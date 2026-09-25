@@ -160,8 +160,8 @@ describe('FunnelGoalsDashboard Component', () => {
 
       expect(screen.queryByTestId('funnel-empty-state')).not.toBeInTheDocument();
       expect(screen.getByTestId('visual-funnel-container')).toBeInTheDocument();
-      expect(screen.getByTestId('count-sent')).toHaveTextContent('500 users');
-      expect(screen.getByTestId('count-viewed')).toHaveTextContent('200 users');
+      expect(screen.getByTestId('count-sent')).toHaveTextContent('500 people');
+      expect(screen.getByTestId('count-viewed')).toHaveTextContent('200 people');
       expect(screen.getByTestId('funnel-dropoff-alert-card')).toBeInTheDocument();
       expect(screen.getByTestId('ask-copilot-btn')).toBeInTheDocument();
       expect(screen.getByTestId('kpi-overall-conversion')).toHaveTextContent('30%');

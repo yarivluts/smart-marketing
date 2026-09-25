@@ -39,8 +39,11 @@ export interface FunnelStepItem {
   stageKey: string;
   stageLabel: string;
   stepOrder: number;
+  /** People who reached this step having gone through every earlier step in order (B20) - never more than the step before. */
   customerCount: number;
+  /** Share of the first step's people, 0..100. */
   conversionPercent: number;
+  /** Share of the previous step's people lost at this step, 0..100 (0 for the first step). */
   dropOffPercent: number;
 }
 
@@ -223,7 +226,29 @@ export function calculateDaysRemaining(deadline: string): number {
 }
 
 /**
- * Calculates drop-off and conversion rates from raw step results.
+ * A whole-number percentage of `part` out of `whole`, within 0..100.
+ *
+ * The bounds are a display guard, not the fix: funnel counts are sequential (a person counts at step N only
+ * after steps 0..N, in order), so a step can never exceed the one before it and a real funnel never needs the
+ * clamp. It exists so that if that invariant were ever broken again (B20 showed EasySign "150%" conversion and
+ * "-0%" drop-offs off per-step event counts), the page shows a bounded number instead of an impossible one;
+ * the query's own DuckDB proof (`funnel-steps-query.duckdb.test.ts`) is what guarantees the counts.
+ */
+export function boundedPercent(part: number, whole: number): number {
+  if (!(whole > 0)) return 0;
+  const percent = Math.round((part / whole) * 100);
+  return Number.isFinite(percent) ? Math.min(100, Math.max(0, percent)) : 0;
+}
+
+/** The funnel's overall conversion - last step's people out of the first step's - as a 0..100 whole percentage. */
+export function overallConversionPercent(steps: readonly { customerCount: number }[]): number {
+  if (steps.length === 0) return 0;
+  return boundedPercent(steps[steps.length - 1].customerCount, steps[0].customerCount);
+}
+
+/**
+ * Conversion (off the first step) and drop-off (off the previous step) for each step, from the sequential
+ * people counts `query_funnel` returns.
  */
 export function calculateFunnelStepItems(
   rawSteps: { eventSchemaName?: string; stageKey: string; stepOrder: number; customerCount: number; conversionRateFromFirst?: number }[],
@@ -238,15 +263,10 @@ export function calculateFunnelStepItems(
     const prevCount = idx > 0 ? sorted[idx - 1].customerCount : step.customerCount;
     const conversionPercent =
       step.conversionRateFromFirst !== undefined
-        ? Math.round(step.conversionRateFromFirst * 100)
-        : firstCount > 0
-          ? Math.round((step.customerCount / firstCount) * 100)
-          : 0;
+        ? boundedPercent(step.conversionRateFromFirst, 1)
+        : boundedPercent(step.customerCount, firstCount);
 
-    const dropOffPercent =
-      idx > 0 && prevCount > 0
-        ? Math.max(0, Math.round(((prevCount - step.customerCount) / prevCount) * 100))
-        : 0;
+    const dropOffPercent = idx > 0 ? boundedPercent(prevCount - step.customerCount, prevCount) : 0;
 
     const stageLabel = stageLabelLookup ? stageLabelLookup(step.stageKey) : step.stageKey;
 
@@ -283,8 +303,7 @@ export function buildVisualFunnelData(
   const steps = calculateFunnelStepItems(outcome.steps, stageLabelLookup);
   const totalStarted = steps[0]?.customerCount ?? 0;
   const totalCompleted = steps[steps.length - 1]?.customerCount ?? 0;
-  const overallConversionPercent =
-    totalStarted > 0 ? Math.round((totalCompleted / totalStarted) * 100) : 0;
+  const overallConversion = overallConversionPercent(steps);
 
   let biggestDropOffStageKey: string | undefined;
   let biggestDropOffPercent = 0;
@@ -300,7 +319,7 @@ export function buildVisualFunnelData(
     kind: 'ok',
     totalStarted,
     totalCompleted,
-    overallConversionPercent,
+    overallConversionPercent: overallConversion,
     biggestDropOffStageKey,
     biggestDropOffPercent,
     steps,

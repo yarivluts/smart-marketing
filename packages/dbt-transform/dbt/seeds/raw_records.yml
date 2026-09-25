@@ -64,6 +64,16 @@ seeds:
       (two by `agent_a1`, one by `agent_a2`, each with its own first-
       response/resolution/CSAT values) and one left open (exercising the
       leaderboard's open-backlog count) — isolated the same way.
+      `proj_25` and `proj_26` are B20's funnel fixtures (`query_funnel`
+      counts people through the steps in order): `proj_25` reproduces
+      EasySign dev (four touchpoint visitors, two stitched to customers who
+      go on to create/send/sign, four REST customers with no touchpoint;
+      expected 4/2/2/2/2) and `proj_26` the edge cases (skipped step, out of
+      order, repeats, never-identified visitor, legacy event-id identity,
+      two devices, timestamp tie, and an env_other that must not leak;
+      expected 9/8/4/3/2). `assert_funnel_identity_fixture_b20` pins their
+      identity edges; the funnel counts are proven in @growthos/firebase-
+      orm-models' `funnel-steps-query.duckdb.test.ts` over these same rows.
     columns:
       - name: organization_id
         tests:
