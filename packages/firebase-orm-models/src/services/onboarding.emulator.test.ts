@@ -6,17 +6,22 @@ import {
   createOrganizationWithOwner,
   createProject,
   ensureUserForFirebaseSession,
+  getConfirmedFunnelSteps,
   getOnboardingState,
   getOrCreateOnboardingState,
+  InvalidFunnelDefinitionError,
+  listAuditLogEntriesForOrg,
   listMetricDefinitionsForProject,
   listBoardsForProject,
   listOnboardingMetricPacks,
   listPluginInstallsForProject,
   markOnboardingSourceConnected,
   mintApiKey,
+  previewProjectFunnel,
   proposeOnboardingFunnelSteps,
   registerSchemaDefinition,
   selectOnboardingMetricPack,
+  setProjectFunnel,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -216,6 +221,137 @@ describe('proposeOnboardingFunnelSteps + confirmOnboardingFunnelSteps', () => {
   it('returns an empty proposal for a project with no registered event schemas yet', async () => {
     const { organization, project } = await setupOrgWithProject('Onboarding No Schemas Org');
     expect(await proposeOnboardingFunnelSteps(organization.id, project.id)).toEqual([]);
+  });
+});
+
+describe('previewProjectFunnel + setProjectFunnel (KAN-199)', () => {
+  async function registerEvent(organizationId: string, projectId: string, userId: string, name: string, kind: 'event' | 'measure' = 'event') {
+    await registerSchemaDefinition({
+      organizationId,
+      projectId,
+      kind,
+      name,
+      fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+      createdByUserId: userId,
+    });
+  }
+
+  /** EasySign's own intended funnel — the integrator whose report this task came from. */
+  const EASYSIGN_FUNNEL = ['touchpoint', 'signup', 'document_created', 'document_sent', 'document_signed'];
+
+  async function setupEasySignProject(orgName: string) {
+    const setup = await setupOrgWithProject(orgName);
+    for (const name of EASYSIGN_FUNNEL) {
+      await registerEvent(setup.organization.id, setup.project.id, setup.owner.id, name);
+    }
+    return setup;
+  }
+
+  it('previews the resolved funnel without writing anything', async () => {
+    const { organization, project } = await setupEasySignProject('Funnel Preview Org');
+
+    const preview = await previewProjectFunnel({
+      organizationId: organization.id,
+      projectId: project.id,
+      steps: EASYSIGN_FUNNEL.map((eventSchemaName) => ({ eventSchemaName })),
+    });
+
+    expect(preview.steps.map((step) => step.eventSchemaName)).toEqual(EASYSIGN_FUNNEL);
+    expect(preview.steps.map((step) => step.order)).toEqual([0, 1, 2, 3, 4]);
+    // Stage keys are inferred by the wizard's own heuristic when not given.
+    expect(preview.steps[1].stageKey).toBe('signup');
+    expect(preview.previousSteps).toEqual([]);
+    expect(preview.changed).toBe(true);
+    expect(await getOnboardingState(organization.id, project.id)).toBeNull();
+    expect(await getConfirmedFunnelSteps(organization.id, project.id)).toEqual([]);
+  });
+
+  it('stores the funnel in the same field the wizard writes, without advancing the wizard or claiming it was started', async () => {
+    const { owner, organization, project } = await setupEasySignProject('Funnel Set Org');
+
+    const result = await setProjectFunnel({
+      organizationId: organization.id,
+      projectId: project.id,
+      actorType: 'api_key',
+      actorId: 'key-123',
+      steps: [{ eventSchemaName: 'touchpoint', stageKey: 'awareness' }, ...EASYSIGN_FUNNEL.slice(1).map((eventSchemaName) => ({ eventSchemaName }))],
+    });
+    expect(result.changed).toBe(true);
+
+    const state = await getOnboardingState(organization.id, project.id);
+    expect(state?.funnel_steps.map((step) => step.eventSchemaName)).toEqual(EASYSIGN_FUNNEL);
+    expect(state?.funnel_steps[0]).toEqual({ eventSchemaName: 'touchpoint', stageKey: 'awareness', order: 0 });
+    expect(state?.step).toBe('pack');
+    expect(await getConfirmedFunnelSteps(organization.id, project.id)).toEqual(state?.funnel_steps);
+
+    const entries = await listAuditLogEntriesForOrg(organization.id);
+    const funnelEntry = entries.find((entry) => entry.action === 'funnel.set');
+    expect(funnelEntry).toMatchObject({ actor_type: 'api_key', actor_id: 'key-123', project_id: project.id });
+    expect(funnelEntry?.summary).toContain('touchpoint -> signup -> document_created -> document_sent -> document_signed');
+    expect(funnelEntry?.before).toEqual({ steps: [] });
+    // No human started the wizard, so neither must its start entry appear.
+    expect(entries.some((entry) => entry.action === 'onboarding.start')).toBe(false);
+
+    // Replacing it reports the previous funnel, and keeps the wizard's own progress untouched.
+    await confirmOnboardingFunnelSteps({ organizationId: organization.id, projectId: project.id, userId: owner.id, steps: [] });
+    const replaced = await setProjectFunnel({
+      organizationId: organization.id,
+      projectId: project.id,
+      actorType: 'user',
+      actorId: owner.id,
+      steps: [{ eventSchemaName: 'signup' }, { eventSchemaName: 'document_signed' }],
+    });
+    expect(replaced.previousSteps).toEqual([]);
+    const reread = await getOnboardingState(organization.id, project.id);
+    expect(reread?.id).toBe(state?.id);
+    expect(reread?.step).toBe('board');
+    expect(reread?.funnel_steps.map((step) => step.eventSchemaName)).toEqual(['signup', 'document_signed']);
+  });
+
+  it('reports an unchanged funnel as changed: false', async () => {
+    const { organization, project } = await setupEasySignProject('Funnel Unchanged Org');
+    const steps = [{ eventSchemaName: 'signup' }, { eventSchemaName: 'document_signed' }];
+    await setProjectFunnel({ organizationId: organization.id, projectId: project.id, actorType: 'user', actorId: 'u', steps });
+    const again = await previewProjectFunnel({ organizationId: organization.id, projectId: project.id, steps });
+    expect(again.changed).toBe(false);
+    expect(again.previousSteps.map((step) => step.eventSchemaName)).toEqual(['signup', 'document_signed']);
+  });
+
+  it('refuses fewer than two steps', async () => {
+    const { organization, project } = await setupEasySignProject('Funnel Too Few Org');
+    await expect(previewProjectFunnel({ organizationId: organization.id, projectId: project.id, steps: [{ eventSchemaName: 'signup' }] })).rejects.toThrow(/at least 2 steps; got 1/);
+    await expect(previewProjectFunnel({ organizationId: organization.id, projectId: project.id, steps: [] })).rejects.toBeInstanceOf(InvalidFunnelDefinitionError);
+  });
+
+  it('refuses a duplicate, an unknown name, a non-event schema and a bad stage key — every reason at once, with the accepted names', async () => {
+    const { owner, organization, project } = await setupEasySignProject('Funnel Invalid Org');
+    await registerEvent(organization.id, project.id, owner.id, 'mrr', 'measure');
+
+    const error = await setProjectFunnel({
+      organizationId: organization.id,
+      projectId: project.id,
+      actorType: 'user',
+      actorId: owner.id,
+      steps: [
+        { eventSchemaName: 'signup' },
+        { eventSchemaName: 'nope' },
+        { eventSchemaName: 'signup' },
+        { eventSchemaName: 'mrr' },
+        { eventSchemaName: 'document_sent', stageKey: 'bogus' },
+      ],
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(InvalidFunnelDefinitionError);
+    const { reasons, availableEventSchemas } = error as InvalidFunnelDefinitionError;
+    expect(reasons).toEqual([
+      '"nope" is not a registered event schema in this project.',
+      '"signup" appears more than once (steps 1 and 3); each event can be only one step.',
+      '"mrr" is registered as a measure schema, not an event; a funnel step must be an event schema.',
+      expect.stringContaining('stage key "bogus"'),
+    ]);
+    expect(availableEventSchemas).toEqual([...EASYSIGN_FUNNEL].sort());
+    // Nothing was written.
+    expect(await getOnboardingState(organization.id, project.id)).toBeNull();
   });
 });
 

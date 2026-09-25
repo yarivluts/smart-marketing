@@ -3,7 +3,7 @@ import { listActiveTrackingAlertsForProject } from './tracking-alert.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
 import { auditMetricCatalogHealth } from './metric-registry.service';
-import { getOnboardingState } from './onboarding.service';
+import { getConfirmedFunnelSteps } from './onboarding.service';
 import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 
 /**
@@ -286,6 +286,8 @@ export interface QueryProjectFunnelStepsParams {
 }
 
 export interface FunnelStepResult {
+  /** The event schema this step counts (`events.event_type`). Two steps can share a stage key (several events all classified `other`, say), so this — not `stageKey` — is what tells steps apart. */
+  eventSchemaName: string;
   stageKey: string;
   stepOrder: number;
   /** Distinct customers who ever reached this stage (`fact_funnel_step`'s own "first reached" grain — a customer can't inflate this by re-firing the same step event). */
@@ -324,8 +326,7 @@ export interface FunnelStepResult {
  * the warehouse.
  */
 export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsParams): Promise<FunnelStepResult[]> {
-  const state = await getOnboardingState(params.organizationId, params.projectId);
-  const steps = [...(state?.funnel_steps ?? [])].sort((a, b) => a.order - b.order);
+  const steps = await getConfirmedFunnelSteps(params.organizationId, params.projectId);
   if (steps.length === 0) {
     return [];
   }
@@ -369,6 +370,7 @@ export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsPar
   return steps.map((step) => {
     const customerCount = countByEventType.get(step.eventSchemaName) ?? 0;
     return {
+      eventSchemaName: step.eventSchemaName,
       stageKey: step.stageKey,
       stepOrder: step.order,
       customerCount,
