@@ -49,8 +49,14 @@ const MOUNTED = ['auth', 'campaigns', 'orgs', 'tv', 'ui'];
  *
  * `shell` is the one worth pointing at: it duplicates `components/orgs/app-shell.tsx`,
  * which is the shell actually rendered by the project layout.
+ *
+ * `funnel` and `goals` used to be listed here too. They were deleted deliberately (Jira B15),
+ * not tidied away: both were built around sample data presented as real - DEFAULT_EASYSIGN_STEPS,
+ * DEFAULT_COHORTS, DEFAULT_GOALS, DEFAULT_PAYBACK_WINDOWS, DEFAULT_QUALITY_TIERS, channel
+ * "filters" that multiplied counts by a constant - so mounting either would have put invented
+ * numbers on a real project. The live equivalents are in `components/orgs`.
  */
-const NOT_MOUNTED = ['ai', 'automation', 'billing', 'funnel', 'goals', 'members', 'reporting', 'settings', 'shell'];
+const NOT_MOUNTED = ['ai', 'automation', 'billing', 'members', 'reporting', 'settings', 'shell'];
 
 function componentDirectories(): string[] {
   return readdirSync(COMPONENTS_ROOT)
