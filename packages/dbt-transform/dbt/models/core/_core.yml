@@ -89,8 +89,11 @@ models:
           - not_null
           - unique
       - name: customer_id
-        tests:
-          - not_null
+        description: >
+          The converting customer: the event's declared properties.customer_id,
+          else (for an event declaring neither anon_id nor customer_id) its
+          entity_id. NULL for an anonymous conversion - one that declares an
+          anon_id but no customer_id - which is never a customer, only a visitor.
       - name: conversion_event_id
         tests:
           - not_null

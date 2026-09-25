@@ -62,9 +62,18 @@ conversions as (
         environment_id,
         event_id as conversion_event_id,
         -- The customer, not the event (B12): a declared properties.customer_id
-        -- wins over entity_id, which is the event's own id under the
-        -- documented contract.
-        coalesce({{ json_text_field('properties', "'customer_id'") }}, entity_id) as customer_id,
+        -- wins. An event that declares an anon_id but no customer_id is an
+        -- ANONYMOUS event under the documented contract, so it has no customer:
+        -- null, never its own event id (KAN-205 - an event id read as a
+        -- customer is a phantom person). Events declaring neither keep
+        -- entity_id, the older convention where event_id named the customer.
+        case
+            when {{ json_text_field('properties', "'customer_id'") }} is not null
+                then {{ json_text_field('properties', "'customer_id'") }}
+            when {{ json_text_field('properties', "'anon_id'") }} is not null
+                then cast(null as {{ dbt.type_string() }})
+            else entity_id
+        end as customer_id,
         {{ json_text_field('properties', "'anon_id'") }} as anon_id,
         coalesce({{ json_text_field('properties', "'event_name'") }}, event_type) as conversion_event,
         occurred_at
