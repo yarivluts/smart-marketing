@@ -427,7 +427,10 @@ describe('McpController (e2e)', () => {
         };
         expect(schemas.schemas.find((entry) => entry.name === 'signup')?.version).toBe(2);
         // The undeclared-but-accepted event fields are stated, not left for a caller to discover by probing.
-        expect((schemas as unknown as { implicit_event_fields: Array<{ name: string }> }).implicit_event_fields.map((field) => field.name)).toEqual(['anon_id', 'customer_id']);
+        const implicit = (schemas as unknown as { implicit_event_fields: Array<{ name: string; note: string }> }).implicit_event_fields;
+        expect(implicit.map((field) => field.name)).toEqual(['anon_id', 'customer_id']);
+        // Registration is irreversible: the note must not send integrators to declare a field stitching reads anyway.
+        expect(implicit.every((field) => /whether or not it is declared/.test(field.note) && !/only to use it for identity stitching/.test(field.note))).toBe(true);
 
         // A metric written against that catalog registers; one naming a column the table lacks is refused with the reason.
         const registered = await client.callTool({

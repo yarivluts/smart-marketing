@@ -328,7 +328,10 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
           name,
           type: 'string',
           accepted_undeclared: true,
-          note: 'Accepted in properties on every event schema without being declared. Declare it explicitly (optional, is_identity_key) only to use it for identity stitching; never as required.',
+          // Registration cannot be undone, so this must not suggest a declaration that
+          // buys nothing: since the identity fix (B12) stitching reads these straight
+          // from properties, declared or not.
+          note: 'Accepted in properties on every event schema without being declared, and identity stitching reads it from properties whether or not it is declared. Declaring it is optional and never needed; never declare it as required.',
         })),
         schemas: schemas
           .filter((schema) => schema.status === 'active')
