@@ -47,6 +47,14 @@ anonymous_via_identity as (
     where project_id = 'proj_24'
       and conversion_event in ('page_view', 'cta_click')
       and via_identity
+),
+-- KAN-205: an anonymous event has no customer - not its own event id.
+anonymous_with_customer as (
+    select count(*) as n
+    from {{ ref('fact_attribution') }}
+    where project_id = 'proj_24'
+      and conversion_event in ('page_view', 'cta_click')
+      and customer_id is not null
 )
 select 'lp_missing' as failure, landing_page as detail from (select * from expected_lp except select * from actual_lp) m
 union all
@@ -59,3 +67,5 @@ union all
 select 'signup_not_credited', cast(n as varchar) from signup_credit where n != 1
 union all
 select 'anonymous_event_resolved_as_customer', cast(n as varchar) from anonymous_via_identity where n != 0
+union all
+select 'anonymous_event_has_customer', cast(n as varchar) from anonymous_with_customer where n != 0
