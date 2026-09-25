@@ -39,12 +39,13 @@ test.describe('Funnel conversion (query_funnel admin surface)', () => {
 
     await page.getByRole('link', { name: 'Conversion', exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/${projectId}/funnel$`));
-    // The tri-module redesign (2026-08-31) replaced the old dedicated funnel page (which showed a
-    // "no funnel confirmed yet" empty state for a project with no real data) with a unified
-    // "Funnel, Goals & Revenue Health" cockpit that always synthesizes a full, zero-config view —
-    // see `lib/orgs/funnel-goals-synthesizer.ts`'s own doc comment. No empty state exists anymore
-    // to assert against; asserting the cockpit's own real, stable headings instead.
+    // A fresh project has no confirmed funnel. The cockpit used to "synthesize a full,
+    // zero-config view" here - a sample EasySign funnel with a drop-off alert and an AI Copilot
+    // suggestion (Jira B15). It must show an honest empty state instead, with no sample badge.
     await expect(page.getByRole('heading', { name: 'Funnel, Goals & Revenue Health' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Conversion Funnel: Client Theta' })).toBeVisible();
+    await expect(page.getByText('No funnel is defined for this project yet')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Define your funnel' })).toBeVisible();
+    await expect(page.getByText(/Simulated Mode/)).toHaveCount(0);
+    await expect(page.getByText('Funnel Drop-off Alert')).toHaveCount(0);
   });
 });

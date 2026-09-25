@@ -1,5 +1,4 @@
 import {
-  calculateGoalProgress,
   computeElapsedFraction,
   type GoalDirection,
   type GoalPaceStatus,
@@ -15,6 +14,24 @@ import type {
 } from '@growthos/firebase-orm-models';
 import { buildFunnelView, type FunnelView } from './funnel-view';
 import { buildCohortRetentionView, type CohortRetentionView } from './cohort-retention-view';
+import type { GoalProgressUnavailableReason } from './goal-view';
+
+/*
+  Data-honesty contract for this module (Jira B15).
+
+  Everything returned here is either derived from a measurement the caller passed in, or it is
+  absent - an empty list, a `null`, or a `kind` saying why there is nothing to show. There is no
+  third option. This file used to have one: when a project had no funnel it returned
+  `createMockEasySignFunnel`'s 1000/380/220 (scaled per project by a hash of the project id, so
+  EasySign's real project showed 955/363/210); when it had no goals it returned five invented
+  goals with invented owners; with no cohort, payback or calibration data it returned hard-coded
+  retention rows, revenue windows and Diamond/Gold/Silver/Bronze tiers; and it applied an invented
+  `windowDays * 1200` revenue target to REAL payback data. An integrator found the funnel page
+  telling a real customer to launch a retargeting campaign against a drop-off nobody had measured.
+
+  A reader cannot tell an invented number from a measured one, so an invented number must never
+  be produced. When a measurement is missing, say what is missing.
+*/
 
 export interface FunnelStepItem {
   stageKey: string;
@@ -27,16 +44,35 @@ export interface FunnelStepItem {
 
 export type VisualFunnelStepItem = FunnelStepItem;
 
-export interface VisualFunnelData {
-  funnelName: string;
-  isSimulated: boolean;
-  totalStarted: number;
-  totalCompleted: number;
-  overallConversionPercent: number;
-  biggestDropOffStageKey?: string;
-  biggestDropOffPercent: number;
-  steps: FunnelStepItem[];
-}
+/** Why the funnel has nothing to show - `FunnelView`'s own degraded kinds. */
+export type FunnelUnavailableKind = Exclude<FunnelView['kind'], 'ok'>;
+
+/**
+ * The funnel as the cockpit renders it. Only the `ok` branch carries numbers; every other branch
+ * says why there are none (no funnel confirmed yet, warehouse not configured, quota, error).
+ */
+export type VisualFunnelData =
+  | {
+      kind: 'ok';
+      totalStarted: number;
+      totalCompleted: number;
+      overallConversionPercent: number;
+      biggestDropOffStageKey?: string;
+      biggestDropOffPercent: number;
+      steps: FunnelStepItem[];
+    }
+  | { kind: FunnelUnavailableKind };
+
+/**
+ * Where a goal's progress figures came from.
+ *
+ * - `ok`: measured by `queryGoalProgress` - the only kind that carries numbers.
+ * - `no_measurements`: the query ran but the metric has no rows in the goal's window. A sum over
+ *   no rows is 0, and pace against that 0 reads "off track"; that is not a measurement.
+ * - `pending`: the goal was just created in this session and has not been queried yet.
+ * - the `GoalProgressUnavailableReason`s: the query could not run or failed.
+ */
+export type GoalProgressKind = 'ok' | 'no_measurements' | 'pending' | GoalProgressUnavailableReason;
 
 export interface UnifiedGoalItem {
   id: string;
@@ -51,26 +87,31 @@ export interface UnifiedGoalItem {
   rhythm: GoalRhythm;
   ownerPersonId: string;
   ownerName?: string;
-  actualValue: number;
-  expectedAtNow: number;
-  projectedFinalValue: number;
-  percentFilled: number;
-  status: GoalPaceStatus;
-  statusColor: 'green' | 'amber' | 'red';
-  isGoalMet: boolean;
+  progressKind: GoalProgressKind;
+  /** Null unless `progressKind === 'ok'`. */
+  actualValue: number | null;
+  expectedAtNow: number | null;
+  projectedFinalValue: number | null;
+  percentFilled: number | null;
+  status: GoalPaceStatus | null;
+  statusColor: 'green' | 'amber' | 'red' | null;
+  isGoalMet: boolean | null;
+  /** Calendar facts from the goal's own dates - real whether or not progress was measured. */
   elapsedFraction: number;
   daysRemaining: number;
-  isDemo?: boolean;
 }
 
 export type GoalPaceItem = UnifiedGoalItem;
 
 export interface GoalsCockpitSummary {
   totalGoalsCount: number;
+  /** Goals whose progress was actually measured. The status counts below cover only these. */
+  measuredGoalsCount: number;
   onTrackCount: number;
   atRiskCount: number;
   offTrackCount: number;
-  averageProgressPct: number;
+  /** Mean fill of measured goals; null when no goal was measured. */
+  averageProgressPct: number | null;
   activeGoalsCount: number;
 }
 
@@ -81,11 +122,14 @@ export interface CohortHeatmapRow {
   retentionByPeriod: Map<number, { retainedCount: number; retentionRatePercent: number; colorClass: string }>;
 }
 
+/**
+ * One cumulative collected-revenue window. There is deliberately no target or pace here: nothing
+ * in GrowthOS lets a project set a payback target, and the `windowDays * 1200` that used to fill
+ * this slot was invented - and it was applied to real revenue, painting a pace bar against it.
+ */
 export interface PaybackVelocityItem {
   windowDays: 7 | 14 | 30 | 40;
   collectedRevenue: number;
-  targetRevenue: number;
-  pacePercent: number;
 }
 
 export interface QualityCalibrationItem {
@@ -93,9 +137,19 @@ export interface QualityCalibrationItem {
   tierLabel: string;
   signups: number;
   payingSignups: number;
-  payingRatePercent: number;
-  avgCollectedRevenue40d: number;
+  /** Null when the tier had no signups - an undefined ratio, not 0%. */
+  payingRatePercent: number | null;
+  avgCollectedRevenue40d: number | null;
 }
+
+/** Why a warehouse-backed cockpit section has nothing to show. */
+export type WarehouseSectionKind =
+  | 'ok'
+  | 'no_data'
+  | 'warehouse_not_configured'
+  | 'quota_exceeded'
+  | 'not_yet_backed'
+  | 'query_error';
 
 /**
  * The funnel cockpit's headline figures.
@@ -103,14 +157,14 @@ export interface QualityCalibrationItem {
  * The retention / velocity / payback / dunning / churn fields are nullable because GrowthOS
  * has no source for any of them yet. They used to be the literals 64, 3.8, 48200, 82.4 and
  * 1.8 - written straight into the returned object, never derived from anything - and the
- * dashboard rendered them beside the two figures that are real. `topFunnelDropOffPct` had a
- * `|| 62` fallback and `overallFunnelConversionPct` fell back to 22, so even those two
- * produced confident numbers for a project with no funnel at all.
+ * dashboard rendered them beside the two figures that are real. The two funnel figures are
+ * null too unless the project's own funnel was measured.
  */
 export interface FunnelGoalsExecutiveSummary {
   overallFunnelConversionPct: number | null;
   topFunnelDropOffPct: number | null;
   activeGoalsCount: number;
+  goalsMeasuredCount: number;
   goalsOnTrackCount: number;
   avgMonth1RetentionPct: number | null;
   avgConversionVelocityDays: number | null;
@@ -134,22 +188,21 @@ export interface ProactiveFunnelGoalRecommendation {
 
 export interface FunnelGoalsCockpitData {
   summary: FunnelGoalsExecutiveSummary;
-  /**
-   * Whether `funnelSteps` is the zero-config sample funnel rather than the project's own.
-   * `buildVisualFunnelData` has always computed this; this builder used to take only its
-   * `.steps` and drop the flag, so the dashboard had no way to label sample data and showed
-   * `createMockEasySignFunnel`'s 1000/380/220 as the project's real funnel.
-   */
-  isSimulatedFunnel: boolean;
+  /** Empty unless `funnelViewKind === 'ok'`. */
   funnelSteps: FunnelStepItem[];
   funnelViewKind: FunnelView['kind'];
   goals: UnifiedGoalItem[];
   goalsSummary: GoalsCockpitSummary;
+  /** Empty unless `cohortViewKind === 'ok'` and the warehouse returned cohorts. */
   cohortRows: CohortHeatmapRow[];
   cohortPeriodNumbers: number[];
   cohortViewKind: CohortRetentionView['kind'];
+  /** Empty unless `paybackViewKind === 'ok'`. */
   paybackVelocity: PaybackVelocityItem[];
+  paybackViewKind: WarehouseSectionKind;
+  /** Empty unless `calibrationViewKind === 'ok'`. */
   qualityCalibration: QualityCalibrationItem[];
+  calibrationViewKind: WarehouseSectionKind;
   proactiveRecommendation: ProactiveFunnelGoalRecommendation | null;
 }
 
@@ -159,58 +212,12 @@ const STATUS_COLOR_MAP: Record<GoalPaceStatus, 'green' | 'amber' | 'red'> = {
   off_track: 'red',
 };
 
-export function getDeterministicFactor(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  const normalized = Math.abs(hash % 1000) / 1000;
-  return 0.85 + normalized * 0.3; // 0.85 .. 1.15
-}
-
 export function calculateDaysRemaining(deadline: string): number {
   const deadlineMs = Date.parse(deadline);
   const nowMs = Date.now();
   if (Number.isNaN(deadlineMs)) return 0;
   const diffDays = Math.ceil((deadlineMs - nowMs) / (1000 * 60 * 60 * 24));
   return Math.max(0, diffDays);
-}
-
-/**
- * Returns default EasySign multi-step conversion funnel with mathematically precise drop-offs.
- */
-export function createMockEasySignFunnel(factor = 1.0): FunnelStepItem[] {
-  const sent = Math.round(1000 * factor);
-  const viewed = Math.round(380 * factor);
-  const signed = Math.round(220 * factor);
-
-  return [
-    {
-      stageKey: 'sent',
-      stageLabel: 'Document Sent',
-      stepOrder: 1,
-      customerCount: sent,
-      conversionPercent: 100,
-      dropOffPercent: 0,
-    },
-    {
-      stageKey: 'viewed',
-      stageLabel: 'Document Viewed',
-      stepOrder: 2,
-      customerCount: viewed,
-      conversionPercent: sent > 0 ? Math.round((viewed / sent) * 100) : 0,
-      dropOffPercent: sent > 0 ? Math.round(((sent - viewed) / sent) * 100) : 0,
-    },
-    {
-      stageKey: 'signed',
-      stageLabel: 'Document Signed',
-      stepOrder: 3,
-      customerCount: signed,
-      conversionPercent: sent > 0 ? Math.round((signed / sent) * 100) : 0,
-      dropOffPercent: viewed > 0 ? Math.round(((viewed - signed) / viewed) * 100) : 0,
-    },
-  ];
 }
 
 /**
@@ -253,29 +260,24 @@ export function calculateFunnelStepItems(
 }
 
 /**
- * Synthesizes visual funnel data with zero-config fallback.
+ * The project's own funnel, or the reason there isn't one.
+ *
+ * A `null` outcome means the page's query threw, so it reports `query_error` - not `no_funnel`,
+ * which would tell the user to go define a funnel they may already have.
  */
 export function buildVisualFunnelData(
   outcome: FunnelStepsOutcome | null,
-  seed = 'default-project',
   stageLabelLookup?: (key: string) => string,
 ): VisualFunnelData {
-  const isSimulated = !outcome || !outcome.ok || outcome.steps.length === 0;
-
-  let steps: FunnelStepItem[];
-  if (isSimulated) {
-    const factor = seed === 'default-project' ? 1.0 : getDeterministicFactor(seed);
-    steps = createMockEasySignFunnel(factor);
-    if (stageLabelLookup) {
-      steps = steps.map((s) => ({
-        ...s,
-        stageLabel: stageLabelLookup(s.stageKey) || s.stageLabel,
-      }));
-    }
-  } else {
-    steps = calculateFunnelStepItems(outcome.steps, stageLabelLookup);
+  if (!outcome) {
+    return { kind: 'query_error' };
+  }
+  const view = buildFunnelView(outcome);
+  if (view.kind !== 'ok' || !outcome.ok) {
+    return { kind: view.kind === 'ok' ? 'no_funnel' : view.kind };
   }
 
+  const steps = calculateFunnelStepItems(outcome.steps, stageLabelLookup);
   const totalStarted = steps[0]?.customerCount ?? 0;
   const totalCompleted = steps[steps.length - 1]?.customerCount ?? 0;
   const overallConversionPercent =
@@ -292,8 +294,7 @@ export function buildVisualFunnelData(
   }
 
   return {
-    funnelName: 'EasySign',
-    isSimulated,
+    kind: 'ok',
     totalStarted,
     totalCompleted,
     overallConversionPercent,
@@ -303,224 +304,98 @@ export function buildVisualFunnelData(
   };
 }
 
-/**
- * Synthesizes 5 deterministic demo business goals when no user goals exist in Firestore.
- */
-export function buildDeterministicDemoGoals(projectId = 'default-project'): UnifiedGoalItem[] {
-  const factor = projectId === 'default-project' ? 1.0 : getDeterministicFactor(projectId);
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const d30Ago = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-  const d45Ago = new Date(Date.now() - 45 * 86400000).toISOString().slice(0, 10);
-  const d60Ago = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
-  const d30Ahead = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
-  const d45Ahead = new Date(Date.now() + 45 * 86400000).toISOString().slice(0, 10);
-
-  const demoConfigs = [
-    {
-      id: 'demo-goal-mrr',
-      name: 'Q3 Monthly Recurring Revenue (MRR)',
-      metricName: 'mrr_usd',
-      direction: 'maximize' as GoalDirection,
-      targetValue: 100000,
-      rangeMin: null,
-      rangeMax: null,
-      startDate: d60Ago,
-      deadline: d30Ahead,
-      rhythm: 'work_week_weekend' as GoalRhythm,
-      ownerPersonId: 'person-growth-lead',
-      ownerName: 'Sarah Jenkins (Growth Lead)',
-      actualValue: Math.round(68400 * factor),
-    },
-    {
-      id: 'demo-goal-leads',
-      name: 'Inbound Qualified Leads Volume',
-      metricName: 'qualified_leads',
-      direction: 'maximize' as GoalDirection,
-      targetValue: 1500,
-      rangeMin: null,
-      rangeMax: null,
-      startDate: d45Ago,
-      deadline: d45Ahead,
-      rhythm: 'even' as GoalRhythm,
-      ownerPersonId: 'person-marketing-mgr',
-      ownerName: 'Alex Rivera (Demand Gen)',
-      actualValue: Math.round(820 * factor),
-    },
-    {
-      id: 'demo-goal-cac',
-      name: 'Blended CAC Ceiling Target',
-      metricName: 'blended_cac_usd',
-      direction: 'minimize' as GoalDirection,
-      targetValue: 45,
-      rangeMin: null,
-      rangeMax: null,
-      startDate: d30Ago,
-      deadline: d30Ahead,
-      rhythm: 'even' as GoalRhythm,
-      ownerPersonId: 'person-paid-media',
-      ownerName: 'David Chen (Performance)',
-      actualValue: Number((48.5 * factor).toFixed(2)),
-    },
-    {
-      id: 'demo-goal-demo-cvr',
-      name: 'EasySign Demo Conversion Rate',
-      metricName: 'demo_sign_cvr_pct',
-      direction: 'maximize' as GoalDirection,
-      targetValue: 25,
-      rangeMin: null,
-      rangeMax: null,
-      startDate: d30Ago,
-      deadline: d30Ahead,
-      rhythm: 'work_week_weekend' as GoalRhythm,
-      ownerPersonId: 'person-product-mgr',
-      ownerName: 'Maya Ronen (Product)',
-      actualValue: Number((21.8 * factor).toFixed(1)),
-    },
-    {
-      id: 'demo-goal-payback',
-      name: 'Customer Payback Window',
-      metricName: 'payback_days',
-      direction: 'range' as GoalDirection,
-      targetValue: null,
-      rangeMin: 30,
-      rangeMax: 45,
-      startDate: d45Ago,
-      deadline: d45Ahead,
-      rhythm: 'even' as GoalRhythm,
-      ownerPersonId: 'person-finance',
-      ownerName: 'Eitan Levi (Finance)',
-      actualValue: Math.round(38 * factor),
-    },
-  ];
-
-  return demoConfigs.map((config) => {
-    const elapsed = computeElapsedFraction(config.startDate, config.deadline, todayStr, config.rhythm);
-    const progress = calculateGoalProgress({
-      direction: config.direction,
-      targetValue: config.targetValue ?? undefined,
-      rangeMin: config.rangeMin ?? undefined,
-      rangeMax: config.rangeMax ?? undefined,
-      actualValue: config.actualValue,
-      elapsedFraction: elapsed,
-    });
-
-    const percentFilled = Math.min(100, Math.max(0, Math.round(progress.progressRatio * 100)));
-
-    return {
-      ...config,
-      expectedAtNow: Math.round(progress.expectedAtNow * 100) / 100,
-      projectedFinalValue: Math.round(progress.projectedFinalValue * 100) / 100,
-      percentFilled,
-      status: progress.status,
-      statusColor: STATUS_COLOR_MAP[progress.status],
-      isGoalMet: progress.isGoalMet,
-      elapsedFraction: elapsed,
-      daysRemaining: calculateDaysRemaining(config.deadline),
-      isDemo: true,
-    };
-  });
-}
+/** The progress fields of an item whose progress was not measured. */
+const UNMEASURED_PROGRESS = {
+  actualValue: null,
+  expectedAtNow: null,
+  projectedFinalValue: null,
+  percentFilled: null,
+  status: null,
+  statusColor: null,
+  isGoalMet: null,
+} as const;
 
 /**
- * Builds unified goal items from live Firestore models and query outcomes, or falls back to
- * demo goals.
+ * Builds unified goal items from the project's own goals and their measured progress.
  *
- * The fallback is deliberate and, unlike the ad-performance figures, honest: every demo goal
- * carries `isDemo: true`, `GoalThermometerCard` renders a "Demo Data" badge beside it, and
- * editing one deliberately skips the PATCH so nothing fictional is ever persisted. Keep that
- * contract intact — a demo goal that loses its flag becomes indistinguishable from a target
- * the team actually set.
+ * A project with no goals gets an empty list - never sample goals. (It used to get five, with
+ * invented owners such as "Sarah Jenkins (Growth Lead)" and actuals scaled by a hash of the
+ * project id.) A goal whose progress was not measured carries `progressKind` saying why and null
+ * figures; it used to be shown with an actual of 0 and a pace computed against that 0.
  */
 export function buildUnifiedGoalsData(
-  projectId: string,
   rawGoals: GoalModel[],
   outcomesByGoalId?: Map<string, GoalProgressOutcome>,
   personNameById?: Map<string, string>,
 ): { items: UnifiedGoalItem[]; summary: GoalsCockpitSummary } {
-  let items: UnifiedGoalItem[];
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  if (rawGoals.length === 0) {
-    items = buildDeterministicDemoGoals(projectId);
-  } else {
-    const todayStr = new Date().toISOString().slice(0, 10);
-    items = rawGoals.map((goal) => {
-      const outcome = outcomesByGoalId?.get(goal.id);
-      const elapsed = computeElapsedFraction(goal.start_date, goal.deadline, todayStr, goal.rhythm);
+  const items: UnifiedGoalItem[] = rawGoals.map((goal) => {
+    const outcome = outcomesByGoalId?.get(goal.id);
+    const elapsed = computeElapsedFraction(goal.start_date, goal.deadline, todayStr, goal.rhythm);
 
-      let actualValue = 0;
-      let expectedAtNow = 0;
-      let projectedFinalValue = 0;
-      let percentFilled = 0;
-      let status: GoalPaceStatus = 'on_track';
-      let isGoalMet = false;
+    const base = {
+      id: goal.id,
+      name: goal.name,
+      metricName: goal.metric_name,
+      direction: goal.direction,
+      targetValue: goal.target_value,
+      rangeMin: goal.range_min,
+      rangeMax: goal.range_max,
+      startDate: goal.start_date,
+      deadline: goal.deadline,
+      rhythm: goal.rhythm,
+      ownerPersonId: goal.owner_person_id,
+      ownerName: personNameById?.get(goal.owner_person_id) ?? goal.owner_person_id,
+      elapsedFraction: elapsed,
+      daysRemaining: calculateDaysRemaining(goal.deadline),
+    };
 
-      if (outcome && outcome.ok) {
-        actualValue = outcome.actualValue;
-        expectedAtNow = outcome.progress.expectedAtNow;
-        projectedFinalValue = outcome.progress.projectedFinalValue;
-        percentFilled = Math.min(100, Math.max(0, Math.round(outcome.progress.progressRatio * 100)));
-        status = outcome.progress.status;
-        isGoalMet = outcome.progress.isGoalMet;
-      } else {
-        const prog = calculateGoalProgress({
-          direction: goal.direction,
-          targetValue: goal.target_value ?? undefined,
-          rangeMin: goal.range_min ?? undefined,
-          rangeMax: goal.range_max ?? undefined,
-          actualValue: 0,
-          elapsedFraction: elapsed,
-        });
-        expectedAtNow = prog.expectedAtNow;
-        projectedFinalValue = prog.projectedFinalValue;
-        status = prog.status;
-        isGoalMet = prog.isGoalMet;
-      }
+    if (!outcome) {
+      // The page's per-goal query threw, so nothing was measured.
+      return { ...base, progressKind: 'query_error', ...UNMEASURED_PROGRESS };
+    }
+    if (!outcome.ok) {
+      return { ...base, progressKind: outcome.reason, ...UNMEASURED_PROGRESS };
+    }
+    if (!outcome.hasMeasurements) {
+      return { ...base, progressKind: 'no_measurements', ...UNMEASURED_PROGRESS };
+    }
 
-      return {
-        id: goal.id,
-        name: goal.name,
-        metricName: goal.metric_name,
-        direction: goal.direction,
-        targetValue: goal.target_value,
-        rangeMin: goal.range_min,
-        rangeMax: goal.range_max,
-        startDate: goal.start_date,
-        deadline: goal.deadline,
-        rhythm: goal.rhythm,
-        ownerPersonId: goal.owner_person_id,
-        ownerName: personNameById?.get(goal.owner_person_id) ?? goal.owner_person_id,
-        actualValue,
-        expectedAtNow,
-        projectedFinalValue,
-        percentFilled,
-        status,
-        statusColor: STATUS_COLOR_MAP[status],
-        isGoalMet,
-        elapsedFraction: elapsed,
-        daysRemaining: calculateDaysRemaining(goal.deadline),
-        isDemo: false,
-      };
-    });
-  }
+    const status = outcome.progress.status;
+    return {
+      ...base,
+      progressKind: 'ok',
+      actualValue: outcome.actualValue,
+      expectedAtNow: outcome.progress.expectedAtNow,
+      projectedFinalValue: outcome.progress.projectedFinalValue,
+      percentFilled: Math.min(100, Math.max(0, Math.round(outcome.progress.progressRatio * 100))),
+      status,
+      statusColor: STATUS_COLOR_MAP[status],
+      isGoalMet: outcome.progress.isGoalMet,
+    };
+  });
 
-  const onTrackCount = items.filter((i) => i.status === 'on_track').length;
-  const atRiskCount = items.filter((i) => i.status === 'at_risk').length;
-  const offTrackCount = items.filter((i) => i.status === 'off_track').length;
-  const avgProgress =
-    items.length > 0
-      ? Math.round(items.reduce((sum, item) => sum + item.percentFilled, 0) / items.length)
-      : 0;
+  return { items, summary: summarizeGoals(items) };
+}
 
-  const summary: GoalsCockpitSummary = {
+/** Summary counts over real goals; pace counts cover only the goals that were measured. */
+export function summarizeGoals(items: readonly UnifiedGoalItem[]): GoalsCockpitSummary {
+  const measured = items.filter((i) => i.progressKind === 'ok');
+  const averageProgressPct =
+    measured.length > 0
+      ? Math.round(measured.reduce((sum, item) => sum + (item.percentFilled ?? 0), 0) / measured.length)
+      : null;
+
+  return {
     totalGoalsCount: items.length,
-    onTrackCount,
-    atRiskCount,
-    offTrackCount,
-    averageProgressPct: avgProgress,
+    measuredGoalsCount: measured.length,
+    onTrackCount: measured.filter((i) => i.status === 'on_track').length,
+    atRiskCount: measured.filter((i) => i.status === 'at_risk').length,
+    offTrackCount: measured.filter((i) => i.status === 'off_track').length,
+    averageProgressPct,
     activeGoalsCount: items.length,
   };
-
-  return { items, summary };
 }
 
 export function getHeatmapCellColor(ratePct: number): string {
@@ -532,6 +407,88 @@ export function getHeatmapCellColor(ratePct: number): string {
   return 'bg-muted/30 text-muted-foreground';
 }
 
+/**
+ * Payback windows as measured, or why there are none.
+ *
+ * Windows that are all zero are reported as `no_data`: `getPaybackOverviewForProject` sums
+ * metric rows, and a sum over no rows is 0, so all-zero windows are what a project with nothing
+ * landed yet returns. "No collected revenue has landed yet" is true in both readings; "$0" would
+ * state a measurement that may never have happened.
+ */
+export function buildPaybackVelocity(outcome: PaybackOverviewOutcome | null): {
+  kind: WarehouseSectionKind;
+  items: PaybackVelocityItem[];
+} {
+  if (!outcome) return { kind: 'query_error', items: [] };
+  if (!outcome.ok) return { kind: outcome.reason, items: [] };
+
+  const items = outcome.windows
+    .filter((w): w is PaybackVelocityItem => [7, 14, 30, 40].includes(w.windowDays))
+    .map((w) => ({ windowDays: w.windowDays, collectedRevenue: w.collectedRevenue }));
+
+  if (items.length === 0 || items.every((w) => w.collectedRevenue === 0)) {
+    return { kind: 'no_data', items: [] };
+  }
+  return { kind: 'ok', items };
+}
+
+/** Quality-tier calibration as measured, or why there is none. */
+export function buildQualityCalibration(outcome: QualityCalibrationBreakdownOutcome | null): {
+  kind: WarehouseSectionKind;
+  items: QualityCalibrationItem[];
+} {
+  if (!outcome) return { kind: 'query_error', items: [] };
+  if (!outcome.ok) return { kind: outcome.reason, items: [] };
+  if (outcome.tiers.length === 0 || outcome.tiers.every((t) => t.signups === 0)) {
+    return { kind: 'no_data', items: [] };
+  }
+
+  return {
+    kind: 'ok',
+    items: outcome.tiers.map((t) => ({
+      tier: t.qualityTier,
+      tierLabel: t.qualityTier.charAt(0).toUpperCase() + t.qualityTier.slice(1),
+      signups: t.signups,
+      payingSignups: t.payingSignups,
+      payingRatePercent: t.payingRate !== null ? Math.round(t.payingRate * 100) : null,
+      avgCollectedRevenue40d: t.avgCollectedRevenue40d !== null ? Math.round(t.avgCollectedRevenue40d) : null,
+    })),
+  };
+}
+
+function buildCohortHeatmap(outcome: CohortRetentionOutcome | null): {
+  kind: CohortRetentionView['kind'];
+  rows: CohortHeatmapRow[];
+  periodNumbers: number[];
+} {
+  // A null outcome means the page's query threw - an error, not "warehouse not configured".
+  if (!outcome) return { kind: 'query_error', rows: [], periodNumbers: [] };
+
+  const view = buildCohortRetentionView(outcome);
+  if (view.kind !== 'ok' || view.cohorts.length === 0) {
+    return { kind: view.kind, rows: [], periodNumbers: [] };
+  }
+
+  const rows = view.cohorts.map((cohort) => {
+    const retentionMap = new Map<number, { retainedCount: number; retentionRatePercent: number; colorClass: string }>();
+    for (const p of cohort.periods) {
+      retentionMap.set(p.periodNumber, {
+        retainedCount: p.retainedCount,
+        retentionRatePercent: p.retentionRatePercent,
+        colorClass: getHeatmapCellColor(p.retentionRatePercent),
+      });
+    }
+    return {
+      cohortMonth: cohort.cohortMonth,
+      cohortLabel: new Date(cohort.cohortMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      cohortSize: cohort.cohortSize,
+      retentionByPeriod: retentionMap,
+    };
+  });
+
+  return { kind: 'ok', rows, periodNumbers: view.periodNumbers };
+}
+
 export function buildFunnelGoalsCockpitData(params: {
   funnelOutcome: FunnelStepsOutcome | null;
   goals: GoalModel[];
@@ -540,7 +497,6 @@ export function buildFunnelGoalsCockpitData(params: {
   cohortOutcome?: CohortRetentionOutcome | null;
   paybackOutcome?: PaybackOverviewOutcome | null;
   calibrationOutcome?: QualityCalibrationBreakdownOutcome | null;
-  projectId?: string;
 }): FunnelGoalsCockpitData {
   const {
     funnelOutcome,
@@ -550,134 +506,35 @@ export function buildFunnelGoalsCockpitData(params: {
     cohortOutcome = null,
     paybackOutcome = null,
     calibrationOutcome = null,
-    projectId = 'default-project',
   } = params;
 
-  // 1. Synthesize Funnel Steps
-  const funnelView = funnelOutcome ? buildFunnelView(funnelOutcome) : { kind: 'no_funnel' as const };
-  const visualFunnel = buildVisualFunnelData(funnelOutcome, projectId);
-  const funnelSteps = visualFunnel.steps;
+  // 1. Funnel - the project's own, or nothing.
+  const visualFunnel = buildVisualFunnelData(funnelOutcome);
+  const funnelSteps = visualFunnel.kind === 'ok' ? visualFunnel.steps : [];
 
-  // 2. Synthesize Goals & Summary
-  const { items: goalItems, summary: goalsSummary } = buildUnifiedGoalsData(
-    projectId,
-    goals,
-    goalOutcomes,
-    personNameById,
-  );
+  // 2. Goals & summary - the project's own, or an empty list.
+  const { items: goalItems, summary: goalsSummary } = buildUnifiedGoalsData(goals, goalOutcomes, personNameById);
 
-  // 3. Synthesize Cohort Retention Heatmap Matrix
-  const cohortView = cohortOutcome ? buildCohortRetentionView(cohortOutcome) : { kind: 'warehouse_not_configured' as const };
-  let cohortRows: CohortHeatmapRow[] = [];
-  let cohortPeriodNumbers: number[] = [0, 1, 2, 3, 4];
+  // 3. Cohort retention, payback and calibration - measured, or a kind saying why not.
+  const cohort = buildCohortHeatmap(cohortOutcome);
+  const payback = buildPaybackVelocity(paybackOutcome);
+  const calibration = buildQualityCalibration(calibrationOutcome);
 
-  if (cohortView.kind === 'ok' && cohortView.cohorts.length > 0) {
-    cohortPeriodNumbers = cohortView.periodNumbers;
-    cohortRows = cohortView.cohorts.map((cohort) => {
-      const retentionMap = new Map<number, { retainedCount: number; retentionRatePercent: number; colorClass: string }>();
-      for (const p of cohort.periods) {
-        retentionMap.set(p.periodNumber, {
-          retainedCount: p.retainedCount,
-          retentionRatePercent: p.retentionRatePercent,
-          colorClass: getHeatmapCellColor(p.retentionRatePercent),
-        });
-      }
-      return {
-        cohortMonth: cohort.cohortMonth,
-        cohortLabel: new Date(cohort.cohortMonth).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        cohortSize: cohort.cohortSize,
-        retentionByPeriod: retentionMap,
-      };
-    });
-  } else {
-    // Default zero-config cohort retention baseline
-    const fallbackCohorts = [
-      { month: '2026-02-01', size: 50, rates: [100, 64] },
-      { month: '2026-01-01', size: 100, rates: [100, 62, 48, 42] },
-      { month: '2025-12-01', size: 85, rates: [100, 58, 45, 38, 35] },
-    ];
-    cohortRows = fallbackCohorts.map((c) => {
-      const retentionMap = new Map<number, { retainedCount: number; retentionRatePercent: number; colorClass: string }>();
-      c.rates.forEach((rate, idx) => {
-        retentionMap.set(idx, {
-          retainedCount: Math.round((c.size * rate) / 100),
-          retentionRatePercent: rate,
-          colorClass: getHeatmapCellColor(rate),
-        });
-      });
-      return {
-        cohortMonth: c.month,
-        cohortLabel: new Date(c.month).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-        cohortSize: c.size,
-        retentionByPeriod: retentionMap,
-      };
-    });
-  }
-
-  // 4. Payback Velocity & Quality Calibration
-  const paybackVelocity: PaybackVelocityItem[] =
-    paybackOutcome && paybackOutcome.ok && paybackOutcome.windows.length > 0
-      ? (paybackOutcome.windows
-          .filter((w): w is { windowDays: 7 | 14 | 30 | 40; collectedRevenue: number } =>
-            [7, 14, 30, 40].includes(w.windowDays),
-          )
-          .map((w) => ({
-            windowDays: w.windowDays,
-            collectedRevenue: w.collectedRevenue,
-            targetRevenue: w.windowDays * 1200,
-            pacePercent: Math.min(100, Math.round((w.collectedRevenue / Math.max(1, w.windowDays * 1200)) * 100)),
-          })))
-      : [
-          { windowDays: 7, collectedRevenue: 12400, targetRevenue: 10000, pacePercent: 100 },
-          { windowDays: 14, collectedRevenue: 24800, targetRevenue: 22000, pacePercent: 100 },
-          { windowDays: 30, collectedRevenue: 38900, targetRevenue: 36000, pacePercent: 100 },
-          { windowDays: 40, collectedRevenue: 48200, targetRevenue: 48000, pacePercent: 100 },
-        ];
-
-  const qualityCalibration: QualityCalibrationItem[] =
-    calibrationOutcome && calibrationOutcome.ok && calibrationOutcome.tiers.length > 0
-      ? calibrationOutcome.tiers.map((t) => ({
-          tier: t.qualityTier,
-          tierLabel: t.qualityTier.charAt(0).toUpperCase() + t.qualityTier.slice(1),
-          signups: t.signups,
-          payingSignups: t.payingSignups,
-          payingRatePercent: t.payingRate !== null ? Math.round(t.payingRate * 100) : 0,
-          avgCollectedRevenue40d: Math.round(t.avgCollectedRevenue40d ?? 0),
-        }))
-      : [
-          { tier: 'diamond', tierLabel: 'Diamond (Tier 1)', signups: 120, payingSignups: 110, payingRatePercent: 92, avgCollectedRevenue40d: 1420 },
-          { tier: 'gold', tierLabel: 'Gold (Tier 2)', signups: 340, payingSignups: 231, payingRatePercent: 68, avgCollectedRevenue40d: 890 },
-          { tier: 'silver', tierLabel: 'Silver (Tier 3)', signups: 480, payingSignups: 163, payingRatePercent: 34, avgCollectedRevenue40d: 420 },
-          { tier: 'bronze', tierLabel: 'Bronze (Tier 4)', signups: 260, payingSignups: 31, payingRatePercent: 12, avgCollectedRevenue40d: 160 },
-        ];
-
-  // 5. Executive Summary & Proactive Recommendation
-  const totalConversions = funnelSteps.length > 0 ? funnelSteps[funnelSteps.length - 1].customerCount : 220;
-  const initialEntrants = funnelSteps.length > 0 ? funnelSteps[0].customerCount : 1000;
-  // Null while the funnel is the zero-config sample: a conversion rate computed from
-  // createMockEasySignFunnel's 1000/380/220 is exactly as invented as the drop-off beside it,
-  // and reporting one but not the other would be arbitrary.
+  // 4. Executive summary - funnel figures only from a measured funnel with entrants.
   const overallConversionPct =
-    visualFunnel.isSimulated || initialEntrants === 0
-      ? null
-      : Math.round((totalConversions / initialEntrants) * 100);
+    visualFunnel.kind === 'ok' && visualFunnel.totalStarted > 0 ? visualFunnel.overallConversionPercent : null;
+  const topFunnelDropOffPct = visualFunnel.kind === 'ok' ? visualFunnel.biggestDropOffPercent : null;
 
   /*
     Only raised from the project's own funnel.
 
-    This used to be a fixed recommendation - "62% of users drop off between Sent and Viewed.
-    Deploying an instant SMS reminder sequence increases completion by +14%", projecting
-    "+31 conversions/mo" against the target id `easysign_funnel_viewed` - returned
-    unconditionally, including for a project whose funnel was the zero-config sample. The
-    dashboard puts an Apply button on it that POSTs to the real automation endpoint, so a
-    customer could act on a drop-off that had never been measured, quoted to the percent.
-
-    A recommendation needs a real funnel with a real worst step; without one there is nothing
-    to recommend, so this is null and the dashboard renders no card.
+    This used to be a fixed recommendation - "62% of users drop off between Sent and Viewed" -
+    returned unconditionally, including for a project whose funnel was the zero-config sample.
+    The dashboard puts an Apply button on it that POSTs to the real automation endpoint, so a
+    recommendation needs a real funnel with a real worst step; without one it is null.
   */
-  const worstStep = visualFunnel.isSimulated
-    ? null
-    : [...funnelSteps].sort((a, b) => b.dropOffPercent - a.dropOffPercent)[0] ?? null;
+  const worstStep =
+    funnelSteps.length > 0 ? [...funnelSteps].sort((a, b) => b.dropOffPercent - a.dropOffPercent)[0] : null;
 
   const proactiveRecommendation: ProactiveFunnelGoalRecommendation | null =
     worstStep && worstStep.dropOffPercent > 0
@@ -688,8 +545,7 @@ export function buildFunnelGoalsCockpitData(params: {
           description: `${worstStep.dropOffPercent}% of the visitors who reach "${worstStep.stageLabel}" do not continue past it.`,
           beforeDiff: `${worstStep.dropOffPercent}% drop-off`,
           afterDiff: 'Retargeting campaign draft',
-          // No projected impact: projecting one needs a model of the intervention's effect,
-          // and the previous "+14% / +31 conversions/mo" was a literal, not a forecast.
+          // No projected impact: projecting one needs a model of the intervention's effect.
           projectedImpact: '',
           actionType: 'funnel_optimization',
           targetId: `funnel_${worstStep.stageKey}`,
@@ -700,8 +556,9 @@ export function buildFunnelGoalsCockpitData(params: {
   return {
     summary: {
       overallFunnelConversionPct: overallConversionPct,
-      topFunnelDropOffPct: visualFunnel.isSimulated ? null : visualFunnel.biggestDropOffPercent,
+      topFunnelDropOffPct,
       activeGoalsCount: goalsSummary.totalGoalsCount,
+      goalsMeasuredCount: goalsSummary.measuredGoalsCount,
       goalsOnTrackCount: goalsSummary.onTrackCount,
       // Each of these needs a source that does not exist yet - see the interface doc comment.
       avgMonth1RetentionPct: null,
@@ -710,16 +567,17 @@ export function buildFunnelGoalsCockpitData(params: {
       dunningRecoveryRatePct: null,
       churnRatePct: null,
     },
-    isSimulatedFunnel: visualFunnel.isSimulated,
     funnelSteps,
-    funnelViewKind: funnelView.kind,
+    funnelViewKind: visualFunnel.kind,
     goals: goalItems,
     goalsSummary,
-    cohortRows,
-    cohortPeriodNumbers,
-    cohortViewKind: cohortView.kind,
-    paybackVelocity,
-    qualityCalibration,
+    cohortRows: cohort.rows,
+    cohortPeriodNumbers: cohort.periodNumbers,
+    cohortViewKind: cohort.kind,
+    paybackVelocity: payback.items,
+    paybackViewKind: payback.kind,
+    qualityCalibration: calibration.items,
+    calibrationViewKind: calibration.kind,
     proactiveRecommendation,
   };
 }

@@ -1,28 +1,71 @@
 import { describe, expect, it } from 'vitest';
 import {
-  getDeterministicFactor,
   calculateDaysRemaining,
-  createMockEasySignFunnel,
   calculateFunnelStepItems,
   buildVisualFunnelData,
-  buildDeterministicDemoGoals,
   buildUnifiedGoalsData,
+  buildPaybackVelocity,
+  buildQualityCalibration,
   getHeatmapCellColor,
   buildFunnelGoalsCockpitData,
 } from './funnel-goals-synthesizer';
-import type { GoalModel } from '@growthos/firebase-orm-models';
+import type { GoalModel, GoalProgressOutcome } from '@growthos/firebase-orm-models';
+
+/*
+  Jira B15. This module used to fill every absent measurement with invented data: a sample
+  EasySign funnel (1000/380/220, hash-scaled per project), five demo goals, three hard-coded
+  cohorts, four payback windows, four Diamond..Bronze tiers, and a `windowDays * 1200` payback
+  target applied even to real revenue. The tests that asserted those samples (22% conversion,
+  62% drop-off, 5 demo goals, "Diamond (Tier 1)") were asserting a fabrication; they are
+  replaced below by tests that the absent path returns NOTHING numeric, and that the real path
+  returns exactly what it did before.
+*/
+
+function goal(overrides: Partial<Record<string, unknown>> = {}): GoalModel {
+  return {
+    id: 'goal-1',
+    project_id: 'p1',
+    name: 'Custom MRR',
+    metric_name: 'mrr',
+    direction: 'maximize',
+    target_value: 1000,
+    range_min: null,
+    range_max: null,
+    start_date: '2026-01-01',
+    deadline: '2026-12-31',
+    rhythm: 'even',
+    owner_person_id: 'person-1',
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  } as unknown as GoalModel;
+}
+
+function measured(overrides: Partial<{ actualValue: number; progressRatio: number; status: 'on_track' | 'at_risk' | 'off_track'; hasMeasurements: boolean }> = {}): GoalProgressOutcome {
+  return {
+    ok: true,
+    actualValue: overrides.actualValue ?? 640,
+    hasMeasurements: overrides.hasMeasurements ?? true,
+    progress: {
+      expectedAtNow: 700,
+      progressRatio: overrides.progressRatio ?? 0.644,
+      projectedFinalValue: 915.5,
+      status: overrides.status ?? 'at_risk',
+      isGoalMet: false,
+    },
+  } as unknown as GoalProgressOutcome;
+}
+
+const REAL_FUNNEL = {
+  ok: true as const,
+  steps: [
+    { stageKey: 'sent', stepOrder: 1, customerCount: 500, conversionRateFromFirst: 1 },
+    { stageKey: 'viewed', stepOrder: 2, customerCount: 200, conversionRateFromFirst: 0.4 },
+    { stageKey: 'signed', stepOrder: 3, customerCount: 150, conversionRateFromFirst: 0.3 },
+  ],
+};
 
 describe('funnel-goals-synthesizer', () => {
-  describe('getDeterministicFactor', () => {
-    it('returns a stable deterministic number between 0.85 and 1.15 for the same seed', () => {
-      const f1 = getDeterministicFactor('project-123');
-      const f2 = getDeterministicFactor('project-123');
-      expect(f1).toBe(f2);
-      expect(f1).toBeGreaterThanOrEqual(0.85);
-      expect(f1).toBeLessThanOrEqual(1.15);
-    });
-  });
-
   describe('calculateDaysRemaining', () => {
     it('calculates days remaining until deadline or returns 0 for past deadline', () => {
       const futureDate = new Date(Date.now() + 10 * 86400000).toISOString().slice(0, 10);
@@ -32,47 +75,6 @@ describe('funnel-goals-synthesizer', () => {
       expect(calculateDaysRemaining(pastDate)).toBe(0);
 
       expect(calculateDaysRemaining('invalid-date')).toBe(0);
-    });
-  });
-
-  describe('createMockEasySignFunnel', () => {
-    it('returns the standard 3-step pipeline with accurate percentages and drop-offs', () => {
-      const steps = createMockEasySignFunnel();
-      expect(steps).toHaveLength(3);
-
-      expect(steps[0]).toEqual({
-        stageKey: 'sent',
-        stageLabel: 'Document Sent',
-        stepOrder: 1,
-        customerCount: 1000,
-        conversionPercent: 100,
-        dropOffPercent: 0,
-      });
-
-      expect(steps[1]).toEqual({
-        stageKey: 'viewed',
-        stageLabel: 'Document Viewed',
-        stepOrder: 2,
-        customerCount: 380,
-        conversionPercent: 38,
-        dropOffPercent: 62,
-      });
-
-      expect(steps[2]).toEqual({
-        stageKey: 'signed',
-        stageLabel: 'Document Signed',
-        stepOrder: 3,
-        customerCount: 220,
-        conversionPercent: 22,
-        dropOffPercent: 42,
-      });
-    });
-
-    it('scales customer counts proportionally with factor argument', () => {
-      const steps = createMockEasySignFunnel(1.5);
-      expect(steps[0].customerCount).toBe(1500);
-      expect(steps[1].customerCount).toBe(570);
-      expect(steps[2].customerCount).toBe(330);
     });
   });
 
@@ -89,112 +91,120 @@ describe('funnel-goals-synthesizer', () => {
       ];
 
       const steps = calculateFunnelStepItems(raw, (k) => `Label: ${k}`);
-      expect(steps).toHaveLength(3);
-      expect(steps[0].stageKey).toBe('started');
-      expect(steps[0].conversionPercent).toBe(100);
-      expect(steps[0].dropOffPercent).toBe(0);
+      expect(steps.map((s) => [s.stageKey, s.conversionPercent, s.dropOffPercent])).toEqual([
+        ['started', 100, 0],
+        ['in_progress', 50, 50],
+        ['completed', 20, 60],
+      ]);
       expect(steps[0].stageLabel).toBe('Label: started');
-
-      expect(steps[1].stageKey).toBe('in_progress');
-      expect(steps[1].conversionPercent).toBe(50);
-      expect(steps[1].dropOffPercent).toBe(50);
-
-      expect(steps[2].stageKey).toBe('completed');
-      expect(steps[2].conversionPercent).toBe(20);
-      expect(steps[2].dropOffPercent).toBe(60); // (500 - 200)/500 = 60%
     });
   });
 
   describe('buildVisualFunnelData', () => {
-    it('synthesizes EasySign pipeline when outcome is null or empty (zero-config)', () => {
-      const data = buildVisualFunnelData(null, 'default-project');
-      expect(data.isSimulated).toBe(true);
-      expect(data.totalStarted).toBe(1000);
-      expect(data.totalCompleted).toBe(220);
-      expect(data.overallConversionPercent).toBe(22);
-      expect(data.biggestDropOffStageKey).toBe('viewed');
-      expect(data.biggestDropOffPercent).toBe(62);
-      expect(data.steps).toHaveLength(3);
+    it('reports no_funnel - with no numbers at all - when the project has not confirmed a funnel', () => {
+      // EasySign's real project: the query succeeds with zero steps. This used to return the
+      // hash-scaled sample funnel (955 / 363 / 210) with "Simulated Mode (Zero-Config)".
+      expect(buildVisualFunnelData({ ok: true, steps: [] })).toEqual({ kind: 'no_funnel' });
     });
 
-    it('processes live warehouse outcome properly', () => {
-      const outcome = {
-        ok: true as const,
+    it('reports query_error for a null outcome (the page query threw), not no_funnel', () => {
+      expect(buildVisualFunnelData(null)).toEqual({ kind: 'query_error' });
+    });
+
+    it('passes the warehouse degradation reason through', () => {
+      expect(
+        buildVisualFunnelData({ ok: false, reason: 'warehouse_not_configured', message: 'x' }),
+      ).toEqual({ kind: 'warehouse_not_configured' });
+      expect(buildVisualFunnelData({ ok: false, reason: 'quota_exceeded', message: 'x' })).toEqual({
+        kind: 'quota_exceeded',
+      });
+    });
+
+    it('processes a live warehouse outcome exactly as before', () => {
+      const data = buildVisualFunnelData({
+        ok: true,
         steps: [
           { stageKey: 'step_1', stepOrder: 1, customerCount: 800, conversionRateFromFirst: 1.0 },
           { stageKey: 'step_2', stepOrder: 2, customerCount: 400, conversionRateFromFirst: 0.5 },
         ],
-      };
-      const data = buildVisualFunnelData(outcome, 'p-live');
-      expect(data.isSimulated).toBe(false);
-      expect(data.totalStarted).toBe(800);
-      expect(data.totalCompleted).toBe(400);
-      expect(data.overallConversionPercent).toBe(50);
-      expect(data.biggestDropOffPercent).toBe(50);
-    });
-  });
-
-  describe('buildDeterministicDemoGoals', () => {
-    it('produces 5 realistic demo business goals covering maximize, minimize, and range', () => {
-      const demoGoals = buildDeterministicDemoGoals('test-project');
-      expect(demoGoals).toHaveLength(5);
-
-      const mrrGoal = demoGoals.find((g) => g.id === 'demo-goal-mrr');
-      expect(mrrGoal).toBeDefined();
-      expect(mrrGoal?.direction).toBe('maximize');
-      expect(mrrGoal?.targetValue).toBe(100000);
-      expect(mrrGoal?.percentFilled).toBeGreaterThan(0);
-
-      const cacGoal = demoGoals.find((g) => g.id === 'demo-goal-cac');
-      expect(cacGoal).toBeDefined();
-      expect(cacGoal?.direction).toBe('minimize');
-      expect(cacGoal?.targetValue).toBe(45);
-
-      const paybackGoal = demoGoals.find((g) => g.id === 'demo-goal-payback');
-      expect(paybackGoal).toBeDefined();
-      expect(paybackGoal?.direction).toBe('range');
-      expect(paybackGoal?.rangeMin).toBe(30);
-      expect(paybackGoal?.rangeMax).toBe(45);
+      });
+      expect(data).toMatchObject({
+        kind: 'ok',
+        totalStarted: 800,
+        totalCompleted: 400,
+        overallConversionPercent: 50,
+        biggestDropOffPercent: 50,
+        biggestDropOffStageKey: 'step_2',
+      });
     });
   });
 
   describe('buildUnifiedGoalsData', () => {
-    it('falls back to demo goals when rawGoals is empty', () => {
-      const { items, summary } = buildUnifiedGoalsData('project-empty', []);
-      expect(items).toHaveLength(5);
-      expect(items[0].isDemo).toBe(true);
-      expect(summary.totalGoalsCount).toBe(5);
-      expect(summary.averageProgressPct).toBeGreaterThan(0);
+    it('returns an empty list for a project with no goals - never demo goals', () => {
+      // Used to return five invented goals ("Q3 Monthly Recurring Revenue (MRR)", owned by
+      // "Sarah Jenkins (Growth Lead)") flagged isDemo, which rendered beside real ones.
+      const { items, summary } = buildUnifiedGoalsData([]);
+      expect(items).toEqual([]);
+      expect(summary).toEqual({
+        totalGoalsCount: 0,
+        measuredGoalsCount: 0,
+        onTrackCount: 0,
+        atRiskCount: 0,
+        offTrackCount: 0,
+        averageProgressPct: null,
+        activeGoalsCount: 0,
+      });
     });
 
-    it('processes custom GoalModels when provided', () => {
-      const rawGoals: GoalModel[] = [
-        {
-          id: 'custom-goal-1',
-          project_id: 'p1',
-          name: 'Custom MRR',
-          metric_name: 'mrr',
-          direction: 'maximize',
-          target_value: 1000,
-          range_min: null,
-          range_max: null,
-          start_date: '2026-01-01',
-          deadline: '2026-12-31',
-          rhythm: 'even',
-          owner_person_id: 'person-1',
-          created_at: '2026-01-01T00:00:00Z',
-          updated_at: '2026-01-01T00:00:00Z',
-        } as unknown as GoalModel,
-      ];
-
+    it('carries measured progress through unchanged', () => {
       const personMap = new Map([['person-1', 'Alice Leader']]);
-      const { items, summary } = buildUnifiedGoalsData('p1', rawGoals, undefined, personMap);
+      const { items, summary } = buildUnifiedGoalsData([goal()], new Map([['goal-1', measured()]]), personMap);
 
       expect(items).toHaveLength(1);
-      expect(items[0].id).toBe('custom-goal-1');
-      expect(items[0].ownerName).toBe('Alice Leader');
-      expect(items[0].isDemo).toBe(false);
-      expect(summary.totalGoalsCount).toBe(1);
+      expect(items[0]).toMatchObject({
+        id: 'goal-1',
+        ownerName: 'Alice Leader',
+        progressKind: 'ok',
+        actualValue: 640,
+        expectedAtNow: 700,
+        projectedFinalValue: 915.5,
+        percentFilled: 64,
+        status: 'at_risk',
+        statusColor: 'amber',
+        isGoalMet: false,
+      });
+      expect(summary).toMatchObject({ measuredGoalsCount: 1, atRiskCount: 1, averageProgressPct: 64 });
+    });
+
+    it.each([
+      ['a failed query', { ok: false, reason: 'warehouse_not_configured', message: 'x' } as GoalProgressOutcome, 'warehouse_not_configured'],
+      ['a metric with no rows in the window', measured({ actualValue: 0, hasMeasurements: false, status: 'off_track' }), 'no_measurements'],
+      ['a query that threw (no outcome in the map)', undefined, 'query_error'],
+    ])('reports %s as unmeasured, with no actual value and no pace', (_label, outcome, kind) => {
+      // Previously an unmeasured goal was shown with actual 0 and a pace computed against it -
+      // typically "Off track" in red for a project that simply had no data yet.
+      const outcomes = new Map<string, GoalProgressOutcome>();
+      if (outcome) outcomes.set('goal-1', outcome);
+
+      const { items, summary } = buildUnifiedGoalsData([goal()], outcomes);
+      expect(items[0]).toMatchObject({
+        progressKind: kind,
+        actualValue: null,
+        expectedAtNow: null,
+        projectedFinalValue: null,
+        percentFilled: null,
+        status: null,
+        statusColor: null,
+        isGoalMet: null,
+        targetValue: 1000,
+      });
+      expect(summary).toMatchObject({
+        totalGoalsCount: 1,
+        measuredGoalsCount: 0,
+        onTrackCount: 0,
+        offTrackCount: 0,
+        averageProgressPct: null,
+      });
     });
   });
 
@@ -209,39 +219,149 @@ describe('funnel-goals-synthesizer', () => {
     });
   });
 
+  describe('buildPaybackVelocity', () => {
+    it('returns the real windows with no invented target or pace', () => {
+      const result = buildPaybackVelocity({
+        ok: true,
+        windows: [
+          { windowDays: 7, collectedRevenue: 310 },
+          { windowDays: 14, collectedRevenue: 520 },
+          { windowDays: 30, collectedRevenue: 900 },
+          { windowDays: 40, collectedRevenue: 1150 },
+        ],
+      });
+      expect(result.kind).toBe('ok');
+      // Exactly the measured fields. `targetRevenue: windowDays * 1200` and a pacePercent
+      // against it used to be attached here - to REAL revenue.
+      expect(result.items).toEqual([
+        { windowDays: 7, collectedRevenue: 310 },
+        { windowDays: 14, collectedRevenue: 520 },
+        { windowDays: 30, collectedRevenue: 900 },
+        { windowDays: 40, collectedRevenue: 1150 },
+      ]);
+    });
+
+    it('reports no_data, not $0 windows, when nothing has landed', () => {
+      expect(buildPaybackVelocity({ ok: true, windows: [] })).toEqual({ kind: 'no_data', items: [] });
+      expect(
+        buildPaybackVelocity({
+          ok: true,
+          windows: [
+            { windowDays: 7, collectedRevenue: 0 },
+            { windowDays: 40, collectedRevenue: 0 },
+          ],
+        }),
+      ).toEqual({ kind: 'no_data', items: [] });
+    });
+
+    it('reports why when the query failed or never ran', () => {
+      expect(buildPaybackVelocity(null)).toEqual({ kind: 'query_error', items: [] });
+      expect(buildPaybackVelocity({ ok: false, reason: 'not_yet_backed', message: 'x' })).toEqual({
+        kind: 'not_yet_backed',
+        items: [],
+      });
+    });
+  });
+
+  describe('buildQualityCalibration', () => {
+    it('returns the real tiers, keeping an undefined paying rate null instead of 0%', () => {
+      const result = buildQualityCalibration({
+        ok: true,
+        tiers: [
+          { qualityTier: 'high', signups: 40, payingSignups: 10, payingRate: 0.25, collectedRevenue40d: 4000, avgCollectedRevenue40d: 100.4 },
+          { qualityTier: 'low', signups: 0, payingSignups: 0, payingRate: null, collectedRevenue40d: 0, avgCollectedRevenue40d: null },
+        ],
+      } as never);
+      expect(result.kind).toBe('ok');
+      expect(result.items).toEqual([
+        { tier: 'high', tierLabel: 'High', signups: 40, payingSignups: 10, payingRatePercent: 25, avgCollectedRevenue40d: 100 },
+        { tier: 'low', tierLabel: 'Low', signups: 0, payingSignups: 0, payingRatePercent: null, avgCollectedRevenue40d: null },
+      ]);
+    });
+
+    it('reports no_data or the failure reason rather than sample tiers', () => {
+      expect(buildQualityCalibration({ ok: true, tiers: [] })).toEqual({ kind: 'no_data', items: [] });
+      expect(buildQualityCalibration(null)).toEqual({ kind: 'query_error', items: [] });
+      expect(buildQualityCalibration({ ok: false, reason: 'quota_exceeded', message: 'x' })).toEqual({
+        kind: 'quota_exceeded',
+        items: [],
+      });
+    });
+  });
+
   describe('buildFunnelGoalsCockpitData', () => {
-    it('consolidates funnel, goals, cohort heatmap, payback velocity, and recommendations', () => {
+    it('returns an explicit no-data shape - no numbers, no alerts, no recommendation - when nothing was measured', () => {
       const cockpit = buildFunnelGoalsCockpitData({
-        funnelOutcome: null,
+        funnelOutcome: { ok: true, steps: [] },
         goals: [],
-        projectId: 'demo-project',
       });
 
-      /*
-        funnelOutcome is null here, so the funnel is the zero-config sample. This used to
-        assert 22 / 62 and a recommendation with the fixed target id `easysign_funnel_viewed`
-        - all computed from, or written for, createMockEasySignFunnel's 1000/380/220. The
-        dashboard rendered them as the project's own numbers, with an Apply button on the
-        recommendation that POSTs to the real automation endpoint.
-      */
-      expect(cockpit.isSimulatedFunnel).toBe(true);
-      expect(cockpit.summary.overallFunnelConversionPct).toBeNull();
-      expect(cockpit.summary.topFunnelDropOffPct).toBeNull();
+      expect(cockpit.funnelViewKind).toBe('no_funnel');
+      expect(cockpit.funnelSteps).toEqual([]);
+      expect(cockpit.goals).toEqual([]);
+      expect(cockpit.cohortRows).toEqual([]);
+      expect(cockpit.cohortPeriodNumbers).toEqual([]);
+      expect(cockpit.cohortViewKind).toBe('query_error');
+      expect(cockpit.paybackVelocity).toEqual([]);
+      expect(cockpit.paybackViewKind).toBe('query_error');
+      expect(cockpit.qualityCalibration).toEqual([]);
+      expect(cockpit.calibrationViewKind).toBe('query_error');
       expect(cockpit.proactiveRecommendation).toBeNull();
+      expect(cockpit.summary).toEqual({
+        overallFunnelConversionPct: null,
+        topFunnelDropOffPct: null,
+        activeGoalsCount: 0,
+        goalsMeasuredCount: 0,
+        goalsOnTrackCount: 0,
+        avgMonth1RetentionPct: null,
+        avgConversionVelocityDays: null,
+        total40dPaybackUsd: null,
+        dunningRecoveryRatePct: null,
+        churnRatePct: null,
+      });
+    });
 
-      // Never measured anywhere, so never reported.
-      expect(cockpit.summary.avgMonth1RetentionPct).toBeNull();
-      expect(cockpit.summary.avgConversionVelocityDays).toBeNull();
-      expect(cockpit.summary.total40dPaybackUsd).toBeNull();
-      expect(cockpit.summary.dunningRecoveryRatePct).toBeNull();
-      expect(cockpit.summary.churnRatePct).toBeNull();
+    it('builds the funnel figures and the drop-off recommendation from a real funnel, as before', () => {
+      const cockpit = buildFunnelGoalsCockpitData({ funnelOutcome: REAL_FUNNEL, goals: [] });
 
-      // Goal counts are real - they come from the goal list itself.
-      expect(cockpit.summary.activeGoalsCount).toBe(5);
-      expect(cockpit.funnelSteps).toHaveLength(3);
-      expect(cockpit.cohortRows.length).toBeGreaterThan(0);
-      expect(cockpit.paybackVelocity).toHaveLength(4);
-      expect(cockpit.qualityCalibration).toHaveLength(4);
+      expect(cockpit.funnelViewKind).toBe('ok');
+      expect(cockpit.funnelSteps.map((s) => s.customerCount)).toEqual([500, 200, 150]);
+      expect(cockpit.summary.overallFunnelConversionPct).toBe(30);
+      expect(cockpit.summary.topFunnelDropOffPct).toBe(60);
+      expect(cockpit.proactiveRecommendation).toMatchObject({
+        id: 'rec-funnel-viewed',
+        targetId: 'funnel_viewed',
+        beforeDiff: '60% drop-off',
+        projectedImpact: '',
+      });
+    });
+
+    it('builds the cohort heatmap from real cohort rows', () => {
+      const cockpit = buildFunnelGoalsCockpitData({
+        funnelOutcome: REAL_FUNNEL,
+        goals: [],
+        cohortOutcome: {
+          ok: true,
+          rows: [
+            { cohortMonth: '2026-06-01', periodNumber: 0, cohortSize: 40, retainedCount: 40, retentionRate: 1 },
+            { cohortMonth: '2026-06-01', periodNumber: 1, cohortSize: 40, retainedCount: 22, retentionRate: 0.55 },
+          ],
+        },
+      });
+      expect(cockpit.cohortViewKind).toBe('ok');
+      expect(cockpit.cohortPeriodNumbers).toEqual([0, 1]);
+      expect(cockpit.cohortRows).toHaveLength(1);
+      expect(cockpit.cohortRows[0].retentionByPeriod.get(1)?.retentionRatePercent).toBe(55);
+    });
+
+    it('reports an ok-but-empty cohort outcome as ok with no rows (nothing landed yet)', () => {
+      const cockpit = buildFunnelGoalsCockpitData({
+        funnelOutcome: REAL_FUNNEL,
+        goals: [],
+        cohortOutcome: { ok: true, rows: [] },
+      });
+      expect(cockpit.cohortViewKind).toBe('ok');
+      expect(cockpit.cohortRows).toEqual([]);
     });
   });
 });

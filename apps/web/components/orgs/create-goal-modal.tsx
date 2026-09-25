@@ -3,10 +3,11 @@
 import React, { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { Target, X } from 'lucide-react';
-import { GOAL_DIRECTIONS, type GoalDirection, type GoalRhythm } from '@growthos/shared';
+import { GOAL_DIRECTIONS, computeElapsedFraction, type GoalDirection, type GoalRhythm } from '@growthos/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { UnifiedGoalItem } from '@/lib/orgs/funnel-goals-synthesizer';
+import { calculateDaysRemaining, type UnifiedGoalItem } from '@/lib/orgs/funnel-goals-synthesizer';
+import type { GoalSummaryView } from '@/lib/orgs/goal-view';
 
 export interface CreateGoalModalProps {
   orgId: string;
@@ -104,38 +105,44 @@ export function CreateGoalModal({
         body: JSON.stringify(payload),
       });
 
+      /*
+        A failed create is an error. It used to add a locally invented goal instead - "on track",
+        projected to hit its target, 60 days left - that existed nowhere and vanished on reload.
+      */
       if (!res.ok) {
-        // Create local optimistic goal fallback if backend route unavailable in test harness
-        const newGoal: UnifiedGoalItem = {
-          id: `goal-${Date.now()}`,
-          name,
-          metricName,
-          direction,
-          targetValue: direction !== 'range' ? Number(targetValue) : null,
-          rangeMin: direction === 'range' ? Number(rangeMin) : null,
-          rangeMax: direction === 'range' ? Number(rangeMax) : null,
-          startDate,
-          deadline,
-          rhythm,
-          ownerPersonId,
-          actualValue: 0,
-          expectedAtNow: 0,
-          projectedFinalValue: direction !== 'range' ? Number(targetValue) : 0,
-          percentFilled: 0,
-          status: 'on_track',
-          statusColor: 'green',
-          isGoalMet: false,
-          elapsedFraction: 0,
-          daysRemaining: 60,
-          isDemo: false,
-        };
-        onGoalCreated?.(newGoal);
-        onClose();
+        setError(t('createError'));
         return;
       }
 
-      const data = await res.json();
-      onGoalCreated?.(data.goal);
+      const data = (await res.json()) as { goal: GoalSummaryView };
+      const created = data.goal;
+      // The new goal has not been measured yet, so it carries no progress figures: the card
+      // shows its target and says progress appears on the next refresh.
+      const newGoal: UnifiedGoalItem = {
+        id: created.id,
+        name: created.name,
+        metricName: created.metricName,
+        direction: created.direction,
+        targetValue: created.targetValue,
+        rangeMin: created.rangeMin,
+        rangeMax: created.rangeMax,
+        startDate,
+        deadline: created.deadline,
+        rhythm,
+        ownerPersonId: created.ownerPersonId,
+        ownerName: people.find((p) => p.id === created.ownerPersonId)?.name ?? created.ownerPersonId,
+        progressKind: 'pending',
+        actualValue: null,
+        expectedAtNow: null,
+        projectedFinalValue: null,
+        percentFilled: null,
+        status: null,
+        statusColor: null,
+        isGoalMet: null,
+        elapsedFraction: computeElapsedFraction(startDate, created.deadline, new Date().toISOString().slice(0, 10), rhythm),
+        daysRemaining: calculateDaysRemaining(created.deadline),
+      };
+      onGoalCreated?.(newGoal);
       onClose();
     } catch {
       setError(t('createError'));

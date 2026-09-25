@@ -775,10 +775,8 @@
     "cohortSizeColumnHeading": "Size",
     "periodColumnHeading": "Period {periodNumber}",
     "retentionCell": "{percent}%",
-    "filterAllActivity": "All Activity",
-    "filterPurchases": "Purchases",
-    "filterSignIns": "Sign-ins",
-    "legendLabel": "Retention"
+    "legendLabel": "Retention",
+    "emptyDetail": "Retention appears here once customers have landed for at least one cohort month."
   },
   "Funnel": {
     "metaTitle": "Funnel",
@@ -786,8 +784,6 @@
     "description": "How customers move through this project's confirmed funnel, stage by stage, and each stage's conversion off the first step.",
     "visualFunnelHeading": "Conversion Funnel: {funnelName}",
     "visualFunnelSubtitle": "Step-by-step conversion pipeline, drop-off analysis, and volume velocity.",
-    "simulatedBadge": "Simulated Mode (Zero-Config)",
-    "liveBadge": "Live Warehouse Data",
     "totalStarted": "Total Started",
     "totalCompleted": "Total Completed",
     "overallConversion": "Overall Conversion",
@@ -1383,7 +1379,8 @@
       "warehouse_not_configured": "Warehouse not configured yet",
       "quota_exceeded": "Daily query quota reached",
       "not_yet_backed": "Not backed by real data yet",
-      "query_error": "Couldn't load this goal's progress"
+      "query_error": "Couldn't load this goal's progress",
+      "pending": "Just created - progress appears once the page is refreshed"
     },
     "cockpitTitle": "Goals & Dynamic Pace",
     "cockpitSubtitle": "Track business metric targets, monitor real-time linear pace, and preview projected deadline outcomes.",
@@ -1394,7 +1391,6 @@
     "presetLeadVolume": "Lead Volume (1,500)",
     "presetCacCeiling": "CAC Ceiling (<$45)",
     "presetConversionRate": "Demo CVR (25%)",
-    "demoBadge": "Demo Data",
     "kpiTotalGoals": "Active Goals",
     "kpiOnTrack": "On Track",
     "kpiAtRisk": "At Risk",
@@ -2110,7 +2106,6 @@
   },
   "FunnelGoals": {
     "noData": "No data",
-    "simulatedBadge": "Sample funnel - no real data yet",
     "metaTitle": "Funnel & Goals",
     "cockpitTitle": "Funnel, Goals & Revenue Health",
     "cockpitDescription": "Visual conversion pipelines, dynamic business goals tracking, and cohort retention health.",
@@ -2135,13 +2130,32 @@
     "signups": "Signups",
     "payingRate": "Paying Conv. %",
     "avg40dRevenue": "Avg 40d Revenue",
-    "kpiBenchmarkComparison": "{diff} vs benchmark",
-    "kpiOnTrackRate": "{rate} on track",
-    "kpiCohortComparison": "{diff} vs prev cohort",
     "kpiTimeToSign": "Time to sign",
-    "kpiPaceMet": "{pace} pace met",
     "kpiChurnRate": "{rate}% churn",
-    "paybackDayWindow": "Day {days} Payback"
+    "paybackDayWindow": "Day {days} Payback",
+    "funnelEmptyTitle": "No funnel is defined for this project yet",
+    "funnelUnavailableTitle": "Funnel conversion is unavailable",
+    "funnelUnavailable": {
+      "no_funnel": "GrowthOS only shows conversion for a funnel you have confirmed. Confirm your funnel stages in project onboarding, and conversion will appear here once events land.",
+      "warehouse_not_configured": "The data warehouse is not configured for this project yet, so the funnel cannot be queried.",
+      "quota_exceeded": "This project's daily query quota is used up. The funnel will load again when the quota resets.",
+      "query_error": "The funnel could not be loaded. Nothing is shown rather than an estimate - try again later."
+    },
+    "defineFunnelCta": "Define your funnel",
+    "goalsEmptyTitle": "No goals yet",
+    "goalsEmptyBody": "A goal tracks one of your metrics against a target you set. Create one and its pace will show here once the metric has data.",
+    "goalsEmptyCta": "Go to the goals page",
+    "goalsNoMatch": "No goals match your search or filter.",
+    "paybackNoTarget": "No payback target is set for this project, so collected revenue is shown without a pace bar.",
+    "paybackNoData": "Not enough landed data yet: no collected revenue has reached the warehouse for this project.",
+    "calibrationNoData": "Not enough landed data yet: no signups have been scored into quality tiers for this project.",
+    "sectionUnavailable": {
+      "warehouse_not_configured": "Unavailable: the data warehouse is not configured for this project yet.",
+      "quota_exceeded": "Unavailable right now: this project's daily query quota is used up.",
+      "not_yet_backed": "Unavailable: the warehouse table behind this section has not been built yet.",
+      "query_error": "This section could not be loaded. Nothing is shown rather than an estimate."
+    },
+    "recommendationFailed": "The optimization could not be applied. Nothing was changed."
   },
   "Copilot": {
     "actionExecuted": "Action submitted. You can roll it back from the audit log.",
@@ -2218,8 +2232,7 @@
     "spendChangeLabel": "Spend Change",
     "cacChangeLabel": "CAC Change",
     "roasChangeLabel": "ROAS Change",
-    "rebalanceAction": "1-Click Rebalance"
+    "rebalanceAction": "1-Click Rebalance",
+    "channelAllocationEmpty": "No ad spend has been measured yet, so there is no channel split to show."
   }
 }
-
-

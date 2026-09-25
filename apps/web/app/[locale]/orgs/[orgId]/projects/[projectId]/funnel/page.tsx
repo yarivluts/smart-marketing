@@ -38,9 +38,11 @@ export async function generateMetadata({ params }: PageProps) {
 
 /**
  * Unified Funnel, Goals & Revenue Health Cockpit (Milestone 2):
- * Consolidates Visual Conversion Pipelines (EasySign), Dynamic Business Metric Goals,
- * Linear Pace Extrapolations, Cohort Retention Heatmap Matrix, Payback Velocity (7d..40d),
- * and Intent Tier Quality Calibration with instant zero-config synthesis.
+ * Consolidates the project's own conversion funnel, metric goals with linear pace, the cohort
+ * retention matrix, payback velocity (7d..40d) and intent-tier quality calibration.
+ *
+ * Every section renders only what was measured for this project. Where a query failed or nothing
+ * has landed yet, the section says so - it never falls back to sample data (Jira B15).
  */
 export default async function FunnelPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -118,7 +120,7 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
           const outcome = await queryGoalProgress(orgId, projectId, goal, environmentScope);
           goalOutcomes.set(goal.id, outcome);
         } catch {
-          // Fallback to synthesizer standard progress calculation
+          // Left out of the map: the synthesizer reports this goal's progress as `query_error`.
         }
       }),
     );
@@ -132,7 +134,6 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     cohortOutcome,
     paybackOutcome,
     calibrationOutcome,
-    projectId,
   });
 
   return (

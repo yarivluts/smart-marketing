@@ -20,7 +20,7 @@ export interface GoalThermometerCardProps {
   onOptimizeRequested?: (goal: UnifiedGoalItem) => void;
 }
 
-const STATUS_BADGE_STYLES: Record<UnifiedGoalItem['status'], { badge: string; dot: string; bar: string }> = {
+const STATUS_BADGE_STYLES: Record<NonNullable<UnifiedGoalItem['status']>, { badge: string; dot: string; bar: string }> = {
   on_track: {
     badge: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
     dot: 'bg-emerald-500',
@@ -63,33 +63,51 @@ export function GoalThermometerCard({
   const [minInput, setMinInput] = useState(goal.rangeMin !== null ? String(goal.rangeMin) : '');
   const [maxInput, setMaxInput] = useState(goal.rangeMax !== null ? String(goal.rangeMax) : '');
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  const style = STATUS_BADGE_STYLES[goal.status] ?? STATUS_BADGE_STYLES.on_track;
+  /*
+    Numbers render only for a goal whose progress was measured. Anything else - no rows in the
+    goal's window yet, warehouse not configured, a failed query - shows the reason and the goal's
+    own target, never a 0 actual with a pace judged against it.
+  */
+  const isMeasured = goal.progressKind === 'ok' && goal.status !== null;
+  const style = goal.status ? STATUS_BADGE_STYLES[goal.status] : STATUS_BADGE_STYLES.on_track;
+  const percentFilled = goal.percentFilled ?? 0;
 
   async function handleSaveTarget(): Promise<void> {
     setIsSaving(true);
+    setSaveError(null);
     try {
       const payload =
         goal.direction === 'range'
           ? { rangeMin: Number(minInput), rangeMax: Number(maxInput) }
           : { targetValue: Number(targetInput) };
 
-      if (!goal.isDemo) {
-        await fetch(`/api/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
+      const res = await fetch(`/api/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      // Only reflect the new target once it was actually saved - a failed PATCH used to update
+      // the card anyway, showing a target that exists nowhere.
+      if (!res.ok) {
+        setSaveError(t('targetUpdateError'));
+        return;
       }
 
       onTargetUpdated?.(goal.id, payload);
       setIsEditingTarget(false);
     } catch {
-      // Revert / best effort
+      setSaveError(t('targetUpdateError'));
     } finally {
       setIsSaving(false);
     }
   }
+
+  const targetText =
+    goal.direction === 'range'
+      ? `${formatValue(goal.rangeMin ?? 0, goal.metricName)} - ${formatValue(goal.rangeMax ?? 0, goal.metricName)}`
+      : formatValue(goal.targetValue ?? 0, goal.metricName);
 
   return (
     <div
@@ -104,65 +122,75 @@ export function GoalThermometerCard({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 {goal.metricName}
               </span>
-              {goal.isDemo && (
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                  {t('demoBadge')}
-                </span>
-              )}
             </div>
             <h3 className="text-base font-bold text-foreground">{goal.name}</h3>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span
-              data-testid={`goal-status-${goal.id}`}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${style.badge}`}
+          {isMeasured && goal.status ? (
+            <div className="flex items-center gap-2">
+              <span
+                data-testid={`goal-status-${goal.id}`}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium ${style.badge}`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
+                {t(`paceStatus.${goal.status}`)}
+              </span>
+            </div>
+          ) : null}
+        </div>
+
+        {isMeasured ? (
+          /* Thermometer Gauge */
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-muted-foreground">
+                {t('progressLabel')}{': '}
+                <span dir="ltr">{`${percentFilled}%`}</span>
+              </span>
+              <span className="font-bold text-foreground" dir="ltr">
+                {`${formatValue(goal.actualValue ?? 0, goal.metricName)} / ${targetText}`}
+              </span>
+            </div>
+
+            {/* Animated Bar with Milestone Markers */}
+            <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                data-testid={`goal-bar-${goal.id}`}
+                role="progressbar"
+                aria-valuenow={percentFilled}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
+                style={{ width: `${Math.min(100, Math.max(2, percentFilled))}%` }}
+              />
+            </div>
+
+            {/* Expected vs Projected Timeline Strip */}
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>
+                {t('expectedAtNowLabel')}{': '}
+                <strong className="text-foreground" dir="ltr">{formatValue(goal.expectedAtNow ?? 0, goal.metricName)}</strong>
+              </span>
+              <span data-testid={`goal-projection-${goal.id}`}>
+                {t('projectedFinalValueLabel')}{': '}
+                <strong className="text-foreground" dir="ltr">{formatValue(goal.projectedFinalValue ?? 0, goal.metricName)}</strong>
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-col gap-2 text-xs">
+            <span className="text-muted-foreground">
+              {t('columnTarget')}{': '}
+              <strong className="text-foreground" dir="ltr">{targetText}</strong>
+            </span>
+            <p
+              data-testid={`goal-progress-unavailable-${goal.id}`}
+              className="rounded-lg border border-dashed border-border bg-muted/30 p-2.5 text-muted-foreground"
             >
-              <span className={`h-1.5 w-1.5 rounded-full ${style.dot}`} />
-              {t(`paceStatus.${goal.status}`)}
-            </span>
+              {t(`thermometerUnavailableReason.${goal.progressKind}`)}
+            </p>
           </div>
-        </div>
-
-        {/* Thermometer Gauge */}
-        <div className="mt-4 flex flex-col gap-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-medium text-muted-foreground">
-              {t('progressLabel')}{': '}
-              <span dir="ltr">{`${goal.percentFilled}%`}</span>
-            </span>
-            <span className="font-bold text-foreground" dir="ltr">
-              {goal.direction === 'range'
-                ? `${formatValue(goal.actualValue, goal.metricName)} / ${formatValue(goal.rangeMin ?? 0, goal.metricName)} - ${formatValue(goal.rangeMax ?? 0, goal.metricName)}`
-                : `${formatValue(goal.actualValue, goal.metricName)} / ${formatValue(goal.targetValue ?? 0, goal.metricName)}`}
-            </span>
-          </div>
-
-          {/* Animated Bar with Milestone Markers */}
-          <div className="relative h-3 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              data-testid={`goal-bar-${goal.id}`}
-              role="progressbar"
-              aria-valuenow={goal.percentFilled}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
-              style={{ width: `${Math.min(100, Math.max(2, goal.percentFilled))}%` }}
-            />
-          </div>
-
-          {/* Expected vs Projected Timeline Strip */}
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>
-              {t('expectedAtNowLabel')}{': '}
-              <strong className="text-foreground" dir="ltr">{formatValue(goal.expectedAtNow, goal.metricName)}</strong>
-            </span>
-            <span data-testid={`goal-projection-${goal.id}`}>
-              {t('projectedFinalValueLabel')}{': '}
-              <strong className="text-foreground" dir="ltr">{formatValue(goal.projectedFinalValue, goal.metricName)}</strong>
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Footer Details & Quick Action */}
@@ -243,8 +271,14 @@ export function GoalThermometerCard({
           )}
         </div>
 
-        {/* Proactive Copilot Callout for At-Risk / Off-Track Goals */}
-        {goal.status !== 'on_track' && onOptimizeRequested && (
+        {saveError ? (
+          <p role="alert" className="mt-2 text-xs text-destructive">
+            {saveError}
+          </p>
+        ) : null}
+
+        {/* Proactive Copilot Callout - only for a MEASURED at-risk / off-track goal */}
+        {isMeasured && goal.status !== 'on_track' && onOptimizeRequested && (
           <div
             data-testid={`goal-rec-card-${goal.id}`}
             className="mt-3 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 text-xs text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-200"

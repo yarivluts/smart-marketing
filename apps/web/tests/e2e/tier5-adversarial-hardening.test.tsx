@@ -310,11 +310,9 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(zeroStarted[1].conversionPercent).toBe(0);
       expect(zeroStarted[1].dropOffPercent).toBe(0);
 
-      // 4. Null outcome fallback synthesis
-      const synthesized = buildVisualFunnelData(null, 'test-seed');
-      expect(synthesized.isSimulated).toBe(true);
-      expect(synthesized.steps.length).toBe(3);
-      expect(synthesized.overallConversionPercent).toBeGreaterThan(0);
+      // 4. Null outcome: reported as a failed query with no numbers. This used to assert a
+      // synthesized 3-step sample funnel with a positive conversion rate (Jira B15).
+      expect(buildVisualFunnelData(null)).toEqual({ kind: 'query_error' });
     });
 
     it('5.2.2 Inverted drop-offs: clamps drop-off percentage to 0% when a subsequent step has more users than preceding step', () => {
@@ -412,7 +410,6 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(getHeatmapCellColor(15)).toContain('bg-rose-500/20');
       expect(getHeatmapCellColor(0)).toContain('bg-muted/30');
 
-      const onSelectEvent = vi.fn();
       const mockCohortRow = {
         cohortMonth: '2026-01-01',
         cohortLabel: 'Jan 2026',
@@ -425,19 +422,13 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       };
 
       renderWithIntl(
-        <CohortRetentionMatrix
-          cohorts={[mockCohortRow]}
-          periodNumbers={[0, 1, 2]}
-          onSelectConversionEvent={onSelectEvent}
-        />,
+        <CohortRetentionMatrix cohorts={[mockCohortRow]} periodNumbers={[0, 1, 2]} projectName="EasySign" />,
       );
 
-      // Filter clicks
-      fireEvent.click(screen.getByTestId('filter-purchases'));
-      expect(onSelectEvent).toHaveBeenCalledWith('purchase');
-
-      fireEvent.click(screen.getByTestId('filter-sign-ins'));
-      expect(onSelectEvent).toHaveBeenCalledWith('sign_in');
+      expect(screen.getByTestId('retention-cell-2026-01-01-p1')).toHaveTextContent('65%');
+      // The Purchases / Sign-ins filter pills are gone: they relabelled the same all-activity
+      // matrix without re-querying anything (Jira B15).
+      expect(screen.queryByTestId('filter-purchases')).not.toBeInTheDocument();
     });
   });
 

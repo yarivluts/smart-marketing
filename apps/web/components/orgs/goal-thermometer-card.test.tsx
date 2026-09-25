@@ -4,6 +4,7 @@ import React from 'react';
 import { GoalThermometerCard } from './goal-thermometer-card';
 import { CreateGoalModal } from './create-goal-modal';
 import { renderWithIntl } from '../../tests/e2e/helpers/test-harness';
+import enMessages from '../../messages/en.json';
 import type { UnifiedGoalItem } from '../../lib/orgs/funnel-goals-synthesizer';
 
 const mockGoal: UnifiedGoalItem = {
@@ -28,7 +29,7 @@ const mockGoal: UnifiedGoalItem = {
   isGoalMet: false,
   elapsedFraction: 0.6,
   daysRemaining: 30,
-  isDemo: false,
+  progressKind: 'ok',
 };
 
 const mockAtRiskGoal: UnifiedGoalItem = {
@@ -114,6 +115,59 @@ describe('GoalThermometerCard Component', () => {
   });
 });
 
+describe('GoalThermometerCard with unmeasured progress', () => {
+  /*
+    A goal whose metric has no rows, or whose query failed, used to render an actual of 0 with a
+    pace judged against it - usually "Off track" in red - plus an AI Copilot "boost budget"
+    callout. None of that was measured.
+  */
+  const unmeasured: UnifiedGoalItem = {
+    ...mockGoal,
+    id: 'goal-unmeasured',
+    progressKind: 'no_measurements',
+    actualValue: null,
+    expectedAtNow: null,
+    projectedFinalValue: null,
+    percentFilled: null,
+    status: null,
+    statusColor: null,
+    isGoalMet: null,
+  };
+
+  it('shows the reason and the real target, with no status, bar, projection or Copilot callout', () => {
+    renderWithIntl(
+      <GoalThermometerCard orgId="org-1" projectId="p-1" goal={unmeasured} onOptimizeRequested={vi.fn()} />,
+    );
+
+    expect(screen.getByTestId('goal-progress-unavailable-goal-unmeasured')).toHaveTextContent(
+      enMessages.Goals.thermometerUnavailableReason.no_measurements,
+    );
+    expect(screen.getByTestId('goal-card-goal-unmeasured')).toHaveTextContent('$100,000');
+    expect(screen.queryByTestId('goal-status-goal-unmeasured')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('goal-bar-goal-unmeasured')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('goal-projection-goal-unmeasured')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('goal-rec-card-goal-unmeasured')).not.toBeInTheDocument();
+    expect(screen.queryByText('Demo Data')).not.toBeInTheDocument();
+  });
+
+  it('does not show a new target when saving it failed', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+    const handleTargetUpdated = vi.fn();
+    renderWithIntl(
+      <GoalThermometerCard orgId="org-1" projectId="p-1" goal={mockGoal} onTargetUpdated={handleTargetUpdated} />,
+    );
+
+    fireEvent.click(screen.getByTestId('adjust-target-btn-goal-1'));
+    fireEvent.change(screen.getByTestId('input-target-goal-1'), { target: { value: '5' } });
+    fireEvent.click(screen.getByTestId('save-target-btn-goal-1'));
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(enMessages.Goals.targetUpdateError);
+    });
+    expect(handleTargetUpdated).not.toHaveBeenCalled();
+  });
+});
+
 describe('CreateGoalModal Component', () => {
   it('applies 1-click presets properly', () => {
     renderWithIntl(
@@ -140,6 +194,26 @@ describe('CreateGoalModal Component', () => {
     expect(screen.getByTestId('modal-input-target')).toHaveValue(45);
   });
 
+  it('shows an error - and invents no goal - when the create request fails', async () => {
+    // A failed create used to add a locally invented goal ("on track", 60 days left) instead.
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+    const handleCreated = vi.fn();
+    const handleClose = vi.fn();
+
+    renderWithIntl(
+      <CreateGoalModal orgId="org-1" projectId="p-1" isOpen={true} onClose={handleClose} onGoalCreated={handleCreated} />,
+    );
+
+    fireEvent.click(screen.getByTestId('preset-leads-btn'));
+    fireEvent.click(screen.getByTestId('modal-submit-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText(enMessages.Goals.createError)).toBeInTheDocument();
+    });
+    expect(handleCreated).not.toHaveBeenCalled();
+    expect(handleClose).not.toHaveBeenCalled();
+  });
+
   it('submits form and invokes onGoalCreated callback', async () => {
     const handleCreated = vi.fn();
     const handleClose = vi.fn();
@@ -160,6 +234,14 @@ describe('CreateGoalModal Component', () => {
     await waitFor(() => {
       expect(handleCreated).toHaveBeenCalled();
       expect(handleClose).toHaveBeenCalled();
+    });
+    // The created goal has not been measured yet, so it carries no progress figures.
+    expect(handleCreated.mock.calls[0][0]).toMatchObject({
+      id: 'goal-1',
+      progressKind: 'pending',
+      actualValue: null,
+      percentFilled: null,
+      status: null,
     });
   });
 });
