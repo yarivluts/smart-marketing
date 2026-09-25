@@ -144,8 +144,8 @@
     "prod": "Prod"
   },
   "EnvironmentPicker": {
-    "label": "Environment",
-    "nonProdNotice": "Showing {environment} data, not production."
+    "label": "Viewing data from",
+    "nonProdNotice": "Showing {environment} data, not production. Pages without environment support still show production."
   },
   "Members": {
     "roleAndStatus": "{role} ({status})",

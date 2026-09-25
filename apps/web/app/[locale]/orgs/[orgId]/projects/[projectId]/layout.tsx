@@ -79,8 +79,9 @@ export default async function ProjectLayout({
     getTranslations('EnvironmentPicker'),
     resolveSelectedEnvironment(orgId, projectId),
   ]);
-  // KAN-196: every project page scopes its data reads to this environment (see
-  // `resolveSelectedEnvironment`); the picker below is how a viewer changes it.
+  // KAN-196: environment-aware project pages scope their data reads to this
+  // environment (see `resolveSelectedEnvironment`); the picker below is how a
+  // viewer changes it.
   const currentEnv = selectedEnvironment?.name ?? DEFAULT_SELECTED_ENVIRONMENT;
   const environmentOptions = ENVIRONMENTS.filter((name) => environments.some((environment) => environment.name === name));
   const environmentLabels = { dev: tEnvBadge('dev'), staging: tEnvBadge('staging'), prod: tEnvBadge('prod') };
