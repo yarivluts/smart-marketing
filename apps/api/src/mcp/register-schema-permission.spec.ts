@@ -1,4 +1,4 @@
-import { requiredRegisterSchemaPermission } from './mcp-admin-tools';
+import { requiredRegisterSchemaPermission, requiredSetFunnelPermission } from './mcp-admin-tools';
 
 /**
  * `register_schema`'s dry run writes nothing, so it needs only `mcp.read`;
@@ -44,5 +44,31 @@ describe('requiredRegisterSchemaPermission', () => {
     expect(requiredRegisterSchemaPermission(null)).toBe('schema.write');
     expect(requiredRegisterSchemaPermission(undefined)).toBe('schema.write');
     expect(requiredRegisterSchemaPermission('not an object')).toBe('schema.write');
+  });
+});
+
+/**
+ * `set_funnel` (KAN-199) follows the same dry-run split, with
+ * `project.configure` as its write permission: which events make up the
+ * funnel is the project describing itself, and `project.manage` (what the web
+ * wizard's route checks) is withheld from API keys.
+ */
+describe('requiredSetFunnelPermission', () => {
+  it('requires only mcp.read for a dry run', () => {
+    expect(requiredSetFunnelPermission({ steps: ['a', 'b'], dry_run: true })).toBe('mcp.read');
+  });
+
+  it('requires project.configure to actually save the funnel', () => {
+    expect(requiredSetFunnelPermission({ steps: ['a', 'b'] })).toBe('project.configure');
+    expect(requiredSetFunnelPermission({ steps: ['a', 'b'], dry_run: false })).toBe('project.configure');
+  });
+
+  it.each([['string', 'true'], ['number', 1], ['object', {}], ['null', null]])('does not accept a truthy %s as a dry run', (_label, value) => {
+    expect(requiredSetFunnelPermission({ steps: ['a', 'b'], dry_run: value })).toBe('project.configure');
+  });
+
+  it('tolerates junk args without throwing', () => {
+    expect(requiredSetFunnelPermission(null)).toBe('project.configure');
+    expect(requiredSetFunnelPermission('not an object')).toBe('project.configure');
   });
 });

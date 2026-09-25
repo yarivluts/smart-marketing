@@ -3,6 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import {
+  getConfirmedFunnelSteps,
   getMetricCatalogDetail,
   listMetricsCatalogForProject,
   listProjectInsights,
@@ -73,6 +74,10 @@ export function textResult(value: unknown): ToolResult {
 export function errorResult(message: string): ToolResult {
   return { content: [{ type: 'text', text: message }], isError: true };
 }
+
+/** What `query_funnel` says when the project has no confirmed funnel yet (KAN-199). */
+export const NO_FUNNEL_DEFINED_MESSAGE =
+  'This project has no confirmed funnel yet, so there is nothing to count. Define one with set_funnel (an ordered list of at least 2 registered event schema names; pass dry_run first to check it) or confirm one in the web onboarding wizard.';
 
 /**
  * Appends one audit-log entry for a single MCP tool call (KAN-77 AC: "every tool call lands in the
@@ -350,15 +355,24 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Query funnel',
       description:
-        "Query this project's confirmed funnel (onboarding wizard step order): distinct customer count per stage, ordered by step, each stage's count also expressed as a conversion rate off the first step.",
+        "Query this project's confirmed funnel: distinct customer count per step, in step order, each step's count also expressed as a conversion rate off the first step. Each step names the event schema it counts (eventSchemaName) and its funnel stage (stageKey); several steps can share a stage. A project only has a funnel once one is confirmed - with set_funnel or in the web onboarding wizard. Until then this returns status \"no_funnel_defined\" with an empty steps list and a message saying so, rather than a bare empty list that would read as a funnel nobody entered.",
       inputSchema: {},
     },
     auditedToolHandler(auth, 'query_funnel', async () => {
       try {
         const steps = await queryProjectFunnelSteps({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}) });
+        if (steps.length === 0) {
+          // KAN-199: an empty list was indistinguishable from "a funnel with nobody in it", and an
+          // integrator who never opened the web wizard had no way to learn a funnel must be set.
+          return textResult({ status: 'no_funnel_defined', steps: [], message: NO_FUNNEL_DEFINED_MESSAGE });
+        }
         return textResult({ steps });
       } catch (error) {
-        return errorResult(describeMetricsError(error));
+        // The funnel exists but could not be counted: say which funnel, so a warehouse problem is not
+        // mistaken for a missing or wrong funnel definition.
+        const configured = await getConfirmedFunnelSteps(auth.organizationId, auth.projectId).catch(() => []);
+        const funnelNote = configured.length > 0 ? ` The confirmed funnel is: ${configured.map((step) => step.eventSchemaName).join(' -> ')}.` : '';
+        return errorResult(`${describeMetricsError(error)}${funnelNote}`);
       }
     }),
   );

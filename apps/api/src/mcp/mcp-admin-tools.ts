@@ -13,6 +13,7 @@ import {
   GoalNotFoundError,
   HookEndpointNotFoundError,
   HookEndpointNotHmacModeError,
+  InvalidFunnelDefinitionError,
   InvalidMetricDefinitionError,
   InvalidProjectCurrencyError,
   InvalidProjectNameError,
@@ -37,17 +38,21 @@ import {
   reexportRawRecordsToWarehouse,
   registerMetricDefinition,
   describeSchemaDefinitionWarnings,
+  previewProjectFunnel,
   previewSchemaDefinition,
   registerSchemaDefinition,
   setGoalStatus,
   setHookEndpointSigningSecret,
+  setProjectFunnel,
   unarchiveProject,
   updateProjectDetails,
   VaultNotConfiguredError,
   WarehouseNotConfiguredError,
+  type FunnelStepInput,
   type MetricDefinitionInput,
+  type OnboardingFunnelStep,
 } from '@growthos/firebase-orm-models';
-import type { Permission } from '@growthos/shared';
+import { FUNNEL_STAGE_KEYS, type Permission } from '@growthos/shared';
 import { getServerKmsProvider } from '../vault/kms-provider';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
@@ -94,6 +99,13 @@ function describeAdminToolError(error: unknown): string {
   }
   if (error instanceof MetricDefStillReferencedError) {
     return error.message;
+  }
+  if (error instanceof InvalidFunnelDefinitionError) {
+    const accepted =
+      error.availableEventSchemas.length > 0
+        ? `Registered event schemas you can use: ${error.availableEventSchemas.join(', ')}.`
+        : 'This project has no registered event schemas yet - register them with register_schema first.';
+    return `Invalid funnel: ${error.reasons.join(' ')} ${accepted} Nothing was saved.`;
   }
   if (
     error instanceof DuplicateMetricDefinitionError ||
@@ -145,7 +157,37 @@ function actorId(auth: McpAuthContext): string {
  * `schema.write` rather than be coerced into a dry run.
  */
 export function requiredRegisterSchemaPermission(args: unknown): Permission {
-  return (args as { dry_run?: unknown } | null | undefined)?.dry_run === true ? 'mcp.read' : 'schema.write';
+  return requiredDryRunablePermission(args, 'schema.write');
+}
+
+/**
+ * Which permission a `set_funnel` call needs (KAN-199) — `mcp.read` for a dry
+ * run, `project.configure` to actually replace the confirmed funnel.
+ *
+ * `project.configure` rather than the `project.manage` the web wizard's route
+ * checks: which events make up this project's funnel is the project describing
+ * ITSELF, the exact category `project.configure` was split out of
+ * `project.manage` for (see `permissions.ts`) — and `project.manage` is
+ * withheld from API keys, so choosing it would recreate the P-08 dead end this
+ * tool exists to remove. It is not `schema.write` (no schema changes) nor
+ * `dashboards.write` (a funnel is not a board, and dashboards.write would let
+ * a board-editing key redefine what every funnel view measures). The dry-run
+ * split follows `requiredRegisterSchemaPermission`'s reasoning unchanged: a
+ * preview writes nothing and discloses no more than `list_schemas` already
+ * does.
+ */
+export function requiredSetFunnelPermission(args: unknown): Permission {
+  return requiredDryRunablePermission(args, 'project.configure');
+}
+
+/**
+ * Shared by every tool with a `dry_run` flag. Reads the RAW args: the
+ * permission check runs before the handler, so only a literal `true` counts
+ * as a dry run — anything else falls through to the write permission rather
+ * than being coerced into the cheaper one.
+ */
+function requiredDryRunablePermission(args: unknown, writePermission: Permission): Permission {
+  return (args as { dry_run?: unknown } | null | undefined)?.dry_run === true ? 'mcp.read' : writePermission;
 }
 
 async function runAdminTool<Args>(auth: McpAuthContext, permission: Permission, args: unknown, handler: (args: Args) => Promise<ToolResult>): Promise<ToolResult> {
@@ -282,6 +324,46 @@ const purgeInputShape = {
   confirm_project_id: z.string().min(1).describe('Must exactly equal this connection\'s own project id. A deliberate guard: this deletes landed data irreversibly.'),
   environment_id: z.string().optional().describe('Restrict the purge to one environment; omit to clear every environment.'),
 };
+
+const setFunnelInputShape = {
+  steps: z
+    .array(
+      z.union([
+        z.string(),
+        z.object({
+          event_schema_name: z.string().describe('A registered event schema name of this project (see list_schemas).'),
+          stage_key: z.string().optional().describe(`Optional funnel stage. One of: ${FUNNEL_STAGE_KEYS.join(', ')}. Inferred from the event name when omitted.`),
+        }),
+      ]),
+    )
+    .describe(
+      'The funnel, first step first, e.g. ["touchpoint", "signup", "document_created", "document_sent", "document_signed"]. Each entry is a registered event schema name, or { event_schema_name, stage_key } to also pick its stage. At least 2 steps, each event at most once, and every name must be an active EVENT schema of this project (entity/measure schemas cannot be funnel steps). Replaces the whole funnel; it is not merged with the current one.',
+    ),
+  dry_run: z
+    .boolean()
+    .optional()
+    .describe('Validate and report the funnel that would be saved (and the one it would replace), writing nothing. Needs only "mcp.read".'),
+};
+
+/** Normalises `set_funnel`'s loosely-typed `steps` (a bare name, or an object) into the service's input. Anything unrecognisable becomes an empty name, which the service then refuses with a positioned reason. */
+function toFunnelStepInputs(raw: unknown): FunnelStepInput[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.map((entry: any) => {
+    if (typeof entry === 'string') {
+      return { eventSchemaName: entry };
+    }
+    return {
+      eventSchemaName: String(entry?.event_schema_name ?? ''),
+      ...(entry?.stage_key !== undefined ? { stageKey: String(entry.stage_key) } : {}),
+    };
+  });
+}
+
+function toFunnelStepOutput(steps: readonly OnboardingFunnelStep[]): Array<{ order: number; event_schema_name: string; stage_key: string }> {
+  return steps.map((step) => ({ order: step.order, event_schema_name: step.eventSchemaName, stage_key: step.stageKey }));
+}
 
 export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): void {
   server.registerTool(
@@ -653,6 +735,45 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
           ? await archiveProject(auth.organizationId, auth.projectId, actorId(auth))
           : await unarchiveProject(auth.organizationId, auth.projectId, actorId(auth));
         return textResult({ id: project.id, name: project.name, archived_at: project.archived_at ?? null });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'set_funnel',
+    {
+      title: 'Set the project funnel',
+      description:
+        'Define (or replace) this project\'s confirmed funnel: the ordered event schemas query_funnel counts customers through and the web Funnel page charts. This is the same funnel the web onboarding wizard confirms, so either surface can set it and both show the result. Pass dry_run first to see the resolved funnel and the one it would replace. Committing requires "project.configure"; a dry run needs only "mcp.read".',
+      inputSchema: toolInputSchema(setFunnelInputShape),
+    },
+    auditedToolHandler(auth, 'set_funnel', async (args: any) =>
+      runAdminTool(auth, requiredSetFunnelPermission(args), args, async (a: any) => {
+        const request = { organizationId: auth.organizationId, projectId: auth.projectId, steps: toFunnelStepInputs(a.steps) };
+
+        if (a.dry_run === true) {
+          const preview = await previewProjectFunnel(request);
+          return textResult({
+            dry_run: true,
+            saved: false,
+            would_set: toFunnelStepOutput(preview.steps),
+            previous_steps: toFunnelStepOutput(preview.previousSteps),
+            changed: preview.changed,
+          });
+        }
+
+        const result = await setProjectFunnel({
+          ...request,
+          actorType: auth.principalKind === 'api_key' ? 'api_key' : 'user',
+          actorId: actorId(auth),
+        });
+        return textResult({
+          saved: true,
+          steps: toFunnelStepOutput(result.steps),
+          previous_steps: toFunnelStepOutput(result.previousSteps),
+          changed: result.changed,
+          next_step: 'Call query_funnel to count customers through it.',
+        });
       }),
     ),
   );
