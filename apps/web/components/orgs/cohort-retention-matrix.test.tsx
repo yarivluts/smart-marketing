@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+import { screen } from '@testing-library/react';
 import React from 'react';
 import { CohortRetentionMatrix } from './cohort-retention-matrix';
 import { renderWithIntl } from '../../tests/e2e/helpers/test-harness';
+import enMessages from '../../messages/en.json';
 import { getHeatmapCellColor, type CohortHeatmapRow } from '../../lib/orgs/funnel-goals-synthesizer';
 
 const mockCohorts: CohortHeatmapRow[] = [
@@ -34,6 +35,7 @@ describe('CohortRetentionMatrix Component', () => {
       <CohortRetentionMatrix
         cohorts={mockCohorts}
         periodNumbers={[0, 1, 2, 3]}
+        projectName="EasySign"
       />,
     );
 
@@ -46,25 +48,29 @@ describe('CohortRetentionMatrix Component', () => {
     expect(screen.getByTestId('retention-cell-2026-01-01-p2')).toHaveTextContent('48%');
   });
 
-  it('handles conversion event filtering pills', () => {
-    const handleSelectEvent = vi.fn();
+  /*
+    The "All Activity / Purchases / Sign-ins" pills are gone: they changed their own highlight and
+    nothing else (the page never re-queried), so "Purchases" relabelled all-activity retention.
+  */
+  it('offers no conversion-event filter pills that would relabel the same data', () => {
+    renderWithIntl(<CohortRetentionMatrix cohorts={mockCohorts} periodNumbers={[0, 1, 2, 3]} projectName="EasySign" />);
+    expect(screen.queryByTestId('cohort-event-filters')).not.toBeInTheDocument();
+  });
 
+  it('renders a not-enough-data empty state instead of sample cohorts when there are none', () => {
+    renderWithIntl(<CohortRetentionMatrix cohorts={[]} periodNumbers={[]} projectName="EasySign" />);
+    const empty = screen.getByTestId('cohort-retention-empty');
+    expect(empty).toHaveTextContent(enMessages.CohortRetention.empty);
+    expect(empty).toHaveTextContent(enMessages.CohortRetention.emptyDetail);
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.getByTestId('cohort-retention-matrix').textContent ?? '').not.toMatch(/\d+%/);
+  });
+
+  it('explains a warehouse failure when cohorts could not be queried', () => {
     renderWithIntl(
-      <CohortRetentionMatrix
-        cohorts={mockCohorts}
-        periodNumbers={[0, 1, 2, 3]}
-        conversionEvent=""
-        onSelectConversionEvent={handleSelectEvent}
-      />,
+      <CohortRetentionMatrix cohorts={[]} periodNumbers={[]} projectName="EasySign" viewKind="warehouse_not_configured" />,
     );
-
-    const purchaseBtn = screen.getByTestId('filter-purchases');
-    fireEvent.click(purchaseBtn);
-    expect(handleSelectEvent).toHaveBeenCalledWith('purchase');
-
-    const signinBtn = screen.getByTestId('filter-sign-ins');
-    fireEvent.click(signinBtn);
-    expect(handleSelectEvent).toHaveBeenCalledWith('sign_in');
+    expect(screen.getByTestId('cohort-retention-empty')).toHaveTextContent(enMessages.CohortRetention.notConfigured);
   });
 
   it('renders heatmap legend and trend indicators', () => {
@@ -72,6 +78,7 @@ describe('CohortRetentionMatrix Component', () => {
       <CohortRetentionMatrix
         cohorts={mockCohorts}
         periodNumbers={[0, 1, 2, 3]}
+        projectName="EasySign"
       />,
     );
 

@@ -52,7 +52,7 @@ describe('ExecutiveReportingSynthesizer Unit Tests', () => {
 
   it('reports every metric as null for a project with no targets and no warehouse data', () => {
     for (const timeWindow of ['7d', '30d', '90d'] as const) {
-      const metrics = buildExecutiveBlendedMetrics({ timeWindow, seed: 'test-seed' });
+      const metrics = buildExecutiveBlendedMetrics({ timeWindow });
 
       expect(metrics.totalSpendUsd).toBeNull();
       expect(metrics.metaSpendUsd).toBeNull();

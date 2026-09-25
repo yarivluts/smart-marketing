@@ -9,13 +9,9 @@ import {
   isGoalRhythm,
 } from '@growthos/shared';
 import {
-  getDeterministicFactor,
   calculateDaysRemaining,
-  createMockEasySignFunnel,
   calculateFunnelStepItems,
   buildVisualFunnelData,
-  buildDeterministicDemoGoals,
-  buildUnifiedGoalsData,
   getHeatmapCellColor,
   buildFunnelGoalsCockpitData,
   type FunnelStepItem,
@@ -26,6 +22,63 @@ import { VisualFunnelSteps } from '../components/orgs/visual-funnel-steps';
 import { GoalThermometerCard } from '../components/orgs/goal-thermometer-card';
 import { CohortRetentionMatrix } from '../components/orgs/cohort-retention-matrix';
 import { FunnelGoalsDashboard } from '../components/orgs/funnel-goals-dashboard';
+import type { GoalModel, GoalProgressOutcome } from '@growthos/firebase-orm-models';
+
+vi.mock('@/i18n/navigation', () => ({
+  Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
+/** Narrows `buildVisualFunnelData` to its measured branch, failing loudly otherwise. */
+function measuredFunnel(outcome: Parameters<typeof buildVisualFunnelData>[0]) {
+  const data = buildVisualFunnelData(outcome);
+  if (data.kind !== 'ok') throw new Error(`expected a measured funnel, got ${data.kind}`);
+  return data;
+}
+
+const MEASURED_GOALS = [
+  {
+    id: 'g-mrr',
+    name: 'Q3 MRR',
+    metric_name: 'mrr_usd',
+    direction: 'maximize',
+    target_value: 1000,
+    range_min: null,
+    range_max: null,
+    start_date: '2026-01-01',
+    deadline: '2099-12-31',
+    rhythm: 'even',
+    owner_person_id: 'p1',
+  },
+  {
+    id: 'g-leads',
+    name: 'Leads',
+    metric_name: 'qualified_leads',
+    direction: 'maximize',
+    target_value: 100,
+    range_min: null,
+    range_max: null,
+    start_date: '2026-01-01',
+    deadline: '2099-12-31',
+    rhythm: 'even',
+    owner_person_id: 'p1',
+  },
+] as unknown as GoalModel[];
+
+const MEASURED_GOAL_OUTCOMES = new Map<string, GoalProgressOutcome>(
+  MEASURED_GOALS.map((g) => [
+    g.id,
+    {
+      ok: true,
+      actualValue: 50,
+      hasMeasurements: true,
+      progress: { expectedAtNow: 40, progressRatio: 0.5, projectedFinalValue: 120, status: 'on_track', isGoalMet: false },
+    } as unknown as GoalProgressOutcome,
+  ]),
+);
 
 beforeEach(() => {
   global.fetch = vi.fn().mockResolvedValue({
@@ -40,9 +93,8 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
       const items = calculateFunnelStepItems([]);
       expect(items).toEqual([]);
 
-      const data = buildVisualFunnelData({ ok: true, steps: [] }, 'proj-zero');
-      expect(data.isSimulated).toBe(true);
-      expect(data.steps.length).toBe(3);
+      // An empty funnel is "no funnel" - it used to be replaced by a 3-step sample (Jira B15).
+      expect(buildVisualFunnelData({ ok: true, steps: [] })).toEqual({ kind: 'no_funnel' });
     });
 
     it('1.2 handles single-step funnel with 100% conversion and 0% drop-off', () => {
@@ -59,8 +111,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         dropOffPercent: 0,
       });
 
-      const data = buildVisualFunnelData({ ok: true, steps: raw });
-      expect(data.isSimulated).toBe(false);
+      const data = measuredFunnel({ ok: true, steps: raw });
       expect(data.totalStarted).toBe(450);
       expect(data.totalCompleted).toBe(450);
       expect(data.overallConversionPercent).toBe(100);
@@ -81,7 +132,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
       expect(items[1].conversionPercent).toBe(0);
       expect(items[1].dropOffPercent).toBe(0);
 
-      const data = buildVisualFunnelData({ ok: true, steps: raw });
+      const data = measuredFunnel({ ok: true, steps: raw });
       expect(data.totalStarted).toBe(0);
       expect(data.totalCompleted).toBe(0);
       expect(data.overallConversionPercent).toBe(0);
@@ -106,7 +157,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
       expect(items[2].conversionPercent).toBe(0);
       expect(items[2].dropOffPercent).toBe(0); // 0 from 0 is 0 drop-off
 
-      const data = buildVisualFunnelData({ ok: true, steps: raw });
+      const data = measuredFunnel({ ok: true, steps: raw });
       expect(data.biggestDropOffPercent).toBe(100);
       expect(data.biggestDropOffStageKey).toBe('s2');
       expect(data.overallConversionPercent).toBe(0);
@@ -123,7 +174,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
       expect(items[1].conversionPercent).toBe(250);
       expect(items[1].dropOffPercent).toBe(0); // clamped at min 0, not negative
 
-      const data = buildVisualFunnelData({ ok: true, steps: raw });
+      const data = measuredFunnel({ ok: true, steps: raw });
       expect(data.overallConversionPercent).toBe(250);
       expect(data.biggestDropOffPercent).toBe(0);
     });
@@ -150,7 +201,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         { stageKey: 'solo', stageLabel: 'Solo Step', stepOrder: 1, customerCount: 0, conversionPercent: 0, dropOffPercent: 0 },
       ];
 
-      const { unmount } = renderWithIntl(<VisualFunnelSteps steps={singleStep} />);
+      const { unmount } = renderWithIntl(<VisualFunnelSteps steps={singleStep} funnelName="EasySign" />);
       expect(screen.getByTestId('visual-funnel-container')).toBeInTheDocument();
       expect(screen.getByTestId('count-solo')).toHaveTextContent('0 users');
       expect(screen.getByTestId('pct-solo')).toHaveTextContent('0%');
@@ -163,7 +214,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         { stageKey: 'viewed', stageLabel: 'Viewed', stepOrder: 2, customerCount: 100, conversionPercent: 10, dropOffPercent: 90 },
       ];
       const onCopilot = vi.fn();
-      renderWithIntl(<VisualFunnelSteps steps={alertSteps} onAskCopilot={onCopilot} />);
+      renderWithIntl(<VisualFunnelSteps steps={alertSteps} funnelName="EasySign" onAskCopilot={onCopilot} />);
 
       expect(screen.getByTestId('funnel-dropoff-alert-card')).toBeInTheDocument();
       const copilotBtn = screen.getByTestId('ask-copilot-btn');
@@ -172,8 +223,11 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
     });
 
     it('1.8 renders VisualFunnelSteps in Hebrew (RTL) without layout breakage', () => {
-      const steps = createMockEasySignFunnel();
-      renderWithIntl(<VisualFunnelSteps steps={steps} isSimulated />, { locale: 'he' });
+      const steps: FunnelStepItem[] = [
+        { stageKey: 'sent', stageLabel: 'Sent', stepOrder: 1, customerCount: 500, conversionPercent: 100, dropOffPercent: 0 },
+        { stageKey: 'signed', stageLabel: 'Signed', stepOrder: 2, customerCount: 120, conversionPercent: 24, dropOffPercent: 76 },
+      ];
+      renderWithIntl(<VisualFunnelSteps steps={steps} funnelName="EasySign" />, { locale: 'he' });
 
       expect(screen.getByTestId('visual-funnel-container')).toBeInTheDocument();
       expect(screen.getByTestId('count-sent')).toBeInTheDocument();
@@ -348,7 +402,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         isGoalMet: false,
         elapsedFraction: 0.5,
         daysRemaining: 30,
-        isDemo: true,
+        progressKind: 'ok',
       };
 
       const onUpdate = vi.fn();
@@ -401,7 +455,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         isGoalMet: true,
         elapsedFraction: 0.5,
         daysRemaining: 30,
-        isDemo: true,
+        progressKind: 'ok',
       };
 
       const onUpdate = vi.fn();
@@ -453,7 +507,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         isGoalMet: false,
         elapsedFraction: 0.5,
         daysRemaining: 30,
-        isDemo: true,
+        progressKind: 'ok',
       };
 
       const onOptimize = vi.fn();
@@ -475,7 +529,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
 
   describe('3. Cohort Retention Matrix Stress Tests', () => {
     it('3.1 handles empty cohort list and empty period numbers gracefully', () => {
-      renderWithIntl(<CohortRetentionMatrix cohorts={[]} periodNumbers={[]} />);
+      renderWithIntl(<CohortRetentionMatrix cohorts={[]} periodNumbers={[]} projectName="EasySign" />);
       expect(screen.getByTestId('cohort-retention-matrix')).toBeInTheDocument();
     });
 
@@ -489,7 +543,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         ]),
       };
 
-      renderWithIntl(<CohortRetentionMatrix cohorts={[singlePeriodCohort]} periodNumbers={[0]} />);
+      renderWithIntl(<CohortRetentionMatrix cohorts={[singlePeriodCohort]} periodNumbers={[0]} projectName="EasySign" />);
       expect(screen.getByTestId('cohort-row-2026-02-01')).toBeInTheDocument();
       expect(screen.getByTestId('retention-cell-2026-02-01-p0')).toHaveTextContent('100%');
     });
@@ -506,7 +560,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         ]),
       };
 
-      renderWithIntl(<CohortRetentionMatrix cohorts={[sparseCohort]} periodNumbers={[0, 1, 2]} />);
+      renderWithIntl(<CohortRetentionMatrix cohorts={[sparseCohort]} periodNumbers={[0, 1, 2]} projectName="EasySign" />);
       const row = screen.getByTestId('cohort-row-2026-01-01');
       expect(within(row).getByText('—')).toBeInTheDocument();
       expect(screen.getByTestId('retention-cell-2026-01-01-p2')).toHaveTextContent('45%');
@@ -523,25 +577,8 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
       expect(getHeatmapCellColor(-10)).toContain('bg-muted/30');
     });
 
-    it('3.5 triggers conversion event filter callbacks', () => {
-      const onFilter = vi.fn();
-      renderWithIntl(
-        <CohortRetentionMatrix
-          cohorts={[]}
-          periodNumbers={[0, 1]}
-          onSelectConversionEvent={onFilter}
-        />,
-      );
-
-      fireEvent.click(screen.getByTestId('filter-purchases'));
-      expect(onFilter).toHaveBeenCalledWith('purchase');
-
-      fireEvent.click(screen.getByTestId('filter-sign-ins'));
-      expect(onFilter).toHaveBeenCalledWith('sign_in');
-
-      fireEvent.click(screen.getByTestId('filter-all-activity'));
-      expect(onFilter).toHaveBeenCalledWith('');
-    });
+    // 3.5 (conversion-event filter pills) removed with the pills: they relabelled the same
+    // all-activity data as purchase / sign-in retention without re-querying anything.
   });
 
   describe('4. Integrated Cockpit Dashboard & Interactivity Stress Tests', () => {
@@ -549,13 +586,13 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
       const data = buildFunnelGoalsCockpitData({
         funnelOutcome: null,
         goals: [],
-        projectId: 'test-dash',
       });
 
       renderWithIntl(
         <FunnelGoalsDashboard
           orgId="org-1"
           projectId="test-dash"
+          projectName="EasySign"
           cockpitData={data}
           canExecute
         />,
@@ -579,16 +616,19 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
     });
 
     it('4.2 filters goals by search query and status filter with empty state fallback', () => {
+      // Real, measured goals. This used to rely on the five demo goals a goal-less project was
+      // given (Jira B15); a goal-less project now shows a no-goals empty state instead.
       const data = buildFunnelGoalsCockpitData({
         funnelOutcome: null,
-        goals: [],
-        projectId: 'test-dash',
+        goals: MEASURED_GOALS,
+        goalOutcomes: MEASURED_GOAL_OUTCOMES,
       });
 
       renderWithIntl(
         <FunnelGoalsDashboard
           orgId="org-1"
           projectId="test-dash"
+          projectName="EasySign"
           cockpitData={data}
           canExecute
         />,
@@ -626,13 +666,13 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         ],
       },
         goals: [],
-        projectId: 'test-dash',
       });
 
       renderWithIntl(
         <FunnelGoalsDashboard
           orgId="org-1"
           projectId="test-dash"
+          projectName="EasySign"
           cockpitData={data}
           canExecute
         />,

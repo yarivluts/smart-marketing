@@ -396,7 +396,6 @@ export function AdsPerformanceDashboard({
           <ExecutiveBlendedReport
             targets={rawTargets}
             spendOutcome={spendOutcome}
-            seed={projectId}
             canExecute={canExecute}
             onApplyRecommendation={handleApplyRecommendation}
           />

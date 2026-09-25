@@ -775,10 +775,8 @@
     "cohortSizeColumnHeading": "גודל",
     "periodColumnHeading": "תקופה {periodNumber}",
     "retentionCell": "{percent}%",
-    "filterAllActivity": "כל הפעילות",
-    "filterPurchases": "רכישות",
-    "filterSignIns": "כניסות משתמש",
-    "legendLabel": "שימור"
+    "legendLabel": "שימור",
+    "emptyDetail": "נתוני השימור יופיעו כאן ברגע שיגיעו לקוחות לפחות לחודש קוהורטה אחד."
   },
   "Funnel": {
     "metaTitle": "משפך המרות",
@@ -786,8 +784,6 @@
     "description": "כיצד לקוחות עוברים במשפך ההמרות המאושר של הפרויקט, שלב אחר שלב, ושיעור ההמרה של כל שלב ביחס לשלב הראשון.",
     "visualFunnelHeading": "משפך המרות: {funnelName}",
     "visualFunnelSubtitle": "צינור המרה שלב אחר שלב, ניתוח נטישה וקצב תנועת משתמשים.",
-    "simulatedBadge": "מצב הדמיה (ללא הגדרות)",
-    "liveBadge": "נתוני מחסן חיים",
     "totalStarted": "סך התחילו",
     "totalCompleted": "סך השלימו",
     "overallConversion": "המרה כוללת",
@@ -1383,7 +1379,8 @@
       "warehouse_not_configured": "מחסן הנתונים עדיין לא מוגדר",
       "quota_exceeded": "מכסת השאילתות היומית מוצתה",
       "not_yet_backed": "עדיין לא מגובה בנתונים אמיתיים",
-      "query_error": "לא ניתן היה לטעון את התקדמות היעד"
+      "query_error": "לא ניתן היה לטעון את התקדמות היעד",
+      "pending": "היעד נוצר זה עתה - ההתקדמות תופיע אחרי רענון העמוד"
     },
     "cockpitTitle": "יעדים וקצב דינמי",
     "cockpitSubtitle": "מעקב אחר יעדי ביצועים עסקיים, ניטור קצב התקדמות דינמי ותחזיות עמידה ביעד.",
@@ -1394,7 +1391,6 @@
     "presetLeadVolume": "נפח לידים (1,500)",
     "presetCacCeiling": "תקרת עלות רכישה (<$45)",
     "presetConversionRate": "יחס המרת דמו (25%)",
-    "demoBadge": "נתוני הדגמה",
     "kpiTotalGoals": "יעדים פעילים",
     "kpiOnTrack": "בקצב טוב",
     "kpiAtRisk": "בסיכון",
@@ -2110,7 +2106,6 @@
   },
   "FunnelGoals": {
     "noData": "אין נתונים",
-    "simulatedBadge": "משפך לדוגמה — טרם התקבלו נתונים אמיתיים",
     "metaTitle": "משפך ויעדים",
     "cockpitTitle": "משפך, יעדים ובריאות הכנסות",
     "cockpitDescription": "צינורות המרה ויזואליים, מעקב יעדים עסקיים בזמן אמת, ובריאות שימור לקוחות לפי קבוצות.",
@@ -2135,13 +2130,32 @@
     "signups": "הרשמות",
     "payingRate": "% המרה לתשלום",
     "avg40dRevenue": "הכנסה ממוצעת 40 יום",
-    "kpiBenchmarkComparison": "‎{diff} מול מדד הייחוס",
-    "kpiOnTrackRate": "{rate} במסלול",
-    "kpiCohortComparison": "‎{diff} מול קבוצה קודמת",
     "kpiTimeToSign": "זמן עד לחתימה",
-    "kpiPaceMet": "{pace} עמידה בקצב",
     "kpiChurnRate": "{rate}% נטישה",
-    "paybackDayWindow": "החזר יום {days}"
+    "paybackDayWindow": "החזר יום {days}",
+    "funnelEmptyTitle": "עדיין לא הוגדר משפך לפרויקט הזה",
+    "funnelUnavailableTitle": "נתוני ההמרה של המשפך אינם זמינים",
+    "funnelUnavailable": {
+      "no_funnel": "GrowthOS מציג המרה רק עבור משפך שאישרתם. אשרו את שלבי המשפך בתהליך ההקמה של הפרויקט, והנתונים יופיעו כאן ברגע שיגיעו אירועים.",
+      "warehouse_not_configured": "מחסן הנתונים עדיין לא הוגדר לפרויקט הזה, ולכן אי אפשר לשלוף את המשפך.",
+      "quota_exceeded": "מכסת השאילתות היומית של הפרויקט נוצלה. המשפך ייטען שוב כשהמכסה תתאפס.",
+      "query_error": "לא הצלחנו לטעון את המשפך. במקום להציג הערכה אנחנו לא מציגים דבר - נסו שוב מאוחר יותר."
+    },
+    "defineFunnelCta": "הגדרת המשפך",
+    "goalsEmptyTitle": "עדיין אין יעדים",
+    "goalsEmptyBody": "יעד עוקב אחרי אחד המדדים שלכם מול ערך מטרה שאתם קובעים. צרו יעד, והקצב שלו יוצג כאן ברגע שיהיו למדד נתונים.",
+    "goalsEmptyCta": "למעבר לעמוד היעדים",
+    "goalsNoMatch": "אין יעדים שתואמים לחיפוש או לסינון.",
+    "paybackNoTarget": "לא הוגדר יעד החזר לפרויקט, ולכן ההכנסות שנגבו מוצגות בלי פס קצב.",
+    "paybackNoData": "עדיין אין מספיק נתונים: לא הגיעו למחסן הנתונים הכנסות שנגבו עבור הפרויקט הזה.",
+    "calibrationNoData": "עדיין אין מספיק נתונים: אף הרשמה בפרויקט הזה עוד לא דורגה לשכבות איכות.",
+    "sectionUnavailable": {
+      "warehouse_not_configured": "לא זמין: מחסן הנתונים עדיין לא הוגדר לפרויקט הזה.",
+      "quota_exceeded": "לא זמין כרגע: מכסת השאילתות היומית של הפרויקט נוצלה.",
+      "not_yet_backed": "לא זמין: הטבלה במחסן הנתונים שעליה נשען החלק הזה עוד לא נבנתה.",
+      "query_error": "לא הצלחנו לטעון את החלק הזה. במקום להציג הערכה אנחנו לא מציגים דבר."
+    },
+    "recommendationFailed": "לא הצלחנו להחיל את האופטימיזציה. שום דבר לא שונה."
   },
   "Copilot": {
     "actionExecuted": "הפעולה נשלחה. ניתן לבטל אותה מיומן הביקורת.",
@@ -2218,8 +2232,7 @@
     "spendChangeLabel": "שינוי בהוצאה",
     "cacChangeLabel": "שינוי ב-CAC",
     "roasChangeLabel": "שינוי ב-ROAS",
-    "rebalanceAction": "איזון תקציב בלחיצה"
+    "rebalanceAction": "איזון תקציב בלחיצה",
+    "channelAllocationEmpty": "עדיין לא נמדדה הוצאת פרסום, ולכן אין חלוקה בין ערוצים להציג."
   }
 }
-
-

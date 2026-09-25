@@ -310,11 +310,9 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(zeroStarted[1].conversionPercent).toBe(0);
       expect(zeroStarted[1].dropOffPercent).toBe(0);
 
-      // 4. Null outcome fallback synthesis
-      const synthesized = buildVisualFunnelData(null, 'test-seed');
-      expect(synthesized.isSimulated).toBe(true);
-      expect(synthesized.steps.length).toBe(3);
-      expect(synthesized.overallConversionPercent).toBeGreaterThan(0);
+      // 4. Null outcome: reported as a failed query with no numbers. This used to assert a
+      // synthesized 3-step sample funnel with a positive conversion rate (Jira B15).
+      expect(buildVisualFunnelData(null)).toEqual({ kind: 'query_error' });
     });
 
     it('5.2.2 Inverted drop-offs: clamps drop-off percentage to 0% when a subsequent step has more users than preceding step', () => {
@@ -412,7 +410,6 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(getHeatmapCellColor(15)).toContain('bg-rose-500/20');
       expect(getHeatmapCellColor(0)).toContain('bg-muted/30');
 
-      const onSelectEvent = vi.fn();
       const mockCohortRow = {
         cohortMonth: '2026-01-01',
         cohortLabel: 'Jan 2026',
@@ -425,19 +422,13 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       };
 
       renderWithIntl(
-        <CohortRetentionMatrix
-          cohorts={[mockCohortRow]}
-          periodNumbers={[0, 1, 2]}
-          onSelectConversionEvent={onSelectEvent}
-        />,
+        <CohortRetentionMatrix cohorts={[mockCohortRow]} periodNumbers={[0, 1, 2]} projectName="EasySign" />,
       );
 
-      // Filter clicks
-      fireEvent.click(screen.getByTestId('filter-purchases'));
-      expect(onSelectEvent).toHaveBeenCalledWith('purchase');
-
-      fireEvent.click(screen.getByTestId('filter-sign-ins'));
-      expect(onSelectEvent).toHaveBeenCalledWith('sign_in');
+      expect(screen.getByTestId('retention-cell-2026-01-01-p1')).toHaveTextContent('65%');
+      // The Purchases / Sign-ins filter pills are gone: they relabelled the same all-activity
+      // matrix without re-querying anything (Jira B15).
+      expect(screen.queryByTestId('filter-purchases')).not.toBeInTheDocument();
     });
   });
 
@@ -697,30 +688,29 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
         7/30, 1.0 or 3.0, so the test confirmed the arithmetic of a fabrication. With no
         measurements there is nothing to scale and nothing to compare.
       */
-      const report30d = buildExecutiveReportData({ timeWindow: '30d', seed: 'test-scaling' });
-      const report7d = buildExecutiveReportData({ timeWindow: '7d', seed: 'test-scaling' });
-      const report90d = buildExecutiveReportData({ timeWindow: '90d', seed: 'test-scaling' });
+      const report30d = buildExecutiveReportData({ timeWindow: '30d' });
+      const report7d = buildExecutiveReportData({ timeWindow: '7d' });
+      const report90d = buildExecutiveReportData({ timeWindow: '90d' });
 
       for (const report of [report7d, report30d, report90d]) {
         expect(report.metrics.totalSpendUsd).toBeNull();
         expect(report.channels).toHaveLength(0);
       }
 
-      // Render ExecutiveBlendedReport and test time-window filter buttons
-      renderWithIntl(<ExecutiveBlendedReport seed="test-scaling" />);
+      /*
+        The component no longer offers 7 / 30 / 90 day pills. They changed nothing but their own
+        highlight - spend is only ever measured over a trailing 30 days - so "7 Days" relabelled
+        30-day spend. It now states the one window it has, and with no spend it shows neither a
+        "Live" badge nor the 50/50 channel split it used to fall back to.
+      */
+      renderWithIntl(<ExecutiveBlendedReport />);
 
-      const btn7d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window7d });
-      const btn30d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window30d });
-      const btn90d = screen.getByRole('button', { name: enMessages.ExecutiveReport.window90d });
-
-      expect(btn7d).toBeInTheDocument();
-      expect(btn30d).toBeInTheDocument();
-      expect(btn90d).toBeInTheDocument();
-
-      // Click 7d
-      fireEvent.click(btn7d);
-      // Click 90d
-      fireEvent.click(btn90d);
+      expect(screen.queryByRole('button', { name: enMessages.ExecutiveReport.window7d })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: enMessages.ExecutiveReport.window90d })).not.toBeInTheDocument();
+      expect(screen.getByTestId('report-window-label')).toHaveTextContent(enMessages.ExecutiveReport.timeRange30d);
+      expect(screen.queryByTestId('zero-config-badge')).not.toBeInTheDocument();
+      expect(screen.getByTestId('channel-allocation-empty')).toBeInTheDocument();
+      expect(screen.queryByTestId('channel-split-bar')).not.toBeInTheDocument();
     });
   });
 });

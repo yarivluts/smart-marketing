@@ -9,25 +9,32 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 import type { FunnelStepItem } from '@/lib/orgs/funnel-goals-synthesizer';
-import { createMockEasySignFunnel } from '@/lib/orgs/funnel-goals-synthesizer';
 
 export interface VisualFunnelStepsProps {
-  steps?: FunnelStepItem[];
-  funnelName?: string;
-  isSimulated?: boolean;
+  /** The project's own measured funnel steps. Must be non-empty - an absent funnel is the caller's empty state, never a sample. */
+  steps: FunnelStepItem[];
+  funnelName: string;
+  /** When omitted, the drop-off alert renders without an action button. */
   onAskCopilot?: () => void;
   className?: string;
 }
 
+/**
+ * Renders a measured funnel. It used to fall back to `createMockEasySignFunnel()` when given no
+ * steps and to badge the result "Simulated Mode (Zero-Config)" - which still put invented counts,
+ * a drop-off alert and an AI Copilot suggestion on the screen of a real project with no funnel.
+ * With no steps it now renders nothing at all; the dashboard shows an empty state instead.
+ */
 export function VisualFunnelSteps({
-  steps: passedSteps,
-  funnelName = 'EasySign',
-  isSimulated = false,
+  steps,
+  funnelName,
   onAskCopilot,
   className = '',
-}: VisualFunnelStepsProps): React.ReactElement {
+}: VisualFunnelStepsProps): React.ReactElement | null {
   const t = useTranslations('Funnel');
-  const steps = passedSteps && passedSteps.length > 0 ? passedSteps : createMockEasySignFunnel();
+  if (steps.length === 0) {
+    return null;
+  }
 
   const totalStarted = steps[0]?.customerCount ?? 0;
   const totalCompleted = steps[steps.length - 1]?.customerCount ?? 0;
@@ -53,11 +60,6 @@ export function VisualFunnelSteps({
             <h2 className="text-xl font-bold tracking-tight text-foreground">
               {t('visualFunnelHeading', { funnelName })}
             </h2>
-            {isSimulated && (
-              <span className="inline-flex items-center rounded-full bg-indigo-50 dark:bg-indigo-950/50 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                {t('simulatedBadge')}
-              </span>
-            )}
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{t('visualFunnelSubtitle')}</p>
         </div>
@@ -183,15 +185,17 @@ export function VisualFunnelSteps({
             </div>
           </div>
 
-          <button
-            type="button"
-            data-testid="ask-copilot-btn"
-            onClick={onAskCopilot}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all shrink-0 cursor-pointer"
-          >
-            <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>{t('optimizeDropoffButton')}</span>
-          </button>
+          {onAskCopilot ? (
+            <button
+              type="button"
+              data-testid="ask-copilot-btn"
+              onClick={onAskCopilot}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-all shrink-0 cursor-pointer"
+            >
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{t('optimizeDropoffButton')}</span>
+            </button>
+          ) : null}
         </div>
       )}
     </div>
