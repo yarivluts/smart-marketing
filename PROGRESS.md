@@ -7,6 +7,50 @@ fresh session can pick up work from this file + [TASKS.md](./TASKS.md) alone. Se
 Template for each entry:
 
 ```
+## 2026-09-25 - EasySign as the reference integration: B1-B18 triaged, eight fixed and live
+
+Yariv asked this session to follow the EasySign session and do whatever it needed. EasySign ran a
+real browser E2E on its dev key and reported each gap; every finding got a KAN issue.
+
+### Fixed and deployed (verified in production, most also by EasySign independently)
+- **B12 attribution (KAN-203, #484 + KAN-205 #486).** Three defects under each other: bridge_identity
+  took each record's client_id (a per-event id under the documented contract) as the customer, so
+  every anon resolved to an event id; attribution joined on entity_id; and landing-page performance
+  counted every attributed event as a conversion, so fixing the join alone would have produced 10
+  conversions for one visitor. Now: explicit customer_id links, attribution by properties.anon_id /
+  customer_id plus a direct anon path (`via_identity`), conversion = visitor who became a known
+  customer. Anonymous events carry a null customer_id. Live: 1/1, 1/1 and the no-signup case 1/0.
+- **B13 entity upserts (KAN-206, #487).** Entity dedup on the id alone meant the first version won
+  forever; Customer 360 froze at signup and Stripe subscription snapshots never updated. The claim now
+  stores the latest version's content hash, so changes land, a change back lands, a resend doesn't.
+- **B15 fabricated data (KAN-208, #491).** The funnel page showed "Simulated Mode" numbers on real
+  projects and ran alerts and Copilot suggestions on them. The synthesizers invented a funnel,
+  goals, cohorts, payback windows, quality tiers and a `windowDays * 1200` target applied to real
+  data. All replaced by honest empty states; a guard test fails if a no-data path emits numbers.
+- **Access and scoping:** project-scoped roles 404ed on 30 pages (KAN-194, #482); environment picker
+  on project pages (KAN-196, #485, 4 new indexes); ingest health named the wrong environment and its
+  run panels contradicted the hourly job (KAN-209, #489); list_schemas states the implicit event
+  fields (KAN-198, #483, wording fixed in #488).
+- **B14 (KAN-207):** api-preprod ran an untracked build against production data and dropped customer
+  updates. On Yariv's decision it is redeployed from main and under the drift alarm (#490).
+- **dbt-refresh had run a 2026-09-10 image for 15 days** (KAN-204), so KAN-179 and every later model
+  change had never run in production. Now deployed with each dbt change; the alarm does not cover it yet.
+
+### Operational
+- Two agent accounts for UI verification, passwords only in Secret Manager: a `viewer` (org
+  JGTxet9aGXV6xUPWYidR) that can see almost nothing because read-only pages gate on write
+  permissions (KAN-195, product decision), and a project-scoped `project_admin` used by this session
+  for screenshots. Board "EasySign integration check" created with table tiles.
+
+- **Last completed:** everything above; production api-prod/api-preprod/web-prod at 2d3eee3.
+- **In progress:** none. EasySign re-verifying #488, #489, KAN-208.
+- **Blocked + why:** KAN-197, the other session's setup tools (get_setup_health etc.) exist only in
+  its uncommitted tree and are no longer served anywhere; they return when that code goes through a
+  PR. web-preprod still runs an untracked revision against production Firestore (KAN-207).
+- **Next step:** KAN-201 (dismissed counted as quarantined), KAN-199 (set_funnel), KAN-204 (drift
+  alarm for web and dbt), KAN-210/211 (bar values, relative board ranges), KAN-212 (Copilot bar).
+- **Waiting on human:** KAN-195 (viewer read access), KAN-197 ownership, KAN-97, KAN-117, KAN-130.
+
 ## <date> — <run summary>
 - **Last completed:** …
 - **In progress (exact stopping point):** …
