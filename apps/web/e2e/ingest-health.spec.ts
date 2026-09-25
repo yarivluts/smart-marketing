@@ -68,8 +68,8 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page.getByText('Still quarantined: missing_required_field:amount')).toBeVisible();
 
     // Orchestration (KAN-38): before triggering a run, there's no history and no freshness snapshot yet.
-    await expect(page.getByText('No orchestration runs for this project yet.')).toBeVisible();
-    await expect(page.getByText('No successful orchestration run yet.')).toBeVisible();
+    await expect(page.getByText('No runs started from this page yet. The hourly scheduled refresh runs separately and is not listed here.')).toBeVisible();
+    await expect(page.getByText('No run has been started from this page yet. The hourly scheduled refresh is not listed here - warehouse freshness above reflects it.')).toBeVisible();
 
     // Triggering a run actually shells out to a real dbt build (KAN-37) against the buildable-today
     // DuckDB stand-in — normally a few seconds, but a generous 60s timeout here absorbs real subprocess
@@ -103,7 +103,7 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
     await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();
     await expect(page.getByText('No pipeline messages stuck in the queue.')).toBeVisible();
-    await expect(page.getByText('No orchestration runs for this project yet.')).toBeVisible();
-    await expect(page.getByText('No successful orchestration run yet.')).toBeVisible();
+    await expect(page.getByText('No runs started from this page yet. The hourly scheduled refresh runs separately and is not listed here.')).toBeVisible();
+    await expect(page.getByText('No run has been started from this page yet. The hourly scheduled refresh is not listed here - warehouse freshness above reflects it.')).toBeVisible();
   });
 });

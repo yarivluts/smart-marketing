@@ -100,6 +100,9 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   const t = await getTranslations('IngestHealth');
   const tEnv = await getTranslations('EnvBadge');
   const environmentDisplayNameById = new Map(environments.map((environment) => [environment.id, tEnv(environment.name)]));
+  // The environment the warehouse-freshness read is scoped to (the picker's, KAN-196) - named in
+  // the copy rather than hard-coding "production", which mislabelled dev records (B16).
+  const selectedEnvironmentLabel = tEnv(selectedEnvironment?.name ?? 'prod');
 
   function renderRollup(rollup: IngestHealthRollup, key: string) {
     return (
@@ -250,8 +253,9 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
                 ? t('warehouseFreshnessLine', {
                     latestLandedAt: warehouseFreshness.latestLandedAt,
                     count: warehouseFreshness.landedRecordCount,
+                    environment: selectedEnvironmentLabel,
                   })
-                : t('warehouseFreshnessEmpty')}
+                : t('warehouseFreshnessEmpty', { environment: selectedEnvironmentLabel })}
             </p>
           ) : warehouseFreshness.status === 'not_configured' ? (
             <p className="text-sm text-muted-foreground">{t('warehouseFreshnessNotConfigured')}</p>
