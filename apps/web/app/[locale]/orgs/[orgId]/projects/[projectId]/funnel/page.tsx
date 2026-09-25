@@ -54,9 +54,9 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
   const membership = findActiveMembership(memberships, orgId);
   const principal = { type: 'user' as const, id: user.id };
 
-  const canExecute = can(bindings, principal, 'automation.execute', { orgId });
-  const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId });
-  const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId });
+  const canExecute = can(bindings, principal, 'automation.execute', { orgId, projectId });
+  const canReadDashboards = can(bindings, principal, 'dashboards.read', { orgId, projectId });
+  const canWriteDashboards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
 
   if (!membership || (!canExecute && !canReadDashboards && !canWriteDashboards)) {
     notFound();

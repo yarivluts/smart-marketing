@@ -58,15 +58,15 @@ export default async function ProjectLayout({
   }
 
   const principal = { type: 'user' as const, id: user.id };
-  const canManageKeys = can(bindings, principal, 'keys.manage', { orgId });
-  const canManageSchemas = can(bindings, principal, 'schema.write', { orgId });
-  const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId });
-  const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
-  const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
-  const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
-  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
-  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
-  const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId });
+  const canManageKeys = can(bindings, principal, 'keys.manage', { orgId, projectId });
+  const canManageSchemas = can(bindings, principal, 'schema.write', { orgId, projectId });
+  const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId, projectId });
+  const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId, projectId });
+  const canManageProjects = can(bindings, principal, 'project.manage', { orgId, projectId });
+  const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId, projectId });
+  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
+  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId, projectId }) || canManageBoards;
+  const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId, projectId });
 
   const [t, tWinRules, tShell] = await Promise.all([
     getTranslations('OrgDetailPage'),

@@ -66,8 +66,8 @@ export default async function ProjectResourcesPage({ params }: PageProps): Promi
   }
 
   const principal = { type: 'user' as const, id: user.id };
-  const canRequest = can(bindings, principal, 'project.manage', { orgId });
-  const canDetach = can(bindings, principal, 'resources.manage', { orgId });
+  const canRequest = can(bindings, principal, 'project.manage', { orgId, projectId });
+  const canDetach = can(bindings, principal, 'resources.manage', { orgId, projectId });
 
   const [credentials, templates, people, attachments] = await Promise.all([
     listSharedCredentials(orgId),
