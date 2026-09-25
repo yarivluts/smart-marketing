@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   calculateDaysRemaining,
+  boundedPercent,
   calculateFunnelStepItems,
+  overallConversionPercent,
   buildVisualFunnelData,
   buildUnifiedGoalsData,
   buildPaybackVelocity,
@@ -97,6 +99,57 @@ describe('funnel-goals-synthesizer', () => {
         ['completed', 20, 60],
       ]);
       expect(steps[0].stageLabel).toBe('Label: started');
+    });
+
+    /*
+      B20: EasySign's funnel read 4 -> 6 -> 6 -> 6 -> 6 (150% overall, "-0%" drop-offs) because the query
+      counted events per step. The query now returns sequential people counts, and these are the real ones.
+    */
+    it("renders EasySign's sequential people counts: 50% conversion, one 50% drop-off, then none", () => {
+      const raw = [
+        { eventSchemaName: 'touchpoint', stageKey: 'awareness', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
+        { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.5 },
+        { eventSchemaName: 'document_created', stageKey: 'other', stepOrder: 2, customerCount: 2, conversionRateFromFirst: 0.5 },
+        { eventSchemaName: 'document_sent', stageKey: 'other', stepOrder: 3, customerCount: 2, conversionRateFromFirst: 0.5 },
+        { eventSchemaName: 'document_signed', stageKey: 'other', stepOrder: 4, customerCount: 2, conversionRateFromFirst: 0.5 },
+      ];
+      const steps = calculateFunnelStepItems(raw);
+      expect(steps.map((s) => [s.customerCount, s.conversionPercent, s.dropOffPercent])).toEqual([
+        [4, 100, 0],
+        [2, 50, 50],
+        [2, 50, 0],
+        [2, 50, 0],
+        [2, 50, 0],
+      ]);
+      expect(overallConversionPercent(steps)).toBe(50);
+    });
+
+    it('never shows more than 100% or a negative drop-off, even for counts that break the sequential invariant', () => {
+      // The pre-B20 shape. The query can no longer produce it; the page must still never render it as 150%.
+      const raw = [
+        { stageKey: 'a', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
+        { stageKey: 'b', stepOrder: 1, customerCount: 6, conversionRateFromFirst: 1.5 },
+        { stageKey: 'c', stepOrder: 2, customerCount: 6 },
+      ];
+      const steps = calculateFunnelStepItems(raw);
+      for (const step of steps) {
+        expect(step.conversionPercent).toBeLessThanOrEqual(100);
+        expect(step.conversionPercent).toBeGreaterThanOrEqual(0);
+        expect(step.dropOffPercent).toBeLessThanOrEqual(100);
+        expect(step.dropOffPercent).toBeGreaterThanOrEqual(0);
+      }
+      expect(overallConversionPercent(steps)).toBe(100);
+    });
+  });
+
+  describe('boundedPercent', () => {
+    it('rounds to a whole percentage within 0..100 and is 0 for an empty whole', () => {
+      expect(boundedPercent(1, 3)).toBe(33);
+      expect(boundedPercent(2, 2)).toBe(100);
+      expect(boundedPercent(3, 2)).toBe(100);
+      expect(boundedPercent(-1, 2)).toBe(0);
+      expect(boundedPercent(1, 0)).toBe(0);
+      expect(boundedPercent(Number.NaN, 2)).toBe(0);
     });
   });
 

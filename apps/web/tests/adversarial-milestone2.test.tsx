@@ -164,19 +164,22 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
       expect(data.overallConversionPercent).toBe(0);
     });
 
-    it('1.5 handles inverted / expanding funnel stages (growth at later step)', () => {
-      // e.g. viral expansion or multi-attendee invitations
+    it('1.5 never renders a growing funnel above 100% (B20)', () => {
+      // A funnel counts people who went through the steps in order, so a later step can never exceed an
+      // earlier one - this used to assert 250% as if growth were a feature, and that is exactly how EasySign's
+      // per-event counts reached the page as "150% conversion". The query now makes this shape impossible
+      // (proven on DuckDB in @growthos/firebase-orm-models); if it is ever handed one, it stays bounded.
       const raw = [
         { eventSchemaName: 's1_event', stageKey: 's1', stepOrder: 1, customerCount: 100, conversionRateFromFirst: 1.0 },
         { eventSchemaName: 's2_event', stageKey: 's2', stepOrder: 2, customerCount: 250, conversionRateFromFirst: 2.5 },
       ];
       const items = calculateFunnelStepItems(raw);
 
-      expect(items[1].conversionPercent).toBe(250);
+      expect(items[1].conversionPercent).toBe(100);
       expect(items[1].dropOffPercent).toBe(0); // clamped at min 0, not negative
 
       const data = measuredFunnel({ ok: true, steps: raw });
-      expect(data.overallConversionPercent).toBe(250);
+      expect(data.overallConversionPercent).toBe(100);
       expect(data.biggestDropOffPercent).toBe(0);
     });
 
@@ -204,7 +207,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
 
       const { unmount } = renderWithIntl(<VisualFunnelSteps steps={singleStep} funnelName="EasySign" />);
       expect(screen.getByTestId('visual-funnel-container')).toBeInTheDocument();
-      expect(screen.getByTestId('count-solo')).toHaveTextContent('0 users');
+      expect(screen.getByTestId('count-solo')).toHaveTextContent('0 people');
       expect(screen.getByTestId('pct-solo')).toHaveTextContent('0%');
       expect(screen.queryByTestId('funnel-dropoff-alert-card')).not.toBeInTheDocument();
       unmount();

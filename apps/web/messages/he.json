@@ -786,9 +786,9 @@
   "Funnel": {
     "metaTitle": "משפך המרות",
     "title": "משפך ההמרות עבור {projectName}",
-    "description": "כיצד לקוחות עוברים במשפך ההמרות המאושר של הפרויקט, שלב אחר שלב, ושיעור ההמרה של כל שלב ביחס לשלב הראשון.",
+    "description": "כיצד אנשים עוברים במשפך ההמרות המאושר של הפרויקט, שלב אחר שלב, ושיעור ההמרה של כל שלב ביחס לשלב הראשון.",
     "visualFunnelHeading": "משפך המרות: {funnelName}",
-    "visualFunnelSubtitle": "צינור המרה שלב אחר שלב, ניתוח נטישה וקצב תנועת משתמשים.",
+    "visualFunnelSubtitle": "אנשים שעברו כל שלב לפי הסדר, והנטישה מהשלב שלפניו.",
     "totalStarted": "סך התחילו",
     "totalCompleted": "סך השלימו",
     "overallConversion": "המרה כוללת",
@@ -799,7 +799,7 @@
     "stageViewed": "מסמך נצפה",
     "stageSigned": "מסמך נחתם",
     "stageCompleted": "מסמך הושלם",
-    "usersUnit": "משתמשים",
+    "peopleCount": "{count, plural, one {אדם אחד} other {# אנשים}}",
     "dropOffLabel": "נטישה",
     "stageVelocityNote": "מחושב ביחס לשלב הקודם",
     "noFunnel": "טרם אושר משפך המרות עבור פרויקט זה. אשר מיפוי משפך בתהליך ההקמה כדי לראות כאן את נתוני ההמרה.",
@@ -808,7 +808,7 @@
     "queryError": "נתוני משפך ההמרות אינם זמינים",
     "stepHeading": "{order}. {stage}",
     "stepConversion": "{percent}% משלב 1",
-    "stepCustomerCount": "{count} לקוחות הגיעו לשלב זה"
+    "stepCustomerCount": "{count} אנשים הגיעו לשלב זה לפי הסדר"
   },
   "Insights": {
     "metaTitle": "תובנות",

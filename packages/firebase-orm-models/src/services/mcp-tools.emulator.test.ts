@@ -336,9 +336,9 @@ describe('queryProjectFunnelSteps', () => {
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
 
     expect(rows).toEqual([
-      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 5, conversionRateFromFirst: 1, conversionRateFromPrevious: 1 },
-      { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.4, conversionRateFromPrevious: 0.4 },
-      { eventSchemaName: 'purchase', stageKey: 'conversion', stepOrder: 2, customerCount: 1, conversionRateFromFirst: 0.2, conversionRateFromPrevious: 0.5 },
+      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 5, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.4 },
+      { eventSchemaName: 'purchase', stageKey: 'conversion', stepOrder: 2, customerCount: 1, conversionRateFromFirst: 0.2 },
     ]);
     expect(executor.calls).toHaveLength(1);
     expect(executor.calls[0].params).toEqual({
@@ -394,9 +394,9 @@ describe('queryProjectFunnelSteps', () => {
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
 
     expect(rows).toEqual([
-      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1, conversionRateFromPrevious: 1 },
-      { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0, conversionRateFromPrevious: 0 },
-      { eventSchemaName: 'purchase', stageKey: 'conversion', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0, conversionRateFromPrevious: 0 },
+      { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 4, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 0, conversionRateFromFirst: 0 },
+      { eventSchemaName: 'purchase', stageKey: 'conversion', stepOrder: 2, customerCount: 0, conversionRateFromFirst: 0 },
     ]);
   });
 
@@ -441,8 +441,8 @@ describe('queryProjectFunnelSteps', () => {
     const rows = await queryProjectFunnelSteps({ organizationId: organization.id, projectId: project.id, executor });
 
     expect(rows).toEqual([
-      { eventSchemaName: 'document_sent', stageKey: 'other', stepOrder: 0, customerCount: 8, conversionRateFromFirst: 1, conversionRateFromPrevious: 1 },
-      { eventSchemaName: 'document_signed', stageKey: 'other', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.25, conversionRateFromPrevious: 0.25 },
+      { eventSchemaName: 'document_sent', stageKey: 'other', stepOrder: 0, customerCount: 8, conversionRateFromFirst: 1 },
+      { eventSchemaName: 'document_signed', stageKey: 'other', stepOrder: 1, customerCount: 2, conversionRateFromFirst: 0.25 },
     ]);
   });
 
@@ -483,8 +483,8 @@ describe('queryProjectFunnelStepsForAdmin', () => {
     expect(outcome).toEqual({
       ok: true,
       steps: [
-        { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1, conversionRateFromPrevious: 1 },
-        { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 5, conversionRateFromFirst: 0.5, conversionRateFromPrevious: 0.5 },
+        { eventSchemaName: 'signup', stageKey: 'signup', stepOrder: 0, customerCount: 10, conversionRateFromFirst: 1 },
+        { eventSchemaName: 'activated', stageKey: 'activation', stepOrder: 1, customerCount: 5, conversionRateFromFirst: 0.5 },
       ],
     });
   });

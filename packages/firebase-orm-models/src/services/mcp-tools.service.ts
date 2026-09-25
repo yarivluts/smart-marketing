@@ -307,8 +307,6 @@ export interface FunnelStepResult {
   customerCount: number;
   /** `customerCount` as a fraction of the funnel's first step's own `customerCount` (1.0 for the first step itself; 0 when the first step had nobody). Never above 1: the counts are sequential. */
   conversionRateFromFirst: number;
-  /** `customerCount` as a fraction of the previous step's (1.0 for the first step itself; 0 when the previous step had nobody). Never above 1, for the same reason. */
-  conversionRateFromPrevious: number;
 }
 
 export interface BuildFunnelStepsQueryParams {
@@ -428,7 +426,7 @@ export function buildFunnelStepsQuery(params: BuildFunnelStepsQueryParams): Comp
 /**
  * The `query_funnel` half of plan `12 §6.2`'s "funnels/cohorts" tool: for the project's own confirmed funnel,
  * how many people reached each step having gone through every earlier one in order, with each step's count
- * also expressed as a conversion rate off the first step and off the previous one.
+ * also expressed as a conversion rate off the first step.
  *
  * The confirmed funnel lives in Firestore (`OnboardingStateModel.funnel_steps`, KAN-68; `set_funnel`), NOT in
  * the warehouse, so the dbt `fact_funnel_step` model cannot hold it; this reads the steps from Firestore and
@@ -459,18 +457,15 @@ export async function queryProjectFunnelSteps(params: QueryProjectFunnelStepsPar
     countByStepIndex.set(Number(row.step_index), Number(row.people_count ?? 0));
   }
 
-  const counts = steps.map((_, index) => countByStepIndex.get(index) ?? 0);
-  const firstStepCount = counts[0];
+  const firstStepCount = countByStepIndex.get(0) ?? 0;
   return steps.map((step, index) => {
-    const customerCount = counts[index];
-    const previousCount = index === 0 ? customerCount : counts[index - 1];
+    const customerCount = countByStepIndex.get(index) ?? 0;
     return {
       eventSchemaName: step.eventSchemaName,
       stageKey: step.stageKey,
       stepOrder: step.order,
       customerCount,
       conversionRateFromFirst: firstStepCount > 0 ? customerCount / firstStepCount : 0,
-      conversionRateFromPrevious: previousCount > 0 ? customerCount / previousCount : 0,
     };
   });
 }

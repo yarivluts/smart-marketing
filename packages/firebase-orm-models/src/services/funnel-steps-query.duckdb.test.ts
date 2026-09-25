@@ -186,7 +186,6 @@ describe('queryProjectFunnelSteps end to end on DuckDB (B20)', () => {
       ['document_signed', 2],
     ]);
     expect(steps.map((step) => step.conversionRateFromFirst)).toEqual([1, 0.5, 0.5, 0.5, 0.5]);
-    expect(steps.map((step) => step.conversionRateFromPrevious)).toEqual([1, 0.5, 1, 1, 1]);
     expect(executor.calls).toHaveLength(1);
   });
 });

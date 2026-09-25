@@ -786,9 +786,9 @@
   "Funnel": {
     "metaTitle": "Funnel",
     "title": "Funnel for {projectName}",
-    "description": "How customers move through this project's confirmed funnel, stage by stage, and each stage's conversion off the first step.",
+    "description": "How people move through this project's confirmed funnel, stage by stage and in order, and each stage's conversion off the first step.",
     "visualFunnelHeading": "Conversion Funnel: {funnelName}",
-    "visualFunnelSubtitle": "Step-by-step conversion pipeline, drop-off analysis, and volume velocity.",
+    "visualFunnelSubtitle": "People who went through each step in order, with the drop-off from the step before.",
     "totalStarted": "Total Started",
     "totalCompleted": "Total Completed",
     "overallConversion": "Overall Conversion",
@@ -799,7 +799,7 @@
     "stageViewed": "Document Viewed",
     "stageSigned": "Document Signed",
     "stageCompleted": "Document Completed",
-    "usersUnit": "users",
+    "peopleCount": "{count, plural, one {# person} other {# people}}",
     "dropOffLabel": "drop-off",
     "stageVelocityNote": "Calculated against previous stage",
     "noFunnel": "No funnel confirmed yet for this project. Confirm a funnel mapping during onboarding to see conversion here.",
@@ -808,7 +808,7 @@
     "queryError": "Funnel conversion unavailable",
     "stepHeading": "{order}. {stage}",
     "stepConversion": "{percent}% of step 1",
-    "stepCustomerCount": "{count} customers reached this stage"
+    "stepCustomerCount": "{count} people reached this stage in order"
   },
   "Insights": {
     "metaTitle": "Insights",
