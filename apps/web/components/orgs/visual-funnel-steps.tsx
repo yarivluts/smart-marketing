@@ -160,10 +160,12 @@ export function VisualFunnelSteps({
                 {idx > 0 && (
                   <div
                     data-testid={`dropoff-${step.stageKey}`}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-destructive"
+                    className={`inline-flex items-center gap-1 text-xs font-medium ${step.dropOffPercent > 0 ? 'text-destructive' : 'text-muted-foreground'}`}
+                    data-loss={step.dropOffPercent > 0 ? 'true' : 'false'}
                     dir="ltr"
                   >
-                    <ArrowDownRight className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    {/* A zero loss is not a loss: no red down-arrow on it (EasySign, KAN-216 follow-up). */}
+                    {step.dropOffPercent > 0 ? <ArrowDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /> : null}
                     {/* The arrow already says "down"; a minus sign on top read as "-50% drop-off" (B22). */}
                     <span>{`${step.dropOffPercent}% ${t('dropOffLabel')}`}</span>
                   </div>

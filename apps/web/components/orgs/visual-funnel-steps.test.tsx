@@ -67,6 +67,10 @@ describe('VisualFunnelSteps Component', () => {
     expect(screen.queryByTestId('funnel-dropoff-alert-card')).not.toBeInTheDocument();
     expect(screen.getByTestId('dropoff-other')).toHaveTextContent('0% drop-off');
     expect(screen.getByTestId('dropoff-other')).not.toHaveTextContent('-0%');
+    // A zero loss is not styled as a loss: no red arrow, neutral colour (KAN-216 follow-up).
+    expect(screen.getByTestId('dropoff-other')).toHaveAttribute('data-loss', 'false');
+    expect(screen.getByTestId('dropoff-other').querySelector('svg')).toBeNull();
+    expect(screen.getByTestId('dropoff-signup')).toHaveAttribute('data-loss', 'true');
     // Nothing above 100% anywhere on the card.
     expect(screen.queryAllByText(/(^|\D)(10[1-9]|1[1-9]\d|[2-9]\d\d|\d{4,})%/)).toHaveLength(0);
   });

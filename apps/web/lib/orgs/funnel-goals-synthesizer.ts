@@ -104,6 +104,8 @@ export interface UnifiedGoalItem {
   /** Calendar facts from the goal's own dates - real whether or not progress was measured. */
   elapsedFraction: number;
   daysRemaining: number;
+  /** The goal is paused (GoalModel.status). A paused goal is not being pursued: it has no pace to judge and never counts as on track (KAN-213). */
+  isPaused: boolean;
 }
 
 export type GoalPaceItem = UnifiedGoalItem;
@@ -115,6 +117,8 @@ export interface GoalsCockpitSummary {
   onTrackCount: number;
   atRiskCount: number;
   offTrackCount: number;
+  /** Paused goals: listed, but outside every count above (KAN-213). */
+  pausedGoalsCount: number;
   /** Mean fill of measured goals; null when no goal was measured. */
   averageProgressPct: number | null;
   activeGoalsCount: number;
@@ -173,6 +177,7 @@ export interface FunnelGoalsExecutiveSummary {
   activeGoalsCount: number;
   goalsMeasuredCount: number;
   goalsOnTrackCount: number;
+  goalsPausedCount: number;
   avgMonth1RetentionPct: number | null;
   avgConversionVelocityDays: number | null;
   total40dPaybackUsd: number | null;
@@ -398,6 +403,7 @@ export function buildUnifiedGoalsData(
       deadline: goal.deadline,
       rhythm: goal.rhythm,
       ownerPersonId: goal.owner_person_id,
+      isPaused: goal.status === 'paused',
       ownerName: personNameById?.get(goal.owner_person_id) ?? goal.owner_person_id,
       elapsedFraction: elapsed,
       daysRemaining: calculateDaysRemaining(goal.deadline),
@@ -433,7 +439,10 @@ export function buildUnifiedGoalsData(
 
 /** Summary counts over real goals; pace counts cover only the goals that were measured. */
 export function summarizeGoals(items: readonly UnifiedGoalItem[]): GoalsCockpitSummary {
-  const measured = items.filter((i) => i.progressKind === 'ok');
+  // A paused goal is not being pursued, so it is neither on track nor off it. Counting it made
+  // EasySign's page read "Goals on Track 1/1" for a single goal that was paused (KAN-213).
+  const active = items.filter((i) => !i.isPaused);
+  const measured = active.filter((i) => i.progressKind === 'ok');
   const averageProgressPct =
     measured.length > 0
       ? Math.round(measured.reduce((sum, item) => sum + (item.percentFilled ?? 0), 0) / measured.length)
@@ -445,8 +454,9 @@ export function summarizeGoals(items: readonly UnifiedGoalItem[]): GoalsCockpitS
     onTrackCount: measured.filter((i) => i.status === 'on_track').length,
     atRiskCount: measured.filter((i) => i.status === 'at_risk').length,
     offTrackCount: measured.filter((i) => i.status === 'off_track').length,
+    pausedGoalsCount: items.length - active.length,
     averageProgressPct,
-    activeGoalsCount: items.length,
+    activeGoalsCount: active.length,
   };
 }
 
@@ -611,6 +621,7 @@ export function buildFunnelGoalsCockpitData(params: {
       activeGoalsCount: goalsSummary.totalGoalsCount,
       goalsMeasuredCount: goalsSummary.measuredGoalsCount,
       goalsOnTrackCount: goalsSummary.onTrackCount,
+      goalsPausedCount: goalsSummary.pausedGoalsCount,
       // Each of these needs a source that does not exist yet - see the interface doc comment.
       avgMonth1RetentionPct: null,
       avgConversionVelocityDays: null,

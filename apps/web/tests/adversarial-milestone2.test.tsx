@@ -406,6 +406,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         isGoalMet: false,
         elapsedFraction: 0.5,
         daysRemaining: 30,
+        isPaused: false,
         progressKind: 'ok',
       };
 
@@ -459,6 +460,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         isGoalMet: true,
         elapsedFraction: 0.5,
         daysRemaining: 30,
+        isPaused: false,
         progressKind: 'ok',
       };
 
@@ -511,6 +513,7 @@ describe('Adversarial & Edge-Case Stress Harness: Milestone 2 (Funnel & Goals)',
         isGoalMet: false,
         elapsedFraction: 0.5,
         daysRemaining: 30,
+        isPaused: false,
         progressKind: 'ok',
       };
 
