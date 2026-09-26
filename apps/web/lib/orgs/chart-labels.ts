@@ -124,3 +124,42 @@ export function labeledAxisIndexes(count: number): Set<number> {
   }
   return axis;
 }
+
+/**
+ * How many per-value plots a split bar tile draws before summarising the rest (KAN-217). A bar tile
+ * split by a dimension draws one small plot per value; with no cap, a breakdown by four campaigns
+ * grew the tile past its grid cell and drew over the tile below it.
+ */
+export const MAX_SMALL_MULTIPLES = 3;
+
+/** The series a capped small-multiples chart draws, and the ones it only summarises behind "+N more". */
+export interface CappedSeries<T> {
+  shown: T[];
+  hidden: T[];
+}
+
+/**
+ * Keeps the `cap` series with the largest total (a gap counts as nothing) - the ones a reader is most
+ * likely looking for - in their original order, so the plots keep the order the breakdown was sorted
+ * in. Ties keep the earlier series. Everything else goes to `hidden`, also in original order.
+ */
+export function capSmallMultiples<T extends { points: readonly { value: number | null }[] }>(
+  series: readonly T[],
+  cap: number = MAX_SMALL_MULTIPLES,
+): CappedSeries<T> {
+  if (series.length <= cap) {
+    return { shown: [...series], hidden: [] };
+  }
+  const total = (entry: T) => entry.points.reduce((sum, point) => sum + (point.value ?? 0), 0);
+  const keep = new Set(
+    series
+      .map((entry, index) => ({ index, total: total(entry) }))
+      .sort((a, b) => b.total - a.total || a.index - b.index)
+      .slice(0, Math.max(0, cap))
+      .map((entry) => entry.index),
+  );
+  return {
+    shown: series.filter((_, index) => keep.has(index)),
+    hidden: series.filter((_, index) => !keep.has(index)),
+  };
+}

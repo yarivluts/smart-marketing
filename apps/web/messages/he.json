@@ -1316,6 +1316,7 @@
     "chartSeriesCaption": "{title} · {series}",
     "chartPreviousPeriodCaption": "{caption} (תקופה קודמת)",
     "previousPeriodLabel": "תקופה קודמת",
+    "moreSeriesLabel": "+{count} נוספים",
     "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
     "tableEmpty": "אין נתונים לטווח זה עדיין.",
     "columnsMenuLabel": "עמודות",

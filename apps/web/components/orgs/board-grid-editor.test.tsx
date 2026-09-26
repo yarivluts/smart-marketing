@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { BoardGridEditor } from './board-grid-editor';
 import type { BoardTileRow, MetricCatalogEntryRow } from './board-types';
@@ -74,6 +74,18 @@ describe('BoardGridEditor', () => {
     expect(screen.getByText('Signups')).toBeInTheDocument();
     expect(screen.getByText('100')).toBeInTheDocument();
     expect(screen.getByText('40')).toBeInTheDocument();
+  });
+
+  it('pins each tile to the grid rows its layout spans and clips its content there (KAN-217)', () => {
+    renderEditor();
+    const cells = screen.getAllByTestId('board-tile-cell');
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      // `min-h-0` lets the grid item shrink to its row span; `overflow-hidden` keeps anything taller from painting over the next tile.
+      expect(cell).toHaveClass('min-h-0', 'overflow-hidden');
+      expect(cell.style.gridRow).toMatch(/span \d+/);
+      expect(within(cell).getByTestId('board-tile-body')).toHaveClass('overflow-y-auto');
+    }
   });
 
   it('shows the empty state when there are no tiles', () => {

@@ -427,14 +427,17 @@ export function BoardGridEditor({
             ) : (
               <div
                 key={tile.id}
-                className="flex flex-col gap-1 rounded-md border border-input bg-card p-3"
+                data-testid="board-tile-cell"
+                // `min-h-0` + `overflow-hidden`: a grid item's content must never paint past the
+                // rows the tile's layout spans (KAN-217) - the body below scrolls instead.
+                className="flex min-h-0 flex-col gap-1 overflow-hidden rounded-md border border-input bg-card p-3"
                 style={{
                   gridColumn: `${tile.layout.x + 1} / span ${tile.layout.w}`,
                   gridRow: `${tile.layout.y + 1} / span ${tile.layout.h}`,
                 }}
               >
-                <span className="text-sm font-medium">{tile.title || t(`tileType.${tile.type}`)}</span>
-                <div className="flex-1">
+                <span className="shrink-0 truncate text-sm font-medium">{tile.title || t(`tileType.${tile.type}`)}</span>
+                <div className="min-h-0 flex-1">
                   <BoardTileView
                     tile={tile}
                     view={renderViews[tile.id] ?? { kind: 'unavailable', reason: 'query_error', message: tile.id }}
