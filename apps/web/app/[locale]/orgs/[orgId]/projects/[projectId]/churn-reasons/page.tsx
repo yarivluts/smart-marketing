@@ -27,6 +27,7 @@ import {
   toCancellationTrend,
 } from '@/lib/orgs/churn-reason-view';
 import { PackSetupLanding } from '@/components/orgs/pack-setup-landing';
+import { ThemeDigestGrid } from '@/components/orgs/theme-digest-grid';
 import { StatCard } from '@/components/ui/stat-card';
 import { BarList, ChartCard, DonutChart, EmptyState, PageHero, TrendChart } from '@/components/viz';
 
@@ -202,23 +203,15 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
           // customers write in another language that nobody had commented.
           <EmptyState icon={MessageSquareQuote} title={t('themeDigestNoneMatched', { count: themeDigest.totalComments })} compact />
         ) : (
-          <div className="grid gap-6 lg:grid-cols-2">
-            <BarList
-              items={themeDigest.clusters.map((cluster) => ({ key: cluster.theme, label: t(cancellationReasonThemeLabelKey(cluster.theme)), value: cluster.commentCount }))}
-              valueFormatter={(count) => t('themeCommentCount', { count })}
-              color="hsl(var(--warning))"
-            />
-            <ul className="flex flex-col gap-3">
-              {themeDigest.clusters.flatMap((cluster) =>
-                cluster.exampleComments.slice(0, 2).map((comment, index) => (
-                  <li key={`${cluster.theme}-${index}`} className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm">
-                    <p className="text-foreground">{t('themeExampleComment', { comment })}</p>
-                    <p className="mt-1 text-xs font-medium text-muted-foreground">{t(cancellationReasonThemeLabelKey(cluster.theme))}</p>
-                  </li>
-                )),
-              )}
-            </ul>
-          </div>
+          <ThemeDigestGrid
+            items={themeDigest.clusters.map((cluster) => ({
+              key: cluster.theme,
+              label: t(cancellationReasonThemeLabelKey(cluster.theme)),
+              count: cluster.commentCount,
+              countLabel: t('themeCommentCount', { count: cluster.commentCount }),
+              quotes: cluster.exampleComments.map((comment) => t('themeExampleComment', { comment })),
+            }))}
+          />
         )}
       </ChartCard>
 

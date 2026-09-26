@@ -163,6 +163,7 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
               kind="bar"
               data={trend.buckets.map((bucket) => ({ day: dayFormat.format(new Date(bucket.start)), wins: bucket.count }))}
               series={[{ key: 'wins', label: t('trendSeries'), color: 'hsl(var(--success))' }]}
+              height={320}
             />
           )}
         </ChartCard>

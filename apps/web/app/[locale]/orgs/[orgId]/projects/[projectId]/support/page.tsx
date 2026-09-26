@@ -159,8 +159,8 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
                     {row.photoUrl ? (
                       <img src={row.photoUrl} alt="" className="h-8 w-8 shrink-0 rounded-full object-cover" />
                     ) : (
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary" aria-hidden="true">
-                        {index + 1}
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold uppercase text-primary" aria-hidden="true">
+                        {initials(row.name)}
                       </span>
                     )}
                     <span className="min-w-0">
@@ -216,4 +216,14 @@ export default async function SupportPage({ params }: PageProps): Promise<React.
       </div>
     </main>
   );
+}
+
+/** Up to two initials for an agent without a photo, e.g. "Dana Levi" -> "DL". */
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join('');
 }
