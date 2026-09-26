@@ -10,8 +10,11 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   Search,
+  Megaphone,
 } from 'lucide-react';
 import { AdsKpiScorecards } from './ads-kpi-scorecards';
+import { AdsPerformanceCharts } from './ads-performance-charts';
+import { EmptyState, PageHero } from '@/components/viz';
 import { CampaignListTable } from './campaign-list-table';
 import { CreativePreviewGallery } from './creative-preview-gallery';
 import { AutomationSeedTargetForm } from '@/components/orgs/automation-seed-target-form';
@@ -34,6 +37,8 @@ export interface AdsPerformanceDashboardProps {
   connections: AutomationConnectionOption[];
   canExecute: boolean;
   spendOutcome?: CampaignSpendBreakdownOutcome | null;
+  /** The trailing window the per-campaign spend figures cover, in days. */
+  spendWindowDays?: number;
   className?: string;
 }
 
@@ -47,6 +52,7 @@ export function AdsPerformanceDashboard({
   connections,
   canExecute,
   spendOutcome = null,
+  spendWindowDays = 30,
   className = '',
 }: AdsPerformanceDashboardProps): React.ReactElement {
   const t = useTranslations('Campaigns');
@@ -116,23 +122,13 @@ export function AdsPerformanceDashboard({
 
   return (
     <div
-      className={`flex flex-col gap-8 pb-16 ${className}`}
+      className={`flex flex-col gap-6 ${className}`}
       data-testid="ads-performance-dashboard"
     >
-      {/* Top Header */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            {t('cockpitTitle')}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t('cockpitDescription')}
-          </p>
-        </div>
-      </div>
-
-      {/* 1. Executive Blended KPI Cards */}
-      <AdsKpiScorecards summary={summary} />
+      {/* 1. Hero with the executive blended KPI cards */}
+      <PageHero icon={Megaphone} eyebrow={t('heroEyebrow')} title={t('cockpitTitle')} description={t('cockpitDescription')}>
+        <AdsKpiScorecards summary={summary} className="grid grid-cols-2 gap-3 md:grid-cols-3" />
+      </PageHero>
 
       {/* 2. AI Proactive Growth Recommendation Banner */}
       {topCampaign && (
@@ -194,7 +190,16 @@ export function AdsPerformanceDashboard({
         </div>
       )}
 
-      {/* 3. Sub-Navigation Tabs */}
+      {/* 3. Spend, channel and budget charts */}
+      <AdsPerformanceCharts
+        orgId={orgId}
+        projectId={projectId}
+        items={initialItems}
+        spendOutcome={spendOutcome}
+        spendWindowDays={spendWindowDays}
+      />
+
+      {/* 4. Sub-Navigation Tabs */}
       <div className="border-b border-border">
         <div className="flex gap-4">
           <button
@@ -348,10 +353,7 @@ export function AdsPerformanceDashboard({
 
           {/* Campaigns Table */}
           {filteredItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border p-12 text-center text-muted-foreground">
-              <Layers className="h-8 w-8 text-muted-foreground/40 mb-2" aria-hidden="true" />
-              <p className="text-sm font-medium">{t('noCampaigns')}</p>
-            </div>
+            <EmptyState icon={Layers} title={t('noCampaigns')} />
           ) : (
             <CampaignListTable
               orgId={orgId}
