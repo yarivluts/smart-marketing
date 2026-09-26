@@ -700,6 +700,46 @@
     "warehouseFreshnessNotConfigured": "טרם הוגדר מחסן נתונים לפריסה הזו — העדכניות תופיע כאן ברגע ש-BigQuery יחובר.",
     "warehouseFreshnessError": "לא ניתן היה לקרוא את עדכניות מחסן הנתונים: {message}"
   },
+  "SetupHealth": {
+    "heading": "מצב ההטמעה",
+    "summaryLine": "{connected} מתוך {total} דרישות ההטמעה מחוברות בסביבת {environment}.",
+    "status": {
+      "connected": "מחובר",
+      "error": "רק רשומות שנדחו",
+      "gap": "לא מחובר"
+    },
+    "acceptedLine": "התקבלו רשומות עבור {schemas}, האחרונה ב-{lastAcceptedAt}.",
+    "rejectedLine": "{count, plural, one {רשומה אחת נדחתה וממתינה} other {# רשומות נדחו וממתינות}} בהסגר ({schemas}): {reasons}",
+    "silentRegisteredLine": "רשומים אך מעולם לא התקבלו בסביבה הזו: {schemas}.",
+    "nothingReceivedLine": "לא התקבל דבר בסביבה הזו, לא רשומות שהתקבלו ולא רשומות שנדחו.",
+    "sourceNote": "נגזר אך ורק מהרשומות שהסביבה הזו קיבלה או דחתה; אי אפשר לסמן דרישה כמחוברת ידנית. להנחיות תיקון מפורטות, הריצו את כלי ה-MCP audit_installation_gaps.",
+    "requirements": {
+      "landing_page_attribution": {
+        "title": "ייחוס לדפי נחיתה (נקודות מגע)",
+        "impact": "ללא נקודות מגע אי אפשר לשייך הרשמה או לקוח לקמפיין, לערוץ או לדף הנחיתה שהביאו אותם."
+      },
+      "signups": {
+        "title": "הרשמות",
+        "impact": "ללא אירוע הרשמה למשפך אין שלב כניסה, ואי אפשר לחשב עלות להרשמה, המרה בדפי נחיתה וקוהורטות."
+      },
+      "product_usage": {
+        "title": "אירועי שימוש במוצר",
+        "impact": "ללא אירועי מוצר אין קריאה של הפעלה, מעורבות או שימור."
+      },
+      "customer_profiles": {
+        "title": "ישות לקוח",
+        "impact": "ללא ישויות לקוח תצוגת הלקוח המלאה ריקה, ופלחים לא יכולים לסנן לפי מאפייני לקוח."
+      },
+      "billing": {
+        "title": "חיוב ומנויים",
+        "impact": "ללא רשומות חיוב (אירועי subscription_state_change או מחבר Stripe) אין קריאה של הכנסות, MRR, נטישה או החזר השקעה."
+      },
+      "ad_spend": {
+        "title": "הוצאות פרסום",
+        "impact": "ללא הוצאות פרסום אין צד עלויות: אי אפשר לחשב עלות רכישת לקוח, עלות להרשמה, ROAS והחזר השקעה."
+      }
+    }
+  },
   "BillingOpsFeed": {
     "metaTitle": "פיד אירועי חיוב",
     "title": "פיד אירועי חיוב עבור {projectName}",
