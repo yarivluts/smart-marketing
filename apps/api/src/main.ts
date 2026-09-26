@@ -7,8 +7,12 @@ import { NestFactory } from '@nestjs/core';
 import { RequestMethod } from '@nestjs/common';
 import { AppModule } from './app.module';
 import { connectFirestoreOrmForApi } from './firestore-orm.bootstrap';
+import { assertPublicUrlsConfigured } from './mcp-oauth/mcp-oauth-urls';
 
 async function bootstrap(): Promise<void> {
+  // Before anything else: a deployed API with localhost public URLs must not come up at all.
+  assertPublicUrlsConfigured();
+
   // Every controller here touches Firestore via a `BaseModel` subclass — connect once, up front,
   // rather than leaving it for the first request to discover the ORM was never initialized.
   await connectFirestoreOrmForApi();
