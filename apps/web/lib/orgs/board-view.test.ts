@@ -68,6 +68,51 @@ describe('buildTileRenderView — unavailable', () => {
   });
 });
 
+describe('buildTileRenderView — metric units (KAN-213)', () => {
+  const units = {
+    lp_conversion_rate: { kind: 'ratio' as const },
+    signups: { kind: 'count' as const },
+    plain: { kind: 'number' as const },
+  };
+
+  it("attaches only the tile's own metrics' declared units, leaving plain numbers out", () => {
+    const view = buildTileRenderView(tile({ type: 'table', metricNames: ['signups', 'plain'] }), { ok: true, series: [{ bucket_date: '2026-01-01', signups: 3, plain: 1 }] }, null, units);
+    expect(view).toMatchObject({ kind: 'table', units: { signups: { kind: 'count' } } });
+  });
+
+  it('attaches no units at all when none of the tile metrics declares one (display unchanged)', () => {
+    const view = buildTileRenderView(tile({ type: 'big_number', metricNames: ['plain'] }), { ok: true, series: [{ bucket_date: '2026-01-01', plain: 1 }] }, null, units);
+    expect(view).toEqual({ kind: 'big_number', value: 1, isEmpty: false, freshness: null });
+  });
+
+  it('averages a ratio big number across its buckets instead of summing fractions, gaps excluded', () => {
+    const view = buildTileRenderView(
+      tile({ type: 'big_number', metricNames: ['lp_conversion_rate'] }),
+      {
+        ok: true,
+        series: [
+          { bucket_date: '2026-01-01', lp_conversion_rate: 0.4 },
+          { bucket_date: '2026-01-02', lp_conversion_rate: 0.6 },
+          { bucket_date: '2026-01-03', lp_conversion_rate: null },
+        ],
+      },
+      null,
+      units,
+    );
+    expect(view).toMatchObject({ kind: 'big_number', value: 0.5, units: { lp_conversion_rate: { kind: 'ratio' } } });
+  });
+
+  it('still sums a count big number', () => {
+    const view = buildTileRenderView(
+      tile({ type: 'big_number', metricNames: ['signups'] }),
+      { ok: true, series: [{ bucket_date: '2026-01-01', signups: 2 }, { bucket_date: '2026-01-02', signups: 3 }] },
+      null,
+      units,
+    );
+    expect(view).toMatchObject({ value: 5 });
+  });
+});
+
 describe('buildTileRenderView — big_number', () => {
   it('sums the current period, with no previousValue/deltaPct when there is no compare data', () => {
     const view = buildTileRenderView(tile({ type: 'big_number' }), {

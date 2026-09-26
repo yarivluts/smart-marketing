@@ -35,6 +35,7 @@ export async function POST(request: NextRequest, { params }: RouteParams): Promi
       name: parsed.name,
       definition: parsed.definition,
       dimensions: parsed.dimensions,
+      ...(parsed.unit !== undefined ? { unit: parsed.unit } : {}),
       createdByUserId: user.id,
     });
     return NextResponse.json({ metricDef: toMetricDefView(metricDef) }, { status: 201 });

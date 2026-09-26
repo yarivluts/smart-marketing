@@ -41,6 +41,7 @@ function groupIntoFamilies(views: readonly MetricDefView[]): MetricFamily[] {
       aggregation: view.aggregation,
       formula: view.formula,
       dimensions: view.dimensions,
+      unit: view.unit,
     });
     familiesByName.set(view.name, family);
   }

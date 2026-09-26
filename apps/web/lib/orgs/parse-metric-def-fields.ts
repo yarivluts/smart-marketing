@@ -3,8 +3,15 @@ import type { MetricDefinitionInput } from '@growthos/firebase-orm-models';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 
 export type ParsedMetricDefRequest =
-  | { name: string; definition: MetricDefinitionInput; dimensions: string[]; error?: undefined }
-  | { name?: undefined; definition?: undefined; dimensions?: undefined; error: NextResponse };
+  | {
+      name: string;
+      definition: MetricDefinitionInput;
+      dimensions: string[];
+      /** `undefined` when the body carries no `unit` key (an evolve then keeps the current unit); `null` clears it. Validated by the registry service. */
+      unit: string | null | undefined;
+      error?: undefined;
+    }
+  | { name?: undefined; definition?: undefined; dimensions?: undefined; unit?: undefined; error: NextResponse };
 
 function parseDefinitionBody(value: unknown): MetricDefinitionInput | undefined {
   if (typeof value !== 'object' || value === null) {
@@ -63,7 +70,7 @@ function parseDefinitionBody(value: unknown): MetricDefinitionInput | undefined 
 
 /** Shared JSON-body parsing + validation for the register and evolve metric-def routes — both accept the identical `{name, definition, dimensions}` shape. Deeper validation (name pattern, formula references, breaking rules) happens in `@growthos/firebase-orm-models`'s `metric-registry.service.ts`. */
 export async function parseMetricDefRequestBody(request: NextRequest): Promise<ParsedMetricDefRequest> {
-  const parsed = await parseJsonBody<{ name?: unknown; definition?: unknown; dimensions?: unknown }>(request);
+  const parsed = await parseJsonBody<{ name?: unknown; definition?: unknown; dimensions?: unknown; unit?: unknown }>(request);
   if (parsed.error) {
     return { error: parsed.error };
   }
@@ -82,5 +89,10 @@ export async function parseMetricDefRequestBody(request: NextRequest): Promise<P
     return { error: NextResponse.json({ error: 'invalid_dimensions' }, { status: 400 }) };
   }
 
-  return { name: name.trim(), definition, dimensions: rawDimensions as string[] };
+  const rawUnit = parsed.body.unit;
+  if (rawUnit !== undefined && rawUnit !== null && typeof rawUnit !== 'string') {
+    return { error: NextResponse.json({ error: 'invalid_unit' }, { status: 400 }) };
+  }
+
+  return { name: name.trim(), definition, dimensions: rawDimensions as string[], unit: rawUnit };
 }

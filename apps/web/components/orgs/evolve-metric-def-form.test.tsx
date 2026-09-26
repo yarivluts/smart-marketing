@@ -18,6 +18,8 @@ const INITIAL_STATE: MetricDefinitionFormState = {
   column: 'reporting_spend',
   timeColumn: 'date',
   dimensions: 'channel',
+  unitKind: 'currency',
+  currencyCode: '',
 };
 
 function renderForm(initialState: MetricDefinitionFormState = INITIAL_STATE): void {
@@ -43,6 +45,7 @@ describe('EvolveMetricDefForm', () => {
     renderForm();
 
     expect(screen.getByDisplayValue('fact_ad_spend')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unit')).toHaveValue('currency');
     fireEvent.change(screen.getByLabelText('Dimensions (comma-separated)'), { target: { value: 'channel, campaign' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Evolve metric' }));
@@ -59,6 +62,7 @@ describe('EvolveMetricDefForm', () => {
               aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] },
             },
             dimensions: ['channel', 'campaign'],
+            unit: 'currency',
           }),
         }),
       ),

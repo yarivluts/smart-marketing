@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
+import { parseMetricUnit } from '@growthos/shared';
 import { Button } from '@/components/ui/button';
 import { EvolveMetricDefForm } from './evolve-metric-def-form';
 import { ArchiveMetricDefButton } from './archive-metric-def-button';
@@ -27,6 +28,14 @@ export function MetricFamilyCard({ orgId, projectId, name, versions }: MetricFam
       return t('activeLabel');
     }
     return status === 'archived' ? t('archivedLabel') : t('supersededLabel');
+  }
+
+  function unitLabel(unit: string | null): string {
+    const parsed = unit ? parseMetricUnit(unit) : null;
+    if (!parsed) {
+      return t('unitNone');
+    }
+    return parsed.currency ? t('unitCurrencyWithCode', { code: parsed.currency }) : t(`unitOption.${parsed.kind}`);
   }
 
   function formulaOrAggregationSummary(version: MetricVersionView): string {
@@ -65,6 +74,7 @@ export function MetricFamilyCard({ orgId, projectId, name, versions }: MetricFam
           </span>
           <span>{formulaOrAggregationSummary(version)}</span>
           {version.dimensions.length > 0 ? <span className="text-muted-foreground">{t('dimensionsSummary', { dimensions: version.dimensions.join(', ') })}</span> : null}
+          <span className="text-muted-foreground">{t('unitSummary', { unit: unitLabel(version.unit) })}</span>
         </div>
       ))}
 

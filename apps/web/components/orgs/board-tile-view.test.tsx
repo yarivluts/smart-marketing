@@ -44,6 +44,71 @@ describe('BoardTileView', () => {
     expect(screen.getByText('50% vs. previous')).toBeInTheDocument();
   });
 
+  describe('values in their metric unit (KAN-213)', () => {
+    const ratio = { lp_conversion_rate: { kind: 'ratio' as const } };
+
+    it('shows a ratio big number as a percent: 0.5 is 50%', () => {
+      renderTile({ kind: 'big_number', value: 0.5, isEmpty: false, freshness: null, units: ratio }, { metricNames: ['lp_conversion_rate'], title: 'Conversion rate' });
+      expect(screen.getByText('50%')).toBeInTheDocument();
+      expect(screen.queryByText('0.5')).not.toBeInTheDocument();
+    });
+
+    it('shows a currency big number with its symbol', () => {
+      renderTile({ kind: 'big_number', value: 1250, isEmpty: false, freshness: null, units: { ad_spend: { kind: 'currency', currency: 'USD' } } });
+      expect(screen.getByText('$1,250.00')).toBeInTheDocument();
+    });
+
+    it.each(['bar', 'line'] as const)('labels %s values, legend and screen-reader table in the unit', (chart) => {
+      renderTile(
+        {
+          kind: 'time_series',
+          chart,
+          series: [{ label: 'all', points: [{ bucket: '2026-09-24', value: 0.08 }, { bucket: '2026-09-25', value: 0.125 }] }],
+          isEmpty: false,
+          freshness: null,
+          units: ratio,
+        },
+        { type: chart, metricNames: ['lp_conversion_rate'], title: 'Conversion rate' },
+      );
+      expect(screen.getAllByText('8%').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('12.5%').length).toBeGreaterThan(0);
+      const table = screen.getByRole('table', { name: 'Conversion rate' });
+      expect(within(table).getByText('12.5%')).toBeInTheDocument();
+    });
+
+    it('formats a table metric column in its unit and leaves dimension columns alone', () => {
+      renderTile(
+        { kind: 'table', columns: ['campaign_id', 'lp_conversion_rate'], rows: [{ campaign_id: '42', lp_conversion_rate: 0.25 }], isEmpty: false, freshness: null, units: ratio },
+        { type: 'table', metricNames: ['lp_conversion_rate'] },
+      );
+      expect(screen.getByText('25%')).toBeInTheDocument();
+      expect(screen.getByText('42')).toBeInTheDocument();
+    });
+
+    it('formats each funnel step total in its own unit', () => {
+      renderTile(
+        {
+          kind: 'funnel',
+          steps: [{ metricName: 'revenue', total: 1000, pctOfFirstStep: 100 }],
+          isEmpty: false,
+          freshness: null,
+          units: { revenue: { kind: 'currency', currency: 'EUR' } },
+        },
+        { type: 'funnel', metricNames: ['revenue'] },
+      );
+      expect(screen.getByText('€1,000.00 (100%)')).toBeInTheDocument();
+    });
+
+    it('in Hebrew, still shows the percent', () => {
+      render(
+        <NextIntlClientProvider locale="he" messages={heMessages}>
+          <BoardTileView tile={tile({ metricNames: ['lp_conversion_rate'] })} view={{ kind: 'big_number', value: 0.5, isEmpty: false, freshness: null, units: ratio }} />
+        </NextIntlClientProvider>,
+      );
+      expect(screen.getByText(/50/)).toHaveTextContent('%');
+    });
+  });
+
   it('renders an empty big_number state instead of a misleading zero', () => {
     renderTile({ kind: 'big_number', value: 0, isEmpty: true, freshness: null });
     expect(screen.getByText('No data for this range yet.')).toBeInTheDocument();

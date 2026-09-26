@@ -121,6 +121,34 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/metric-defs/evolve', () =>
     expect(body.metricDef.dimensions).toEqual(['channel', 'campaign']);
   });
 
+  it('registers with a unit, keeps it on an evolve that omits it, and clears it with null (KAN-213)', async () => {
+    const { ownerSession, organization, project } = await setupOrgProject('Evolve Metric Unit Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const registerReq = request(organization.id, project.id, 'metric-defs', { ...adSpendV1, unit: 'currency:usd' });
+    const registered = await register(registerReq.request, { params: registerReq.params });
+    expect(registered.status).toBe(201);
+    expect(((await registered.json()) as { metricDef: { unit: string | null } }).metricDef.unit).toBe('currency:USD');
+
+    const keep = request(organization.id, project.id, 'metric-defs/evolve', adSpendV1);
+    const kept = await evolve(keep.request, { params: keep.params });
+    expect(((await kept.json()) as { metricDef: { unit: string | null } }).metricDef.unit).toBe('currency:USD');
+
+    const clear = request(organization.id, project.id, 'metric-defs/evolve', { ...adSpendV1, unit: null });
+    const cleared = await evolve(clear.request, { params: clear.params });
+    expect(((await cleared.json()) as { metricDef: { version: number; unit: string | null } }).metricDef).toMatchObject({ version: 3, unit: null });
+
+    const bad = request(organization.id, project.id, 'metric-defs/evolve', { ...adSpendV1, unit: 'fraction' });
+    const refused = await evolve(bad.request, { params: bad.params });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { reasons: string[] }).reasons.join(' ')).toContain('Unknown metric unit "fraction"');
+
+    const wrongType = request(organization.id, project.id, 'metric-defs/evolve', { ...adSpendV1, unit: 5 });
+    const wrongTypeResponse = await evolve(wrongType.request, { params: wrongType.params });
+    expect(wrongTypeResponse.status).toBe(400);
+    expect(await wrongTypeResponse.json()).toEqual({ error: 'invalid_unit' });
+  });
+
   it('rejects an invalid evolution (a formula referencing an unregistered metric)', async () => {
     const { ownerSession, organization, project } = await setupOrgProject('Evolve Invalid Metric Org');
     getServerSessionMock.mockResolvedValue(ownerSession);
