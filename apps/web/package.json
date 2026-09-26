@@ -20,6 +20,7 @@
     "@growthos/tracking-sdk": "workspace:*",
     "@radix-ui/react-slot": "^1.1.1",
     "@sentry/nextjs": "^10.63.0",
+    "@xyflow/react": "^12.8.4",
     "class-variance-authority": "^0.7.1",
     "client-only": "^0.0.1",
     "clsx": "^2.1.1",
@@ -30,6 +31,7 @@
     "next-intl": "^4.13.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "recharts": "^2.15.4",
     "server-only": "^0.0.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7"

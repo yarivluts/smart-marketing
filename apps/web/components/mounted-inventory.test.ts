@@ -41,7 +41,7 @@ const COMPONENTS_ROOT = __dirname;
 const APP_ROOT = path.resolve(__dirname, '..', 'app');
 
 /** Rendered by at least one file under `app/`. */
-const MOUNTED = ['auth', 'campaigns', 'orgs', 'tv', 'ui'];
+const MOUNTED = ['auth', 'campaigns', 'orgs', 'tv', 'ui', 'viz'];
 
 /**
  * Imported by no page. Each is real, reviewed code — it is simply not reachable
