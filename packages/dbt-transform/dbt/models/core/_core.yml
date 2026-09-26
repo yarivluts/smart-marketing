@@ -303,7 +303,7 @@ models:
       reactivate transition, derived by diffing consecutive landed
       subscription snapshots. Feeds the SaaS pack's `reactivations`/
       `trial_starts`/`trial_conversions` metrics. See
-      `stg_stripe_subscription_history`'s own doc comment for the exact
+      `stg_subscription_history`'s own doc comment for the exact
       transition rules.
     columns:
       - name: subscription_event_key
