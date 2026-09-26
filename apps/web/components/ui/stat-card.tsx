@@ -3,6 +3,7 @@ import type { LucideIcon } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Sparkline } from '@/components/viz/sparkline';
 
 export interface StatCardProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
@@ -28,6 +29,7 @@ export function StatCard({
   badge,
   targetHint,
   progress,
+  trendData,
   subtext,
   className,
   ...props
@@ -65,7 +67,7 @@ export function StatCard({
     >
       <div>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-medium text-muted-foreground truncate">{title}</span>
+          <span className="line-clamp-2 text-sm font-medium text-muted-foreground">{title}</span>
           <div className="flex items-center gap-1.5 shrink-0">
             {badge}
             {Icon ? (
@@ -84,6 +86,7 @@ export function StatCard({
       </div>
 
       <div className="mt-4 flex flex-col gap-2">
+        {trendData && trendData.length > 1 ? <Sparkline values={trendData} className="h-9" /> : null}
         {progress !== undefined ? (
           <div className="w-full">
             <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">

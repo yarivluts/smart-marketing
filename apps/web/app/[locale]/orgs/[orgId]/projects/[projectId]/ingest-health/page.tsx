@@ -38,6 +38,9 @@ import { ReexportRawRecordsButton } from '@/components/orgs/reexport-raw-records
 import { SweepQueuedPipelineMessagesButton } from '@/components/orgs/sweep-queued-pipeline-messages-button';
 import { TriggerOrchestrationRunButton } from '@/components/orgs/trigger-orchestration-run-button';
 import { SetupHealthPanel } from '@/components/orgs/setup-health-panel';
+import { Activity, CheckCircle2, Clock, Inbox, Workflow, XCircle } from 'lucide-react';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard, DonutChart, FlowDiagram, PageHero, type FlowEdgeSpec, type FlowNodeSpec } from '@/components/viz';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -108,9 +111,46 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   // the copy rather than hard-coding "production", which mislabelled dev records (B16).
   const selectedEnvironmentLabel = tEnv(selectedEnvironment?.name ?? 'prod');
 
+  const numberFormat = new Intl.NumberFormat(locale);
+  const overall = summary.overall;
+  const base = `/orgs/${orgId}/projects/${projectId}/ingest-health`;
+  const warehouseCount = warehouseFreshness.status === 'ok' ? warehouseFreshness.landedRecordCount : null;
+  // The pipeline as a graph: every count is one this page already shows below, so the diagram and
+  // the detail sections cannot disagree.
+  const flowNodes: FlowNodeSpec[] = [
+    { id: 'received', label: t('flowReceived'), value: numberFormat.format(overall.totalRecords), sublabel: t('flowReceivedSub', { count: summary.batchesConsidered }), status: overall.totalRecords > 0 ? 'ok' : 'idle' },
+    { id: 'accepted', label: t('flowAccepted'), value: numberFormat.format(overall.acceptedCount), status: overall.acceptedCount > 0 ? 'ok' : 'idle' },
+    { id: 'quarantined', label: t('flowQuarantined'), value: numberFormat.format(quarantinedViews.length), sublabel: t('flowQuarantinedSub'), status: quarantinedViews.length > 0 ? 'error' : 'ok', href: `${base}#quarantine` },
+    { id: 'duplicates', label: t('flowDuplicates'), value: numberFormat.format(overall.duplicateCount), sublabel: t('flowDuplicatesSub'), status: 'idle' },
+    {
+      id: 'delivery',
+      label: t('flowDelivery'),
+      sublabel: t('flowDeliverySub', { failed: failedPipelineMessages.length, queued: queuedPipelineMessages.length }),
+      status: failedPipelineMessages.length > 0 ? 'error' : queuedPipelineMessages.length > 0 ? 'warn' : overall.acceptedCount > 0 ? 'ok' : 'idle',
+      href: `${base}#pipeline`,
+    },
+    {
+      id: 'warehouse',
+      label: t('flowWarehouse'),
+      value: warehouseCount !== null ? numberFormat.format(warehouseCount) : undefined,
+      sublabel: warehouseCount !== null ? t('flowWarehouseSub', { count: warehouseCount }) : t('flowWarehouseUnknown'),
+      status: warehouseFreshness.status === 'error' ? 'error' : warehouseCount ? 'ok' : 'idle',
+      href: `${base}#orchestration`,
+    },
+    { id: 'reports', label: t('flowReports'), sublabel: t('flowReportsSub'), status: warehouseCount ? 'ok' : 'idle', href: `/orgs/${orgId}/projects/${projectId}/boards` },
+  ];
+  const flowEdges: FlowEdgeSpec[] = [
+    { source: 'received', target: 'accepted', label: t('flowEdgeValidated'), animated: overall.acceptedCount > 0, status: 'ok' },
+    { source: 'received', target: 'quarantined', label: t('flowEdgeRejected'), status: quarantinedViews.length > 0 ? 'error' : 'idle' },
+    { source: 'received', target: 'duplicates', label: t('flowEdgeRepeat'), status: 'idle' },
+    { source: 'accepted', target: 'delivery', label: t('flowEdgeDelivered'), animated: overall.acceptedCount > 0, status: failedPipelineMessages.length > 0 ? 'error' : 'ok' },
+    { source: 'delivery', target: 'warehouse', animated: Boolean(warehouseCount), status: warehouseCount ? 'ok' : 'idle' },
+    { source: 'warehouse', target: 'reports', label: t('flowEdgeModelled'), animated: Boolean(warehouseCount), status: warehouseCount ? 'ok' : 'idle' },
+  ];
+
   function renderRollup(rollup: IngestHealthRollup, key: string) {
     return (
-      <li key={key} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
+      <li key={key} className="flex flex-col gap-1 rounded-xl border border-border bg-background/60 px-4 py-3 text-sm">
         <span className="font-medium">{rollup.kind === 'overall' ? t('overallHeading') : t(rollup.kind)}</span>
         <span className="text-muted-foreground">
           {t('countsLine', {
@@ -138,27 +178,63 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   }
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Activity} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('heroDescription')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiReceived')} value={numberFormat.format(overall.totalRecords)} icon={Inbox} />
+          <StatCard
+            title={t('kpiAccepted')}
+            value={numberFormat.format(overall.acceptedCount)}
+            icon={CheckCircle2}
+            progress={overall.totalRecords > 0 ? Math.round((overall.acceptedCount / overall.totalRecords) * 100) : undefined}
+          />
+          <StatCard title={t('kpiRejectedRate')} value={`${overall.errorRatePercent.toFixed(1)}%`} icon={XCircle} />
+          <StatCard
+            title={t('kpiLastBatch')}
+            value={overall.freshnessMinutes === null ? t('kpiNever') : t('kpiLastBatchValue', { minutes: formatMinutesAgo(overall.freshnessMinutes) })}
+            icon={Clock}
+          />
+        </div>
+      </PageHero>
+
+      <ChartCard title={t('flowTitle')} description={t('flowDescription')} icon={Workflow}>
+        <FlowDiagram label={t('flowTitle')} nodes={flowNodes} edges={flowEdges} height={360} />
+      </ChartCard>
 
       {environmentId !== undefined && setupHealth?.environments[0] ? (
         <SetupHealthPanel health={setupHealth.environments[0]} environmentLabel={selectedEnvironmentLabel} />
       ) : null}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('summaryHeading')}</h2>
-        {batches.length === 0 ? (
-          <p className="text-muted-foreground">{t('noBatches')}</p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {renderRollup(summary.overall, 'overall')}
-            {summary.byKind.map((rollup) => renderRollup(rollup, rollup.kind))}
-          </ul>
-        )}
-        <p className="text-xs text-muted-foreground">{t('batchCapNote', { count: summary.batchesConsidered })}</p>
-      </section>
+      <div className="grid gap-6 lg:grid-cols-3">
+          <ChartCard title={t('outcomesTitle')} description={t('outcomesDescription')} icon={CheckCircle2}>
+            <DonutChart
+              label={t('outcomesTitle')}
+              centerValue={numberFormat.format(overall.totalRecords)}
+              centerLabel={t('outcomesCenter')}
+              data={[
+                { label: t('outcomesAccepted'), value: overall.acceptedCount, color: 'hsl(var(--success))' },
+                { label: t('outcomesRejected'), value: overall.quarantinedCount, color: 'hsl(var(--destructive))' },
+                { label: t('outcomesDuplicate'), value: overall.duplicateCount, color: 'hsl(var(--muted-foreground))' },
+              ]}
+              size={170}
+              layout="stacked"
+            />
+          </ChartCard>
+        <section id="summary" className="flex flex-col gap-3 rounded-2xl lg:col-span-2 border border-border bg-card p-5 shadow-sm">
+          <h2 className="text-lg font-semibold">{t('summaryHeading')}</h2>
+          {batches.length === 0 ? (
+            <p className="text-muted-foreground">{t('noBatches')}</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {renderRollup(summary.overall, 'overall')}
+              {summary.byKind.map((rollup) => renderRollup(rollup, rollup.kind))}
+            </ul>
+          )}
+          <p className="text-xs text-muted-foreground">{t('batchCapNote', { count: summary.batchesConsidered })}</p>
+        </section>
+      </div>
 
-      <section className="flex flex-col gap-3">
+      <section id="quarantine" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-lg font-semibold">{t('quarantineHeading')}</h2>
         {quarantinedViews.length === 0 ? (
           <p className="text-muted-foreground">{t('noQuarantinedRecords')}</p>
@@ -189,7 +265,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
         <p className="text-xs text-muted-foreground">{t('quarantineCapNote', { count: quarantinedViews.length })}</p>
       </section>
 
-      <section className="flex flex-col gap-3">
+      <section id="pipeline" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{t('pipelineFailuresHeading')}</h2>
           <div className="flex items-start gap-2">
@@ -219,7 +295,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
+      <section id="queued" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{t('queuedMessagesHeading')}</h2>
           {queuedPipelineMessageViews.length > 0 ? (
@@ -246,7 +322,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
         )}
       </section>
 
-      <section className="flex flex-col gap-3">
+      <section id="orchestration" className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{t('orchestrationHeading')}</h2>
           <TriggerOrchestrationRunButton orgId={orgId} projectId={projectId} />

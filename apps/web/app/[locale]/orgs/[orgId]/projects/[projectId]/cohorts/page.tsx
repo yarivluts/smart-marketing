@@ -7,7 +7,10 @@ import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects, queryCohortRetention } from '@/lib/orgs/queries';
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildCohortRetentionView } from '@/lib/orgs/cohort-retention-view';
+import { CalendarRange, DatabaseZap, Filter, Grid3X3, TrendingUp, Trophy, Users } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard, EmptyState, Heatmap, PageHero, TrendChart } from '@/components/viz';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -68,78 +71,119 @@ export default async function CohortRetentionPage({ params, searchParams }: Page
     await queryCohortRetention(orgId, projectId, trimmedConversionEvent ? { conversionEvent: trimmedConversionEvent, ...environmentScope } : environmentScope),
   );
   const t = await getTranslations('CohortRetention');
+  const monthLabel = (cohortMonth: string): string => {
+    const date = new Date(cohortMonth);
+    return Number.isNaN(date.getTime()) ? cohortMonth : new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date);
+  };
+  const numberFormat = new Intl.NumberFormat(locale);
+
+  const ok = view.kind === 'ok' && view.cohorts.length > 0 ? view : null;
+  // Period-1 retention per cohort: the first read on whether a signup month stuck at all.
+  const firstPeriodRates = ok
+    ? ok.cohorts
+        .map((cohort) => ({ cohort, rate: cohort.periods.find((period) => period.periodNumber === 1)?.retentionRatePercent }))
+        .filter((entry): entry is { cohort: (typeof ok.cohorts)[number]; rate: number } => entry.rate !== undefined)
+    : [];
+  const averageFirstPeriod = firstPeriodRates.length > 0 ? Math.round(firstPeriodRates.reduce((sum, entry) => sum + entry.rate, 0) / firstPeriodRates.length) : null;
+  const bestCohort = firstPeriodRates.length > 0 ? firstPeriodRates.reduce((best, entry) => (entry.rate > best.rate ? entry : best)) : null;
+  const totalPeople = ok ? ok.cohorts.reduce((sum, cohort) => sum + cohort.cohortSize, 0) : 0;
+  // The average curve weights every cohort equally at each period it has reached.
+  const curve = ok
+    ? ok.periodNumbers.map((periodNumber) => {
+        const rates = ok.cohorts.flatMap((cohort) => cohort.periods.filter((period) => period.periodNumber === periodNumber).map((period) => period.retentionRatePercent));
+        return { period: t('periodShort', { periodNumber }), retention: rates.length > 0 ? rates.reduce((sum, rate) => sum + rate, 0) / rates.length : null };
+      })
+    : [];
+
+  const unavailable =
+    view.kind === 'warehouse_not_configured' ? t('notConfigured') : view.kind === 'quota_exceeded' ? t('quotaExceeded') : view.kind === 'query_error' ? t('queryError') : null;
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
-
-      <form method="get" className="flex flex-wrap items-end gap-2">
-        <div className="flex flex-col gap-1">
-          <label htmlFor="cohort-conversion-event" className="text-xs text-muted-foreground">
-            {t('conversionEventLabel')}
-          </label>
-          <input
-            id="cohort-conversion-event"
-            name="conversionEvent"
-            defaultValue={conversionEventParam ?? ''}
-            placeholder={t('conversionEventPlaceholder')}
-            className="rounded-md border border-input bg-background px-2 py-1 text-sm"
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Grid3X3} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiCohorts')} value={ok ? numberFormat.format(ok.cohorts.length) : t('kpiNoValue')} icon={CalendarRange} />
+          <StatCard title={t('kpiPeople')} value={ok ? numberFormat.format(totalPeople) : t('kpiNoValue')} icon={Users} />
+          <StatCard
+            title={t('kpiFirstPeriod')}
+            value={averageFirstPeriod !== null ? t('retentionCell', { percent: averageFirstPeriod }) : t('kpiNoValue')}
+            icon={TrendingUp}
+            progress={averageFirstPeriod ?? undefined}
+          />
+          <StatCard
+            title={t('kpiBestCohort')}
+            value={bestCohort ? monthLabel(bestCohort.cohort.cohortMonth) : t('kpiNoValue')}
+            subtext={bestCohort ? t('retentionCell', { percent: bestCohort.rate }) : undefined}
+            icon={Trophy}
           />
         </div>
-        <button type="submit" className="rounded-md border border-input px-3 py-1 text-sm hover:bg-accent">
-          {t('conversionEventApplyButton')}
-        </button>
-        {trimmedConversionEvent ? (
-          <Link
-            href={{ pathname: `/orgs/${orgId}/projects/${projectId}/cohorts` }}
-            className="text-xs text-muted-foreground underline"
-          >
-            {t('conversionEventClear')}
-          </Link>
-        ) : null}
-      </form>
+      </PageHero>
 
-      {view.kind === 'warehouse_not_configured' ? (
-        <p className="text-muted-foreground">{t('notConfigured')}</p>
-      ) : view.kind === 'quota_exceeded' ? (
-        <p className="text-muted-foreground">{t('quotaExceeded')}</p>
-      ) : view.kind === 'query_error' ? (
-        <p className="text-muted-foreground">{t('queryError')}</p>
-      ) : view.cohorts.length === 0 ? (
-        <p className="text-muted-foreground">{t('empty')}</p>
+      <ChartCard title={t('filterTitle')} description={t('filterHint')} icon={Filter}>
+        <form method="get" className="flex flex-wrap items-end gap-2">
+          <div className="flex min-w-64 flex-1 flex-col gap-1">
+            <label htmlFor="cohort-conversion-event" className="text-xs font-medium text-muted-foreground">
+              {t('conversionEventLabel')}
+            </label>
+            <input
+              id="cohort-conversion-event"
+              name="conversionEvent"
+              defaultValue={conversionEventParam ?? ''}
+              placeholder={t('conversionEventPlaceholder')}
+              className="h-10 rounded-xl border border-input bg-background px-3 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <button type="submit" className="h-10 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
+            {t('conversionEventApplyButton')}
+          </button>
+          {trimmedConversionEvent ? (
+            <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/cohorts` }} className="h-10 rounded-xl px-3 text-sm leading-10 text-muted-foreground underline-offset-4 hover:underline">
+              {t('conversionEventClear')}
+            </Link>
+          ) : null}
+        </form>
+      </ChartCard>
+
+      {unavailable ? (
+        <EmptyState icon={DatabaseZap} title={unavailable} />
+      ) : !ok ? (
+        <EmptyState icon={Grid3X3} title={t('empty')} description={t('emptyDetail')} />
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr>
-                <th className="border-b border-input px-3 py-2 text-left">{t('cohortColumnHeading')}</th>
-                <th className="border-b border-input px-3 py-2 text-right">{t('cohortSizeColumnHeading')}</th>
-                {view.periodNumbers.map((periodNumber) => (
-                  <th key={periodNumber} className="border-b border-input px-3 py-2 text-right">
-                    {t('periodColumnHeading', { periodNumber })}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {view.cohorts.map((cohort) => {
+        <>
+          <div className="grid gap-6 lg:grid-cols-5">
+            <ChartCard title={t('curveTitle')} description={t('curveDescription')} icon={TrendingUp} className="lg:col-span-3" fill>
+              <TrendChart label={t('curveTitle')} xKey="period" data={curve} series={[{ key: 'retention', label: t('curveSeries') }]} kind="line" valueFormat="percent" />
+            </ChartCard>
+            <ChartCard title={t('sizesTitle')} description={t('sizesDescription')} icon={Users} className="lg:col-span-2" fill>
+              <TrendChart
+                label={t('sizesTitle')}
+                xKey="month"
+                data={ok.cohorts.map((cohort) => ({ month: monthLabel(cohort.cohortMonth), people: cohort.cohortSize }))}
+                series={[{ key: 'people', label: t('sizesSeries'), color: 'hsl(var(--info))' }]}
+                kind="bar"
+              />
+            </ChartCard>
+          </div>
+
+          <ChartCard title={t('matrixTitle')} description={t('matrixDescription')} icon={Grid3X3}>
+            <Heatmap
+              label={t('matrixTitle')}
+              rowHeader={t('cohortColumnHeading')}
+              columns={ok.periodNumbers.map((periodNumber) => t('periodColumnHeading', { periodNumber }))}
+              max={100}
+              valueFormatter={(value) => t('retentionCell', { percent: value })}
+              rows={ok.cohorts.map((cohort) => {
                 const percentByPeriod = new Map(cohort.periods.map((period) => [period.periodNumber, period.retentionRatePercent]));
-                return (
-                  <tr key={cohort.cohortMonth}>
-                    <td className="border-b border-input px-3 py-2">{cohort.cohortMonth}</td>
-                    <td className="border-b border-input px-3 py-2 text-right">{cohort.cohortSize}</td>
-                    {view.periodNumbers.map((periodNumber) => (
-                      <td key={periodNumber} className="border-b border-input px-3 py-2 text-right text-muted-foreground">
-                        {percentByPeriod.has(periodNumber) ? t('retentionCell', { percent: percentByPeriod.get(periodNumber)! }) : ''}
-                      </td>
-                    ))}
-                  </tr>
-                );
+                return {
+                  key: cohort.cohortMonth,
+                  label: monthLabel(cohort.cohortMonth),
+                  sublabel: t('cohortSizeSublabel', { count: cohort.cohortSize }),
+                  cells: ok.periodNumbers.map((periodNumber) => percentByPeriod.get(periodNumber) ?? null),
+                };
               })}
-            </tbody>
-          </table>
-        </div>
+            />
+          </ChartCard>
+        </>
       )}
     </main>
   );
