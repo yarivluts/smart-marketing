@@ -7,6 +7,23 @@ fresh session can pick up work from this file + [TASKS.md](./TASKS.md) alone. Se
 Template for each entry:
 
 ```
+## 2026-09-26 - EasySign round 3: ratio period math, tile fit, line-tile edges
+
+### Fixed and deployed (production api-prod/api-preprod/web-prod/web-preprod at 6633e8c; dbt-refresh b70c5f9)
+- **KAN-218 (B24) ratio over a period was an average of daily ratios** (#505): a `total` grain now
+  computes sum(numerator)/sum(denominator). Proven with a discriminating dev probe EasySign ingested
+  (one non-converting visitor on 09-24): after dbt-refresh-x2jfz the API returns 0.40 for 09-19..25
+  (the old average would be 0.25) and the landing-page board tile reads 40%. Probe data stays in dev.
+- **KAN-219 (B25)** the #500 overflow cap clipped "+N more" and the last axis label (#505).
+- **KAN-220 (B26)** line tiles cut their first and last points in half at the tile edge (#506):
+  plot and axis share an 8px inset.
+
+- **Last completed:** all of the above, each verified by EasySign independently and in prod screenshots.
+- **Blocked + why:** unchanged - KAN-197 (setup tools only in the other session's uncommitted tree),
+  KAN-195 (viewer read access, a product decision).
+- **Next step:** KAN-212, KAN-202, a "dbt job has not run in 3h" alarm, drift age from merge time.
+- **Waiting on human:** KAN-195, KAN-197 ownership, KAN-97, KAN-117, KAN-130.
+
 ## 2026-09-26 - EasySign reference integration, round 2: funnel, goals, boards, units, drift everywhere
 
 Continued following the EasySign session (Yariv: "do everything needed to help it"). Each item was
