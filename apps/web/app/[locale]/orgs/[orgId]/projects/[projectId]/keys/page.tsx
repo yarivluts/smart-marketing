@@ -186,7 +186,7 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
     <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={KeyRound} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('heroDescription')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard title={t('kpiActive')} value={t('kpiOfTotal', { value: activeCount, total: stats.total })} icon={ShieldCheck} />
+          <StatCard title={t('kpiActive')} value={`${numberFormat.format(activeCount)}/${numberFormat.format(stats.total)}`} icon={ShieldCheck} />
           <StatCard
             title={t('kpiRecent')}
             value={numberFormat.format(stats.byStatus.recent)}

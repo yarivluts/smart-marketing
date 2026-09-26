@@ -223,7 +223,7 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
           />
           <StatCard
             title={t('kpiLiveSchemas')}
-            value={t('kpiOfTotal', { value: liveSchemaCount, total: eventVolumeOverview.length })}
+            value={`${numberFormat.format(liveSchemaCount)}/${numberFormat.format(eventVolumeOverview.length)}`}
             progress={eventVolumeOverview.length > 0 ? Math.round((liveSchemaCount / eventVolumeOverview.length) * 100) : undefined}
             icon={Radio}
           />

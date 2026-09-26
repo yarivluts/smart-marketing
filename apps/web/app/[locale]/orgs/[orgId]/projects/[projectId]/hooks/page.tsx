@@ -99,7 +99,7 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
     <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Webhook} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('heroDescription')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard title={t('kpiEndpoints')} value={t('kpiOfTotal', { value: activeEndpoints, total: hookEndpoints.length })} icon={Webhook} />
+          <StatCard title={t('kpiEndpoints')} value={`${numberFormat.format(activeEndpoints)}/${numberFormat.format(hookEndpoints.length)}`} icon={Webhook} />
           <StatCard title={t('kpiDeliveries')} value={numberFormat.format(hookDeliveries.length)} subtext={t('kpiDeliveriesSub', { count: recentTotal })} icon={Inbox} />
           <StatCard
             title={t('kpiPending')}

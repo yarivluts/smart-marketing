@@ -168,7 +168,7 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
     <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Shuffle} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('heroDescription')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatCard title={t('kpiActiveMappings')} value={t('kpiOfTotal', { value: activeMappings.length, total: fieldMappings.length })} icon={Workflow} />
+          <StatCard title={t('kpiActiveMappings')} value={`${numberFormat.format(activeMappings.length)}/${numberFormat.format(fieldMappings.length)}`} icon={Workflow} />
           <StatCard title={t('kpiRules')} value={numberFormat.format(allRules.length)} icon={ListTree} />
           <StatCard title={t('kpiPending')} value={numberFormat.format(pendingDeliveries.length)} subtext={t('kpiPendingSub')} icon={Inbox} />
           <StatCard title={t('kpiApplied')} value={numberFormat.format(appliedCount)} subtext={t('kpiAppliedSub')} icon={Webhook} />
