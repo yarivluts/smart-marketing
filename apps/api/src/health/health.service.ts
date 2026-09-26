@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ENVIRONMENTS, isEnvironment, type Environment } from '@growthos/shared';
+import { ENVIRONMENTS, isEnvironment, readBuildSha, type Environment } from '@growthos/shared';
 
 export interface HealthStatus {
   status: 'ok';
@@ -29,17 +29,6 @@ export interface HealthStatus {
    * compared as though it were real.
    */
   buildSha: string | null;
-}
-
-/**
- * Normalizes the build SHA the image was stamped with. Accepts only something
- * shaped like a git hash, so a mis-set or placeholder build arg (an empty
- * string, a literal `$SHORT_SHA` that never got substituted) reads as `null` —
- * "not stamped" — instead of being reported as a commit that does not exist.
- */
-export function readBuildSha(raw: string | undefined): string | null {
-  const trimmed = raw?.trim().toLowerCase() ?? '';
-  return /^[0-9a-f]{7,40}$/.test(trimmed) ? trimmed : null;
 }
 
 @Injectable()

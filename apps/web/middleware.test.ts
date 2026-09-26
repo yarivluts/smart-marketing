@@ -13,7 +13,8 @@ vi.mock('next-intl/middleware', () => ({
   default: () => intlMiddlewareMock,
 }));
 
-import middleware from './middleware';
+import { unstable_doesMiddlewareMatch } from 'next/experimental/testing/server';
+import middleware, { config } from './middleware';
 
 function requestFor(path: string, options: { cookie?: string } = {}): NextRequest {
   const headers = new Headers();
@@ -74,5 +75,21 @@ describe('middleware', () => {
     const response = middleware(requestFor('/dashboard'));
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe('https://growthos.test/en/dashboard');
+  });
+});
+
+/**
+ * /api/health is read hourly by .github/workflows/prod-drift.yml, which holds no
+ * credentials (KAN-204). If the auth gate or the locale redirect ever ran on it,
+ * the drift check would read a login page (or a 307) instead of the build SHA.
+ * Asserted through Next's own matcher compiler, not a hand-rolled regex.
+ */
+describe('middleware matcher', () => {
+  it('never runs on the public health endpoint', () => {
+    expect(unstable_doesMiddlewareMatch({ config, url: '/api/health' })).toBe(false);
+  });
+
+  it('still runs on locale-prefixed pages, so skipping /api did not switch the gate off', () => {
+    expect(unstable_doesMiddlewareMatch({ config, url: '/en/dashboard' })).toBe(true);
   });
 });

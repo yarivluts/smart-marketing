@@ -1,6 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { HealthController } from './health.controller';
-import { HealthService, readBuildSha } from './health.service';
+import { HealthService } from './health.service';
+import { DBT_BUILD_INFO_EXECUTOR, DbtRefreshBuildService } from './dbt-refresh-build.service';
+import { NotConfiguredWarehouseQueryExecutor } from '@growthos/firebase-orm-models';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -8,7 +10,11 @@ describe('HealthController', () => {
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [HealthController],
-      providers: [HealthService],
+      providers: [
+        HealthService,
+        DbtRefreshBuildService,
+        { provide: DBT_BUILD_INFO_EXECUTOR, useValue: new NotConfiguredWarehouseQueryExecutor() },
+      ],
     }).compile();
 
     controller = moduleRef.get(HealthController);
@@ -49,26 +55,10 @@ describe('HealthController buildSha', () => {
     delete process.env.GIT_SHA;
     expect(new HealthService().getHealth().buildSha).toBeNull();
   });
-});
 
-describe('readBuildSha', () => {
-  it.each([
-    ['62d2115', '62d2115'],
-    ['  62D2115  ', '62d2115'],
-    ['62d2115a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e', '62d2115a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e'],
-  ])('accepts a git hash %s', (raw, expected) => {
-    expect(readBuildSha(raw)).toBe(expected);
+  /** Validated by the shared `readBuildSha` (packages/shared), the same rule the web app and the dbt report use. */
+  it('reports an unsubstituted build arg as unstamped', () => {
+    process.env.GIT_SHA = '${_GIT_SHA}';
+    expect(new HealthService().getHealth().buildSha).toBeNull();
   });
-
-  /**
-   * A mis-set build arg must read as "not stamped", not as a commit that does
-   * not exist — an unsubstituted `$SHORT_SHA` or an empty string would otherwise
-   * be reported as though production were at that "commit".
-   */
-  it.each([[''], ['   '], ['$SHORT_SHA'], ['${_GIT_SHA}'], ['unknown'], ['abc'], [undefined]])(
-    'treats %s as unstamped rather than as a commit',
-    (raw) => {
-      expect(readBuildSha(raw as string | undefined)).toBeNull();
-    },
-  );
 });
