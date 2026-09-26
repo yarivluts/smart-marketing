@@ -14,6 +14,7 @@ import {
   getPaybackOverviewForProject,
   getQualityCalibrationBreakdownForProject,
   queryGoalProgress,
+  resolveMetricDisplayUnits,
 } from '@/lib/orgs/queries';
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildFunnelGoalsCockpitData } from '@/lib/orgs/funnel-goals-synthesizer';
@@ -104,10 +105,11 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     calibrationOutcome = null;
   }
 
-  const [goals, metricCatalog, people] = await Promise.all([
+  const [goals, metricCatalog, people, metricUnits] = await Promise.all([
     listGoalsForProject(orgId, projectId).catch(() => []),
     listMetricsCatalogForProject(orgId, projectId).catch(() => []),
     listOrgPeople(orgId).catch(() => []),
+    resolveMetricDisplayUnits(orgId, projectId).catch(() => ({})),
   ]);
 
   const personNameById = new Map(people.map((p) => [p.id, p.name]));
@@ -131,6 +133,7 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
     goals,
     goalOutcomes,
     personNameById,
+    metricUnits,
     cohortOutcome,
     paybackOutcome,
     calibrationOutcome,

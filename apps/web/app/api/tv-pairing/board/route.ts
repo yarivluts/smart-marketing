@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireTvViewer } from '@/lib/orgs/tv-viewer-auth';
-import { getBoard, queryBoardTiles } from '@/lib/orgs/queries';
+import { getBoard, queryBoardTiles, resolveMetricDisplayUnits } from '@/lib/orgs/queries';
 import { buildTileRenderView, toBoardView } from '@/lib/orgs/board-view';
 import { resolveBoardFreshness } from '@/lib/orgs/board-freshness';
 
@@ -34,14 +34,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // Fetched in parallel with the board itself — freshness only depends on
   // `organizationId`/`projectId`, already known at this point, not on the
   // board doc.
-  const [board, freshness] = await Promise.all([getBoard(organizationId, projectId, boardId), resolveBoardFreshness(organizationId, projectId)]);
+  const [board, freshness, metricUnits] = await Promise.all([
+    getBoard(organizationId, projectId, boardId),
+    resolveBoardFreshness(organizationId, projectId),
+    resolveMetricDisplayUnits(organizationId, projectId),
+  ]);
   if (!board) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
   const boardView = toBoardView(board);
   const tileOutcomes = await queryBoardTiles(organizationId, projectId, board);
-  const tiles = board.tiles.map((tile, index) => ({ tile, view: buildTileRenderView(tile, tileOutcomes[index], freshness) }));
+  const tiles = board.tiles.map((tile, index) => ({ tile, view: buildTileRenderView(tile, tileOutcomes[index], freshness, metricUnits) }));
 
   return NextResponse.json({ id: board.id, name: boardView.name, tiles });
 }

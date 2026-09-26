@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
-import { buildSessionReplayLink, sessionReplayTemplateFiltersByPage } from '@growthos/shared';
+import { buildSessionReplayLink, formatMetricValue, sessionReplayTemplateFiltersByPage, type ParsedMetricUnit } from '@growthos/shared';
 import type { TileFreshness, TileRenderView, TimeSeries, TimeSeriesPoint } from '@/lib/orgs/board-view';
 import { capSmallMultiples, formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, latestPresentPoint, splitAtGaps } from '@/lib/orgs/chart-labels';
 import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
@@ -24,8 +24,23 @@ const LANDING_PAGE_COLUMNS = new Set(['landing_page']);
 
 const SERIES_COLOR_CLASSES = ['bg-primary', 'bg-blue-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500', 'bg-violet-500'];
 
-function formatNumber(value: number, locale?: string): string {
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+/** A plain number, or a metric value in its declared unit (KAN-213) when one is given: a ratio 0.5 reads "50%". */
+function formatNumber(value: number, locale?: string, unit?: ParsedMetricUnit): string {
+  return unit ? formatMetricValue(value, unit, locale) : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
+}
+
+/**
+ * The unit of the metric a tile draws (its first metric), for every chart part below that prints a
+ * value - labels, legends, tooltips and screen-reader tables - without threading it through each one.
+ * Undefined when the metric declares no unit, which keeps the pre-unit display.
+ */
+const TileUnitContext = createContext<ParsedMetricUnit | undefined>(undefined);
+
+/** Formats a value of the tile's own metric in its unit and the viewer's locale. */
+function useFormatValue(): (value: number) => string {
+  const unit = useContext(TileUnitContext);
+  const locale = useLocale();
+  return (value) => formatNumber(value, locale, unit);
 }
 
 /** The largest real value across every series (gaps ignored), floored at 1 so an all-zero chart still has a scale. */
@@ -84,12 +99,13 @@ function TileFreshnessBadge({ freshness }: { freshness: TileFreshness }): React.
 
 function BigNumberView({ view }: { view: Extract<TileRenderView, { kind: 'big_number' }> }): React.ReactElement {
   const t = useTranslations('Boards');
+  const formatValue = useFormatValue();
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('bigNumberEmpty')}</p>;
   }
   return (
     <div className="flex h-full flex-col items-center justify-center gap-1">
-      <span className="text-3xl font-bold tabular-nums">{formatNumber(view.value)}</span>
+      <span className="text-3xl font-bold tabular-nums">{formatValue(view.value)}</span>
       {view.deltaPct !== undefined ? (
         <span className={view.deltaPct >= 0 ? 'text-xs font-medium text-emerald-600' : 'text-xs font-medium text-rose-600'}>
           {t('tileDeltaLabel', { deltaPct: formatNumber(view.deltaPct) })}
@@ -105,8 +121,9 @@ function BigNumberView({ view }: { view: Extract<TileRenderView, { kind: 'big_nu
  * a shape it can navigate, rather than a picture it cannot read. The bucket is the raw, unabbreviated
  * date so it stays unambiguous where the axis label drops the year.
  */
-function SeriesDataTable({ caption, points, locale }: { caption: string; points: readonly TimeSeriesPoint[]; locale: string }): React.ReactElement {
+function SeriesDataTable({ caption, points }: { caption: string; points: readonly TimeSeriesPoint[]; locale?: string }): React.ReactElement {
   const t = useTranslations('Boards');
+  const formatValue = useFormatValue();
   return (
     <table className="sr-only">
       <caption>{caption}</caption>
@@ -120,7 +137,7 @@ function SeriesDataTable({ caption, points, locale }: { caption: string; points:
         {points.map((point) => (
           <tr key={point.bucket}>
             <th scope="row">{point.bucket}</th>
-            <td>{point.value === null ? t('chartNoValue') : formatNumber(point.value, locale)}</td>
+            <td>{point.value === null ? t('chartNoValue') : formatValue(point.value)}</td>
           </tr>
         ))}
       </tbody>
@@ -142,6 +159,7 @@ function useSeriesCaption(title: string, seriesCount: number): (seriesLabel: str
 function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 'time_series' }>; title: string }): React.ReactElement {
   const t = useTranslations('Boards');
   const locale = useLocale();
+  const formatValue = useFormatValue();
   const captionFor = useSeriesCaption(title, view.series.length);
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('timeSeriesEmpty')}</p>;
@@ -247,7 +265,7 @@ function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 
                   className="absolute whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-foreground"
                   style={{ left: `${label.x}%`, top: `${label.y}%`, transform: `translate(${edgeAwareTranslateX(label.x)}, calc(-100% - 5px))` }}
                 >
-                  {formatNumber(label.value, locale)}
+                  {formatValue(label.value)}
                 </span>
               </span>
             ))}
@@ -277,7 +295,7 @@ function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 
                   className={`inline-block h-2 w-2 rounded-full ${SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length]}`}
                 />
                 <span>{series.label}</span>
-                {latest ? <span className="font-medium tabular-nums text-foreground">{formatNumber(latest.value, locale)}</span> : null}
+                {latest ? <span className="font-medium tabular-nums text-foreground">{formatValue(latest.value)}</span> : null}
               </li>
             );
           })}
@@ -311,12 +329,13 @@ function BarRow({
   muted?: boolean;
 }): React.ReactElement {
   const t = useTranslations('Boards');
+  const formatValue = useFormatValue();
   return (
     <div className="flex h-8 items-end gap-0.5">
       {points.map((point) => (
         <div
           key={point.bucket}
-          title={t('barTooltip', { bucket: point.bucket, value: formatNumber(point.value) })}
+          title={t('barTooltip', { bucket: point.bucket, value: formatValue(point.value) })}
           className={`w-2 rounded-sm ${colorClass} ${muted ? 'opacity-40' : ''}`}
           style={{ height: `${Math.max(2, Math.round((point.value / maxValue) * 100))}%` }}
         />
@@ -351,6 +370,7 @@ function LabeledBarPlot({
   locale: string;
 }): React.ReactElement {
   const t = useTranslations('Boards');
+  const formatValue = useFormatValue();
   const bucketLabels = formatBucketLabels(
     points.map((point) => point.bucket),
     locale,
@@ -366,7 +386,7 @@ function LabeledBarPlot({
     }
     return point.value === null
       ? t('barTooltipNoValue', { bucket: point.bucket })
-      : t('barTooltip', { bucket: point.bucket, value: formatNumber(point.value, locale) });
+      : t('barTooltip', { bucket: point.bucket, value: formatValue(point.value) });
   }
 
   return (
@@ -386,7 +406,7 @@ function LabeledBarPlot({
                 >
                   {valueIndexes.has(index) ? (
                     <span className="absolute bottom-full left-1/2 mb-0.5 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-foreground">
-                      {formatNumber(point.value, locale)}
+                      {formatValue(point.value)}
                     </span>
                   ) : null}
                 </div>
@@ -577,6 +597,7 @@ function TableView({
   sessionReplayUrlTemplate?: string;
 }): React.ReactElement {
   const t = useTranslations('Boards');
+  const locale = useLocale();
   const [prefs, setPrefs] = useState<TableColumnPrefs>(() => readTableColumnPrefs(tileId));
   const replayFiltersByPage = sessionReplayTemplateFiltersByPage(sessionReplayUrlTemplate);
 
@@ -669,7 +690,11 @@ function TableView({
             {rows.map((row, index) => (
               <tr key={index}>
                 {columns.map((column) => {
-                  const value = row[column] ?? '';
+                  const raw = row[column] ?? '';
+                  // A metric column is shown in its unit (KAN-213); dimensions and unit-less metrics as they came.
+                  const columnUnit = view.units?.[column];
+                  const numeric = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : Number.NaN;
+                  const value = columnUnit && Number.isFinite(numeric) ? formatNumber(numeric, locale, columnUnit) : raw;
                   // Both kinds of template render an identical-looking link, so
                   // the tooltip is the only thing that can distinguish them. A
                   // template with no `{landing_page}` opens the same unfiltered
@@ -707,6 +732,7 @@ function TableView({
 
 function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap' }> }): React.ReactElement {
   const t = useTranslations('Boards');
+  const formatValue = useFormatValue();
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('heatmapEmpty')}</p>;
   }
@@ -735,9 +761,9 @@ function HeatmapView({ view }: { view: Extract<TileRenderView, { kind: 'heatmap'
                     key={column}
                     className="px-2 py-1 tabular-nums"
                     style={value === null ? undefined : { backgroundColor: `rgba(59, 130, 246, ${Math.max(0.08, value / maxValue)})` }}
-                    title={t('heatmapCellTooltip', { row, column, value: value === null ? '—' : formatNumber(value) })}
+                    title={t('heatmapCellTooltip', { row, column, value: value === null ? '—' : formatValue(value) })}
                   >
-                    {value === null ? '—' : formatNumber(value)}
+                    {value === null ? '—' : formatValue(value)}
                   </td>
                 );
               })}
@@ -773,6 +799,7 @@ function HistogramView({ view }: { view: Extract<TileRenderView, { kind: 'histog
 
 function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }> }): React.ReactElement {
   const t = useTranslations('Boards');
+  const locale = useLocale();
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('funnelEmpty')}</p>;
   }
@@ -783,7 +810,7 @@ function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }
           <div className="flex items-center justify-between text-xs">
             <span className="font-medium">{step.metricName}</span>
             <span className="tabular-nums text-muted-foreground">
-              {t('funnelStepValueLabel', { total: formatNumber(step.total), pctOfFirstStep: formatNumber(step.pctOfFirstStep) })}
+              {t('funnelStepValueLabel', { total: formatNumber(step.total, locale, view.units?.[step.metricName]), pctOfFirstStep: formatNumber(step.pctOfFirstStep) })}
             </span>
           </div>
           <div className="h-4 rounded-sm bg-muted">
@@ -824,11 +851,14 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
   })();
 
   const freshness = view.kind === 'unavailable' ? null : view.freshness;
+  const unit = view.kind === 'unavailable' ? undefined : view.units?.[tile.metricNames[0]];
   // The tile body scrolls inside whatever height its container gives it, and never paints outside
   // it: content taller than the tile's grid cell (a long legend, a split breakdown) used to spill over
   // the tile below (KAN-217).
   return (
+    <TileUnitContext.Provider value={unit}>
     <div data-testid="board-tile-body" className="relative h-full overflow-y-auto overflow-x-hidden">
+
       {freshness ? (
         <div className="absolute right-0 top-0">
           <TileFreshnessBadge freshness={freshness} />
@@ -836,5 +866,6 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
       ) : null}
       {content}
     </div>
+    </TileUnitContext.Provider>
   );
 }

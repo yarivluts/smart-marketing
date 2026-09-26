@@ -1,10 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { can } from '@growthos/shared';
+import { can, formatMetricValue } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { getGoal, listMetricsCatalogForProject, listOrgPeople, listOrgProjects, queryGoalProgress } from '@/lib/orgs/queries';
+import { getGoal, listMetricsCatalogForProject, listOrgPeople, listOrgProjects, queryGoalProgress, resolveMetricDisplayUnits } from '@/lib/orgs/queries';
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildGoalThermometerView } from '@/lib/orgs/goal-view';
 import { GoalThermometer } from '@/components/orgs/goal-thermometer';
@@ -48,11 +48,12 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
     notFound();
   }
 
-  const [projects, goal, people, metricCatalog] = await Promise.all([
+  const [projects, goal, people, metricCatalog, metricUnits] = await Promise.all([
     listOrgProjects(orgId),
     getGoal(orgId, projectId, goalId),
     listOrgPeople(orgId),
     listMetricsCatalogForProject(orgId, projectId),
+    resolveMetricDisplayUnits(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project || !goal) {
@@ -63,7 +64,10 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
   const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
   const environmentScope = { environmentId: selectedEnvironment?.id };
   const outcome = await queryGoalProgress(orgId, projectId, goal, environmentScope);
-  const thermometerView = buildGoalThermometerView(outcome);
+  // The goal metric's unit (KAN-213): the target and every progress figure are shown in it.
+  const metricUnit = metricUnits[goal.metric_name];
+  const thermometerView = buildGoalThermometerView(outcome, metricUnit);
+  const formatTarget = (value: number | null): string => (value === null ? '' : formatMetricValue(value, metricUnit, locale));
   const peopleRows = people.map((person) => ({ id: person.id, name: person.name }));
   const ownerName = peopleRows.find((person) => person.id === goal.owner_person_id)?.name ?? goal.owner_person_id;
 
@@ -97,17 +101,17 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
             <>
               <div className="flex flex-col gap-0.5">
                 <dt className="text-muted-foreground">{t('rangeMinLabel')}</dt>
-                <dd className="font-medium">{goal.range_min}</dd>
+                <dd className="font-medium">{formatTarget(goal.range_min)}</dd>
               </div>
               <div className="flex flex-col gap-0.5">
                 <dt className="text-muted-foreground">{t('rangeMaxLabel')}</dt>
-                <dd className="font-medium">{goal.range_max}</dd>
+                <dd className="font-medium">{formatTarget(goal.range_max)}</dd>
               </div>
             </>
           ) : (
             <div className="flex flex-col gap-0.5">
               <dt className="text-muted-foreground">{t('targetValueLabel')}</dt>
-              <dd className="font-medium">{goal.target_value}</dd>
+              <dd className="font-medium">{formatTarget(goal.target_value)}</dd>
             </div>
           )}
           <div className="flex flex-col gap-0.5">

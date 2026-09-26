@@ -50,6 +50,7 @@ describe('RegisterMetricDefForm', () => {
               aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] },
             },
             dimensions: ['channel', 'campaign'],
+            unit: null,
           }),
         }),
       ),
@@ -67,6 +68,8 @@ describe('RegisterMetricDefForm', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'cost_per_signup' } });
     fireEvent.change(screen.getByLabelText('Definition kind'), { target: { value: 'formula' } });
     fireEvent.change(screen.getByLabelText('Formula'), { target: { value: 'ad_spend / signups' } });
+    fireEvent.change(screen.getByLabelText('Unit'), { target: { value: 'currency' } });
+    fireEvent.change(screen.getByLabelText('Currency code'), { target: { value: 'usd' } });
     fireEvent.click(screen.getByRole('button', { name: 'Register metric' }));
 
     await waitFor(() =>
@@ -78,6 +81,7 @@ describe('RegisterMetricDefForm', () => {
             name: 'cost_per_signup',
             definition: { kind: 'formula', formula: 'ad_spend / signups' },
             dimensions: [],
+            unit: 'currency:USD',
           }),
         }),
       ),

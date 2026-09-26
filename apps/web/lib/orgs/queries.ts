@@ -88,6 +88,7 @@ import {
   listMcpOAuthGrantsForProject as listMcpOAuthGrantsForProjectInOrganization,
   listMetricDefinitionsForProject as listMetricDefinitionsForProjectInOrganization,
   listMetricsCatalogForProject as listMetricsCatalogForProjectInOrganization,
+  resolveMetricDisplayUnits as resolveMetricDisplayUnitsInOrganization,
   listOrgMembersWithProfiles,
   listOrchestrationRunsForProject as listOrchestrationRunsForProjectInOrganization,
   getWarehouseFreshnessForProject as getWarehouseFreshnessForProjectInOrganization,
@@ -204,6 +205,7 @@ import type {
   FeedbackThemeCluster,
   FirmographicIndustryCount,
   FunnelStepSuggestion,
+  ParsedMetricUnit,
   Result,
   SignupQualityScoreDistribution,
 } from '@growthos/shared';
@@ -784,6 +786,12 @@ export async function getBoard(organizationId: string, projectId: string, boardI
 export async function listMetricsCatalogForProject(organizationId: string, projectId: string): Promise<MetricCatalogEntry[]> {
   await ensureFirestoreOrm();
   return listMetricsCatalogForProjectInOrganization(organizationId, projectId);
+}
+
+/** Every active metric's display unit (KAN-213), resolved against the project currency — what board tiles and goal cards format values with. */
+export async function resolveMetricDisplayUnits(organizationId: string, projectId: string): Promise<Record<string, ParsedMetricUnit>> {
+  await ensureFirestoreOrm();
+  return resolveMetricDisplayUnitsInOrganization(organizationId, projectId);
 }
 
 /** One tile's queried data (or a typed, renderable "why not" outcome — see `BoardTileQueryOutcome`'s own doc comment) for board render time. */

@@ -3,6 +3,7 @@ import {
   type GoalDirection,
   type GoalPaceStatus,
   type GoalRhythm,
+  type ParsedMetricUnit,
 } from '@growthos/shared';
 import type {
   CohortRetentionOutcome,
@@ -106,6 +107,8 @@ export interface UnifiedGoalItem {
   daysRemaining: number;
   /** The goal is paused (GoalModel.status). A paused goal is not being pursued: it has no pace to judge and never counts as on track (KAN-213). */
   isPaused: boolean;
+  /** The goal metric's declared unit (KAN-213): the card shows the target and progress in it. Absent for a plain number. */
+  unit?: ParsedMetricUnit;
 }
 
 export type GoalPaceItem = UnifiedGoalItem;
@@ -362,6 +365,11 @@ export function funnelSupportsDropOffAlert(steps: readonly FunnelStepItem[]): bo
 }
 
 /** The progress fields of an item whose progress was not measured. */
+/** `{ unit }` for a declared unit, nothing for a plain number — so a goal on a unit-less metric renders as before. */
+function declaredUnit(unit: ParsedMetricUnit | undefined): { unit?: ParsedMetricUnit } {
+  return unit && unit.kind !== 'number' ? { unit } : {};
+}
+
 const UNMEASURED_PROGRESS = {
   actualValue: null,
   expectedAtNow: null,
@@ -384,6 +392,7 @@ export function buildUnifiedGoalsData(
   rawGoals: GoalModel[],
   outcomesByGoalId?: Map<string, GoalProgressOutcome>,
   personNameById?: Map<string, string>,
+  metricUnits?: Record<string, ParsedMetricUnit>,
 ): { items: UnifiedGoalItem[]; summary: GoalsCockpitSummary } {
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -407,6 +416,7 @@ export function buildUnifiedGoalsData(
       ownerName: personNameById?.get(goal.owner_person_id) ?? goal.owner_person_id,
       elapsedFraction: elapsed,
       daysRemaining: calculateDaysRemaining(goal.deadline),
+      ...declaredUnit(metricUnits?.[goal.metric_name]),
     };
 
     if (!outcome) {
@@ -556,6 +566,8 @@ export function buildFunnelGoalsCockpitData(params: {
   goals: GoalModel[];
   goalOutcomes?: Map<string, GoalProgressOutcome>;
   personNameById?: Map<string, string>;
+  /** Each metric's display unit (KAN-213) — see `resolveMetricDisplayUnits`. */
+  metricUnits?: Record<string, ParsedMetricUnit>;
   cohortOutcome?: CohortRetentionOutcome | null;
   paybackOutcome?: PaybackOverviewOutcome | null;
   calibrationOutcome?: QualityCalibrationBreakdownOutcome | null;
@@ -565,6 +577,7 @@ export function buildFunnelGoalsCockpitData(params: {
     goals,
     goalOutcomes = new Map(),
     personNameById = new Map(),
+    metricUnits,
     cohortOutcome = null,
     paybackOutcome = null,
     calibrationOutcome = null,
@@ -575,7 +588,7 @@ export function buildFunnelGoalsCockpitData(params: {
   const funnelSteps = visualFunnel.kind === 'ok' ? visualFunnel.steps : [];
 
   // 2. Goals & summary - the project's own, or an empty list.
-  const { items: goalItems, summary: goalsSummary } = buildUnifiedGoalsData(goals, goalOutcomes, personNameById);
+  const { items: goalItems, summary: goalsSummary } = buildUnifiedGoalsData(goals, goalOutcomes, personNameById, metricUnits);
 
   // 3. Cohort retention, payback and calibration - measured, or a kind saying why not.
   const cohort = buildCohortHeatmap(cohortOutcome);

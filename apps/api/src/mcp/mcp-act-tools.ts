@@ -118,8 +118,13 @@ const createGoalInputShape = {
   name: z.string().min(1).describe('Human-readable goal name, shown wherever the goal appears. Not an identifier — it does not have to be unique.'),
   metric_name: z.string().min(1).describe('Must be a currently registered and active metric (see list_metrics).'),
   direction: z.string().describe('One of: maximize, minimize, range.'),
-  target_value: z.number().optional().describe('Required for maximize/minimize.'),
-  range_min: z.number().optional().describe('Required for range, together with range_max.'),
+  target_value: z
+    .number()
+    .optional()
+    .describe(
+      "Required for maximize/minimize. In the metric's own unit (see list_metrics): a ratio metric is a 0-1 fraction, so 8% is 0.08, not 8. A target outside the unit's range (ratio 0..1, percent 0..100, a count or duration below 0) is refused.",
+    ),
+  range_min: z.number().optional().describe("Required for range, together with range_max. In the metric's own unit, like target_value."),
   range_max: z.number().optional().describe('Required for range, together with range_min. The upper bound of the band the metric should stay inside.'),
   start_date: z.string().min(1).describe('YYYY-MM-DD, inclusive.'),
   deadline: z.string().min(1).describe('YYYY-MM-DD, inclusive, must be after start_date.'),

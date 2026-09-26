@@ -122,6 +122,7 @@ export * from './services/key.service';
 export * from './services/vault.service';
 export * from './services/schema-registry.service';
 export * from './services/metric-registry.service';
+export * from './services/metric-unit-backfill.service';
 export * from './services/metrics-compiler.service';
 export * from './services/metrics-query.service';
 export * from './services/ingest.service';

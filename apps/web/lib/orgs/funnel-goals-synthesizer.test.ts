@@ -254,6 +254,13 @@ describe('funnel-goals-synthesizer', () => {
       expect(mixed).toMatchObject({ totalGoalsCount: 2, activeGoalsCount: 1, pausedGoalsCount: 1, measuredGoalsCount: 1, onTrackCount: 1 });
     });
 
+    it("attaches the goal metric's declared unit, and none for a plain number (KAN-213)", () => {
+      const units = { mrr: { kind: 'ratio' as const }, other: { kind: 'number' as const } };
+      expect(buildUnifiedGoalsData([goal()], new Map(), undefined, units).items[0].unit).toEqual({ kind: 'ratio' });
+      expect('unit' in buildUnifiedGoalsData([goal()], new Map(), undefined, { mrr: { kind: 'number' } }).items[0]).toBe(false);
+      expect('unit' in buildUnifiedGoalsData([goal()]).items[0]).toBe(false);
+    });
+
     it('carries measured progress through unchanged', () => {
       const personMap = new Map([['person-1', 'Alice Leader']]);
       const { items, summary } = buildUnifiedGoalsData([goal()], new Map([['goal-1', measured()]]), personMap);

@@ -60,6 +60,7 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
     listOrgPeople(orgId),
   ]);
   const goalViews = goals.map(toGoalSummaryView);
+  const unitByMetric = new Map(metricCatalog.map((entry) => [entry.name, entry.unit]));
   // Every registered person's name still resolves for an existing goal's own owner label — an
   // archived person (KAN-129) isn't erased, only hidden from picking a *new* owner below.
   const personNameById = new Map(people.map((person) => [person.id, person.name]));
@@ -104,6 +105,7 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
                       targetValue={goal.targetValue}
                       rangeMin={goal.rangeMin}
                       rangeMax={goal.rangeMax}
+                      unit={unitByMetric.get(goal.metricName)}
                     />
                   </td>
                   <td className="py-2 pe-3">{goal.deadline}</td>

@@ -4,7 +4,7 @@ import { can, todayUtcDateOnly } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
-import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTiles } from '@/lib/orgs/queries';
+import { getBoard, listMetricsCatalogForProject, listOrgProjects, queryBoardTiles, resolveMetricDisplayUnits } from '@/lib/orgs/queries';
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { buildTileRenderView, toBoardView, type TileRenderView } from '@/lib/orgs/board-view';
 import { resolveBoardFreshness } from '@/lib/orgs/board-freshness';
@@ -64,11 +64,12 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
   // `freshness` (KAN-69): one project-wide badge shared by every tile on
   // this board — see `resolveBoardFreshness`'s own doc comment for why a
   // tile doesn't get its own per-metric freshness.
-  const [projects, board, metricCatalog, freshness] = await Promise.all([
+  const [projects, board, metricCatalog, freshness, metricUnits] = await Promise.all([
     listOrgProjects(orgId),
     getBoard(orgId, projectId, boardId),
     listMetricsCatalogForProject(orgId, projectId),
     resolveBoardFreshness(orgId, projectId),
+    resolveMetricDisplayUnits(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project || !board) {
@@ -86,7 +87,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
   const tileOutcomes = await queryBoardTiles(orgId, projectId, board, environmentScope);
   const renderViews: Record<string, TileRenderView> = {};
   board.tiles.forEach((tile, index) => {
-    renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index], freshness);
+    renderViews[tile.id] = buildTileRenderView(tile, tileOutcomes[index], freshness, metricUnits);
   });
 
   const t = await getTranslations('Boards');

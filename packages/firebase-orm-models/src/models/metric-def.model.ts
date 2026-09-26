@@ -109,6 +109,15 @@ export class MetricDefModel extends BaseModel {
   @Field({ is_required: true })
   public dimensions!: string[];
 
+  /**
+   * What the metric's values mean (KAN-213), as a `MetricUnit` string from `@growthos/shared`:
+   * `number`, `count`, `ratio` (a 0-1 fraction, displayed as a percent), `percent` (already 0-100),
+   * `currency` (the project's currency) or `currency:XXX`, `duration_seconds`. Optional and never
+   * inferred: absent means a plain number, exactly how every value displayed before units existed.
+   */
+  @Field({ is_required: false })
+  public unit?: string;
+
   @Field({ is_required: true })
   public created_by!: string;
 

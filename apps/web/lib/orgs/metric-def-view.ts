@@ -9,6 +9,8 @@ export interface MetricDefView {
   aggregation: MetricAggregationDef | null;
   formula: string | null;
   dimensions: string[];
+  /** The declared unit (KAN-213), or `null` when none is declared. */
+  unit: string | null;
   createdBy: string;
   createdAt: string;
 }
@@ -29,6 +31,7 @@ export function toMetricDefView(metricDef: MetricDefModel): MetricDefView {
     aggregation: metricDef.aggregation ?? null,
     formula: metricDef.formula ?? null,
     dimensions: metricDef.dimensions,
+    unit: metricDef.unit ?? null,
     createdBy: metricDef.created_by,
     createdAt: metricDef.created_at,
   };

@@ -12,6 +12,7 @@ import {
   todayUtcDateOnly,
   type ComparePeriod,
   type DateRangeSetting,
+  type ParsedMetricUnit,
   type ResolvedDateRange,
 } from '@growthos/shared';
 
@@ -125,7 +126,32 @@ export interface HistogramView {
 }
 
 /** Every data-bearing tile kind carries the same two KAN-69 fields: whether its query returned zero rows (an "empty state", distinct from a genuine zero) and its project-wide data-freshness badge (`null` when no orchestration run has ever succeeded). `unavailable` carries neither — it's already its own degraded state with no queried data to attach either to. */
-type WithFreshness<T> = T & { isEmpty: boolean; freshness: TileFreshness | null };
+type WithFreshness<T> = T & {
+  isEmpty: boolean;
+  freshness: TileFreshness | null;
+  /** The declared unit (KAN-213) of each of the tile's metrics that has one, by metric name. Absent when none of them declares a unit. */
+  units?: MetricDisplayUnits;
+};
+
+/** Metric name -> the unit its values are displayed in (see `resolveMetricDisplayUnits`). */
+export type MetricDisplayUnits = Record<string, ParsedMetricUnit>;
+
+/**
+ * The units a tile needs: only its own metrics, and only a declared unit - a plain `number` is left
+ * out, so a tile over unit-less metrics renders exactly as it did before units existed.
+ */
+function tileUnits(tile: BoardTile, units: MetricDisplayUnits | undefined): MetricDisplayUnits | undefined {
+  if (!units) {
+    return undefined;
+  }
+  const picked = Object.fromEntries(
+    tile.metricNames.flatMap((metricName) => {
+      const unit = units[metricName];
+      return unit && unit.kind !== 'number' ? [[metricName, unit] as const] : [];
+    }),
+  );
+  return Object.keys(picked).length > 0 ? picked : undefined;
+}
 
 export type TileRenderView =
   | { kind: 'unavailable'; reason: BoardTileUnavailableReason; message: string }
@@ -163,14 +189,37 @@ export function sumMetric(rows: readonly WarehouseRow[], metricName: string): nu
   return rows.reduce((total, row) => total + toNumber(row[metricName] ?? null), 0);
 }
 
-function buildBigNumberView(tile: BoardTile, rows: readonly WarehouseRow[]) {
+/** The mean of the rows that carry a real value for `metricName` (a gap is not a zero), or 0 when none does. */
+function meanMetric(rows: readonly WarehouseRow[], metricName: string): number {
+  const values = rows.flatMap((row) => {
+    const raw = row[metricName];
+    if (raw === null || raw === undefined || raw === '') {
+      return [];
+    }
+    const value = typeof raw === 'number' ? raw : Number(raw);
+    return Number.isFinite(value) ? [value] : [];
+  });
+  return values.length === 0 ? 0 : values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+/**
+ * A big number is the period's total: the sum of its buckets. A fraction or a percent cannot be
+ * summed (thirty days at 5% is not 150%), so a metric whose unit says it is one (KAN-213) shows the
+ * mean of its buckets instead. Still an approximation - it weights a quiet day like a busy one -
+ * until the tile can query the whole range as a single bucket.
+ */
+function combineBuckets(rows: readonly WarehouseRow[], metricName: string, unit: ParsedMetricUnit | undefined): number {
+  return unit?.kind === 'ratio' || unit?.kind === 'percent' ? meanMetric(rows, metricName) : sumMetric(rows, metricName);
+}
+
+function buildBigNumberView(tile: BoardTile, rows: readonly WarehouseRow[], unit?: ParsedMetricUnit) {
   const metricName = tile.metricNames[0];
   const { current, previous } = splitByPeriod(rows);
-  const value = sumMetric(current, metricName);
+  const value = combineBuckets(current, metricName, unit);
   if (previous.length === 0) {
     return { kind: 'big_number' as const, value };
   }
-  const previousValue = sumMetric(previous, metricName);
+  const previousValue = combineBuckets(previous, metricName, unit);
   const deltaPct = previousValue !== 0 ? ((value - previousValue) / previousValue) * 100 : undefined;
   return { kind: 'big_number' as const, value, previousValue, ...(deltaPct !== undefined ? { deltaPct } : {}) };
 }
@@ -354,14 +403,19 @@ function contentIsEmpty(content: TileContent, currentRowCount: number): boolean 
   }
 }
 
-export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutcome, freshness: TileFreshness | null = null): TileRenderView {
+export function buildTileRenderView(
+  tile: BoardTile,
+  outcome: BoardTileQueryOutcome,
+  freshness: TileFreshness | null = null,
+  units?: MetricDisplayUnits,
+): TileRenderView {
   if (!outcome.ok) {
     return { kind: 'unavailable', reason: outcome.reason, message: outcome.message };
   }
   const content = (() => {
     switch (tile.type) {
       case 'big_number':
-        return buildBigNumberView(tile, outcome.series);
+        return buildBigNumberView(tile, outcome.series, units?.[tile.metricNames[0]]);
       case 'line':
       case 'bar':
         return buildTimeSeriesView(tile, outcome.series);
@@ -397,5 +451,6 @@ export function buildTileRenderView(tile: BoardTile, outcome: BoardTileQueryOutc
   */
   const isEmpty = contentIsEmpty(content, splitByPeriod(outcome.series).current.length);
 
-  return { ...content, isEmpty, freshness };
+  const displayUnits = tileUnits(tile, units);
+  return { ...content, isEmpty, freshness, ...(displayUnits ? { units: displayUnits } : {}) };
 }

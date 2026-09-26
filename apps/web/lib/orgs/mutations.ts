@@ -878,6 +878,7 @@ interface RegisterMetricDefinitionInput {
   name: string;
   definition: MetricDefinitionInput;
   dimensions: readonly string[];
+  unit?: string | null;
   createdByUserId: string;
 }
 
@@ -892,6 +893,7 @@ interface EvolveMetricDefinitionInput {
   name: string;
   definition: MetricDefinitionInput;
   dimensions: readonly string[];
+  unit?: string | null;
   createdByUserId: string;
 }
 

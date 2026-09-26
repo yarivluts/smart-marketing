@@ -623,6 +623,73 @@ describe('McpController (e2e)', () => {
       }
     });
 
+    it('carries a metric unit through register/evolve, the catalog, query_metric and goals (KAN-213)', async () => {
+      const { owner, organization, rawKey } = await setupProjectWithKey('MCP Metric Units Org', ['mcp.read', 'metrics.write', 'dashboards.write']);
+      const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+      const textOfResult = (result: Awaited<ReturnType<Client['callTool']>>) => (result.content as Array<{ text: string }>)[0].text;
+      const lpAggregation = (column: string) => ({ name: `lp_${column}`, kind: 'aggregation', function: 'sum', table: 'fact_landing_page_performance', column, time_column: 'activity_date' });
+
+      const client = await connectedClient(rawKey);
+      try {
+        expect(JSON.parse(textOfResult(await client.callTool({ name: 'register_metric', arguments: { ...lpAggregation('visitors'), unit: 'count' } })))).toMatchObject({ unit: 'count' });
+        await client.callTool({ name: 'register_metric', arguments: lpAggregation('conversions') });
+        const rate = await client.callTool({
+          name: 'register_metric',
+          arguments: { name: 'lp_conversion_rate', kind: 'formula', formula: 'lp_conversions / lp_visitors', unit: 'ratio' },
+        });
+        expect(JSON.parse(textOfResult(rate))).toMatchObject({ name: 'lp_conversion_rate', version: 1, unit: 'ratio' });
+
+        const refused = await client.callTool({ name: 'register_metric', arguments: { ...lpAggregation('bounces'), unit: 'fraction' } });
+        expect(refused.isError).toBe(true);
+        expect(textOfResult(refused)).toContain('Unknown metric unit "fraction"');
+
+        const catalog = JSON.parse(textOfResult(await client.callTool({ name: 'list_metrics', arguments: {} }))) as { metrics: Array<{ name: string; unit?: string }> };
+        expect(Object.fromEntries(catalog.metrics.map((metric) => [metric.name, metric.unit ?? null]))).toEqual({
+          lp_conversion_rate: 'ratio',
+          lp_conversions: null,
+          lp_visitors: 'count',
+        });
+        expect(JSON.parse(textOfResult(await client.callTool({ name: 'describe_metric', arguments: { name: 'lp_conversion_rate' } })))).toMatchObject({ unit: 'ratio' });
+
+        // An evolve that omits the unit keeps it.
+        const evolved = await client.callTool({ name: 'evolve_metric', arguments: { name: 'lp_conversion_rate', kind: 'formula', formula: 'lp_conversions / lp_visitors' } });
+        expect(JSON.parse(textOfResult(evolved))).toMatchObject({ version: 2, unit: 'ratio' });
+        const versions = JSON.parse(textOfResult(await client.callTool({ name: 'list_metric_versions', arguments: { name: 'lp_conversion_rate' } }))) as {
+          versions: Array<{ unit: string | null }>;
+        };
+        expect(versions.versions.map((version) => version.unit)).toEqual(['ratio', 'ratio']);
+
+        const warehouse: WarehouseQueryExecutor = { execute: () => Promise.resolve([{ bucket_date: '2026-09-19', lp_conversion_rate: 0.5, lp_visitors: 10 }]) };
+        mockedQueryMetrics.mockImplementationOnce((params) => realQueryMetrics({ ...params, executor: warehouse, cache: new InMemoryMetricQueryResultCache() }));
+        const queried = await client.callTool({
+          name: 'query_metric',
+          arguments: { metric: ['lp_conversion_rate', 'lp_visitors'], time: { start: '2026-09-19', end: '2026-09-19', grain: 'day' } },
+        });
+        expect(JSON.parse(textOfResult(queried))).toMatchObject({ units: { lp_conversion_rate: 'ratio', lp_visitors: 'count' } });
+
+        // "Lift conversion to 8%" with target 8 against a 0-1 ratio is refused, naming the fraction meant.
+        const goalArgs = {
+          name: 'Lift landing page conversion to 8%',
+          metric_name: 'lp_conversion_rate',
+          direction: 'maximize',
+          start_date: '2026-09-01',
+          deadline: '2026-12-31',
+          rhythm: 'even',
+          owner_person_id: person.id,
+        };
+        const badGoal = await client.callTool({ name: 'create_goal', arguments: { ...goalArgs, target_value: 8 } });
+        expect(badGoal.isError).toBe(true);
+        expect(textOfResult(badGoal)).toContain('For 8%, use 0.08.');
+        expect((await client.callTool({ name: 'create_goal', arguments: { ...goalArgs, target_value: 0.08 } })).isError).not.toBe(true);
+
+        const goals = JSON.parse(textOfResult(await client.callTool({ name: 'list_goals', arguments: {} }))) as { goals: Array<Record<string, unknown>> };
+        expect(goals.goals).toHaveLength(1);
+        expect(goals.goals[0]).toMatchObject({ metric_unit: 'ratio', target_value: 0.08, target_formatted: '8%' });
+      } finally {
+        await client.close();
+      }
+    });
+
     it('create_segment saves a real segment definition for an API key holding dashboards.write', async () => {
       const { owner, organization, project, rawKey } = await setupProjectWithKey('Act Tools Create Segment Org', ['mcp.read', 'dashboards.write']);
       await registerSchemaDefinition({

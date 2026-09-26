@@ -16,12 +16,13 @@ import {
   queryMetrics,
   queryProjectCohortRetention,
   queryProjectFunnelSteps,
+  resolveMetricDisplayUnits,
   recordAuditLogEntry,
   searchProjectCustomers,
   WarehouseNotConfiguredError,
   type FunnelStepResult,
 } from '@growthos/firebase-orm-models';
-import { MetricCompilerError } from '@growthos/shared';
+import { MetricCompilerError, serializeMetricUnit } from '@growthos/shared';
 import { parseMetricQueryRequestBody } from '../metrics/metrics-request';
 import type { McpAuthContext } from './mcp-auth.guard';
 
@@ -238,16 +239,21 @@ async function runMetricQueryTool(
     // API-key caller: the key's bound environment; OAuth (human) caller:
     // undefined, so queryMetrics resolves the project's prod default — see
     // McpAuthContext.environmentId's own doc comment.
-    const result = await queryMetrics({
-      organizationId: auth.organizationId,
-      projectId: auth.projectId,
-      ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
-      request,
-      // One row per bucket of the range, the same series a board line/bar tile draws: a silent
-      // missing day would read to an agent as "no data", or as two adjacent days, when it was a 0.
-      fillEmptyBuckets: true,
-    });
-    return textResult({ series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
+    const [result, displayUnits] = await Promise.all([
+      queryMetrics({
+        organizationId: auth.organizationId,
+        projectId: auth.projectId,
+        ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
+        request,
+        // One row per bucket of the range, the same series a board line/bar tile draws: a silent
+        // missing day would read to an agent as "no data", or as two adjacent days, when it was a 0.
+        fillEmptyBuckets: true,
+      }),
+      resolveMetricDisplayUnits(auth.organizationId, auth.projectId),
+    ]);
+    // Each queried metric's unit (KAN-213), so a 0.5 in a "ratio" column is read as 50%, not 0.5.
+    const units = Object.fromEntries(request.metrics.map((metric) => [metric, serializeMetricUnit(displayUnits[metric] ?? { kind: 'number' })]));
+    return textResult({ series: result.series, units, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
   } catch (error) {
     return errorResult(describeMetricsError(error));
   }
@@ -300,7 +306,8 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     'list_metrics',
     {
       title: 'List metrics',
-      description: "List every metric registered in this project's active metric catalog, with lineage.",
+      description:
+        "List every metric registered in this project's active metric catalog, with lineage and its unit when one is declared (count, ratio = a 0-1 fraction shown as a percent, percent = 0-100, currency, duration_seconds; absent = a plain number). A goal target is given in that unit: 8% on a ratio metric is 0.08.",
       inputSchema: {},
     },
     auditedToolHandler(auth, 'list_metrics', async () => {

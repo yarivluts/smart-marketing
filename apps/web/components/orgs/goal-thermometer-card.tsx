@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatMetricValue } from '@growthos/shared';
 import {
   Clock,
   Sparkles,
@@ -10,6 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import type { UnifiedGoalItem } from '@/lib/orgs/funnel-goals-synthesizer';
+import { enteredGoalTargetText, storedGoalTarget, useGoalTargetEntryError } from './goal-target-entry';
 
 export interface GoalThermometerCardProps {
   orgId: string;
@@ -38,6 +40,14 @@ const STATUS_BADGE_STYLES: Record<NonNullable<UnifiedGoalItem['status']>, { badg
   },
 };
 
+/**
+ * A goal figure for display. A metric that declares its unit (KAN-213) is shown in it - a ratio 0.08
+ * reads "8%". One that does not keeps the display it had before units existed, guessed from its name.
+ */
+function formatGoalValue(value: number, goal: Pick<UnifiedGoalItem, 'metricName' | 'unit'>, locale: string): string {
+  return goal.unit ? formatMetricValue(value, goal.unit, locale) : formatValue(value, goal.metricName);
+}
+
 function formatValue(value: number, metricName: string): string {
   if (metricName.includes('usd') || metricName.includes('mrr') || metricName.includes('cac')) {
     return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -57,11 +67,15 @@ export function GoalThermometerCard({
   onOptimizeRequested,
 }: GoalThermometerCardProps): React.ReactElement {
   const t = useTranslations('Goals');
+  const locale = useLocale();
+  const targetEntryError = useGoalTargetEntryError();
+  const show = (value: number) => formatGoalValue(value, goal, locale);
 
   const [isEditingTarget, setIsEditingTarget] = useState(false);
-  const [targetInput, setTargetInput] = useState(goal.targetValue !== null ? String(goal.targetValue) : '');
-  const [minInput, setMinInput] = useState(goal.rangeMin !== null ? String(goal.rangeMin) : '');
-  const [maxInput, setMaxInput] = useState(goal.rangeMax !== null ? String(goal.rangeMax) : '');
+  // A ratio goal's target is edited as a percent (KAN-213).
+  const [targetInput, setTargetInput] = useState(enteredGoalTargetText(goal.targetValue, goal.unit));
+  const [minInput, setMinInput] = useState(enteredGoalTargetText(goal.rangeMin, goal.unit));
+  const [maxInput, setMaxInput] = useState(enteredGoalTargetText(goal.rangeMax, goal.unit));
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -76,13 +90,19 @@ export function GoalThermometerCard({
   const percentFilled = goal.percentFilled ?? 0;
 
   async function handleSaveTarget(): Promise<void> {
-    setIsSaving(true);
     setSaveError(null);
+    const typed = goal.direction === 'range' ? [Number(minInput), Number(maxInput)] : [Number(targetInput)];
+    const outOfRange = targetEntryError(typed, goal.unit);
+    if (outOfRange) {
+      setSaveError(outOfRange);
+      return;
+    }
+    setIsSaving(true);
     try {
       const payload =
         goal.direction === 'range'
-          ? { rangeMin: Number(minInput), rangeMax: Number(maxInput) }
-          : { targetValue: Number(targetInput) };
+          ? { rangeMin: storedGoalTarget(Number(minInput), goal.unit), rangeMax: storedGoalTarget(Number(maxInput), goal.unit) }
+          : { targetValue: storedGoalTarget(Number(targetInput), goal.unit) };
 
       const res = await fetch(`/api/orgs/${orgId}/projects/${projectId}/goals/${goal.id}`, {
         method: 'PATCH',
@@ -107,8 +127,8 @@ export function GoalThermometerCard({
 
   const targetText =
     goal.direction === 'range'
-      ? `${formatValue(goal.rangeMin ?? 0, goal.metricName)} - ${formatValue(goal.rangeMax ?? 0, goal.metricName)}`
-      : formatValue(goal.targetValue ?? 0, goal.metricName);
+      ? `${show(goal.rangeMin ?? 0)} - ${show(goal.rangeMax ?? 0)}`
+      : show(goal.targetValue ?? 0);
 
   return (
     <div
@@ -154,7 +174,7 @@ export function GoalThermometerCard({
                 <span dir="ltr">{`${percentFilled}%`}</span>
               </span>
               <span className="font-bold text-foreground" dir="ltr">
-                {`${formatValue(goal.actualValue ?? 0, goal.metricName)} / ${targetText}`}
+                {`${show(goal.actualValue ?? 0)} / ${targetText}`}
               </span>
             </div>
 
@@ -175,11 +195,11 @@ export function GoalThermometerCard({
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>
                 {t('expectedAtNowLabel')}{': '}
-                <strong className="text-foreground" dir="ltr">{formatValue(goal.expectedAtNow ?? 0, goal.metricName)}</strong>
+                <strong className="text-foreground" dir="ltr">{show(goal.expectedAtNow ?? 0)}</strong>
               </span>
               <span data-testid={`goal-projection-${goal.id}`}>
                 {t('projectedFinalValueLabel')}{': '}
-                <strong className="text-foreground" dir="ltr">{formatValue(goal.projectedFinalValue ?? 0, goal.metricName)}</strong>
+                <strong className="text-foreground" dir="ltr">{show(goal.projectedFinalValue ?? 0)}</strong>
               </span>
             </div>
           </div>

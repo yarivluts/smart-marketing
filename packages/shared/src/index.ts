@@ -10,6 +10,7 @@ export * from './result';
 export * from './ids';
 export * from './policy';
 export * from './metrics-compiler';
+export * from './metric-units';
 export * from './plugin-manifest';
 export * from './touchpoint-capture';
 export * from './mapping-engine';

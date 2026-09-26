@@ -1,6 +1,14 @@
 import { createHash } from 'node:crypto';
-import { collectIdentifiers, fillEmptyBuckets, parseFormula, type CompilerParamValue, type MetricQueryRequest } from '@growthos/shared';
-import type { ProjectModel } from '../models/project.model';
+import {
+  collectIdentifiers,
+  fillEmptyBuckets,
+  parseFormula,
+  resolveMetricUnit,
+  type CompilerParamValue,
+  type MetricQueryRequest,
+  type ParsedMetricUnit,
+} from '@growthos/shared';
+import { ProjectModel } from '../models/project.model';
 import type { MetricAggregationDef, MetricDefModel, MetricDefinitionKind } from '../models/metric-def.model';
 import { compileMetricQueryForProject, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
@@ -220,6 +228,8 @@ export interface MetricCatalogEntry {
   version: number;
   definitionKind: MetricDefinitionKind;
   dimensions: string[];
+  /** The metric's declared unit (KAN-213) — see `MetricDefModel.unit`. Absent when none is declared, meaning a plain number. */
+  unit?: string;
 }
 
 /** `GET /v1/metrics` (plan `12 §3`): every metric family's current `active` version in a project — deliberately excludes `superseded` versions, unlike the admin UI's `listMetricDefinitionsForProject` (KAN-40), which browses the full history. */
@@ -227,7 +237,13 @@ export async function listMetricsCatalogForProject(organizationId: string, proje
   const defs = await listMetricDefinitionsForProject(organizationId, projectId);
   return defs
     .filter((def) => def.status === 'active')
-    .map((def) => ({ name: def.name, version: def.version, definitionKind: def.definition_kind, dimensions: def.dimensions }));
+    .map((def) => ({
+      name: def.name,
+      version: def.version,
+      definitionKind: def.definition_kind,
+      dimensions: def.dimensions,
+      ...(def.unit ? { unit: def.unit } : {}),
+    }));
 }
 
 /** `GET /v1/metrics/{name}`'s "definition + lineage" shape — `dependsOn` is the formula's own direct metric references (not transitive; a dashboard/AI caller wanting the full dependency tree can walk it one hop at a time via repeat calls). Empty for an aggregation-kind metric, which depends on no other metric. */
@@ -313,9 +329,26 @@ export async function getMetricCatalogDetail(organizationId: string, projectId: 
     version: active.version,
     definitionKind: active.definition_kind,
     dimensions: active.dimensions,
+    ...(active.unit ? { unit: active.unit } : {}),
     ...(active.aggregation ? { aggregation: active.aggregation } : {}),
     ...(active.formula ? { formula: active.formula } : {}),
     dependsOn,
     ...(requiredEvents ? { requiredEvents } : {}),
   };
+}
+
+/**
+ * Every active metric's display unit in a project (KAN-213), keyed by metric name: each declared
+ * unit resolved against the project's own currency (a bare `currency` unit means "this project's
+ * currency"), and every metric with no declared unit as a plain `number`. What a board, a goal card
+ * or an MCP response formats a metric's value with - one read of the catalog plus the project, not
+ * one per value.
+ */
+export async function resolveMetricDisplayUnits(organizationId: string, projectId: string): Promise<Record<string, ParsedMetricUnit>> {
+  const [defs, project] = await Promise.all([
+    listMetricDefinitionsForProject(organizationId, projectId),
+    ProjectModel.init(projectId, { organization_id: organizationId }),
+  ]);
+  const projectCurrency = project && project.organization_id === organizationId ? project.currency : undefined;
+  return Object.fromEntries(defs.filter((def) => def.status === 'active').map((def) => [def.name, resolveMetricUnit(def.unit, projectCurrency)]));
 }

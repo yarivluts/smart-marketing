@@ -1,5 +1,5 @@
 import type { GoalModel, GoalProgressOutcome } from '@growthos/firebase-orm-models';
-import type { GoalPaceStatus } from '@growthos/shared';
+import type { GoalPaceStatus, ParsedMetricUnit } from '@growthos/shared';
 
 /** A goal's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface GoalSummaryView {
@@ -51,6 +51,8 @@ export type GoalThermometerView =
       expectedAtNow: number;
       projectedFinalValue: number;
       isGoalMet: boolean;
+      /** The goal metric's declared unit (KAN-213), which the figures are shown in. Absent for a plain number. */
+      unit?: ParsedMetricUnit;
     }
   /**
    * The metric returned no rows over the goal's window, so there is no pace to report.
@@ -77,7 +79,7 @@ export type GoalThermometerView =
  * over-target maximize goal) or sits at 0 (a range goal missed on the low
  * side).
  */
-export function buildGoalThermometerView(outcome: GoalProgressOutcome): GoalThermometerView {
+export function buildGoalThermometerView(outcome: GoalProgressOutcome, unit?: ParsedMetricUnit): GoalThermometerView {
   if (!outcome.ok) {
     if (outcome.reason === 'warehouse_not_configured') {
       return { kind: 'warehouse_not_configured' };
@@ -101,5 +103,6 @@ export function buildGoalThermometerView(outcome: GoalProgressOutcome): GoalTher
     expectedAtNow: progress.expectedAtNow,
     projectedFinalValue: progress.projectedFinalValue,
     isGoalMet: progress.isGoalMet,
+    ...(unit && unit.kind !== 'number' ? { unit } : {}),
   };
 }

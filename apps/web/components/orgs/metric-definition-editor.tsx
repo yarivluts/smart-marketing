@@ -2,6 +2,7 @@
 
 import { useId } from 'react';
 import { useTranslations } from 'next-intl';
+import { METRIC_UNIT_KINDS, parseMetricUnit, type MetricUnitKind } from '@growthos/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -35,10 +36,29 @@ export interface MetricDefinitionFormState {
   formula: string;
   /** Raw comma-separated input — split into an array only at submit time. */
   dimensions: string;
+  /** The declared unit kind (KAN-213), or `''` for none (a plain number). */
+  unitKind: MetricUnitKind | '';
+  /** A `currency` unit's ISO 4217 code; blank means the project's own currency. */
+  currencyCode: string;
 }
 
 export function blankMetricDefinitionFormState(): MetricDefinitionFormState {
-  return { kind: 'aggregation', aggFunction: 'sum', table: '', column: '', timeColumn: '', filters: [], formula: '', dimensions: '' };
+  return { kind: 'aggregation', aggFunction: 'sum', table: '', column: '', timeColumn: '', filters: [], formula: '', dimensions: '', unitKind: '', currencyCode: '' };
+}
+
+/** The unit string the form submits: `null` for none, `currency:XXX` when a currency code is given. */
+export function metricUnitFromFormState(state: Pick<MetricDefinitionFormState, 'unitKind' | 'currencyCode'>): string | null {
+  if (state.unitKind === '') {
+    return null;
+  }
+  const code = state.currencyCode.trim().toUpperCase();
+  return state.unitKind === 'currency' && code.length > 0 ? `currency:${code}` : state.unitKind;
+}
+
+/** The form fields for a stored unit string; an unreadable one falls back to "none". */
+export function metricUnitToFormState(unit: string | null | undefined): Pick<MetricDefinitionFormState, 'unitKind' | 'currencyCode'> {
+  const parsed = unit ? parseMetricUnit(unit) : null;
+  return { unitKind: parsed?.kind ?? '', currencyCode: parsed?.currency ?? '' };
 }
 
 export interface MetricDefinitionRequestBody {
@@ -49,6 +69,8 @@ export interface MetricDefinitionRequestBody {
       }
     | { kind: 'formula'; formula: string };
   dimensions: string[];
+  /** Always sent, so an evolve made from the form states the unit explicitly (`null` clears it). */
+  unit: string | null;
 }
 
 /** The shared shape the register/evolve metric-def forms POST — `parseMetricDefRequestBody` (the API-route side) accepts exactly this. */
@@ -58,8 +80,9 @@ export function metricDefinitionFormStateToRequestBody(state: MetricDefinitionFo
     .map((dimension) => dimension.trim())
     .filter((dimension) => dimension.length > 0);
 
+  const unit = metricUnitFromFormState(state);
   if (state.kind === 'formula') {
-    return { definition: { kind: 'formula', formula: state.formula }, dimensions };
+    return { definition: { kind: 'formula', formula: state.formula }, dimensions, unit };
   }
 
   return {
@@ -74,6 +97,7 @@ export function metricDefinitionFormStateToRequestBody(state: MetricDefinitionFo
       },
     },
     dimensions,
+    unit,
   };
 }
 
@@ -90,6 +114,8 @@ export interface MetricVersionView {
   aggregation: { function: MetricAggFunctionRow; table: string; column?: string; timeColumn: string; filters: MetricFilterRow[] } | null;
   formula: string | null;
   dimensions: string[];
+  /** The version's declared unit (KAN-213), or `null` when none is declared. */
+  unit: string | null;
 }
 
 /** Prefills the shared editor's form state from an existing version — used by `EvolveMetricDefForm` to open pre-populated with the latest version's definition. */
@@ -103,6 +129,7 @@ export function metricVersionToFormState(version: MetricVersionView): MetricDefi
     filters: version.aggregation?.filters ?? [],
     formula: version.formula ?? '',
     dimensions: version.dimensions.join(', '),
+    ...metricUnitToFormState(version.unit),
   };
 }
 
@@ -258,6 +285,38 @@ export function MetricDefinitionEditor({ state, onChange }: MetricDefinitionEdit
           onChange={(event) => onChange({ ...state, dimensions: event.target.value })}
         />
       </div>
+
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-unit`}>
+          {t('unitLabel')}
+          <select
+            id={`${idBase}-unit`}
+            value={state.unitKind}
+            onChange={(event) => onChange({ ...state, unitKind: event.target.value as MetricUnitKind | '' })}
+            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            <option value="">{t('unitNone')}</option>
+            {METRIC_UNIT_KINDS.map((kind) => (
+              <option key={kind} value={kind}>
+                {t(`unitOption.${kind}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {state.unitKind === 'currency' ? (
+          <label className="flex flex-col gap-1.5 text-sm font-medium" htmlFor={`${idBase}-currency`}>
+            {t('currencyCodeLabel')}
+            <Input
+              id={`${idBase}-currency`}
+              placeholder={t('currencyCodePlaceholder')}
+              maxLength={3}
+              value={state.currencyCode}
+              onChange={(event) => onChange({ ...state, currencyCode: event.target.value })}
+            />
+          </label>
+        ) : null}
+      </div>
+      <p className="text-xs text-muted-foreground">{t('unitHelp')}</p>
     </fieldset>
   );
 }
