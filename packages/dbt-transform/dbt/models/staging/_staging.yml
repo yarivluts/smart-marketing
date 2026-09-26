@@ -60,10 +60,13 @@ models:
           - not_null
           - unique
 
-  - name: stg_stripe_subscription_history
+  - name: stg_subscription_history
     description: >
-      Every landed `stripe_subscription` entity snapshot (not deduped to the
-      latest, unlike `entities`), with the previous snapshot's status/MRR
+      Every subscription state, from two sources (KAN-110): each landed
+      `stripe_subscription` entity snapshot (not deduped to the latest, unlike
+      `entities`), and each vendor-neutral `subscription_state_change` event
+      carrying `properties.mrr` (any billing source without a PSP connector,
+      keyed by subscription_id else customer_id, ordered by the event ts). With the previous snapshot's status/MRR
       lagged alongside and the detected MRR-movement/lifecycle-transition
       type — see the model's own doc comment for the full derivation.
     columns:

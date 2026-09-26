@@ -74,6 +74,12 @@ seeds:
       expected 9/8/4/3/2). `assert_funnel_identity_fixture_b20` pins their
       identity edges; the funnel counts are proven in @growthos/firebase-
       orm-models' `funnel-steps-query.duckdb.test.ts` over these same rows.
+      `proj_27` is KAN-110's vendor-neutral billing fixture: a source with no
+      PSP connector sending `subscription_state_change` events (`mrr` +
+      `currency`, keyed by customer_id) - an out-of-order delivery, a cancel
+      and return, a cancel without `status`, and a v1-only record without
+      `mrr` that must be ignored. `assert_vendor_neutral_subscriptions_kan110`
+      pins dim_subscription, the MRR movements and the reactivation.
     columns:
       - name: organization_id
         tests:

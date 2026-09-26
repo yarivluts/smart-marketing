@@ -1,22 +1,27 @@
--- Subscription snapshot history (2026-08-21 KAN-59 follow-up): every landed
--- `stripe_subscription` entity snapshot, not just the current one `entities`
--- dedupes down to — built directly off `stg_entities` (the undeduped
--- staging view) rather than `entities`/`dim_subscription`, since the
--- MRR-movement and lifecycle-transition rows `fact_revenue_event`/
--- `fact_subscription_event` both need both need to diff a subscription
--- against its own *previous* landed state, which the deduped-to-latest
--- `entities` table has already discarded. A "thicker" staging view than its
--- siblings (`stg_events`/`stg_entities` are thin typed passthroughs) —
--- kept here rather than under `models/core/` because it isn't itself a
--- plan-referenced fact/dim table any metric targets, just shared prep two
--- core models both need.
+-- Subscription state history, vendor-neutral (KAN-110). Two sources feed one diff:
 --
--- Stripe's connector (`mapSubscriptionToEntityRecord`,
--- `packages/firebase-orm-models`) lands only a subscription's *current*
--- state on each sync — there is no dedicated "plan changed"/"trial
--- converted" event captured — so this model detects those transitions
--- itself by comparing each snapshot to the immediately-preceding one for
--- the same subscription (`lag()` over `landed_at`).
+--   stripe:    every landed `stripe_subscription` entity snapshot (KAN-49's
+--              connector), ordered by `landed_at` - the connector lands only
+--              current state per sync, so a transition is dated by when the sync
+--              observed it (see the precision note below).
+--   canonical: every `subscription_state_change` EVENT carrying `properties.mrr`
+--              - the contract any billing source without a PSP connector sends
+--              (EasySign: plans set by an admin, no Stripe). Keyed by
+--              `properties.subscription_id`, else `properties.customer_id` (a
+--              customer has one plan, so a source with no subscription id is
+--              not forced to invent one). `mrr` is the monthly recurring amount
+--              AFTER the change, in `properties.currency`; `status` is
+--              `properties.status`, or derived: mrr 0 -> canceled, else active.
+--              Ordered by the event's own `ts` (`occurred_at`), so a late
+--              or replayed batch still sorts by when the change happened. A
+--              source's own type/mrr_delta fields are informational: movements
+--              are derived from consecutive states here, exactly as for Stripe.
+--              Records without `mrr` (EasySign's v1 events carried only a
+--              currency-named field) are not read: no per-customer aliases.
+--
+-- Each row carries `changed_at` - the moment its state took effect as far as
+-- the source tells us (`landed_at` for stripe, `occurred_at` for canonical) -
+-- which downstream models date movements and transitions by.
 --
 -- `movement_type`/`mrr_delta` (consumed by `fact_revenue_event`'s MRR-
 -- movement rows) and `lifecycle_event_type` (consumed by
@@ -63,33 +68,86 @@
 -- "buildable-today" polling precision this connector's sync already has
 -- everywhere else, documented rather than silently assumed exact.
 
-with snapshots as (
+with stripe_snapshots as (
     select
         organization_id,
         project_id,
         environment_id,
         raw_record_key,
+        'stripe' as source,
         client_id as subscription_id,
         {{ json_text_field('attributes', "'customer_id'") }} as customer_id,
         {{ json_text_field('attributes', "'status'") }} as status,
         {{ growthos_try_cast(json_text_field('attributes', "'mrr_normalized'"), dbt.type_float()) }} as mrr_normalized,
+        {{ json_text_field('attributes', "'currency'") }} as currency,
         {{ json_text_field('attributes', "'plan_interval'") }} as plan_interval,
+        {{ json_text_field('attributes', "'plan_interval'") }} as plan,
         {{ growthos_try_cast(json_text_field('attributes', "'started_at'"), dbt.type_timestamp()) }} as started_at,
-        landed_at
+        landed_at,
+        landed_at as changed_at
     from {{ ref('stg_entities') }}
     where schema_name = 'stripe_subscription'
+),
+
+canonical_changes as (
+    select
+        organization_id,
+        project_id,
+        environment_id,
+        raw_record_key,
+        'canonical' as source,
+        coalesce(
+            {{ json_text_field('properties', "'subscription_id'") }},
+            {{ json_text_field('properties', "'customer_id'") }}
+        ) as subscription_id,
+        {{ json_text_field('properties', "'customer_id'") }} as customer_id,
+        {{ json_text_field('properties', "'status'") }} as declared_status,
+        {{ growthos_try_cast(json_text_field('properties', "'mrr'"), dbt.type_float()) }} as mrr_normalized,
+        {{ json_text_field('properties', "'currency'") }} as currency,
+        cast(null as {{ dbt.type_string() }}) as plan_interval,
+        {{ json_text_field('properties', "'plan'") }} as plan,
+        cast(null as {{ dbt.type_timestamp() }}) as started_at,
+        landed_at,
+        occurred_at as changed_at
+    from {{ ref('stg_events') }}
+    where schema_name = 'subscription_state_change'
+),
+
+snapshots as (
+    select * from stripe_snapshots
+    union all
+    select
+        organization_id,
+        project_id,
+        environment_id,
+        raw_record_key,
+        source,
+        subscription_id,
+        customer_id,
+        coalesce(declared_status, case when mrr_normalized = 0 then 'canceled' else 'active' end) as status,
+        mrr_normalized,
+        currency,
+        plan_interval,
+        plan,
+        started_at,
+        landed_at,
+        changed_at
+    from canonical_changes
+    -- The contract: a change without mrr, or without anyone to attribute it to, is not a state.
+    where mrr_normalized is not null
+      and subscription_id is not null
 ),
 
 with_prev as (
     select
         *,
         lag(status) over (
-            partition by organization_id, project_id, environment_id, subscription_id
-            order by landed_at, raw_record_key
+            partition by organization_id, project_id, environment_id, source, subscription_id
+            order by changed_at, raw_record_key
         ) as prev_status,
         lag(mrr_normalized) over (
-            partition by organization_id, project_id, environment_id, subscription_id
-            order by landed_at, raw_record_key
+            partition by organization_id, project_id, environment_id, source, subscription_id
+            order by changed_at, raw_record_key
         ) as prev_mrr_normalized
     from snapshots
 )
@@ -99,13 +157,17 @@ select
     project_id,
     environment_id,
     raw_record_key,
+    source,
     subscription_id,
     customer_id,
     status,
     mrr_normalized,
+    currency,
     plan_interval,
+    plan,
     started_at,
     landed_at,
+    changed_at,
     case
         when status = 'active' and (prev_status is null or prev_status != 'active') then 'new'
         when status = 'active' and prev_status = 'active' and mrr_normalized > prev_mrr_normalized then 'upgrade'
