@@ -58,9 +58,9 @@ describe('toGoalSummaryView', () => {
 
 describe('buildGoalThermometerView', () => {
   it("carries the metric's declared unit, and none for a plain number (KAN-213)", () => {
-    const ratio = buildGoalThermometerView(okOutcome(0.05), { kind: 'ratio' });
+    const ratio = buildGoalThermometerView(okOutcome(0.05, {}), { kind: 'ratio' });
     expect(ratio.kind === 'ok' && ratio.unit).toEqual({ kind: 'ratio' });
-    const plain = buildGoalThermometerView(okOutcome(5), { kind: 'number' });
+    const plain = buildGoalThermometerView(okOutcome(5, {}), { kind: 'number' });
     expect(plain.kind === 'ok' && 'unit' in plain).toBe(false);
   });
 
