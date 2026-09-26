@@ -68,9 +68,13 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   set_hook_signing_secret: { kind: 'per-call-permission', permission: 'ingest.write' },
   reexport_raw_records: { kind: 'per-call-permission', permission: 'ingest.write' },
   purge_project_data: { kind: 'per-call-permission', permission: 'ingest.write' },
+  // KAN-197 integrator setup tools (`mcp-setup-tools.ts`): read-only, derived from the credential's
+  // own project's ingest records.
+  get_setup_health: { kind: 'connection-scope', permission: 'mcp.read' },
+  audit_installation_gaps: { kind: 'connection-scope', permission: 'mcp.read' },
 };
 
-const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-admin-tools.ts'];
+const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-admin-tools.ts', 'mcp-setup-tools.ts'];
 
 function readToolFile(name: string): string {
   return readFileSync(path.join(__dirname, name), 'utf8');

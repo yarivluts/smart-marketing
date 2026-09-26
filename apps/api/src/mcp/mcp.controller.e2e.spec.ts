@@ -14,6 +14,7 @@ import {
   ensureUserForFirebaseSession,
   exchangeMcpAuthorizationCode,
   getOnboardingState,
+  ingestBatch,
   InMemoryTokenBucketRateLimiter,
   issueMcpAuthorizationCode,
   listAuditLogEntriesForOrg,
@@ -234,7 +235,9 @@ describe('McpController (e2e)', () => {
           'get_goal_progress',
           'list_goals',
           'archive_project',
+          'audit_installation_gaps',
           'create_hook_endpoint',
+          'get_setup_health',
           'evolve_metric',
           'list_hook_endpoints',
           'list_insights',
@@ -1115,6 +1118,118 @@ describe('McpController (e2e)', () => {
         expect(JSON.parse(textOf(await clientB.callTool({ name: 'query_funnel', arguments: {} }))).status).toBe('no_funnel_defined');
       } finally {
         await clientB.close();
+      }
+    });
+  });
+
+  describe('KAN-197 setup tools: get_setup_health + audit_installation_gaps', () => {
+    type SetupHealthBody = { environment: string; requirements: Array<{ id: string; status: string; detail: string }> };
+    type GapsBody = {
+      environment: string;
+      gaps: Array<{ requirement_id: string; status: string; impact_summary: string; how_to_fix: Array<{ web_page_url?: string; api_endpoint?: string; mcp_tool?: string }> }>;
+      connected: Array<{ requirement_id: string; schemas: string[] }>;
+    };
+
+    async function callJson<T>(rawKey: string, name: string, args: Record<string, unknown> = {}): Promise<T> {
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({ name, arguments: args });
+        expect(result.isError ?? false).toBe(false);
+        return JSON.parse((result.content as Array<{ text: string }>)[0].text) as T;
+      } finally {
+        await client.close();
+      }
+    }
+
+    async function registerEvent(organizationId: string, projectId: string, ownerId: string, name: string) {
+      await registerSchemaDefinition({
+        organizationId,
+        projectId,
+        kind: 'event',
+        name,
+        fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: ownerId,
+      });
+    }
+
+    function eventRecord(name: string) {
+      return { event_id: unique('evt'), event: name, ts: '2026-09-25T10:00:00Z', properties: { plan: 'free' } };
+    }
+
+    it("reads the key's own environment by default, judges each environment on its own records, and never sees another project", async () => {
+      const a = await setupProjectWithKey('Setup Tools Org A');
+      const b = await setupProjectWithKey('Setup Tools Org B');
+      await registerEvent(a.organization.id, a.project.id, a.owner.id, 'signup');
+      await registerEvent(b.organization.id, b.project.id, b.owner.id, 'signup');
+      await registerEvent(b.organization.id, b.project.id, b.owner.id, 'subscription_state_change');
+      // A: signups flow in dev only. B: signups and (non-Stripe) billing flow in prod.
+      await ingestBatch({ organizationId: a.organization.id, projectId: a.project.id, environmentId: a.devEnvironmentId, input: { kind: 'event', records: [eventRecord('signup')] } });
+      await ingestBatch({
+        organizationId: b.organization.id,
+        projectId: b.project.id,
+        environmentId: b.environmentId,
+        input: { kind: 'event', records: [eventRecord('signup'), eventRecord('subscription_state_change')] },
+      });
+      const { rawKey: aDevKey } = await mintApiKey({
+        organizationId: a.organization.id,
+        projectId: a.project.id,
+        environmentId: a.devEnvironmentId,
+        name: 'e2e dev setup key',
+        scopes: ['mcp.read'],
+        createdByUserId: a.owner.id,
+      });
+
+      const statusOf = (body: SetupHealthBody, id: string) => body.requirements.find((requirement) => requirement.id === id)?.status;
+
+      const aDev = await callJson<SetupHealthBody>(aDevKey, 'get_setup_health');
+      expect(aDev.environment).toBe('dev');
+      expect(statusOf(aDev, 'signups')).toBe('connected');
+      expect(statusOf(aDev, 'billing')).toBe('gap');
+
+      // The prod-bound key: dev's signups do not count here.
+      const aProd = await callJson<SetupHealthBody>(a.rawKey, 'get_setup_health');
+      expect(aProd.environment).toBe('prod');
+      expect(statusOf(aProd, 'signups')).toBe('gap');
+      expect(statusOf(await callJson<SetupHealthBody>(a.rawKey, 'get_setup_health', { environment: 'dev' }), 'signups')).toBe('connected');
+
+      // B's prod billing is B's alone, whatever A's call smuggles in.
+      const smuggled = await callJson<SetupHealthBody>(a.rawKey, 'get_setup_health', { organizationId: b.organization.id, projectId: b.project.id });
+      expect(statusOf(smuggled, 'billing')).toBe('gap');
+      const bProd = await callJson<SetupHealthBody>(b.rawKey, 'get_setup_health');
+      expect(statusOf(bProd, 'billing')).toBe('connected');
+      expect(statusOf(bProd, 'signups')).toBe('connected');
+    });
+
+    it("audit_installation_gaps names each gap's cost and real steps, linked into the caller's own project only", async () => {
+      const a = await setupProjectWithKey('Setup Gaps Org A');
+      const b = await setupProjectWithKey('Setup Gaps Org B');
+      const body = await callJson<GapsBody>(a.rawKey, 'audit_installation_gaps');
+
+      expect(body.environment).toBe('prod');
+      expect(body.gaps.map((gap) => gap.requirement_id).sort()).toEqual(['ad_spend', 'billing', 'customer_profiles', 'landing_page_attribution', 'product_usage', 'signups']);
+      const steps = body.gaps.flatMap((gap) => gap.how_to_fix);
+      expect(steps.length).toBeGreaterThan(0);
+      for (const gap of body.gaps) {
+        // B3: an impact is a sentence, not a translation key such as "SetupRequirements.webSdkImpact".
+        expect(gap.impact_summary).not.toMatch(/^[A-Z][A-Za-z]*\.[A-Za-z]+$/);
+        expect(gap.impact_summary.split(' ').length).toBeGreaterThan(8);
+      }
+      for (const step of steps) {
+        if (step.web_page_url) {
+          expect(step.web_page_url).toContain(`/orgs/${a.organization.id}/projects/${a.project.id}/`);
+        }
+      }
+      expect(JSON.stringify(body)).not.toContain(b.project.id);
+    });
+
+    it('refuses an environment name the project does not have, rather than reporting on another one', async () => {
+      const { rawKey } = await setupProjectWithKey('Setup Env Org');
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({ name: 'get_setup_health', arguments: { environment: 'qa' } });
+        expect(result.isError).toBe(true);
+      } finally {
+        await client.close();
       }
     });
   });
