@@ -8,6 +8,7 @@ import type {
 import {
   DEFAULT_RELATIVE_DATE_RANGE,
   normalizeDateRangeSetting,
+  readPeriodValue,
   resolveDateRangeSetting,
   todayUtcDateOnly,
   type ComparePeriod,
@@ -162,7 +163,7 @@ export type TileRenderView =
   | WithFreshness<{ kind: 'heatmap' } & HeatmapView>
   | WithFreshness<{ kind: 'histogram' } & HistogramView>;
 
-/** Exported for reuse by other view-mappers in this app (e.g. `trial-pipeline-view.ts`) that sum the same `WarehouseRow[]` shape — not shared with `packages/firebase-orm-models`, which keeps its own local mirror since that package must not depend on `apps/web` (see `goal.service.ts`'s `sumMetricRows`). */
+/** Coerces one warehouse cell to a finite number (`null`/unparseable reads 0). Exported for reuse by other view-mappers in this app that read the same `WarehouseRow[]` shape. */
 export function toNumber(value: string | number | null): number {
   if (value === null) {
     return 0;
@@ -184,42 +185,26 @@ function splitByPeriod(rows: readonly WarehouseRow[]): { current: WarehouseRow[]
   return { current, previous };
 }
 
-/** Exported — see `toNumber`'s own doc comment on why this is shared within `apps/web` but not with `packages/firebase-orm-models`. */
-export function sumMetric(rows: readonly WarehouseRow[], metricName: string): number {
-  return rows.reduce((total, row) => total + toNumber(row[metricName] ?? null), 0);
-}
-
-/** The mean of the rows that carry a real value for `metricName` (a gap is not a zero), or 0 when none does. */
-function meanMetric(rows: readonly WarehouseRow[], metricName: string): number {
-  const values = rows.flatMap((row) => {
-    const raw = row[metricName];
-    if (raw === null || raw === undefined || raw === '') {
-      return [];
-    }
-    const value = typeof raw === 'number' ? raw : Number(raw);
-    return Number.isFinite(value) ? [value] : [];
-  });
-  return values.length === 0 ? 0 : values.reduce((total, value) => total + value, 0) / values.length;
-}
-
 /**
- * A big number is the period's total: the sum of its buckets. A fraction or a percent cannot be
- * summed (thirty days at 5% is not 150%), so a metric whose unit says it is one (KAN-213) shows the
- * mean of its buckets instead. Still an approximation - it weights a quiet day like a busy one -
- * until the tile can query the whole range as a single bucket.
+ * A big number is its metric's value for the whole period. `queryBoardTile` asks the warehouse for
+ * exactly that - the board's range as ONE bucket per period (`total` grain), with no breakdown - so
+ * `rows` holds one row for the current period and, when compared, one for the previous. It is read
+ * as-is, never re-derived from daily buckets: a conversion rate over the period is
+ * sum(conversions) / sum(visitors), which neither the sum of its daily rates (thirty days at 5% is
+ * not 150%) nor their mean (day 1 at 1/1 and day 2 at 1/100 average 50.5%, while the period's rate
+ * is 2/101 = 1.98%) can recover. The same holds for an average and for a count_distinct (a customer
+ * active on two days is one customer) - so a distinct-count big number can deliberately read LOWER
+ * than the sum of the same metric's daily bars on a line/bar tile: the bars count each day's
+ * distinct customers, the big number the period's. A count or a sum reads the same total it always
+ * did.
  */
-function combineBuckets(rows: readonly WarehouseRow[], metricName: string, unit: ParsedMetricUnit | undefined): number {
-  return unit?.kind === 'ratio' || unit?.kind === 'percent' ? meanMetric(rows, metricName) : sumMetric(rows, metricName);
-}
-
-function buildBigNumberView(tile: BoardTile, rows: readonly WarehouseRow[], unit?: ParsedMetricUnit) {
+function buildBigNumberView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const metricName = tile.metricNames[0];
-  const { current, previous } = splitByPeriod(rows);
-  const value = combineBuckets(current, metricName, unit);
-  if (previous.length === 0) {
+  const value = readPeriodValue(rows, metricName, 'current') ?? 0;
+  if (!rows.some((row) => row.period === 'previous')) {
     return { kind: 'big_number' as const, value };
   }
-  const previousValue = combineBuckets(previous, metricName, unit);
+  const previousValue = readPeriodValue(rows, metricName, 'previous') ?? 0;
   const deltaPct = previousValue !== 0 ? ((value - previousValue) / previousValue) * 100 : undefined;
   return { kind: 'big_number' as const, value, previousValue, ...(deltaPct !== undefined ? { deltaPct } : {}) };
 }
@@ -281,8 +266,9 @@ function buildTableView(rows: readonly WarehouseRow[]) {
   return { kind: 'table' as const, columns, rows: sorted };
 }
 
+/** Each step's value for the whole period - like a big number, a funnel tile queries one `total`-grain row (see `buildBigNumberView`). */
 function buildFunnelView(tile: BoardTile, rows: readonly WarehouseRow[]) {
-  const totals = tile.metricNames.map((metricName) => sumMetric(rows, metricName));
+  const totals = tile.metricNames.map((metricName) => readPeriodValue(rows, metricName) ?? 0);
   const firstTotal = totals[0] ?? 0;
   const steps: FunnelStep[] = tile.metricNames.map((metricName, index) => ({
     metricName,
@@ -333,9 +319,8 @@ function buildHeatmapView(tile: BoardTile, rows: readonly WarehouseRow[]) {
  * single axis instead of a matrix: every row is summed into its own
  * dimension-value bucket (there should only ever be one row per bucket for
  * a real "as of latest date" snapshot metric, but summing rather than
- * overwriting tolerates a query that happens to return more than one, the
- * same defensive posture `sumMetric` already takes for `big_number`/
- * `funnel`).
+ * overwriting tolerates a query that happens to return more than one - right
+ * for the additive snapshot counts a histogram draws).
  */
 function buildHistogramView(tile: BoardTile, rows: readonly WarehouseRow[]) {
   const metricName = tile.metricNames[0];
@@ -415,7 +400,7 @@ export function buildTileRenderView(
   const content = (() => {
     switch (tile.type) {
       case 'big_number':
-        return buildBigNumberView(tile, outcome.series, units?.[tile.metricNames[0]]);
+        return buildBigNumberView(tile, outcome.series);
       case 'line':
       case 'bar':
         return buildTimeSeriesView(tile, outcome.series);

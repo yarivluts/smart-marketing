@@ -31,6 +31,12 @@ import {
   type WarehouseRow,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
+import {
+  registerTwoDayRatioMetrics,
+  TWO_DAY_RATIO_MEAN_OF_DAILY_RATES,
+  TWO_DAY_RATIO_PERIOD_VALUE,
+  TwoDayRatioWarehouse,
+} from '../test-utils/two-day-ratio-warehouse';
 
 beforeAll(async () => {
   await connectToFirestoreEmulator('board-tests');
@@ -1142,6 +1148,116 @@ describe('queryBoardTile empty-bucket fill (KAN-210 follow-up)', () => {
       cache: new InMemoryMetricQueryResultCache(),
     });
     expect(empty).toEqual({ ok: true, series: [] });
+  });
+});
+
+describe('queryBoardTile period values (B24: a ratio is not the mean of its daily ratios)', () => {
+  async function twoDayBoard(orgName: string, compare?: 'previous_period') {
+    const setup = await setupOrgWithProject(orgName);
+    await registerTwoDayRatioMetrics(setup.organization.id, setup.project.id, setup.owner.id);
+    const created = await createBoard({ organizationId: setup.organization.id, projectId: setup.project.id, name: 'Landing page', createdByUserId: setup.owner.id });
+    await updateBoardSettings({
+      organizationId: setup.organization.id,
+      projectId: setup.project.id,
+      boardId: created.id,
+      dateRange: { start: '2026-09-01', end: '2026-09-02', grain: 'day' },
+      ...(compare ? { compare } : {}),
+      updatedByUserId: setup.owner.id,
+    });
+    const board = (await getBoard(setup.organization.id, setup.project.id, created.id))!;
+    return { ...setup, board };
+  }
+
+  it('a big-number tile over a ratio queries the whole range as ONE bucket and gets 2/101 = 1.98%, not the 50.5% mean of 100% and 1%', async () => {
+    const { organization, project, board } = await twoDayBoard('Board Ratio Big Number Org');
+    const warehouse = new TwoDayRatioWarehouse();
+
+    const outcome = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ metricNames: ['lp_conversion_rate'], title: 'Conversion rate', dimensions: ['campaign_id'] }),
+      executor: warehouse,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    // The query asked for the period, not for days - and without the tile's breakdown, since a big
+    // number is one number and adding up per-campaign rates would be the same fallacy again.
+    expect(warehouse.queries).toHaveLength(1);
+    const [query] = warehouse.queries;
+    expect(query.sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(query.sql).not.toContain('DATE_TRUNC');
+    expect(query.sql).not.toContain('`campaign_id`');
+    expect(query.params).toMatchObject({ time_start_current: '2026-09-01', time_end_current: '2026-09-02' });
+
+    expect(outcome.ok && outcome.series).toHaveLength(1);
+    const value = outcome.ok ? Number(outcome.series[0].lp_conversion_rate) : Number.NaN;
+    expect(value).toBeCloseTo(TWO_DAY_RATIO_PERIOD_VALUE, 10);
+    expect(value).not.toBeCloseTo(TWO_DAY_RATIO_MEAN_OF_DAILY_RATES, 2);
+  });
+
+  it('a compared big number gets a period value for each period from the same single-bucket query', async () => {
+    const { organization, project, board } = await twoDayBoard('Board Ratio Compare Org', 'previous_period');
+    const warehouse = new TwoDayRatioWarehouse();
+
+    await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ metricNames: ['lp_conversion_rate'], title: 'Conversion rate' }),
+      executor: warehouse,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    const [query] = warehouse.queries;
+    expect(query.sql).toContain('CAST(@time_start_previous AS DATE) AS bucket_date');
+    expect(query.params).toMatchObject({ time_start_previous: '2026-08-30', time_end_previous: '2026-08-31' });
+  });
+
+  it('a big number over a count is unchanged: the single bucket holds the same 101 the daily buckets sum to', async () => {
+    const { organization, project, board } = await twoDayBoard('Board Count Big Number Org');
+    const cache = new InMemoryMetricQueryResultCache();
+    const warehouse = new TwoDayRatioWarehouse();
+
+    const bigNumber = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ metricNames: ['lp_visitors'], title: 'Visitors' }),
+      executor: warehouse,
+      cache,
+    });
+    // A line tile over the same metric and window keeps its daily series - and does not share the
+    // big number's cache entry just because the metric and dates match.
+    const line = await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ type: 'line', metricNames: ['lp_visitors'], title: 'Visitors' }),
+      executor: warehouse,
+      cache,
+    });
+
+    expect(bigNumber.ok && bigNumber.series.map((row) => row.lp_visitors)).toEqual([101]);
+    expect(line.ok && line.series.map((row) => row.lp_visitors)).toEqual([1, 100]);
+    expect(warehouse.queries).toHaveLength(2);
+    expect(warehouse.queries[1].sql).toContain('DATE_TRUNC');
+  });
+
+  it('a funnel tile reads each step over the whole range too (so a count_distinct or ratio step is its period value, never a sum of daily values)', async () => {
+    const { organization, project, board } = await twoDayBoard('Board Funnel Period Org');
+    const warehouse = new TwoDayRatioWarehouse();
+
+    await queryBoardTile({
+      organizationId: organization.id,
+      projectId: project.id,
+      board,
+      tile: bigNumberTile({ type: 'funnel', metricNames: ['lp_visitors', 'lp_conversions'], title: 'Landing funnel' }),
+      executor: warehouse,
+      cache: new InMemoryMetricQueryResultCache(),
+    });
+
+    expect(warehouse.queries[0].sql).not.toContain('DATE_TRUNC');
   });
 });
 

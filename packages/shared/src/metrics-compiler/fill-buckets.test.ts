@@ -174,3 +174,16 @@ describe('fillEmptyBuckets', () => {
     expect(rows[0].signups).toBeNull();
   });
 });
+
+describe('the total grain (one bucket for the whole range)', () => {
+  it('lists exactly one bucket per window - its start date, the bucket_date the compiler stamps on it', () => {
+    expect(listBucketDates({ start: '2026-09-01', end: '2026-09-30' }, 'total')).toEqual(['2026-09-01']);
+    // Even a 1970 floor: one bucket, never refused as oversized.
+    expect(listBucketDates({ start: '1970-01-01', end: '2026-09-30' }, 'total')).toEqual(['1970-01-01']);
+  });
+
+  it('leaves a complete total-grain result untouched', () => {
+    const rows = [{ bucket_date: '2026-09-01', lp_conversion_rate: 2 / 101 }];
+    expect(fillEmptyBuckets(rows, { time: { start: '2026-09-01', end: '2026-09-02', grain: 'total' }, dimensions: [], metrics: { lp_conversion_rate: 'gap' } })).toEqual(rows);
+  });
+});

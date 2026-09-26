@@ -5,7 +5,7 @@ import { BoardTileView } from './board-tile-view';
 import type { BoardTileRow } from './board-types';
 import messages from '../../messages/en.json';
 import heMessages from '../../messages/he.json';
-import type { TileRenderView } from '@/lib/orgs/board-view';
+import { buildTileRenderView, type TileRenderView } from '@/lib/orgs/board-view';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -51,6 +51,21 @@ describe('BoardTileView', () => {
       renderTile({ kind: 'big_number', value: 0.5, isEmpty: false, freshness: null, units: ratio }, { metricNames: ['lp_conversion_rate'], title: 'Conversion rate' });
       expect(screen.getByText('50%')).toBeInTheDocument();
       expect(screen.queryByText('0.5')).not.toBeInTheDocument();
+    });
+
+    it('renders a ratio big number over day 1 at 1/1 and day 2 at 1/100 as the period value 2/101 = 1.98% (shown to one decimal: "2%") - never as 50.5% (B24)', () => {
+      // What `queryBoardTile` returns for the tile: its range as ONE bucket, the rate over the
+      // period's totals (2 conversions / 101 visitors).
+      const view = buildTileRenderView(
+        { id: 't1', type: 'big_number', title: 'Conversion rate', layout: { x: 0, y: 0, w: 3, h: 2 }, metricNames: ['lp_conversion_rate'], dimensions: [] },
+        { ok: true, series: [{ bucket_date: '2026-09-01', lp_conversion_rate: 2 / 101 }] },
+        null,
+        ratio,
+      );
+      renderTile(view, { metricNames: ['lp_conversion_rate'], title: 'Conversion rate' });
+      expect(screen.getByText('2%')).toBeInTheDocument();
+      expect(screen.queryByText('50.5%')).not.toBeInTheDocument();
+      expect(screen.queryByText('51%')).not.toBeInTheDocument();
     });
 
     it('shows a currency big number with its symbol', () => {

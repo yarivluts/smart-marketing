@@ -7,6 +7,7 @@ import {
   resolveDateRangeSetting,
   resolveRelativeDatePreset,
   todayUtcDateOnly,
+  TOTAL_GRAIN,
 } from '@growthos/shared';
 import { OrganizationModel } from '../models/organization.model';
 import { ProjectModel } from '../models/project.model';
@@ -397,9 +398,20 @@ export interface QueryBoardTileParams {
  * Tile types whose rows are drawn as a time series, one point/bar per bucket - the only ones that
  * ask `queryMetrics` to fill empty buckets. A heatmap must not be filled (its absent cell means "not
  * observable yet", see `buildHeatmapView`), a histogram queries from a 1970 floor, a table would
- * grow a row of zeros per empty day, and a big number/funnel only sums, so filling changes nothing.
+ * grow a row of zeros per empty day, and a big number/funnel reads one whole-range row (see
+ * `PERIOD_VALUE_TILE_TYPES`), so there is no bucket to fill.
  */
 const FILLED_TILE_TYPES: ReadonlySet<BoardTile['type']> = new Set(['line', 'bar']);
+
+/**
+ * Tile types that show a period's value rather than a series - a big number (and its compared
+ * previous value) and a funnel's per-step totals. They query the board's range as ONE bucket
+ * (`TOTAL_GRAIN`), so the warehouse evaluates each metric over the whole period: a conversion rate
+ * as sum(conversions) / sum(visitors), a count_distinct as the distinct count of the period. Adding
+ * up (or averaging) the board-grain buckets instead is only right for a plain count or sum - day 1
+ * at 1/1 and day 2 at 1/100 is a 1.98% period, not the 50.5% mean of the two daily rates.
+ */
+const PERIOD_VALUE_TILE_TYPES: ReadonlySet<BoardTile['type']> = new Set(['big_number', 'funnel']);
 
 /**
  * Resolves + runs one tile's own metric query (its metric(s) + dimension
@@ -463,15 +475,18 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
   // Resolved first, so a relative range ("last 30 days") reaches the compiler - and its
   // previous-period compare window - as ordinary concrete dates.
   const dateRange = resolveBoardDateRange(params.board.date_range, params.today);
+  const periodValue = PERIOD_VALUE_TILE_TYPES.has(params.tile.type);
   const request: MetricQueryRequest = {
     metrics: params.tile.metricNames,
-    ...(params.tile.type === 'funnel' ? {} : { dimensions: params.tile.dimensions }),
+    // A period value is one number for the whole board filter - a big number has no breakdown to
+    // show, and adding up per-dimension values would be the same fallacy as adding up per-day ones.
+    ...(periodValue ? {} : { dimensions: params.tile.dimensions }),
     ...(params.board.global_filters.length > 0 ? { filters: params.board.global_filters } : {}),
     time: {
       // See `HISTOGRAM_TIME_RANGE_FLOOR`'s own doc comment.
       start: params.tile.type === 'histogram' ? HISTOGRAM_TIME_RANGE_FLOOR : dateRange.start,
       end: dateRange.end,
-      grain: dateRange.grain,
+      grain: periodValue ? TOTAL_GRAIN : dateRange.grain,
       ...(supportsCompare && params.board.compare ? { compare: params.board.compare } : {}),
     },
   };

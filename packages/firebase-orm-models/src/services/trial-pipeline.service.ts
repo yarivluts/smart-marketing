@@ -1,4 +1,4 @@
-import { MetricCompilerError } from '@growthos/shared';
+import { MetricCompilerError, TOTAL_GRAIN } from '@growthos/shared';
 import type { MetricQueryRequest } from '@growthos/shared';
 import { ProjectNotFoundError } from './resource-library.service';
 import { queryMetrics } from './metrics-query.service';
@@ -11,8 +11,8 @@ import type { MetricQueryResultCache } from '../warehouse/result-cache';
  * KAN-66's trial-pipeline war-room widget (E12.2b, `14` gap 14: "in trial
  * now -> converting at X%") — a fixed 2-metric query against the KAN-59 SaaS
  * pack's `trials_active`/`trial_conversion_rate` (see that pack's `metrics.ts`
- * for their definitions), summed the same way `board-view.ts`'s
- * `buildBigNumberView` collapses a bucketed series into one number. This is a
+ * for their definitions), each evaluated once over the whole window (one
+ * `total`-grain bucket), the same way a board's big-number tile gets its period value. This is a
  * project-level widget, not a board tile — there's no tile config to read a
  * date range/compare/dimensions from, so it always queries a fixed trailing
  * window, the exact same 30-day default `defaultDateRange()`
@@ -69,7 +69,11 @@ export interface GetTrialPipelineSummaryParams {
 export async function getTrialPipelineSummary(params: GetTrialPipelineSummaryParams): Promise<TrialPipelineOutcome> {
   const request: MetricQueryRequest = {
     metrics: ['trials_active', 'trial_conversion_rate'],
-    time: { ...trailingWindow(TRIAL_PIPELINE_WINDOW_DAYS), grain: 'day' },
+    // One bucket for the whole window: `trials_active` is then every trial started in it that is
+    // still trialing, and `trial_conversion_rate` is the window's conversions over its trial starts -
+    // neither survives being read off one day (the latest day holds only that day's starts) or
+    // summed/averaged across days. See `TOTAL_GRAIN`.
+    time: { ...trailingWindow(TRIAL_PIPELINE_WINDOW_DAYS), grain: TOTAL_GRAIN },
   };
 
   try {

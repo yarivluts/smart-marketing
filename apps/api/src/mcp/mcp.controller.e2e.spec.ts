@@ -333,6 +333,77 @@ describe('McpController (e2e)', () => {
     }
   });
 
+  it('compare_periods reports each period\'s own value of a ratio - 2/101 = 1.98% for day 1 at 1/1 plus day 2 at 1/100, NOT the 50.5% mean of its daily rates (B24)', async () => {
+    const { owner, organization, project, rawKey } = await setupProjectWithKey('Compare Periods Ratio Org');
+    for (const [name, column] of [
+      ['lp_visitors', 'visitors'],
+      ['lp_conversions', 'conversions'],
+    ] as const) {
+      await registerMetricDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        name,
+        definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_landing_page_performance', column, timeColumn: 'activity_date', filters: [] } },
+        dimensions: [],
+        createdByUserId: owner.id,
+      });
+    }
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'lp_conversion_rate',
+      definition: { kind: 'formula', formula: 'lp_conversions / lp_visitors' },
+      dimensions: [],
+      unit: 'ratio',
+      createdByUserId: owner.id,
+    });
+    // Answers the way the compiled SQL would: per day for the bucketed series; for the whole-range
+    // (`total` grain) query, each period's summed conversions over its summed visitors.
+    const queries: string[] = [];
+    const warehouse: WarehouseQueryExecutor = {
+      execute: (query) => {
+        queries.push(query.sql);
+        if (query.sql.includes('DATE_TRUNC')) {
+          return Promise.resolve([
+            { period: 'current', bucket_date: '2026-09-01', lp_conversion_rate: 1 },
+            { period: 'current', bucket_date: '2026-09-02', lp_conversion_rate: 0.01 },
+            { period: 'previous', bucket_date: '2026-08-30', lp_conversion_rate: 0.1 },
+            { period: 'previous', bucket_date: '2026-08-31', lp_conversion_rate: 0.1 },
+          ]);
+        }
+        return Promise.resolve([
+          { period: 'current', bucket_date: '2026-09-01', lp_conversion_rate: 2 / 101 },
+          { period: 'previous', bucket_date: '2026-08-30', lp_conversion_rate: 0.1 },
+        ]);
+      },
+    };
+    const withWarehouse: typeof realQueryMetrics = (params) => realQueryMetrics({ ...params, executor: warehouse, cache: new InMemoryMetricQueryResultCache() });
+    mockedQueryMetrics.mockImplementationOnce(withWarehouse).mockImplementationOnce(withWarehouse);
+
+    const client = await connectedClient(rawKey);
+    try {
+      const result = await client.callTool({
+        name: 'compare_periods',
+        arguments: { metric: 'lp_conversion_rate', time: { start: '2026-09-01', end: '2026-09-02', grain: 'day', compare: 'previous_period' } },
+      });
+      expect(result.isError).not.toBe(true);
+      const body = JSON.parse((result.content as Array<{ text: string }>)[0].text) as {
+        period_totals: Array<{ dimensions: Record<string, unknown>; current: Record<string, number>; previous: Record<string, number>; change_pct: Record<string, number> }>;
+      };
+      expect(body.period_totals).toHaveLength(1);
+      const [totals] = body.period_totals;
+      expect(totals.current.lp_conversion_rate).toBeCloseTo(2 / 101, 10);
+      expect(totals.current.lp_conversion_rate).not.toBeCloseTo(0.505, 2);
+      expect(totals.previous.lp_conversion_rate).toBeCloseTo(0.1, 10);
+      // 1.98% vs. 10%: down ~80%. The mean of daily rates would have claimed up 405%.
+      expect(totals.change_pct.lp_conversion_rate).toBeCloseTo(((2 / 101 - 0.1) / 0.1) * 100, 6);
+      // The period values came from a whole-range query, not from the bucketed series.
+      expect(queries.some((sql) => sql.includes('CAST(@time_start_current AS DATE) AS bucket_date') && !sql.includes('DATE_TRUNC'))).toBe(true);
+    } finally {
+      await client.close();
+    }
+  });
+
   it('query_metric surfaces a tool error for an unregistered metric name', async () => {
     const { rawKey } = await setupProjectWithKey('Query Metric Org');
     const client = await connectedClient(rawKey);

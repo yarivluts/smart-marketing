@@ -1,5 +1,5 @@
 import { computeCompareWindow, type TimeWindow } from './time';
-import { MetricCompilerError, TIME_GRAINS, type MetricCatalog, type MetricQueryTimeRange, type TimeGrain } from './types';
+import { MetricCompilerError, TIME_GRAINS, TOTAL_GRAIN, type MetricCatalog, type MetricQueryGrain, type MetricQueryTimeRange, type TimeGrain } from './types';
 
 /**
  * What an empty time bucket means for one metric (KAN-210 follow-up).
@@ -92,7 +92,11 @@ function nextBucket(bucket: Date, grain: TimeGrain): Date {
  * containing `end`. Returns `null` instead of a list once it would exceed `limit`, so a caller can
  * cheaply refuse an oversized fill without materialising it first.
  */
-export function listBucketDates(window: TimeWindow, grain: TimeGrain, limit: number = MAX_FILLED_BUCKETS): string[] | null {
+export function listBucketDates(window: TimeWindow, grain: MetricQueryGrain, limit: number = MAX_FILLED_BUCKETS): string[] | null {
+  if (grain === TOTAL_GRAIN) {
+    // The whole window is one bucket, stamped with its start date - see `totalBucketExpression`.
+    return [window.start];
+  }
   const last = parseUtc(truncateToGrain(window.end, grain)).getTime();
   const buckets: string[] = [];
   for (let bucket = parseUtc(truncateToGrain(window.start, grain)); bucket.getTime() <= last; bucket = nextBucket(bucket, grain)) {

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { MetricCompilerError, SIGNUP_QUALITY_SCORE_TIERS, type SignupQualityScoreTier } from '@growthos/shared';
+import { MetricCompilerError, SIGNUP_QUALITY_SCORE_TIERS, TOTAL_GRAIN, type SignupQualityScoreTier } from '@growthos/shared';
 import { CampaignTargetModel } from '../models/campaign-target.model';
 import { ProjectModel } from '../models/project.model';
 import { ProjectNotFoundError } from './resource-library.service';
@@ -251,7 +251,7 @@ export type PaybackOverviewOutcome =
   | { ok: true; windows: PaybackWindowValue[] }
   | { ok: false; reason: 'warehouse_not_configured' | 'quota_exceeded' | 'not_yet_backed' | 'query_error'; message: string };
 
-/** Local mirror of `sumMetricRows` (`goal.service.ts`) — same reasoning that file's own copy gives for not sharing one across services. */
+/** Sums an additive metric's column across rows (its `collection_Nd` sums only - never a ratio; see `TOTAL_GRAIN` for how a non-additive metric's period value is read instead). */
 function sumMetricRows(rows: readonly WarehouseRow[], metricName: string): number {
   return rows.reduce((total, row) => {
     const raw = row[metricName] ?? null;
@@ -348,8 +348,7 @@ function toCampaignPaybackRow(row: WarehouseRow): CampaignPaybackRow | null {
  * (2026-08-25 follow-up — see `fact_customer_payback.sql`'s own doc comment
  * for how the mart now carries `campaign_id`): lifetime `collection_40d`/
  * `roi_40d`, broken down by `campaign_id`, one query for both metrics at
- * once (same "one wide `1970..2999` bucket" posture
- * {@link getPaybackOverviewForProject} already establishes, so each
+ * once (one `total`-grain `1970..2999` bucket, so each
  * campaign_id contributes at most one row — no cross-bucket fold needed for
  * `roi_40d`, which (being a ratio) couldn't be summed correctly anyway, see
  * `quality-score-pack/metrics.ts`'s own doc comment on the identical
@@ -372,7 +371,11 @@ export async function getCampaignPaybackBreakdownForProject(
       request: {
         metrics: ['collection_40d', 'roi_40d'],
         dimensions: ['campaign_id'],
-        time: { start: '1970-01-01', end: '2999-12-31', grain: 'year' },
+        // `total`, not `year`: a `year` grain over 1970..2999 is one bucket per calendar YEAR, so a
+        // campaign with data in two years came back as two rows, each a partial "lifetime" ROI (and
+        // a duplicate campaign key). One whole-range bucket makes `roi_40d` the ratio of the
+        // campaign's lifetime totals - see `TOTAL_GRAIN`.
+        time: { start: '1970-01-01', end: '2999-12-31', grain: TOTAL_GRAIN },
       },
       ...(options?.executor ? { executor: options.executor } : {}),
       ...(options?.cache ? { cache: options.cache } : {}),

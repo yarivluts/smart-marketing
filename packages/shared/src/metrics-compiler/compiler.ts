@@ -1,9 +1,11 @@
 import { assertSafeIdentifier, quoteIdentifier } from './identifiers';
 import { collectIdentifiers, parseFormula, type FormulaAstNode } from './formula-parser';
-import { bucketExpression, computeCompareWindow, dateColumnExpression, type TimeWindow } from './time';
+import { bucketExpression, computeCompareWindow, dateColumnExpression, totalBucketExpression, type TimeWindow } from './time';
 import {
   METRIC_FILTER_OPERATORS,
+  METRIC_QUERY_GRAINS,
   MetricCompilerError,
+  TOTAL_GRAIN,
   type CompilerAggregationDef,
   type CompilerFilter,
   type CompilerMetricDefinition,
@@ -11,8 +13,8 @@ import {
   type CompilerTenant,
   type CompiledMetricQuery,
   type MetricCatalog,
+  type MetricQueryGrain,
   type MetricQueryRequest,
-  type TimeGrain,
 } from './types';
 
 interface Period {
@@ -107,7 +109,7 @@ function buildLeafCte(
   dimensions: readonly string[],
   queryFilters: readonly CompilerFilter[],
   period: Period,
-  grain: TimeGrain,
+  grain: MetricQueryGrain,
   tenant: CompilerTenant | undefined,
   params: Record<string, CompilerParamValue>,
 ): LeafCte {
@@ -136,12 +138,19 @@ function buildLeafCte(
   agg.filters.forEach((filter, index) => whereClauses.push(emitFilterClause(filter, `filter_${leafName}_${index}`, params)));
   queryFilters.forEach((filter, index) => whereClauses.push(emitFilterClause(filter, `qfilter_${index}`, params)));
 
+  // A `total` grain aggregates the whole window at once (see `TOTAL_GRAIN`): its bucket is a
+  // constant, so only the dimensions are grouped by - and with none, nothing is, which makes the
+  // aggregate return a row even over zero input rows. `HAVING COUNT(*) > 0` drops that row, so an
+  // empty window reads as "no rows" exactly as an empty day does at a calendar grain, instead of a
+  // COUNT of 0 that a tile could not tell apart from a measured zero.
+  const isTotal = grain === TOTAL_GRAIN;
+  const bucketSql = isTotal ? totalBucketExpression(startParam) : bucketExpression(timeColumnSql, grain);
   const selectColumns = [
-    `${bucketExpression(timeColumnSql, grain)} AS bucket_date`,
+    `${bucketSql} AS bucket_date`,
     ...dimensionColumns.map((column) => `${column} AS ${column}`),
     `${buildAggregateExpr(agg)} AS ${valueAlias}`,
   ];
-  const groupByColumns = ['bucket_date', ...dimensionColumns];
+  const groupByColumns = isTotal ? dimensionColumns : ['bucket_date', ...dimensionColumns];
 
   const sql = [
     `${cteName} AS (`,
@@ -149,7 +158,7 @@ function buildLeafCte(
     selectColumns.map((column) => `    ${column}`).join(',\n'),
     `  FROM ${tableSql}`,
     `  WHERE ${whereClauses.join(' AND ')}`,
-    `  GROUP BY ${groupByColumns.join(', ')}`,
+    ...(groupByColumns.length > 0 ? [`  GROUP BY ${groupByColumns.join(', ')}`] : ['  HAVING COUNT(*) > 0']),
     ')',
   ].join('\n');
 
@@ -200,7 +209,8 @@ function emitFormulaAst(catalog: MetricCatalog, node: FormulaAstNode, resolving:
 /**
  * Compiles a set of already-resolved metric definitions + a query request
  * into BigQuery SQL (KAN-41, plan `13 §E5.2`): buckets by the requested time
- * grain, breaks down by the requested dimensions, and — when `compare` is
+ * grain (or, for `total`, aggregates the whole range as one bucket - the
+ * period value, see `TOTAL_GRAIN`), breaks down by the requested dimensions, and — when `compare` is
  * set — unions a `previous` window alongside `current`, tagged by a
  * `period` column.
  *
@@ -224,6 +234,9 @@ export function compileMetricQuery(catalog: MetricCatalog, request: MetricQueryR
   const metricNames = [...new Set(request.metrics)];
   if (metricNames.length === 0) {
     throw new MetricCompilerError('A query must request at least one metric.');
+  }
+  if (!METRIC_QUERY_GRAINS.includes(request.time.grain)) {
+    throw new MetricCompilerError(`Unknown time grain "${request.time.grain}".`);
   }
 
   const definitions = new Map(metricNames.map((name) => [name, getDefinition(catalog, name)] as const));
