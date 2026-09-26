@@ -7,6 +7,7 @@ import { McpAuthGuard, type McpAuthenticatedRequest } from './mcp-auth.guard';
 import { registerMcpTools } from './mcp-tools';
 import { registerMcpActTools } from './mcp-act-tools';
 import { registerMcpAdminTools } from './mcp-admin-tools';
+import { registerMcpSetupTools } from './mcp-setup-tools';
 
 const SERVER_NAME = 'growthos';
 const SERVER_VERSION = '1.0.0';
@@ -61,6 +62,7 @@ export class McpController {
     registerMcpTools(server, auth);
     registerMcpActTools(server, auth);
     registerMcpAdminTools(server, auth);
+    registerMcpSetupTools(server, auth);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
     response.on('close', () => {

@@ -7,6 +7,24 @@ fresh session can pick up work from this file + [TASKS.md](./TASKS.md) alone. Se
 Template for each entry:
 
 ```
+## 2026-09-26 - KAN-197: setup tools ported from the abandoned tree, fixed (PR open, not merged)
+
+- **Last completed:** `get_setup_health` + `audit_installation_gaps` MCP tools, registered in
+  mcp.controller so the normal api build ships them. Ported only the two tools and rewrote their
+  core: each requirement's status is derived per environment from landed raw records (connected)
+  and open quarantine (error), never from a manual flag (B1); every recommended page/endpoint/tool
+  is resolved against the real code by `setup-requirements-artifacts.spec.ts` (B2); output is
+  plain English, key-like strings are a test failure (B3); billing is satisfied by
+  `subscription_state_change` from any billing system (KAN-110). Read-only Setup health panel on
+  the ingest-health page (en + he). EasySign dev encoded as a fixture: touchpoints, signups,
+  documents, customer connected; ads and billing gaps.
+- **Dropped from the source:** the duplicate `packages/shared/src/schemas/*` canonical-schema
+  system (main's per-project schema registry is the one), `verified_requirements` and the other
+  project-profile fields, `verify_installation`/`test_integration_event` (manual verification and
+  synthetic events), `get_tracking_script`/`get_installation_instructions` (fake SDK/CDN/webhook
+  URLs), and project/goal CRUD tools main already has.
+- **Next step:** review + merge the PR, then EasySign re-runs `get_setup_health` against dev.
+
 ## 2026-09-26 - EasySign round 3: ratio period math, tile fit, line-tile edges
 
 ### Fixed and deployed (production api-prod/api-preprod/web-prod/web-preprod at 6633e8c; dbt-refresh b70c5f9)

@@ -61,6 +61,14 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
     // duplicate — a retry storm must not read as a validation problem.
     await expect(overallRow).toContainText('25.0% rejected on arrival');
 
+    // KAN-197: the setup-health panel reads the same records. order_completed was accepted in prod,
+    // so billing is connected (with its one rejected record noted); nothing else was sent.
+    const billingRequirement = page.getByTestId('setup-requirement-billing');
+    await expect(billingRequirement).toContainText('Connected');
+    await expect(billingRequirement).toContainText('Accepted records for "order_completed"');
+    await expect(billingRequirement).toContainText('1 record is rejected and open in quarantine ("order_completed"): missing_required_field:amount');
+    await expect(page.getByTestId('setup-requirement-ad_spend')).toContainText('Not connected');
+
     await expect(page.getByText('ord-3 (Events, Prod)')).toBeVisible();
     await expect(page.getByText('Reasons: missing_required_field:amount')).toBeVisible();
 
@@ -103,6 +111,8 @@ test.describe('Ingest health: throughput/error-rate rollup + quarantine browser 
 
     await page.getByRole('link', { name: 'Ingest health' }).click();
     await expect(page.getByText('No ingest batches for this project yet.')).toBeVisible();
+    // KAN-197: nothing received, so nothing is connected - a fresh project can never read as set up.
+    await expect(page.getByText('0 of 6 setup requirements connected in the Prod environment.')).toBeVisible();
     await expect(page.getByText('No quarantined records for this project.')).toBeVisible();
     await expect(page.getByText('No failed pipeline deliveries.')).toBeVisible();
     await expect(page.getByText('No pipeline messages stuck in the queue.')).toBeVisible();

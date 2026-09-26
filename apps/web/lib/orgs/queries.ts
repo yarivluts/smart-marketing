@@ -104,6 +104,8 @@ import {
   listPluginInstallsForProject as listPluginInstallsForProjectInOrganization,
   listPluginManifestsForOrg as listPluginManifestsForOrgInOrganization,
   listQuarantinedRecordsForProject as listQuarantinedRecordsForProjectInOrganization,
+  evaluateProjectSetupHealth as evaluateProjectSetupHealthInOrganization,
+  ProjectNotFoundError,
   listRecentBillingEventsForProject as listRecentBillingEventsForProjectInOrganization,
   listRecentChurnedSubscriptionsForProject as listRecentChurnedSubscriptionsForProjectInOrganization,
   listRecentDunningSubscriptionsForProject as listRecentDunningSubscriptionsForProjectInOrganization,
@@ -207,6 +209,7 @@ import type {
   FunnelStepSuggestion,
   ParsedMetricUnit,
   Result,
+  SetupHealthReport,
   SignupQualityScoreDistribution,
 } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
@@ -352,6 +355,22 @@ export async function listQuarantinedRecordsForProject(
 ): Promise<QuarantinedRecordModel[]> {
   await ensureFirestoreOrm();
   return listQuarantinedRecordsForProjectInOrganization(organizationId, projectId, limit, environmentId);
+}
+
+/**
+ * KAN-197: each setup requirement's status, derived from the records the environment accepted and
+ * rejected. `environmentId` restricts the read to the environment picked in the project shell.
+ * `null` for a project that is not in the organization, so the page's own not-found handling
+ * decides what to show rather than this read throwing first.
+ */
+export async function evaluateProjectSetupHealth(organizationId: string, projectId: string, environmentId?: string): Promise<SetupHealthReport | null> {
+  await ensureFirestoreOrm();
+  try {
+    return await evaluateProjectSetupHealthInOrganization({ organizationId, projectId, environmentId });
+  } catch (error) {
+    if (error instanceof ProjectNotFoundError) return null;
+    throw error;
+  }
 }
 
 export async function listRecentBillingEventsForProject(

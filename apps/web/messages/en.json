@@ -700,6 +700,47 @@
     "warehouseFreshnessNotConfigured": "No warehouse is configured for this deployment yet — freshness will appear here once BigQuery is connected.",
     "warehouseFreshnessError": "Couldn't read warehouse freshness: {message}"
   },
+  "SetupHealth": {
+    "heading": "Setup health",
+    "summaryLine": "{connected} of {total} setup requirements connected in the {environment} environment.",
+    "status": {
+      "connected": "Connected",
+      "error": "Rejected records only",
+      "gap": "Not connected"
+    },
+    "acceptedLine": "Accepted records for {schemas}, latest at {lastAcceptedAt}.",
+    "rejectedLine": "{count, plural, one {# record is} other {# records are}} rejected and open in quarantine ({schemas}): {reasons}",
+    "silentRegisteredLine": "Registered but never received in this environment: {schemas}.",
+    "nothingReceivedLine": "Nothing received in this environment, accepted or rejected.",
+    "sourceNote": "Derived only from the records this environment accepted or rejected; no requirement can be marked connected by hand. For step-by-step fixes, run the audit_installation_gaps MCP tool.",
+    "mappingNote": "Schemas are matched to requirements by their names, so check the schemas listed under each one: a name like \"order_viewed\" would be counted as billing.",
+    "requirements": {
+      "landing_page_attribution": {
+        "title": "Landing-page attribution (touchpoints)",
+        "impact": "Without touchpoints no signup or customer can be traced back to the campaign, channel or landing page that brought it."
+      },
+      "signups": {
+        "title": "Signups",
+        "impact": "Without a signup event the funnel has no entry step, and cost per signup, landing-page conversion and cohorts cannot be computed."
+      },
+      "product_usage": {
+        "title": "Product usage events",
+        "impact": "Without product events there is no activation, engagement or retention reading."
+      },
+      "customer_profiles": {
+        "title": "Customer entity",
+        "impact": "Without customer entities Customer 360 is empty and segments cannot filter on customer attributes."
+      },
+      "billing": {
+        "title": "Billing and subscriptions",
+        "impact": "Without billing records (subscription_state_change events or the Stripe connector) there is no revenue, MRR, churn or payback reading."
+      },
+      "ad_spend": {
+        "title": "Ad spend",
+        "impact": "Without ad spend there is no cost side: CAC, cost per signup, ROAS and payback cannot be computed."
+      }
+    }
+  },
   "BillingOpsFeed": {
     "metaTitle": "Billing ops feed",
     "title": "Billing ops feed for {projectName}",

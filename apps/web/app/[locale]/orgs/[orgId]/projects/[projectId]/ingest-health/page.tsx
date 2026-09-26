@@ -5,6 +5,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
+  evaluateProjectSetupHealth,
   getWarehouseFreshnessForProject,
   listFailedPipelineMessagesForProject,
   listOrchestrationRunsForProject,
@@ -36,6 +37,7 @@ import { RetryFailedPipelineMessagesButton } from '@/components/orgs/retry-faile
 import { ReexportRawRecordsButton } from '@/components/orgs/reexport-raw-records-button';
 import { SweepQueuedPipelineMessagesButton } from '@/components/orgs/sweep-queued-pipeline-messages-button';
 import { TriggerOrchestrationRunButton } from '@/components/orgs/trigger-orchestration-run-button';
+import { SetupHealthPanel } from '@/components/orgs/setup-health-panel';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -76,7 +78,7 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   // every environment), so they stay unscoped.
   const { selected: selectedEnvironment, environments } = await resolveSelectedEnvironment(orgId, projectId);
   const environmentId = selectedEnvironment?.id;
-  const [projects, batches, quarantinedRecords, failedPipelineMessages, queuedPipelineMessages, orchestrationRuns, warehouseFreshness] = await Promise.all([
+  const [projects, batches, quarantinedRecords, failedPipelineMessages, queuedPipelineMessages, orchestrationRuns, warehouseFreshness, setupHealth] = await Promise.all([
     listOrgProjects(orgId),
     listRecentIngestBatchesForProject(orgId, projectId, undefined, environmentId),
     listQuarantinedRecordsForProject(orgId, projectId, undefined, environmentId),
@@ -84,6 +86,8 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
     listQueuedPipelineMessagesForProject(orgId, projectId, undefined, environmentId),
     listOrchestrationRunsForProject(orgId, projectId),
     getWarehouseFreshnessForProject({ organizationId: orgId, projectId, environmentId }),
+    // KAN-197: requirement statuses for the picked environment only (read-only; derived from records).
+    evaluateProjectSetupHealth(orgId, projectId, environmentId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) {
@@ -136,6 +140,10 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   return (
     <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
       <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+
+      {environmentId !== undefined && setupHealth?.environments[0] ? (
+        <SetupHealthPanel health={setupHealth.environments[0]} environmentLabel={selectedEnvironmentLabel} />
+      ) : null}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">{t('summaryHeading')}</h2>
