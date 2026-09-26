@@ -11,6 +11,10 @@ import type {
   SetupSchemaObservation,
 } from './types';
 
+const CORE_REQUIREMENT_IDS: ReadonlySet<SetupRequirementId> = new Set(
+  SETUP_REQUIREMENTS.filter((requirement) => requirement.importance === 'core').map((requirement) => requirement.id),
+);
+
 /** dev, staging, prod: the order a person reads them in, whatever order Firestore returned them. */
 const ENVIRONMENT_ORDER = ['dev', 'staging', 'prod'];
 
@@ -80,15 +84,14 @@ export function deriveSetupHealth(environments: readonly SetupEnvironmentRef[], 
       ),
     );
     const connected = requirements.filter((result) => result.status === 'connected');
-    const coreIds = new Set(SETUP_REQUIREMENTS.filter((requirement) => requirement.importance === 'core').map((requirement) => requirement.id));
     return {
       environmentId: environment.id,
       environmentName: environment.name,
       requirements,
       connectedCount: connected.length,
       totalCount: requirements.length,
-      coreConnectedCount: connected.filter((result) => coreIds.has(result.requirementId)).length,
-      coreTotalCount: coreIds.size,
+      coreConnectedCount: connected.filter((result) => CORE_REQUIREMENT_IDS.has(result.requirementId)).length,
+      coreTotalCount: CORE_REQUIREMENT_IDS.size,
       score: requirements.length === 0 ? 0 : Math.round((connected.length / requirements.length) * 100),
     };
   });
