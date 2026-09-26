@@ -185,7 +185,12 @@ export default async function SegmentsPage({ params, searchParams }: PageProps):
             icon={UsersRound}
             subtext={stats.totalMembers !== null && stats.measuredCount < segments.length ? t('kpiMembersPartial', { count: stats.measuredCount, total: segments.length }) : undefined}
           />
-          <StatCard title={t('kpiLargest')} value={stats.largest ? stats.largest.name : t('kpiNoValue')} subtext={stats.largest ? t('memberCount', { count: stats.largest.count }) : undefined} icon={Trophy} />
+          <StatCard
+            title={t('kpiLargest')}
+            value={stats.largest ? numberFormat.format(stats.largest.count) : t('kpiNoValue')}
+            subtext={stats.largest ? stats.largest.name : undefined}
+            icon={Trophy}
+          />
           <StatCard
             title={t('kpiOpenWork')}
             value={numberFormat.format(stats.byStatus.open + stats.byStatus.in_progress)}

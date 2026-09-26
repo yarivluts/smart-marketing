@@ -2412,7 +2412,7 @@
     "flowTitle": "זרימת המשפך",
     "flowDescription": "כמה אנשים הגיעו לכל שלב, וכמה מהם אבדו בדרך לשלב הבא. כתום מסמן אובדן של חמישית או יותר, אדום - של מחצית או יותר.",
     "flowConversion": "{percent}% משלב 1",
-    "flowDropOff": "{percent}% נשרו",
+    "flowDropOff": "↓ {percent}%",
     "conversionChartTitle": "המרה לפי שלב",
     "conversionChartDescription": "איזה חלק מהאנשים בשלב הראשון הגיע לכל שלב.",
     "conversionSeries": "המרה",

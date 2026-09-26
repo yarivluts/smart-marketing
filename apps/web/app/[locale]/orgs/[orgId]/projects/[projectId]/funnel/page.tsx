@@ -140,7 +140,7 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
   });
 
   return (
-    <main className="container mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <FunnelGoalsDashboard
         orgId={orgId}
         projectId={projectId}

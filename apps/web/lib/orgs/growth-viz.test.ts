@@ -50,7 +50,9 @@ describe('funnel shaping', () => {
   it('builds one node per step in step order, and one edge per transition labelled with its loss', () => {
     const { nodes, edges } = buildFunnelFlow(STEPS, text);
     expect(nodes.map((node) => node.id)).toEqual(['step-1', 'step-2', 'step-3', 'step-4']);
-    expect(nodes[0]).toMatchObject({ label: 'awareness', value: '5 people', status: 'ok', sublabel: 'touchpoint · 100% of step 1' });
+    expect(nodes[0]).toMatchObject({ label: 'touchpoint', value: '5 people', status: 'ok', sublabel: 'awareness · 100% of step 1' });
+    // A step whose event and stage share a name says it once.
+    expect(nodes[1]).toMatchObject({ label: 'signup', sublabel: '40% of step 1' });
     expect(nodes[1].status).toBe('error');
     expect(nodes[2].status).toBe('ok');
     expect(nodes[3].status).toBe('warn');

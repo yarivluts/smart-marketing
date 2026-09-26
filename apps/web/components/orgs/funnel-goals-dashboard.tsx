@@ -407,7 +407,7 @@ export function FunnelGoalsDashboard({
           {funnelMeasured ? (
             <>
               <ChartCard title={t('flowTitle')} description={t('flowDescription')} icon={Workflow}>
-                <FlowDiagram nodes={funnelFlow.nodes} edges={funnelFlow.edges} label={t('flowTitle')} height={240} />
+                <FlowDiagram nodes={funnelFlow.nodes} edges={funnelFlow.edges} label={t('flowTitle')} height={200} />
               </ChartCard>
 
               <div className="grid gap-6 lg:grid-cols-5">
@@ -601,7 +601,8 @@ export function FunnelGoalsDashboard({
 
       {activeTab === 'retention' && (
         <div className="flex flex-col gap-6" data-testid="retention-tab-content">
-          {cohortRows.length > 0 ? (
+          {/* A curve needs two measured periods; one point is already the matrix's single column. */}
+          {retentionCurve.filter((point) => point.retention !== null).length >= 2 ? (
             <ChartCard title={t('retentionCurveTitle')} description={t('retentionCurveDescription')} icon={TrendingUp}>
               <TrendChart
                 label={t('retentionCurveTitle')}

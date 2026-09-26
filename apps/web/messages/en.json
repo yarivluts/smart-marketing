@@ -2412,7 +2412,7 @@
     "flowTitle": "Funnel flow",
     "flowDescription": "Each step's people, with the share lost on the way to the next. Amber marks a loss of a fifth or more, red half or more.",
     "flowConversion": "{percent}% of step 1",
-    "flowDropOff": "{percent}% lost",
+    "flowDropOff": "↓ {percent}%",
     "conversionChartTitle": "Conversion by step",
     "conversionChartDescription": "Share of the first step's people who reached each step.",
     "conversionSeries": "Conversion",

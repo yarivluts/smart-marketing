@@ -40,8 +40,11 @@ export function buildFunnelFlow(steps: readonly FunnelStepItem[], text: FunnelFl
   const ordered = [...steps].sort((a, b) => a.stepOrder - b.stepOrder);
   const nodes: FlowNodeSpec[] = ordered.map((step, index) => ({
     id: `step-${step.stepOrder}`,
-    label: step.stageLabel,
-    sublabel: [step.eventSchemaName, text.conversion(step.conversionPercent)].filter(Boolean).join(' · '),
+    // The event is what tells steps apart (several can share a stage); the stage rides along below it.
+    label: step.eventSchemaName ?? step.stageLabel,
+    sublabel: [step.eventSchemaName && step.eventSchemaName !== step.stageLabel ? step.stageLabel : null, text.conversion(step.conversionPercent)]
+      .filter(Boolean)
+      .join(' · '),
     value: text.people(step.customerCount),
     status: index === 0 ? (step.customerCount > 0 ? 'ok' : 'idle') : funnelDropOffStatus(step.dropOffPercent),
   }));

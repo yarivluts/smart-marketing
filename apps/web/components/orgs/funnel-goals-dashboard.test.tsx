@@ -277,8 +277,8 @@ describe('FunnelGoalsDashboard Component', () => {
       renderDashboard(buildFunnelGoalsCockpitData({ funnelOutcome: REAL_FUNNEL, goals: [] }));
 
       const flow = screen.getByTestId('flow-diagram');
-      expect(within(flow).getByText('sent → viewed: 60% lost')).toBeInTheDocument();
-      expect(within(flow).getByText('viewed → signed: 25% lost')).toBeInTheDocument();
+      expect(within(flow).getByText('sent_event → viewed_event: ↓ 60%')).toBeInTheDocument();
+      expect(within(flow).getByText('viewed_event → signed_event: ↓ 25%')).toBeInTheDocument();
     });
 
     it('charts conversion per step and ranks where people were lost', () => {
@@ -360,6 +360,19 @@ describe('FunnelGoalsDashboard Component', () => {
       fireEvent.click(screen.getByTestId('tab-retention-btn'));
       const curve = screen.getByRole('table', { name: enMessages.FunnelGoals.retentionCurveTitle });
       expect(within(curve).getAllByRole('row').slice(1).map((row) => row.textContent)).toEqual(['P0100%', 'P140%']);
+    });
+
+    it('draws no curve from a single measured period', () => {
+      renderDashboard(
+        buildFunnelGoalsCockpitData({
+          funnelOutcome: null,
+          goals: [],
+          cohortOutcome: { ok: true, rows: [{ cohortMonth: '2026-09-01', cohortSize: 83, periodNumber: 0, retainedCount: 83, retentionRate: 1 }] },
+        }),
+      );
+      fireEvent.click(screen.getByTestId('tab-retention-btn'));
+      expect(screen.queryByRole('table', { name: enMessages.FunnelGoals.retentionCurveTitle })).not.toBeInTheDocument();
+      expect(screen.getByTestId('cohort-retention-matrix')).toBeInTheDocument();
     });
   });
 });
