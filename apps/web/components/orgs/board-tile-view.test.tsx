@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
 import { BoardTileView } from './board-tile-view';
 import type { BoardTileRow } from './board-types';
 import messages from '../../messages/en.json';
+import heMessages from '../../messages/he.json';
 import type { TileRenderView } from '@/lib/orgs/board-view';
 
 beforeEach(() => {
@@ -77,7 +78,7 @@ describe('BoardTileView', () => {
       { kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: [{ bucket: '2026-01-01', value: 10 }] }], isEmpty: false, freshness: null },
       { type: 'bar' },
     );
-    expect(screen.getByRole('img', { name: 'all' })).toBeInTheDocument();
+    expect(screen.getByRole('figure', { name: 'Ad spend' })).toBeInTheDocument();
   });
 
   it('renders an empty bar-chart state', () => {
@@ -128,6 +129,133 @@ describe('BoardTileView', () => {
     );
     expect(screen.getByText('Previous period')).toBeInTheDocument();
     expect(screen.getByTitle('2025-12-01: 8')).toBeInTheDocument();
+  });
+
+  describe('readable time-series labels (KAN-210)', () => {
+    const signupsPerDay = [
+      { bucket: '2026-09-24', value: 1 },
+      { bucket: '2026-09-25', value: 3 },
+      { bucket: '2026-09-26', value: 0 },
+    ];
+
+    /** The drawn (aria-hidden) plot + axis - what a sighted reader or a screenshot sees. */
+    function visiblePlot(container: HTMLElement): HTMLElement {
+      const plot = container.querySelector<HTMLElement>('[dir="ltr"][aria-hidden="true"]');
+      expect(plot).not.toBeNull();
+      return plot!;
+    }
+
+    it.each(['bar', 'line'] as const)('prints each %s value and its bucket date as text on the chart', (chart) => {
+      const { container } = renderTile(
+        { kind: 'time_series', chart, series: [{ label: 'all', points: signupsPerDay }], isEmpty: false, freshness: null },
+        { type: chart, title: 'Signups per day' },
+      );
+      const plot = within(visiblePlot(container));
+      for (const text of ['1', '3', '0', '9/24', '9/25', '9/26']) {
+        expect(plot.getByText(text)).toBeInTheDocument();
+      }
+    });
+
+    it.each(['bar', 'line'] as const)('exposes the %s series to assistive tech as a captioned table of date and value', (chart) => {
+      renderTile(
+        { kind: 'time_series', chart, series: [{ label: 'all', points: signupsPerDay }], isEmpty: false, freshness: null },
+        { type: chart, title: 'Signups per day' },
+      );
+      const table = screen.getByRole('table', { name: 'Signups per day' });
+      expect(within(table).getByRole('columnheader', { name: 'Date' })).toBeInTheDocument();
+      expect(within(table).getByRole('row', { name: '2026-09-25 3' })).toBeInTheDocument();
+    });
+
+    it('formats the axis dates for the Hebrew locale and keeps the plot left-to-right', () => {
+      const { container } = render(
+        <NextIntlClientProvider locale="he" messages={heMessages}>
+          <BoardTileView
+            tile={tile({ type: 'bar', title: 'Signups per day' })}
+            view={{ kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: signupsPerDay }], isEmpty: false, freshness: null }}
+          />
+        </NextIntlClientProvider>,
+      );
+      const plot = visiblePlot(container);
+      expect(within(plot).getByText('25.9')).toBeInTheDocument();
+      expect(within(plot).getByText('3')).toBeInTheDocument();
+      expect(screen.getByRole('columnheader', { name: heMessages.Boards.chartBucketColumn })).toBeInTheDocument();
+    });
+
+    it('pairs a muted previous-period bar beside each current bar in the same plot, with its own captioned table', () => {
+      const { container } = renderTile(
+        {
+          kind: 'time_series',
+          chart: 'bar',
+          series: [{ label: 'all', points: [{ bucket: '2026-09-25', value: 3 }] }],
+          previousSeries: [{ label: 'all', points: [{ bucket: '2026-09-18', value: 7 }] }],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'bar', title: 'Signups per day' },
+      );
+      const plots = container.querySelectorAll<HTMLElement>('[dir="ltr"][aria-hidden="true"]');
+      expect(plots).toHaveLength(1);
+      const plot = within(plots[0]);
+      expect(plot.getByText('3')).toBeInTheDocument();
+      expect(plot.getByText('9/25')).toBeInTheDocument();
+      expect(plot.getByTitle('2026-09-18: 7')).toHaveClass('opacity-40');
+      expect(screen.getByText('Previous period')).toBeInTheDocument();
+      const previousTable = screen.getByRole('table', { name: 'Signups per day (previous period)' });
+      expect(within(previousTable).getByRole('row', { name: '2026-09-18 7' })).toBeInTheDocument();
+    });
+
+    it('puts each series\' latest value in the legend of a split line tile rather than on colliding points', () => {
+      const { container } = renderTile(
+        {
+          kind: 'time_series',
+          chart: 'line',
+          series: [
+            { label: 'google', points: [{ bucket: '2026-09-24', value: 4 }, { bucket: '2026-09-25', value: 10 }] },
+            { label: 'meta', points: [{ bucket: '2026-09-24', value: 2 }, { bucket: '2026-09-25', value: 5 }] },
+          ],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'line' },
+      );
+      const legendItems = [...container.querySelectorAll('ul li')].map((item) => item.textContent);
+      expect(legendItems).toEqual(['google10', 'meta5']);
+      expect(within(visiblePlot(container)).getByText('9/25')).toBeInTheDocument();
+    });
+
+    it('thins labels on a long series so they do not collide, while the table keeps every value', () => {
+      const points = Array.from({ length: 30 }, (_, index) => ({
+        bucket: `2026-09-${String(index + 1).padStart(2, '0')}`,
+        value: index === 10 ? 50 : 2,
+      }));
+      const { container } = renderTile(
+        { kind: 'time_series', chart: 'bar', series: [{ label: 'all', points }], isEmpty: false, freshness: null },
+        { type: 'bar', title: 'Signups per day' },
+      );
+      const plot = within(visiblePlot(container));
+      expect(plot.getByText('50')).toBeInTheDocument(); // the peak
+      expect(plot.getAllByText('2')).toHaveLength(1); // only the latest of the 29 other bars
+      expect(plot.getByText('9/30')).toBeInTheDocument(); // the latest bucket is always on the axis
+      expect(within(screen.getByRole('table', { name: 'Signups per day' })).getAllByRole('row')).toHaveLength(31);
+    });
+
+    it('captions each series table of a split line tile with the tile title and the series', () => {
+      renderTile(
+        {
+          kind: 'time_series',
+          chart: 'line',
+          series: [
+            { label: 'google', points: [{ bucket: '2026-09-25', value: 10 }] },
+            { label: 'meta', points: [{ bucket: '2026-09-25', value: 5 }] },
+          ],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'line' },
+      );
+      expect(screen.getByRole('table', { name: 'Ad spend · google' })).toBeInTheDocument();
+      expect(screen.getByRole('table', { name: 'Ad spend · meta' })).toBeInTheDocument();
+    });
   });
 
   it('renders a table tile', () => {
