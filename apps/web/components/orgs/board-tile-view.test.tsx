@@ -421,6 +421,60 @@ describe('BoardTileView', () => {
     });
   });
 
+  describe('a split tile stays inside its grid cell (KAN-217)', () => {
+    const byCampaign = (values: Record<string, number>) => ({
+      kind: 'time_series' as const,
+      chart: 'bar' as const,
+      series: Object.entries(values).map(([label, value]) => ({ label, points: [{ bucket: '2026-09-25', value }] })),
+      isEmpty: false,
+      freshness: null,
+    });
+
+    it('clips the tile body and scrolls it, rather than letting content paint over the tile below', () => {
+      const { getByTestId } = renderTile(byCampaign({ a: 1, b: 2 }), { type: 'bar' });
+      const body = getByTestId('board-tile-body');
+      expect(body).toHaveClass('h-full', 'overflow-y-auto', 'overflow-x-hidden');
+    });
+
+    it('draws at most three per-campaign plots and summarises the rest behind "+N more"', () => {
+      const { container } = renderTile(byCampaign({ spring: 0.12, summer: 0.5, autumn: 0.08, winter: 0.3, brand: 0.02 }), {
+        type: 'bar',
+        title: 'Conversion rate',
+      });
+      // One plot (a labelled <figure>) per drawn campaign: the three with the largest values.
+      const plots = container.querySelectorAll('figure');
+      expect([...plots].map((plot) => plot.getAttribute('aria-label'))).toEqual([
+        'Conversion rate · spring',
+        'Conversion rate · summer',
+        'Conversion rate · winter',
+      ]);
+      expect(container.querySelectorAll('[data-testid="series-bar"]')).toHaveLength(3);
+
+      const more = screen.getByTestId('small-multiples-more');
+      expect(within(more).getByText('+2 more')).toBeInTheDocument();
+      expect(within(more).getByText('autumn')).toBeInTheDocument();
+      expect(within(more).getByText('0.08')).toBeInTheDocument();
+      expect(within(more).getByText('brand')).toBeInTheDocument();
+      // The hidden campaigns' numbers still reach assistive tech.
+      expect(screen.getByRole('table', { name: 'Conversion rate · autumn' })).toBeInTheDocument();
+      expect(screen.getByRole('table', { name: 'Conversion rate · brand' })).toBeInTheDocument();
+    });
+
+    it('shows no "+N more" when the split fits under the cap', () => {
+      renderTile(byCampaign({ a: 1, b: 2, c: 3 }), { type: 'bar' });
+      expect(screen.queryByTestId('small-multiples-more')).not.toBeInTheDocument();
+    });
+
+    it('translates the "+N more" affordance', () => {
+      render(
+        <NextIntlClientProvider locale="he" messages={heMessages}>
+          <BoardTileView tile={tile({ type: 'bar' })} view={byCampaign({ a: 1, b: 2, c: 3, d: 4 })} />
+        </NextIntlClientProvider>,
+      );
+      expect(screen.getByText(heMessages.Boards.moreSeriesLabel.replace('{count}', '1'))).toBeInTheDocument();
+    });
+  });
+
   it('renders a table tile', () => {
     renderTile(
       { kind: 'table', columns: ['bucket_date', 'ad_spend'], rows: [{ bucket_date: '2026-01-01', ad_spend: 100 }], isEmpty: false, freshness: null },

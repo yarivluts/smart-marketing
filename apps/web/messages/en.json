@@ -1331,6 +1331,7 @@
     "chartSeriesCaption": "{title} · {series}",
     "chartPreviousPeriodCaption": "{caption} (previous period)",
     "previousPeriodLabel": "Previous period",
+    "moreSeriesLabel": "+{count} more",
     "funnelStepValueLabel": "{total} ({pctOfFirstStep}%)",
     "tableEmpty": "No data for this range yet.",
     "columnsMenuLabel": "Columns",

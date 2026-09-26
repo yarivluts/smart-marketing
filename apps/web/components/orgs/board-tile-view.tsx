@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { buildSessionReplayLink, formatMetricValue, sessionReplayTemplateFiltersByPage, type ParsedMetricUnit } from '@growthos/shared';
 import type { TileFreshness, TileRenderView, TimeSeries, TimeSeriesPoint } from '@/lib/orgs/board-view';
-import { formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, latestPresentPoint, splitAtGaps } from '@/lib/orgs/chart-labels';
+import { capSmallMultiples, formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, latestPresentPoint, splitAtGaps } from '@/lib/orgs/chart-labels';
 import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
 
 export interface BoardTileViewProps {
@@ -452,10 +452,13 @@ function BarChartView({ view, title }: { view: Extract<TileRenderView, { kind: '
   const previousByLabel = new Map((view.previousSeries ?? []).map((series) => [series.label, series]));
   // Several stacked plots must share the tile's height, so each gets a shorter plot area.
   const compact = view.series.length > 1;
+  // A split with many values would stack one plot per value past the tile's grid cell (KAN-217), so
+  // only the largest few are drawn and the rest are summarised behind a "+N more" disclosure.
+  const { shown, hidden } = capSmallMultiples(view.series);
 
   return (
-    <div className="flex h-full flex-col justify-center gap-3">
-      {view.series.map((series) => {
+    <div className="flex min-h-full flex-col justify-center gap-3">
+      {shown.map((series) => {
         const colorClass = SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length];
         const previous = previousByLabel.get(series.label);
         const caption = captionFor(series.label);
@@ -480,6 +483,31 @@ function BarChartView({ view, title }: { view: Extract<TileRenderView, { kind: '
           </figure>
         );
       })}
+      {hidden.length > 0 ? (
+        <details data-testid="small-multiples-more" className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer select-none">{t('moreSeriesLabel', { count: hidden.length })}</summary>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {hidden.map((series) => {
+              const latest = latestPresentPoint(series.points);
+              return (
+                <li key={series.label} className="flex items-center justify-between gap-2">
+                  <span className="flex min-w-0 items-center gap-1">
+                    <span
+                      className={`inline-block h-2 w-2 shrink-0 rounded-sm ${SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length]}`}
+                    />
+                    <span className="truncate">{series.label}</span>
+                  </span>
+                  <span className="font-medium tabular-nums text-foreground">{latest ? formatNumber(latest.value, locale) : t('chartNoValue')}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      ) : null}
+      {/* Outside the disclosure: a closed <details> hides its content from assistive tech too, and a screen reader should still get every series' numbers. */}
+      {hidden.map((series) => (
+        <SeriesDataTable key={series.label} caption={captionFor(series.label)} points={series.points} locale={locale} />
+      ))}
     </div>
   );
 }
@@ -824,9 +852,13 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
 
   const freshness = view.kind === 'unavailable' ? null : view.freshness;
   const unit = view.kind === 'unavailable' ? undefined : view.units?.[tile.metricNames[0]];
+  // The tile body scrolls inside whatever height its container gives it, and never paints outside
+  // it: content taller than the tile's grid cell (a long legend, a split breakdown) used to spill over
+  // the tile below (KAN-217).
   return (
     <TileUnitContext.Provider value={unit}>
-    <div className="relative h-full">
+    <div data-testid="board-tile-body" className="relative h-full overflow-y-auto overflow-x-hidden">
+
       {freshness ? (
         <div className="absolute right-0 top-0">
           <TileFreshnessBadge freshness={freshness} />
