@@ -17,6 +17,7 @@ import {
   listMetricsCatalogForProject,
   MetricDefModel,
   registerMetricDefinition,
+  resolveMetricDisplayUnits,
   updateGoal,
   updateGoalDefinition,
   GoalModel,
@@ -110,6 +111,26 @@ describe('metric unit on registration and evolution', () => {
     const v4 = await evolveMetricDefinition({ ...base, unit: null });
     expect(v4.unit).toBeUndefined();
     expect((await getActiveMetricDefinition(organization.id, project.id, 'lp_visitors'))?.version).toBe(4);
+  });
+});
+
+describe('resolveMetricDisplayUnits', () => {
+  it('resolves a bare currency to the project currency and an undeclared unit to a plain number', async () => {
+    const { owner, organization, project } = await setup();
+    project.currency = 'ILS';
+    await project.save();
+    const base = { organizationId: organization.id, projectId: project.id, dimensions: [] as string[], createdByUserId: owner.id };
+    await registerMetricDefinition({ ...base, name: 'lp_visitors', definition: visitors });
+    await registerMetricDefinition({ ...base, name: 'spend', definition: { kind: 'formula', formula: 'lp_visitors * 3' }, unit: 'currency' });
+    await registerMetricDefinition({ ...base, name: 'spend_usd', definition: { kind: 'formula', formula: 'lp_visitors * 4' }, unit: 'currency:USD' });
+    await registerMetricDefinition({ ...base, name: 'rate', definition: { kind: 'formula', formula: 'lp_visitors / lp_visitors' }, unit: 'ratio' });
+
+    expect(await resolveMetricDisplayUnits(organization.id, project.id)).toEqual({
+      lp_visitors: { kind: 'number' },
+      spend: { kind: 'currency', currency: 'ILS' },
+      spend_usd: { kind: 'currency', currency: 'USD' },
+      rate: { kind: 'ratio' },
+    });
   });
 });
 

@@ -1,6 +1,14 @@
 import { createHash } from 'node:crypto';
-import { collectIdentifiers, fillEmptyBuckets, parseFormula, type CompilerParamValue, type MetricQueryRequest } from '@growthos/shared';
-import type { ProjectModel } from '../models/project.model';
+import {
+  collectIdentifiers,
+  fillEmptyBuckets,
+  parseFormula,
+  resolveMetricUnit,
+  type CompilerParamValue,
+  type MetricQueryRequest,
+  type ParsedMetricUnit,
+} from '@growthos/shared';
+import { ProjectModel } from '../models/project.model';
 import type { MetricAggregationDef, MetricDefModel, MetricDefinitionKind } from '../models/metric-def.model';
 import { compileMetricQueryForProject, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
 import { resolveDefaultQueryEnvironment } from './organization.service';
@@ -327,4 +335,20 @@ export async function getMetricCatalogDetail(organizationId: string, projectId: 
     dependsOn,
     ...(requiredEvents ? { requiredEvents } : {}),
   };
+}
+
+/**
+ * Every active metric's display unit in a project (KAN-213), keyed by metric name: each declared
+ * unit resolved against the project's own currency (a bare `currency` unit means "this project's
+ * currency"), and every metric with no declared unit as a plain `number`. What a board, a goal card
+ * or an MCP response formats a metric's value with - one read of the catalog plus the project, not
+ * one per value.
+ */
+export async function resolveMetricDisplayUnits(organizationId: string, projectId: string): Promise<Record<string, ParsedMetricUnit>> {
+  const [defs, project] = await Promise.all([
+    listMetricDefinitionsForProject(organizationId, projectId),
+    ProjectModel.init(projectId, { organization_id: organizationId }),
+  ]);
+  const projectCurrency = project && project.organization_id === organizationId ? project.currency : undefined;
+  return Object.fromEntries(defs.filter((def) => def.status === 'active').map((def) => [def.name, resolveMetricUnit(def.unit, projectCurrency)]));
 }
