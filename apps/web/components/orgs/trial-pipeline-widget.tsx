@@ -1,6 +1,9 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { Hourglass } from 'lucide-react';
+import { ChartCard } from '@/components/viz/chart-card';
+import { EmptyState } from '@/components/viz/empty-state';
 import type { TrialPipelineWidgetView } from '@/lib/orgs/trial-pipeline-view';
 
 export interface TrialPipelineWidgetProps {
@@ -29,31 +32,33 @@ export function TrialPipelineWidget({ view }: TrialPipelineWidgetProps): React.R
 
   if (view.status === 'unavailable') {
     return (
-      <section className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
-        <h2 className="text-lg font-semibold">{t('heading')}</h2>
-        <p className="text-sm text-muted-foreground">{t(`unavailable.${view.reason}`)}</p>
-      </section>
+      <ChartCard title={t('heading')} icon={Hourglass} fill>
+        <EmptyState icon={Hourglass} title={t(`unavailable.${view.reason}`)} compact />
+      </ChartCard>
     );
   }
 
+  const rate = view.conversionRatePct === null ? null : Math.max(0, Math.min(100, view.conversionRatePct));
   return (
-    <section className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
-      <h2 className="text-lg font-semibold">{t('heading')}</h2>
-      <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-        <div className="flex flex-col">
+    <ChartCard title={t('heading')} icon={Hourglass} fill>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col gap-1">
           {/* Null when no bucket reported a count - unknown, which is not the same as zero open trials. */}
-          <span className="text-2xl font-bold tabular-nums">
-            {view.activeTrials === null ? '—' : formatNumber(view.activeTrials)}
-          </span>
+          <span className="text-3xl font-bold tabular-nums text-foreground">{view.activeTrials === null ? '—' : formatNumber(view.activeTrials)}</span>
           <span className="text-xs text-muted-foreground">{t('inTrialLabel')}</span>
         </div>
-        <div className="flex flex-col">
-          <span className="text-2xl font-bold tabular-nums">
+        <div className="flex flex-col gap-1">
+          <span className="text-3xl font-bold tabular-nums text-foreground">
             {view.conversionRatePct === null ? '—' : t('convertingValue', { ratePct: formatPercent(view.conversionRatePct) })}
           </span>
           <span className="text-xs text-muted-foreground">{t('convertingLabel')}</span>
+          {rate !== null ? (
+            <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <div className="h-full rounded-full bg-success" style={{ width: `${rate}%` }} />
+            </div>
+          ) : null}
         </div>
       </div>
-    </section>
+    </ChartCard>
   );
 }

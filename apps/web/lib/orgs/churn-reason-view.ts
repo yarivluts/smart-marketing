@@ -1,6 +1,7 @@
 import type { WarehouseRow } from '@growthos/firebase-orm-models';
 import type { CancellationReasonThemeCluster } from '@growthos/shared';
 import { toNumber } from './board-view';
+import { bucketByPeriod, earliestTimestamp, type PeriodBucket } from './period-buckets';
 
 /** One dimension value's cancellation count — the row shape the Churn Reasons page's plan/channel/cohort breakdown tables render from. */
 export interface CancellationReasonDimensionBreakdownRow {
@@ -85,4 +86,40 @@ export function cancellationReasonCodeLabelKey(reasonCode: string): string {
     default:
       return reasonCode;
   }
+}
+
+/** The fields of a landed `cancellation_reason` raw record the trend reads. */
+export interface CancellationTrendRecord {
+  landed_at: string;
+  payload: Record<string, unknown>;
+}
+
+export interface CancellationTrend {
+  buckets: PeriodBucket[];
+  /** Set when the read hit its cap: weeks before this were never read and come back as `null`. */
+  reliableFrom: string | null;
+}
+
+/**
+ * Cancellations landed per UTC week over the last `weeks` weeks, from the same bounded read the
+ * reason breakdown uses. Counts only records the breakdown counts (a non-empty `reason_code`), so
+ * the chart and the donut add up to the same total. When the read came back full (`records.length
+ * >= cap`) older history exists that was not fetched, so weeks before the oldest fetched record are
+ * reported as unknown rather than zero.
+ */
+export function toCancellationTrend(records: readonly CancellationTrendRecord[], options: { now: Date; weeks: number; cap: number }): CancellationTrend {
+  const counted = records.filter((record) => {
+    const properties = record.payload.properties;
+    if (typeof properties !== 'object' || properties === null) return false;
+    const reasonCode = (properties as Record<string, unknown>).reason_code;
+    return typeof reasonCode === 'string' && reasonCode.trim().length > 0;
+  });
+  const reliableFrom = records.length >= options.cap ? earliestTimestamp(records.map((record) => record.landed_at)) : null;
+  return {
+    buckets: bucketByPeriod(
+      counted.map((record) => ({ at: record.landed_at })),
+      { period: 'week', periods: options.weeks, now: options.now, reliableFrom },
+    ),
+    reliableFrom,
+  };
 }

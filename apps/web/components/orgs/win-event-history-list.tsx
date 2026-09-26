@@ -1,6 +1,9 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { History, Trophy } from 'lucide-react';
+import { ChartCard } from '@/components/viz/chart-card';
+import { EmptyState } from '@/components/viz/empty-state';
 import type { WinEventFeedItem } from '@/lib/orgs/win-rule-view';
 
 export interface WinEventHistoryListProps {
@@ -8,6 +11,9 @@ export interface WinEventHistoryListProps {
   /** True when more wins exist than were fetched. Measured by the page over-fetching one row past the cap, not inferred from `events.length`. */
   truncated?: boolean;
 }
+
+/** Rows shown before the list scrolls, so a busy project's history does not push the rest of the page away. */
+const VISIBLE_ROWS_BEFORE_SCROLL = 8;
 
 /**
  * The persisted counterpart to `LiveWinFeed` (KAN-65 follow-up): a plain
@@ -21,32 +27,36 @@ export function WinEventHistoryList({ events, truncated = false }: WinEventHisto
   const t = useTranslations('WinRules');
 
   return (
-    <section className="flex flex-col gap-3">
-      <h2 className="text-lg font-semibold">{t('historyHeading')}</h2>
+    <ChartCard
+      title={t('historyHeading')}
+      icon={History}
+      fill
+      footer={events.length > 0 ? (truncated ? t('historyListCapNoteTruncated', { count: events.length }) : t('historyListCapNote', { count: events.length })) : undefined}
+    >
       {events.length === 0 ? (
-        <p className="text-muted-foreground">{t('historyEmpty')}</p>
+        <EmptyState icon={Trophy} title={t('historyEmpty')} compact />
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className={events.length > VISIBLE_ROWS_BEFORE_SCROLL ? 'flex max-h-[26rem] flex-col gap-2 overflow-y-auto pe-1' : 'flex flex-col gap-2'}>
           {events.map((event) => (
-            <li key={event.id} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-              <div className="flex items-center gap-2">
-                <span>{t('feedItem', { winRuleName: event.winRuleName, schemaName: event.schemaName, clientId: event.clientId })}</span>
+            <li key={event.id} className="flex items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-sm">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-success/10 text-success" aria-hidden="true">
+                  <Trophy className="h-3.5 w-3.5" />
+                </span>
+                <span className="min-w-0 truncate">{t('feedItem', { winRuleName: event.winRuleName, schemaName: event.schemaName, clientId: event.clientId })}</span>
                 {event.winType !== 'generic' ? (
-                  <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">
                     {t(`winTypeLabel.${event.winType}`)}
                   </span>
                 ) : null}
               </div>
-              <span className="text-xs text-muted-foreground">{event.occurredAt}</span>
+              <time dateTime={event.occurredAt} className="shrink-0 text-xs tabular-nums text-muted-foreground" dir="ltr">
+                {event.occurredAt}
+              </time>
             </li>
           ))}
         </ul>
       )}
-      {events.length > 0 ? (
-        <p className="text-xs text-muted-foreground">
-          {truncated ? t('historyListCapNoteTruncated', { count: events.length }) : t('historyListCapNote', { count: events.length })}
-        </p>
-      ) : null}
-    </section>
+    </ChartCard>
   );
 }

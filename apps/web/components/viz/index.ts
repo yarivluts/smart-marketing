@@ -9,3 +9,4 @@ export * from './trend-chart';
 export * from './donut-chart';
 export * from './flow-diagram';
 export * from './format';
+export * from './comparison-bars';
