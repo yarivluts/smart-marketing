@@ -1,4 +1,4 @@
-import { collectIdentifiers, MetricCompilerError, parseFormula } from '@growthos/shared';
+import { collectIdentifiers, MetricCompilerError, normalizeMetricUnitInput, parseFormula, type MetricUnit } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import {
   isMetricAggFunction,
@@ -378,12 +378,15 @@ interface MetricDefRequest {
   name: string;
   definition: MetricDefinitionInput;
   dimensions: readonly string[];
+  /** See `MetricDefModel.unit`. Validated here; `undefined`/empty means no unit declared. */
+  unit?: string | null;
 }
 
 interface ValidatedMetricDefRequest {
   name: string;
   definition: ValidatedDefinition;
   dimensions: string[];
+  unit: MetricUnit | undefined;
 }
 
 /** Shared name/definition/dimensions validation for register and evolve. */
@@ -400,6 +403,11 @@ async function validateMetricDefRequest(request: MetricDefRequest): Promise<Vali
 
   const definition = validateDefinitionBody(request.definition, reasons);
   const dimensions = validateDimensions(request.dimensions, reasons);
+  const unitResult = normalizeMetricUnitInput(request.unit);
+  if (!unitResult.ok) {
+    reasons.push(unitResult.reason);
+  }
+  const unit = unitResult.ok ? unitResult.unit : undefined;
 
   // Only once the aggregation itself is structurally valid — otherwise
   // there's no well-formed table/column/function to check against a schema.
@@ -437,7 +445,7 @@ async function validateMetricDefRequest(request: MetricDefRequest): Promise<Vali
     }
   }
 
-  return { name, definition, dimensions };
+  return { name, definition, dimensions, unit };
 }
 
 /** One registered-and-active metric that can no longer be queried as defined, with the registration-time reasons that now fail for it — the payload behind `list_insights`'s `metric_health` kind. */
@@ -581,6 +589,7 @@ interface BuildMetricDefVersionParams {
   version: number;
   definition: ValidatedDefinition;
   dimensions: string[];
+  unit: MetricUnit | undefined;
   createdByUserId: string;
 }
 
@@ -600,6 +609,9 @@ function buildMetricDefVersion(params: BuildMetricDefVersionParams): MetricDefMo
     metricDef.formula = params.definition.formula;
   }
   metricDef.dimensions = params.dimensions;
+  if (params.unit) {
+    metricDef.unit = params.unit;
+  }
   metricDef.created_by = params.createdByUserId;
   metricDef.created_at = new Date().toISOString();
   metricDef.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
@@ -620,6 +632,7 @@ function auditSnapshot(metricDef: MetricDefModel): Record<string, unknown> {
     version: metricDef.version,
     ...(metricDef.aggregation ? { aggregation: metricDef.aggregation } : {}),
     ...(metricDef.formula ? { formula: metricDef.formula } : {}),
+    ...(metricDef.unit ? { unit: metricDef.unit } : {}),
   };
 }
 
@@ -629,6 +642,8 @@ export interface RegisterMetricDefinitionParams {
   name: string;
   definition: MetricDefinitionInput;
   dimensions: readonly string[];
+  /** Optional unit (KAN-213) — see `MetricDefModel.unit`. */
+  unit?: string | null;
   createdByUserId: string;
 }
 
@@ -642,7 +657,7 @@ export interface RegisterMetricDefinitionParams {
  * `firestore-connection.ts`).
  */
 export async function registerMetricDefinition(params: RegisterMetricDefinitionParams): Promise<MetricDefModel> {
-  const { name, definition, dimensions } = await validateMetricDefRequest(params);
+  const { name, definition, dimensions, unit } = await validateMetricDefRequest(params);
 
   const alreadyExists = await metricFamilyHasAnyVersion(params.organizationId, params.projectId, name);
   if (alreadyExists) {
@@ -656,6 +671,7 @@ export async function registerMetricDefinition(params: RegisterMetricDefinitionP
     version: 1,
     definition,
     dimensions,
+    unit,
     createdByUserId: params.createdByUserId,
   });
   await metricDef.save();
@@ -685,6 +701,12 @@ export interface EvolveMetricDefinitionParams {
   name: string;
   definition: MetricDefinitionInput;
   dimensions: readonly string[];
+  /**
+   * The next version's unit (KAN-213). `undefined` carries the previous version's unit forward, so a
+   * caller that predates units (or edits only the formula) never silently drops one; `null` or an
+   * empty string clears it back to a plain number.
+   */
+  unit?: string | null;
   createdByUserId: string;
 }
 
@@ -696,7 +718,7 @@ export interface EvolveMetricDefinitionParams {
  * `registerMetricDefinition`.
  */
 export async function evolveMetricDefinition(params: EvolveMetricDefinitionParams): Promise<MetricDefModel> {
-  const { name, definition, dimensions } = await validateMetricDefRequest(params);
+  const { name, definition, dimensions, unit } = await validateMetricDefRequest(params);
 
   const previous = await findActiveVersion(params.organizationId, params.projectId, name);
   if (!previous) {
@@ -711,6 +733,7 @@ export async function evolveMetricDefinition(params: EvolveMetricDefinitionParam
     version: previous.version + 1,
     definition,
     dimensions,
+    unit: params.unit === undefined ? (previous.unit as MetricUnit | undefined) : unit,
     createdByUserId: params.createdByUserId,
   });
 

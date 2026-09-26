@@ -4,6 +4,7 @@ import {
   LANDING_PAGE_PACK_FORMULA_METRICS,
   type LandingPagePackMetricDefinition,
 } from './metrics';
+import { builtinMetricUnit } from '../builtin-metric-units';
 
 export * from './manifest';
 export * from './metrics';
@@ -29,6 +30,7 @@ async function registerOne(
       name: metric.name,
       definition: metric.definition,
       dimensions: metric.dimensions,
+      unit: builtinMetricUnit(metric.name),
       createdByUserId,
     });
     return 'registered';

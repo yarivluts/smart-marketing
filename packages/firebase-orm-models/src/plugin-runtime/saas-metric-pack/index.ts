@@ -1,5 +1,6 @@
 import { DuplicateMetricDefinitionError, registerMetricDefinition } from '../../services/metric-registry.service';
 import { SAAS_METRIC_PACK_METRICS, type SaasMetricPackDefinition } from './metrics';
+import { builtinMetricUnit } from '../builtin-metric-units';
 
 export * from './manifest';
 export * from './metrics';
@@ -26,6 +27,7 @@ async function registerOne(
       name: metric.name,
       definition: metric.definition,
       dimensions: metric.dimensions,
+      unit: builtinMetricUnit(metric.name),
       createdByUserId,
     });
     return 'registered';

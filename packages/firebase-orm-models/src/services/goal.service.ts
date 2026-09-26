@@ -1,6 +1,7 @@
 import {
   calculateGoalProgress,
   computeElapsedFraction,
+  goalTargetUnitProblem,
   isGoalDirection,
   isGoalRhythm,
   MetricCompilerError,
@@ -170,6 +171,33 @@ function validateGoalFields(params: GoalFieldsInput, reasons: string[]): Validat
   };
 }
 
+/**
+ * Refuses a target (or range bound) the goal's metric can never reach given its declared unit
+ * (KAN-213): a target of 8 on a 0-1 conversion ratio means 800% and can never be met. Targets are
+ * validated in the unit's STORED scale - a form that lets a human type "8" for 8% converts it before
+ * it reaches this service. A metric with no declared unit accepts any finite value, as before.
+ */
+function validateGoalTargetsForUnit(
+  targets: { targetValue: number | null; rangeMin: number | null; rangeMax: number | null },
+  unit: string | undefined,
+  reasons: string[],
+): void {
+  const checks: [string, number | null][] = [
+    ['Target', targets.targetValue],
+    ['Range minimum', targets.rangeMin],
+    ['Range maximum', targets.rangeMax],
+  ];
+  for (const [label, value] of checks) {
+    if (value === null) {
+      continue;
+    }
+    const problem = goalTargetUnitProblem(label, value, unit);
+    if (problem) {
+      reasons.push(problem);
+    }
+  }
+}
+
 /** Confirms `ownerPersonId` resolves to an `OrgPersonModel` belonging to `organizationId` — the same `.init` + org-match pattern `requireResourceInOrg` (`resource-library.service.ts`) uses for its own cross-tenant-safe lookup. Pushes onto `reasons` on failure rather than throwing, for the same collect-everything reason as `validateGoalFields`. */
 async function validateOrgPersonInOrg(organizationId: string, ownerPersonId: string, reasons: string[]): Promise<void> {
   const person = await OrgPersonModel.init(ownerPersonId, { organization_id: organizationId });
@@ -188,6 +216,8 @@ export async function createGoal(params: CreateGoalParams): Promise<GoalModel> {
   const metricDef = await getActiveMetricDefinition(params.organizationId, params.projectId, params.metricName);
   if (!metricDef) {
     reasons.push(`Metric "${params.metricName}" is not registered (or not active) in this project.`);
+  } else if (fields) {
+    validateGoalTargetsForUnit(fields, metricDef.unit, reasons);
   }
 
   await validateOrgPersonInOrg(params.organizationId, params.ownerPersonId, reasons);
@@ -287,6 +317,16 @@ export async function updateGoal(params: UpdateGoalParams): Promise<GoalModel> {
       reasons.push('A "range" goal requires rangeMin to be less than rangeMax.');
     }
   }
+  if (reasons.length === 0) {
+    // Only the values this call changes: an existing goal saved before units existed is not
+    // retroactively refused for a bound this edit leaves alone.
+    const metricDef = await getActiveMetricDefinition(params.organizationId, params.projectId, goal.metric_name);
+    validateGoalTargetsForUnit(
+      { targetValue: params.targetValue ?? null, rangeMin: params.rangeMin ?? null, rangeMax: params.rangeMax ?? null },
+      metricDef?.unit,
+      reasons,
+    );
+  }
   if (reasons.length > 0) {
     throw new InvalidGoalError(reasons);
   }
@@ -364,6 +404,8 @@ export async function updateGoalDefinition(params: UpdateGoalDefinitionParams): 
   const metricDef = await getActiveMetricDefinition(params.organizationId, params.projectId, params.metricName);
   if (!metricDef) {
     reasons.push(`Metric "${params.metricName}" is not registered (or not active) in this project.`);
+  } else if (fields) {
+    validateGoalTargetsForUnit(fields, metricDef.unit, reasons);
   }
 
   await validateOrgPersonInOrg(params.organizationId, params.ownerPersonId, reasons);

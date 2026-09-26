@@ -7,6 +7,7 @@ import {
   QUALITY_SCORE_PACK_PHASE_3_FORMULA_METRICS,
   type QualityScorePackMetricDefinition,
 } from './metrics';
+import { builtinMetricUnit } from '../builtin-metric-units';
 
 export * from './manifest';
 export * from './metrics';
@@ -32,6 +33,7 @@ async function registerOne(
       name: metric.name,
       definition: metric.definition,
       dimensions: metric.dimensions,
+      unit: builtinMetricUnit(metric.name),
       createdByUserId,
     });
     return 'registered';

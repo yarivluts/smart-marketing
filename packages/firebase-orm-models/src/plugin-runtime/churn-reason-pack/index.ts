@@ -1,6 +1,7 @@
 import { DuplicateMetricDefinitionError, registerMetricDefinition } from '../../services/metric-registry.service';
 import { ensureCancellationReasonSchemaRegistered } from '../../services/churn-reason.service';
 import { CHURN_REASON_PACK_METRICS, type ChurnReasonPackMetricDefinition } from './metrics';
+import { builtinMetricUnit } from '../builtin-metric-units';
 
 export * from './manifest';
 export * from './metrics';
@@ -25,6 +26,7 @@ async function registerOne(
       name: metric.name,
       definition: metric.definition,
       dimensions: metric.dimensions,
+      unit: builtinMetricUnit(metric.name),
       createdByUserId,
     });
     return 'registered';

@@ -3,6 +3,7 @@ import {
   DuplicateMetricDefinitionError,
   registerMetricDefinition,
 } from '../../services/metric-registry.service';
+import { builtinMetricUnit } from '../builtin-metric-units';
 
 export interface EasySignMetricDefinition {
   name: string;
@@ -129,6 +130,7 @@ export async function ensureEasySignMetricsRegistered(
         name: metric.name,
         definition: metric.definition,
         dimensions: metric.dimensions as unknown as string[],
+        unit: builtinMetricUnit(metric.name),
         createdByUserId,
       });
     } catch (err) {
@@ -148,6 +150,7 @@ export async function ensureEasySignMetricsRegistered(
         name: metric.name,
         definition: metric.definition,
         dimensions: metric.dimensions as unknown as string[],
+        unit: builtinMetricUnit(metric.name),
         createdByUserId,
       });
     } catch (err) {
