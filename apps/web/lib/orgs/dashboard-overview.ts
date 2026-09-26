@@ -49,7 +49,6 @@ export async function loadDashboardOverview(input: {
   bindings: readonly PolicyBinding[];
   now: number;
 }): Promise<DashboardOverview> {
-  const principal = { type: 'user' as const, id: input.userId };
   const active = input.memberships.filter((membership) => isActiveMembershipStatus(membership.status));
   const pendingInviteCount = input.memberships.filter((membership) => membership.status === 'invited').length;
 
@@ -63,30 +62,45 @@ export async function loadDashboardOverview(input: {
       const shown = all.slice(0, Math.max(0, budget));
       budget -= shown.length;
       const projects = await Promise.all(
-        shown.map(async (project): Promise<DashboardProject> => {
-          const scope = { orgId, projectId: project.id };
-          const canViewHealth = can([...input.bindings], principal, 'ingest.write', scope);
-          const canManage = can([...input.bindings], principal, 'project.manage', scope);
-          const base: DashboardProject = { orgId, projectId: project.id, name: project.name, vertical: project.vertical ?? null, health: null };
-          try {
-            const [report, batches, onboarding] = await Promise.all([
-              canViewHealth ? evaluateProjectSetupHealth(orgId, project.id) : Promise.resolve(null),
-              canViewHealth ? listRecentIngestBatchesForProject(orgId, project.id, BATCHES_PER_PROJECT) : Promise.resolve([]),
-              canManage ? getOnboardingState(orgId, project.id) : Promise.resolve(undefined),
-            ]);
-            return {
-              ...base,
-              health: canViewHealth ? summarizeProjectHealth(report, batches, input.now) : null,
-              ...(onboarding === undefined ? {} : { onboardingStep: onboarding ? onboarding.step : null }),
-            };
-          } catch {
-            return { ...base, healthUnavailable: true };
-          }
-        }),
+        shown.map((project) => loadDashboardProject({ orgId, project, userId: input.userId, bindings: input.bindings, now: input.now })),
       );
       return { orgId, name: membership.organizationName, role: membership.role, projects, hiddenProjectCount: all.length - shown.length };
     }),
   );
 
   return { orgs, pendingInviteCount };
+}
+
+/**
+ * One project's card data, read under the viewer's own permissions: setup health and recent batches
+ * only with `ingest.write`, onboarding progress only with `project.manage`. A failed read yields a card
+ * that says so rather than one showing zeros.
+ */
+export async function loadDashboardProject(input: {
+  orgId: string;
+  project: { id: string; name: string; vertical?: string | null };
+  userId: string;
+  bindings: readonly PolicyBinding[];
+  now: number;
+}): Promise<DashboardProject> {
+  const { orgId, project } = input;
+  const principal = { type: 'user' as const, id: input.userId };
+  const scope = { orgId, projectId: project.id };
+  const canViewHealth = can([...input.bindings], principal, 'ingest.write', scope);
+  const canManage = can([...input.bindings], principal, 'project.manage', scope);
+  const base: DashboardProject = { orgId, projectId: project.id, name: project.name, vertical: project.vertical ?? null, health: null };
+  try {
+    const [report, batches, onboarding] = await Promise.all([
+      canViewHealth ? evaluateProjectSetupHealth(orgId, project.id) : Promise.resolve(null),
+      canViewHealth ? listRecentIngestBatchesForProject(orgId, project.id, BATCHES_PER_PROJECT) : Promise.resolve([]),
+      canManage ? getOnboardingState(orgId, project.id) : Promise.resolve(undefined),
+    ]);
+    return {
+      ...base,
+      health: canViewHealth ? summarizeProjectHealth(report, batches, input.now) : null,
+      ...(onboarding === undefined ? {} : { onboardingStep: onboarding ? onboarding.step : null }),
+    };
+  } catch {
+    return { ...base, healthUnavailable: true };
+  }
 }

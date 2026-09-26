@@ -198,7 +198,8 @@ export function timeAgoParts(minutes: number): { unit: 'minutes' | 'hours' | 'da
 // ---------------------------------------------------------------------------------------------
 
 /** The kind of change an audit action records, which picks its timeline icon and colour. */
-export type AuditActionCategory = 'create' | 'update' | 'delete' | 'access' | 'data' | 'run' | 'other';
+export const AUDIT_ACTION_CATEGORIES = ['create', 'update', 'delete', 'access', 'data', 'run', 'other'] as const;
+export type AuditActionCategory = (typeof AUDIT_ACTION_CATEGORIES)[number];
 
 const CATEGORY_BY_VERB: Record<string, AuditActionCategory> = {
   create: 'create',
