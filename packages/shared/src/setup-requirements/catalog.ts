@@ -28,6 +28,7 @@ export const SETUP_REQUIREMENTS: readonly SetupRequirement[] = [
     recommendations: [
       {
         kind: 'web_page',
+        registersSchema: true,
         path: '/orgs/:orgId/projects/:projectId/schema-defs',
         action: `Register the built-in "${TOUCHPOINT_SCHEMA_NAME}" event schema (the Schema Registry page has a button for it).`,
       },
@@ -55,6 +56,7 @@ export const SETUP_REQUIREMENTS: readonly SetupRequirement[] = [
     recommendations: [
       {
         kind: 'mcp_tool',
+        registersSchema: true,
         tool: REGISTER_SCHEMA_TOOL,
         action: 'Register an event schema for your signup event, for example "signup" (use dry_run first).',
       },
@@ -75,6 +77,7 @@ export const SETUP_REQUIREMENTS: readonly SetupRequirement[] = [
     recommendations: [
       {
         kind: 'mcp_tool',
+        registersSchema: true,
         tool: REGISTER_SCHEMA_TOOL,
         action: 'Register an event schema for each core product action (for example "document_created", "project_shared").',
       },
@@ -95,6 +98,7 @@ export const SETUP_REQUIREMENTS: readonly SetupRequirement[] = [
     recommendations: [
       {
         kind: 'mcp_tool',
+        registersSchema: true,
         tool: REGISTER_SCHEMA_TOOL,
         action: 'Register an entity schema, for example "customer", with the attributes you want to segment on (plan, status, created_at).',
       },
@@ -116,6 +120,7 @@ export const SETUP_REQUIREMENTS: readonly SetupRequirement[] = [
     recommendations: [
       {
         kind: 'mcp_tool',
+        registersSchema: true,
         tool: REGISTER_SCHEMA_TOOL,
         action:
           'For any billing system (Stripe is not required), register a "subscription_state_change" event schema, for example with properties plan, previous_plan, status, mrr and currency.',
@@ -124,7 +129,7 @@ export const SETUP_REQUIREMENTS: readonly SetupRequirement[] = [
         kind: 'api_endpoint',
         method: 'POST',
         path: EVENTS_ENDPOINT,
-        action: 'Send one "subscription_state_change" event per change (new, upgrade, downgrade, cancel, reactivate), with customer_id set.',
+        action: 'Send one "subscription_state_change" event per plan change, with customer_id, mrr (the monthly recurring amount after the change), currency and, optionally, status (mrr 0 reads as canceled). Movements - new, upgrade, downgrade, cancel, reactivation - are derived from consecutive changes, so the source does not classify them.',
       },
       {
         kind: 'web_page',
@@ -142,11 +147,13 @@ export const SETUP_REQUIREMENTS: readonly SetupRequirement[] = [
     recommendations: [
       {
         kind: 'web_page',
+        registersSchema: true,
         path: '/orgs/:orgId/projects/:projectId/plugins',
         action: 'Install the SaaS marketing metric pack on the Plugins page; it registers the "ad_spend" measure schema and the metrics that read it.',
       },
       {
         kind: 'mcp_tool',
+        registersSchema: true,
         tool: REGISTER_SCHEMA_TOOL,
         action: 'Or register the "ad_spend" measure schema yourself, with dimensions channel_id, campaign_id, adset_id and ad_id.',
       },
