@@ -2279,7 +2279,51 @@
     "chartsBudgetByChannel": "Daily budget by channel",
     "chartsBudgetByChannelDescription": "Configured daily budget per channel, split into active and paused campaigns.",
     "seriesActiveBudget": "Active",
-    "seriesPausedBudget": "Paused"
+    "seriesPausedBudget": "Paused",
+    "spendUnavailableTitle": "Spend is not available yet",
+    "spendAvgDailyLabel": "Avg. per day",
+    "spendPeakDayLabel": "Peak day",
+    "spendActiveDays": "{count, plural, one {# day with spend} other {# days with spend}}",
+    "spendDescription": "Daily spend the warehouse measured for this campaign.",
+    "kpiActionsTaken": "Actions taken",
+    "lifecycleTitle": "Live state",
+    "lifecycleDescription": "From draft to spend - each stage is colored by what actually happened to this campaign.",
+    "historyDescription": "Every GrowthOS action proposed for this campaign and where it stands.",
+    "historyStatusSummary": "Actions by status",
+    "lifecycle": {
+      "draft": {
+        "title": "Draft",
+        "none": "No draft yet",
+        "done": "Draft created",
+        "pending": "Awaiting approval",
+        "stopped": "Draft stopped"
+      },
+      "activation": {
+        "title": "Activation",
+        "none": "Not activated yet",
+        "done": "Activated",
+        "pending": "Activation pending",
+        "stopped": "Stopped"
+      },
+      "live": {
+        "title": "Platform status",
+        "enabled": "Delivering",
+        "paused": "Paused",
+        "removed": "Removed",
+        "none": "No campaign yet"
+      },
+      "sync": {
+        "title": "Platform sync",
+        "done": "Synced",
+        "none": "Not synced yet"
+      },
+      "spend": {
+        "title": "Spend",
+        "measured": "Spend measured",
+        "none": "No spend recorded",
+        "unavailable": "Not queryable yet"
+      }
+    }
   },
   "FunnelGoals": {
     "noData": "No data",

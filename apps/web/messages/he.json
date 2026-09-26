@@ -2279,7 +2279,51 @@
     "chartsBudgetByChannel": "תקציב יומי לפי ערוץ",
     "chartsBudgetByChannelDescription": "התקציב היומי שהוגדר לכל ערוץ, בחלוקה לקמפיינים פעילים ומושהים.",
     "seriesActiveBudget": "פעילים",
-    "seriesPausedBudget": "מושהים"
+    "seriesPausedBudget": "מושהים",
+    "spendUnavailableTitle": "ההוצאה עדיין לא זמינה",
+    "spendAvgDailyLabel": "ממוצע ליום",
+    "spendPeakDayLabel": "יום השיא",
+    "spendActiveDays": "{count, plural, one {יום אחד עם הוצאה} other {# ימים עם הוצאה}}",
+    "spendDescription": "ההוצאה היומית שמחסן הנתונים מדד עבור הקמפיין הזה.",
+    "kpiActionsTaken": "פעולות שבוצעו",
+    "lifecycleTitle": "מצב חי",
+    "lifecycleDescription": "מטיוטה ועד הוצאה - כל שלב צבוע לפי מה שקרה בפועל לקמפיין הזה.",
+    "historyDescription": "כל פעולות GrowthOS שהוצעו לקמפיין הזה והמצב של כל אחת.",
+    "historyStatusSummary": "פעולות לפי סטטוס",
+    "lifecycle": {
+      "draft": {
+        "title": "טיוטה",
+        "none": "עדיין אין טיוטה",
+        "done": "הטיוטה נוצרה",
+        "pending": "ממתינה לאישור",
+        "stopped": "הטיוטה נעצרה"
+      },
+      "activation": {
+        "title": "הפעלה",
+        "none": "עדיין לא הופעל",
+        "done": "הופעל",
+        "pending": "ההפעלה ממתינה",
+        "stopped": "נעצר"
+      },
+      "live": {
+        "title": "סטטוס בפלטפורמה",
+        "enabled": "פעיל",
+        "paused": "מושהה",
+        "removed": "הוסר",
+        "none": "עדיין אין קמפיין"
+      },
+      "sync": {
+        "title": "סנכרון מהפלטפורמה",
+        "done": "סונכרן",
+        "none": "עדיין לא סונכרן"
+      },
+      "spend": {
+        "title": "הוצאה",
+        "measured": "ההוצאה נמדדה",
+        "none": "לא נרשמה הוצאה",
+        "unavailable": "עדיין לא זמין לשליפה"
+      }
+    }
   },
   "FunnelGoals": {
     "noData": "אין נתונים",
