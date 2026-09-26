@@ -713,6 +713,7 @@
     "silentRegisteredLine": "Registered but never received in this environment: {schemas}.",
     "nothingReceivedLine": "Nothing received in this environment, accepted or rejected.",
     "sourceNote": "Derived only from the records this environment accepted or rejected; no requirement can be marked connected by hand. For step-by-step fixes, run the audit_installation_gaps MCP tool.",
+    "mappingNote": "Schemas are matched to requirements by their names, so check the schemas listed under each one: a name like \"order_viewed\" would be counted as billing.",
     "requirements": {
       "landing_page_attribution": {
         "title": "Landing-page attribution (touchpoints)",
@@ -1458,7 +1459,6 @@
       "off_track": "Off track"
     },
     "goalMetLabel": "Currently met: {met}",
-    "pausedBadge": "Paused",
     "yes": "Yes",
     "no": "No",
     "actualValueLabel": "Actual",

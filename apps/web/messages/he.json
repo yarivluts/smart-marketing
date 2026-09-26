@@ -713,6 +713,7 @@
     "silentRegisteredLine": "רשומים אך מעולם לא התקבלו בסביבה הזו: {schemas}.",
     "nothingReceivedLine": "לא התקבל דבר בסביבה הזו, לא רשומות שהתקבלו ולא רשומות שנדחו.",
     "sourceNote": "נגזר אך ורק מהרשומות שהסביבה הזו קיבלה או דחתה; אי אפשר לסמן דרישה כמחוברת ידנית. להנחיות תיקון מפורטות, הריצו את כלי ה-MCP audit_installation_gaps.",
+    "mappingNote": "הסכמות משויכות לדרישות לפי השמות שלהן, לכן כדאי לבדוק את הסכמות שמופיעות תחת כל דרישה: שם כמו \"order_viewed\" ייספר כחיוב.",
     "requirements": {
       "landing_page_attribution": {
         "title": "ייחוס לדפי נחיתה (נקודות מגע)",
@@ -1458,7 +1459,6 @@
       "off_track": "לא בקצב"
     },
     "goalMetLabel": "עומד ביעד כרגע: {met}",
-    "pausedBadge": "מושהה",
     "yes": "כן",
     "no": "לא",
     "actualValueLabel": "בפועל",

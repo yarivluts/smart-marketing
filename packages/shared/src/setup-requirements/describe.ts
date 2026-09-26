@@ -101,6 +101,26 @@ function healthLabel(environment: SetupEnvironmentHealth): SetupHealthLabel {
   return environment.connectedCount === 0 ? 'not_connected' : 'partial';
 }
 
+/**
+ * How a schema was assigned to a requirement. Today always inferred from the schema's kind and the
+ * words in its name (`classifySchemaForSetupRequirement`), which can guess wrong - "order_viewed"
+ * reads as billing - so every output says so and names the schemas behind each status, making a
+ * wrong inference visible instead of a confident, unexplained "connected".
+ */
+export const SETUP_SCHEMA_MAPPING = 'inferred_from_schema_name';
+
+export const SETUP_SCHEMA_MAPPING_NOTE =
+  'Schemas are matched to requirements by their kind and the words in their name (for example "subscription_state_change" counts as billing, and any other event that is not a touchpoint, signup or billing event counts as product usage). The match is an inference: check the schemas listed under each requirement, since a name like "order_viewed" would be counted as billing.';
+
+/** The schemas behind one requirement's status, by what was seen for each. */
+function schemasBehind(result: SetupRequirementEnvironmentResult) {
+  return {
+    accepted: result.acceptedSchemas.map((schema) => schema.name),
+    rejected: result.rejectedSchemas.map((schema) => schema.name),
+    registered_but_silent: result.silentRegisteredSchemas,
+  };
+}
+
 export const SETUP_STATUS_SOURCE_NOTE =
   'Each status is derived from the ingest records this environment actually accepted (landed raw records) or rejected (open quarantine). Nothing can be marked connected by hand, and each environment is judged on its own traffic.';
 
@@ -144,6 +164,8 @@ export function buildSetupHealthOutput(report: SetupHealthReport, focus: SetupEn
         status: result.status,
         detail: describeSetupRequirementResult(result, focus.environmentName),
         last_accepted_at: result.lastAcceptedAt,
+        schemas: schemasBehind(result),
+        mapping: SETUP_SCHEMA_MAPPING,
       };
     }),
     environments: report.environments.map((environment) => ({
@@ -155,6 +177,7 @@ export function buildSetupHealthOutput(report: SetupHealthReport, focus: SetupEn
       summary: summarizeEnvironment(environment),
     })),
     status_source: SETUP_STATUS_SOURCE_NOTE,
+    schema_mapping: SETUP_SCHEMA_MAPPING_NOTE,
     next_step: 'Call audit_installation_gaps for what each missing requirement costs and how to connect it.',
   };
 }
@@ -181,6 +204,8 @@ export function buildInstallationGapsOutput(report: SetupHealthReport, focus: Se
         detail: describeSetupRequirementResult(result, focus.environmentName),
         impact_summary: requirement.impact,
         satisfied_by: requirement.satisfiedBy,
+        schemas: schemasBehind(result),
+        mapping: SETUP_SCHEMA_MAPPING,
         // null, not []: a credential bound to one environment cannot see the others, and an empty
         // list would read as "connected nowhere else".
         connected_in_other_environments: context.otherEnvironmentsVisible === false ? null : connectedElsewhere(report, focus, requirement.id),
@@ -194,6 +219,7 @@ export function buildInstallationGapsOutput(report: SetupHealthReport, focus: Se
       requirement_id: result.requirementId,
       title: getSetupRequirement(result.requirementId).title,
       schemas: result.acceptedSchemas.map((schema) => schema.name),
+      mapping: SETUP_SCHEMA_MAPPING,
       last_accepted_at: result.lastAcceptedAt,
       detail: describeSetupRequirementResult(result, focus.environmentName),
     }));
@@ -206,5 +232,6 @@ export function buildInstallationGapsOutput(report: SetupHealthReport, focus: Se
     gaps,
     connected,
     status_source: SETUP_STATUS_SOURCE_NOTE,
+    schema_mapping: SETUP_SCHEMA_MAPPING_NOTE,
   };
 }

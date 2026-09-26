@@ -71,6 +71,9 @@ export function SetupHealthPanel({ health, environmentLabel }: SetupHealthPanelP
         ))}
       </ul>
       <p className="text-xs text-muted-foreground">{t('sourceNote')}</p>
+      <p className="text-xs text-muted-foreground" data-testid="setup-health-mapping-note">
+        {t('mappingNote')}
+      </p>
     </section>
   );
 }

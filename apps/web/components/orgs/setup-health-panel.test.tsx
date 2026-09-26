@@ -50,6 +50,13 @@ describe('SetupHealthPanel (KAN-197)', () => {
     expect(adSpend.getByText('Registered but never received in this environment: "ad_spend".')).toBeInTheDocument();
   });
 
+  it('says the schema-to-requirement match is inferred from names, in both locales', () => {
+    renderPanel('en', 'Development');
+    expect(screen.getByTestId('setup-health-mapping-note')).toHaveTextContent(en.SetupHealth.mappingNote);
+    expect(en.SetupHealth.mappingNote).toContain('order_viewed');
+    expect(he.SetupHealth.mappingNote).not.toBe(en.SetupHealth.mappingNote);
+  });
+
   it('never shows the impact line for a connected requirement', () => {
     renderPanel('en', 'Development');
     expect(within(screen.getByTestId('setup-requirement-signups')).queryByText(/funnel has no entry step/)).not.toBeInTheDocument();

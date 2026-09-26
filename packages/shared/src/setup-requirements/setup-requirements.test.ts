@@ -88,6 +88,46 @@ describe('EasySign dev, the reference integration', () => {
   });
 });
 
+describe('a wrong name-based inference is visible, never a bare "connected"', () => {
+  // EasySign's stream as it reported it on 2026-09-26: billing via subscription_state_change, and a
+  // WhatsApp lead click whose name says nothing about which requirement it serves.
+  const report = deriveSetupHealth(EASYSIGN_ENVIRONMENTS, [
+    ...EASYSIGN_DEV_OBSERVATIONS,
+    observation({ schemaName: 'subscription_state_change', kind: 'event', lastAcceptedAt: '2026-09-25T16:20:00.000Z' }),
+    observation({ schemaName: 'lead_whatsapp_click', kind: 'event', lastAcceptedAt: '2026-09-25T16:21:00.000Z' }),
+  ]);
+  const focus = selectSetupFocusEnvironment(report, { environmentName: 'dev' })!;
+
+  it('get_setup_health names the schemas behind every requirement and marks the match as inferred', () => {
+    const output = buildSetupHealthOutput(report, focus, CONTEXT);
+    const byId = Object.fromEntries(output.requirements.map((requirement) => [requirement.id, requirement]));
+    expect(byId.billing.status).toBe('connected');
+    expect(byId.billing.schemas.accepted).toEqual(['subscription_state_change']);
+    // Where the ambiguous name landed is on the page, so a wrong guess can be seen and questioned.
+    expect(byId.product_usage.schemas.accepted).toContain('lead_whatsapp_click');
+    expect(byId.product_usage.schemas.accepted).toContain('document_signed');
+    expect(byId.ad_spend.schemas).toEqual({ accepted: [], rejected: [], registered_but_silent: [] });
+    for (const requirement of output.requirements) {
+      expect(requirement.mapping).toBe('inferred_from_schema_name');
+    }
+    expect(output.schema_mapping).toContain('inference');
+  });
+
+  it('audit_installation_gaps marks both gaps and connected entries as inferred', () => {
+    const output = buildInstallationGapsOutput(report, focus, CONTEXT);
+    expect(output.gaps.map((gap) => gap.requirement_id)).toEqual(['ad_spend']);
+    expect(output.gaps[0].mapping).toBe('inferred_from_schema_name');
+    const billing = output.connected.find((entry) => entry.requirement_id === 'billing')!;
+    expect(billing).toMatchObject({ schemas: ['subscription_state_change'], mapping: 'inferred_from_schema_name' });
+    expect(output.schema_mapping).toContain('order_viewed');
+  });
+
+  it('a credential that sees one environment gets null, not [], for the others', () => {
+    const output = buildInstallationGapsOutput(report, focus, { ...CONTEXT, otherEnvironmentsVisible: false });
+    expect(output.gaps[0].connected_in_other_environments).toBeNull();
+  });
+});
+
 describe('B1: status comes from accepted ingest records, per environment, never from a flag', () => {
   const environments = [
     { id: 'env-dev', name: 'dev' },
