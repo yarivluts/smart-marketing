@@ -12,6 +12,7 @@ import {
   pickHeadlineEnvironment,
   projectHealthStatus,
   shortDayLabel,
+  sourceRunSeries,
   stableIndex,
   summarizeProjectHealth,
   timeAgoParts,
@@ -173,6 +174,22 @@ describe('audit log shaping', () => {
     expect(groups.map((group) => [group.day, group.entries.map((entry) => entry.id)])).toEqual([
       ['2026-09-20', ['a', 'b']],
       ['2026-09-18', ['c']],
+    ]);
+  });
+});
+
+describe('sourceRunSeries', () => {
+  it('charts counted runs oldest first, skipping runs without counts', () => {
+    const run = (startedAt: string, fetched: number | null, accepted: number | null) => ({
+      startedAt,
+      recordsFetched: fetched,
+      recordsAccepted: accepted,
+      recordsQuarantined: fetched === null ? null : 1,
+      recordsDuplicate: null,
+    });
+    expect(sourceRunSeries([run('2026-09-20T10:05:00.000Z', 5, 4), run('2026-09-20T09:00:00.000Z', null, null), run('2026-09-19T08:30:00.000Z', 3, 2)])).toEqual([
+      { run: '09-19 08:30', accepted: 2, quarantined: 1, duplicate: 0 },
+      { run: '09-20 10:05', accepted: 4, quarantined: 1, duplicate: 0 },
     ]);
   });
 });

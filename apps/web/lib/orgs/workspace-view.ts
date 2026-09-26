@@ -194,6 +194,38 @@ export function timeAgoParts(minutes: number): { unit: 'minutes' | 'hours' | 'da
 }
 
 // ---------------------------------------------------------------------------------------------
+// Plugin source runs
+// ---------------------------------------------------------------------------------------------
+
+export interface SourceRunPoint {
+  run: string;
+  accepted: number;
+  quarantined: number;
+  duplicate: number;
+}
+
+/**
+ * A source install's runs (given newest-first, as listed) as chart rows, oldest first, keeping only
+ * runs that reported counts and at most the last `limit`. Each row is labelled by its UTC start
+ * (`MM-DD HH:MM`), so two runs on one day stay apart.
+ */
+export function sourceRunSeries(
+  runs: readonly { startedAt: string; recordsFetched: number | null; recordsAccepted: number | null; recordsQuarantined: number | null; recordsDuplicate: number | null }[],
+  limit = 20,
+): SourceRunPoint[] {
+  return runs
+    .filter((run) => run.recordsFetched !== null)
+    .slice(0, limit)
+    .reverse()
+    .map((run) => ({
+      run: Number.isNaN(Date.parse(run.startedAt)) ? run.startedAt : new Date(run.startedAt).toISOString().slice(5, 16).replace('T', ' '),
+      accepted: run.recordsAccepted ?? 0,
+      quarantined: run.recordsQuarantined ?? 0,
+      duplicate: run.recordsDuplicate ?? 0,
+    }));
+}
+
+// ---------------------------------------------------------------------------------------------
 // Audit log
 // ---------------------------------------------------------------------------------------------
 

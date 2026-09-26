@@ -30,6 +30,13 @@ import { MetaLookalikeAudienceControls } from '@/components/orgs/meta-lookalike-
 import { PluginHealthSummary } from '@/components/orgs/plugin-health-summary';
 import { PluginInstallList } from '@/components/orgs/plugin-install-list';
 import { TriggerSourcePluginRunButton } from '@/components/orgs/trigger-source-plugin-run-button';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard } from '@/components/viz/chart-card';
+import { DonutChart } from '@/components/viz/donut-chart';
+import { PageHero } from '@/components/viz/page-hero';
+import { TrendChart } from '@/components/viz/trend-chart';
+import { sourceRunSeries } from '@/lib/orgs/workspace-view';
+import { Boxes, DownloadCloud, PackageCheck, PauseCircle, PieChart, Puzzle, RefreshCw, Sparkles, Users } from 'lucide-react';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -114,104 +121,158 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
   );
 
   const t = await getTranslations('ProjectPlugins');
+  const numberFormat = new Intl.NumberFormat(locale);
+  const runningCount = installViews.filter((install) => install.status === 'installed').length;
+  const pausedCount = installViews.filter((install) => install.status === 'disabled').length;
+  const removedCount = installViews.filter((install) => install.status === 'uninstalled').length;
+  const sourceHealth = activeSourceInstalls.map((install) => pluginInstallHealth(install, 'source', sourceRunsByInstallId.get(install.id) ?? []));
+  const healthySources = sourceHealth.filter((health) => health.status === 'healthy').length;
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Puzzle} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('heroDescription')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiRunning')} value={numberFormat.format(runningCount)} icon={PackageCheck} />
+          <StatCard title={t('kpiPaused')} value={numberFormat.format(pausedCount)} icon={PauseCircle} />
+          <StatCard
+            title={t('kpiSources')}
+            value={activeSourceInstalls.length > 0 ? `${healthySources}/${activeSourceInstalls.length}` : '-'}
+            icon={RefreshCw}
+            subtext={activeSourceInstalls.length > 0 ? t('kpiSourcesSubtext') : t('kpiSourcesNone')}
+          />
+          <StatCard title={t('kpiAvailable')} value={numberFormat.format(installableBuiltinPacks.length + installableManifests.length)} icon={DownloadCloud} />
+        </div>
+      </PageHero>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('builtinPacksHeading')}</h2>
-        <p className="text-sm text-muted-foreground">{t('builtinPacksIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installableBuiltinPacks} />
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('installHeading')}</h2>
-        {installableManifests.length === 0 && manifestViews.length > 0 ? (
-          <p className="text-muted-foreground">{t('allManifestsInstalled')}</p>
-        ) : (
-          <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableManifests} />
-        )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('installsHeading')}</h2>
-        <PluginInstallList orgId={orgId} projectId={projectId} installs={installViews} manifests={manifestViews} />
-      </section>
+      <div className="grid gap-6 lg:grid-cols-3">
+        <ChartCard className="lg:col-span-2" title={t('installsHeading')} icon={Boxes}>
+          <PluginInstallList orgId={orgId} projectId={projectId} installs={installViews} manifests={manifestViews} />
+        </ChartCard>
+        <ChartCard title={t('mixTitle')} description={t('mixDescription')} icon={PieChart}>
+          {installViews.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('mixEmpty')}</p>
+          ) : (
+            <DonutChart
+              label={t('mixTitle')}
+              centerValue={numberFormat.format(installViews.length)}
+              centerLabel={t('mixCenter')}
+              data={[
+                { label: t('mixRunning'), value: runningCount, color: 'hsl(var(--success))' },
+                { label: t('mixPaused'), value: pausedCount, color: 'hsl(var(--warning))' },
+                { label: t('mixRemoved'), value: removedCount, color: 'hsl(var(--muted-foreground))' },
+              ]}
+              size={140}
+              layout="stacked"
+            />
+          )}
+        </ChartCard>
+      </div>
 
       {activeSourceInstalls.length > 0 ? (
-        <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold">{t('sourceRuntimeHeading')}</h2>
-          {activeSourceInstalls.map((install) => {
-            const runs = sourceRunsByInstallId.get(install.id) ?? [];
-            const health = pluginInstallHealth(install, 'source', runs);
-            return (
-              <div key={install.id} className="flex flex-col gap-3 rounded-md border border-input px-3 py-3 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <span className="font-medium">{t('installLine', { pluginId: install.pluginId, version: install.version })}</span>
-                  <TriggerSourcePluginRunButton orgId={orgId} projectId={projectId} installId={install.id} environments={environmentOptions} />
-                </div>
-                <PluginHealthSummary health={health} />
-                <details className="flex flex-col gap-2">
-                  <summary className="cursor-pointer text-sm font-medium text-muted-foreground">{t('sourceRunHistoryHeading')}</summary>
-                  <div className="pt-2">
-                    {runs.length === 0 ? (
-                      <p className="text-muted-foreground">{t('sourceRunNoRuns')}</p>
-                    ) : (
-                      <ul className="flex flex-col gap-2">
-                        {runs.map((run) => (
-                          <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-xs">
-                            <span className="font-medium">
-                              {t('sourceRunSummary', { status: t(sourceRunStatusLabelKey(run.status)), startedAt: run.startedAt })}
-                            </span>
-                            <span className="text-muted-foreground">{t('sourceRunAttemptsLine', { attempts: run.attempts })}</span>
-                            <span className="text-muted-foreground">
-                              {t('sourceRunCursorLine', {
-                                before: run.cursorBefore ?? t('sourceRunCursorFromScratch'),
-                                after: run.cursorAfter ?? t('sourceRunCursorFromScratch'),
-                              })}
-                            </span>
-                            {run.recordsFetched !== null ? (
+        <ChartCard title={t('sourceRuntimeHeading')} description={t('sourceRuntimeDescription')} icon={RefreshCw}>
+          <div className="flex flex-col gap-4">
+            {activeSourceInstalls.map((install) => {
+              const runs = sourceRunsByInstallId.get(install.id) ?? [];
+              const health = pluginInstallHealth(install, 'source', runs);
+              const series = sourceRunSeries(runs);
+              return (
+                <div key={install.id} className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <span className="font-medium">{t('installLine', { pluginId: install.pluginId, version: install.version })}</span>
+                    <TriggerSourcePluginRunButton orgId={orgId} projectId={projectId} installId={install.id} environments={environmentOptions} />
+                  </div>
+                  <PluginHealthSummary health={health} />
+                  {series.length > 1 ? (
+                    <TrendChart
+                      label={t('runChartLabel', { pluginId: install.pluginId })}
+                      data={series.map((point) => ({ ...point }))}
+                      xKey="run"
+                      series={[
+                        { key: 'accepted', label: t('runChartAccepted'), color: 'hsl(var(--success))' },
+                        { key: 'quarantined', label: t('runChartQuarantined'), color: 'hsl(var(--destructive))' },
+                        { key: 'duplicate', label: t('runChartDuplicate'), color: 'hsl(var(--muted-foreground))' },
+                      ]}
+                      kind="bar"
+                      stacked
+                      height={180}
+                    />
+                  ) : null}
+                  <details className="flex flex-col gap-2">
+                    <summary className="cursor-pointer text-sm font-medium text-muted-foreground">{t('sourceRunHistoryHeading')}</summary>
+                    <div className="pt-2">
+                      {runs.length === 0 ? (
+                        <p className="text-muted-foreground">{t('sourceRunNoRuns')}</p>
+                      ) : (
+                        <ul className="flex flex-col gap-2">
+                          {runs.map((run) => (
+                            <li key={run.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-xs">
+                              <span className="font-medium">
+                                {t('sourceRunSummary', { status: t(sourceRunStatusLabelKey(run.status)), startedAt: run.startedAt })}
+                              </span>
+                              <span className="text-muted-foreground">{t('sourceRunAttemptsLine', { attempts: run.attempts })}</span>
                               <span className="text-muted-foreground">
-                                {t('sourceRunCountsLine', {
-                                  fetched: run.recordsFetched,
-                                  accepted: run.recordsAccepted ?? 0,
-                                  quarantined: run.recordsQuarantined ?? 0,
-                                  duplicate: run.recordsDuplicate ?? 0,
+                                {t('sourceRunCursorLine', {
+                                  before: run.cursorBefore ?? t('sourceRunCursorFromScratch'),
+                                  after: run.cursorAfter ?? t('sourceRunCursorFromScratch'),
                                 })}
                               </span>
-                            ) : null}
-                            {run.errorMessage ? (
-                              <span className="text-destructive">{t('sourceRunErrorLine', { message: run.errorMessage })}</span>
-                            ) : null}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </details>
-              </div>
-            );
-          })}
-        </section>
+                              {run.recordsFetched !== null ? (
+                                <span className="text-muted-foreground">
+                                  {t('sourceRunCountsLine', {
+                                    fetched: run.recordsFetched,
+                                    accepted: run.recordsAccepted ?? 0,
+                                    quarantined: run.recordsQuarantined ?? 0,
+                                    duplicate: run.recordsDuplicate ?? 0,
+                                  })}
+                                </span>
+                              ) : null}
+                              {run.errorMessage ? (
+                                <span className="text-destructive">{t('sourceRunErrorLine', { message: run.errorMessage })}</span>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </details>
+                </div>
+              );
+            })}
+          </div>
+        </ChartCard>
       ) : null}
 
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard title={t('builtinPacksHeading')} description={t('builtinPacksIntro')} icon={Sparkles}>
+          <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installableBuiltinPacks} />
+        </ChartCard>
+
+        <ChartCard title={t('installHeading')} icon={DownloadCloud}>
+          {installableManifests.length === 0 && manifestViews.length > 0 ? (
+            <p className="text-muted-foreground">{t('allManifestsInstalled')}</p>
+          ) : (
+            <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableManifests} />
+          )}
+        </ChartCard>
+      </div>
+
       {activeMetaCustomAudienceInstalls.length > 0 ? (
-        <section className="flex flex-col gap-4">
-          <h2 className="text-lg font-semibold">{t('lookalikeHeading')}</h2>
-          {activeMetaCustomAudienceInstalls.map((install) => (
-            <div key={install.id} className="flex flex-col gap-3 rounded-md border border-input px-3 py-3 text-sm">
-              <span className="font-medium">{t('installLine', { pluginId: install.pluginId, version: install.version })}</span>
-              <MetaLookalikeAudienceControls
-                orgId={orgId}
-                projectId={projectId}
-                installId={install.id}
-                hasSeedAudience={install.sinkExternalRef !== null}
-                audiences={lookalikeAudiencesByInstallId.get(install.id) ?? []}
-              />
-            </div>
-          ))}
-        </section>
+        <ChartCard title={t('lookalikeHeading')} icon={Users}>
+          <div className="flex flex-col gap-4">
+            {activeMetaCustomAudienceInstalls.map((install) => (
+              <div key={install.id} className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4 text-sm">
+                <span className="font-medium">{t('installLine', { pluginId: install.pluginId, version: install.version })}</span>
+                <MetaLookalikeAudienceControls
+                  orgId={orgId}
+                  projectId={projectId}
+                  installId={install.id}
+                  hasSeedAudience={install.sinkExternalRef !== null}
+                  audiences={lookalikeAudiencesByInstallId.get(install.id) ?? []}
+                />
+              </div>
+            ))}
+          </div>
+        </ChartCard>
       ) : null}
     </main>
   );
