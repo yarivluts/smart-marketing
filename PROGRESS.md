@@ -7,6 +7,42 @@ fresh session can pick up work from this file + [TASKS.md](./TASKS.md) alone. Se
 Template for each entry:
 
 ```
+## 2026-09-26 - EasySign round 4: setup tools live, integration infrastructure, MRR without a PSP
+
+### Deployed (api-prod/api-preprod/web-prod/web-preprod and dbt-refresh all at 9d51c51)
+- **KAN-197** setup tools (#508): verified independently by EasySign on prod (dev 5/6 connected,
+  ad spend an honest gap, every how_to_fix target real). Review fixes before merge: an API key
+  reports only on its own environment (KAN-28), and every requirement lists the schemas behind it
+  with `mapping: inferred_from_schema_name`. Explicit mapping is KAN-221; B27 (don't tell an
+  integrator to register a schema that is registered but silent) is #517, merging next.
+- **KAN-137** (#510): `search_customers` returns `empty_reason: no_entity_schemas` when the project
+  has no entity schema. **KAN-212** (#509): the Copilot command bar asks data questions instead of
+  fixed invented budget actions.
+- **KAN-202**: I1 ingest contract as OpenAPI 3.1 at `GET /v1/ingest/contract` (#511, held against
+  `checkRecordEnvelope`); I3 `POST /v1/ingest/*/validate` (#512) and MCP `validate_records` (#514),
+  storing nothing; I2 `apply_schema_manifest` with dry run, all-or-nothing (#513). I4 remains.
+- **KAN-110** (#515): `stg_subscription_history` feeds Stripe snapshots and vendor-neutral
+  `subscription_state_change` events (`mrr` + `currency`, keyed by subscription_id else
+  customer_id, ordered by source ts) through one diff. EasySign's schema evolved to v2 (mrr,
+  status) under Yariv's standing schema authorization after a live dry-run plan. Verified on
+  BigQuery (dbt-refresh-r247b): EasySign dev MuxgBhYa... active 20 ILS. In Review for EasySign.
+
+### Production incident, fixed (KAN-222)
+- `GROWTHOS_API_BASE_URL` / `GROWTHOS_WEB_APP_URL` were never set on api-prod/api-preprod, so MCP
+  OAuth discovery advertised `http://localhost:3001` (no OAuth MCP client could sign in against
+  prod). Set on both services; #516 makes a non-dev API refuse to start without real public URLs.
+- web-preprod was built with ingest/hook bases `/v1/events` and `/v1/webhooks` (both 404); rebuilt
+  with `/v1/ingest` and `/v1/hooks`. **Future web-preprod builds must copy substitutions from
+  build `e108076d-2be9-43ba-b930-101b736fe279`, not the old `c804e3df-...`.** The dbt image build
+  needs both `_IMAGE` and `_GIT_SHA`.
+
+- **Last completed:** all of the above. **In progress:** #517 (B27).
+- **Blocked + why:** KAN-97 (schema.write in default key scopes) and KAN-195 (viewer read access)
+  are Yariv's product decisions.
+- **Next step:** KAN-202 I4 (per-event ingest health over the API), KAN-221, EasySign's customer
+  entity backfill and Adir's production deploy (key gos_live_Jz47ju3m, watched for first use).
+- **Waiting on human:** KAN-97, KAN-195, KAN-117, KAN-130.
+
 ## 2026-09-26 - KAN-197: setup tools ported from the abandoned tree, fixed (PR open, not merged)
 
 - **Last completed:** `get_setup_health` + `audit_installation_gaps` MCP tools, registered in
