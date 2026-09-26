@@ -52,6 +52,16 @@ export interface ProdDriftInput {
   now: Date;
   /** How long a merged commit may wait before its absence counts as drift. */
   graceHours: number;
+  /**
+   * Set when `undeployedCommits` was narrowed to commits touching only these paths
+   * (`git log A..main -- <paths>`), for a service whose image is built from a small
+   * corner of the monorepo (KAN-204). The dbt-refresh job is built from
+   * `packages/dbt-transform` alone: counting every web or API merge against it would
+   * raise its alarm after every ordinary deploy that did not touch dbt, and an alarm
+   * that fires during ordinary operation is one people learn to ignore. Only
+   * phrases the message; the decision is made on `undeployedCommits` either way.
+   */
+  watchedPaths?: readonly string[];
 }
 
 export interface ProdDriftAssessment {
@@ -89,12 +99,18 @@ export function assessProdDrift(input: ProdDriftInput): ProdDriftAssessment {
     };
   }
 
-  if (input.undeployedCommits.length === 0 || shaMatches(input.deployedSha, input.mainSha)) {
+  const watched = input.watchedPaths && input.watchedPaths.length > 0 ? input.watchedPaths.join(', ') : null;
+  const atMain = shaMatches(input.deployedSha, input.mainSha);
+
+  if (input.undeployedCommits.length === 0 || atMain) {
     return {
       status: 'current',
       behindBy: 0,
       oldestUndeployedAgeHours: null,
-      message: `Production is at ${short(input.deployedSha)}, which is main.`,
+      message:
+        watched === null || atMain
+          ? `Production is at ${short(input.deployedSha)}, which is main.`
+          : `Production is at ${short(input.deployedSha)}; main (${short(input.mainSha)}) has no later change to ${watched}.`,
     };
   }
 
@@ -105,13 +121,14 @@ export function assessProdDrift(input: ProdDriftInput): ProdDriftAssessment {
   const oldestMs = Math.min(...input.undeployedCommits.map((commit) => Date.parse(commit.committedAt)));
   const oldestAgeHours = Math.max(0, Math.floor((input.now.getTime() - oldestMs) / HOUR_MS));
   const behindBy = input.undeployedCommits.length;
+  const commits = watched === null ? `${behindBy} commit(s)` : `${behindBy} commit(s) touching ${watched}`;
 
   if (oldestAgeHours < input.graceHours) {
     return {
       status: 'within_grace',
       behindBy,
       oldestUndeployedAgeHours: oldestAgeHours,
-      message: `Production is ${behindBy} commit(s) behind main, the oldest ${oldestAgeHours}h old — within the ${input.graceHours}h grace period.`,
+      message: `Production is ${commits} behind main, the oldest ${oldestAgeHours}h old — within the ${input.graceHours}h grace period.`,
     };
   }
 
@@ -120,7 +137,7 @@ export function assessProdDrift(input: ProdDriftInput): ProdDriftAssessment {
     behindBy,
     oldestUndeployedAgeHours: oldestAgeHours,
     message:
-      `Production is at ${short(input.deployedSha)}, ${behindBy} commit(s) behind main (${short(input.mainSha)}). ` +
+      `Production is at ${short(input.deployedSha)}, ${commits} behind main (${short(input.mainSha)}). ` +
       `The oldest undeployed commit merged ${oldestAgeHours}h ago, past the ${input.graceHours}h grace period. ` +
       'A deploy is owed — see docs/deploy-api.md.',
   };

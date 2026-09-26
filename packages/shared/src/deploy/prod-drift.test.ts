@@ -90,3 +90,55 @@ describe('assessProdDrift (KAN-180)', () => {
     expect(DEFAULT_PROD_DRIFT_GRACE_HOURS).toBeGreaterThanOrEqual(2);
   });
 });
+
+/**
+ * dbt-refresh is built from packages/dbt-transform alone, so the check narrows the
+ * undeployed commits to that path (KAN-204). The decision stays the same function of
+ * the commits; the message has to say what was counted, or "current" at a SHA far
+ * behind main reads like a bug in the check.
+ */
+describe('assessProdDrift with watchedPaths (KAN-204)', () => {
+  const watchedPaths = ['packages/dbt-transform', 'deploy/cloudbuild.dbt.yaml'];
+
+  it('is current when main has moved on only outside the watched paths, and says so', () => {
+    const result = assessProdDrift({ deployedSha: 'aaaaaaa', mainSha: 'bbbbbbb', undeployedCommits: [], now: NOW, graceHours: 6, watchedPaths });
+    expect(result).toMatchObject({ status: 'current', behindBy: 0 });
+    expect(result.message).toBe('Production is at aaaaaaa; main (bbbbbbb) has no later change to packages/dbt-transform, deploy/cloudbuild.dbt.yaml.');
+  });
+
+  it('keeps the plain message when production is at main itself', () => {
+    const result = assessProdDrift({ deployedSha: 'bbbbbbb', mainSha: 'bbbbbbb', undeployedCommits: [], now: NOW, graceHours: 6, watchedPaths });
+    expect(result.message).toBe('Production is at bbbbbbb, which is main.');
+  });
+
+  it('counts only the watched commits when they are overdue, and names the paths', () => {
+    const result = assessProdDrift({
+      deployedSha: 'aaaaaaa',
+      mainSha: 'ddddddd',
+      undeployedCommits: [{ sha: 'ccccccc', committedAt: hoursAgo(15 * 24) }],
+      now: NOW,
+      graceHours: 6,
+      watchedPaths,
+    });
+    expect(result).toMatchObject({ status: 'drifted', behindBy: 1, oldestUndeployedAgeHours: 360 });
+    expect(result.message).toContain('1 commit(s) touching packages/dbt-transform, deploy/cloudbuild.dbt.yaml behind main (ddddddd)');
+  });
+
+  it('phrases a within-grace wait the same way', () => {
+    const result = assessProdDrift({
+      deployedSha: 'aaaaaaa',
+      mainSha: 'ddddddd',
+      undeployedCommits: [{ sha: 'ccccccc', committedAt: hoursAgo(1) }],
+      now: NOW,
+      graceHours: 6,
+      watchedPaths: ['packages/dbt-transform'],
+    });
+    expect(result.status).toBe('within_grace');
+    expect(result.message).toMatch(/^Production is 1 commit\(s\) touching packages\/dbt-transform behind main/);
+  });
+
+  it('treats an empty watchedPaths as unfiltered', () => {
+    const result = assessProdDrift({ deployedSha: 'aaaaaaa', mainSha: 'bbbbbbb', undeployedCommits: [], now: NOW, graceHours: 6, watchedPaths: [] });
+    expect(result.message).toBe('Production is at aaaaaaa, which is main.');
+  });
+});
