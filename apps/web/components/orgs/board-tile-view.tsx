@@ -4,7 +4,17 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { buildSessionReplayLink, formatMetricValue, sessionReplayTemplateFiltersByPage, type ParsedMetricUnit } from '@growthos/shared';
 import type { TileFreshness, TileRenderView, TimeSeries, TimeSeriesPoint } from '@/lib/orgs/board-view';
-import { capSmallMultiples, formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, latestPresentPoint, splitAtGaps } from '@/lib/orgs/chart-labels';
+import {
+  capSmallMultiples,
+  edgeAnchor,
+  formatBucketLabels,
+  labeledAxisIndexes,
+  labeledValueIndexes,
+  latestPresentPoint,
+  MAX_SMALL_MULTIPLES,
+  splitAtGaps,
+} from '@/lib/orgs/chart-labels';
+import { planBarChartLayout, tileBodyHeightPx, VALUE_HEADROOM_PX } from '@/lib/orgs/small-multiples-layout';
 import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
 
 export interface BoardTileViewProps {
@@ -359,14 +369,18 @@ function LabeledBarPlot({
   previousPoints,
   colorClass,
   maxValue,
-  compact,
+  plotHeightPx,
+  showAxis,
   locale,
 }: {
   points: readonly TimeSeriesPoint[];
   previousPoints?: readonly TimeSeriesPoint[];
   colorClass: string;
   maxValue: number;
-  compact?: boolean;
+  /** The bar area's height, planned by `planBarChartLayout` so every drawn plot fits the tile. */
+  plotHeightPx: number;
+  /** False for an upper plot of a stack that shares the last plot's date axis. */
+  showAxis: boolean;
   locale: string;
 }): React.ReactElement {
   const t = useTranslations('Boards');
@@ -391,7 +405,12 @@ function LabeledBarPlot({
 
   return (
     <div dir="ltr" aria-hidden="true" className="flex flex-col">
-      <div className={`flex items-end gap-1 border-b border-border pt-4 ${compact ? 'h-16' : 'h-24'}`}>
+      <div
+        data-testid="bar-plot-area"
+        className="flex items-end gap-1 border-b border-border pt-3"
+        // The headroom (`pt-3`) holds the value printed over the tallest bar; the rest is the bar area.
+        style={{ height: `${VALUE_HEADROOM_PX + plotHeightPx}px` }}
+      >
         {Array.from({ length: columnCount }, (_, index) => {
           const point = points[index];
           const previous = previousPoints?.[index];
@@ -405,7 +424,10 @@ function LabeledBarPlot({
                   style={{ height: heightPct(point.value) }}
                 >
                   {valueIndexes.has(index) ? (
-                    <span className="absolute bottom-full left-1/2 mb-0.5 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-foreground">
+                    <span
+                      data-anchor={edgeAnchor(index, columnCount)}
+                      className={`absolute bottom-full mb-0.5 whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-foreground ${EDGE_ANCHOR_CLASSES[edgeAnchor(index, columnCount)]}`}
+                    >
                       {formatValue(point.value)}
                     </span>
                   ) : null}
@@ -425,22 +447,46 @@ function LabeledBarPlot({
           );
         })}
       </div>
-      <div className="flex h-3.5 gap-1">
-        {Array.from({ length: columnCount }, (_, index) => (
-          <div key={index} className="relative min-w-0 flex-1">
-            {axisIndexes.has(index) && index < points.length ? (
-              <span className="absolute left-1/2 top-0.5 -translate-x-1/2 whitespace-nowrap text-[10px] leading-none tabular-nums text-muted-foreground">
-                {bucketLabels[index]}
-              </span>
-            ) : null}
-          </div>
-        ))}
-      </div>
+      {showAxis ? (
+        <div data-testid="bar-axis" className="flex h-3.5 gap-1">
+          {Array.from({ length: columnCount }, (_, index) => (
+            <div key={index} className="relative min-w-0 flex-1">
+              {axisIndexes.has(index) && index < points.length ? (
+                <span
+                  data-anchor={edgeAnchor(index, columnCount)}
+                  className={`absolute top-0.5 whitespace-nowrap text-[10px] leading-none tabular-nums text-muted-foreground ${EDGE_ANCHOR_CLASSES[edgeAnchor(index, columnCount)]}`}
+                >
+                  {bucketLabels[index]}
+                </span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function BarChartView({ view, title }: { view: Extract<TileRenderView, { kind: 'time_series' }>; title: string }): React.ReactElement {
+/**
+ * Positions a label inside its column so it never overhangs the plot (see `edgeAnchor`): the first
+ * column's label starts at its left edge, the last one's ends at its right edge, the rest centre.
+ */
+const EDGE_ANCHOR_CLASSES: Record<ReturnType<typeof edgeAnchor>, string> = {
+  start: 'left-0',
+  center: 'left-1/2 -translate-x-1/2',
+  end: 'right-0',
+};
+
+function BarChartView({
+  view,
+  title,
+  availableHeightPx,
+}: {
+  view: Extract<TileRenderView, { kind: 'time_series' }>;
+  title: string;
+  /** The tile body's height - see `BoardTileView`. */
+  availableHeightPx: number;
+}): React.ReactElement {
   const t = useTranslations('Boards');
   const locale = useLocale();
   const captionFor = useSeriesCaption(title, view.series.length);
@@ -450,32 +496,50 @@ function BarChartView({ view, title }: { view: Extract<TileRenderView, { kind: '
   const maxValue = maxSeriesValue([...view.series, ...(view.previousSeries ?? [])]);
   const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
   const previousByLabel = new Map((view.previousSeries ?? []).map((series) => [series.label, series]));
-  // Several stacked plots must share the tile's height, so each gets a shorter plot area.
-  const compact = view.series.length > 1;
-  // A split with many values would stack one plot per value past the tile's grid cell (KAN-217), so
-  // only the largest few are drawn and the rest are summarised behind a "+N more" disclosure.
-  const { shown, hidden } = capSmallMultiples(view.series);
+  const isSplit = view.series.length > 1;
+  // A split draws one small plot per value, and they all have to fit the tile's grid cell - with the
+  // "+N more" line that names the rest in view, not below the fold (KAN-217, B25). The plan sizes the
+  // plots from the height the tile has, drawing fewer when the cap's worth would not fit.
+  const bucketsOf = (series: TimeSeries) => series.points.map((point) => point.bucket).join('|');
+  const { shown: capped } = capSmallMultiples(view.series);
+  const sharedAxis = isSplit && capped.every((series) => bucketsOf(series) === bucketsOf(capped[0]));
+  const layout = planBarChartLayout({
+    seriesCount: view.series.length,
+    availableHeightPx,
+    maxShown: MAX_SMALL_MULTIPLES,
+    labelled: isSplit || previousByLabel.size > 0,
+    sharedAxis,
+  });
+  const { shown, hidden } = capSmallMultiples(view.series, layout.shownCount);
 
   return (
-    <div className="flex min-h-full flex-col justify-center gap-3">
-      {shown.map((series) => {
+    <div className={`flex flex-col gap-2 ${isSplit ? '' : 'min-h-full justify-center'}`}>
+      {shown.map((series, index) => {
         const colorClass = SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length];
         const previous = previousByLabel.get(series.label);
         const caption = captionFor(series.label);
         return (
-          <figure key={series.label} className="flex flex-col gap-1" aria-label={caption}>
-            {view.series.length > 1 || previous ? (
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground" aria-hidden="true">
-                {view.series.length > 1 ? <span>{series.label}</span> : null}
+          <figure key={series.label} className="flex flex-col gap-0.5" aria-label={caption}>
+            {isSplit || previous ? (
+              <div className="flex items-center gap-3 overflow-hidden text-[10px] leading-3 text-muted-foreground" aria-hidden="true">
+                {isSplit ? <span className="truncate">{series.label}</span> : null}
                 {previous ? (
-                  <span className="flex items-center gap-1">
+                  <span className="flex shrink-0 items-center gap-1">
                     <span className={`inline-block h-2 w-2 rounded-sm opacity-40 ${colorClass}`} />
                     {t('previousPeriodLabel')}
                   </span>
                 ) : null}
               </div>
             ) : null}
-            <LabeledBarPlot points={series.points} previousPoints={previous?.points} colorClass={colorClass} maxValue={maxValue} compact={compact} locale={locale} />
+            <LabeledBarPlot
+              points={series.points}
+              previousPoints={previous?.points}
+              colorClass={colorClass}
+              maxValue={maxValue}
+              plotHeightPx={layout.plotHeightPx}
+              showAxis={!sharedAxis || index === shown.length - 1}
+              locale={locale}
+            />
             <SeriesDataTable caption={caption} points={series.points} locale={locale} />
             {previous ? (
               <SeriesDataTable caption={t('chartPreviousPeriodCaption', { caption })} points={previous.points} locale={locale} />
@@ -484,7 +548,7 @@ function BarChartView({ view, title }: { view: Extract<TileRenderView, { kind: '
         );
       })}
       {hidden.length > 0 ? (
-        <details data-testid="small-multiples-more" className="text-xs text-muted-foreground">
+        <details data-testid="small-multiples-more" className="text-xs leading-4 text-muted-foreground">
           <summary className="cursor-pointer select-none">{t('moreSeriesLabel', { count: hidden.length })}</summary>
           <ul className="mt-1 flex flex-col gap-0.5">
             {hidden.map((series) => {
@@ -826,8 +890,33 @@ function FunnelView({ view }: { view: Extract<TileRenderView, { kind: 'funnel' }
 }
 
 /** Renders one tile's already-queried, already-shaped data (see `buildTileRenderView` in `lib/orgs/board-view.ts`) — every tile type from the KAN-60 AC (line/bar/big-number/table/funnel) plus KAN-62's `heatmap` and KAN-63's `histogram`, plus a per-tile degraded state instead of the whole board failing. A `freshness` badge (KAN-69) floats in the tile's top-right corner for every kind except `unavailable`, which has no queried data to attach one to. Both consumers of this component (the board detail page's grid and the TV war-room rotation, `tv-rotation-screen.tsx`) get the badge for free — there's no TV-specific rendering fork to keep in sync. */
+/**
+ * The body's real height once it is laid out (a ResizeObserver keeps it current as the tile or the
+ * window resizes, and on the TV screen, whose tiles are not grid-row sized). `null` until measured -
+ * on the server, before mount, and where there is no layout engine or ResizeObserver at all.
+ */
+function useMeasuredHeight(): [React.RefCallback<HTMLElement>, number | null] {
+  const [element, setElement] = useState<HTMLElement | null>(null);
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!element || typeof ResizeObserver === 'undefined') {
+      return undefined;
+    }
+    const measure = () => setHeight(element.clientHeight > 0 ? element.clientHeight : null);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element]);
+  return [setElement, height];
+}
+
 export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTileViewProps): React.ReactElement {
   const t = useTranslations('Boards');
+  const [bodyRef, measuredHeight] = useMeasuredHeight();
+  // What the body measures once laid out, or - before that, and wherever nothing can be measured -
+  // the height its grid cell gives it from the rows the tile spans.
+  const availableHeightPx = measuredHeight ?? tileBodyHeightPx(tile.layout.h);
 
   const content = (() => {
     switch (view.kind) {
@@ -836,7 +925,11 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
       case 'big_number':
         return <BigNumberView view={view} />;
       case 'time_series':
-        return view.chart === 'line' ? <LineChartView view={view} title={tile.title} /> : <BarChartView view={view} title={tile.title} />;
+        return view.chart === 'line' ? (
+          <LineChartView view={view} title={tile.title} />
+        ) : (
+          <BarChartView view={view} title={tile.title} availableHeightPx={availableHeightPx} />
+        );
       case 'table':
         return <TableView view={view} tileId={tile.id} sessionReplayUrlTemplate={sessionReplayUrlTemplate} />;
       case 'funnel':
@@ -857,8 +950,7 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
   // the tile below (KAN-217).
   return (
     <TileUnitContext.Provider value={unit}>
-    <div data-testid="board-tile-body" className="relative h-full overflow-y-auto overflow-x-hidden">
-
+    <div ref={bodyRef} data-testid="board-tile-body" className="relative h-full overflow-y-auto overflow-x-hidden">
       {freshness ? (
         <div className="absolute right-0 top-0">
           <TileFreshnessBadge freshness={freshness} />

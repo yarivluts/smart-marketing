@@ -6,6 +6,9 @@ import type { BoardTileRow } from './board-types';
 import messages from '../../messages/en.json';
 import heMessages from '../../messages/he.json';
 import { buildTileRenderView, type TileRenderView } from '@/lib/orgs/board-view';
+import { MAX_SMALL_MULTIPLES } from '@/lib/orgs/chart-labels';
+import { layoutHeightPx, planBarChartLayout, tileBodyHeightPx, VALUE_HEADROOM_PX } from '@/lib/orgs/small-multiples-layout';
+import { defaultTileSize } from './board-types';
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -451,10 +454,14 @@ describe('BoardTileView', () => {
       expect(body).toHaveClass('h-full', 'overflow-y-auto', 'overflow-x-hidden');
     });
 
+    // Tall enough for the full cap of three plots - see `planBarChartLayout`.
+    const tallTile = { x: 0, y: 0, w: 6, h: 8 };
+
     it('draws at most three per-campaign plots and summarises the rest behind "+N more"', () => {
       const { container } = renderTile(byCampaign({ spring: 0.12, summer: 0.5, autumn: 0.08, winter: 0.3, brand: 0.02 }), {
         type: 'bar',
         title: 'Conversion rate',
+        layout: tallTile,
       });
       // One plot (a labelled <figure>) per drawn campaign: the three with the largest values.
       const plots = container.querySelectorAll('figure');
@@ -476,17 +483,67 @@ describe('BoardTileView', () => {
     });
 
     it('shows no "+N more" when the split fits under the cap', () => {
-      renderTile(byCampaign({ a: 1, b: 2, c: 3 }), { type: 'bar' });
+      renderTile(byCampaign({ a: 1, b: 2, c: 3 }), { type: 'bar', layout: tallTile });
       expect(screen.queryByTestId('small-multiples-more')).not.toBeInTheDocument();
     });
 
     it('translates the "+N more" affordance', () => {
       render(
         <NextIntlClientProvider locale="he" messages={heMessages}>
-          <BoardTileView tile={tile({ type: 'bar' })} view={byCampaign({ a: 1, b: 2, c: 3, d: 4 })} />
+          <BoardTileView tile={tile({ type: 'bar', layout: tallTile })} view={byCampaign({ a: 1, b: 2, c: 3, d: 4 })} />
         </NextIntlClientProvider>,
       );
       expect(screen.getByText(heMessages.Boards.moreSeriesLabel.replace('{count}', '1'))).toBeInTheDocument();
+    });
+  });
+
+  describe('a split tile fits its default-height cell, "+N more" included (B25)', () => {
+    const days = (values: number[]) => values.map((value, index) => ({ bucket: `2026-09-${String(24 + index).padStart(2, '0')}`, value }));
+    const fourCampaigns = {
+      kind: 'time_series' as const,
+      chart: 'bar' as const,
+      series: [
+        { label: 'spring', points: days([0.12, 0.1, 0.14]) },
+        { label: 'summer', points: days([0.5, 0.4, 0.45]) },
+        { label: 'autumn', points: days([0.08, 0.07, 0.09]) },
+        { label: 'winter', points: days([0.3, 0.2, 0.25]) },
+      ],
+      isEmpty: false,
+      freshness: null,
+    };
+    const defaultBarLayout = { x: 0, y: 0, ...defaultTileSize('bar') };
+
+    it('draws only the plots that fit a default 4-row tile, sized so they and "+N more" sum within the cell', () => {
+      const { container } = renderTile(fourCampaigns, { type: 'bar', title: 'Conversion rate by campaign', layout: defaultBarLayout });
+
+      const body = tileBodyHeightPx(defaultBarLayout.h);
+      const plan = planBarChartLayout({ seriesCount: 4, availableHeightPx: body, maxShown: MAX_SMALL_MULTIPLES, labelled: true, sharedAxis: true });
+      expect(layoutHeightPx(plan)).toBeLessThanOrEqual(body);
+
+      // The two largest campaigns are drawn, at the planned height ...
+      const figures = [...container.querySelectorAll('figure')];
+      expect(figures.map((figure) => figure.getAttribute('aria-label'))).toEqual(['Conversion rate by campaign · summer', 'Conversion rate by campaign · winter']);
+      for (const area of container.querySelectorAll<HTMLElement>('[data-testid="bar-plot-area"]')) {
+        expect(area.style.height).toBe(`${VALUE_HEADROOM_PX + plan.plotHeightPx}px`);
+      }
+      // ... sharing one date axis under the last plot ...
+      expect(container.querySelectorAll('[data-testid="bar-axis"]')).toHaveLength(1);
+      // ... and "+2 more" is rendered right after them, as the last thing in the chart - inside the
+      // planned height, so it needs no scrolling to be seen.
+      const more = screen.getByTestId('small-multiples-more');
+      expect(within(more).getByText('+2 more')).toBeInTheDocument();
+      expect(more.parentElement?.lastElementChild === more || more.nextElementSibling?.tagName === 'TABLE').toBe(true);
+    });
+
+    it('prints the last x-axis date in full, anchored to the plot\'s right edge instead of centred past it ("9/26", never "9/2")', () => {
+      const { container } = renderTile(fourCampaigns, { type: 'bar', layout: defaultBarLayout });
+      const axis = container.querySelector<HTMLElement>('[data-testid="bar-axis"]')!;
+      const lastLabel = within(axis).getByText('9/26');
+      expect(lastLabel.textContent).toBe('9/26');
+      expect(lastLabel).toHaveAttribute('data-anchor', 'end');
+      expect(lastLabel).toHaveClass('right-0');
+      expect(lastLabel).not.toHaveClass('-translate-x-1/2');
+      expect(within(axis).getByText('9/24')).toHaveAttribute('data-anchor', 'start');
     });
   });
 

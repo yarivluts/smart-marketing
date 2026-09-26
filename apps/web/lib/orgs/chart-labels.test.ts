@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { capSmallMultiples, formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, MAX_FULLY_LABELED_POINTS, MAX_SMALL_MULTIPLES } from './chart-labels';
+import { capSmallMultiples, edgeAnchor, formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, MAX_FULLY_LABELED_POINTS, MAX_SMALL_MULTIPLES } from './chart-labels';
+
+describe('edgeAnchor (B25)', () => {
+  it('anchors the last column\'s label to its right edge and the first column\'s to its left, so neither overhangs the plot', () => {
+    expect(edgeAnchor(29, 30)).toBe('end');
+    expect(edgeAnchor(0, 30)).toBe('start');
+    expect(edgeAnchor(15, 30)).toBe('center');
+  });
+
+  it('centres the label of a lone column, which spans the whole plot', () => {
+    expect(edgeAnchor(0, 1)).toBe('center');
+  });
+});
 
 describe('capSmallMultiples (KAN-217)', () => {
   const series = (label: string, ...values: (number | null)[]) => ({ label, points: values.map((value, index) => ({ bucket: `b${index}`, value })) });
