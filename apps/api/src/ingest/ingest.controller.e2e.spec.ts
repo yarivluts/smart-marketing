@@ -77,6 +77,18 @@ async function setupProjectWithKey(orgName: string, scopes: ('ingest.write' | 'm
 }
 
 describe('IngestController (e2e)', () => {
+  it('serves the ingest contract without a key, while the ingest routes still require one (KAN-202 I1)', async () => {
+    const res = await fetch(`${baseUrl}/v1/ingest/contract`);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { openapi: string; paths: Record<string, unknown> };
+    expect(body.openapi).toBe('3.1.0');
+    expect(Object.keys(body.paths)).toContain('/ingest/events');
+
+    // The contract route must not have loosened its siblings: batches still needs a key.
+    const batch = await fetch(`${baseUrl}/v1/ingest/batches/any-id`);
+    expect(batch.status).toBe(401);
+  });
+
   it('rejects (401) a request with no Authorization header', async () => {
     const res = await fetch(`${baseUrl}/v1/ingest/events`, {
       method: 'POST',

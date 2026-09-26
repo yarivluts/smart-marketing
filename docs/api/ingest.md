@@ -11,6 +11,14 @@ If you are pushing real data and something is silently missing from your boards,
 [§9](#9-differences-from-the-plan-sketch) first — the three record kinds do **not** share a
 payload shape, and unknown fields are quarantined, not dropped or accepted.
 
+**Machine-readable contract (KAN-202 I1).** `GET /v1/ingest/contract` returns this API as an
+OpenAPI 3.1 document without a key: the three request envelopes, the batch response, the batch
+limit, and in `x-growthos-rules` the rules a JSON shape cannot express. Those rules say identity
+goes inside `properties`, `ts` is source time, the touchpoint is the first event of a visit, and
+entity upserts send the whole row. It is built from the constants ingest enforces, and
+`apps/api/src/ingest/ingest-contract.spec.ts` holds it against the real envelope validation.
+Field-level schemas are per project: read them with `list_schemas`.
+
 ## 1. Authentication
 
 Every ingest request is authenticated by a **bearer API key**, not a human/service-account
