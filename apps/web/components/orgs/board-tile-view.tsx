@@ -238,7 +238,10 @@ function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 
 
   return (
     <figure className="flex h-full flex-col gap-2" aria-label={title}>
-      <div dir="ltr" aria-hidden="true" className="flex flex-col">
+      {/* The inset keeps the first and last points whole: they sit at 0% and 100% and are centred there,
+          so without it half of each marker falls outside the tile, which clips its overflow. The axis
+          shares the inset, so its labels stay under their points. */}
+      <div dir="ltr" aria-hidden="true" data-testid="line-plot" className="flex flex-col px-2">
         <div className="pt-4">
           <div className="relative h-20">
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full overflow-visible" preserveAspectRatio="none">

@@ -279,6 +279,18 @@ describe('BoardTileView', () => {
       expect(container.querySelectorAll('[data-testid="series-dot"]')).toHaveLength(2);
     });
 
+    it('the plot is inset so the first and last points are not cut in half at the tile edge', () => {
+      const { container } = renderTile(
+        { kind: 'time_series', chart: 'line', series: [{ label: 'all', points: withGap }], isEmpty: false, freshness: null },
+        { type: 'line', title: 'CAC' },
+      );
+      const plot = container.querySelector('[data-testid="line-plot"]');
+      // The plot and its axis share one inset wrapper, so labels stay aligned under their points.
+      expect(plot?.className).toMatch(/(^|\s)px-2(\s|$)/);
+      expect(plot?.querySelector('svg')).not.toBeNull();
+      expect(plot?.querySelector('.border-t')).not.toBeNull();
+    });
+
     it('a bar tile leaves an empty, labelled slot for a gap rather than a zero-height bar', () => {
       const { container } = renderTile(
         { kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: withGap }], isEmpty: false, freshness: null },
