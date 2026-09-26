@@ -88,6 +88,16 @@ export function buildMappingFlow(
     edges.push({ source: sourceId, target: mappingId, active: !mapping.disabled && !(endpoint?.disabled ?? false) });
     edges.push({ source: mappingId, target: schemaId, active: !mapping.disabled });
   }
+
+  // A mapping not tied to an endpoint can be applied to a delivery from any of them, so every live
+  // endpoint feeds the "any delivery" step - otherwise those endpoints would float unconnected.
+  const anyId = idByKey.get('any');
+  if (anyId) {
+    for (const endpoint of endpoints) {
+      const endpointId = idByKey.get(`endpoint:${endpoint.id}`);
+      if (endpointId && !endpoint.disabled) edges.push({ source: endpointId, target: anyId, active: anyActiveUntied });
+    }
+  }
   return { nodes, edges };
 }
 

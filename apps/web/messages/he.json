@@ -587,7 +587,8 @@
     "rulesTargetMissing": "(לא רשומה)",
     "rulesNone": "אין למיפוי הזה כללים.",
     "ruleStaticSource": "קבוע: {value}",
-    "createMappingDescription": "בחרו את הסכמה שהרשומות צריכות לעמוד בה, ואז מפו נתיבים במטען לשדות שלה - או תנו ל\"הצעת מיפויים\" להציע אותם מתוך דוגמה."
+    "createMappingDescription": "בחרו את הסכמה שהרשומות צריכות לעמוד בה, ואז מפו נתיבים במטען לשדות שלה - או תנו ל\"הצעת מיפויים\" להציע אותם מתוך דוגמה.",
+    "flowAnySourceSub": "למיפויים שלא קשורים לנקודת קצה אחת"
   },
   "SchemaRegistry": {
     "eventRejectedCount": "{count} רשומות נדחו והועברו לבידוד — הן מעולם לא נחתו, ולכן הסכימה עדיין מוצגת כמי שלא התקבלה.",
@@ -940,7 +941,7 @@
     "ringLabel": "{connected} מתוך {total} דרישות ההגדרה מחוברות",
     "ringCenter": "דרישות",
     "coreLabel": "דרישות ליבה",
-    "breakdownLine": "{error} עם רשומות שנדחו בלבד · {gap} לא מחוברות",
+    "breakdownLine": "{error, plural, =0 {} one {אחת עם רשומות שנדחו בלבד} other {# עם רשומות שנדחו בלבד}}{error, plural, =0 {} other {{gap, plural, =0 {} other { · }}}}{gap, plural, =0 {} one {אחת לא מחוברת} other {# לא מחוברות}}",
     "importance": {
       "core": "ליבה",
       "recommended": "מומלץ"

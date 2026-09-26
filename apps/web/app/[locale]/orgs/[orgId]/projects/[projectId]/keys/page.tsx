@@ -249,7 +249,7 @@ export default async function ProjectApiKeysPage({ params }: PageProps): Promise
             {revokedKeys.length > 0 ? (
               <div className="flex flex-col gap-3">
                 <h3 className="text-sm font-medium text-muted-foreground">{t('deactivatedHeading', { count: revokedKeys.length })}</h3>
-                <ul className="grid gap-3 lg:grid-cols-2">{revokedKeys.map(keyCard)}</ul>
+                <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{revokedKeys.map(keyCard)}</ul>
               </div>
             ) : null}
           </div>

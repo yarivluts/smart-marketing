@@ -587,7 +587,8 @@
     "rulesTargetMissing": "(not registered)",
     "rulesNone": "This mapping has no rules.",
     "ruleStaticSource": "fixed: {value}",
-    "createMappingDescription": "Pick the schema the records must satisfy, then map payload paths to its fields - or let Suggest mappings propose them from a sample."
+    "createMappingDescription": "Pick the schema the records must satisfy, then map payload paths to its fields - or let Suggest mappings propose them from a sample.",
+    "flowAnySourceSub": "For mappings not tied to one endpoint"
   },
   "SchemaRegistry": {
     "eventRejectedCount": "{count} records rejected and quarantined - they never landed, so this schema still reads as never received.",
@@ -940,7 +941,7 @@
     "ringLabel": "{connected} of {total} setup requirements connected",
     "ringCenter": "requirements",
     "coreLabel": "Core requirements",
-    "breakdownLine": "{error} with rejected records only · {gap} not connected",
+    "breakdownLine": "{error, plural, =0 {} other {# with rejected records only}}{error, plural, =0 {} other {{gap, plural, =0 {} other { · }}}}{gap, plural, =0 {} other {# not connected}}",
     "importance": {
       "core": "Core",
       "recommended": "Recommended"

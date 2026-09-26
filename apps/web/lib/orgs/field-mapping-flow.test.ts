@@ -28,6 +28,20 @@ describe('buildMappingFlow', () => {
     expect(edges).toContainEqual({ source: node('endpoint', 'Stripe').id, target: node('mapping', 'Stripe to order').id, active: true });
     expect(edges).toContainEqual({ source: node('mapping', 'Any to visitor').id, target: node('schema', 'visitor').id, active: false });
     expect(nodes.every((candidate) => /^f\d+$/.test(candidate.id))).toBe(true);
+    // Every live endpoint feeds the "any delivery" step the untied mapping reads from.
+    expect(edges).toContainEqual({ source: node('endpoint', 'Zapier').id, target: node('any_source').id, active: false });
+    expect(edges).toContainEqual({ source: node('endpoint', 'Stripe').id, target: node('any_source').id, active: false });
+  });
+
+  it('marks the endpoint-to-any edges active when an untied mapping is active', () => {
+    const { nodes, edges } = buildMappingFlow(
+      [{ id: 'm1', name: 'Any', kind: 'event', schemaName: 'signup', disabled: false, ruleCount: 1 }],
+      endpoints,
+      new Set(['event:signup']),
+    );
+    const any = nodes.find((candidate) => candidate.type === 'any_source')!;
+    expect(edges.filter((edge) => edge.target === any.id).every((edge) => edge.active)).toBe(true);
+    expect(nodes.filter((candidate) => candidate.type === 'endpoint').every((candidate) => candidate.healthy)).toBe(true);
   });
 
   it('shares one schema node between mappings that target it', () => {

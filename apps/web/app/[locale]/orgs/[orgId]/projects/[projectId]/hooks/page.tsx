@@ -104,7 +104,7 @@ export default async function ProjectHooksPage({ params }: PageProps): Promise<R
           <StatCard
             title={t('kpiPending')}
             value={numberFormat.format(counts.pending)}
-            progress={hookDeliveries.length > 0 ? Math.round((counts.pending / hookDeliveries.length) * 100) : undefined}
+            subtext={t('kpiPendingSub')}
             icon={Clock}
           />
           <StatCard title={t('kpiApplied')} value={numberFormat.format(counts.applied)} subtext={t('kpiAppliedSub')} icon={DatabaseZap} />

@@ -120,10 +120,13 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
   );
   const base = `/orgs/${orgId}/projects/${projectId}`;
   const flowNode = (node: MappingFlowNode): FlowNodeSpec => {
-    if (node.type === 'endpoint' || node.type === 'any_source') {
+    if (node.type === 'any_source') {
+      return { id: node.id, label: t('flowAnySource'), sublabel: t('flowAnySourceSub'), status: 'ok', href: `${base}/hooks` };
+    }
+    if (node.type === 'endpoint') {
       return {
         id: node.id,
-        label: node.type === 'any_source' ? t('flowAnySource') : node.name,
+        label: node.name,
         sublabel: node.disabled ? t('disabledLabel') : node.healthy ? t('flowPendingSub', { count: node.count }) : t('flowUnmappedSub', { count: node.count }),
         value: node.count > 0 ? numberFormat.format(node.count) : undefined,
         status: node.disabled ? 'idle' : !node.healthy && node.count > 0 ? 'warn' : node.healthy ? 'ok' : 'idle',
@@ -254,7 +257,7 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
                   <div className="overflow-hidden rounded-xl border border-border/70">
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-muted/40 px-3 py-1.5 text-xs font-medium text-muted-foreground">
                       <span>{t('rulesSourceHeader')}</span>
-                      <span className="sr-only">{t('transformHeader')}</span>
+                      <span className="text-center">{t('transformHeader')}</span>
                       <span className="text-end">
                         {t('rulesTargetHeader', { schemaName: mapping.schema_name })}
                         {!schemaRegistered ? <span className="ms-1 text-destructive">{t('rulesTargetMissing')}</span> : null}

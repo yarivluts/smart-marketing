@@ -84,6 +84,19 @@ describe('SetupHealthPanel (KAN-197)', () => {
     expect(screen.getByText('1 with rejected records only · 1 not connected')).toBeInTheDocument();
   });
 
+  it('leaves a zero count out of the breakdown line', () => {
+    const noErrors = deriveSetupHealth(
+      [{ id: 'env-dev', name: 'dev' }],
+      [observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' })],
+    ).environments[0];
+    render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <SetupHealthPanel health={noErrors} environmentLabel="Development" />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText('5 not connected')).toBeInTheDocument();
+  });
+
   it('marks each checklist row with its status and importance', () => {
     renderPanel('en', 'Development');
     expect(screen.getByTestId('setup-requirement-signups')).toHaveAttribute('data-status', 'connected');
