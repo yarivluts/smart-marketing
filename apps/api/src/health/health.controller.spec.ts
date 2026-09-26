@@ -1,6 +1,8 @@
 import { Test } from '@nestjs/testing';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
+import { DBT_BUILD_INFO_EXECUTOR, DbtRefreshBuildService } from './dbt-refresh-build.service';
+import { NotConfiguredWarehouseQueryExecutor } from '@growthos/firebase-orm-models';
 
 describe('HealthController', () => {
   let controller: HealthController;
@@ -8,7 +10,11 @@ describe('HealthController', () => {
   beforeEach(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [HealthController],
-      providers: [HealthService],
+      providers: [
+        HealthService,
+        DbtRefreshBuildService,
+        { provide: DBT_BUILD_INFO_EXECUTOR, useValue: new NotConfiguredWarehouseQueryExecutor() },
+      ],
     }).compile();
 
     controller = moduleRef.get(HealthController);
@@ -47,6 +53,12 @@ describe('HealthController buildSha', () => {
    */
   it('reports null when the image was not stamped', () => {
     delete process.env.GIT_SHA;
+    expect(new HealthService().getHealth().buildSha).toBeNull();
+  });
+
+  /** Validated by the shared `readBuildSha` (packages/shared), the same rule the web app and the dbt report use. */
+  it('reports an unsubstituted build arg as unstamped', () => {
+    process.env.GIT_SHA = '${_GIT_SHA}';
     expect(new HealthService().getHealth().buildSha).toBeNull();
   });
 });

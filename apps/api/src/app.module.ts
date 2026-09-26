@@ -4,6 +4,8 @@ import { SentryModule } from '@sentry/nestjs/setup';
 import { AllExceptionsFilter } from './common/all-exceptions.filter';
 import { HealthController } from './health/health.controller';
 import { HealthService } from './health/health.service';
+import { DBT_BUILD_INFO_EXECUTOR, DbtRefreshBuildService } from './health/dbt-refresh-build.service';
+import { defaultWarehouseQueryExecutor } from '@growthos/firebase-orm-models';
 import { PermissionGuard } from './authz/permission.guard';
 import { IngestModule } from './ingest/ingest.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -17,6 +19,8 @@ import { TraceMiddleware } from './observability/trace.middleware';
   controllers: [HealthController],
   providers: [
     HealthService,
+    DbtRefreshBuildService,
+    { provide: DBT_BUILD_INFO_EXECUTOR, useValue: defaultWarehouseQueryExecutor },
     { provide: APP_GUARD, useClass: PermissionGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
   ],
