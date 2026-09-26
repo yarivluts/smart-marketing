@@ -243,6 +243,9 @@ async function runMetricQueryTool(
       projectId: auth.projectId,
       ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
       request,
+      // One row per bucket of the range, the same series a board line/bar tile draws: a silent
+      // missing day would read to an agent as "no data", or as two adjacent days, when it was a 0.
+      fillEmptyBuckets: true,
     });
     return textResult({ series: result.series, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
   } catch (error) {
@@ -328,7 +331,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Query metric',
       description:
-        'Run a grounded query against one or more registered metrics for a date range — never generated numbers, always compiled from the metric registry and executed against the warehouse.',
+        'Run a grounded query against one or more registered metrics for a date range — never generated numbers, always compiled from the metric registry and executed against the warehouse. The series has one row per time bucket in the range: a bucket with no events is 0 for a count/count_distinct/sum metric and null ("no value", not zero) for an avg/min/max or formula metric. An entirely empty result means nothing was recorded in the range at all.',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
     auditedToolHandler(auth, 'query_metric', async (args: any) => runMetricQueryTool(auth, args)),
