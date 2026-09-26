@@ -10,6 +10,9 @@ import {
   DuplicateMetricDefinitionError,
   evolveMetricDefinition,
   evolveSchemaDefinition,
+  applySchemaManifest,
+  planSchemaManifest,
+  type SchemaManifestPlan,
   GoalNotFoundError,
   HookEndpointNotFoundError,
   HookEndpointNotHmacModeError,
@@ -305,6 +308,43 @@ function toSchemaFields(args: any): { name: string; type: string; isRequired: bo
   }));
 }
 
+const schemaManifestInputShape = {
+  schemas: z
+    .unknown()
+    .describe(
+      'The manifest: an array of { kind, name, fields }, each exactly what register_schema takes (fields is an array of { name, type, is_required?, is_pii?, is_identity_key? }). Declare every schema the project should have, each with its WHOLE field list - a schema omitted from the manifest is left alone, never deleted.',
+    ),
+  dry_run: z
+    .boolean()
+    .optional()
+    .describe('true: report what applying would do and write nothing. Use it first - registration cannot be undone and evolution is additive-only.'),
+};
+
+/** The manifest's `schemas` argument as service entries; each field list goes through the same normalisation register_schema uses. */
+function toManifestEntries(args: any): { kind: string; name: string; fields: ReturnType<typeof toSchemaFields> }[] {
+  const raw = Array.isArray(args?.schemas) ? args.schemas : [];
+  return raw.map((schema: any) => ({ kind: String(schema?.kind ?? ''), name: String(schema?.name ?? ''), fields: toSchemaFields(schema ?? {}) }));
+}
+
+function manifestPlanOutput(plan: SchemaManifestPlan) {
+  const count = (action: string) => plan.entries.filter((entry) => entry.action === action).length;
+  return {
+    applicable: plan.applicable,
+    summary: { register: count('register'), evolve: count('evolve'), unchanged: count('unchanged'), blocked: count('blocked'), invalid: count('invalid') },
+    schemas: plan.entries.map((entry) => ({
+      kind: entry.kind,
+      name: entry.name,
+      action: entry.action,
+      current_version: entry.currentVersion,
+      next_version: entry.nextVersion,
+      added_fields: entry.addedFields,
+      changed_fields: entry.changedFields,
+      problems: entry.problems,
+      warnings: entry.warnings,
+    })),
+  };
+}
+
 const archiveMetricInputShape = { name: z.string().min(1).describe('The metric family to retire. Refused while an active formula still references it.') };
 const metricVersionsInputShape = { name: z.string().min(1).describe('The metric name whose version history to list — every version, not just the active one.') };
 const goalIdInputShape = { goal_id: z.string().min(1).describe('Id of the goal, as returned by list_goals.') };
@@ -516,6 +556,35 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
           createdByUserId: actorId(auth),
         });
         return textResult({ name: schemaDef.name, kind: schemaDef.kind, version: schemaDef.version, status: schemaDef.status });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'apply_schema_manifest',
+    {
+      title: 'Apply schema manifest',
+      description:
+        "Register and evolve this project's schemas from one manifest (KAN-202 I2) - the JSON file an integrator keeps in its own repo. For each schema it reports register (new, v1), evolve (a non-breaking change: added optional fields or changed flags), unchanged, blocked (a breaking change, with the reasons evolve_schema would give) or invalid. With dry_run: true it only reports. Otherwise it applies every register and evolve - unless any schema is blocked or invalid, in which case it writes nothing. Schemas missing from the manifest are left alone. Committing requires \"schema.write\"; a dry run needs only \"mcp.read\".",
+      inputSchema: toolInputSchema(schemaManifestInputShape),
+    },
+    auditedToolHandler(auth, 'apply_schema_manifest', async (args: any) =>
+      runAdminTool(auth, requiredDryRunablePermission(args, 'schema.write'), args, async (a: any) => {
+        const schemas = toManifestEntries(a);
+        if (schemas.length === 0) {
+          return errorResult('schemas must be a non-empty array of { kind, name, fields }.');
+        }
+        const request = { organizationId: auth.organizationId, projectId: auth.projectId, schemas };
+        if (a.dry_run === true) {
+          return textResult({ dry_run: true, applied: false, ...manifestPlanOutput(await planSchemaManifest(request)) });
+        }
+        const result = await applySchemaManifest({ ...request, createdByUserId: actorId(auth) });
+        return textResult({
+          dry_run: false,
+          applied: result.applied,
+          ...(result.applied ? {} : { not_applied_reason: 'At least one schema is blocked or invalid, so nothing was written. Fix those entries and apply again.' }),
+          ...manifestPlanOutput(result.plan),
+        });
       }),
     ),
   );
