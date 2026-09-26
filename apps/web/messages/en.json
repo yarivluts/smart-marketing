@@ -394,7 +394,8 @@
     "globalProjectsDescription": "Setup progress for every project you administer.",
     "globalCurrentStep": "Next: {step}",
     "globalReview": "Review",
-    "globalContinue": "Continue setup"
+    "globalContinue": "Continue setup",
+    "globalJourneyAllDone": "Every project you administer is set up. Showing {project} in {org}."
   },
   "Invite": {
     "title": "Organization invite",

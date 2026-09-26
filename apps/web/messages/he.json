@@ -394,7 +394,8 @@
     "globalProjectsDescription": "התקדמות ההגדרה של כל פרויקט שאתם מנהלים.",
     "globalCurrentStep": "הבא: {step}",
     "globalReview": "צפייה",
-    "globalContinue": "המשך הגדרה"
+    "globalContinue": "המשך הגדרה",
+    "globalJourneyAllDone": "כל הפרויקטים שאתם מנהלים מוגדרים. מוצג {project} בארגון {org}."
   },
   "Invite": {
     "title": "הזמנה לארגון",

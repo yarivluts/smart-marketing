@@ -49,3 +49,12 @@ export function buildOnboardingJourney(
   });
   return { nodes, edges };
 }
+
+/**
+ * Lays a linear chain of nodes out left-to-right in rows of `perRow`, so a long journey wraps onto a
+ * second row instead of shrinking every node until its text is unreadable.
+ */
+export function wrapIntoRows<T extends FlowNodeSpec>(nodes: readonly T[], perRow: number): (T & { column: number; row: number })[] {
+  const width = Math.max(1, perRow);
+  return nodes.map((node, index) => ({ ...node, column: index % width, row: Math.floor(index / width) }));
+}

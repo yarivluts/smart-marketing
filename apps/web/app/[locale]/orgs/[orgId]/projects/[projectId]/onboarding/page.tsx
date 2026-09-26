@@ -22,7 +22,7 @@ import {
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
 import { hasActiveInstall, pluginTypeForInstall, toPluginInstallView, toPluginManifestView } from '@/lib/orgs/plugin-view';
 import { buildFunnelEditorRows, toOnboardingStateView, type OnboardingStateView } from '@/lib/orgs/onboarding-view';
-import { buildOnboardingJourney } from '@/lib/orgs/onboarding-journey';
+import { buildOnboardingJourney, wrapIntoRows } from '@/lib/orgs/onboarding-journey';
 import { onboardingProgress, type OnboardingJourneyStep } from '@/lib/orgs/workspace-view';
 import { StartOnboardingButton } from '@/components/orgs/start-onboarding-button';
 import { OnboardingPackStep } from '@/components/orgs/onboarding-pack-step';
@@ -165,7 +165,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
   );
   const journeyCard = (
     <ChartCard title={t('journeyTitle')} description={t('journeyDescription')} icon={Route}>
-      <FlowDiagram label={t('journeyTitle')} nodes={journey.nodes} edges={journey.edges} height={260} />
+      <FlowDiagram label={t('journeyTitle')} nodes={wrapIntoRows(journey.nodes, 3)} edges={journey.edges} height={300} />
     </ChartCard>
   );
 

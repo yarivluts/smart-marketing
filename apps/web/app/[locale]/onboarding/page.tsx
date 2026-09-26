@@ -15,7 +15,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 import { getOnboardingState, listOrgProjects } from '@/lib/orgs/queries';
-import { buildOnboardingJourney } from '@/lib/orgs/onboarding-journey';
+import { buildOnboardingJourney, wrapIntoRows } from '@/lib/orgs/onboarding-journey';
 import { ONBOARDING_JOURNEY, onboardingProgress, pickFocusProject } from '@/lib/orgs/workspace-view';
 
 type PageProps = Readonly<{
@@ -117,10 +117,14 @@ export default async function GlobalOnboardingPage({ params }: PageProps): Promi
 
       <ChartCard
         title={t('journeyTitle')}
-        description={focus ? t('globalJourneyFocus', { project: focus.name, org: focus.orgName }) : t('globalJourneyDescription')}
+        description={
+          focus
+            ? t(focus.step === 'done' ? 'globalJourneyAllDone' : 'globalJourneyFocus', { project: focus.name, org: focus.orgName })
+            : t('globalJourneyDescription')
+        }
         icon={Route}
       >
-        <FlowDiagram label={t('journeyTitle')} nodes={nodes} edges={edges} height={280} />
+        <FlowDiagram label={t('journeyTitle')} nodes={wrapIntoRows(nodes, 4)} edges={edges} height={300} />
       </ChartCard>
 
       {!hasOrg ? (

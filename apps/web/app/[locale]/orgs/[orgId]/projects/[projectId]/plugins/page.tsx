@@ -242,7 +242,7 @@ export default async function ProjectPluginsPage({ params }: PageProps): Promise
         </ChartCard>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="flex flex-col gap-6">
         <ChartCard title={t('builtinPacksHeading')} description={t('builtinPacksIntro')} icon={Sparkles}>
           <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installableBuiltinPacks} />
         </ChartCard>
