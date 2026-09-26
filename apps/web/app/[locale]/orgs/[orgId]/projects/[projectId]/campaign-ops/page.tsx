@@ -139,7 +139,7 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
           <StatCard title={t('kpiTrackedCampaigns')} value={spendSummary ? number.format(spendSummary.campaigns) : t('kpiNoValue')} icon={Layers} />
           <StatCard
             title={t('kpiSpend', { days: CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS })}
-            value={spendSummary?.totalSpend !== null && spendSummary ? number.format(spendSummary.totalSpend) : t('kpiNoValue')}
+            value={spendSummary && spendSummary.totalSpend !== null ? number.format(spendSummary.totalSpend) : t('kpiNoValue')}
             icon={CircleDollarSign}
           />
           <StatCard

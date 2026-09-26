@@ -86,11 +86,12 @@ export function buildCampaignOpsFlow(input: CampaignOpsFlowInput): CampaignOpsFl
   };
 
   const spendSummary = input.spend.ok ? summariseSpendTargets(input.spend.rows) : null;
-  const spend: CampaignOpsFlowNode = !input.spend.ok
-    ? { stage: 'spend', status: 'warn', stateKey: 'flowUnavailable' }
-    : spendSummary?.totalSpend === null || spendSummary === null
-      ? { stage: 'spend', status: 'idle', stateKey: 'flowNothingLanded' }
-      : { stage: 'spend', status: 'ok', stateKey: 'flowState.spend', value: spendSummary.totalSpend };
+  const spend: CampaignOpsFlowNode =
+    spendSummary === null
+      ? { stage: 'spend', status: 'warn', stateKey: 'flowUnavailable' }
+      : spendSummary.totalSpend === null
+        ? { stage: 'spend', status: 'idle', stateKey: 'flowNothingLanded' }
+        : { stage: 'spend', status: 'ok', stateKey: 'flowState.spend', value: spendSummary.totalSpend };
   const targeted = spendSummary ? spendSummary.byStatus.over_target + spendSummary.byStatus.on_target : 0;
   const targets: CampaignOpsFlowNode = !spendSummary
     ? { stage: 'targets', status: 'warn', stateKey: 'flowUnavailable' }
