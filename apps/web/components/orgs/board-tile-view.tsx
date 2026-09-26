@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { buildSessionReplayLink, sessionReplayTemplateFiltersByPage } from '@growthos/shared';
-import type { TileFreshness, TileRenderView, TimeSeries } from '@/lib/orgs/board-view';
+import type { TileFreshness, TileRenderView, TimeSeries, TimeSeriesPoint } from '@/lib/orgs/board-view';
+import { formatBucketLabels, labeledAxisIndexes, labeledValueIndexes } from '@/lib/orgs/chart-labels';
 import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
 
 export interface BoardTileViewProps {
@@ -23,8 +24,8 @@ const LANDING_PAGE_COLUMNS = new Set(['landing_page']);
 
 const SERIES_COLOR_CLASSES = ['bg-primary', 'bg-blue-500', 'bg-amber-500', 'bg-emerald-500', 'bg-rose-500', 'bg-violet-500'];
 
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+function formatNumber(value: number, locale?: string): string {
+  return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
 }
 
 /**
@@ -92,68 +93,180 @@ function BigNumberView({ view }: { view: Extract<TileRenderView, { kind: 'big_nu
   );
 }
 
-function LineChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_series' }> }): React.ReactElement {
+/**
+ * The accessible form of one time-series (KAN-210): every bucket and value as a real table, hidden
+ * visually. The drawn chart beside it is `aria-hidden`, so a screen reader gets the numbers once, in
+ * a shape it can navigate, rather than a picture it cannot read. The bucket is the raw, unabbreviated
+ * date so it stays unambiguous where the axis label drops the year.
+ */
+function SeriesDataTable({ caption, points, locale }: { caption: string; points: readonly TimeSeriesPoint[]; locale: string }): React.ReactElement {
   const t = useTranslations('Boards');
+  return (
+    <table className="sr-only">
+      <caption>{caption}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{t('chartBucketColumn')}</th>
+          <th scope="col">{t('chartValueColumn')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {points.map((point) => (
+          <tr key={point.bucket}>
+            <th scope="row">{point.bucket}</th>
+            <td>{formatNumber(point.value, locale)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+/** Horizontal placement for a label centred on `xPct`, pinned inward at either edge so the first and last labels never spill out of the tile. */
+function edgeAwareTranslateX(xPct: number): string {
+  return xPct <= 0 ? '0' : xPct >= 100 ? '-100%' : '-50%';
+}
+
+/** A chart's accessible name: the tile title, qualified by the series label when a dimension splits the tile into several series. */
+function useSeriesCaption(title: string, seriesCount: number): (seriesLabel: string) => string {
+  const t = useTranslations('Boards');
+  return (seriesLabel) => (seriesCount > 1 ? t('chartSeriesCaption', { title, series: seriesLabel }) : title);
+}
+
+function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 'time_series' }>; title: string }): React.ReactElement {
+  const t = useTranslations('Boards');
+  const locale = useLocale();
+  const captionFor = useSeriesCaption(title, view.series.length);
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('timeSeriesEmpty')}</p>;
   }
   const allSeries = [...view.series, ...(view.previousSeries ?? [])];
   const maxValue = Math.max(1, ...allSeries.flatMap((series) => series.points.map((point) => point.value)));
   const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
-  const width = 300;
-  const height = 100;
 
-  function toPolylinePoints(points: readonly { bucket: string; value: number }[]): string {
-    if (points.length === 0) {
-      return '';
-    }
-    return points
-      .map((point, index) => {
-        const x = points.length === 1 ? width / 2 : (index / (points.length - 1)) * width;
-        const y = height - (point.value / maxValue) * height;
-        return `${x},${y}`;
-      })
-      .join(' ');
+  // Current-period points are placed by their bucket's position on one shared axis, so two series
+  // that don't cover the same buckets still line up with each other and with the axis labels.
+  const buckets = [...new Set(view.series.flatMap((series) => series.points.map((point) => point.bucket)))].sort();
+  const bucketIndex = new Map(buckets.map((bucket, index) => [bucket, index]));
+  const bucketLabels = formatBucketLabels(buckets, locale);
+  const axisIndexes = labeledAxisIndexes(buckets.length);
+
+  function xPct(index: number, count: number): number {
+    return count <= 1 ? 50 : (index / (count - 1)) * 100;
   }
-
+  function yPct(value: number): number {
+    return 100 - (value / maxValue) * 100;
+  }
+  function currentX(point: TimeSeriesPoint): number {
+    return xPct(bucketIndex.get(point.bucket) ?? 0, buckets.length);
+  }
   function colorFor(label: string): string {
     return SERIES_STROKE_COLORS[(colorIndexByLabel.get(label) ?? 0) % SERIES_STROKE_COLORS.length];
   }
 
+  // One series labels its values on the line (all of them, or peak + latest when long). Several
+  // series would collide there, so each one's latest value goes in the legend beside its name instead.
+  const isSingleSeries = view.series.length === 1;
+  const valueLabels = isSingleSeries
+    ? view.series.flatMap((series) => {
+        const indexes = labeledValueIndexes(series.points.map((point) => point.value));
+        return series.points
+          .filter((_, index) => indexes.has(index))
+          .map((point) => ({ key: `${series.label}-${point.bucket}`, x: currentX(point), y: yPct(point.value), value: point.value, color: colorFor(series.label) }));
+      })
+    : [];
+
   return (
-    <div className="flex h-full flex-col gap-2">
-      <svg viewBox={`0 0 ${width} ${height}`} className="h-24 w-full" preserveAspectRatio="none" role="img" aria-hidden="true">
-        {(view.previousSeries ?? []).map((series) => (
-          <polyline
-            key={`previous-${series.label}`}
-            points={toPolylinePoints(series.points)}
-            fill="none"
-            strokeDasharray="4 3"
-            strokeWidth={1.5}
-            stroke={colorFor(series.label)}
-            opacity={0.5}
-          />
-        ))}
-        {view.series.map((series) => (
-          <polyline key={series.label} points={toPolylinePoints(series.points)} fill="none" strokeWidth={2} stroke={colorFor(series.label)} />
-        ))}
-      </svg>
-      {view.series.length > 1 ? (
-        <ul className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          {view.series.map((series) => (
-            <li key={series.label} className="flex items-center gap-1">
+    <figure className="flex h-full flex-col gap-2" aria-label={title}>
+      <div dir="ltr" aria-hidden="true" className="flex flex-col">
+        <div className="pt-4">
+          <div className="relative h-20">
+            <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full overflow-visible" preserveAspectRatio="none">
+              {(view.previousSeries ?? []).map((series) => (
+                <polyline
+                  key={`previous-${series.label}`}
+                  points={series.points.map((point, index) => `${xPct(index, series.points.length)},${yPct(point.value)}`).join(' ')}
+                  fill="none"
+                  strokeDasharray="4 3"
+                  strokeWidth={1.5}
+                  vectorEffect="non-scaling-stroke"
+                  stroke={colorFor(series.label)}
+                  opacity={0.5}
+                />
+              ))}
+              {view.series.map((series) => (
+                <polyline
+                  key={series.label}
+                  points={series.points.map((point) => `${currentX(point)},${yPct(point.value)}`).join(' ')}
+                  fill="none"
+                  strokeWidth={2}
+                  vectorEffect="non-scaling-stroke"
+                  stroke={colorFor(series.label)}
+                />
+              ))}
+            </svg>
+            {valueLabels.map((label) => (
+              <span key={label.key}>
+                <span
+                  className="absolute h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card"
+                  style={{ left: `${label.x}%`, top: `${label.y}%`, backgroundColor: label.color }}
+                />
+                <span
+                  className="absolute whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-foreground"
+                  style={{ left: `${label.x}%`, top: `${label.y}%`, transform: `translate(${edgeAwareTranslateX(label.x)}, calc(-100% - 5px))` }}
+                >
+                  {formatNumber(label.value, locale)}
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="relative mt-1 h-3 border-t border-border">
+          {buckets.map((bucket, index) =>
+            axisIndexes.has(index) ? (
               <span
-                className={`inline-block h-2 w-2 rounded-full ${SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length]}`}
-              />
-              {series.label}
-            </li>
-          ))}
+                key={bucket}
+                className="absolute top-0.5 whitespace-nowrap text-[10px] leading-none tabular-nums text-muted-foreground"
+                style={{ left: `${xPct(index, buckets.length)}%`, transform: `translateX(${edgeAwareTranslateX(xPct(index, buckets.length))})` }}
+              >
+                {bucketLabels[index]}
+              </span>
+            ) : null,
+          )}
+        </div>
+      </div>
+      {!isSingleSeries ? (
+        <ul className="flex flex-wrap gap-3 text-xs text-muted-foreground" aria-hidden="true">
+          {view.series.map((series) => {
+            const latest = series.points[series.points.length - 1];
+            return (
+              <li key={series.label} className="flex items-center gap-1">
+                <span
+                  className={`inline-block h-2 w-2 rounded-full ${SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length]}`}
+                />
+                <span>{series.label}</span>
+                {latest ? <span className="font-medium tabular-nums text-foreground">{formatNumber(latest.value, locale)}</span> : null}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
-    </div>
+      {view.series.map((series) => (
+        <SeriesDataTable key={series.label} caption={captionFor(series.label)} points={series.points} locale={locale} />
+      ))}
+      {(view.previousSeries ?? []).map((series) => (
+        <SeriesDataTable
+          key={`previous-${series.label}`}
+          caption={t('chartPreviousPeriodCaption', { caption: captionFor(series.label) })}
+          points={series.points}
+          locale={locale}
+        />
+      ))}
+    </figure>
   );
 }
 
+/** The fixed-width bar strip the histogram tile draws (its labels are rendered by `HistogramView` itself). */
 function BarRow({
   points,
   colorClass,
@@ -180,8 +293,92 @@ function BarRow({
   );
 }
 
-function BarChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_series' }> }): React.ReactElement {
+/**
+ * One labelled bar plot (KAN-210): each bar carries its value above it and its bucket date on the
+ * axis beneath, so a board screenshot reads "3 on 25.9" without hovering. A previous period, when
+ * compared, is drawn as a muted bar beside each current one (paired by position, the same pairing the
+ * line tile's dashed overlay uses) rather than as a second plot, so a compared tile still fits its
+ * grid cell; its values are in the tooltip and the table rather than printed, to keep the labels
+ * from colliding. Forced left-to-right so time runs the same way in the Hebrew UI as the line tile's
+ * SVG does; text uses the foreground/muted tokens, so it follows dark mode. `aria-hidden` because
+ * `SeriesDataTable` carries the same numbers for assistive tech.
+ */
+function LabeledBarPlot({
+  points,
+  previousPoints,
+  colorClass,
+  maxValue,
+  compact,
+  locale,
+}: {
+  points: readonly TimeSeriesPoint[];
+  previousPoints?: readonly TimeSeriesPoint[];
+  colorClass: string;
+  maxValue: number;
+  compact?: boolean;
+  locale: string;
+}): React.ReactElement {
   const t = useTranslations('Boards');
+  const bucketLabels = formatBucketLabels(
+    points.map((point) => point.bucket),
+    locale,
+  );
+  const valueIndexes = labeledValueIndexes(points.map((point) => point.value));
+  const columnCount = Math.max(points.length, previousPoints?.length ?? 0);
+  const axisIndexes = labeledAxisIndexes(columnCount);
+  const heightPct = (value: number) => `${Math.max(2, Math.round((value / maxValue) * 100))}%`;
+
+  function tooltip(point: TimeSeriesPoint | undefined): string | undefined {
+    return point ? t('barTooltip', { bucket: point.bucket, value: formatNumber(point.value, locale) }) : undefined;
+  }
+
+  return (
+    <div dir="ltr" aria-hidden="true" className="flex flex-col">
+      <div className={`flex items-end gap-1 border-b border-border pt-4 ${compact ? 'h-16' : 'h-24'}`}>
+        {Array.from({ length: columnCount }, (_, index) => {
+          const point = points[index];
+          const previous = previousPoints?.[index];
+          return (
+            <div key={point?.bucket ?? `previous-${index}`} className="flex h-full min-w-0 flex-1 items-end justify-center gap-0.5">
+              {point ? (
+                <div title={tooltip(point)} className={`relative w-full max-w-8 rounded-t-sm ${colorClass}`} style={{ height: heightPct(point.value) }}>
+                  {valueIndexes.has(index) ? (
+                    <span className="absolute bottom-full left-1/2 mb-0.5 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-foreground">
+                      {formatNumber(point.value, locale)}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {previous ? (
+                <div
+                  title={tooltip(previous)}
+                  className={`w-full max-w-8 rounded-t-sm opacity-40 ${colorClass}`}
+                  style={{ height: heightPct(previous.value) }}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex h-3.5 gap-1">
+        {Array.from({ length: columnCount }, (_, index) => (
+          <div key={index} className="relative min-w-0 flex-1">
+            {axisIndexes.has(index) && index < points.length ? (
+              <span className="absolute left-1/2 top-0.5 -translate-x-1/2 whitespace-nowrap text-[10px] leading-none tabular-nums text-muted-foreground">
+                {bucketLabels[index]}
+              </span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BarChartView({ view, title }: { view: Extract<TileRenderView, { kind: 'time_series' }>; title: string }): React.ReactElement {
+  const t = useTranslations('Boards');
+  const locale = useLocale();
+  const captionFor = useSeriesCaption(title, view.series.length);
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('timeSeriesEmpty')}</p>;
   }
@@ -189,23 +386,34 @@ function BarChartView({ view }: { view: Extract<TileRenderView, { kind: 'time_se
   const maxValue = Math.max(1, ...allSeries.flatMap((series) => series.points.map((point) => point.value)));
   const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
   const previousByLabel = new Map((view.previousSeries ?? []).map((series) => [series.label, series]));
+  // Several stacked plots must share the tile's height, so each gets a shorter plot area.
+  const compact = view.series.length > 1;
 
   return (
     <div className="flex h-full flex-col justify-center gap-3">
       {view.series.map((series) => {
         const colorClass = SERIES_COLOR_CLASSES[(colorIndexByLabel.get(series.label) ?? 0) % SERIES_COLOR_CLASSES.length];
         const previous = previousByLabel.get(series.label);
+        const caption = captionFor(series.label);
         return (
-          <div key={series.label} className="flex flex-col gap-1" role="img" aria-label={series.label}>
-            {view.series.length > 1 ? <span className="text-xs text-muted-foreground">{series.label}</span> : null}
-            <BarRow points={series.points} colorClass={colorClass} maxValue={maxValue} />
-            {previous ? (
-              <>
-                <span className="text-xs text-muted-foreground">{t('previousPeriodLabel')}</span>
-                <BarRow points={previous.points} colorClass={colorClass} maxValue={maxValue} muted />
-              </>
+          <figure key={series.label} className="flex flex-col gap-1" aria-label={caption}>
+            {view.series.length > 1 || previous ? (
+              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground" aria-hidden="true">
+                {view.series.length > 1 ? <span>{series.label}</span> : null}
+                {previous ? (
+                  <span className="flex items-center gap-1">
+                    <span className={`inline-block h-2 w-2 rounded-sm opacity-40 ${colorClass}`} />
+                    {t('previousPeriodLabel')}
+                  </span>
+                ) : null}
+              </div>
             ) : null}
-          </div>
+            <LabeledBarPlot points={series.points} previousPoints={previous?.points} colorClass={colorClass} maxValue={maxValue} compact={compact} locale={locale} />
+            <SeriesDataTable caption={caption} points={series.points} locale={locale} />
+            {previous ? (
+              <SeriesDataTable caption={t('chartPreviousPeriodCaption', { caption })} points={previous.points} locale={locale} />
+            ) : null}
+          </figure>
         );
       })}
     </div>
@@ -529,7 +737,7 @@ export function BoardTileView({ tile, view, sessionReplayUrlTemplate }: BoardTil
       case 'big_number':
         return <BigNumberView view={view} />;
       case 'time_series':
-        return view.chart === 'line' ? <LineChartView view={view} /> : <BarChartView view={view} />;
+        return view.chart === 'line' ? <LineChartView view={view} title={tile.title} /> : <BarChartView view={view} title={tile.title} />;
       case 'table':
         return <TableView view={view} tileId={tile.id} sessionReplayUrlTemplate={sessionReplayUrlTemplate} />;
       case 'funnel':

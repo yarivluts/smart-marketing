@@ -74,9 +74,11 @@ export async function seedIngestFixture(params: {
     input: {
       kind: 'event',
       records: [
-        { event_id: 'ord-1', event: 'order_completed', ts: '2026-07-06T10:00:00Z', properties: { amount: 42 } },
-        { event_id: 'ord-2', event: 'order_completed', ts: '2026-07-06T10:01:00Z', properties: { amount: 18 } },
-        { event_id: 'ord-1', event: 'order_completed', ts: '2026-07-06T10:02:00Z', properties: { amount: 42 } },
+        // `anon_id`/`customer_id` are undeclared identity keys, accepted implicitly on every event
+        // (IMPLICIT_EVENT_ENVELOPE_FIELDS) - the record feed's Identity line reads them (KAN-210).
+        { event_id: 'ord-1', event: 'order_completed', ts: '2026-07-06T10:00:00Z', properties: { amount: 42, anon_id: 'anon-e2e-1' } },
+        { event_id: 'ord-2', event: 'order_completed', ts: '2026-07-06T10:01:00Z', properties: { amount: 18, customer_id: 'cust-e2e-2' } },
+        { event_id: 'ord-1', event: 'order_completed', ts: '2026-07-06T10:02:00Z', properties: { amount: 42, anon_id: 'anon-e2e-1' } },
         { event_id: 'ord-3', event: 'order_completed', ts: '2026-07-06T10:03:00Z', properties: {} },
       ],
     },

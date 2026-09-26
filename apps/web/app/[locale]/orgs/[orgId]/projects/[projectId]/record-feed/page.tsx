@@ -9,7 +9,8 @@ import { DEFAULT_RECORD_FEED_LIMIT, RECORD_FIELD_FILTER_CANDIDATE_WINDOW } from 
 import { splitOverFetchedFeed } from '@/lib/orgs/capped-list-view';
 import { listOrgProjects, listRecentRecordsForSchema, listSchemaDefinitionsForProject } from '@/lib/orgs/queries';
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
-import { toRecordFeedEntryView } from '@/lib/orgs/record-feed-view';
+import { recordFeedFilterOptions, toRecordFeedEntryView } from '@/lib/orgs/record-feed-view';
+import { RecordFeedEntryList, RecordFeedFieldSelect } from '@/components/orgs/record-feed-entry-list';
 import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{
@@ -33,8 +34,10 @@ export async function generateMetadata({ params }: PageProps) {
  * `record-feed-view.ts`'s `toRecordFeedEntryView` substitutes a fixed redaction placeholder before the
  * projection leaves the server. The same PII gate applies to filtering: the field picker below only
  * ever offers non-PII fields, so a PII value can never round-trip through this page's own `?field=`/
- * `?value=` query string. Gated on `ingest.write`, same "whole feature, not just mutation, is
- * admin-only" posture as the billing-ops feed and ingest-health pages, since this exposes raw landed
+ * `?value=` query string. Each event also shows its `anon_id`/`customer_id` identity keys (KAN-210),
+ * which are accepted undeclared in `properties` and are what identity stitching joins on; both are
+ * filterable too, unless the schema explicitly declares one `is_pii`. Gated on `ingest.write`, same
+ * "whole feature, not just mutation, is admin-only" posture as the billing-ops feed and ingest-health pages, since this exposes raw landed
  * payloads.
  */
 export default async function RecordFeedPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
@@ -67,8 +70,10 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
   const selectedSchemaName = schemaParam && eventSchemaNames.includes(schemaParam) ? schemaParam : eventSchemaNames[0];
   const selectedSchemaDef = schemaDefs.find((def) => def.kind === 'event' && def.status === 'active' && def.name === selectedSchemaName);
 
-  const filterableFieldDefs = (selectedSchemaDef?.field_defs ?? []).filter((fieldDef) => !fieldDef.is_pii);
-  const filterFieldName = fieldParam && filterableFieldDefs.some((fieldDef) => fieldDef.name === fieldParam) ? fieldParam : undefined;
+  // Declared non-PII fields plus the event identity keys (KAN-210) - see `recordFeedFilterOptions`.
+  const filterOptions = recordFeedFilterOptions('event', selectedSchemaDef?.field_defs ?? []);
+  const filterableFieldNames = [...filterOptions.declared, ...filterOptions.identity];
+  const filterFieldName = fieldParam && filterableFieldNames.includes(fieldParam) ? fieldParam : undefined;
   const filterValue = filterFieldName && valueParam ? valueParam : undefined;
   const fieldFilter = filterFieldName && filterValue ? { fieldName: filterFieldName, value: filterValue } : undefined;
 
@@ -114,26 +119,19 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
             })}
           </nav>
 
-          {filterableFieldDefs.length > 0 ? (
+          {filterableFieldNames.length > 0 ? (
             <form method="get" className="flex flex-wrap items-end gap-2">
               <input type="hidden" name="schema" value={selectedSchemaName} />
               <div className="flex flex-col gap-1">
                 <label htmlFor="record-feed-filter-field" className="text-xs text-muted-foreground">
                   {t('filterFieldLabel')}
                 </label>
-                <select
+                <RecordFeedFieldSelect
                   id="record-feed-filter-field"
-                  name="field"
+                  declaredFieldNames={filterOptions.declared}
+                  identityFieldNames={filterOptions.identity}
                   defaultValue={filterFieldName ?? ''}
-                  className="rounded-md border border-input bg-background px-2 py-1 text-sm"
-                >
-                  <option value="">{t('filterFieldPlaceholder')}</option>
-                  {filterableFieldDefs.map((fieldDef) => (
-                    <option key={fieldDef.name} value={fieldDef.name}>
-                      {fieldDef.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <label htmlFor="record-feed-filter-value" className="text-xs text-muted-foreground">
@@ -176,24 +174,7 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
                 {fieldFilter ? t('filterEmpty', { window: RECORD_FIELD_FILTER_CANDIDATE_WINDOW }) : t('empty')}
               </p>
             ) : (
-              <ul className="flex flex-col gap-2">
-                {entries.map((entry) => (
-                  <li key={entry.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs text-muted-foreground">
-                        {environmentDisplayNameById.get(entry.environmentId) ?? entry.environmentId}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{t('landedAtLine', { landedAt: entry.landedAt })}</span>
-                    </div>
-                    {entry.fields.map((field) => (
-                      <span key={field.name} className={field.isPii ? 'text-muted-foreground' : ''}>
-                        {t('fieldLine', { name: field.name, value: field.value })}
-                      </span>
-                    ))}
-                    <span className="text-xs text-muted-foreground">{t('clientIdLine', { clientId: entry.clientId })}</span>
-                  </li>
-                ))}
-              </ul>
+              <RecordFeedEntryList entries={entries} environmentDisplayNameById={environmentDisplayNameById} />
             )}
             <p className="text-xs text-muted-foreground">
               {recordPage.truncated ? t('capNoteTruncated', { count: entries.length }) : t('capNote', { count: entries.length })}
