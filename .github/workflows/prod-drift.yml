@@ -1,14 +1,15 @@
 name: Production drift
 
-# Hourly: is api-prod running what main says it should? (KAN-180)
+# Hourly: is each production service running what main says it should? (KAN-180)
+# Watches api-prod, api-preprod, web-prod and the dbt-refresh job (KAN-204).
 #
 # Nothing deploys on merge, and until this nothing noticed when production fell
 # behind — twice in one week an integrator was blocked on a fix that was merged,
 # green and simply not deployed. This makes the owed deploy visible: a red run
 # and a single tracking issue that closes itself once production catches up.
 #
-# It holds NO production credentials. It reads the public /v1/health endpoint,
-# where the API reports its build SHA, and compares that to git history. The
+# It holds NO production credentials. It reads public health endpoints, where
+# each service reports its build SHA, and compares that to git history. The
 # only permission it needs beyond reading the repo is managing that one issue.
 # A drift check able to deploy would be a far larger thing to trust than one
 # that can only look.
@@ -41,6 +42,17 @@ jobs:
           # entity updates on 2026-09-25 while running an untracked build.
           - service: api-preprod
             health_url: https://api-preprod-5u3ypal2gq-zf.a.run.app/v1/health
+          # KAN-204: web-prod reports its own build on its public /api/health.
+          - service: web-prod
+            health_url: https://web-prod-1098891924957.me-west1.run.app/api/health
+          # KAN-204: dbt-refresh is a Cloud Run Job with no endpoint, and on 2026-09-25 it was
+          # found running a 2026-09-10 image. Each run records its build in the warehouse and
+          # api-prod reports it publicly, so this still reads only a public URL - the
+          # credentialed read happens inside production. Only commits touching what the dbt
+          # image is built from count: a web or API merge must not raise this job's alarm.
+          - service: dbt-refresh
+            health_url: https://api-prod-1098891924957.me-west1.run.app/v1/health/dbt-refresh
+            watched_paths: packages/dbt-transform/dbt packages/dbt-transform/Dockerfile packages/dbt-transform/requirements.txt packages/dbt-transform/requirements-bigquery.txt deploy/cloudbuild.dbt.yaml
     steps:
       - name: Checkout (full history)
         uses: actions/checkout@v4
@@ -70,4 +82,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SERVICE_NAME: ${{ matrix.service }}
           PROD_HEALTH_URL: ${{ matrix.health_url }}
+          DRIFT_PATHS: ${{ matrix.watched_paths }}
         run: node scripts/deploy/check-prod-drift.mjs

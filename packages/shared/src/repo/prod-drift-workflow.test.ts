@@ -88,3 +88,106 @@ describe('prod-drift workflow (KAN-180)', () => {
     expect({ deploys: /run\s+deploy|builds\s+submit|update-traffic/.test(script) }).toEqual({ deploys: false });
   });
 });
+
+const REPO = resolve(__dirname, '../../../..');
+
+interface WatchedService {
+  healthUrl: string;
+  watchedPaths: string[];
+}
+
+/** The matrix entries, read as text: `- service:` / `health_url:` / optional `watched_paths:`. */
+function watchedServices(workflow: string): Record<string, WatchedService> {
+  const services: Record<string, WatchedService> = {};
+  const entry = /^\s*- service: (\S+)\s*\n\s*health_url: (\S+)\s*(?:\n\s*watched_paths: (.+))?$/gm;
+  for (const match of workflow.matchAll(entry)) {
+    services[match[1]!] = { healthUrl: match[2]!, watchedPaths: (match[3] ?? '').trim().split(/\s+/).filter(Boolean) };
+  }
+  return services;
+}
+
+/**
+ * KAN-204. On 2026-09-25 the dbt-refresh job was found running a 2026-09-10 image:
+ * fifteen days of merged model changes had never reached production, and nothing
+ * noticed because only the API was watched. Every deployable production image is
+ * now watched, and each is read from a PUBLIC URL - so adding them cost the workflow
+ * no credentials (the assertions above still hold with all four in the matrix).
+ */
+describe('prod-drift watches every production image (KAN-204)', () => {
+  it('watches api-prod, api-preprod, web-prod and dbt-refresh', () => {
+    expect(Object.keys(watchedServices(read(WORKFLOW))).sort()).toEqual(['api-preprod', 'api-prod', 'dbt-refresh', 'web-prod']);
+  });
+
+  it('reads each from a public https endpoint, the one each service reports its build on', () => {
+    const services = watchedServices(read(WORKFLOW));
+    expect(Object.values(services).every((s) => s.healthUrl.startsWith('https://'))).toBe(true);
+    expect({
+      apiProd: new URL(services['api-prod']!.healthUrl).pathname,
+      webProd: new URL(services['web-prod']!.healthUrl).pathname,
+      webHost: new URL(services['web-prod']!.healthUrl).hostname.startsWith('web-prod-'),
+      // The job has no endpoint: api-prod reports it, from the same host as api-prod's own health.
+      dbt: new URL(services['dbt-refresh']!.healthUrl).pathname,
+      dbtViaApiProd: new URL(services['dbt-refresh']!.healthUrl).host === new URL(services['api-prod']!.healthUrl).host,
+    }).toEqual({ apiProd: '/v1/health', webProd: '/api/health', webHost: true, dbt: '/v1/health/dbt-refresh', dbtViaApiProd: true });
+  });
+
+  it('exists at the routes those URLs name', () => {
+    expect({
+      webRoute: existsSync(resolve(REPO, 'apps/web/app/api/health/route.ts')),
+      dbtRoute: /@Get\('dbt-refresh'\)/.test(read(resolve(REPO, 'apps/api/src/health/health.controller.ts'))),
+    }).toEqual({ webRoute: true, dbtRoute: true });
+  });
+
+  it('passes each entry\'s watched paths to the script, which narrows git log to them', () => {
+    expect({
+      workflow: /DRIFT_PATHS: \$\{\{ matrix\.watched_paths \}\}/.test(read(WORKFLOW)),
+      script: /process\.env\.DRIFT_PATHS/.test(read(SCRIPT)) && /'--', \.\.\.WATCHED_PATHS/.test(read(SCRIPT)),
+    }).toEqual({ workflow: true, script: true });
+  });
+
+  /**
+   * Narrowing is only safe if it covers everything the image is built from: a path
+   * the Dockerfile copies but the check ignores is a change that can sit undeployed
+   * forever while the check reports "current" - the silently green failure again.
+   */
+  it('narrows dbt-refresh to paths that cover everything its image is built from', () => {
+    const watched = watchedServices(read(WORKFLOW))['dbt-refresh']!.watchedPaths;
+    const dockerfile = read(resolve(REPO, 'packages/dbt-transform/Dockerfile'));
+    const copied = [...dockerfile.matchAll(/^COPY\s+(.+)\s+\S+$/gm)].flatMap((m) => m[1]!.trim().split(/\s+/));
+    const inputs = [...copied, 'packages/dbt-transform/Dockerfile', 'deploy/cloudbuild.dbt.yaml'];
+    const uncovered = inputs.filter((input) => !watched.some((path) => input === path || input.startsWith(`${path}/`)));
+    expect({ copiedSomething: copied.length > 0, uncovered }).toEqual({ copiedSomething: true, uncovered: [] });
+  });
+
+  it('holds every other service to all of main', () => {
+    const services = watchedServices(read(WORKFLOW));
+    expect(['api-prod', 'api-preprod', 'web-prod'].map((name) => services[name]!.watchedPaths)).toEqual([[], [], []]);
+  });
+
+  /**
+   * The check can only see a build SHA that was stamped. Each image's build config
+   * passes `_GIT_SHA` (default '' - which reads as "unstamped", never as a commit)
+   * and each Dockerfile carries it into the running container's environment.
+   */
+  it.each([
+    ['api', 'deploy/cloudbuild.api.yaml', 'apps/api/Dockerfile'],
+    ['web', 'deploy/cloudbuild.web.yaml', 'apps/web/Dockerfile'],
+    ['dbt', 'deploy/cloudbuild.dbt.yaml', 'packages/dbt-transform/Dockerfile'],
+  ])('stamps GIT_SHA into the %s image', (_image, cloudbuild, dockerfile) => {
+    const build = read(resolve(REPO, cloudbuild));
+    const docker = read(resolve(REPO, dockerfile));
+    expect({
+      buildArg: /GIT_SHA=\$\{_GIT_SHA\}/.test(build),
+      defaultEmpty: /^\s*_GIT_SHA: ''\s*$/m.test(build),
+      arg: /^ARG GIT_SHA=""\s*$/m.test(docker),
+      env: /^ENV GIT_SHA=\$GIT_SHA\s*$/m.test(docker),
+    }).toEqual({ buildArg: true, defaultEmpty: true, arg: true, env: true });
+  });
+
+  /** The web image is multi-stage: GIT_SHA must reach the stage that actually runs. */
+  it('sets GIT_SHA in the web image\'s final (runtime) stage', () => {
+    const docker = read(resolve(REPO, 'apps/web/Dockerfile'));
+    const finalStage = docker.slice(docker.lastIndexOf('\nFROM '));
+    expect(/^ENV GIT_SHA=\$GIT_SHA\s*$/m.test(finalStage)).toBe(true);
+  });
+});
