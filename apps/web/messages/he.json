@@ -492,7 +492,8 @@
     "endpointSparklineLabel": "משלוחים ליום ב-{days} הימים האחרונים",
     "endpointLastReceived": "אחרון {relative}",
     "endpointNothingYet": "עדיין לא התקבל דבר",
-    "createEndpointDescription": "כתובת הקבלה מוצגת בנקודת הקצה אחרי שהיא נוצרת, ואפשר להעתיק אותה שוב בכל עת."
+    "createEndpointDescription": "כתובת הקבלה מוצגת בנקודת הקצה אחרי שהיא נוצרת, ואפשר להעתיק אותה שוב בכל עת.",
+    "kpiPendingSub": "לא נקלטים עד שמוחל עליהם מיפוי"
   },
   "FieldMappings": {
     "metaTitle": "מיפויי שדות",

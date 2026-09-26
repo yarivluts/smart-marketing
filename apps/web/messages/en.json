@@ -492,7 +492,8 @@
     "endpointSparklineLabel": "Deliveries per day over the last {days} days",
     "endpointLastReceived": "Last {relative}",
     "endpointNothingYet": "Nothing received yet",
-    "createEndpointDescription": "The receive URL is shown on the endpoint once it is created, and can be copied again at any time."
+    "createEndpointDescription": "The receive URL is shown on the endpoint once it is created, and can be copied again at any time.",
+    "kpiPendingSub": "Not ingested until a mapping is applied"
   },
   "FieldMappings": {
     "metaTitle": "Field mappings",
