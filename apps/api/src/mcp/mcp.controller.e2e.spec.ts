@@ -23,6 +23,7 @@ import {
   registerSchemaDefinition,
   queryProjectFunnelSteps,
   queryMetrics,
+  searchProjectCustomers,
   InMemoryMetricQueryResultCache,
   WinEventModel,
   type WarehouseQueryExecutor,
@@ -38,12 +39,20 @@ jest.mock('@growthos/firebase-orm-models', () => {
     ...actual,
     queryProjectFunnelSteps: jest.fn((...args: unknown[]) => actual.queryProjectFunnelSteps(...args)),
     queryMetrics: jest.fn((...args: unknown[]) => actual.queryMetrics(...args)),
+    searchProjectCustomers: jest.fn((...args: unknown[]) => actual.searchProjectCustomers(...args)),
   };
 });
 const mockedQueryProjectFunnelSteps = queryProjectFunnelSteps as jest.MockedFunction<typeof queryProjectFunnelSteps>;
 const mockedQueryMetrics = queryMetrics as jest.MockedFunction<typeof queryMetrics>;
 const realQueryMetrics = jest.requireActual<typeof import('@growthos/firebase-orm-models')>('@growthos/firebase-orm-models').queryMetrics;
 const realQueryProjectFunnelSteps = jest.requireActual<typeof import('@growthos/firebase-orm-models')>('@growthos/firebase-orm-models').queryProjectFunnelSteps;
+const mockedSearchProjectCustomers = searchProjectCustomers as jest.MockedFunction<typeof searchProjectCustomers>;
+const realSearchProjectCustomers = jest.requireActual<typeof import('@growthos/firebase-orm-models')>('@growthos/firebase-orm-models').searchProjectCustomers;
+
+/** Runs the next `search_customers` call's REAL service (real SQL, real schema-registry read) against `executor`. */
+function nextSearchCustomersUsesWarehouse(executor: WarehouseQueryExecutor): void {
+  mockedSearchProjectCustomers.mockImplementationOnce((params) => realSearchProjectCustomers({ ...params, executor }));
+}
 
 /** Runs the next `query_funnel` call's REAL service (saved funnel from Firestore, real SQL) against `executor`. */
 function nextQueryFunnelUsesWarehouse(executor: WarehouseQueryExecutor): void {
@@ -426,6 +435,54 @@ describe('McpController (e2e)', () => {
       // shape (an error result, not a leaked cross-project row) rather than real search results.
       const result = await client.callTool({ name: 'search_customers', arguments: { query: 'anyone' } });
       expect(result.isError).toBe(true);
+    } finally {
+      await client.close();
+    }
+  });
+
+  // KAN-137: an events-only project has populated cohorts and an empty Customer 360. An empty
+  // answer has to say whether nothing matched or nothing could ever match.
+  it('search_customers says Customer 360 has no source when the project has no entity schema (KAN-137)', async () => {
+    const { owner, organization, project, rawKey } = await setupProjectWithKey('Search Customers Events Only Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'event',
+      name: 'user_signed_up',
+      fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+      createdByUserId: owner.id,
+    });
+    const client = await connectedClient(rawKey);
+    try {
+      nextSearchCustomersUsesWarehouse({ execute: () => Promise.resolve([]) });
+      const result = await client.callTool({ name: 'search_customers', arguments: { query: 'someone@example.com' } });
+      expect(result.isError).toBeFalsy();
+      const body = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+      expect(body.results).toEqual([]);
+      expect(body.empty_reason).toBe('no_entity_schemas');
+      expect(body.note).toContain('no active entity-kind schema');
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('search_customers reports a plain miss, with no empty_reason, once an entity schema exists (KAN-137)', async () => {
+    const { owner, organization, project, rawKey } = await setupProjectWithKey('Search Customers Entity Org');
+    await registerSchemaDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      kind: 'entity',
+      name: 'customer',
+      fields: [{ name: 'email', type: 'string', isRequired: false, isPii: true, isIdentityKey: true }],
+      createdByUserId: owner.id,
+    });
+    const client = await connectedClient(rawKey);
+    try {
+      nextSearchCustomersUsesWarehouse({ execute: () => Promise.resolve([]) });
+      const result = await client.callTool({ name: 'search_customers', arguments: { query: 'nobody@example.com' } });
+      expect(result.isError).toBeFalsy();
+      const body = JSON.parse((result.content as Array<{ text: string }>)[0].text);
+      expect(body).toEqual({ results: [], has_more: false, limit: expect.any(Number) });
     } finally {
       await client.close();
     }

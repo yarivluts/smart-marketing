@@ -12,6 +12,7 @@ import { resolveDefaultQueryEnvironment } from './organization.service';
 import { listRecentWinEventsForProject } from './win-rule.service';
 import { auditMetricCatalogHealth } from './metric-registry.service';
 import { getConfirmedFunnelSteps } from './onboarding.service';
+import { activeSchemaNamesForKind, listSchemaDefinitionsForProject } from './schema-registry.service';
 import { runQuotaGatedWarehouseQuery, ProjectQueryQuotaExceededError } from './cost-guardrail.service';
 
 /**
@@ -115,6 +116,13 @@ export interface CustomerSearchPage {
   hasMore: boolean;
   /** The cap actually applied, after clamping — so a caller can say what it is rather than guess. */
   limit: number;
+  /**
+   * Set only on an empty page whose emptiness is structural rather than a miss (KAN-137): with no
+   * active entity-kind schema nothing is ever written to the entities table, so no query could
+   * match. A project that sends only events has populated cohorts and an empty Customer 360, and
+   * "no entity schemas" is a different answer from "no matches".
+   */
+  emptyReason?: 'no_entity_schemas';
 }
 
 export async function searchProjectCustomers(params: SearchProjectCustomersParams): Promise<CustomerSearchPage> {
@@ -153,6 +161,14 @@ export async function searchProjectCustomers(params: SearchProjectCustomersParam
     executor.execute({ sql, params: queryParams }),
   );
   const hasMore = rows.length > limit;
+  if (rows.length === 0) {
+    // Checked only on an empty page: a search that found rows pays no extra read, and "no source"
+    // is only ever claimed when it is true.
+    const schemaDefs = await listSchemaDefinitionsForProject(params.organizationId, params.projectId);
+    if (activeSchemaNamesForKind(schemaDefs, 'entity').length === 0) {
+      return { results: [], hasMore: false, limit, emptyReason: 'no_entity_schemas' };
+    }
+  }
   return { results: rows.slice(0, limit).map(rowToCustomerResult), hasMore, limit };
 }
 

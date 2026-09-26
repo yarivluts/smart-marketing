@@ -83,6 +83,51 @@ describe('searchProjectCustomers', () => {
     expect(executor.calls[0].params).not.toHaveProperty('schemaName');
   });
 
+  describe('an empty page says whether anything could have matched (KAN-137)', () => {
+    it('reports no_entity_schemas for an events-only project', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Search Customers Events Only Org');
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'event',
+        name: 'user_signed_up',
+        fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: owner.id,
+      });
+
+      const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', executor: new FakeWarehouseQueryExecutor([]) });
+
+      expect(page).toEqual({ results: [], hasMore: false, limit: expect.any(Number), emptyReason: 'no_entity_schemas' });
+    });
+
+    it('leaves emptyReason unset on a plain miss once an entity schema exists', async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Search Customers Entity Miss Org');
+      await registerSchemaDefinition({
+        organizationId: organization.id,
+        projectId: project.id,
+        kind: 'entity',
+        name: 'customer',
+        fields: [{ name: 'email', type: 'string', isRequired: false, isPii: true, isIdentityKey: true }],
+        createdByUserId: owner.id,
+      });
+
+      const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', executor: new FakeWarehouseQueryExecutor([]) });
+
+      expect(page.results).toEqual([]);
+      expect(page.emptyReason).toBeUndefined();
+    });
+
+    it('never sets emptyReason on a page that found rows', async () => {
+      const { organization, project } = await setupOrgWithProject('Search Customers Found Org');
+      const executor = new FakeWarehouseQueryExecutor([{ entity_id: 'cust_1', schema_name: 'customer', properties: '{}', last_seen_at: '2026-07-10T00:00:00Z' }]);
+
+      const page = await searchProjectCustomers({ organizationId: organization.id, projectId: project.id, query: 'x', executor });
+
+      expect(page.results).toHaveLength(1);
+      expect(page.emptyReason).toBeUndefined();
+    });
+  });
+
   it('adds a schema_name filter when provided', async () => {
     const { organization, project } = await setupOrgWithProject('Search Customers Schema Org');
     const executor = new FakeWarehouseQueryExecutor([]);
