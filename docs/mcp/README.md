@@ -157,6 +157,8 @@ Read tools (need only the connection-level `mcp.read`):
 | `query_funnel` | For each step of the project's confirmed funnel, the people who reached it having gone through every earlier step in order (`people_count`, never increasing; a visitor who becomes a customer counts once), with `conversion_rate_from_first` / `conversion_rate_from_previous`, `event_schema_name`, `stage_key` and `step_order`. Steps can be passed straight back to `set_funnel`. The camelCase keys (`eventSchemaName`, `stageKey`, `stepOrder`, `customerCount`, `conversionRateFromFirst`) are deprecated duplicates kept for one release. With no confirmed funnel yet it returns `status: "no_funnel_defined"` and a message pointing to `set_funnel` |
 | `search_customers` | Substring search over Customer 360 entity records |
 | `list_insights` | Recent tracking-broke alerts and fired win-rule events |
+| `get_setup_health` | Whether each setup requirement (landing-page attribution, signups, product usage, customer entity, billing, ad spend) is `connected`, `error` (only rejected records) or a `gap` in one environment (default: the key's own; `environment` to pick another), plus a one-line summary per environment. Derived only from accepted and quarantined ingest records; nothing can be marked connected by hand |
+| `audit_installation_gaps` | Every requirement not connected in that environment: what was received, `impact_summary`, `satisfied_by`, `connected_in_other_environments` and `how_to_fix` steps naming real pages, ingest endpoints and MCP tools. Billing accepts `subscription_state_change` events from any billing system, not only Stripe |
 
 Act tools (each requires its own extra permission, re-checked on every call):
 
