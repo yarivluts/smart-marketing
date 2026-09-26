@@ -98,9 +98,15 @@ test.describe('Dashboard boards: create a board, add tiles via the grid editor, 
     await expect(page.getByText('Ad spend')).toHaveCount(0);
 
     // Board-level settings: rename, and it's reflected as the page heading.
+    // A new board rolls: it defaults to the "Last 30 days" preset, not frozen dates (KAN-211).
+    await expect(page.getByLabel('Date range')).toHaveValue('last_30_days');
+    await expect(page.getByLabel('Start date')).toHaveCount(0);
     await page.getByLabel('Name', { exact: true }).first().fill('Revenue');
+    await page.getByLabel('Date range').selectOption('last_7_days');
     await page.getByRole('button', { name: 'Save settings' }).click();
     await expect(page.getByRole('heading', { name: 'Revenue' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel('Date range')).toHaveValue('last_7_days');
 
     // Delete the board — back on the (now empty again) boards list.
     page.once('dialog', (dialog) => dialog.accept());
