@@ -1,5 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, MAX_FULLY_LABELED_POINTS } from './chart-labels';
+import { capSmallMultiples, formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, MAX_FULLY_LABELED_POINTS, MAX_SMALL_MULTIPLES } from './chart-labels';
+
+describe('capSmallMultiples (KAN-217)', () => {
+  const series = (label: string, ...values: (number | null)[]) => ({ label, points: values.map((value, index) => ({ bucket: `b${index}`, value })) });
+
+  it('keeps every series when there are no more than the cap', () => {
+    const input = [series('a', 1), series('b', 2), series('c', 3)];
+    expect(capSmallMultiples(input)).toEqual({ shown: input, hidden: [] });
+    expect(MAX_SMALL_MULTIPLES).toBe(3);
+  });
+
+  it('keeps the largest-total series in their original order and hides the rest', () => {
+    const input = [series('a', 1, 1), series('b', 10), series('c', null, 0), series('d', 4, null), series('e', 5)];
+    const { shown, hidden } = capSmallMultiples(input);
+    expect(shown.map((entry) => entry.label)).toEqual(['b', 'd', 'e']);
+    expect(hidden.map((entry) => entry.label)).toEqual(['a', 'c']);
+  });
+
+  it('breaks ties in favour of the earlier series', () => {
+    const input = [series('a', 1), series('b', 1), series('c', 1)];
+    expect(capSmallMultiples(input, 2).shown.map((entry) => entry.label)).toEqual(['a', 'b']);
+  });
+});
 
 describe('formatBucketLabels', () => {
   it('renders daily date buckets as day + month in the viewer locale', () => {
