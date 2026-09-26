@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import type { OnboardingPackKey } from '@growthos/firebase-orm-models';
+import { CheckCircle2, GitMerge, Inbox, LayoutDashboard, ListChecks, Route } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
@@ -20,6 +22,8 @@ import {
 import { ingestApiUrl } from '@/lib/orgs/ingest-api-url';
 import { hasActiveInstall, pluginTypeForInstall, toPluginInstallView, toPluginManifestView } from '@/lib/orgs/plugin-view';
 import { buildFunnelEditorRows, toOnboardingStateView, type OnboardingStateView } from '@/lib/orgs/onboarding-view';
+import { buildOnboardingJourney } from '@/lib/orgs/onboarding-journey';
+import { onboardingProgress, type OnboardingJourneyStep } from '@/lib/orgs/workspace-view';
 import { StartOnboardingButton } from '@/components/orgs/start-onboarding-button';
 import { OnboardingPackStep } from '@/components/orgs/onboarding-pack-step';
 import { OnboardingSourceContinueButton } from '@/components/orgs/onboarding-source-continue-button';
@@ -28,6 +32,10 @@ import { CompleteOnboardingButton } from '@/components/orgs/complete-onboarding-
 import { InstallPluginForm } from '@/components/orgs/install-plugin-form';
 import { CreateApiKeyForm } from '@/components/orgs/create-api-key-form';
 import { Button } from '@/components/ui/button';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard } from '@/components/viz/chart-card';
+import { FlowDiagram } from '@/components/viz/flow-diagram';
+import { PageHero } from '@/components/viz/page-hero';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -40,6 +48,23 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
+/** Each wizard pack's existing translated title. */
+const PACK_TITLE_KEYS: Record<OnboardingPackKey, string> = {
+  saas_marketing: 'packSaasMarketingTitle',
+  engagement: 'packEngagementTitle',
+  landing_page: 'packLandingPageTitle',
+  custom: 'packCustomTitle',
+};
+
+/** A wizard step's body, framed as a card (its own heading stays inside, so tests and screen readers find it unchanged). */
+function StepCard({ children, testId }: { children: React.ReactNode; testId?: string }): React.ReactElement {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm" data-testid={testId}>
+      {children}
+    </div>
+  );
+}
+
 /**
  * The onboarding wizard (KAN-68, plan `10 §2.6`/`13 §E13.1`): org/project already exist by the time
  * this page is reached (created via the org page's own "new project" flow, which now redirects
@@ -47,8 +72,9 @@ export async function generateMetadata({ params }: PageProps) {
  * AI-proposed funnel mapping, then land on the starter board with links to invite the team / set a
  * goal / turn on the war room. Every step's actual work happens through its own existing surface
  * (plugin install, key mint, board seeding, invites, goals, TV pairing) — this page only sequences
- * them and tracks progress. Gated on `project.manage`, the same permission every constituent action is
- * already reachable through for a `project_admin`.
+ * them and tracks progress, drawn as a clickable journey diagram built from the stored state and the
+ * records the project really has. Gated on `project.manage`, the same permission every constituent
+ * action is already reachable through for a `project_admin`.
  */
 export default async function OnboardingPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -73,52 +99,139 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
   }
 
   const t = await getTranslations('Onboarding');
-  const state = await getOnboardingState(orgId, projectId);
+  const [state, batches, boards] = await Promise.all([
+    getOnboardingState(orgId, projectId),
+    listRecentIngestBatchesForProject(orgId, projectId, 50),
+    listBoardsForProject(orgId, projectId),
+  ]);
+  const view = state ? toOnboardingStateView(state) : null;
+  const acceptedCount = batches.reduce((total, batch) => total + batch.accepted_count, 0);
+  const numberFormat = new Intl.NumberFormat(locale);
+  const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
+  const formatDate = (value: string | null | undefined) => (value && !Number.isNaN(Date.parse(value)) ? dateFormat.format(new Date(value)) : undefined);
+  const progress = onboardingProgress(view?.step ?? null);
+  const base = `/orgs/${orgId}/projects/${projectId}`;
+  const onboardingHref = `${base}/onboarding`;
 
-  if (!state) {
+  const sublabels: Record<OnboardingJourneyStep, string | undefined> = {
+    start: view ? t('journeyStartedOn', { date: formatDate(view.startedAt) ?? view.startedAt }) : t('journeyNotStarted'),
+    pack: view?.selectedPackKey ? t(PACK_TITLE_KEYS[view.selectedPackKey]) : t('journeyPackNone'),
+    sources:
+      view?.sourceConnectionMethod === 'plugin'
+        ? (view.connectedSourcePluginId ?? t('journeySourcePlugin'))
+        : view?.sourceConnectionMethod === 'push_your_own'
+          ? t('journeySourcePush')
+          : t('journeySourceNone'),
+    funnel: view && view.funnelSteps.length > 0 ? t('journeyFunnelSteps', { count: view.funnelSteps.length }) : t('journeyFunnelNone'),
+    board: t('journeyBoards', { count: boards.length }),
+    done: view?.completedAt ? t('journeyDoneOn', { date: formatDate(view.completedAt) ?? view.completedAt }) : t('journeyDoneNot'),
+  };
+  const values: Partial<Record<OnboardingJourneyStep, string>> = {
+    sources: acceptedCount > 0 ? numberFormat.format(acceptedCount) : undefined,
+    funnel: view && view.funnelSteps.length > 0 ? numberFormat.format(view.funnelSteps.length) : undefined,
+    board: boards.length > 0 ? numberFormat.format(boards.length) : undefined,
+  };
+  const journey = buildOnboardingJourney(
+    { step: view?.step ?? null },
+    {
+      label: (step) => t(`journeyStep_${step}`),
+      sublabel: (step) => sublabels[step],
+      value: (step) => values[step],
+    },
+    {
+      pack: `${base}/plugins`,
+      sources: `${base}/ingest-health`,
+      funnel: view && view.funnelSteps.length > 0 && view.step !== 'funnel' ? `${onboardingHref}?editFunnel=1` : `${base}/funnel`,
+      board: `${base}/boards`,
+      done: `${base}/campaigns`,
+    },
+  );
+
+  const hero = (
+    <PageHero icon={Route} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('introBody')}>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          title={t('kpiProgress')}
+          value={`${progress.completed}/${progress.total}`}
+          icon={ListChecks}
+          progress={progress.percent}
+          subtext={view?.step === 'done' ? t('kpiProgressDone') : view ? t(`journeyStep_${view.step}`) : t('journeyNotStarted')}
+        />
+        <StatCard title={t('kpiEvents')} value={numberFormat.format(acceptedCount)} icon={Inbox} subtext={t('kpiEventsSubtext')} />
+        <StatCard title={t('kpiFunnelSteps')} value={numberFormat.format(view?.funnelSteps.length ?? 0)} icon={GitMerge} />
+        <StatCard title={t('kpiBoards')} value={numberFormat.format(boards.length)} icon={LayoutDashboard} />
+      </div>
+    </PageHero>
+  );
+  const journeyCard = (
+    <ChartCard title={t('journeyTitle')} description={t('journeyDescription')} icon={Route}>
+      <FlowDiagram label={t('journeyTitle')} nodes={journey.nodes} edges={journey.edges} height={260} />
+    </ChartCard>
+  );
+
+  if (!view) {
     return (
-      <main className="container mx-auto flex max-w-2xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <StartOnboardingButton orgId={orgId} projectId={projectId} />
+      <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+        {hero}
+        {journeyCard}
+        <StepCard>
+          <div className="flex flex-col items-start gap-3">
+            <p className="text-sm text-muted-foreground">{t('startHint')}</p>
+            <StartOnboardingButton orgId={orgId} projectId={projectId} />
+          </div>
+        </StepCard>
       </main>
     );
   }
 
-  const view = toOnboardingStateView(state);
   // The funnel editor is the wizard's own step, but a confirmed funnel stays editable from any later
   // step too (KAN-199): it can be set over MCP `set_funnel` at any time, so a human must be able to
   // review and change it here without restarting the wizard.
   const showFunnelEditor = view.step === 'funnel' || editFunnel === '1';
-  const onboardingHref = `/orgs/${orgId}/projects/${projectId}/onboarding`;
 
   return (
-    <main className="container mx-auto flex max-w-2xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      {hero}
+      {journeyCard}
 
       {view.step === 'pack' ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('packStepHeading')}</h2>
-          <OnboardingPackStep orgId={orgId} projectId={projectId} packs={onboardingMetricPacks()} />
-        </section>
+        <StepCard>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">{t('packStepHeading')}</h2>
+            <OnboardingPackStep orgId={orgId} projectId={projectId} packs={onboardingMetricPacks()} />
+          </section>
+        </StepCard>
       ) : null}
 
-      {view.step === 'sources' ? <SourcesStep orgId={orgId} projectId={projectId} /> : null}
+      {view.step === 'sources' ? (
+        <StepCard>
+          <SourcesStep orgId={orgId} projectId={projectId} />
+        </StepCard>
+      ) : null}
 
       {showFunnelEditor ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('funnelStepHeading')}</h2>
-          <OnboardingFunnelStep
-            orgId={orgId}
-            projectId={projectId}
-            proposal={buildFunnelEditorRows(view.funnelSteps, await proposeOnboardingFunnelSteps(orgId, projectId))}
-            {...(view.step === 'funnel' ? {} : { confirmedHref: onboardingHref })}
-          />
-        </section>
+        <StepCard>
+          <section className="flex flex-col gap-3">
+            <h2 className="text-lg font-semibold">{t('funnelStepHeading')}</h2>
+            <OnboardingFunnelStep
+              orgId={orgId}
+              projectId={projectId}
+              proposal={buildFunnelEditorRows(view.funnelSteps, await proposeOnboardingFunnelSteps(orgId, projectId))}
+              {...(view.step === 'funnel' ? {} : { confirmedHref: onboardingHref })}
+            />
+          </section>
+        </StepCard>
       ) : view.funnelSteps.length > 0 ? (
-        <ConfirmedFunnelSummary orgId={orgId} projectId={projectId} funnelSteps={view.funnelSteps} editHref={`${onboardingHref}?editFunnel=1`} />
+        <StepCard>
+          <ConfirmedFunnelSummary orgId={orgId} projectId={projectId} funnelSteps={view.funnelSteps} editHref={`${onboardingHref}?editFunnel=1`} />
+        </StepCard>
       ) : null}
 
-      {view.step === 'board' || view.step === 'done' ? <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} /> : null}
+      {view.step === 'board' || view.step === 'done' ? (
+        <StepCard>
+          <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} />
+        </StepCard>
+      ) : null}
     </main>
   );
 }
@@ -176,37 +289,51 @@ async function SourcesStep({ orgId, projectId }: { orgId: string; projectId: str
 
   return (
     <section className="flex flex-col gap-6">
-      <h2 className="text-lg font-semibold">{t('sourceStepHeading')}</h2>
-      <p className="text-muted-foreground">{t('sourceStepIntro')}</p>
-
-      <div className="flex flex-col gap-3">
-        <h3 className="font-medium">{t('sourceStepPluginHeading')}</h3>
-        {connectedSourceInstall ? (
-          <p className="text-sm text-muted-foreground">{t('sourceStepPluginConnected', { pluginId: connectedSourceInstall.pluginId })}</p>
-        ) : installableSourceManifests.length === 0 ? (
-          <div className="flex flex-col items-start gap-2 rounded-md border border-input p-3">
-            <p className="text-sm text-muted-foreground">{t('sourceStepNoManifests')}</p>
-            <Button asChild size="sm" variant="outline">
-              <Link href={`/orgs/${orgId}/plugins`}>{t('sourceStepNoManifestsLink')}</Link>
-            </Button>
-          </div>
-        ) : (
-          <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableSourceManifests} />
-        )}
+      <div>
+        <h2 className="text-lg font-semibold">{t('sourceStepHeading')}</h2>
+        <p className="text-muted-foreground">{t('sourceStepIntro')}</p>
       </div>
 
-      <div className="flex flex-col gap-3">
-        <h3 className="font-medium">{t('sourceStepPushYourOwnHeading')}</h3>
-        <p className="text-sm text-muted-foreground">{t('sourceStepPushYourOwnIntro')}</p>
-        {environmentOptions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t('sourceStepNoEnvironments')}</p>
-        ) : (
-          <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
-        )}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4">
+          <h3 className="font-medium">{t('sourceStepPluginHeading')}</h3>
+          {connectedSourceInstall ? (
+            <p className="text-sm text-muted-foreground">{t('sourceStepPluginConnected', { pluginId: connectedSourceInstall.pluginId })}</p>
+          ) : installableSourceManifests.length === 0 ? (
+            <div className="flex flex-col items-start gap-2 rounded-md border border-dashed border-input p-3">
+              <p className="text-sm text-muted-foreground">{t('sourceStepNoManifests')}</p>
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/orgs/${orgId}/plugins`}>{t('sourceStepNoManifestsLink')}</Link>
+              </Button>
+            </div>
+          ) : (
+            <InstallPluginForm orgId={orgId} projectId={projectId} manifests={installableSourceManifests} />
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4">
+          <h3 className="font-medium">{t('sourceStepPushYourOwnHeading')}</h3>
+          <p className="text-sm text-muted-foreground">{t('sourceStepPushYourOwnIntro')}</p>
+          {environmentOptions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('sourceStepNoEnvironments')}</p>
+          ) : (
+            <CreateApiKeyForm orgId={orgId} projectId={projectId} environments={environmentOptions} ingestBaseUrl={ingestApiUrl()} />
+          )}
+        </div>
       </div>
 
-      <div className="flex flex-col gap-2" data-testid="onboarding-ingest-status">
-        <h3 className="font-medium">{t('sourceStepDataStatusHeading')}</h3>
+      <div
+        className={
+          hasReceivedData
+            ? 'flex flex-col gap-2 rounded-xl border border-success/30 bg-success/5 p-4'
+            : 'flex flex-col gap-2 rounded-xl border border-warning/30 bg-warning/5 p-4'
+        }
+        data-testid="onboarding-ingest-status"
+      >
+        <h3 className="flex items-center gap-2 font-medium">
+          {hasReceivedData ? <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" /> : <Inbox className="h-4 w-4 text-warning" aria-hidden="true" />}
+          {t('sourceStepDataStatusHeading')}
+        </h3>
         {hasReceivedData ? (
           <p className="text-sm text-muted-foreground">{t('sourceStepEventsReceived', { count: acceptedCount })}</p>
         ) : (
@@ -268,10 +395,10 @@ async function ConfirmedFunnelSummary({
     <section className="flex flex-col gap-3" data-testid="onboarding-confirmed-funnel">
       <h2 className="text-lg font-semibold">{t('confirmedFunnelHeading')}</h2>
       <p className="text-sm text-muted-foreground">{t('confirmedFunnelIntro')}</p>
-      <ol className="flex flex-col gap-1 text-sm">
+      <ol className="flex flex-wrap items-stretch gap-2 text-sm">
         {ordered.map((step, index) => (
-          <li key={step.eventSchemaName} className="flex items-center gap-2 rounded-md border border-input px-3 py-2">
-            <span className="w-6 text-center text-muted-foreground">{index + 1}</span>
+          <li key={step.eventSchemaName} className="flex items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-2">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
             <span className="font-medium" dir="ltr">
               {step.eventSchemaName}
             </span>
@@ -280,10 +407,10 @@ async function ConfirmedFunnelSummary({
         ))}
       </ol>
       <div className="flex flex-wrap gap-4">
-        <Link className="text-sm underline" href={editHref}>
+        <Link className="text-sm font-medium text-primary underline" href={editHref}>
           {t('confirmedFunnelEdit')}
         </Link>
-        <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${projectId}/funnel`}>
+        <Link className="text-sm font-medium text-primary underline" href={`/orgs/${orgId}/projects/${projectId}/funnel`}>
           {t('confirmedFunnelViewConversion')}
         </Link>
       </div>
@@ -302,10 +429,14 @@ async function FinalStep({ orgId, projectId, done }: { orgId: string; projectId:
       {boards.length === 0 ? (
         <p className="text-muted-foreground">{t('boardStepEmpty')}</p>
       ) : (
-        <ul className="flex flex-col gap-2">
+        <ul className="grid gap-2 sm:grid-cols-3">
           {boards.map((board) => (
             <li key={board.id}>
-              <Link className="underline" href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}>
+              <Link
+                className="flex items-center gap-2 rounded-xl border border-border bg-background/60 px-3 py-3 font-medium text-foreground transition-colors hover:border-primary/40 hover:text-primary"
+                href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}
+              >
+                <LayoutDashboard className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 {board.name}
               </Link>
             </li>
@@ -314,18 +445,25 @@ async function FinalStep({ orgId, projectId, done }: { orgId: string; projectId:
       )}
 
       <div className="flex flex-wrap gap-4">
-        <Link className="text-sm underline" href={`/orgs/${orgId}`}>
+        <Link className="text-sm font-medium text-primary underline" href={`/orgs/${orgId}`}>
           {t('inviteTeamLink')}
         </Link>
-        <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${projectId}/goals`}>
+        <Link className="text-sm font-medium text-primary underline" href={`/orgs/${orgId}/projects/${projectId}/goals`}>
           {t('setGoalLink')}
         </Link>
-        <Link className="text-sm underline" href={`/orgs/${orgId}/projects/${projectId}/tv`}>
+        <Link className="text-sm font-medium text-primary underline" href={`/orgs/${orgId}/projects/${projectId}/tv`}>
           {t('warRoomLink')}
         </Link>
       </div>
 
-      {done ? <p className="font-medium">{t('doneMessage')}</p> : <CompleteOnboardingButton orgId={orgId} projectId={projectId} />}
+      {done ? (
+        <p className="flex items-center gap-2 font-medium">
+          <CheckCircle2 className="h-5 w-5 text-success" aria-hidden="true" />
+          {t('doneMessage')}
+        </p>
+      ) : (
+        <CompleteOnboardingButton orgId={orgId} projectId={projectId} />
+      )}
     </section>
   );
 }

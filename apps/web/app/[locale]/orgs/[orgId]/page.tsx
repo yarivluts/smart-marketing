@@ -97,13 +97,19 @@ export default async function OrgDetailPage({
   const canManageMembers = can(bindings, principal, 'members.manage', { orgId });
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId });
   const canManageBilling = can(bindings, principal, 'billing.manage', { orgId });
-  const canManageKeys = can(bindings, principal, 'keys.manage', { orgId });
-  const canManageSchemas = can(bindings, principal, 'schema.write', { orgId });
-  const canManageMetrics = can(bindings, principal, 'metrics.write', { orgId });
-  const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId });
-  const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId });
-  const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId });
-  const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId }) || canManageBoards;
+  // The quick links open pages of the selected project, and each of those pages checks its
+  // permission at project scope - so check them the same way here. An org-scoped binding still
+  // covers every project; a project-scoped one (e.g. a project_admin) now sees its own project's
+  // links instead of only the resources link.
+  const projectScope = currentProjectId ? { orgId, projectId: currentProjectId } : { orgId };
+  const canManageProjectSettings = can(bindings, principal, 'project.manage', projectScope);
+  const canManageKeys = can(bindings, principal, 'keys.manage', projectScope);
+  const canManageSchemas = can(bindings, principal, 'schema.write', projectScope);
+  const canManageMetrics = can(bindings, principal, 'metrics.write', projectScope);
+  const canViewIngestHealth = can(bindings, principal, 'ingest.write', projectScope);
+  const canManagePlugins = can(bindings, principal, 'plugin.install', projectScope);
+  const canManageBoards = can(bindings, principal, 'dashboards.write', projectScope);
+  const canViewBoards = can(bindings, principal, 'dashboards.read', projectScope) || canManageBoards;
 
   // Projects the signed-in inviter administers (KAN-135) — scopes the
   // invite form's project picker to only the projects a project-scoped
@@ -196,7 +202,7 @@ export default async function OrgDetailPage({
           title: t('groupAdmin'),
           icon: Wrench,
           links: [
-            ...(canManageProjects
+            ...(canManageProjectSettings
               ? [
                   { href: 'cost-guardrails', label: t('projectCostGuardrailsLink') },
                   { href: 'session-replay', label: t('projectSessionReplayLink') },

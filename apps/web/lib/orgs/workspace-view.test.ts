@@ -8,6 +8,7 @@ import {
   initialsFor,
   onboardingJourneyStates,
   onboardingProgress,
+  pickFocusProject,
   pickHeadlineEnvironment,
   projectHealthStatus,
   shortDayLabel,
@@ -173,6 +174,18 @@ describe('audit log shaping', () => {
       ['2026-09-20', ['a', 'b']],
       ['2026-09-18', ['c']],
     ]);
+  });
+});
+
+describe('pickFocusProject', () => {
+  it('follows the unfinished project that is furthest along', () => {
+    expect(pickFocusProject([{ id: 'a', step: null }, { id: 'b', step: 'funnel' as const }, { id: 'c', step: 'done' as const }])?.id).toBe('b');
+    expect(pickFocusProject([{ id: 'a', step: 'pack' as const }, { id: 'b', step: 'pack' as const }])?.id).toBe('a');
+  });
+
+  it('falls back to the first project when all are finished, and null when there are none', () => {
+    expect(pickFocusProject([{ id: 'a', step: 'done' as const }, { id: 'b', step: 'done' as const }])?.id).toBe('a');
+    expect(pickFocusProject([])).toBeNull();
   });
 });
 

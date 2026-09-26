@@ -303,6 +303,16 @@ export function onboardingProgress(step: OnboardingStep | null): { completed: nu
   return { completed, total: steps.length, percent: Math.round((completed / steps.length) * 100) };
 }
 
+/**
+ * The project an account-wide journey should follow: the unfinished project that is furthest along
+ * (first one wins a tie), or - when every project is finished - the first project; null for none.
+ */
+export function pickFocusProject<T extends { step: OnboardingStep | null }>(projects: readonly T[]): T | null {
+  const unfinished = projects.filter((project) => project.step !== 'done');
+  if (unfinished.length === 0) return projects[0] ?? null;
+  return unfinished.reduce((best, project) => (onboardingProgress(project.step).completed > onboardingProgress(best.step).completed ? project : best), unfinished[0]);
+}
+
 export function journeyStateToVizStatus(state: OnboardingJourneyState): VizStatus {
   return state === 'done' ? 'ok' : state === 'current' ? 'warn' : 'idle';
 }

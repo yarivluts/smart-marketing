@@ -14,6 +14,8 @@ import { isActiveMembershipStatus } from '@/lib/orgs/membership-status';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { listOrgMembers, listOrgProjects } from '@/lib/orgs/queries';
 
+const PROJECT_CHIP_LIMIT = 4;
+
 type PageProps = Readonly<{
   params: Promise<{ locale: string }>;
 }>;
@@ -45,6 +47,7 @@ export default async function OrgsPage({ params }: PageProps): Promise<React.Rea
       const [projects, members] = await Promise.all([listOrgProjects(membership.organizationId), listOrgMembers(membership.organizationId)]);
       return {
         projectCount: projects.length,
+        projectNames: projects.slice(0, PROJECT_CHIP_LIMIT).map((project) => ({ id: project.id, name: project.name })),
         memberCount: members.filter((member) => isActiveMembershipStatus(member.status)).length,
       };
     }),
@@ -116,7 +119,20 @@ export default async function OrgsPage({ params }: PageProps): Promise<React.Rea
                     </div>
                   </div>
                 </dl>
-                <div className="mt-4 flex justify-end">
+                {(stats[index]?.projectNames.length ?? 0) > 0 ? (
+                  <ul className="mt-3 flex flex-wrap gap-1.5" aria-label={t('cardProjects')}>
+                    {stats[index]?.projectNames.map((project) => (
+                      <li key={project.id} className="flex items-center gap-1.5 rounded-full border border-border bg-background/60 py-0.5 pe-2.5 ps-0.5 text-xs text-foreground">
+                        <InitialsAvatar name={project.name} seed={project.id} size="sm" className="h-5 w-5 text-[9px]" />
+                        {project.name}
+                      </li>
+                    ))}
+                    {(stats[index]?.projectCount ?? 0) > PROJECT_CHIP_LIMIT ? (
+                      <li className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">{t('cardMoreProjects', { count: (stats[index]?.projectCount ?? 0) - PROJECT_CHIP_LIMIT })}</li>
+                    ) : null}
+                  </ul>
+                ) : null}
+                <div className="mt-auto flex justify-end pt-4">
                   <Button asChild size="sm" variant="outline">
                     <Link href={`/orgs/${membership.organizationId}`}>
                       {t('open')}
