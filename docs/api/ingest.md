@@ -194,6 +194,22 @@ Ingest Health admin page (KAN-34/35) once its schema is fixed or evolved. A quar
 never claims its dedup slot, so a corrected retry of the same client id can still be accepted
 later.
 
+**Validate without sending (KAN-202 I3).** `POST /v1/ingest/events/validate`,
+`/entities/validate` and `/measures/validate` take the same body and key as the matching ingest
+endpoint and run the same checks: envelope, registered schema, fields. They store nothing, so no
+batch, dedup claim or quarantine entry is created, and they answer `200` with each record's
+verdict:
+
+```json
+{ "kind": "event", "total": 2, "valid": 1, "invalid": 1,
+  "records": [ { "client_id": "v-ok", "status": "valid" },
+               { "client_id": "v-bad", "status": "invalid", "reasons": ["unregistered_field:coupon"] } ] }
+```
+
+Use it in CI to assert that sample payloads conform before a deploy. A record that validates is
+accepted by ingest, unless it repeats a record already accepted in that environment: dedup
+depends on history, not on the payload, so it is not evaluated here.
+
 ## 6. Implicit event envelope fields
 
 On **event** records only, `anon_id` and `customer_id` are accepted inside `properties`

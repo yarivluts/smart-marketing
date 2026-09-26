@@ -9,8 +9,10 @@ import {
   getIngestBatch,
   IngestBatchTooLargeError,
   ingestBatch,
+  listQuarantinedRecordsForProject,
   listRawRecordsForBatch,
   registerSchemaDefinition,
+  validateIngestBatch,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
 
@@ -625,5 +627,75 @@ describe('getIngestBatch', () => {
 
     const fromOwnEnvironment = await getIngestBatch(organization.id, project.id, prodEnvironment.id, summary.batchId);
     expect(fromOwnEnvironment?.total_count).toBe(1);
+  });
+});
+
+describe("validateIngestBatch (KAN-202 I3): ingest's own checks, nothing stored", () => {
+  const records = [
+    { event_id: 'ok-1', event: 'order_completed', ts: '2026-07-03T10:15:00Z', properties: { net: 349, anon_id: 'anon-1' } },
+    { event_id: 'bad-type', event: 'order_completed', ts: '2026-07-03T10:16:00Z', properties: { net: '349' } },
+    { event_id: 'bad-field', event: 'order_completed', ts: '2026-07-03T10:17:00Z', properties: { net: 1, coupon: 'X' } },
+    { event_id: 'no-schema', event: 'never_registered', ts: '2026-07-03T10:18:00Z', properties: {} },
+    { event: 'order_completed', properties: { net: 1 } },
+  ];
+
+  async function projectWithOrderSchema(name: string) {
+    const setup = await setupProject(name);
+    await registerSchemaDefinition({
+      organizationId: setup.organization.id,
+      projectId: setup.project.id,
+      kind: 'event',
+      name: 'order_completed',
+      fields: [{ name: 'net', type: 'number', isRequired: true, isPii: false, isIdentityKey: false }],
+      createdByUserId: setup.owner.id,
+    });
+    return setup;
+  }
+
+  it('gives each record the reasons ingest would quarantine it for', async () => {
+    const { organization, project } = await projectWithOrderSchema('Validate Records Org');
+    const summary = await validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records } });
+    expect(summary).toMatchObject({ kind: 'event', total: 5, valid: 1, invalid: 4 });
+    expect(summary.records).toEqual([
+      { client_id: 'ok-1', status: 'valid' },
+      { client_id: 'bad-type', status: 'invalid', reasons: ['field_type_mismatch:net'] },
+      { client_id: 'bad-field', status: 'invalid', reasons: ['unregistered_field:coupon'] },
+      { client_id: 'no-schema', status: 'invalid', reasons: ['schema_not_registered:never_registered'] },
+      { client_id: 'event#4', status: 'invalid', reasons: ['missing_field:event_id', 'missing_field:ts'] },
+    ]);
+  });
+
+  it('agrees with ingest record for record', async () => {
+    const { organization, project, devEnvironment } = await projectWithOrderSchema('Validate Agrees Org');
+    const validation = await validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records } });
+    const ingested = await ingestBatch({ organizationId: organization.id, projectId: project.id, environmentId: devEnvironment.id, input: { kind: 'event', records } });
+    const batch = await getIngestBatch(organization.id, project.id, devEnvironment.id, ingested.batchId);
+    expect(batch!.record_results.map((result) => ({ client_id: result.client_id, ok: result.status === 'accepted', reasons: result.reasons }))).toEqual(
+      validation.records.map((result) => ({ client_id: result.client_id, ok: result.status === 'valid', reasons: result.reasons })),
+    );
+  });
+
+  it('stores nothing: no quarantine entry, and a later real send of the same record is not a duplicate', async () => {
+    const { organization, project, devEnvironment } = await projectWithOrderSchema('Validate Stores Nothing Org');
+    await validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records } });
+    expect(await listQuarantinedRecordsForProject(organization.id, project.id, 50, devEnvironment.id)).toHaveLength(0);
+    const ingested = await ingestBatch({
+      organizationId: organization.id,
+      projectId: project.id,
+      environmentId: devEnvironment.id,
+      input: { kind: 'event', records: [records[0]] },
+    });
+    expect(ingested).toMatchObject({ accepted: 1, duplicates: 0 });
+  });
+
+  it('refuses an empty or oversized batch like ingest does', async () => {
+    const { organization, project } = await projectWithOrderSchema('Validate Limits Org');
+    await expect(validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records: [] } })).rejects.toBeInstanceOf(
+      EmptyIngestBatchError,
+    );
+    const tooMany = Array.from({ length: 1001 }, (_unused, index) => ({ ...records[0], event_id: 'e' + index }));
+    await expect(validateIngestBatch({ organizationId: organization.id, projectId: project.id, input: { kind: 'event', records: tooMany } })).rejects.toBeInstanceOf(
+      IngestBatchTooLargeError,
+    );
   });
 });

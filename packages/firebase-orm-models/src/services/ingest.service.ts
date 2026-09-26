@@ -311,6 +311,37 @@ export function dedupKeyId(environmentId: string, kind: SchemaDefKind, schemaNam
   return createHash('sha256').update(`${environmentId}:${kind}:${schemaName}:${clientId}`).digest('hex');
 }
 
+/**
+ * Prefetch every distinct schema a batch needs, in parallel, rather than one `await` per record -
+ * a batch touching k distinct event/entity/measure names costs one round of k concurrent reads
+ * instead of up to k sequential ones. Records whose envelope already failed need no schema.
+ */
+async function prefetchActiveSchemas(
+  organizationId: string,
+  projectId: string,
+  kind: SchemaDefKind,
+  records: readonly Pick<PreparedRecord, 'schemaName' | 'envelopeReasons'>[],
+): Promise<Map<string, Awaited<ReturnType<typeof getActiveSchemaDefinition>>>> {
+  const schemaNames = Array.from(new Set(records.filter((record) => record.envelopeReasons.length === 0).map((record) => record.schemaName)));
+  return new Map(await Promise.all(schemaNames.map(async (name) => [name, await getActiveSchemaDefinition(organizationId, projectId, kind, name)] as const)));
+}
+
+/**
+ * Why a record with a valid envelope does not conform to its registered schema: the schema is not
+ * registered, or the fields do not match it. Empty when it conforms. The one schema check both
+ * ingest and `validateIngestBatch` run, so a validation pass can never disagree with ingest.
+ */
+function schemaConformanceReasons(
+  record: Pick<PreparedRecord, 'schemaName' | 'fieldsToValidate'>,
+  schemaDef: Awaited<ReturnType<typeof getActiveSchemaDefinition>> | undefined,
+  kind: SchemaDefKind,
+): string[] {
+  if (!schemaDef) {
+    return [`schema_not_registered:${record.schemaName}`];
+  }
+  return validateAgainstSchema(record.fieldsToValidate, schemaDef.field_defs, kind);
+}
+
 /** Every count the batch summary needs, in one pass over `results` rather than one `.filter()` per status. */
 function tallyByStatus(results: readonly IngestRecordResult[]): Record<IngestRecordStatus, number> {
   const counts: Record<IngestRecordStatus, number> = { accepted: 0, quarantined: 0, duplicate: 0 };
@@ -360,21 +391,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
   );
   const preparedWithClaims = prepared.map((record, index) => ({ ...record, existingClaim: existingClaims[index] }));
 
-  // Prefetch every distinct schema this batch actually needs, in parallel,
-  // rather than one `await` per record inside the loop below — a batch
-  // touching k distinct event/entity/measure names now costs one round of k
-  // concurrent reads instead of up to k sequential ones.
-  const schemaNames = Array.from(
-    new Set(preparedWithClaims.filter((record) => record.envelopeReasons.length === 0).map((record) => record.schemaName)),
-  );
-  const schemaDefsByName = new Map(
-    await Promise.all(
-      schemaNames.map(
-        async (name) =>
-          [name, await getActiveSchemaDefinition(params.organizationId, params.projectId, params.input.kind, name)] as const,
-      ),
-    ),
-  );
+  const schemaDefsByName = await prefetchActiveSchemas(params.organizationId, params.projectId, params.input.kind, preparedWithClaims);
 
   const recordResults: IngestRecordResult[] = [];
   const acceptedClaims: { dedupId: string; clientId: string; schemaName: string; payload: Record<string, unknown>; contentHash?: string }[] = [];
@@ -406,15 +423,7 @@ export async function ingestBatch(params: IngestBatchParams): Promise<IngestBatc
       continue;
     }
 
-    const schemaDef = schemaDefsByName.get(record.schemaName) ?? null;
-    if (!schemaDef) {
-      const reasons = [`schema_not_registered:${record.schemaName}`];
-      recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
-      quarantinedToPersist.push({ clientId: record.clientId, schemaName: record.schemaName, payload: record.raw, reasons });
-      continue;
-    }
-
-    const reasons = validateAgainstSchema(record.fieldsToValidate, schemaDef.field_defs, params.input.kind);
+    const reasons = schemaConformanceReasons(record, schemaDefsByName.get(record.schemaName), params.input.kind);
     if (reasons.length > 0) {
       recordResults.push({ client_id: record.clientId, status: 'quarantined', reasons });
       quarantinedToPersist.push({ clientId: record.clientId, schemaName: record.schemaName, payload: record.raw, reasons });
@@ -581,4 +590,47 @@ export async function getIngestBatch(
     return null;
   }
   return batch;
+}
+
+export type IngestValidationStatus = 'valid' | 'invalid';
+
+export interface IngestValidationRecordResult {
+  client_id: string;
+  status: IngestValidationStatus;
+  /** The reasons ingest would quarantine the record for; absent when valid. */
+  reasons?: string[];
+}
+
+export interface IngestValidationSummary {
+  kind: SchemaDefKind;
+  total: number;
+  valid: number;
+  invalid: number;
+  records: IngestValidationRecordResult[];
+}
+
+/**
+ * Checks a batch against the envelope rules and the project's registered schemas exactly as
+ * `ingestBatch` would, and stores nothing (KAN-202 I3): no batch, no dedup claim, no quarantine
+ * entry, no pipeline publish. For an integrator's CI conformance tests - a payload that validates
+ * here is accepted by ingest unless it repeats a record already accepted (dedup is not a property
+ * of the payload's shape, so it is not evaluated). Schemas are project-wide, so no environment is
+ * involved.
+ */
+export async function validateIngestBatch(params: Omit<IngestBatchParams, 'environmentId'>): Promise<IngestValidationSummary> {
+  const records = params.input.records;
+  if (records.length === 0) {
+    throw new EmptyIngestBatchError();
+  }
+  if (records.length > MAX_INGEST_BATCH_SIZE) {
+    throw new IngestBatchTooLargeError(MAX_INGEST_BATCH_SIZE);
+  }
+  const prepared = records.map((record, index) => prepareRecord(params.input, record, index));
+  const schemaDefsByName = await prefetchActiveSchemas(params.organizationId, params.projectId, params.input.kind, prepared);
+  const results: IngestValidationRecordResult[] = prepared.map((record) => {
+    const reasons = record.envelopeReasons.length > 0 ? record.envelopeReasons : schemaConformanceReasons(record, schemaDefsByName.get(record.schemaName), params.input.kind);
+    return reasons.length > 0 ? { client_id: record.clientId, status: 'invalid', reasons } : { client_id: record.clientId, status: 'valid' };
+  });
+  const valid = results.filter((result) => result.status === 'valid').length;
+  return { kind: params.input.kind, total: results.length, valid, invalid: results.length - valid, records: results };
 }

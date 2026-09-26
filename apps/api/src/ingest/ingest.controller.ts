@@ -4,7 +4,9 @@ import {
   getIngestBatch,
   IngestBatchTooLargeError,
   ingestBatch,
+  validateIngestBatch,
   type IngestBatchInput,
+  type IngestValidationSummary,
 } from '@growthos/firebase-orm-models';
 import { Public } from '../authz/public.decorator';
 import { ApiKeyAuthGuard, type ApiKeyAuthenticatedRequest } from '../authz/api-key-auth.guard';
@@ -65,6 +67,26 @@ export class IngestController {
     return this.handleBatch(request, parseMeasuresRequestBody(body));
   }
 
+  // KAN-202 I3: the same checks ingest runs, without storing anything - for an integrator's CI
+  // conformance tests. 200, not 202: nothing is queued; the answer is complete in the response.
+  @Post('events/validate')
+  @HttpCode(200)
+  validateEvents(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestValidationSummary> {
+    return this.handleValidation(request, parseEventsRequestBody(body));
+  }
+
+  @Post('entities/validate')
+  @HttpCode(200)
+  validateEntities(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestValidationSummary> {
+    return this.handleValidation(request, parseEntitiesRequestBody(body));
+  }
+
+  @Post('measures/validate')
+  @HttpCode(200)
+  validateMeasures(@Req() request: ApiKeyAuthenticatedRequest, @Body() body: unknown): Promise<IngestValidationSummary> {
+    return this.handleValidation(request, parseMeasuresRequestBody(body));
+  }
+
   @Get('batches/:batchId')
   async getBatch(@Req() request: ApiKeyAuthenticatedRequest, @Param('batchId') batchId: string) {
     const context = requireApiKeyContext(request);
@@ -82,6 +104,18 @@ export class IngestController {
       created_at: batch.created_at,
       records: batch.record_results,
     };
+  }
+
+  private async handleValidation(request: ApiKeyAuthenticatedRequest, input: IngestBatchInput): Promise<IngestValidationSummary> {
+    const context = requireApiKeyContext(request);
+    try {
+      return await validateIngestBatch({ organizationId: context.organizationId, projectId: context.projectId, input });
+    } catch (error) {
+      if (error instanceof EmptyIngestBatchError || error instanceof IngestBatchTooLargeError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
 
   private async handleBatch(request: ApiKeyAuthenticatedRequest, input: IngestBatchInput): Promise<IngestBatchResponse> {
