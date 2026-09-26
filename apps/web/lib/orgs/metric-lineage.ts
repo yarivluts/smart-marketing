@@ -137,7 +137,35 @@ export function schemaForTable(table: string, schemaNames: ReadonlySet<string>):
   return candidate !== table && schemaNames.has(candidate) ? candidate : null;
 }
 
-export type LineageNodeType = 'metric' | 'table' | 'schema' | 'missing';
+/**
+ * How many nodes the lineage graph's tallest column holds (columns by longest path from a source, the
+ * same rule the flow diagram lays out by), so the page can give the diagram enough height.
+ */
+export function tallestLineageColumn(graph: { nodes: readonly { id: string }[]; edges: readonly LineageEdge[] }): number {
+  const incoming = new Map<string, string[]>(graph.nodes.map((node) => [node.id, []]));
+  for (const edge of graph.edges) incoming.get(edge.target)?.push(edge.source);
+  const depth = new Map<string, number>();
+  const visiting = new Set<string>();
+  const depthOf = (id: string): number => {
+    const known = depth.get(id);
+    if (known !== undefined) return known;
+    if (visiting.has(id)) return 0;
+    visiting.add(id);
+    const parents = incoming.get(id) ?? [];
+    const value = parents.length === 0 ? 0 : 1 + Math.max(...parents.map(depthOf));
+    visiting.delete(id);
+    depth.set(id, value);
+    return value;
+  };
+  const counts = new Map<number, number>();
+  for (const node of graph.nodes) {
+    const column = depthOf(node.id);
+    counts.set(column, (counts.get(column) ?? 0) + 1);
+  }
+  return Math.max(1, ...counts.values());
+}
+
+export type LineageNodeType ='metric' | 'table' | 'schema' | 'missing';
 
 export interface LineageNode {
   /** Index-based, so an id never carries a metric or table name into an accessible label. */

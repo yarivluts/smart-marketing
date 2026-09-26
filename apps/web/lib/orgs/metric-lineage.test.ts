@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { buildMetricLineage, catalogStats, formulaInputs, pickLineageFocus, schemaForTable, toCatalogMetrics, type MetricFamilyLike } from './metric-lineage';
+import {
+  buildMetricLineage,
+  catalogStats,
+  formulaInputs,
+  pickLineageFocus,
+  schemaForTable,
+  tallestLineageColumn,
+  toCatalogMetrics,
+  type MetricFamilyLike,
+} from './metric-lineage';
 
 const aggregation = (table: string, column = 'value', status: 'active' | 'superseded' | 'archived' = 'active', version = 1) => ({
   version,
@@ -95,6 +104,13 @@ describe('buildMetricLineage', () => {
     const { nodes } = buildMetricLineage(broken, 'broken', new Set());
     expect(nodes.every((node) => /^n\d+$/.test(node.id))).toBe(true);
     expect(nodes.find((node) => node.name === 'ghost')!.type).toBe('missing');
+  });
+
+  it('measures the tallest column for sizing the diagram', () => {
+    const graph = buildMetricLineage(metrics, 'cost_per_signup', new Set(['ad_spend']));
+    // schema | 2 tables | ad_spend + signups | cost_per_signup | cac_ratio -> the two-node columns win.
+    expect(tallestLineageColumn(graph)).toBe(2);
+    expect(tallestLineageColumn({ nodes: [], edges: [] })).toBe(1);
   });
 
   it('is empty for an unknown focus', () => {
