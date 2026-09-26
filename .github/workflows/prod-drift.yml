@@ -45,6 +45,10 @@ jobs:
           # KAN-204: web-prod reports its own build on its public /api/health.
           - service: web-prod
             health_url: https://web-prod-1098891924957.me-west1.run.app/api/health
+          # web-preprod also reads and writes production Firestore (KAN-207). It ran an untracked
+          # build until 2026-09-26; watching it keeps it on main like api-preprod.
+          - service: web-preprod
+            health_url: https://web-preprod-5u3ypal2gq-zf.a.run.app/api/health
           # KAN-204: dbt-refresh is a Cloud Run Job with no endpoint, and on 2026-09-25 it was
           # found running a 2026-09-10 image. Each run records its build in the warehouse and
           # api-prod reports it publicly, so this still reads only a public URL - the

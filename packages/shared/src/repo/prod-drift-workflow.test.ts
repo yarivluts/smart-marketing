@@ -114,8 +114,8 @@ function watchedServices(workflow: string): Record<string, WatchedService> {
  * no credentials (the assertions above still hold with all four in the matrix).
  */
 describe('prod-drift watches every production image (KAN-204)', () => {
-  it('watches api-prod, api-preprod, web-prod and dbt-refresh', () => {
-    expect(Object.keys(watchedServices(read(WORKFLOW))).sort()).toEqual(['api-preprod', 'api-prod', 'dbt-refresh', 'web-prod']);
+  it('watches api-prod, api-preprod, web-prod, web-preprod and dbt-refresh', () => {
+    expect(Object.keys(watchedServices(read(WORKFLOW))).sort()).toEqual(['api-preprod', 'api-prod', 'dbt-refresh', 'web-preprod', 'web-prod']);
   });
 
   it('reads each from a public https endpoint, the one each service reports its build on', () => {
@@ -161,7 +161,7 @@ describe('prod-drift watches every production image (KAN-204)', () => {
 
   it('holds every other service to all of main', () => {
     const services = watchedServices(read(WORKFLOW));
-    expect(['api-prod', 'api-preprod', 'web-prod'].map((name) => services[name]!.watchedPaths)).toEqual([[], [], []]);
+    expect(['api-prod', 'api-preprod', 'web-prod', 'web-preprod'].map((name) => services[name]!.watchedPaths)).toEqual([[], [], [], []]);
   });
 
   /**
