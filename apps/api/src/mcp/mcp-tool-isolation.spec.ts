@@ -35,6 +35,8 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   query_cohort: { kind: 'connection-scope', permission: 'mcp.read' },
   query_funnel: { kind: 'connection-scope', permission: 'mcp.read' },
   search_customers: { kind: 'connection-scope', permission: 'mcp.read' },
+  // KAN-202 I3: reads only the caller project's schema registry and writes nothing.
+  validate_records: { kind: 'connection-scope', permission: 'mcp.read' },
   list_insights: { kind: 'connection-scope', permission: 'mcp.read' },
   list_segments: { kind: 'connection-scope', permission: 'mcp.read' },
   list_win_rules: { kind: 'connection-scope', permission: 'mcp.read' },

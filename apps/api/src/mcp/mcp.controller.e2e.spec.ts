@@ -18,6 +18,7 @@ import {
   InMemoryTokenBucketRateLimiter,
   issueMcpAuthorizationCode,
   listAuditLogEntriesForOrg,
+  listQuarantinedRecordsForProject,
   listSchemaDefinitionsForProject,
   mintApiKey,
   registerMcpOAuthClient,
@@ -272,6 +273,7 @@ describe('McpController (e2e)', () => {
           'query_funnel',
           'query_metric',
           'search_customers',
+          'validate_records',
         ].sort(),
       );
     } finally {
@@ -1178,6 +1180,35 @@ describe('McpController (e2e)', () => {
       } finally {
         await clientB.close();
       }
+    });
+  });
+
+  describe('KAN-202 I3 validate_records', () => {
+    it("checks records against the caller project's own schemas and stores nothing", async () => {
+      const a = await setupProjectWithKey('Validate Records Org A');
+      const b = await setupProjectWithKey('Validate Records Org B');
+      // Only B registers "signup"; A's key must be judged against A's registry.
+      await registerSchemaDefinition({ organizationId: b.organization.id, projectId: b.project.id, kind: 'event', name: 'signup', fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }], createdByUserId: b.owner.id });
+      const records = [{ event_id: 'e1', event: 'signup', ts: '2026-09-25T10:00:00Z', properties: { plan: 'free', coupon: 'X' } }];
+
+      const client = await connectedClient(b.rawKey);
+      try {
+        const result = await client.callTool({ name: 'validate_records', arguments: { kind: 'event', records } });
+        expect(JSON.parse((result.content as Array<{ text: string }>)[0].text)).toMatchObject({ total: 1, invalid: 1, records: [{ client_id: 'e1', reasons: ['unregistered_field:coupon'] }] });
+        const missingType = await client.callTool({ name: 'validate_records', arguments: { kind: 'entity', records: [{ id: 'c1' }] } });
+        expect(missingType.isError).toBe(true);
+      } finally {
+        await client.close();
+      }
+
+      const clientA = await connectedClient(a.rawKey);
+      try {
+        const result = await clientA.callTool({ name: 'validate_records', arguments: { kind: 'event', records } });
+        expect(JSON.parse((result.content as Array<{ text: string }>)[0].text).records[0].reasons).toEqual(['schema_not_registered:signup']);
+      } finally {
+        await clientA.close();
+      }
+      expect(await listQuarantinedRecordsForProject(b.organization.id, b.project.id, 10)).toEqual([]);
     });
   });
 

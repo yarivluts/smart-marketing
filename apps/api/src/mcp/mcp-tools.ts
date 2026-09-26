@@ -19,6 +19,10 @@ import {
   resolveMetricDisplayUnits,
   recordAuditLogEntry,
   searchProjectCustomers,
+  validateIngestBatch,
+  EmptyIngestBatchError,
+  IngestBatchTooLargeError,
+  type IngestBatchInput,
   WarehouseNotConfiguredError,
   type FunnelStepResult,
 } from '@growthos/firebase-orm-models';
@@ -363,6 +367,14 @@ const searchCustomersInputShape = {
   limit: z.number().int().positive().optional().describe('Maximum matching customers to return.'),
 };
 
+const validateRecordsInputShape = {
+  kind: z.enum(['event', 'entity', 'measure']).describe('Which ingest endpoint the records are for: event (POST /v1/ingest/events), entity (/entities) or measure (/measures).'),
+  type: z.string().optional().describe('entity only: the entity schema name, as the batch-level "type" of POST /v1/ingest/entities.'),
+  records: z
+    .unknown()
+    .describe('The records exactly as they would be sent: events as { event_id, event, ts, properties }, entities as { id, attributes }, measures as { measure, ts, value, dimensions }. Up to the ingest batch limit.'),
+};
+
 const listInsightsInputShape = {
   limit: z.number().int().positive().optional().describe('Maximum insights to return, most recent first.'),
 };
@@ -532,6 +544,36 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
         return textResult({ results: page.results, has_more: page.hasMore, limit: page.limit });
       } catch (error) {
         return errorResult(describeMetricsError(error));
+      }
+    }),
+  );
+
+  // KAN-202 I3: ingest's own envelope + schema checks, storing nothing - the same service the
+  // REST /v1/ingest/*/validate endpoints use, so an agent and a CI job get identical verdicts.
+  server.registerTool(
+    'validate_records',
+    {
+      title: 'Validate records',
+      description:
+        "Check sample records against this project's registered schemas exactly as ingest would - envelope fields, schema registered, every property declared and correctly typed - without storing anything (no batch, no quarantine entry, no dedup claim). Returns each record's status (valid or invalid) and the reasons ingest would quarantine it for. A valid record is accepted by ingest unless it repeats one already accepted; dedup is not evaluated. The same check is available over REST at POST /v1/ingest/(events|entities|measures)/validate for CI.",
+      inputSchema: toolInputSchema(validateRecordsInputShape),
+    },
+    auditedToolHandler(auth, 'validate_records', async (args: any) => {
+      const { kind, type, records } = args as { kind: IngestBatchInput['kind']; type?: string; records?: unknown };
+      if (!Array.isArray(records)) {
+        return errorResult('records must be an array of records, shaped as the ingest endpoint for this kind takes them.');
+      }
+      if (kind === 'entity' && (typeof type !== 'string' || type.trim().length === 0)) {
+        return errorResult('type is required for entity records: it is the entity schema name.');
+      }
+      const input: IngestBatchInput = kind === 'entity' ? { kind, type: type as string, records } : { kind, records };
+      try {
+        return textResult(await validateIngestBatch({ organizationId: auth.organizationId, projectId: auth.projectId, input }));
+      } catch (error) {
+        if (error instanceof EmptyIngestBatchError || error instanceof IngestBatchTooLargeError) {
+          return errorResult(error.message);
+        }
+        throw error;
       }
     }),
   );
