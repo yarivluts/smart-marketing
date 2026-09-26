@@ -3,6 +3,7 @@ import type {
   SetupEnvironmentHealth,
   SetupHealthReport,
   SetupRecommendation,
+  SetupRequirement,
   SetupRequirementEnvironmentResult,
   SetupRequirementId,
   SetupSchemaEvidence,
@@ -189,13 +190,36 @@ function connectedElsewhere(report: SetupHealthReport, focus: SetupEnvironmentHe
     .map((environment) => environment.environmentName);
 }
 
+/**
+ * The steps that connect one requirement from where it stands. Rejected records: read their reasons
+ * first. Schemas already registered but silent: registering is done, so the register steps are
+ * dropped and the send step leads, naming the registered schemas (B27). Otherwise every step.
+ */
+function stepsFor(requirement: SetupRequirement, result: SetupRequirementEnvironmentResult, environmentName: string): readonly SetupRecommendation[] {
+  if (result.status === 'error') {
+    return [SETUP_REJECTED_RECORDS_RECOMMENDATION, ...requirement.recommendations];
+  }
+  if (result.silentRegisteredSchemas.length === 0) {
+    return requirement.recommendations;
+  }
+  const remaining = requirement.recommendations.filter((step) => !step.registersSchema);
+  const send = remaining.find((step) => step.kind === 'api_endpoint');
+  if (!send) {
+    return remaining;
+  }
+  const names = result.silentRegisteredSchemas.map((name) => `"${name}"`).join(', ');
+  const already = result.silentRegisteredSchemas.length === 1 ? 'is already registered' : 'are already registered';
+  const lead: SetupRecommendation = { ...send, action: `${names} ${already}; nothing has arrived for it in ${environmentName} yet, so no registration is needed - send the records. ${send.action}` };
+  return [lead, ...remaining.filter((step) => step !== send)];
+}
+
 /** `audit_installation_gaps`: every requirement not connected in the focus environment, with its cost and the steps to connect it. */
 export function buildInstallationGapsOutput(report: SetupHealthReport, focus: SetupEnvironmentHealth, context: SetupOutputContext) {
   const gaps = focus.requirements
     .filter((result) => result.status !== 'connected')
     .map((result) => {
       const requirement = getSetupRequirement(result.requirementId);
-      const steps = result.status === 'error' ? [SETUP_REJECTED_RECORDS_RECOMMENDATION, ...requirement.recommendations] : requirement.recommendations;
+      const steps = stepsFor(requirement, result, focus.environmentName);
       return {
         requirement_id: requirement.id,
         title: requirement.title,

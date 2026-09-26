@@ -46,10 +46,16 @@ export type SetupRequirementImportance = 'core' | 'recommended';
  * use `:orgId`/`:projectId` placeholders and never carry a host - the host is the deployment's own
  * configured base URL, filled in by whoever renders the step.
  */
-export type SetupRecommendation =
+/**
+ * `registersSchema`: the step's job is to register the requirement's schema. Dropped from a gap
+ * whose schemas are already registered but silent - telling an integrator to register what exists
+ * invites a duplicate and reads as "setup incomplete" (B27).
+ */
+export type SetupRecommendation = (
   | { kind: 'web_page'; path: string; action: string }
   | { kind: 'api_endpoint'; method: 'GET' | 'POST'; path: string; action: string }
-  | { kind: 'mcp_tool'; tool: string; action: string };
+  | { kind: 'mcp_tool'; tool: string; action: string }
+) & { registersSchema?: true };
 
 export interface SetupRequirement {
   id: SetupRequirementId;

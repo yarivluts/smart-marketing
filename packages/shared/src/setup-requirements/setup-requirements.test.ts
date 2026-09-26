@@ -128,6 +128,45 @@ describe('a wrong name-based inference is visible, never a bare "connected"', ()
   });
 });
 
+describe('B27: a gap whose schemas are registered but silent is told to send, not to register again', () => {
+  function adSpendGap(observations: SetupSchemaObservation[]) {
+    const report = deriveSetupHealth([{ id: 'env-dev', name: 'dev' }], observations);
+    const output = buildInstallationGapsOutput(report, report.environments[0], CONTEXT);
+    return output.gaps.find((gap) => gap.requirement_id === 'ad_spend')!;
+  }
+
+  it('drops the register steps and leads with sending to the registered schemas', () => {
+    const gap = adSpendGap([observation({ schemaName: 'ad_spend', kind: 'measure' }), observation({ schemaName: 'campaign_spend_daily', kind: 'measure' })]);
+    expect(gap.how_to_fix).toHaveLength(1);
+    expect(gap.how_to_fix[0].api_endpoint).toBe('POST https://api.example.test/v1/ingest/measures');
+    expect(gap.how_to_fix[0].action).toMatch(/^"ad_spend", "campaign_spend_daily" are already registered; nothing has arrived for it in dev yet/);
+    expect(gap.how_to_fix.some((step) => step.mcp_tool === 'register_schema' || step.web_page_url?.includes('/plugins'))).toBe(false);
+  });
+
+  it('still offers registration when nothing is registered yet', () => {
+    const gap = adSpendGap([]);
+    expect(gap.how_to_fix.map((step) => step.mcp_tool ?? step.web_page_url ?? step.api_endpoint)).toEqual([
+      'https://web.example.test/en/orgs/JGTxet9aGXV6xUPWYidR/projects/LYierelkF0eKnLmIrS9u/plugins',
+      'register_schema',
+      'POST https://api.example.test/v1/ingest/measures',
+    ]);
+  });
+
+  it('rejected records still lead with their reasons, whatever is registered', () => {
+    const gap = adSpendGap([observation({ schemaName: 'ad_spend', kind: 'measure', openQuarantinedCount: 2, quarantineReasons: ['missing_field:value'] })]);
+    expect(gap.status).toBe('error');
+    expect(gap.how_to_fix[0].web_page_url).toContain('/ingest-health');
+  });
+
+  it('keeps every requirement that has a register step also a send step to lead with', () => {
+    for (const requirement of SETUP_REQUIREMENTS) {
+      if (requirement.recommendations.some((step) => step.registersSchema)) {
+        expect(requirement.recommendations.some((step) => !step.registersSchema && step.kind === 'api_endpoint')).toBe(true);
+      }
+    }
+  });
+});
+
 describe('B1: status comes from accepted ingest records, per environment, never from a flag', () => {
   const environments = [
     { id: 'env-dev', name: 'dev' },
