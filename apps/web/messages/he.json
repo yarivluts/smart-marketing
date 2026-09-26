@@ -1374,6 +1374,7 @@
       "off_track": "לא בקצב"
     },
     "goalMetLabel": "עומד ביעד כרגע: {met}",
+    "pausedBadge": "מושהה",
     "yes": "כן",
     "no": "לא",
     "actualValueLabel": "בפועל",
@@ -2120,6 +2121,7 @@
     "kpiOverallConversion": "יחס המרה כולל",
     "kpiLowSample": "{count, plural, one {מבוסס על אדם אחד - מעט מדי כדי להסתמך עליו} other {מבוסס על # אנשים - מעט מדי כדי להסתמך עליו}}",
     "kpiGoalsOnTrack": "יעדים במסלול",
+    "kpiGoalsPaused": "{count, plural, one {יעד מושהה אחד לא נספר} other {# יעדים מושהים לא נספרים}}",
     "kpiM1Retention": "שימור ממוצע חודש 1",
     "kpiConversionVelocity": "מהירות המרה",
     "kpiPaybackRevenue": "הכנסות החזר 40 יום",

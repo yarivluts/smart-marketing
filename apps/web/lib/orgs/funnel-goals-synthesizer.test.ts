@@ -10,7 +10,36 @@ import {
   buildQualityCalibration,
   getHeatmapCellColor,
   buildFunnelGoalsCockpitData,
+  summarizeGoals,
+  type UnifiedGoalItem,
 } from './funnel-goals-synthesizer';
+
+/** A measured, on-track goal - the shape a paused goal must NOT be counted as (KAN-213). */
+const MEASURED_ON_TRACK_ITEM: UnifiedGoalItem = {
+  id: 'g-1',
+  name: 'Lift landing page conversion to 8%',
+  metricName: 'lp_conversion_rate',
+  direction: 'maximize',
+  targetValue: 0.08,
+  rangeMin: null,
+  rangeMax: null,
+  startDate: '2026-09-01',
+  deadline: '2026-12-31',
+  rhythm: 'even',
+  ownerPersonId: 'person-1',
+  ownerName: 'Owner',
+  actualValue: 1,
+  expectedAtNow: 0.02,
+  projectedFinalValue: 1,
+  percentFilled: 100,
+  status: 'on_track',
+  statusColor: 'green',
+  isGoalMet: true,
+  elapsedFraction: 0.2,
+  daysRemaining: 90,
+  isPaused: false,
+  progressKind: 'ok',
+};
 import type { GoalModel, GoalProgressOutcome } from '@growthos/firebase-orm-models';
 
 /*
@@ -204,9 +233,25 @@ describe('funnel-goals-synthesizer', () => {
         onTrackCount: 0,
         atRiskCount: 0,
         offTrackCount: 0,
+        pausedGoalsCount: 0,
         averageProgressPct: null,
         activeGoalsCount: 0,
       });
+    });
+
+    /*
+      KAN-213 (EasySign): its only goal was paused, and the page read "Goals on Track 1/1". A paused
+      goal is not being pursued - it is listed and marked, but outside every pace count.
+    */
+    it('keeps a paused goal out of every pace count, even when it was measured', () => {
+      const paused = summarizeGoals([{ ...MEASURED_ON_TRACK_ITEM, id: 'g-paused', isPaused: true }]);
+      expect(paused).toMatchObject({ totalGoalsCount: 1, activeGoalsCount: 0, pausedGoalsCount: 1, measuredGoalsCount: 0, onTrackCount: 0 });
+
+      const mixed = summarizeGoals([
+        { ...MEASURED_ON_TRACK_ITEM, id: 'g-paused', isPaused: true },
+        { ...MEASURED_ON_TRACK_ITEM, id: 'g-live', isPaused: false },
+      ]);
+      expect(mixed).toMatchObject({ totalGoalsCount: 2, activeGoalsCount: 1, pausedGoalsCount: 1, measuredGoalsCount: 1, onTrackCount: 1 });
     });
 
     it('carries measured progress through unchanged', () => {
@@ -367,6 +412,7 @@ describe('funnel-goals-synthesizer', () => {
         activeGoalsCount: 0,
         goalsMeasuredCount: 0,
         goalsOnTrackCount: 0,
+        goalsPausedCount: 0,
         avgMonth1RetentionPct: null,
         avgConversionVelocityDays: null,
         total40dPaybackUsd: null,

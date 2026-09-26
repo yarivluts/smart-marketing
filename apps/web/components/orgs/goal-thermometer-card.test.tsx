@@ -29,6 +29,7 @@ const mockGoal: UnifiedGoalItem = {
   isGoalMet: false,
   elapsedFraction: 0.6,
   daysRemaining: 30,
+  isPaused: false,
   progressKind: 'ok',
 };
 
@@ -52,6 +53,14 @@ beforeEach(() => {
 });
 
 describe('GoalThermometerCard Component', () => {
+  /* KAN-213: a paused goal shows "Paused" - never a pace badge or a Copilot callout. */
+  it('marks a paused goal as paused, with no pace status or optimization callout', () => {
+    renderWithIntl(<GoalThermometerCard orgId="org-1" projectId="p-1" goal={{ ...mockAtRiskGoal, id: 'goal-paused', isPaused: true }} onOptimizeRequested={() => undefined} />);
+    expect(screen.getByTestId('goal-paused-goal-paused')).toHaveTextContent('Paused');
+    expect(screen.queryByTestId('goal-status-goal-paused')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('goal-rec-card-goal-paused')).not.toBeInTheDocument();
+  });
+
   it('renders goal name, status badge, progress bar, and linear statistical projection', () => {
     renderWithIntl(
       <GoalThermometerCard

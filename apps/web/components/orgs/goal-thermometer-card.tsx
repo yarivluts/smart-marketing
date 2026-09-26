@@ -70,7 +70,8 @@ export function GoalThermometerCard({
     goal's window yet, warehouse not configured, a failed query - shows the reason and the goal's
     own target, never a 0 actual with a pace judged against it.
   */
-  const isMeasured = goal.progressKind === 'ok' && goal.status !== null;
+  // A paused goal has no pace to judge: no status badge, no Copilot callout (KAN-213).
+  const isMeasured = goal.progressKind === 'ok' && goal.status !== null && !goal.isPaused;
   const style = goal.status ? STATUS_BADGE_STYLES[goal.status] : STATUS_BADGE_STYLES.on_track;
   const percentFilled = goal.percentFilled ?? 0;
 
@@ -126,6 +127,11 @@ export function GoalThermometerCard({
             <h3 className="text-base font-bold text-foreground">{goal.name}</h3>
           </div>
 
+          {goal.isPaused ? (
+            <span data-testid={`goal-paused-${goal.id}`} className="inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+              {t('pausedBadge')}
+            </span>
+          ) : null}
           {isMeasured && goal.status ? (
             <div className="flex items-center gap-2">
               <span

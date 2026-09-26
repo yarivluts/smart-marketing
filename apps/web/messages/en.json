@@ -1374,6 +1374,7 @@
       "off_track": "Off track"
     },
     "goalMetLabel": "Currently met: {met}",
+    "pausedBadge": "Paused",
     "yes": "Yes",
     "no": "No",
     "actualValueLabel": "Actual",
@@ -2120,6 +2121,7 @@
     "kpiOverallConversion": "Overall Funnel Conv.",
     "kpiLowSample": "{count, plural, one {Based on # person - too few to rely on} other {Based on # people - too few to rely on}}",
     "kpiGoalsOnTrack": "Goals on Track",
+    "kpiGoalsPaused": "{count, plural, one {# paused goal not counted} other {# paused goals not counted}}",
     "kpiM1Retention": "M1 Avg Retention",
     "kpiConversionVelocity": "Conversion Velocity",
     "kpiPaybackRevenue": "40d Payback Rev",

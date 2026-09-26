@@ -174,6 +174,12 @@ describe('FunnelGoalsDashboard Component', () => {
       B22 (EasySign): its first real funnel had 4 entrants. The rate is real but must say how
       little it rests on, and nothing may recommend acting on it.
     */
+    it('says a paused goal is not counted in Goals on Track (KAN-213)', () => {
+      const cockpit = buildFunnelGoalsCockpitData({ funnelOutcome: REAL_FUNNEL, goals: [] });
+      renderDashboard({ ...cockpit, summary: { ...cockpit.summary, goalsPausedCount: 1 } });
+      expect(screen.getByTestId('kpi-goals-paused')).toHaveTextContent('1 paused goal not counted');
+    });
+
     it('marks a rate on a handful of people and raises no alert or recommendation on it', () => {
       const tiny = { ...REAL_FUNNEL, steps: REAL_FUNNEL.steps.map((step, i) => ({ ...step, customerCount: [4, 2, 2][i] })) };
       renderDashboard(buildFunnelGoalsCockpitData({ funnelOutcome: tiny, goals: [] }));

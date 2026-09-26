@@ -141,6 +141,7 @@ export function CreateGoalModal({
         isGoalMet: null,
         elapsedFraction: computeElapsedFraction(startDate, created.deadline, new Date().toISOString().slice(0, 10), rhythm),
         daysRemaining: calculateDaysRemaining(created.deadline),
+        isPaused: false,
       };
       onGoalCreated?.(newGoal);
       onClose();
