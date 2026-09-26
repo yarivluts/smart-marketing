@@ -8,9 +8,14 @@ import { Input } from '@/components/ui/input';
 import {
   COMPARE_PERIODS,
   METRIC_FILTER_OPERATORS,
+  RELATIVE_DATE_PRESETS,
   TIME_GRAINS,
+  resolveDateRangeSetting,
+  resolveRelativeDatePreset,
   type ComparePeriodRow,
+  type DateRangeSettingRow,
   type GlobalFilterRow,
+  type RelativeDatePresetRow,
   type TimeGrainRow,
 } from './board-types';
 
@@ -19,12 +24,17 @@ export interface BoardSettingsFormProps {
   projectId: string;
   boardId: string;
   initialName: string;
-  initialDateRange: { start: string; end: string; grain: TimeGrainRow };
+  /** The board's stored range (KAN-211): a rolling preset, or fixed dates (a legacy kind-less `{ start, end, grain }` reads as fixed). */
+  initialDateRange: DateRangeSettingRow;
+  /** Today's UTC date as the server resolved it, so a preset's "right now" preview matches the tiles on the page. */
+  today: string;
   initialCompare?: ComparePeriodRow;
   initialGlobalFilters: GlobalFilterRow[];
 }
 
 const NO_COMPARE = 'none';
+/** The range picker's one non-preset choice: fixed start/end dates. */
+const CUSTOM_RANGE = 'custom';
 
 function blankFilterRow(): GlobalFilterRow {
   return { field: '', operator: '=', value: '' };
@@ -37,15 +47,31 @@ export function BoardSettingsForm({
   boardId,
   initialName,
   initialDateRange,
+  today,
   initialCompare,
   initialGlobalFilters,
 }: BoardSettingsFormProps): React.ReactElement {
   const t = useTranslations('Boards');
   const router = useRouter();
+  const initialResolved = resolveDateRangeSetting(initialDateRange, today);
   const [name, setName] = useState(initialName);
-  const [start, setStart] = useState(initialDateRange.start);
-  const [end, setEnd] = useState(initialDateRange.end);
+  const [rangeChoice, setRangeChoice] = useState<RelativeDatePresetRow | typeof CUSTOM_RANGE>(
+    initialDateRange.kind === 'relative' ? initialDateRange.preset : CUSTOM_RANGE,
+  );
+  const [start, setStart] = useState(initialResolved.start);
+  const [end, setEnd] = useState(initialResolved.end);
   const [grain, setGrain] = useState<TimeGrainRow>(initialDateRange.grain);
+  const presetWindow = rangeChoice === CUSTOM_RANGE ? null : resolveRelativeDatePreset(rangeChoice, today);
+
+  function chooseRange(choice: RelativeDatePresetRow | typeof CUSTOM_RANGE): void {
+    // Switching to fixed dates starts from the window the preset shows today, so "freeze what I see"
+    // is one click rather than retyping both dates.
+    if (choice === CUSTOM_RANGE && presetWindow) {
+      setStart(presetWindow.start);
+      setEnd(presetWindow.end);
+    }
+    setRangeChoice(choice);
+  }
   const [compare, setCompare] = useState<ComparePeriodRow | typeof NO_COMPARE>(initialCompare ?? NO_COMPARE);
   const [filters, setFilters] = useState<GlobalFilterRow[]>(initialGlobalFilters.length > 0 ? initialGlobalFilters : []);
   const [submitting, setSubmitting] = useState(false);
@@ -58,10 +84,12 @@ export function BoardSettingsForm({
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
-    if (start > end) {
+    if (rangeChoice === CUSTOM_RANGE && (!start || !end || start > end)) {
       setError(t('invalidDateRangeError'));
       return;
     }
+    const dateRange: DateRangeSettingRow =
+      rangeChoice === CUSTOM_RANGE ? { kind: 'absolute', start, end, grain } : { kind: 'relative', preset: rangeChoice, grain };
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/boards/${boardId}`, {
@@ -69,7 +97,7 @@ export function BoardSettingsForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
-          dateRange: { start, end, grain },
+          dateRange,
           compare: compare === NO_COMPARE ? null : compare,
           globalFilters: filters.filter((filter) => filter.field.trim().length > 0),
         }),
@@ -95,17 +123,40 @@ export function BoardSettingsForm({
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" htmlFor="board-settings-start">
-            {t('dateRangeStartLabel')}
+          <label className="text-sm font-medium" htmlFor="board-settings-range">
+            {t('dateRangeLabel')}
           </label>
-          <Input id="board-settings-start" type="date" required value={start} onChange={(event) => setStart(event.target.value)} />
+          <select
+            id="board-settings-range"
+            value={rangeChoice}
+            onChange={(event) => chooseRange(event.target.value as RelativeDatePresetRow | typeof CUSTOM_RANGE)}
+            aria-describedby="board-settings-range-hint"
+            className="h-10 rounded-md border border-input bg-background px-2 text-sm"
+          >
+            {RELATIVE_DATE_PRESETS.map((preset) => (
+              <option key={preset} value={preset}>
+                {t(`dateRangePresetOption.${preset}`)}
+              </option>
+            ))}
+            <option value={CUSTOM_RANGE}>{t('dateRangeCustomOption')}</option>
+          </select>
         </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium" htmlFor="board-settings-end">
-            {t('dateRangeEndLabel')}
-          </label>
-          <Input id="board-settings-end" type="date" required value={end} onChange={(event) => setEnd(event.target.value)} />
-        </div>
+        {rangeChoice === CUSTOM_RANGE ? (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium" htmlFor="board-settings-start">
+                {t('dateRangeStartLabel')}
+              </label>
+              <Input id="board-settings-start" type="date" required value={start} onChange={(event) => setStart(event.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium" htmlFor="board-settings-end">
+                {t('dateRangeEndLabel')}
+              </label>
+              <Input id="board-settings-end" type="date" required value={end} onChange={(event) => setEnd(event.target.value)} />
+            </div>
+          </>
+        ) : null}
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium" htmlFor="board-settings-grain">
             {t('grainLabel')}
@@ -142,6 +193,9 @@ export function BoardSettingsForm({
           </select>
         </div>
       </div>
+      <p id="board-settings-range-hint" className="-mt-2 text-xs text-muted-foreground">
+        {presetWindow ? t('dateRangeRelativeHint', { start: presetWindow.start, end: presetWindow.end }) : t('dateRangeCustomHint')}
+      </p>
 
       <div className="flex flex-col gap-2">
         <span className="text-sm font-medium">{t('globalFiltersLabel')}</span>

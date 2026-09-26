@@ -53,7 +53,8 @@ describe('parseUpdateBoardSettingsRequestBody', () => {
     );
     expect(parsed).toEqual({
       name: 'Revenue',
-      dateRange: { start: '2026-01-01', end: '2026-01-31', grain: 'week' },
+      // The legacy kind-less shape still parses, as the absolute range it always meant.
+      dateRange: { kind: 'absolute', start: '2026-01-01', end: '2026-01-31', grain: 'week' },
       compare: 'previous_year',
       globalFilters: [{ field: 'channel', operator: '=', value: 'google' }],
     });
@@ -69,6 +70,15 @@ describe('parseUpdateBoardSettingsRequestBody', () => {
     expect(
       (await parseUpdateBoardSettingsRequestBody(request({ dateRange: { start: '2026-01-01', end: '2026-01-31', grain: 'decade' } }))).error?.status,
     ).toBe(400);
+    expect((await parseUpdateBoardSettingsRequestBody(request({ dateRange: { kind: 'relative', preset: 'last_2_days', grain: 'day' } }))).error?.status).toBe(400);
+    expect((await parseUpdateBoardSettingsRequestBody(request({ dateRange: { kind: 'rolling', preset: 'last_7_days', grain: 'day' } }))).error?.status).toBe(400);
+  });
+
+  it('accepts a relative preset (KAN-211), keeping only the relative fields', async () => {
+    const parsed = await parseUpdateBoardSettingsRequestBody(
+      request({ dateRange: { kind: 'relative', preset: 'last_30_days', grain: 'day', start: '2026-01-01', end: '2026-01-31' } }),
+    );
+    expect(parsed).toEqual({ dateRange: { kind: 'relative', preset: 'last_30_days', grain: 'day' } });
   });
 
   it('accepts an explicit null compare (clears it) and rejects an unknown compare value', async () => {

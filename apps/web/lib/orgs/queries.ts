@@ -808,10 +808,17 @@ export async function queryBoardTiles(
   organizationId: string,
   projectId: string,
   board: Pick<BoardModel, 'date_range' | 'compare' | 'global_filters' | 'tiles'>,
-  options?: EnvironmentScope,
+  /** `today` (UTC `YYYY-MM-DD`) pins what a relative board range resolves against — the board page passes the same value it shows in the settings form. */
+  options?: EnvironmentScope & { today?: string },
 ): Promise<BoardTileQueryOutcome[]> {
   await ensureFirestoreOrm();
-  return queryBoardTilesInOrganization({ organizationId, projectId, board, ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}) });
+  return queryBoardTilesInOrganization({
+    organizationId,
+    projectId,
+    board,
+    ...(options?.environmentId !== undefined ? { environmentId: options.environmentId } : {}),
+    ...(options?.today !== undefined ? { today: options.today } : {}),
+  });
 }
 
 /** How far back the campaign detail page's spend panel looks — 28 days, the same window ad platforms themselves default to. */

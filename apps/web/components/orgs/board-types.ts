@@ -14,8 +14,15 @@
 // `INVITABLE_ROLES`) from it directly, so re-declaring those same three
 // vocabularies here too would just be a second copy to keep in sync by
 // hand — re-exported from there instead.
-export { TIME_GRAINS, COMPARE_PERIODS, METRIC_FILTER_OPERATORS } from '@growthos/shared';
-export type { TimeGrain as TimeGrainRow, ComparePeriod as ComparePeriodRow, MetricFilterOperator as MetricFilterOperatorRow, CompilerFilter as GlobalFilterRow } from '@growthos/shared';
+export { TIME_GRAINS, COMPARE_PERIODS, METRIC_FILTER_OPERATORS, RELATIVE_DATE_PRESETS, resolveDateRangeSetting, resolveRelativeDatePreset } from '@growthos/shared';
+export type {
+  TimeGrain as TimeGrainRow,
+  ComparePeriod as ComparePeriodRow,
+  MetricFilterOperator as MetricFilterOperatorRow,
+  CompilerFilter as GlobalFilterRow,
+  DateRangeSetting as DateRangeSettingRow,
+  RelativeDatePreset as RelativeDatePresetRow,
+} from '@growthos/shared';
 
 export const BOARD_TILE_TYPES = ['line', 'bar', 'big_number', 'table', 'funnel', 'heatmap', 'histogram'] as const;
 export type BoardTileTypeRow = (typeof BOARD_TILE_TYPES)[number];

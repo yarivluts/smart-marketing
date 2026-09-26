@@ -47,6 +47,48 @@ export function formatBucketLabels(buckets: readonly string[], locale: string): 
   return parsed.map((date) => format.format(date));
 }
 
+/** One drawable point of a series: a bucket with a real value, and its position in the series. */
+export interface PresentPoint {
+  bucket: string;
+  value: number;
+  index: number;
+}
+
+/**
+ * Splits a series at its gaps (`null`, "no value" for that bucket) into runs of consecutive real
+ * points. A line is drawn per run, so a chart never draws a straight line across a bucket that had
+ * no value - which would claim a trend nobody measured.
+ */
+export function splitAtGaps(points: readonly { bucket: string; value: number | null }[]): PresentPoint[][] {
+  const runs: PresentPoint[][] = [];
+  let current: PresentPoint[] = [];
+  points.forEach((point, index) => {
+    if (point.value === null) {
+      if (current.length > 0) {
+        runs.push(current);
+      }
+      current = [];
+      return;
+    }
+    current.push({ bucket: point.bucket, value: point.value, index });
+  });
+  if (current.length > 0) {
+    runs.push(current);
+  }
+  return runs;
+}
+
+/** The newest point with a real value (a legend's "latest" figure) - a trailing gap is not a reading. */
+export function latestPresentPoint(points: readonly { bucket: string; value: number | null }[]): PresentPoint | undefined {
+  for (let index = points.length - 1; index >= 0; index -= 1) {
+    const value = points[index].value;
+    if (value !== null) {
+      return { bucket: points[index].bucket, value, index };
+    }
+  }
+  return undefined;
+}
+
 function allIndexes(count: number): Set<number> {
   return new Set(Array.from({ length: count }, (_, index) => index));
 }
@@ -56,12 +98,14 @@ function allIndexes(count: number): Set<number> {
  * collide, so only its peak and its latest point are labelled. Every value stays available
  * regardless, in the chart's screen-reader table and per-mark tooltip.
  */
-export function labeledValueIndexes(values: readonly number[]): Set<number> {
-  if (values.length <= MAX_FULLY_LABELED_POINTS) {
-    return allIndexes(values.length);
+export function labeledValueIndexes(values: readonly (number | null)[]): Set<number> {
+  // A `null` is a gap ("no value" for that bucket) - there is no mark to label there.
+  const present = values.flatMap((value, index) => (value === null ? [] : [index]));
+  if (values.length <= MAX_FULLY_LABELED_POINTS || present.length === 0) {
+    return new Set(present);
   }
-  const peak = values.reduce((best, value, index) => (value > values[best] ? index : best), 0);
-  return new Set([peak, values.length - 1]);
+  const peak = present.reduce((best, index) => ((values[index] as number) > (values[best] as number) ? index : best), present[0]);
+  return new Set([peak, present[present.length - 1]]);
 }
 
 /**

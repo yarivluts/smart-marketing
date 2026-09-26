@@ -5,7 +5,15 @@ import type {
   BoardTileType,
   WarehouseRow,
 } from '@growthos/firebase-orm-models';
-import type { ComparePeriod } from '@growthos/shared';
+import {
+  DEFAULT_RELATIVE_DATE_RANGE,
+  normalizeDateRangeSetting,
+  resolveDateRangeSetting,
+  todayUtcDateOnly,
+  type ComparePeriod,
+  type DateRangeSetting,
+  type ResolvedDateRange,
+} from '@growthos/shared';
 
 /** A board's own list-page card — never sends the full `@arbel/firebase-orm` model instance to a client component. */
 export interface BoardSummaryView {
@@ -23,18 +31,23 @@ export function toBoardSummaryView(board: BoardModel): BoardSummaryView {
 export interface BoardView {
   id: string;
   name: string;
-  dateRange: BoardModel['date_range'];
+  /** The stored setting (KAN-211), normalized: always carries its `kind`, so a legacy `{ start, end, grain }` board arrives as `kind: 'absolute'`. */
+  dateRange: DateRangeSetting;
+  /** The concrete window `dateRange` means today (UTC) — what the tiles on the page were queried over. */
+  resolvedDateRange: ResolvedDateRange;
   /** `undefined`, never `null` — this view's own conditional-spread construction (`toBoardView`) omits the key entirely rather than including an explicit `null` (unlike `BoardModel.compare` itself, whose stored `null` has its own storage-layer reason — see that field's own doc comment). */
   compare?: ComparePeriod;
   globalFilters: BoardModel['global_filters'];
   tiles: BoardTile[];
 }
 
-export function toBoardView(board: BoardModel): BoardView {
+export function toBoardView(board: BoardModel, today: string = todayUtcDateOnly()): BoardView {
+  const dateRange = normalizeDateRangeSetting(board.date_range) ?? { ...DEFAULT_RELATIVE_DATE_RANGE };
   return {
     id: board.id,
     name: board.name,
-    dateRange: board.date_range,
+    dateRange,
+    resolvedDateRange: resolveDateRangeSetting(dateRange, today),
     ...(board.compare ? { compare: board.compare } : {}),
     globalFilters: board.global_filters,
     tiles: board.tiles,
@@ -43,7 +56,12 @@ export function toBoardView(board: BoardModel): BoardView {
 
 export interface TimeSeriesPoint {
   bucket: string;
-  value: number;
+  /**
+   * `null` is "no value" for this bucket — an avg/ratio/formula metric over a bucket with no events
+   * (the query layer fills count/sum buckets with a real 0 instead, see `fillEmptyBuckets`). Charts
+   * draw it as a gap and never interpolate across it; it is not a 0.
+   */
+  value: number | null;
 }
 
 export interface TimeSeries {
@@ -182,7 +200,8 @@ function buildSeries(rows: readonly WarehouseRow[], tile: BoardTile): TimeSeries
   for (const row of rows) {
     const key = groupKey(row, tile.dimensions);
     const group = byGroup.get(key) ?? { label: groupLabel(row, tile.dimensions), points: [] };
-    group.points.push({ bucket: String(row.bucket_date ?? ''), value: toNumber(row[metricName] ?? null) });
+    const raw = row[metricName] ?? null;
+    group.points.push({ bucket: String(row.bucket_date ?? ''), value: raw === null ? null : toNumber(raw) });
     byGroup.set(key, group);
   }
   return [...byGroup.values()]
@@ -324,7 +343,8 @@ function contentIsEmpty(content: TileContent, currentRowCount: number): boolean 
     case 'funnel':
       return currentRowCount === 0;
     case 'time_series':
-      return content.series.length === 0 || content.series.every((series) => series.points.length === 0);
+      // A series of nothing but gaps (every bucket "no value") has nothing to draw either.
+      return content.series.length === 0 || content.series.every((series) => series.points.every((point) => point.value === null));
     case 'table':
       return content.rows.length === 0;
     case 'heatmap':

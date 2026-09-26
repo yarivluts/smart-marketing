@@ -96,10 +96,30 @@ describe('BoardTileView', () => {
         // each array's own independent index, "meta" (current, index 1)
         // and "google" (previous, index 0) would wrongly share a color.
         series: [
-          { label: 'google', points: [{ bucket: '2026-01-01', value: 10 }] },
-          { label: 'meta', points: [{ bucket: '2026-01-01', value: 5 }] },
+          {
+            label: 'google',
+            points: [
+              { bucket: '2026-01-01', value: 10 },
+              { bucket: '2026-01-02', value: 12 },
+            ],
+          },
+          {
+            label: 'meta',
+            points: [
+              { bucket: '2026-01-01', value: 5 },
+              { bucket: '2026-01-02', value: 6 },
+            ],
+          },
         ],
-        previousSeries: [{ label: 'google', points: [{ bucket: '2025-12-01', value: 8 }] }],
+        previousSeries: [
+          {
+            label: 'google',
+            points: [
+              { bucket: '2025-12-30', value: 8 },
+              { bucket: '2025-12-31', value: 9 },
+            ],
+          },
+        ],
         isEmpty: false,
         freshness: null,
       },
@@ -129,6 +149,84 @@ describe('BoardTileView', () => {
     );
     expect(screen.getByText('Previous period')).toBeInTheDocument();
     expect(screen.getByTitle('2025-12-01: 8')).toBeInTheDocument();
+  });
+
+  describe('gaps - a bucket with no value (KAN-210 follow-up)', () => {
+    const withGap = [
+      { bucket: '2026-09-23', value: 1 },
+      { bucket: '2026-09-24', value: null },
+      { bucket: '2026-09-25', value: 3 },
+      { bucket: '2026-09-26', value: 4 },
+    ];
+
+    it('a line breaks at a gap instead of drawing straight across it', () => {
+      const { container } = renderTile(
+        { kind: 'time_series', chart: 'line', series: [{ label: 'all', points: withGap }], isEmpty: false, freshness: null },
+        { type: 'line', title: 'CAC' },
+      );
+      const lines = container.querySelectorAll('polyline');
+      // Only the 9/25-9/26 run is a line; 9/23 stands alone (drawn as its labelled dot), and nothing
+      // connects 9/23 to 9/25.
+      expect(lines).toHaveLength(1);
+      expect(lines[0].getAttribute('points')?.split(' ')).toHaveLength(2);
+      const table = screen.getByRole('table', { name: 'CAC' });
+      expect(within(table).getByRole('row', { name: '2026-09-24 No value' })).toBeInTheDocument();
+    });
+
+    it('a lone value between two gaps is still drawn, as a dot, when it carries no label', () => {
+      const lone = [
+        { bucket: '2026-09-23', value: null },
+        { bucket: '2026-09-24', value: 2 },
+        { bucket: '2026-09-25', value: null },
+      ];
+      const { container } = renderTile(
+        {
+          kind: 'time_series',
+          chart: 'line',
+          series: [
+            { label: 'google', points: lone },
+            { label: 'meta', points: lone },
+          ],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'line' },
+      );
+      expect(container.querySelectorAll('polyline')).toHaveLength(0);
+      expect(container.querySelectorAll('[data-testid="series-dot"]')).toHaveLength(2);
+    });
+
+    it('a bar tile leaves an empty, labelled slot for a gap rather than a zero-height bar', () => {
+      const { container } = renderTile(
+        { kind: 'time_series', chart: 'bar', series: [{ label: 'all', points: withGap }], isEmpty: false, freshness: null },
+        { type: 'bar', title: 'CAC' },
+      );
+      expect(container.querySelectorAll('[data-testid="series-bar"]')).toHaveLength(3);
+      expect(screen.getByTitle('2026-09-24: no value')).toHaveAttribute('data-testid', 'series-bar-gap');
+    });
+
+    it('a real zero is still a bar and a point, never a gap', () => {
+      const { container } = renderTile(
+        {
+          kind: 'time_series',
+          chart: 'bar',
+          series: [
+            {
+              label: 'all',
+              points: [
+                { bucket: '2026-09-24', value: 0 },
+                { bucket: '2026-09-25', value: 2 },
+              ],
+            },
+          ],
+          isEmpty: false,
+          freshness: null,
+        },
+        { type: 'bar' },
+      );
+      expect(container.querySelectorAll('[data-testid="series-bar"]')).toHaveLength(2);
+      expect(container.querySelectorAll('[data-testid="series-bar-gap"]')).toHaveLength(0);
+    });
   });
 
   describe('readable time-series labels (KAN-210)', () => {

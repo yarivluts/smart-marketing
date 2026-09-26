@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { buildSessionReplayLink, sessionReplayTemplateFiltersByPage } from '@growthos/shared';
 import type { TileFreshness, TileRenderView, TimeSeries, TimeSeriesPoint } from '@/lib/orgs/board-view';
-import { formatBucketLabels, labeledAxisIndexes, labeledValueIndexes } from '@/lib/orgs/chart-labels';
+import { formatBucketLabels, labeledAxisIndexes, labeledValueIndexes, latestPresentPoint, splitAtGaps } from '@/lib/orgs/chart-labels';
 import { SERIES_STROKE_COLORS, type BoardTileRow } from './board-types';
 
 export interface BoardTileViewProps {
@@ -27,6 +27,12 @@ const SERIES_COLOR_CLASSES = ['bg-primary', 'bg-blue-500', 'bg-amber-500', 'bg-e
 function formatNumber(value: number, locale?: string): string {
   return new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
 }
+
+/** The largest real value across every series (gaps ignored), floored at 1 so an all-zero chart still has a scale. */
+function maxSeriesValue(series: readonly TimeSeries[]): number {
+  return Math.max(1, ...series.flatMap((entry) => entry.points.flatMap((point) => (point.value === null ? [] : [point.value]))));
+}
+
 
 /**
  * One color index per distinct series *label*, assigned from `view.series`
@@ -114,7 +120,7 @@ function SeriesDataTable({ caption, points, locale }: { caption: string; points:
         {points.map((point) => (
           <tr key={point.bucket}>
             <th scope="row">{point.bucket}</th>
-            <td>{formatNumber(point.value, locale)}</td>
+            <td>{point.value === null ? t('chartNoValue') : formatNumber(point.value, locale)}</td>
           </tr>
         ))}
       </tbody>
@@ -140,8 +146,7 @@ function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('timeSeriesEmpty')}</p>;
   }
-  const allSeries = [...view.series, ...(view.previousSeries ?? [])];
-  const maxValue = Math.max(1, ...allSeries.flatMap((series) => series.points.map((point) => point.value)));
+  const maxValue = maxSeriesValue([...view.series, ...(view.previousSeries ?? [])]);
   const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
 
   // Current-period points are placed by their bucket's position on one shared axis, so two series
@@ -157,12 +162,34 @@ function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 
   function yPct(value: number): number {
     return 100 - (value / maxValue) * 100;
   }
-  function currentX(point: TimeSeriesPoint): number {
+  function currentX(point: { bucket: string }): number {
     return xPct(bucketIndex.get(point.bucket) ?? 0, buckets.length);
   }
   function colorFor(label: string): string {
     return SERIES_STROKE_COLORS[(colorIndexByLabel.get(label) ?? 0) % SERIES_STROKE_COLORS.length];
   }
+
+  // Each series is drawn as one line per run of consecutive real values: a gap ("no value") breaks
+  // the line rather than being bridged, and a value with gaps on both sides - a run of one - is
+  // drawn as a dot, since a one-point polyline draws nothing.
+  const lines = [
+    ...(view.previousSeries ?? []).flatMap((series) =>
+      splitAtGaps(series.points).map((run, runIndex) => ({
+        key: `previous-${series.label}-${runIndex}`,
+        coords: run.map((point) => ({ x: xPct(point.index, series.points.length), y: yPct(point.value) })),
+        color: colorFor(series.label),
+        previous: true,
+      })),
+    ),
+    ...view.series.flatMap((series) =>
+      splitAtGaps(series.points).map((run, runIndex) => ({
+        key: `${series.label}-${runIndex}`,
+        coords: run.map((point) => ({ x: currentX(point), y: yPct(point.value) })),
+        color: colorFor(series.label),
+        previous: false,
+      })),
+    ),
+  ];
 
   // One series labels its values on the line (all of them, or peak + latest when long). Several
   // series would collide there, so each one's latest value goes in the legend beside its name instead.
@@ -170,11 +197,16 @@ function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 
   const valueLabels = isSingleSeries
     ? view.series.flatMap((series) => {
         const indexes = labeledValueIndexes(series.points.map((point) => point.value));
-        return series.points
-          .filter((_, index) => indexes.has(index))
+        return splitAtGaps(series.points)
+          .flat()
+          .filter((point) => indexes.has(point.index))
           .map((point) => ({ key: `${series.label}-${point.bucket}`, x: currentX(point), y: yPct(point.value), value: point.value, color: colorFor(series.label) }));
       })
     : [];
+  const labeledKeys = new Set(valueLabels.map((label) => `${label.x},${label.y}`));
+  const isolatedDots = lines
+    .filter((line) => line.coords.length === 1 && !labeledKeys.has(`${line.coords[0].x},${line.coords[0].y}`))
+    .map((line) => ({ key: line.key, ...line.coords[0], color: line.color, previous: line.previous }));
 
   return (
     <figure className="flex h-full flex-col gap-2" aria-label={title}>
@@ -182,29 +214,29 @@ function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 
         <div className="pt-4">
           <div className="relative h-20">
             <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full overflow-visible" preserveAspectRatio="none">
-              {(view.previousSeries ?? []).map((series) => (
-                <polyline
-                  key={`previous-${series.label}`}
-                  points={series.points.map((point, index) => `${xPct(index, series.points.length)},${yPct(point.value)}`).join(' ')}
-                  fill="none"
-                  strokeDasharray="4 3"
-                  strokeWidth={1.5}
-                  vectorEffect="non-scaling-stroke"
-                  stroke={colorFor(series.label)}
-                  opacity={0.5}
-                />
-              ))}
-              {view.series.map((series) => (
-                <polyline
-                  key={series.label}
-                  points={series.points.map((point) => `${currentX(point)},${yPct(point.value)}`).join(' ')}
-                  fill="none"
-                  strokeWidth={2}
-                  vectorEffect="non-scaling-stroke"
-                  stroke={colorFor(series.label)}
-                />
-              ))}
+              {lines
+                .filter((line) => line.coords.length > 1)
+                .map((line) => (
+                  <polyline
+                    key={line.key}
+                    data-testid="series-line"
+                    points={line.coords.map((coord) => `${coord.x},${coord.y}`).join(' ')}
+                    fill="none"
+                    strokeWidth={line.previous ? 1.5 : 2}
+                    vectorEffect="non-scaling-stroke"
+                    stroke={line.color}
+                    {...(line.previous ? { strokeDasharray: '4 3', opacity: 0.5 } : {})}
+                  />
+                ))}
             </svg>
+            {isolatedDots.map((dot) => (
+              <span
+                key={dot.key}
+                data-testid="series-dot"
+                className={`absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${dot.previous ? 'opacity-50' : ''}`}
+                style={{ left: `${dot.x}%`, top: `${dot.y}%`, backgroundColor: dot.color }}
+              />
+            ))}
             {valueLabels.map((label) => (
               <span key={label.key}>
                 <span
@@ -238,7 +270,7 @@ function LineChartView({ view, title }: { view: Extract<TileRenderView, { kind: 
       {!isSingleSeries ? (
         <ul className="flex flex-wrap gap-3 text-xs text-muted-foreground" aria-hidden="true">
           {view.series.map((series) => {
-            const latest = series.points[series.points.length - 1];
+            const latest = latestPresentPoint(series.points);
             return (
               <li key={series.label} className="flex items-center gap-1">
                 <span
@@ -329,7 +361,12 @@ function LabeledBarPlot({
   const heightPct = (value: number) => `${Math.max(2, Math.round((value / maxValue) * 100))}%`;
 
   function tooltip(point: TimeSeriesPoint | undefined): string | undefined {
-    return point ? t('barTooltip', { bucket: point.bucket, value: formatNumber(point.value, locale) }) : undefined;
+    if (!point) {
+      return undefined;
+    }
+    return point.value === null
+      ? t('barTooltipNoValue', { bucket: point.bucket })
+      : t('barTooltip', { bucket: point.bucket, value: formatNumber(point.value, locale) });
   }
 
   return (
@@ -340,16 +377,24 @@ function LabeledBarPlot({
           const previous = previousPoints?.[index];
           return (
             <div key={point?.bucket ?? `previous-${index}`} className="flex h-full min-w-0 flex-1 items-end justify-center gap-0.5">
-              {point ? (
-                <div title={tooltip(point)} className={`relative w-full max-w-8 rounded-t-sm ${colorClass}`} style={{ height: heightPct(point.value) }}>
+              {point && point.value !== null ? (
+                <div
+                  title={tooltip(point)}
+                  data-testid="series-bar"
+                  className={`relative w-full max-w-8 rounded-t-sm ${colorClass}`}
+                  style={{ height: heightPct(point.value) }}
+                >
                   {valueIndexes.has(index) ? (
                     <span className="absolute bottom-full left-1/2 mb-0.5 -translate-x-1/2 whitespace-nowrap text-[10px] font-medium leading-none tabular-nums text-foreground">
                       {formatNumber(point.value, locale)}
                     </span>
                   ) : null}
                 </div>
+              ) : point ? (
+                // "No value" for this bucket: an empty slot, not a 0-height (or 2%-stub) bar that would read as zero.
+                <div title={tooltip(point)} data-testid="series-bar-gap" className="h-full w-full max-w-8" />
               ) : null}
-              {previous ? (
+              {previous && previous.value !== null ? (
                 <div
                   title={tooltip(previous)}
                   className={`w-full max-w-8 rounded-t-sm opacity-40 ${colorClass}`}
@@ -382,8 +427,7 @@ function BarChartView({ view, title }: { view: Extract<TileRenderView, { kind: '
   if (view.isEmpty) {
     return <p className="text-xs text-muted-foreground">{t('timeSeriesEmpty')}</p>;
   }
-  const allSeries = [...view.series, ...(view.previousSeries ?? [])];
-  const maxValue = Math.max(1, ...allSeries.flatMap((series) => series.points.map((point) => point.value)));
+  const maxValue = maxSeriesValue([...view.series, ...(view.previousSeries ?? [])]);
   const colorIndexByLabel = buildColorIndexByLabel(view.series, view.previousSeries);
   const previousByLabel = new Map((view.previousSeries ?? []).map((series) => [series.label, series]));
   // Several stacked plots must share the tile's height, so each gets a shorter plot area.
