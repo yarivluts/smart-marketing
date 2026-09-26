@@ -7,6 +7,41 @@ fresh session can pick up work from this file + [TASKS.md](./TASKS.md) alone. Se
 Template for each entry:
 
 ```
+## 2026-09-26 - EasySign reference integration, round 2: funnel, goals, boards, units, drift everywhere
+
+Continued following the EasySign session (Yariv: "do everything needed to help it"). Each item was
+verified by EasySign independently against its own API/BigQuery reads before its ticket closed.
+
+### Fixed and deployed (production api-prod/api-preprod/web-prod/web-preprod/dbt-refresh at b70c5f9)
+- **KAN-199 set_funnel over MCP** (#494) + honest `query_funnel` (`no_funnel_defined`); EasySign's
+  funnel and stage keys set through the same service (it has no `project.configure` key).
+- **KAN-214 funnel counted events, not people, and not in order** (#495): `COUNT(DISTINCT entity_id)`
+  per event type, where entity_id is the per-event id - 4 -> 6 -> 6 -> 6 -> 6, 150%. Now people
+  (customer_id, else anon stitched via bridge_identity) who reached steps 0..N in order: 4/2/2/2/2,
+  proven on BigQuery and DuckDB before merge. **KAN-215** snake_case/camelCase round-trip, same PR.
+- **KAN-216** drop-off alert blamed the wrong transition, "-50%", and fired on 4 people (#496):
+  from->to wording, no minus, MIN_FUNNEL_ENTRANTS_FOR_ALERT = 100, low-sample marker on the KPI.
+- **KAN-201** ingest health: "rejected on arrival" + "still awaiting action" (#493).
+- **KAN-213** paused goals counted as on track (#497) + **declared metric units** (#502): count /
+  ratio / percent / currency / duration; ratio displays as %, goal targets entered as percent and
+  validated. Production backfill applied: 42 built-in metrics got units, 6 customised skipped.
+  EasySign's goal target corrected 8 -> 0.08 (audited) - its name said 8%.
+- **KAN-210** record feed Identity line (anon_id/customer_id) + filter, value/date labels on bar and
+  line tiles (#498). **KAN-211** rolling board ranges, empty days zero-filled for counts and gaps for
+  ratios (#499); the production migration correctly changed nothing (EasySign's frozen ranges were a
+  QA pass's choice, not the seed default), so its four QA-leftover boards were switched individually.
+- **KAN-217** split tiles overflowed onto the tile below (#500).
+- **KAN-204 drift alarm now covers web-prod and dbt-refresh** (#501; dbt records its build each run,
+  api-prod publishes it on /v1/health/dbt-refresh; still credential-free), and **web-preprod** (#503).
+  **KAN-207** closed: web-preprod redeployed from main like api-preprod.
+
+- **Last completed:** all of the above. **In progress:** #503 CI.
+- **Blocked + why:** KAN-197 - the other session's setup tools exist only in its uncommitted tree.
+  KAN-195 (viewer read access) is a product decision.
+- **Next step:** KAN-212 (Copilot bar fixed actions + Hebrew in code), KAN-202 (ingest contract /
+  manifest / validate_records), a "dbt job has not run in 3h" alarm, drift age from merge time.
+- **Waiting on human:** KAN-195, KAN-197 ownership, KAN-97, KAN-117, KAN-130.
+
 ## 2026-09-25 - EasySign as the reference integration: B1-B18 triaged, eight fixed and live
 
 Yariv asked this session to follow the EasySign session and do whatever it needed. EasySign ran a
