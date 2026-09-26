@@ -665,3 +665,61 @@ describe('getMetricCatalogDetail', () => {
     expect(detail?.dependsOn).toHaveLength(2);
   });
 });
+
+describe('queryMetrics fillEmptyBuckets (KAN-210 follow-up)', () => {
+  async function registerSpendSignupsAndCac(organizationId: string, projectId: string, createdByUserId: string) {
+    await registerMetricDefinition({
+      organizationId,
+      projectId,
+      name: 'ad_spend',
+      definition: { kind: 'aggregation', aggregation: { function: 'sum', table: 'fact_ad_spend', column: 'reporting_spend', timeColumn: 'date', filters: [] } },
+      dimensions: [],
+      createdByUserId,
+    });
+    await registerMetricDefinition({
+      organizationId,
+      projectId,
+      name: 'signups',
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_landing_page_performance', timeColumn: 'activity_date', filters: [] } },
+      dimensions: [],
+      createdByUserId,
+    });
+    await registerMetricDefinition({
+      organizationId,
+      projectId,
+      name: 'cac',
+      definition: { kind: 'formula', formula: 'ad_spend / signups' },
+      dimensions: [],
+      createdByUserId,
+    });
+  }
+
+  it('fills count/sum metrics with 0 and formula metrics with null, only when asked, from the same cache entry', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Fill Org');
+    await registerSpendSignupsAndCac(organization.id, project.id, owner.id);
+    const rows: WarehouseRow[] = [
+      { bucket_date: '2026-01-01', ad_spend: 100, signups: 4, cac: 25 },
+      { bucket_date: '2026-01-03', ad_spend: 50, signups: null, cac: null },
+    ];
+    const executor = new FakeWarehouseQueryExecutor(rows);
+    const cache = new InMemoryMetricQueryResultCache();
+    const request = { metrics: ['ad_spend', 'signups', 'cac'], time: { start: '2026-01-01', end: '2026-01-04', grain: 'day' as const } };
+
+    const unfilled = await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache });
+    expect(unfilled.series).toEqual(rows);
+
+    const filled = await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache, fillEmptyBuckets: true });
+    expect(filled.cacheHit).toBe(true);
+    expect(executor.callCount).toBe(1);
+    expect(filled.series).toEqual([
+      { bucket_date: '2026-01-01', ad_spend: 100, signups: 4, cac: 25 },
+      { bucket_date: '2026-01-02', ad_spend: 0, signups: 0, cac: null },
+      { bucket_date: '2026-01-03', ad_spend: 50, signups: 0, cac: null },
+      { bucket_date: '2026-01-04', ad_spend: 0, signups: 0, cac: null },
+    ]);
+
+    // The cached rows themselves were not rewritten by the fill.
+    const again = await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache });
+    expect(again.series).toEqual(rows);
+  });
+});

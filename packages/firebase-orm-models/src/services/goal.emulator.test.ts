@@ -858,6 +858,46 @@ describe('queryGoalProgress', () => {
     expect(outcome.progress.projectedFinalValue).toBeCloseTo(40, 10);
   });
 
+  it('counts a day with no events as a real 0 in a count metric\'s trend (KAN-210 follow-up)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Goal Minimize Zero Fill Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    const goal = await createGoal({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'Daily signups ceiling',
+      metricName: 'signups',
+      direction: 'minimize',
+      targetValue: 50,
+      startDate: '2026-01-01',
+      deadline: '2026-01-11',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+      createdByUserId: owner.id,
+    });
+
+    // Only days 1 and 6 had events. Unfilled, the fit saw two equal points and projected a flat 10;
+    // filled, days 2-5 are the zeros they really were: points (0,10) (.1,0) (.2,0) (.3,0) (.4,0)
+    // (.5,10) fit a flat line at their mean, 20/6.
+    const outcome = await queryGoalProgress({
+      organizationId: organization.id,
+      projectId: project.id,
+      goal,
+      executor: new FakeWarehouseQueryExecutor([
+        { bucket_date: '2026-01-01', signups: 10 },
+        { bucket_date: '2026-01-06', signups: 10 },
+      ]),
+      cache: new InMemoryMetricQueryResultCache(),
+      asOfDate: '2026-01-06',
+    });
+
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) throw new Error('expected ok outcome');
+    expect(outcome.actualValue).toBe(20);
+    expect(outcome.hasMeasurements).toBe(true);
+    expect(outcome.progress.projectedFinalValue).toBeCloseTo(20 / 6, 10);
+  });
+
   it('degrades to a "warehouse not configured" outcome instead of throwing, using the default executor', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Goal Query Unconfigured Org');
     await registerSignups(organization.id, project.id, owner.id);

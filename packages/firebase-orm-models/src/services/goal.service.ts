@@ -642,6 +642,9 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       organizationId: params.organizationId,
       projectId: params.projectId,
       request,
+      // A day with no events is a real zero for a count/sum metric, and the trend fit below must
+      // see it as one; for a rate/formula metric it arrives as null and `buildHistoryPoints` skips it.
+      fillEmptyBuckets: true,
       ...(params.executor ? { executor: params.executor } : {}),
       ...(params.cache ? { cache: params.cache } : {}),
       ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { collectIdentifiers, parseFormula, type CompilerParamValue, type MetricQueryRequest } from '@growthos/shared';
+import { collectIdentifiers, fillEmptyBuckets, parseFormula, type CompilerParamValue, type MetricQueryRequest } from '@growthos/shared';
 import type { ProjectModel } from '../models/project.model';
 import type { MetricAggregationDef, MetricDefModel, MetricDefinitionKind } from '../models/metric-def.model';
 import { compileMetricQueryForProject, MetricTargetsUnbuiltWarehouseTableError } from './metrics-compiler.service';
@@ -79,6 +79,19 @@ export interface QueryMetricsParams {
   precomputedProject?: ProjectModel;
   precomputedActiveMetricDefsByName?: ReadonlyMap<string, MetricDefModel>;
   precomputedQuota?: ProjectCostQuota;
+  /**
+   * Completes the returned series to one row per time bucket of the requested range (KAN-210
+   * follow-up) - 0 for a count/count_distinct/sum metric, `null` (a gap, never a made-up 0) for
+   * avg/min/max and formula metrics. See `fillEmptyBuckets` in `@growthos/shared` for the exact
+   * rules, including why an entirely empty result stays empty.
+   *
+   * Opt-in, because not every caller wants a row per bucket: a heatmap reads an absent cohort cell as
+   * "not observable yet", a histogram queries from a 1970 floor, and the many internal callers that
+   * only sum a series gain nothing but rows. Time-series surfaces - board line/bar tiles, goal
+   * progress, the MCP metric tools - turn it on, so they all show the same series. Applied after the
+   * result cache, which keeps the warehouse's own rows, so filled and unfilled callers share entries.
+   */
+  fillEmptyBuckets?: boolean;
 }
 
 export interface MetricQueryResult {
@@ -164,10 +177,15 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     throw new MetricTargetsUnbuiltWarehouseTableError(metricName, table);
   }
 
+  const shapeSeries = (rows: WarehouseRow[]): WarehouseRow[] =>
+    params.fillEmptyBuckets
+      ? fillEmptyBuckets(rows, { time: params.request.time, dimensions: [...new Set(params.request.dimensions ?? [])], metrics: compiled.emptyBucketValues })
+      : rows;
+
   const cacheKey = buildResultCacheKey(params.organizationId, params.projectId, environmentId, compiled.definitionRefs, compiled.params);
   const cached = cache.get(cacheKey);
   if (cached) {
-    return { series: cached, definitionRefs: compiled.definitionRefs, cacheHit: true };
+    return { series: shapeSeries(cached), definitionRefs: compiled.definitionRefs, cacheHit: true };
   }
 
   const quota = await checkProjectQueryQuota(params.organizationId, params.projectId, new Date(), params.precomputedQuota);
@@ -188,7 +206,7 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     }
     cache.set(cacheKey, series, cacheTtlSeconds);
     await logCostAttempt(params.organizationId, params.projectId, 'executed', compiled.definitionRefs, estimatedCostUsd);
-    return { series, definitionRefs: compiled.definitionRefs, cacheHit: false };
+    return { series: shapeSeries(series), definitionRefs: compiled.definitionRefs, cacheHit: false };
   } catch (error) {
     const outcome = error instanceof WarehouseNotConfiguredError ? 'warehouse_not_configured' : 'executed';
     await logCostAttempt(params.organizationId, params.projectId, outcome, compiled.definitionRefs);
