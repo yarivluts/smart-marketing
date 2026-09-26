@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useTranslations, useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import {
   Search,
@@ -32,7 +32,6 @@ export function MarketingCommandBar({
   onClose: controlledOnClose,
 }: MarketingCommandBarProps): React.ReactElement | null {
   const t = useTranslations('CommandBar');
-  const locale = useLocale();
   const router = useRouter();
 
   const [uncontrolledIsOpen, setUncontrolledIsOpen] = useState(false);
@@ -76,50 +75,30 @@ export function MarketingCommandBar({
 
   const base = `/orgs/${orgId}/projects/${projectId}`;
 
+  // Questions for the Copilot, never recommendations: the bar knows nothing about this project's data,
+  // so it cannot propose a budget, a channel or an amount (KAN-212). The Copilot answers from the
+  // project's own metrics; without a Copilot the item opens the page where that answer lives.
+  const askItems = [
+    { id: 'ai-ask-spend', label: t('askSpendLabel'), query: t('askSpendQuery'), icon: TrendingUp, fallbackPath: `${base}/campaigns` },
+    { id: 'ai-ask-funnel', label: t('askFunnelLabel'), query: t('askFunnelQuery'), icon: Sparkles, fallbackPath: `${base}/funnel` },
+    { id: 'ai-ask-goals', label: t('askGoalsLabel'), query: t('askGoalsQuery'), icon: Zap, fallbackPath: `${base}/goals` },
+  ];
+
   const commandItems = [
-    // Fast AI Action Triggers
-    {
-      id: 'ai-rebalance',
+    ...askItems.map((item) => ({
+      id: item.id,
       group: 'actions',
-      label: t('actionRebalance'),
-      icon: TrendingUp,
+      label: item.label,
+      icon: item.icon,
       action: () => {
         close();
         if (onOpenCopilotWithQuery) {
-          onOpenCopilotWithQuery(locale === 'he' ? 'העבר תקציב מגוגל למטא' : 'Reallocate Google to Meta budget');
+          onOpenCopilotWithQuery(item.query);
         } else {
-          router.push(`${base}/automation`);
+          router.push(item.fallbackPath);
         }
       },
-    },
-    {
-      id: 'ai-retarget-draft',
-      group: 'actions',
-      label: t('actionRetargetDraft'),
-      icon: Sparkles,
-      action: () => {
-        close();
-        if (onOpenCopilotWithQuery) {
-          onOpenCopilotWithQuery(locale === 'he' ? 'ייעל נטישה בשלב 2' : 'Optimize drop-off at stage 2');
-        } else {
-          router.push(`${base}/funnel`);
-        }
-      },
-    },
-    {
-      id: 'ai-meta-budget',
-      group: 'actions',
-      label: t('actionIncreaseMeta'),
-      icon: Zap,
-      action: () => {
-        close();
-        if (onOpenCopilotWithQuery) {
-          onOpenCopilotWithQuery(locale === 'he' ? 'הגדל תקציב ל-250$ ב-Meta' : 'Increase budget for retargeting campaign to $250');
-        } else {
-          router.push(`${base}/campaigns`);
-        }
-      },
-    },
+    })),
     // Primary Module Navigations
     {
       id: 'nav-ads',
