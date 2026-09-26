@@ -13,6 +13,8 @@ vi.mock('@/i18n/navigation', () => ({
       {children}
     </a>
   ),
+  // The funnel flow diagram navigates on node click.
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 beforeEach(() => {
@@ -267,6 +269,97 @@ describe('FunnelGoalsDashboard Component', () => {
       expect(screen.getByTestId('payback-window-40')).toHaveTextContent('$1,150');
       expect(screen.getByTestId('payback-no-target-note')).toHaveTextContent(enMessages.FunnelGoals.paybackNoTarget);
       expect(screen.queryByTestId('payback-empty-state')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('visuals drawn from the measured data', () => {
+    it('draws the funnel as a flow with each transition labelled by its measured loss', () => {
+      renderDashboard(buildFunnelGoalsCockpitData({ funnelOutcome: REAL_FUNNEL, goals: [] }));
+
+      const flow = screen.getByTestId('flow-diagram');
+      expect(within(flow).getByText('sent → viewed: 60% lost')).toBeInTheDocument();
+      expect(within(flow).getByText('viewed → signed: 25% lost')).toBeInTheDocument();
+    });
+
+    it('charts conversion per step and ranks where people were lost', () => {
+      renderDashboard(buildFunnelGoalsCockpitData({ funnelOutcome: REAL_FUNNEL, goals: [] }));
+
+      const conversion = screen.getByRole('table', { name: enMessages.FunnelGoals.conversionChartTitle });
+      const rows = within(conversion).getAllByRole('row').slice(1);
+      expect(rows.map((row) => row.textContent)).toEqual(['1. sent_event100%', '2. viewed_event40%', '3. signed_event30%']);
+
+      const losses = within(screen.getByRole('region', { name: enMessages.FunnelGoals.lossesTitle })).getAllByRole('listitem');
+      expect(losses[0]).toHaveTextContent('1. sent_event → 2. viewed_event');
+      expect(losses[0]).toHaveTextContent('300 people');
+      expect(losses[1]).toHaveTextContent('50 people');
+    });
+
+    it('draws no chart at all without a measured funnel', () => {
+      renderDashboard();
+      expect(screen.queryByTestId('flow-diagram')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('trend-chart')).not.toBeInTheDocument();
+    });
+
+    it('summarises goals by status and progress in the goals tab', () => {
+      const goal = (id: string, status: 'active' | 'paused') =>
+        ({
+          id,
+          name: `Goal ${id}`,
+          metric_name: 'signups',
+          direction: 'maximize',
+          target_value: 100,
+          range_min: null,
+          range_max: null,
+          start_date: '2026-01-01',
+          deadline: '2099-12-31',
+          rhythm: 'even',
+          owner_person_id: 'p1',
+          status,
+        }) as unknown as GoalModel;
+      const outcome = {
+        ok: true,
+        actualValue: 40,
+        hasMeasurements: true,
+        progress: { expectedAtNow: 30, progressRatio: 0.4, projectedFinalValue: 120, status: 'on_track', isGoalMet: false },
+      } as unknown as GoalProgressOutcome;
+      renderDashboard(
+        buildFunnelGoalsCockpitData({
+          funnelOutcome: null,
+          goals: [goal('g1', 'active'), goal('g2', 'paused'), goal('g3', 'active')],
+          goalOutcomes: new Map([
+            ['g1', outcome],
+            ['g2', outcome],
+          ]),
+        }),
+      );
+      fireEvent.click(screen.getByTestId('tab-goals-btn'));
+
+      const mix = within(screen.getByTestId('donut-chart')).getAllByRole('listitem');
+      expect(mix.map((item) => item.textContent)).toEqual(['On track1 · 33%', 'Paused1 · 33%', 'Not measured yet1 · 33%']);
+
+      const progress = within(screen.getByRole('region', { name: enMessages.FunnelGoals.goalsProgressTitle })).getAllByRole('link');
+      expect(progress).toHaveLength(1);
+      expect(progress[0]).toHaveAttribute('href', '/orgs/org-1/projects/test-proj/goals/g1');
+      expect(progress[0]).toHaveTextContent('40%');
+    });
+
+    it('draws the average retention curve only when cohorts landed', () => {
+      renderDashboard(
+        buildFunnelGoalsCockpitData({
+          funnelOutcome: null,
+          goals: [],
+          cohortOutcome: {
+            ok: true,
+            rows: [
+              { cohortMonth: '2026-01-01', cohortSize: 10, periodNumber: 0, retainedCount: 10, retentionRate: 1 },
+              { cohortMonth: '2026-01-01', cohortSize: 10, periodNumber: 1, retainedCount: 4, retentionRate: 0.4 },
+            ],
+          },
+        }),
+      );
+      fireEvent.click(screen.getByTestId('tab-retention-btn'));
+      const curve = screen.getByRole('table', { name: enMessages.FunnelGoals.retentionCurveTitle });
+      expect(within(curve).getAllByRole('row').slice(1).map((row) => row.textContent)).toEqual(['P0100%', 'P140%']);
     });
   });
 });
