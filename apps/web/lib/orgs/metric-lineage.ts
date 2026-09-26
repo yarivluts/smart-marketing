@@ -128,13 +128,14 @@ export function pickLineageFocus(metrics: readonly CatalogMetric[], requested: s
 }
 
 /**
- * The schema a warehouse table is built from, when the naming makes that explicit: a core mart named
- * `fact_<schema>` or a custom-schema mart view `m_<tenant hash>_<schema>`. Anything else (a dbt core
- * table fed by several schemas) is left unlinked rather than guessed.
+ * The schema a warehouse table is built from, when the naming makes that explicit: a table named
+ * exactly like the schema, a core mart named `fact_<schema>`, or a custom-schema mart view
+ * `m_<tenant hash>_<schema>`. Anything else (a dbt core table fed by several schemas) is left
+ * unlinked rather than guessed.
  */
 export function schemaForTable(table: string, schemaNames: ReadonlySet<string>): string | null {
   const candidate = table.replace(/^fact_/, '').replace(/^m_[0-9a-f]{12}_/, '');
-  return candidate !== table && schemaNames.has(candidate) ? candidate : null;
+  return schemaNames.has(candidate) ? candidate : null;
 }
 
 /**

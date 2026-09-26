@@ -77,8 +77,9 @@ describe('schemaForTable', () => {
     const schemas = new Set(['ad_spend', 'signup']);
     expect(schemaForTable('fact_ad_spend', schemas)).toBe('ad_spend');
     expect(schemaForTable('m_0123456789ab_signup', schemas)).toBe('signup');
+    expect(schemaForTable('ad_spend', schemas)).toBe('ad_spend');
     expect(schemaForTable('fact_funnel_event', schemas)).toBeNull();
-    expect(schemaForTable('ad_spend', schemas)).toBeNull();
+    expect(schemaForTable('dim_signup', schemas)).toBeNull();
   });
 });
 
