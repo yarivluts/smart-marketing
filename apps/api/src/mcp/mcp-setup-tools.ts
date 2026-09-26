@@ -32,12 +32,18 @@ const environmentInputShape = {
     .enum(ENVIRONMENTS)
     .optional()
     .describe(
-      'Which environment to report on: dev, staging or prod. Omit it to use the environment this API key is bound to (prod for an OAuth connection). Each environment is judged only on the records it received itself.',
+      'Which environment to report on: dev, staging or prod. Omit it to use the environment this API key is bound to (prod for an OAuth connection). An API key can only report on its own environment; a project-wide OAuth connection can name any. Each environment is judged only on the records it received itself.',
     ),
 };
 
 function outputContext(auth: McpAuthContext): SetupOutputContext {
-  return { organizationId: auth.organizationId, projectId: auth.projectId, webAppUrl: webAppUrl(), apiBaseUrl: apiBaseUrl() };
+  return {
+    organizationId: auth.organizationId,
+    projectId: auth.projectId,
+    webAppUrl: webAppUrl(),
+    apiBaseUrl: apiBaseUrl(),
+    otherEnvironmentsVisible: auth.environmentId === undefined,
+  };
 }
 
 async function withFocusEnvironment(
@@ -48,12 +54,27 @@ async function withFocusEnvironment(
   const environmentName = (args as { environment?: string } | undefined)?.environment;
   let report: SetupHealthReport;
   try {
-    report = await evaluateProjectSetupHealth({ organizationId: auth.organizationId, projectId: auth.projectId });
+    // An API key is bound to one environment, and every read it makes stays inside it (KAN-28): it
+    // is evaluated for that environment alone, so it can neither name another one nor see another
+    // one's status in the summary. Only a project-wide OAuth connection reads every environment.
+    report = await evaluateProjectSetupHealth({
+      organizationId: auth.organizationId,
+      projectId: auth.projectId,
+      ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
+    });
   } catch (error) {
     if (error instanceof ProjectNotFoundError) {
       return errorResult('Project not found.');
     }
     throw error;
+  }
+  if (auth.environmentId !== undefined && environmentName !== undefined) {
+    const bound = report.environments.find((environment) => environment.environmentId === auth.environmentId);
+    if (bound && bound.environmentName !== environmentName) {
+      return errorResult(
+        `This API key is bound to the "${bound.environmentName}" environment and can only report on it. Use a key minted for "${environmentName}", or omit environment.`,
+      );
+    }
   }
   const focus = selectSetupFocusEnvironment(report, { environmentName, environmentId: auth.environmentId });
   if (!focus) {

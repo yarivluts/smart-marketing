@@ -21,6 +21,11 @@ export interface SetupOutputContext {
   webAppUrl: string;
   /** The deployment's API base URL (`GROWTHOS_API_BASE_URL`). */
   apiBaseUrl: string;
+  /**
+   * False when the credential is bound to one environment and the report was evaluated for that
+   * environment alone: other environments' status is then unknown to the output, not "not connected".
+   */
+  otherEnvironmentsVisible?: boolean;
 }
 
 export interface RenderedSetupStep {
@@ -176,7 +181,9 @@ export function buildInstallationGapsOutput(report: SetupHealthReport, focus: Se
         detail: describeSetupRequirementResult(result, focus.environmentName),
         impact_summary: requirement.impact,
         satisfied_by: requirement.satisfiedBy,
-        connected_in_other_environments: connectedElsewhere(report, focus, requirement.id),
+        // null, not []: a credential bound to one environment cannot see the others, and an empty
+        // list would read as "connected nowhere else".
+        connected_in_other_environments: context.otherEnvironmentsVisible === false ? null : connectedElsewhere(report, focus, requirement.id),
         how_to_fix: steps.map((step) => renderSetupRecommendation(step, context)),
       };
     });

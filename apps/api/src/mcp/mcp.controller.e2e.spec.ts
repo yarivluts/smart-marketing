@@ -1187,10 +1187,20 @@ describe('McpController (e2e)', () => {
       expect(statusOf(aDev, 'billing')).toBe('gap');
 
       // The prod-bound key: dev's signups do not count here.
-      const aProd = await callJson<SetupHealthBody>(a.rawKey, 'get_setup_health');
+      const aProd = await callJson<SetupHealthBody & { environments: Array<{ environment: string }> }>(a.rawKey, 'get_setup_health');
       expect(aProd.environment).toBe('prod');
       expect(statusOf(aProd, 'signups')).toBe('gap');
-      expect(statusOf(await callJson<SetupHealthBody>(a.rawKey, 'get_setup_health', { environment: 'dev' }), 'signups')).toBe('connected');
+      // KAN-28: a key sees only its own environment - not in detail, not in the summary.
+      expect(aProd.environments.map((environment) => environment.environment)).toEqual(['prod']);
+      const client = await connectedClient(a.rawKey);
+      try {
+        const crossEnvironment = await client.callTool({ name: 'get_setup_health', arguments: { environment: 'dev' } });
+        expect(crossEnvironment.isError).toBe(true);
+        expect((crossEnvironment.content as Array<{ text: string }>)[0].text).toContain('bound to the "prod" environment');
+      } finally {
+        await client.close();
+      }
+      expect(statusOf(await callJson<SetupHealthBody>(aDevKey, 'get_setup_health', { environment: 'dev' }), 'signups')).toBe('connected');
 
       // B's prod billing is B's alone, whatever A's call smuggles in.
       const smuggled = await callJson<SetupHealthBody>(a.rawKey, 'get_setup_health', { organizationId: b.organization.id, projectId: b.project.id });
@@ -1220,6 +1230,10 @@ describe('McpController (e2e)', () => {
         }
       }
       expect(JSON.stringify(body)).not.toContain(b.project.id);
+      // An environment-bound key cannot see the other environments, so it must not claim "connected nowhere else".
+      for (const gap of body.gaps as Array<{ connected_in_other_environments?: unknown }>) {
+        expect(gap.connected_in_other_environments).toBeNull();
+      }
     });
 
     it('refuses an environment name the project does not have, rather than reporting on another one', async () => {
