@@ -22,6 +22,8 @@ import {
   registerMetricDefinition,
   registerSchemaDefinition,
   queryProjectFunnelSteps,
+  queryMetrics,
+  InMemoryMetricQueryResultCache,
   WinEventModel,
   type WarehouseQueryExecutor,
 } from '@growthos/firebase-orm-models';
@@ -32,9 +34,15 @@ import { MCP_RATE_LIMITER } from './mcp-auth.guard';
 // this environment, gets its real "not configured" error) unless a test supplies a warehouse for one call.
 jest.mock('@growthos/firebase-orm-models', () => {
   const actual = jest.requireActual('@growthos/firebase-orm-models');
-  return { ...actual, queryProjectFunnelSteps: jest.fn((...args: unknown[]) => actual.queryProjectFunnelSteps(...args)) };
+  return {
+    ...actual,
+    queryProjectFunnelSteps: jest.fn((...args: unknown[]) => actual.queryProjectFunnelSteps(...args)),
+    queryMetrics: jest.fn((...args: unknown[]) => actual.queryMetrics(...args)),
+  };
 });
 const mockedQueryProjectFunnelSteps = queryProjectFunnelSteps as jest.MockedFunction<typeof queryProjectFunnelSteps>;
+const mockedQueryMetrics = queryMetrics as jest.MockedFunction<typeof queryMetrics>;
+const realQueryMetrics = jest.requireActual<typeof import('@growthos/firebase-orm-models')>('@growthos/firebase-orm-models').queryMetrics;
 const realQueryProjectFunnelSteps = jest.requireActual<typeof import('@growthos/firebase-orm-models')>('@growthos/firebase-orm-models').queryProjectFunnelSteps;
 
 /** Runs the next `query_funnel` call's REAL service (saved funnel from Firestore, real SQL) against `executor`. */
@@ -278,6 +286,48 @@ describe('McpController (e2e)', () => {
       expect(result.isError).not.toBe(true);
       const text = (result.content as Array<{ type: string; text: string }>)[0].text;
       expect(JSON.parse(text)).toEqual({ insights: [] });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('query_metric returns one row per bucket: 0 for a count metric, null for a formula (KAN-210 follow-up)', async () => {
+    const { owner, organization, project, rawKey } = await setupProjectWithKey('Query Metric Fill Org');
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups',
+      definition: { kind: 'aggregation', aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [] } },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signups_doubled',
+      definition: { kind: 'formula', formula: 'signups * 2' },
+      dimensions: [],
+      createdByUserId: owner.id,
+    });
+    const warehouse: WarehouseQueryExecutor = {
+      execute: () => Promise.resolve([{ bucket_date: '2026-09-19', signups: 2, signups_doubled: 4 }]),
+    };
+    mockedQueryMetrics.mockImplementationOnce((params) => realQueryMetrics({ ...params, executor: warehouse, cache: new InMemoryMetricQueryResultCache() }));
+
+    const client = await connectedClient(rawKey);
+    try {
+      const result = await client.callTool({
+        name: 'query_metric',
+        arguments: { metric: ['signups', 'signups_doubled'], time: { start: '2026-09-19', end: '2026-09-21', grain: 'day' } },
+      });
+      expect(result.isError).not.toBe(true);
+      const body = JSON.parse((result.content as Array<{ text: string }>)[0].text) as { series: unknown[] };
+      expect(body.series).toEqual([
+        { bucket_date: '2026-09-19', signups: 2, signups_doubled: 4 },
+        { bucket_date: '2026-09-20', signups: 0, signups_doubled: null },
+        { bucket_date: '2026-09-21', signups: 0, signups_doubled: null },
+      ]);
+      expect(mockedQueryMetrics.mock.calls.at(-1)?.[0].fillEmptyBuckets).toBe(true);
     } finally {
       await client.close();
     }

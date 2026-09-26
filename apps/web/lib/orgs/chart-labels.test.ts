@@ -38,6 +38,13 @@ describe('labeledValueIndexes', () => {
     const values = Array.from({ length: MAX_FULLY_LABELED_POINTS + 8 }, (_, index) => (index === 4 ? 99 : 1));
     expect([...labeledValueIndexes(values)].sort((a, b) => a - b)).toEqual([4, values.length - 1]);
   });
+
+  it('never labels a gap (null), and treats the last real value as the latest', () => {
+    expect([...labeledValueIndexes([1, null, 0])]).toEqual([0, 2]);
+    const values = Array.from({ length: MAX_FULLY_LABELED_POINTS + 8 }, (_, index) => (index === 4 ? 99 : index >= 15 ? null : 1));
+    expect([...labeledValueIndexes(values)].sort((a, b) => a - b)).toEqual([4, 14]);
+    expect([...labeledValueIndexes(Array.from({ length: MAX_FULLY_LABELED_POINTS + 1 }, () => null))]).toEqual([]);
+  });
 });
 
 describe('labeledAxisIndexes', () => {

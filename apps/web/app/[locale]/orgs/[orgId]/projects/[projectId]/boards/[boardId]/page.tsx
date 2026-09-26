@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { can } from '@growthos/shared';
+import { can, todayUtcDateOnly } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -75,11 +75,14 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
     notFound();
   }
 
-  const boardView = toBoardView(board);
+  // One "today" for the whole render: the tiles' relative range and the settings form's preview
+  // must resolve to the same window, even across a UTC midnight mid-request.
+  const today = todayUtcDateOnly();
+  const boardView = toBoardView(board, today);
 
   // KAN-196: every read below is scoped to the environment picked in the project shell (prod by default).
   const { selected: selectedEnvironment } = await resolveSelectedEnvironment(orgId, projectId);
-  const environmentScope = { environmentId: selectedEnvironment?.id };
+  const environmentScope = { environmentId: selectedEnvironment?.id, today };
   const tileOutcomes = await queryBoardTiles(orgId, projectId, board, environmentScope);
   const renderViews: Record<string, TileRenderView> = {};
   board.tiles.forEach((tile, index) => {
@@ -104,6 +107,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
             boardId={boardId}
             initialName={boardView.name}
             initialDateRange={boardView.dateRange}
+            today={today}
             initialCompare={boardView.compare}
             initialGlobalFilters={boardView.globalFilters}
           />

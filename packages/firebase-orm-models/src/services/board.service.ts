@@ -1,5 +1,14 @@
-import type { ComparePeriod, CompilerFilter, MetricQueryRequest, TimeGrain } from '@growthos/shared';
-import { MetricCompilerError } from '@growthos/shared';
+import type { ComparePeriod, CompilerFilter, MetricQueryRequest, ResolvedDateRange, TimeGrain } from '@growthos/shared';
+import {
+  DEFAULT_RELATIVE_DATE_RANGE,
+  MetricCompilerError,
+  describeInvalidDateRangeSetting,
+  normalizeDateRangeSetting,
+  resolveDateRangeSetting,
+  resolveRelativeDatePreset,
+  todayUtcDateOnly,
+} from '@growthos/shared';
+import { OrganizationModel } from '../models/organization.model';
 import { ProjectModel } from '../models/project.model';
 import {
   BOARD_GRID_COLUMNS,
@@ -50,13 +59,25 @@ async function loadBoard(organizationId: string, projectId: string, boardId: str
   return board;
 }
 
-/** A trailing 30-day window ending today — a reasonable default for a brand-new board, the same "a human can change it immediately" posture `DEFAULT_DAILY_QUERY_LIMIT` (KAN-39) takes for its own default. */
+/**
+ * A brand-new board's range: a *rolling* trailing 30 days (KAN-211), by day. It used to be the
+ * same 30 days frozen as fixed dates at creation, so a pack-seeded board created in August showed
+ * "No data" on every tile by late September - the default board looked broken to anyone who
+ * started later. A copy, so no caller can mutate the shared constant.
+ */
 function defaultDateRange(): BoardDateRange {
-  const end = new Date();
-  const start = new Date(end);
-  start.setUTCDate(start.getUTCDate() - 29);
-  const toDateOnly = (date: Date) => date.toISOString().slice(0, 10);
-  return { start: toDateOnly(start), end: toDateOnly(end), grain: 'day' };
+  return { ...DEFAULT_RELATIVE_DATE_RANGE };
+}
+
+/**
+ * The concrete `{ start, end, grain }` a board's stored range means on `today` (UTC `YYYY-MM-DD`,
+ * defaulting to the real today): a relative preset is resolved, an absolute range - including the
+ * legacy `{ start, end, grain }` shape every pre-KAN-211 board has - passes through unchanged. A
+ * stored value too malformed to read falls back to the default rolling range rather than failing
+ * the board. Every reader that needs dates goes through this, never `date_range.start` directly.
+ */
+export function resolveBoardDateRange(dateRange: BoardDateRange, today: string = todayUtcDateOnly()): ResolvedDateRange {
+  return resolveDateRangeSetting(normalizeDateRangeSetting(dateRange) ?? defaultDateRange(), today);
 }
 
 export interface CreateBoardParams {
@@ -68,7 +89,7 @@ export interface CreateBoardParams {
   seededByPluginId?: string;
 }
 
-/** Creates an empty board (no tiles yet) with a default trailing-30-day date range — the AC's "build a board ... without code" starting point. */
+/** Creates an empty board (no tiles yet) with a default rolling last-30-days date range — the AC's "build a board ... without code" starting point. */
 export async function createBoard(params: CreateBoardParams): Promise<BoardModel> {
   await requireProjectInOrg(params.organizationId, params.projectId);
 
@@ -156,10 +177,18 @@ export async function updateBoardSettings(params: UpdateBoardSettingsParams): Pr
     board.name = name;
   }
   if (params.dateRange !== undefined) {
-    if (params.dateRange.start > params.dateRange.end) {
-      throw new InvalidBoardError(['The date range start must not be after its end.']);
+    // Normalized before storing, so the stored map only ever carries its own kind's fields - see
+    // `normalizeDateRangeSetting`. An absolute range must be two real, ordered dates; a relative
+    // one only a known preset.
+    const dateRange = normalizeDateRangeSetting(params.dateRange);
+    if (dateRange === null) {
+      throw new InvalidBoardError(['The date range must be either a start/end date pair or a known relative preset, with a known granularity.']);
     }
-    if (params.dateRange.grain !== 'month' && board.tiles.some((tile) => tile.type === 'heatmap')) {
+    const invalidReason = describeInvalidDateRangeSetting(dateRange);
+    if (invalidReason !== null) {
+      throw new InvalidBoardError([invalidReason]);
+    }
+    if (dateRange.grain !== 'month' && board.tiles.some((tile) => tile.type === 'heatmap')) {
       // A `heatmap` tile's matrix row axis comes from the board's own time
       // bucketing (see `BOARD_TILE_TYPES`'s own doc comment on
       // `board.model.ts`) — a coarser-than-month grain would `DATE_TRUNC`
@@ -168,7 +197,7 @@ export async function updateBoardSettings(params: UpdateBoardSettingsParams): Pr
       // tile(s) first if a non-month grain is genuinely wanted.
       throw new InvalidBoardError(['This board has a heatmap tile — its date-range granularity must stay "month".']);
     }
-    board.date_range = params.dateRange;
+    board.date_range = dateRange;
   }
   if (params.compare !== undefined) {
     // Assigns a real `null`, never `undefined` — see `BoardModel.compare`'s
@@ -297,7 +326,7 @@ export interface SaveBoardTilesParams {
 export async function saveBoardTiles(params: SaveBoardTilesParams): Promise<BoardModel> {
   const board = await loadBoard(params.organizationId, params.projectId, params.boardId);
   const catalog = await listMetricsCatalogForProject(params.organizationId, params.projectId);
-  validateTiles(params.tiles, catalog, board.date_range.grain);
+  validateTiles(params.tiles, catalog, resolveBoardDateRange(board.date_range).grain);
 
   board.tiles = params.tiles;
   board.updated_by = params.updatedByUserId;
@@ -360,7 +389,17 @@ export interface QueryBoardTileParams {
   precomputedProject?: ProjectModel;
   precomputedActiveMetricDefsByName?: ReadonlyMap<string, MetricDefModel>;
   precomputedQuota?: ProjectCostQuota;
+  /** The UTC date (`YYYY-MM-DD`) a relative board range resolves against — defaults to the real today; tests pin it. */
+  today?: string;
 }
+
+/**
+ * Tile types whose rows are drawn as a time series, one point/bar per bucket - the only ones that
+ * ask `queryMetrics` to fill empty buckets. A heatmap must not be filled (its absent cell means "not
+ * observable yet", see `buildHeatmapView`), a histogram queries from a 1970 floor, a table would
+ * grow a row of zeros per empty day, and a big number/funnel only sums, so filling changes nothing.
+ */
+const FILLED_TILE_TYPES: ReadonlySet<BoardTile['type']> = new Set(['line', 'bar']);
 
 /**
  * Resolves + runs one tile's own metric query (its metric(s) + dimension
@@ -421,15 +460,18 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
   // miss it entirely if the shifted window falls before it), never a
   // genuinely different prior distribution.
   const supportsCompare = params.tile.type !== 'funnel' && params.tile.type !== 'heatmap' && params.tile.type !== 'histogram';
+  // Resolved first, so a relative range ("last 30 days") reaches the compiler - and its
+  // previous-period compare window - as ordinary concrete dates.
+  const dateRange = resolveBoardDateRange(params.board.date_range, params.today);
   const request: MetricQueryRequest = {
     metrics: params.tile.metricNames,
     ...(params.tile.type === 'funnel' ? {} : { dimensions: params.tile.dimensions }),
     ...(params.board.global_filters.length > 0 ? { filters: params.board.global_filters } : {}),
     time: {
       // See `HISTOGRAM_TIME_RANGE_FLOOR`'s own doc comment.
-      start: params.tile.type === 'histogram' ? HISTOGRAM_TIME_RANGE_FLOOR : params.board.date_range.start,
-      end: params.board.date_range.end,
-      grain: params.board.date_range.grain,
+      start: params.tile.type === 'histogram' ? HISTOGRAM_TIME_RANGE_FLOOR : dateRange.start,
+      end: dateRange.end,
+      grain: dateRange.grain,
       ...(supportsCompare && params.board.compare ? { compare: params.board.compare } : {}),
     },
   };
@@ -439,6 +481,7 @@ export async function queryBoardTile(params: QueryBoardTileParams): Promise<Boar
       organizationId: params.organizationId,
       projectId: params.projectId,
       request,
+      ...(FILLED_TILE_TYPES.has(params.tile.type) ? { fillEmptyBuckets: true } : {}),
       ...(params.executor ? { executor: params.executor } : {}),
       ...(params.cache ? { cache: params.cache } : {}),
       ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
@@ -500,6 +543,8 @@ export interface QueryBoardTilesParams {
    * project's default (`prod`) environment is resolved once and shared across every tile.
    */
   environmentId?: string;
+  /** See `QueryBoardTileParams.today`. */
+  today?: string;
 }
 
 /**
@@ -539,6 +584,8 @@ export async function queryBoardTiles(params: QueryBoardTilesParams): Promise<Bo
     params.environmentId !== undefined ? Promise.resolve({ id: params.environmentId }) : resolveDefaultQueryEnvironment(params.organizationId, params.projectId),
   ]);
   const precomputedActiveMetricDefsByName = new Map(metricDefs.filter((def) => def.status === 'active').map((def) => [def.name, def] as const));
+  // One "today" for the whole board, so no two tiles can straddle midnight and read different windows.
+  const today = params.today ?? todayUtcDateOnly();
 
   return Promise.all(
     params.board.tiles.map((tile) =>
@@ -553,7 +600,135 @@ export async function queryBoardTiles(params: QueryBoardTilesParams): Promise<Bo
         precomputedProject: project,
         precomputedActiveMetricDefsByName,
         precomputedQuota: quota,
+        today,
       }),
     ),
   );
+}
+
+/** The actor every {@link migrateSeededBoardsToRelativeDateRange} change is audit-logged under. */
+export const BOARD_DATE_RANGE_MIGRATION_ACTOR_ID = 'system:kan-211-board-relative-date-range';
+
+function previousUtcDay(day: string): string {
+  return new Date(Date.parse(`${day}T00:00:00.000Z`) - 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Whether a board still carries exactly the frozen range a built-in pack's seeding gave it
+ * (KAN-211) - the only boards {@link migrateSeededBoardsToRelativeDateRange} touches:
+ *
+ * - `seeded_by_plugin_id` is set (a human-created board is never touched), and
+ * - its range is absolute, by day, and is precisely what the old `defaultDateRange()` computed at
+ *   creation: `end` = the UTC day of `created_at` (or the day before, when the clock crossed
+ *   midnight between the two reads), `start` = 29 days before `end`.
+ *
+ * The range itself is the fingerprint because `updated_at`/`updated_by` cannot tell: seeding writes
+ * both (as the installing user) when it saves tiles, and a human edit is by that same user. A human
+ * who picked any other range, grain or preset no longer matches, so their choice is kept. One who
+ * saved the settings form without changing the dates does match - they never chose a window, and
+ * the rolling one is what the frozen default was meant to be.
+ */
+export function hasUntouchedSeededDefaultDateRange(board: Pick<BoardModel, 'seeded_by_plugin_id' | 'date_range' | 'created_at'>): boolean {
+  if (!board.seeded_by_plugin_id) {
+    return false;
+  }
+  const range = normalizeDateRangeSetting(board.date_range);
+  if (range === null || range.kind === 'relative' || range.grain !== 'day') {
+    return false;
+  }
+  // `createBoard` writes an ISO string; tolerate the ORM's own epoch-millis auto-time shape too.
+  const createdAt: unknown = board.created_at;
+  const createdDay =
+    typeof createdAt === 'string' ? createdAt.slice(0, 10) : typeof createdAt === 'number' && Number.isFinite(createdAt) ? new Date(createdAt).toISOString().slice(0, 10) : '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(createdDay) || Number.isNaN(Date.parse(`${createdDay}T00:00:00.000Z`))) {
+    return false;
+  }
+  return [createdDay, previousUtcDay(createdDay)].some(
+    (end) => range.end === end && range.start === resolveRelativeDatePreset('last_30_days', end).start,
+  );
+}
+
+export interface MigrateSeededBoardDateRangesParams {
+  /** Restricts the scan to one organization; omitted, every organization is scanned. */
+  organizationId?: string;
+  /** Restricts the scan to one project (requires `organizationId`). */
+  projectId?: string;
+  /** Report what would change without writing anything. */
+  dryRun?: boolean;
+}
+
+export interface MigratedBoardRef {
+  organizationId: string;
+  projectId: string;
+  boardId: string;
+  name: string;
+  previousDateRange: BoardDateRange;
+}
+
+export interface MigrateSeededBoardDateRangesResult {
+  dryRun: boolean;
+  /** Boards examined. */
+  scanned: number;
+  /** Boards switched (or, on a dry run, that would be switched) to the rolling default. */
+  migrated: MigratedBoardRef[];
+}
+
+/**
+ * One-off KAN-211 migration: switches every pack-seeded board still on its frozen seed-time range
+ * (see {@link hasUntouchedSeededDefaultDateRange}) to the rolling default (last 30 days, by day),
+ * so the default boards of every project seeded before relative ranges existed stop showing "No
+ * data" once their original 30 days have passed. Idempotent: a migrated board is relative and no
+ * longer matches, so a re-run changes nothing. Leaves `updated_by` alone - this is not a human edit
+ * (the ORM still stamps its own save time) - and records a `system` audit entry per board instead. Must be run once in production
+ * after deploy (`scripts/migrate-board-relative-date-ranges.mjs`); run with `dryRun` first.
+ */
+export async function migrateSeededBoardsToRelativeDateRange(params: MigrateSeededBoardDateRangesParams = {}): Promise<MigrateSeededBoardDateRangesResult> {
+  if (params.projectId !== undefined && params.organizationId === undefined) {
+    throw new Error('projectId requires organizationId.');
+  }
+  const dryRun = params.dryRun ?? false;
+  const organizationIds =
+    params.organizationId !== undefined ? [params.organizationId] : (await OrganizationModel.getAll()).map((organization) => organization.id);
+
+  let scanned = 0;
+  const migrated: MigratedBoardRef[] = [];
+  for (const organizationId of organizationIds) {
+    const projectIds =
+      params.projectId !== undefined
+        ? [params.projectId]
+        : (await ProjectModel.initPath({ organization_id: organizationId }).where('organization_id', '==', organizationId).get()).map((project) => project.id);
+
+    for (const projectId of projectIds) {
+      const boards = await BoardModel.initPath({ organization_id: organizationId, project_id: projectId }).where('project_id', '==', projectId).get();
+      for (const board of boards) {
+        scanned += 1;
+        if (!hasUntouchedSeededDefaultDateRange(board)) {
+          continue;
+        }
+        const previousDateRange = board.date_range;
+        migrated.push({ organizationId, projectId, boardId: board.id, name: board.name, previousDateRange });
+        if (dryRun) {
+          continue;
+        }
+        board.date_range = defaultDateRange();
+        await board.save();
+        try {
+          await recordAuditLogEntry({
+            organizationId,
+            projectId,
+            actorType: 'system',
+            actorId: BOARD_DATE_RANGE_MIGRATION_ACTOR_ID,
+            action: 'board.settings_update',
+            targetType: 'board',
+            targetId: board.id,
+            summary: `Switched board "${board.name}" from its fixed seed-time dates (${'start' in previousDateRange ? `${previousDateRange.start}..${previousDateRange.end}` : 'unknown'}) to a rolling last 30 days`,
+          });
+        } catch {
+          // Best-effort — see the comment in `createBoard`.
+        }
+      }
+    }
+  }
+
+  return { dryRun, scanned, migrated };
 }

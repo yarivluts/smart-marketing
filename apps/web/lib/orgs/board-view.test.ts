@@ -32,10 +32,27 @@ describe('toBoardSummaryView / toBoardView', () => {
     expect(view).toEqual({ id: 'b1', name: 'Marketing', tileCount: 1, updatedAt: '2026-01-07T00:00:00.000Z' });
   });
 
-  it('maps a board to its full settings view, omitting compare when unset', () => {
-    const view = toBoardView(board({ id: 'b1' }));
+  it('maps a board to its full settings view, omitting compare when unset (a legacy range reads as absolute)', () => {
+    const view = toBoardView(board({ id: 'b1' }), '2026-09-26');
     expect(view.compare).toBeUndefined();
-    expect(view).toMatchObject({ id: 'b1', name: 'Marketing', dateRange: { start: '2026-01-01', end: '2026-01-07', grain: 'day' }, globalFilters: [] });
+    expect(view).toMatchObject({
+      id: 'b1',
+      name: 'Marketing',
+      dateRange: { kind: 'absolute', start: '2026-01-01', end: '2026-01-07', grain: 'day' },
+      resolvedDateRange: { start: '2026-01-01', end: '2026-01-07', grain: 'day' },
+      globalFilters: [],
+    });
+  });
+
+  it('resolves a relative range against the given day (KAN-211)', () => {
+    const view = toBoardView(board({ id: 'b1', date_range: { kind: 'relative', preset: 'last_7_days', grain: 'day' } }), '2026-09-26');
+    expect(view.dateRange).toEqual({ kind: 'relative', preset: 'last_7_days', grain: 'day' });
+    expect(view.resolvedDateRange).toEqual({ start: '2026-09-20', end: '2026-09-26', grain: 'day' });
+  });
+
+  it('falls back to the rolling default for an unreadable stored range rather than failing the page', () => {
+    const view = toBoardView(board({ id: 'b1', date_range: { kind: 'relative', preset: 'bogus', grain: 'day' } as never }), '2026-09-26');
+    expect(view.dateRange).toEqual({ kind: 'relative', preset: 'last_30_days', grain: 'day' });
   });
 
   it('includes compare when set', () => {
@@ -130,6 +147,34 @@ describe('buildTileRenderView — time_series', () => {
       isEmpty: false,
       freshness: null,
     });
+  });
+
+  it('keeps a null value as a gap (null), not 0, and keeps a filled 0 as a real 0 (KAN-210 follow-up)', () => {
+    const view = buildTileRenderView(tile({ type: 'line' }), {
+      ok: true,
+      series: [
+        { bucket_date: '2026-01-01', ad_spend: 10 },
+        { bucket_date: '2026-01-02', ad_spend: null },
+        { bucket_date: '2026-01-03', ad_spend: 0 },
+      ],
+    });
+    expect(view.kind === 'time_series' && view.series[0].points).toEqual([
+      { bucket: '2026-01-01', value: 10 },
+      { bucket: '2026-01-02', value: null },
+      { bucket: '2026-01-03', value: 0 },
+    ]);
+    expect(view.kind === 'time_series' && view.isEmpty).toBe(false);
+  });
+
+  it('flags a series of nothing but gaps as empty - there is nothing to draw', () => {
+    const view = buildTileRenderView(tile({ type: 'bar' }), {
+      ok: true,
+      series: [
+        { bucket_date: '2026-01-01', ad_spend: null },
+        { bucket_date: '2026-01-02', ad_spend: null },
+      ],
+    });
+    expect(view.kind === 'time_series' && view.isEmpty).toBe(true);
   });
 
   it('flags isEmpty when the query returned zero rows', () => {

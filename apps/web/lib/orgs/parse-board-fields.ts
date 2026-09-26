@@ -1,5 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { COMPARE_PERIODS, METRIC_FILTER_OPERATORS, TIME_GRAINS, type CompilerFilter, type ComparePeriod, type TimeGrain } from '@growthos/shared';
+import {
+  COMPARE_PERIODS,
+  METRIC_FILTER_OPERATORS,
+  normalizeDateRangeSetting,
+  type CompilerFilter,
+  type ComparePeriod,
+  type DateRangeSetting,
+} from '@growthos/shared';
 import type { BoardTile, BoardTileType } from '@growthos/firebase-orm-models';
 import { BOARD_TILE_TYPES } from '@growthos/firebase-orm-models';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
@@ -19,25 +26,20 @@ export async function parseCreateBoardRequestBody(request: NextRequest): Promise
 
 export interface ParsedBoardSettingsUpdate {
   name?: string;
-  dateRange?: { start: string; end: string; grain: TimeGrain };
+  dateRange?: DateRangeSetting;
   compare?: ComparePeriod | null;
   globalFilters?: CompilerFilter[];
 }
 
 export type ParsedUpdateBoardSettingsRequest = (ParsedBoardSettingsUpdate & { error?: undefined }) | { error: NextResponse };
 
-function parseDateRange(value: unknown): { start: string; end: string; grain: TimeGrain } | undefined {
-  if (typeof value !== 'object' || value === null) {
-    return undefined;
-  }
-  const record = value as Record<string, unknown>;
-  if (typeof record.start !== 'string' || typeof record.end !== 'string' || typeof record.grain !== 'string') {
-    return undefined;
-  }
-  if (!(TIME_GRAINS as readonly string[]).includes(record.grain)) {
-    return undefined;
-  }
-  return { start: record.start, end: record.end, grain: record.grain as TimeGrain };
+/**
+ * Either `{ kind: 'relative', preset, grain }` (KAN-211) or fixed dates - `{ kind: 'absolute',
+ * start, end, grain }`, or the same without `kind`, which every caller sent before relative ranges
+ * existed. Shape only; whether the dates are real and ordered is `updateBoardSettings`' call.
+ */
+function parseDateRange(value: unknown): DateRangeSetting | undefined {
+  return normalizeDateRangeSetting(value) ?? undefined;
 }
 
 function parseGlobalFilters(value: unknown): CompilerFilter[] | undefined {

@@ -133,6 +133,24 @@ describe('PATCH /api/orgs/[orgId]/projects/[projectId]/boards/[boardId]', () => 
     expect(body.board.compare).toBe('previous_period');
   });
 
+  it('KAN-211: saves a relative preset and returns it with the window it resolves to today', async () => {
+    const { ownerSession, organization, project, board } = await setupOrgProjectBoard('Board Settings Relative Org');
+    getServerSessionMock.mockResolvedValue(ownerSession);
+
+    const { request, params } = patchRequest(organization.id, project.id, board.id, { dateRange: { kind: 'relative', preset: 'last_7_days', grain: 'day' } });
+    const response = await PATCH(request, { params });
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { board: { dateRange: unknown; resolvedDateRange: { start: string; end: string } } };
+    expect(body.board.dateRange).toEqual({ kind: 'relative', preset: 'last_7_days', grain: 'day' });
+    expect(body.board.resolvedDateRange.end).toBe(new Date().toISOString().slice(0, 10));
+
+    // A date that is not a real calendar day is rejected by the service, surfaced as a 400.
+    const badDates = patchRequest(organization.id, project.id, board.id, { dateRange: { start: '2026-02-30', end: '2026-03-01', grain: 'day' } });
+    const badResponse = await PATCH(badDates.request, { params: badDates.params });
+    expect(badResponse.status).toBe(400);
+    expect(((await badResponse.json()) as { error: string }).error).toBe('invalid_board');
+  });
+
   it('KAN-136: lets a project-scoped project_admin rename a board in THEIR OWN project', async () => {
     const { ownerSession, organization, project, board } = await setupOrgProjectBoard('Board Settings Project-Scoped Org');
     const owner = await ensureUserForFirebaseSession({ firebaseUid: ownerSession.uid, email: ownerSession.email as string });

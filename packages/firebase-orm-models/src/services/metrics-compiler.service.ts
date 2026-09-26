@@ -1,8 +1,10 @@
 import {
   collectIdentifiers,
   compileMetricQuery,
+  emptyBucketValueForMetric,
   parseFormula,
   type CompiledMetricQuery,
+  type EmptyBucketValue,
   type CompilerMetricDefinition,
   type MetricCatalog,
   type MetricQueryRequest,
@@ -193,6 +195,8 @@ export interface CompiledProjectMetricQuery extends CompiledMetricQuery {
   definitionRefs: Record<string, string>;
   /** Every dependency of this compiled query whose table is a {@link KNOWN_UNBUILT_WAREHOUSE_TABLES} entry — empty for the overwhelmingly common case. Non-empty doesn't mean this compile *failed* (it didn't — `sql`/`params` above are still a fully valid compiled query); it's a signal for a caller about to actually execute the query (`queryMetrics`) that doing so is certain to fail against any real warehouse today, so it can fail fast with a clean `MetricTargetsUnbuiltWarehouseTableError` instead. */
   unbuiltWarehouseTables: UnbuiltWarehouseTableRef[];
+  /** Per requested metric, what an empty time bucket means for it (a real `zero`, or a `gap`) - see `EmptyBucketValue` in `@growthos/shared`. Consumed by `queryMetrics`'s opt-in `fillEmptyBuckets`. */
+  emptyBucketValues: Record<string, EmptyBucketValue>;
 }
 
 /**
@@ -225,7 +229,11 @@ export async function compileMetricQueryForProject(params: CompileMetricQueryFor
     ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
   });
 
-  return { ...compiled, definitionRefs, unbuiltWarehouseTables };
+  const emptyBucketValues = Object.fromEntries(
+    [...new Set(params.request.metrics)].map((name) => [name, emptyBucketValueForMetric(mappedCatalog, name)] as const),
+  );
+
+  return { ...compiled, definitionRefs, unbuiltWarehouseTables, emptyBucketValues };
 }
 
 /**
