@@ -249,6 +249,7 @@ describe('McpController (e2e)', () => {
           'audit_installation_gaps',
           'create_hook_endpoint',
           'get_setup_health',
+          'get_ingest_health',
           'evolve_metric',
           'list_hook_endpoints',
           'list_insights',
@@ -1255,6 +1256,62 @@ describe('McpController (e2e)', () => {
       expect(body).toMatchObject({ applied: false, summary: { register: 1, blocked: 1 } });
       expect(body.not_applied_reason).toContain('nothing was written');
       expect((await listSchemaDefinitionsForProject(organization.id, project.id)).map((def: { name: string }) => def.name)).toEqual(['signup']);
+    });
+  });
+
+  describe('KAN-202 I4 get_ingest_health', () => {
+    type IngestHealthBody = {
+      environment: string;
+      events: Array<{ event: string; accepted_in_window: number; accepted_in_window_is_lower_bound: boolean; last_seen_at: string | null; open_quarantined: number; quarantine_reasons: string[]; tracking_alert_active: boolean }>;
+      other_schemas: Array<{ kind: string; name: string; registered: boolean; open_quarantined: number }>;
+    };
+
+    it("reports per-event accepted, quarantined and last seen for the key's own environment only", async () => {
+      const a = await setupProjectWithKey('Ingest Health Org');
+      await registerSchemaDefinition({ organizationId: a.organization.id, projectId: a.project.id, kind: 'event', name: 'signup', fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }], createdByUserId: a.owner.id });
+      const now = new Date().toISOString();
+      await ingestBatch({
+        organizationId: a.organization.id,
+        projectId: a.project.id,
+        environmentId: a.devEnvironmentId,
+        input: {
+          kind: 'event',
+          records: [
+            { event_id: 'ih-1', event: 'signup', ts: now, properties: { plan: 'free' } },
+            { event_id: 'ih-2', event: 'signup', ts: now, properties: { plan: 'pro' } },
+            { event_id: 'ih-3', event: 'signup', ts: now, properties: { plan: 'pro', coupon: 'X' } },
+            { event_id: 'ih-4', event: 'lead_click', ts: now, properties: {} },
+          ],
+        },
+      });
+      const { rawKey: devKey } = await mintApiKey({ organizationId: a.organization.id, projectId: a.project.id, environmentId: a.devEnvironmentId, name: 'e2e ingest health dev key', scopes: ['mcp.read'], createdByUserId: a.owner.id });
+
+      const client = await connectedClient(devKey);
+      try {
+        const result = await client.callTool({ name: 'get_ingest_health', arguments: { window_days: 3 } });
+        expect(result.isError ?? false).toBe(false);
+        const body = JSON.parse((result.content as Array<{ text: string }>)[0].text) as IngestHealthBody;
+        expect(body.environment).toBe('dev');
+        expect(body.events).toEqual([
+          expect.objectContaining({ event: 'signup', accepted_in_window: 2, accepted_in_window_is_lower_bound: false, open_quarantined: 1, quarantine_reasons: ['unregistered_field:coupon'], tracking_alert_active: false }),
+        ]);
+        expect(body.events[0].last_seen_at).not.toBeNull();
+        expect(body.other_schemas).toEqual([expect.objectContaining({ kind: 'event', name: 'lead_click', registered: false, open_quarantined: 1 })]);
+      } finally {
+        await client.close();
+      }
+
+      // The prod-bound key sees prod, where nothing landed, and cannot ask for dev.
+      const prodClient = await connectedClient(a.rawKey);
+      try {
+        const prod = JSON.parse(((await prodClient.callTool({ name: 'get_ingest_health', arguments: {} })).content as Array<{ text: string }>)[0].text) as IngestHealthBody;
+        expect(prod.environment).toBe('prod');
+        expect(prod.events).toEqual([expect.objectContaining({ event: 'signup', accepted_in_window: 0, last_seen_at: null, open_quarantined: 0 })]);
+        const crossEnvironment = await prodClient.callTool({ name: 'get_ingest_health', arguments: { environment: 'dev' } });
+        expect(crossEnvironment.isError).toBe(true);
+      } finally {
+        await prodClient.close();
+      }
     });
   });
 
