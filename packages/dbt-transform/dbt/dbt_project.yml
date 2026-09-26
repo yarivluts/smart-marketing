@@ -59,3 +59,7 @@ models:
     core:
       +materialized: table
       +schema: core
+    # Pipeline self-description (KAN-204): which build last ran. See models/ops/_ops.yml.
+    ops:
+      +materialized: table
+      +schema: ops
