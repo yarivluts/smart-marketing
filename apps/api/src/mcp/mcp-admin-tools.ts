@@ -35,6 +35,7 @@ import {
   purgeProjectLandedData,
   PURGEABLE_LANDED_DATA_COLLECTIONS,
   queryGoalProgress,
+  resolveMetricDisplayUnits,
   reexportRawRecordsToWarehouse,
   registerMetricDefinition,
   describeSchemaDefinitionWarnings,
@@ -52,7 +53,7 @@ import {
   type MetricDefinitionInput,
   type OnboardingFunnelStep,
 } from '@growthos/firebase-orm-models';
-import { FUNNEL_STAGE_KEYS, type Permission } from '@growthos/shared';
+import { FUNNEL_STAGE_KEYS, formatMetricValue, serializeMetricUnit, type ParsedMetricUnit, type Permission } from '@growthos/shared';
 import { getServerKmsProvider } from '../vault/kms-provider';
 import { auditedToolHandler, errorResult, textResult, toolInputSchema, type ToolResult } from './mcp-tools';
 import { mcpCallerHasPermission } from './mcp-act-authorization';
@@ -190,6 +191,11 @@ function requiredDryRunablePermission(args: unknown, writePermission: Permission
   return (args as { dry_run?: unknown } | null | undefined)?.dry_run === true ? 'mcp.read' : writePermission;
 }
 
+/** A value formatted in its metric's unit for an MCP response (KAN-213), or `null` when there is no value. English, since a tool response is read by an agent rather than shown to a viewer. */
+function formattedOrNull(value: number | null | undefined, unit: ParsedMetricUnit): string | null {
+  return value === null || value === undefined || !Number.isFinite(value) ? null : formatMetricValue(value, unit, 'en');
+}
+
 async function runAdminTool<Args>(auth: McpAuthContext, permission: Permission, args: unknown, handler: (args: Args) => Promise<ToolResult>): Promise<ToolResult> {
   if (!(await mcpCallerHasPermission(auth, permission))) {
     return errorResult(insufficientPermissionMessage(auth, permission));
@@ -247,6 +253,13 @@ const metricDefinitionInputShape = {
   filters: z.unknown().optional().describe('Aggregation only. Array of { field, op, value }; every field must exist on the table.'),
   formula: z.string().optional().describe('Formula only, e.g. "ad_spend / signups". Every referenced metric must already be registered and active.'),
   dimensions: z.unknown().optional().describe('Breakdown dimensions. For an aggregation each must be a real column on the table; for a formula each must be declared on EVERY referenced metric.'),
+  unit: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'What the values mean, used to format them and to validate goal targets. One of: number, count, ratio (a 0-1 fraction, shown as a percent: declare it for conversion rates so 0.08 displays as 8%), percent (already 0-100), currency (the project currency) or "currency:XXX" (ISO 4217, e.g. "currency:USD"), duration_seconds. Declare it: it cannot be inferred from a formula (a ROI ratio can exceed 1). Omit on register for a plain number; on evolve, omit to keep the current unit and pass null to clear it.',
+    ),
 };
 
 const schemaDefinitionInputShape = {
@@ -524,6 +537,7 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
           aggregation: version.aggregation ?? null,
           formula: version.formula ?? null,
           dimensions: version.dimensions,
+          unit: version.unit ?? null,
           created_at: version.created_at,
         })),
       });
@@ -546,9 +560,10 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
           name: String(a.name),
           definition: toMetricDefinition(a),
           dimensions: Array.isArray(a.dimensions) ? a.dimensions.map(String) : [],
+          ...(a.unit !== undefined ? { unit: a.unit } : {}),
           createdByUserId: actorId(auth),
         });
-        return textResult({ name: metricDef.name, version: metricDef.version, status: metricDef.status });
+        return textResult({ name: metricDef.name, version: metricDef.version, status: metricDef.status, unit: metricDef.unit ?? null });
       }),
     ),
   );
@@ -569,9 +584,10 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
           name: String(a.name),
           definition: toMetricDefinition(a),
           dimensions: Array.isArray(a.dimensions) ? a.dimensions.map(String) : [],
+          ...(a.unit !== undefined ? { unit: a.unit } : {}),
           createdByUserId: actorId(auth),
         });
-        return textResult({ name: metricDef.name, version: metricDef.version, status: metricDef.status });
+        return textResult({ name: metricDef.name, version: metricDef.version, status: metricDef.status, unit: metricDef.unit ?? null });
       }),
     ),
   );
@@ -606,22 +622,30 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
       inputSchema: {},
     },
     auditedToolHandler(auth, 'list_goals', async () => {
-      const goals = await listGoalsForProject(auth.organizationId, auth.projectId);
+      const [goals, units] = await Promise.all([
+        listGoalsForProject(auth.organizationId, auth.projectId),
+        resolveMetricDisplayUnits(auth.organizationId, auth.projectId),
+      ]);
       return textResult({
-        goals: goals.map((goal) => ({
-          id: goal.id,
-          name: goal.name,
-          metric_name: goal.metric_name,
-          direction: goal.direction,
-          target_value: goal.target_value,
-          range_min: goal.range_min,
-          range_max: goal.range_max,
-          start_date: goal.start_date,
-          deadline: goal.deadline,
-          rhythm: goal.rhythm,
-          owner_person_id: goal.owner_person_id,
-          status: goal.status ?? 'active',
-        })),
+        goals: goals.map((goal) => {
+          const unit = units[goal.metric_name] ?? { kind: 'number' as const };
+          return {
+            id: goal.id,
+            name: goal.name,
+            metric_name: goal.metric_name,
+            metric_unit: serializeMetricUnit(unit),
+            direction: goal.direction,
+            target_value: goal.target_value,
+            target_formatted: formattedOrNull(goal.target_value, unit),
+            range_min: goal.range_min,
+            range_max: goal.range_max,
+            start_date: goal.start_date,
+            deadline: goal.deadline,
+            rhythm: goal.rhythm,
+            owner_person_id: goal.owner_person_id,
+            status: goal.status ?? 'active',
+          };
+        }),
       });
     }),
   );
@@ -639,17 +663,26 @@ export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): 
       if (!goal) {
         return errorResult('No such goal in this project.');
       }
-      const outcome = await queryGoalProgress({ organizationId: auth.organizationId, projectId: auth.projectId, goal });
+      const [outcome, units] = await Promise.all([
+        queryGoalProgress({ organizationId: auth.organizationId, projectId: auth.projectId, goal }),
+        resolveMetricDisplayUnits(auth.organizationId, auth.projectId),
+      ]);
       if (!outcome.ok) {
         return textResult({ id: goal.id, name: goal.name, available: false, reason: outcome.reason, detail: outcome.message });
       }
+      const unit = units[goal.metric_name] ?? { kind: 'number' as const };
       return textResult({
         id: goal.id,
         name: goal.name,
         available: true,
+        metric_unit: serializeMetricUnit(unit),
         actual_value: outcome.actualValue,
+        actual_value_formatted: formattedOrNull(outcome.actualValue, unit),
+        target_formatted: formattedOrNull(goal.target_value, unit),
         expected_at_now: outcome.progress.expectedAtNow,
+        expected_at_now_formatted: formattedOrNull(outcome.progress.expectedAtNow, unit),
         projected_final_value: outcome.progress.projectedFinalValue,
+        projected_final_value_formatted: formattedOrNull(outcome.progress.projectedFinalValue, unit),
         progress_ratio: outcome.progress.progressRatio,
         status: outcome.progress.status,
         status_note: 'A paused goal is still reported here; pace is only meaningful for an active one.',
