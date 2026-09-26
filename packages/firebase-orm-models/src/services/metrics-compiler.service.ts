@@ -2,6 +2,7 @@ import {
   collectIdentifiers,
   compileMetricQuery,
   emptyBucketValueForMetric,
+  metricAccumulatesOverPeriod,
   parseFormula,
   type CompiledMetricQuery,
   type EmptyBucketValue,
@@ -197,6 +198,8 @@ export interface CompiledProjectMetricQuery extends CompiledMetricQuery {
   unbuiltWarehouseTables: UnbuiltWarehouseTableRef[];
   /** Per requested metric, what an empty time bucket means for it (a real `zero`, or a `gap`) - see `EmptyBucketValue` in `@growthos/shared`. Consumed by `queryMetrics`'s opt-in `fillEmptyBuckets`. */
   emptyBucketValues: Record<string, EmptyBucketValue>;
+  /** Per requested metric, whether its period value is a running total that grows with the window (a count/sum) or a level (a rate, an average) - see `metricAccumulatesOverPeriod` in `@growthos/shared`. What a goal's pace is judged by. */
+  accumulatesOverPeriod: Record<string, boolean>;
 }
 
 /**
@@ -229,11 +232,11 @@ export async function compileMetricQueryForProject(params: CompileMetricQueryFor
     ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
   });
 
-  const emptyBucketValues = Object.fromEntries(
-    [...new Set(params.request.metrics)].map((name) => [name, emptyBucketValueForMetric(mappedCatalog, name)] as const),
-  );
+  const requestedNames = [...new Set(params.request.metrics)];
+  const emptyBucketValues = Object.fromEntries(requestedNames.map((name) => [name, emptyBucketValueForMetric(mappedCatalog, name)] as const));
+  const accumulatesOverPeriod = Object.fromEntries(requestedNames.map((name) => [name, metricAccumulatesOverPeriod(mappedCatalog, name)] as const));
 
-  return { ...compiled, definitionRefs, unbuiltWarehouseTables, emptyBucketValues };
+  return { ...compiled, definitionRefs, unbuiltWarehouseTables, emptyBucketValues, accumulatesOverPeriod };
 }
 
 /**

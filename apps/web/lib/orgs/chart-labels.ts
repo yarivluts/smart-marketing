@@ -126,6 +126,22 @@ export function labeledAxisIndexes(count: number): Set<number> {
 }
 
 /**
+ * How a label centred on column `index` of `count` is anchored so it never runs past the plot's edge:
+ * the first column's label starts at the column's left edge, the last one's ends at its right edge,
+ * and every other one is centred. A centred label on the last column of a dense plot overhangs the
+ * plot by half its width, and the tile clips that half - "9/26" read as "9/2" (B25).
+ */
+export function edgeAnchor(index: number, count: number): 'start' | 'center' | 'end' {
+  if (count <= 1) {
+    return 'center';
+  }
+  if (index === count - 1) {
+    return 'end';
+  }
+  return index === 0 ? 'start' : 'center';
+}
+
+/**
  * How many per-value plots a split bar tile draws before summarising the rest (KAN-217). A bar tile
  * split by a dimension draws one small plot per value; with no cap, a breakdown by four campaigns
  * grew the tile past its grid cell and drew over the tile below it.

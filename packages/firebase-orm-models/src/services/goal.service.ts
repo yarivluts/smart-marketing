@@ -5,11 +5,12 @@ import {
   isGoalDirection,
   isGoalRhythm,
   MetricCompilerError,
+  readPeriodValue,
+  TOTAL_GRAIN,
   type GoalDirection,
   type GoalProgressHistoryPoint,
   type GoalProgressResult,
   type GoalRhythm,
-  type MetricQueryRequest,
 } from '@growthos/shared';
 import { ProjectModel } from '../models/project.model';
 import { GoalModel, type GoalStatus } from '../models/goal.model';
@@ -559,7 +560,7 @@ export type GoalProgressOutcome =
       /**
        * Whether the metric returned any rows at all over the goal's window.
        *
-       * `actualValue` is a sum, so a metric that has never received a single record sums to 0
+       * `actualValue` reads 0 when nothing was measured, so a metric that has never received a single record reads 0
        * - identical to a metric measured at zero. Pace is then computed against that 0 and the
        * goal reads "off track", in red, with 0% filled: a project that has not started
        * reporting is presented exactly like one that is failing, and the two need opposite
@@ -585,22 +586,9 @@ function todayDateOnly(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Sums one metric's own column across every returned row — a local mirror of `sumMetric` in `apps/web/lib/orgs/board-view.ts` rather than an import across the app/package boundary (this package must not depend on `apps/web`). */
-function sumMetricRows(rows: readonly WarehouseRow[], metricName: string): number {
-  return rows.reduce((total, row) => {
-    const raw = row[metricName] ?? null;
-    if (raw === null) {
-      return total;
-    }
-    const num = typeof raw === 'number' ? raw : Number(raw);
-    return Number.isFinite(num) ? total + num : total;
-  }, 0);
-}
-
 /**
- * Turns the same day-grain `result.series` rows `sumMetricRows` already
- * consumes into {@link GoalProgressHistoryPoint}s for `calculateGoalProgress`'s
- * minimize/range trend fit — each row's own `bucket_date` (the compiler's
+ * Turns the goal's day-grain series into {@link GoalProgressHistoryPoint}s for `calculateGoalProgress`'s
+ * minimize/range/level trend fit — each row's own `bucket_date` (the compiler's
  * per-day `GROUP BY` column, see `metrics-compiler/compiler.ts`) maps to an
  * `elapsedFraction` via the same {@link computeElapsedFraction} used for the
  * goal's own current elapsed fraction. Rows with a missing/non-numeric
@@ -638,11 +626,13 @@ function buildHistoryPoints(
 
 /**
  * Computes a goal's current progress (KAN-64, E12.1): queries the goal's own
- * metric over `[start_date, min(asOfDate, deadline)]`, sums it into a single
- * `actualValue`, also turns the same day-grain rows into `history` points
+ * metric over `[start_date, min(asOfDate, deadline)]` as ONE bucket for its
+ * `actualValue` (the period value - a rate over the period's totals, never a
+ * sum or mean of daily rates), and at day grain for `history` points
  * (`buildHistoryPoints`) so `calculateGoalProgress` can fit a trend for a
- * minimize/range goal's `projectedFinalValue` instead of a flat projection,
- * and runs it all through `calculateGoalProgress`. Mirrors `queryBoardTile`'s
+ * minimize/range/level goal's `projectedFinalValue` instead of a flat projection,
+ * and runs it all through `calculateGoalProgress`, paced as a running total or
+ * as a level per the metric's own kind. Mirrors `queryBoardTile`'s
  * exact error-handling shape (`board.service.ts`) — a goal's own progress
  * thermometer degrades gracefully the same way a board tile does, rather
  * than failing the whole goal detail page.
@@ -674,32 +664,38 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
 
   const queryEnd = asOfDate < goal.deadline ? asOfDate : goal.deadline;
 
-  const request: MetricQueryRequest = {
-    metrics: [goal.metric_name],
-    time: { start: goal.start_date, end: queryEnd, grain: 'day' },
+  const window = { start: goal.start_date, end: queryEnd };
+  const shared = {
+    organizationId: params.organizationId,
+    projectId: params.projectId,
+    ...(params.executor ? { executor: params.executor } : {}),
+    ...(params.cache ? { cache: params.cache } : {}),
+    ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
   };
 
   try {
-    const result = await queryMetrics({
-      organizationId: params.organizationId,
-      projectId: params.projectId,
-      request,
-      // A day with no events is a real zero for a count/sum metric, and the trend fit below must
-      // see it as one; for a rate/formula metric it arrives as null and `buildHistoryPoints` skips it.
-      fillEmptyBuckets: true,
-      ...(params.executor ? { executor: params.executor } : {}),
-      ...(params.cache ? { cache: params.cache } : {}),
-      ...(params.environmentId !== undefined ? { environmentId: params.environmentId } : {}),
-    });
-    const actualValue = sumMetricRows(result.series, goal.metric_name);
+    // The goal's actual value: the metric over the whole window as ONE bucket, so a rate is
+    // sum(numerator) / sum(denominator) for the period - summing (or averaging) daily values is only
+    // right for a plain count or sum. See `TOTAL_GRAIN`.
+    const periodResult = await queryMetrics({ ...shared, request: { metrics: [goal.metric_name], time: { ...window, grain: TOTAL_GRAIN } } });
+    const actualValue = readPeriodValue(periodResult.series, goal.metric_name) ?? 0;
+    // A rate is paced against the target itself, a running total against elapsed x target.
+    const accumulates = periodResult.accumulatesOverPeriod[goal.metric_name] ?? true;
     const elapsedFraction = computeElapsedFraction(goal.start_date, goal.deadline, asOfDate, goal.rhythm);
-    const history: GoalProgressHistoryPoint[] = buildHistoryPoints(
-      result.series,
-      goal.metric_name,
-      goal.start_date,
-      goal.deadline,
-      goal.rhythm,
-    );
+    // The day-by-day series only feeds the trend fit a minimize/range goal (or a maximize goal on a
+    // level) projects with - a maximize goal on a running total extrapolates its own actual value, so
+    // it costs no second query. A day with no events is a real zero for a count/sum metric, and the
+    // fit must see it as one; for a rate/formula metric it arrives as null and is skipped.
+    const needsHistory = goal.direction !== 'maximize' || !accumulates;
+    const history: GoalProgressHistoryPoint[] = needsHistory
+      ? buildHistoryPoints(
+          (await queryMetrics({ ...shared, request: { metrics: [goal.metric_name], time: { ...window, grain: 'day' } }, fillEmptyBuckets: true })).series,
+          goal.metric_name,
+          goal.start_date,
+          goal.deadline,
+          goal.rhythm,
+        )
+      : [];
     const progress = calculateGoalProgress({
       direction: goal.direction,
       targetValue: goal.target_value ?? undefined,
@@ -708,10 +704,12 @@ export async function queryGoalProgress(params: QueryGoalProgressParams): Promis
       actualValue,
       elapsedFraction,
       history,
+      accumulates,
     });
-    // Rows returned, not the summed value: a metric measured at zero has rows and is a real
-    // reading; a metric that has never received a record has none and sums to the same 0.
-    return { ok: true, actualValue, progress, hasMeasurements: result.series.length > 0 };
+    // A returned row, not the value: a metric measured at zero has a row and is a real reading; a
+    // metric that has never received a record has none (the whole-range query drops an empty
+    // window) and would otherwise read as the same 0.
+    return { ok: true, actualValue, progress, hasMeasurements: periodResult.series.length > 0 };
   } catch (error) {
     if (error instanceof WarehouseNotConfiguredError) {
       return { ok: false, reason: 'warehouse_not_configured', message: error.message };

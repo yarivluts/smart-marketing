@@ -267,6 +267,25 @@ describe('getCampaignPaybackBreakdownForProject', () => {
       { campaignId: 'spring_social', collectedRevenue40d: 50, roi40d: null },
     ]);
   });
+
+  it('asks for each campaign\'s lifetime as ONE bucket, so roi_40d is the ratio of its lifetime totals and a campaign never splits into one partial row per calendar year (B24)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Campaign Payback Total Grain Org');
+    await ensureCampaignOpsPackRegistered(organization.id, project.id, owner.id);
+    const queries: { sql: string }[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        queries.push(query);
+        return Promise.resolve([]);
+      },
+    };
+
+    await getCampaignPaybackBreakdownForProject(organization.id, project.id, { executor, cache: new InMemoryMetricQueryResultCache() });
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(queries[0].sql).not.toContain('DATE_TRUNC');
+    expect(queries[0].sql).toContain('GROUP BY `campaign_id`');
+  });
 });
 
 describe('getQualityCalibrationBreakdownForProject', () => {

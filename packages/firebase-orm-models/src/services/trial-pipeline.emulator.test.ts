@@ -121,6 +121,24 @@ describe('getTrialPipelineSummary', () => {
     expect(executor.callCount).toBe(1);
   });
 
+  it('queries its 30-day window as ONE bucket, so the conversion rate is the window\'s conversions over its trial starts (B24)', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Trial Pipeline Total Grain Org');
+    await registerTrialPipelineMetrics(organization.id, project.id, owner.id);
+    const queries: { sql: string; params: Record<string, unknown> }[] = [];
+    const executor: WarehouseQueryExecutor = {
+      execute: (query) => {
+        queries.push(query);
+        return Promise.resolve([]);
+      },
+    };
+
+    await getTrialPipelineSummary({ organizationId: organization.id, projectId: project.id, executor, cache: new InMemoryMetricQueryResultCache() });
+
+    expect(queries).toHaveLength(1);
+    expect(queries[0].sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(queries[0].sql).not.toContain('DATE_TRUNC');
+  });
+
   it('degrades to a "warehouse not configured" outcome instead of throwing, using the default executor', async () => {
     const { owner, organization, project } = await setupOrgWithProject('Trial Pipeline Unconfigured Org');
     await registerTrialPipelineMetrics(organization.id, project.id, owner.id);

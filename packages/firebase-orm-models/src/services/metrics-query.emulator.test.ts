@@ -22,6 +22,12 @@ import {
   type WarehouseRow,
 } from '../index';
 import { connectToFirestoreEmulator } from '../test-utils/emulator';
+import {
+  registerTwoDayRatioMetrics,
+  TWO_DAY_RATIO_MEAN_OF_DAILY_RATES,
+  TWO_DAY_RATIO_PERIOD_VALUE,
+  TwoDayRatioWarehouse,
+} from '../test-utils/two-day-ratio-warehouse';
 
 /** Emulator-backed tests for KAN-42's `queryMetrics`/catalog read-side — the Firestore-resolving layer `POST /v1/metrics/query` and `GET /v1/metrics(/{name})` sit on top of. */
 
@@ -721,5 +727,75 @@ describe('queryMetrics fillEmptyBuckets (KAN-210 follow-up)', () => {
     // The cached rows themselves were not rewritten by the fill.
     const again = await queryMetrics({ organizationId: organization.id, projectId: project.id, request, executor, cache });
     expect(again.series).toEqual(rows);
+  });
+});
+
+describe('queryMetrics total grain - a period value (B24)', () => {
+  it('queries a ratio over the whole range as ONE bucket: the SQL divides the period totals and the result is 2/101 = 1.98%, NOT 50.5%', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Total Grain Org');
+    await registerTwoDayRatioMetrics(organization.id, project.id, owner.id);
+    const warehouse = new TwoDayRatioWarehouse();
+
+    const result = await queryMetrics({
+      organizationId: organization.id,
+      projectId: project.id,
+      request: { metrics: ['lp_conversion_rate'], time: { start: '2026-09-01', end: '2026-09-02', grain: 'total' } },
+      executor: warehouse,
+      cache: new InMemoryMetricQueryResultCache(),
+      fillEmptyBuckets: true,
+    });
+
+    const [query] = warehouse.queries;
+    // Each operand aggregated over the whole window, the formula applied once on top.
+    expect(query.sql).toContain('CAST(@time_start_current AS DATE) AS bucket_date');
+    expect(query.sql).toContain('HAVING COUNT(*) > 0');
+    expect(query.sql).toContain('SAFE_DIVIDE(value_lp_conversions, value_lp_visitors) AS `lp_conversion_rate`');
+    expect(query.sql).not.toContain('DATE_TRUNC');
+    expect(query.sql).not.toContain('GROUP BY bucket_date');
+    expect(query.params).toMatchObject({ time_start_current: '2026-09-01', time_end_current: '2026-09-02' });
+
+    // One row - the period - even with fillEmptyBuckets on.
+    expect(result.series).toHaveLength(1);
+    const value = Number(result.series[0].lp_conversion_rate);
+    expect(value).toBeCloseTo(TWO_DAY_RATIO_PERIOD_VALUE, 10);
+    expect(value).not.toBeCloseTo(TWO_DAY_RATIO_MEAN_OF_DAILY_RATES, 2);
+    expect(result.accumulatesOverPeriod).toEqual({ lp_conversion_rate: false });
+  });
+
+  it('reports a count as accumulating, and its whole-range value equals the sum of its daily values', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Total Grain Count Org');
+    await registerTwoDayRatioMetrics(organization.id, project.id, owner.id);
+    const warehouse = new TwoDayRatioWarehouse();
+    const cache = new InMemoryMetricQueryResultCache();
+    const time = { start: '2026-09-01', end: '2026-09-02' };
+
+    const total = await queryMetrics({ organizationId: organization.id, projectId: project.id, request: { metrics: ['lp_visitors'], time: { ...time, grain: 'total' } }, executor: warehouse, cache });
+    const daily = await queryMetrics({ organizationId: organization.id, projectId: project.id, request: { metrics: ['lp_visitors'], time: { ...time, grain: 'day' } }, executor: warehouse, cache });
+
+    expect(total.accumulatesOverPeriod).toEqual({ lp_visitors: true });
+    expect(total.series.map((row) => row.lp_visitors)).toEqual([101]);
+    expect(daily.series.reduce((sum, row) => sum + Number(row.lp_visitors), 0)).toBe(101);
+  });
+
+  it('never serves one grain\'s or one breakdown\'s cached rows to another request over the same metric and window', async () => {
+    const { owner, organization, project } = await setupOrgWithProject('Query Cache Shape Org');
+    await registerTwoDayRatioMetrics(organization.id, project.id, owner.id);
+    const warehouse = new TwoDayRatioWarehouse();
+    const cache = new InMemoryMetricQueryResultCache();
+    const time = { start: '2026-09-01', end: '2026-09-02' };
+    const base = { organizationId: organization.id, projectId: project.id, executor: warehouse, cache };
+
+    const daily = await queryMetrics({ ...base, request: { metrics: ['lp_conversion_rate'], time: { ...time, grain: 'day' } } });
+    const total = await queryMetrics({ ...base, request: { metrics: ['lp_conversion_rate'], time: { ...time, grain: 'total' } } });
+    const byCampaign = await queryMetrics({ ...base, request: { metrics: ['lp_conversion_rate'], dimensions: ['campaign_id'], time: { ...time, grain: 'total' } } });
+    const totalAgain = await queryMetrics({ ...base, request: { metrics: ['lp_conversion_rate'], time: { ...time, grain: 'total' } } });
+
+    expect(daily.cacheHit).toBe(false);
+    expect(total.cacheHit).toBe(false);
+    expect(byCampaign.cacheHit).toBe(false);
+    expect(totalAgain.cacheHit).toBe(true);
+    expect(daily.series).toHaveLength(2);
+    expect(total.series).toHaveLength(1);
+    expect(warehouse.queries).toHaveLength(3);
   });
 });

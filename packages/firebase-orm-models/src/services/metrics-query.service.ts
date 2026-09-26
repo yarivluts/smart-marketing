@@ -45,6 +45,7 @@ function buildResultCacheKey(
   environmentId: string | null,
   definitionRefs: Record<string, string>,
   params: Record<string, CompilerParamValue>,
+  shape: { grain: MetricQueryRequest['time']['grain']; dimensions: readonly string[] },
 ): string {
   const sortEntries = <T>(record: Record<string, T>) => Object.fromEntries(Object.entries(record).sort(([a], [b]) => a.localeCompare(b)));
   // `environmentId` is included explicitly even though a resolved env also
@@ -52,7 +53,22 @@ function buildResultCacheKey(
   // left the env unset, two different environments' queries would otherwise
   // share one cache entry and serve each other's rows, the same
   // cross-slice-leak reasoning as including org/project above.
-  const canonical = JSON.stringify({ organizationId, projectId, environmentId, definitionRefs: sortEntries(definitionRefs), params: sortEntries(params) });
+  //
+  // `shape` - the grain and the breakdown - never appears in `params` (it is
+  // compiled into the SQL text, not bound), yet it changes the rows
+  // completely. Without it a whole-range `total` query and a day-grain query
+  // over the same metric and window shared one entry, as did a big-number
+  // tile and a split-by-campaign bar tile on the same board: whichever ran
+  // first served its rows to the other.
+  const canonical = JSON.stringify({
+    organizationId,
+    projectId,
+    environmentId,
+    definitionRefs: sortEntries(definitionRefs),
+    params: sortEntries(params),
+    grain: shape.grain,
+    dimensions: [...new Set(shape.dimensions)],
+  });
   return createHash('sha256').update(canonical).digest('hex');
 }
 
@@ -107,6 +123,8 @@ export interface MetricQueryResult {
   /** `metric:<name>@v<version>` per metric the query depends on (requested or transitively referenced by a formula) — see `compileMetricQueryForProject`. */
   definitionRefs: Record<string, string>;
   cacheHit: boolean;
+  /** Per requested metric: a running total (true) or a level such as a rate (false) - see `CompiledProjectMetricQuery.accumulatesOverPeriod`. */
+  accumulatesOverPeriod: Record<string, boolean>;
 }
 
 /**
@@ -190,10 +208,14 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
       ? fillEmptyBuckets(rows, { time: params.request.time, dimensions: [...new Set(params.request.dimensions ?? [])], metrics: compiled.emptyBucketValues })
       : rows;
 
-  const cacheKey = buildResultCacheKey(params.organizationId, params.projectId, environmentId, compiled.definitionRefs, compiled.params);
+  const cacheKey = buildResultCacheKey(params.organizationId, params.projectId, environmentId, compiled.definitionRefs, compiled.params, {
+    grain: params.request.time.grain,
+    dimensions: params.request.dimensions ?? [],
+  });
+  const accumulatesOverPeriod = compiled.accumulatesOverPeriod;
   const cached = cache.get(cacheKey);
   if (cached) {
-    return { series: shapeSeries(cached), definitionRefs: compiled.definitionRefs, cacheHit: true };
+    return { series: shapeSeries(cached), definitionRefs: compiled.definitionRefs, cacheHit: true, accumulatesOverPeriod };
   }
 
   const quota = await checkProjectQueryQuota(params.organizationId, params.projectId, new Date(), params.precomputedQuota);
@@ -214,7 +236,7 @@ export async function queryMetrics(params: QueryMetricsParams): Promise<MetricQu
     }
     cache.set(cacheKey, series, cacheTtlSeconds);
     await logCostAttempt(params.organizationId, params.projectId, 'executed', compiled.definitionRefs, estimatedCostUsd);
-    return { series: shapeSeries(series), definitionRefs: compiled.definitionRefs, cacheHit: false };
+    return { series: shapeSeries(series), definitionRefs: compiled.definitionRefs, cacheHit: false, accumulatesOverPeriod };
   } catch (error) {
     const outcome = error instanceof WarehouseNotConfiguredError ? 'warehouse_not_configured' : 'executed';
     await logCostAttempt(params.organizationId, params.projectId, outcome, compiled.definitionRefs);

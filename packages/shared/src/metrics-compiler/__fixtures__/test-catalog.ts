@@ -95,6 +95,25 @@ export function buildTestCatalog(): MetricCatalog {
       formula: 'max(ad_spend - new_paying, 0)',
       dimensions: ['channel'],
     },
+    {
+      name: 'lp_visitors',
+      definitionKind: 'aggregation',
+      aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [{ field: 'step', operator: '=', value: 'lp_visit' }] },
+      dimensions: ['campaign'],
+    },
+    {
+      name: 'lp_conversions',
+      definitionKind: 'aggregation',
+      aggregation: { function: 'count', table: 'fact_funnel_event', timeColumn: 'ts', filters: [{ field: 'step', operator: '=', value: 'lp_conversion' }] },
+      dimensions: ['campaign'],
+    },
+    {
+      // A ratio - the metric the period-value (`total` grain) cases are about.
+      name: 'lp_conversion_rate',
+      definitionKind: 'formula',
+      formula: 'lp_conversions / lp_visitors',
+      dimensions: ['campaign'],
+    },
   ];
 
   return new Map(definitions.map((definition) => [definition.name, definition]));

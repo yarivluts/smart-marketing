@@ -85,43 +85,51 @@ describe('buildTileRenderView — metric units (KAN-213)', () => {
     expect(view).toEqual({ kind: 'big_number', value: 1, isEmpty: false, freshness: null });
   });
 
-  it('averages a ratio big number across its buckets instead of summing fractions, gaps excluded', () => {
+  it('shows a ratio big number as the period value the warehouse computed (2/101 = 1.98%), never a mean of daily rates (50.5%) (B24)', () => {
+    // The tile's query is the whole range as one bucket, so the row IS the period: 2 conversions
+    // over 101 visitors across day 1 (1/1) and day 2 (1/100).
+    const view = buildTileRenderView(
+      tile({ type: 'big_number', metricNames: ['lp_conversion_rate'] }),
+      { ok: true, series: [{ bucket_date: '2026-09-01', lp_conversion_rate: 2 / 101 }] },
+      null,
+      units,
+    );
+    expect(view).toMatchObject({ kind: 'big_number', units: { lp_conversion_rate: { kind: 'ratio' } } });
+    const value = view.kind === 'big_number' ? view.value : Number.NaN;
+    expect(value).toBeCloseTo(0.0198, 4);
+    expect(value).not.toBeCloseTo(0.505, 2);
+  });
+
+  it('shows a count big number as the same period total as before', () => {
+    const view = buildTileRenderView(tile({ type: 'big_number', metricNames: ['signups'] }), { ok: true, series: [{ bucket_date: '2026-01-01', signups: 5 }] }, null, units);
+    expect(view).toMatchObject({ value: 5 });
+  });
+
+  it('compares a ratio period against the previous period\'s own value', () => {
     const view = buildTileRenderView(
       tile({ type: 'big_number', metricNames: ['lp_conversion_rate'] }),
       {
         ok: true,
         series: [
-          { bucket_date: '2026-01-01', lp_conversion_rate: 0.4 },
-          { bucket_date: '2026-01-02', lp_conversion_rate: 0.6 },
-          { bucket_date: '2026-01-03', lp_conversion_rate: null },
+          { period: 'current', bucket_date: '2026-09-01', lp_conversion_rate: 0.02 },
+          { period: 'previous', bucket_date: '2026-08-30', lp_conversion_rate: 0.04 },
         ],
       },
       null,
       units,
     );
-    expect(view).toMatchObject({ kind: 'big_number', value: 0.5, units: { lp_conversion_rate: { kind: 'ratio' } } });
-  });
-
-  it('still sums a count big number', () => {
-    const view = buildTileRenderView(
-      tile({ type: 'big_number', metricNames: ['signups'] }),
-      { ok: true, series: [{ bucket_date: '2026-01-01', signups: 2 }, { bucket_date: '2026-01-02', signups: 3 }] },
-      null,
-      units,
-    );
-    expect(view).toMatchObject({ value: 5 });
+    expect(view).toMatchObject({ kind: 'big_number', value: 0.02, previousValue: 0.04, deltaPct: -50 });
   });
 });
 
 describe('buildTileRenderView — big_number', () => {
-  it('sums the current period, with no previousValue/deltaPct when there is no compare data', () => {
-    const view = buildTileRenderView(tile({ type: 'big_number' }), {
-      ok: true,
-      series: [
-        { bucket_date: '2026-01-01', ad_spend: 100 },
-        { bucket_date: '2026-01-02', ad_spend: 50 },
-      ],
-    });
+  it('reads the current period\'s single row, with no previousValue/deltaPct when there is no compare data', () => {
+    const view = buildTileRenderView(tile({ type: 'big_number' }), { ok: true, series: [{ bucket_date: '2026-01-01', ad_spend: 150 }] });
+    expect(view).toEqual({ kind: 'big_number', value: 150, isEmpty: false, freshness: null });
+  });
+
+  it('shows a current value with no delta when a compared previous period returned nothing', () => {
+    const view = buildTileRenderView(tile({ type: 'big_number' }), { ok: true, series: [{ period: 'current', bucket_date: '2026-01-01', ad_spend: 150 }] });
     expect(view).toEqual({ kind: 'big_number', value: 150, isEmpty: false, freshness: null });
   });
 
@@ -293,13 +301,10 @@ describe('buildTileRenderView — table', () => {
 });
 
 describe('buildTileRenderView — funnel', () => {
-  it('sums each step across every row and computes its percentage of the first step', () => {
+  it('reads each step\'s period value off the single whole-range row and computes its percentage of the first step', () => {
     const view = buildTileRenderView(tile({ type: 'funnel', metricNames: ['signups', 'activations', 'purchases'], dimensions: [] }), {
       ok: true,
-      series: [
-        { bucket_date: '2026-01-01', signups: 100, activations: 40, purchases: 10 },
-        { bucket_date: '2026-01-02', signups: 50, activations: 20, purchases: 5 },
-      ],
+      series: [{ bucket_date: '2026-01-01', signups: 150, activations: 60, purchases: 15 }],
     });
     expect(view).toEqual({
       kind: 'funnel',

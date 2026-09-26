@@ -22,7 +22,7 @@ import {
   WarehouseNotConfiguredError,
   type FunnelStepResult,
 } from '@growthos/firebase-orm-models';
-import { MetricCompilerError, serializeMetricUnit } from '@growthos/shared';
+import { MetricCompilerError, serializeMetricUnit, TOTAL_GRAIN } from '@growthos/shared';
 import { parseMetricQueryRequestBody } from '../metrics/metrics-request';
 import type { McpAuthContext } from './mcp-auth.guard';
 
@@ -225,10 +225,65 @@ function describeMetricsError(error: unknown): string {
  * extra-validation, not in three independently-maintained copies of the
  * parse-query-respond sequence.
  */
+type MetricQueryRequestBody = ReturnType<typeof parseMetricQueryRequestBody>;
+
+/** One dimension combination's period values in a `compare_periods` answer - see {@link buildPeriodTotals}. */
+interface PeriodTotalsEntry {
+  dimensions: Record<string, string | number | null>;
+  current: Record<string, number | null>;
+  previous: Record<string, number | null>;
+  /** (current - previous) / previous x 100, per metric; null when either side is missing or the previous value is 0. */
+  change_pct: Record<string, number | null>;
+}
+
+function toFiniteOrNull(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined || raw === '') {
+    return null;
+  }
+  const value = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * Folds a compared `total`-grain result (one row per period per dimension combination) into one
+ * entry per combination: each metric's current and previous PERIOD value, and the change between
+ * them. The values are the warehouse's own - a rate evaluated over each period's totals - so an
+ * agent never has to (and must not) derive them by summing or averaging the per-bucket `series`.
+ */
+function buildPeriodTotals(rows: readonly Record<string, string | number | null>[], request: MetricQueryRequestBody): PeriodTotalsEntry[] {
+  const dimensions = [...new Set(request.dimensions ?? [])];
+  const metrics = [...new Set(request.metrics)];
+  const entries = new Map<string, PeriodTotalsEntry>();
+  for (const row of rows) {
+    const dimensionValues = Object.fromEntries(dimensions.map((dimension) => [dimension, row[dimension] ?? null]));
+    const key = JSON.stringify(dimensions.map((dimension) => dimensionValues[dimension]));
+    const entry = entries.get(key) ?? {
+      dimensions: dimensionValues,
+      current: Object.fromEntries(metrics.map((metric) => [metric, null])),
+      previous: Object.fromEntries(metrics.map((metric) => [metric, null])),
+      change_pct: {},
+    };
+    const side = row.period === 'previous' ? entry.previous : entry.current;
+    for (const metric of metrics) {
+      side[metric] = toFiniteOrNull(row[metric]);
+    }
+    entries.set(key, entry);
+  }
+  for (const entry of entries.values()) {
+    for (const metric of metrics) {
+      const current = entry.current[metric];
+      const previous = entry.previous[metric];
+      entry.change_pct[metric] = current !== null && previous !== null && previous !== 0 ? ((current - previous) / previous) * 100 : null;
+    }
+  }
+  return [...entries.values()];
+}
+
 async function runMetricQueryTool(
   auth: McpAuthContext,
   args: unknown,
-  extraValidate?: (request: ReturnType<typeof parseMetricQueryRequestBody>) => string | undefined,
+  extraValidate?: (request: MetricQueryRequestBody) => string | undefined,
+  options: { periodTotals?: boolean } = {},
 ): Promise<ToolResult> {
   try {
     const request = parseMetricQueryRequestBody(args);
@@ -239,21 +294,32 @@ async function runMetricQueryTool(
     // API-key caller: the key's bound environment; OAuth (human) caller:
     // undefined, so queryMetrics resolves the project's prod default — see
     // McpAuthContext.environmentId's own doc comment.
-    const [result, displayUnits] = await Promise.all([
+    const scope = {
+      organizationId: auth.organizationId,
+      projectId: auth.projectId,
+      ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
+    };
+    // A period comparison is about each period's VALUE. For a rate that is the formula over the
+    // period's totals (sum(conversions) / sum(visitors)), which no sum or mean of the bucketed
+    // series can recover - so it is asked of the warehouse directly, as one `total`-grain bucket per
+    // period. A request that is already `total` grain is its own answer.
+    const wantsTotals = options.periodTotals === true;
+    const totalsRequest: MetricQueryRequestBody = { ...request, time: { ...request.time, grain: TOTAL_GRAIN } };
+    const [result, displayUnits, totalsResult] = await Promise.all([
       queryMetrics({
-        organizationId: auth.organizationId,
-        projectId: auth.projectId,
-        ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}),
+        ...scope,
         request,
         // One row per bucket of the range, the same series a board line/bar tile draws: a silent
         // missing day would read to an agent as "no data", or as two adjacent days, when it was a 0.
         fillEmptyBuckets: true,
       }),
       resolveMetricDisplayUnits(auth.organizationId, auth.projectId),
+      wantsTotals && request.time.grain !== TOTAL_GRAIN ? queryMetrics({ ...scope, request: totalsRequest }) : Promise.resolve(undefined),
     ]);
     // Each queried metric's unit (KAN-213), so a 0.5 in a "ratio" column is read as 50%, not 0.5.
     const units = Object.fromEntries(request.metrics.map((metric) => [metric, serializeMetricUnit(displayUnits[metric] ?? { kind: 'number' })]));
-    return textResult({ series: result.series, units, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
+    const periodTotals = wantsTotals ? { period_totals: buildPeriodTotals((totalsResult ?? result).series, request) } : {};
+    return textResult({ series: result.series, ...periodTotals, units, definition_refs: result.definitionRefs, cache_hit: result.cacheHit });
   } catch (error) {
     return errorResult(describeMetricsError(error));
   }
@@ -275,7 +341,11 @@ const metricQueryInputShape = {
   metric: z.unknown().describe('One metric name (string), or an array of metric names to query together.'),
   dimensions: z.unknown().optional().describe('Breakdown dimensions — each must be declared on every requested metric.'),
   filters: z.unknown().optional().describe('Array of { field, op, value } — op is one of =, !=, >, >=, <, <=, in.'),
-  time: z.unknown().describe('{ start: "YYYY-MM-DD", end: "YYYY-MM-DD", grain: day|week|month|quarter|year, compare?: previous_period|previous_year }'),
+  time: z
+    .unknown()
+    .describe(
+      '{ start: "YYYY-MM-DD", end: "YYYY-MM-DD", grain: day|week|month|quarter|year|total, compare?: previous_period|previous_year } - "total" returns the whole range as ONE bucket: the period value.',
+    ),
 };
 
 const cohortInputShape = {
@@ -338,7 +408,7 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Query metric',
       description:
-        'Run a grounded query against one or more registered metrics for a date range — never generated numbers, always compiled from the metric registry and executed against the warehouse. The series has one row per time bucket in the range: a bucket with no events is 0 for a count/count_distinct/sum metric and null ("no value", not zero) for an avg/min/max or formula metric. An entirely empty result means nothing was recorded in the range at all.',
+        'Run a grounded query against one or more registered metrics for a date range — never generated numbers, always compiled from the metric registry and executed against the warehouse. The series has one row per time bucket in the range: a bucket with no events is 0 for a count/count_distinct/sum metric and null ("no value", not zero) for an avg/min/max or formula metric. An entirely empty result means nothing was recorded in the range at all. For a value over the whole range (e.g. "what was the conversion rate last month") use grain "total", which returns one row with the metric evaluated over the period: never sum or average bucket values of a rate/formula, avg or count_distinct metric - day 1 at 1/1 and day 2 at 1/100 average 50.5%, but the period rate is 2/101 = 1.98%.',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
     auditedToolHandler(auth, 'query_metric', async (args: any) => runMetricQueryTool(auth, args)),
@@ -349,12 +419,15 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Compare periods',
       description:
-        'Query one or more metrics with a period-over-period comparison ("time.compare": previous_period or previous_year, required) — the result series is split by a "period" column for "current" vs. "prior".',
+        'Query one or more metrics with a period-over-period comparison ("time.compare": previous_period or previous_year, required) — the result series is split by a "period" column for "current" vs. "prior". "period_totals" holds each period\'s own value per metric (and per dimension combination) plus change_pct, computed by the warehouse over each whole period - compare those, never sums or averages of the series (a rate over a period is not the mean of its daily rates).',
       inputSchema: toolInputSchema(metricQueryInputShape),
     },
     auditedToolHandler(auth, 'compare_periods', async (args: any) =>
-      runMetricQueryTool(auth, args, (request) =>
-        request.time.compare ? undefined : 'compare_periods requires "time.compare" to be "previous_period" or "previous_year".',
+      runMetricQueryTool(
+        auth,
+        args,
+        (request) => (request.time.compare ? undefined : 'compare_periods requires "time.compare" to be "previous_period" or "previous_year".'),
+        { periodTotals: true },
       ),
     ),
   );
