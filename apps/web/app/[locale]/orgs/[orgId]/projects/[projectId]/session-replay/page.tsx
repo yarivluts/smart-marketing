@@ -1,3 +1,7 @@
+import { Link2, MonitorPlay, PlayCircle, SlidersHorizontal } from 'lucide-react';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard, FlowDiagram, PageHero } from '@/components/viz';
+import { summarizeSessionReplayTemplate } from '@/lib/orgs/session-replay-view';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
@@ -53,21 +57,43 @@ export default async function SessionReplaySettingsPage({ params }: PageProps): 
   }
 
   const t = await getTranslations('SessionReplaySettings');
+  const summary = summarizeSessionReplayTemplate(project.session_replay_url_template);
+  const toolLabel = summary.tool ? t(`toolName.${summary.tool}`) : t('notConfigured');
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('intro')}</p>
-      </div>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={PlayCircle} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('intro')}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <StatCard title={t('kpiTool')} value={toolLabel} icon={MonitorPlay} />
+          <StatCard title={t('kpiFiltering')} value={summary.tool ? (summary.filtersByPage ? t('filteringOn') : t('filteringOff')) : t('notConfigured')} icon={SlidersHorizontal} />
+        </div>
+      </PageHero>
 
-      <section>
-        <SessionReplaySettingsForm
-          orgId={orgId}
-          projectId={projectId}
-          initialTemplate={project.session_replay_url_template ?? ''}
-        />
-      </section>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard title={t('flowTitle')} description={t('flowDescription')} icon={Link2} className="lg:col-span-3">
+          <FlowDiagram
+            label={t('flowTitle')}
+            height={220}
+            nodes={[
+              { id: 'row', label: t('flowBoardRow'), sublabel: t('flowBoardRowSub'), status: 'ok', href: `/orgs/${orgId}/projects/${projectId}/boards` },
+              { id: 'template', label: t('flowTemplate'), sublabel: t('flowTemplateSub'), status: summary.tool ? (summary.filtersByPage ? 'ok' : 'warn') : 'idle' },
+              {
+                id: 'tool',
+                label: toolLabel,
+                sublabel: summary.tool ? (summary.filtersByPage ? t('flowToolFiltered') : t('flowToolUnfiltered')) : undefined,
+                status: summary.tool ? (summary.filtersByPage ? 'ok' : 'warn') : 'idle',
+              },
+            ]}
+            edges={[
+              { source: 'row', target: 'template', animated: Boolean(summary.tool), status: summary.tool ? 'ok' : 'idle' },
+              { source: 'template', target: 'tool', animated: Boolean(summary.tool), status: summary.tool ? (summary.filtersByPage ? 'ok' : 'warn') : 'idle' },
+            ]}
+          />
+        </ChartCard>
+        <ChartCard title={t('formTitle')} icon={SlidersHorizontal} className="lg:col-span-2">
+          <SessionReplaySettingsForm orgId={orgId} projectId={projectId} initialTemplate={project.session_replay_url_template ?? ''} />
+        </ChartCard>
+      </div>
     </main>
   );
 }
