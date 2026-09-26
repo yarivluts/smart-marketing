@@ -509,13 +509,24 @@ export function registerMcpTools(server: McpServer, auth: McpAuthContext): void 
     {
       title: 'Search customers',
       description:
-        "Look a customer up by identifier. Despite the name this is NOT a general-purpose search: it matches a substring against the entity id or against the whole attributes object serialised to JSON, which includes the KEY names — so every row with a field called \"plan\" matches the query \"plan\", and any short or common query matches nearly everything. Use a distinctive identifier (a uid, an external id, an exact value); do not use it to explore. Returns the most recently seen matches up to limit, with has_more set when more matched than were returned — narrow the query rather than assuming the list is complete. Customer 360 is populated only by ENTITY-kind ingestion: a project sending only events has no rows here however much data it sends.",
+        "Look a customer up by identifier. Despite the name this is NOT a general-purpose search: it matches a substring against the entity id or against the whole attributes object serialised to JSON, which includes the KEY names — so every row with a field called \"plan\" matches the query \"plan\", and any short or common query matches nearly everything. Use a distinctive identifier (a uid, an external id, an exact value); do not use it to explore. Returns the most recently seen matches up to limit, with has_more set when more matched than were returned — narrow the query rather than assuming the list is complete. Customer 360 is populated only by ENTITY-kind ingestion: a project sending only events has no rows here however much data it sends, and its empty result then carries empty_reason \"no_entity_schemas\" rather than looking like a miss.",
       inputSchema: toolInputSchema(searchCustomersInputShape),
     },
     auditedToolHandler(auth, 'search_customers', async (args: any) => {
       const { query, schema_name: schemaName, limit } = args as { query: string; schema_name?: string; limit?: number };
       try {
         const page = await searchProjectCustomers({ organizationId: auth.organizationId, projectId: auth.projectId, ...(auth.environmentId !== undefined ? { environmentId: auth.environmentId } : {}), query, schemaName, limit });
+        // KAN-137: an empty list must say when nothing COULD match, not only that nothing did -
+        // an events-only project has populated cohorts and an empty Customer 360, by design.
+        if (page.emptyReason === 'no_entity_schemas') {
+          return textResult({
+            results: [],
+            has_more: false,
+            limit: page.limit,
+            empty_reason: 'no_entity_schemas',
+            note: 'This project has no active entity-kind schema, so Customer 360 has no source: search_customers reads only ENTITY-kind records, and no query can match until one is registered and entity records are sent. Cohorts and funnels count people from EVENT-kind records instead, so they can be populated while this is empty.',
+          });
+        }
         // has_more is reported because a truncated list that looks complete is
         // how a caller concludes "no such customer" from "I only saw 20 of them".
         return textResult({ results: page.results, has_more: page.hasMore, limit: page.limit });
