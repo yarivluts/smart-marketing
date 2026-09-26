@@ -18,6 +18,7 @@ import {
   InMemoryTokenBucketRateLimiter,
   issueMcpAuthorizationCode,
   listAuditLogEntriesForOrg,
+  listSchemaDefinitionsForProject,
   mintApiKey,
   registerMcpOAuthClient,
   registerMetricDefinition,
@@ -252,6 +253,7 @@ describe('McpController (e2e)', () => {
           'register_metric',
           'register_schema',
           'evolve_schema',
+          'apply_schema_manifest',
           'set_funnel',
           'set_goal_status',
           'set_hook_signing_secret',
@@ -1119,6 +1121,52 @@ describe('McpController (e2e)', () => {
       } finally {
         await clientB.close();
       }
+    });
+  });
+
+  describe('KAN-202 I2 apply_schema_manifest', () => {
+    const manifest = [
+      { kind: 'event', name: 'signup', fields: [{ name: 'plan', type: 'string' }, { name: 'source', type: 'string' }] },
+      { kind: 'event', name: 'document_signed', fields: [{ name: 'document_id', type: 'string', is_required: true }] },
+    ];
+
+    async function call(rawKey: string, args: Record<string, unknown>) {
+      const client = await connectedClient(rawKey);
+      try {
+        const result = await client.callTool({ name: 'apply_schema_manifest', arguments: args });
+        return { isError: result.isError ?? false, text: (result.content as Array<{ text: string }>)[0].text };
+      } finally {
+        await client.close();
+      }
+    }
+
+    it('a read-only key can preview; applying needs schema.write, and then lands in the caller project only', async () => {
+      const a = await setupProjectWithKey('Manifest Org A', ['mcp.read']);
+      const b = await setupProjectWithKey('Manifest Org B', ['mcp.read', 'schema.write']);
+      await registerSchemaDefinition({ organizationId: b.organization.id, projectId: b.project.id, kind: 'event', name: 'signup', fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }], createdByUserId: b.owner.id });
+
+      const preview = await call(a.rawKey, { schemas: manifest, dry_run: true });
+      expect(preview.isError).toBe(false);
+      expect(JSON.parse(preview.text)).toMatchObject({ dry_run: true, applied: false, summary: { register: 2, evolve: 0 } });
+
+      const refused = await call(a.rawKey, { schemas: manifest });
+      expect(refused.isError).toBe(true);
+      expect(refused.text).toContain('schema.write');
+
+      const applied = JSON.parse((await call(b.rawKey, { schemas: manifest })).text);
+      expect(applied).toMatchObject({ applied: true, summary: { register: 1, evolve: 1 } });
+      expect(applied.schemas.find((schema: { name: string }) => schema.name === 'signup')).toMatchObject({ action: 'evolve', current_version: 1, next_version: 2, added_fields: ['source'] });
+      // Project A previewed the same manifest and has nothing registered.
+      expect(await listSchemaDefinitionsForProject(a.organization.id, a.project.id)).toEqual([]);
+    });
+
+    it('writes nothing when one schema would break, and says why', async () => {
+      const { owner, organization, project, rawKey } = await setupProjectWithKey('Manifest Blocked Org', ['mcp.read', 'schema.write']);
+      await registerSchemaDefinition({ organizationId: organization.id, projectId: project.id, kind: 'event', name: 'signup', fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }], createdByUserId: owner.id });
+      const body = JSON.parse((await call(rawKey, { schemas: [manifest[1], { kind: 'event', name: 'signup', fields: [{ name: 'tier', type: 'string' }] }] })).text);
+      expect(body).toMatchObject({ applied: false, summary: { register: 1, blocked: 1 } });
+      expect(body.not_applied_reason).toContain('nothing was written');
+      expect((await listSchemaDefinitionsForProject(organization.id, project.id)).map((def: { name: string }) => def.name)).toEqual(['signup']);
     });
   });
 

@@ -579,3 +579,147 @@ export async function getActiveMartSchemaByName(
     .get();
   return matches.find((def) => def.kind === 'measure') ?? matches.find((def) => def.kind === 'entity') ?? null;
 }
+
+/** One schema in a manifest: the whole declaration of that schema, as `register_schema` takes it. */
+export interface SchemaManifestEntry {
+  kind: string;
+  name: string;
+  fields: readonly SchemaFieldInput[];
+}
+
+/**
+ * What applying a manifest would do to one schema:
+ * `register` (new family, v1), `evolve` (a non-breaking change to the active version),
+ * `unchanged` (the active version already declares exactly this), `blocked` (a breaking change
+ * {@link findBreakingChanges} refuses) or `invalid` (the declaration itself fails validation, or
+ * names the same schema twice).
+ */
+export type SchemaManifestAction = 'register' | 'evolve' | 'unchanged' | 'blocked' | 'invalid';
+
+export interface SchemaManifestPlanEntry {
+  kind: string;
+  name: string;
+  action: SchemaManifestAction;
+  currentVersion: number | null;
+  nextVersion: number | null;
+  /** Fields the new version adds (register: every field). */
+  addedFields: string[];
+  /** Existing fields whose flags change (e.g. is_pii set), with the change allowed. */
+  changedFields: string[];
+  /** Why a `blocked` or `invalid` entry cannot be applied. */
+  problems: string[];
+  /** Non-fatal consequences, as `register_schema`'s dry run reports them. */
+  warnings: string[];
+}
+
+export interface SchemaManifestPlan {
+  entries: SchemaManifestPlanEntry[];
+  /** True when no entry is `blocked` or `invalid`: applying would make every change or none. */
+  applicable: boolean;
+}
+
+function sameFieldDef(a: SchemaFieldDef, b: SchemaFieldDef): boolean {
+  return a.type === b.type && a.is_required === b.is_required && a.is_pii === b.is_pii && a.is_identity_key === b.is_identity_key;
+}
+
+/**
+ * Diffs a whole manifest against the project's registry and writes nothing (KAN-202 I2). An
+ * integrator keeps its schemas as one JSON file in its own repo; this tells it, per schema, what
+ * registering and evolving from that file would do - with the registry's own validation and
+ * breaking-change rules, so the plan cannot promise what the real calls would refuse.
+ */
+export async function planSchemaManifest(params: {
+  organizationId: string;
+  projectId: string;
+  schemas: readonly SchemaManifestEntry[];
+}): Promise<SchemaManifestPlan> {
+  const seen = new Set<string>();
+  const entries = await Promise.all(
+    params.schemas.map(async (entry): Promise<SchemaManifestPlanEntry> => {
+      const base = { kind: entry.kind, name: entry.name, currentVersion: null, nextVersion: null, addedFields: [], changedFields: [], problems: [], warnings: [] };
+      const key = `${entry.kind}:${entry.name.trim()}`;
+      if (seen.has(key)) {
+        return { ...base, action: 'invalid', problems: [`The manifest declares ${key} more than once.`] };
+      }
+      seen.add(key);
+
+      let validated: { kind: SchemaDefKind; name: string; fields: SchemaFieldDef[] };
+      try {
+        validated = await validateSchemaDefRequest({ organizationId: params.organizationId, projectId: params.projectId, kind: entry.kind, name: entry.name, fields: entry.fields });
+      } catch (error) {
+        if (error instanceof InvalidSchemaDefinitionError) {
+          return { ...base, action: 'invalid', problems: [...error.reasons] };
+        }
+        throw error;
+      }
+      const warnings = describeSchemaDefinitionWarnings(validated.kind, validated.fields);
+      const active = await findActiveVersion(params.organizationId, params.projectId, validated.kind, validated.name);
+
+      if (!active) {
+        if (await schemaFamilyHasAnyVersion(params.organizationId, params.projectId, validated.kind, validated.name)) {
+          return { ...base, action: 'invalid', problems: ['This schema has versions but none is active, so it can be neither registered nor evolved.'] };
+        }
+        return { ...base, name: validated.name, action: 'register', nextVersion: 1, addedFields: validated.fields.map((field) => field.name), warnings };
+      }
+
+      const previousByName = new Map(active.field_defs.map((field) => [field.name, field]));
+      const addedFields = validated.fields.filter((field) => !previousByName.has(field.name)).map((field) => field.name);
+      const changedFields = validated.fields
+        .filter((field) => previousByName.has(field.name) && !sameFieldDef(previousByName.get(field.name)!, field))
+        .map((field) => field.name);
+      const violations = findBreakingChanges(active.field_defs, validated.fields);
+      const current = { ...base, name: validated.name, currentVersion: active.version, addedFields, changedFields, warnings };
+      if (violations.length > 0) {
+        return { ...current, action: 'blocked', problems: violations };
+      }
+      if (addedFields.length === 0 && changedFields.length === 0) {
+        return { ...current, action: 'unchanged', warnings: [] };
+      }
+      return { ...current, action: 'evolve', nextVersion: active.version + 1 };
+    }),
+  );
+  return { entries, applicable: entries.every((entry) => entry.action !== 'blocked' && entry.action !== 'invalid') };
+}
+
+export interface SchemaManifestApplyResult {
+  plan: SchemaManifestPlan;
+  /** False when the plan was not applicable: then nothing was written. */
+  applied: boolean;
+}
+
+/**
+ * Applies a manifest: every `register` and `evolve` in {@link planSchemaManifest}'s plan, through
+ * the same `registerSchemaDefinition`/`evolveSchemaDefinition` calls the single-schema tools use
+ * (validation, audit log, mart-view sync). If any entry is `blocked` or `invalid`, nothing is
+ * written - a manifest is applied whole or not at all as far as its own content can tell.
+ * Registration is irreversible and there is no cross-document transaction here, so an
+ * infrastructure failure mid-way can still leave earlier entries applied; re-planning then shows
+ * them as `unchanged`.
+ */
+export async function applySchemaManifest(params: {
+  organizationId: string;
+  projectId: string;
+  schemas: readonly SchemaManifestEntry[];
+  createdByUserId: string;
+}): Promise<SchemaManifestApplyResult> {
+  const plan = await planSchemaManifest(params);
+  if (!plan.applicable) {
+    return { plan, applied: false };
+  }
+  for (const [index, entry] of plan.entries.entries()) {
+    const request = {
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      kind: params.schemas[index].kind,
+      name: params.schemas[index].name,
+      fields: params.schemas[index].fields,
+      createdByUserId: params.createdByUserId,
+    };
+    if (entry.action === 'register') {
+      await registerSchemaDefinition(request);
+    } else if (entry.action === 'evolve') {
+      await evolveSchemaDefinition(request);
+    }
+  }
+  return { plan, applied: true };
+}
