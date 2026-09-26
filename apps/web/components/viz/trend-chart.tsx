@@ -53,10 +53,13 @@ export function TrendChart({
   const gradientId = React.useId().replace(/:/g, '');
   const rows = data as TrendDatum[];
 
-  const axes = (
-    <>
-      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+  // An array, not a fragment: recharts 2 finds its axes/grid/tooltip by walking the chart's direct
+  // children with React.Children.toArray, which flattens arrays but not fragments - inside a
+  // fragment they were silently dropped (no axes, no tooltip).
+  const axes = [
+      <CartesianGrid key="grid" strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />,
       <XAxis
+        key="x"
         dataKey={xKey}
         reversed={rtl}
         tickFormatter={(value: unknown) => xFormatter(String(value))}
@@ -64,24 +67,25 @@ export function TrendChart({
         axisLine={false}
         tickLine={false}
         minTickGap={16}
-      />
+      />,
       <YAxis
+        key="y"
         orientation={rtl ? 'right' : 'left'}
         tickFormatter={(value: unknown) => valueFormatter(Number(value))}
         tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
         axisLine={false}
         tickLine={false}
         width={56}
-      />
+      />,
       <Tooltip
+        key="tooltip"
         formatter={(value: unknown) => valueFormatter(Number(value))}
         labelFormatter={(value: unknown) => xFormatter(String(value))}
         contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }}
         cursor={{ fill: 'hsl(var(--muted) / 0.5)' }}
-      />
-      {showLegend ? <Legend wrapperStyle={{ fontSize: 12 }} /> : null}
-    </>
-  );
+      />,
+      ...(showLegend ? [<Legend key="legend" wrapperStyle={{ fontSize: 12 }} />] : []),
+  ];
 
   let chart: React.ReactElement;
   if (kind === 'bar') {
