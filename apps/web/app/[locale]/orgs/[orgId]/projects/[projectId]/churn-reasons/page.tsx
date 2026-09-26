@@ -178,7 +178,7 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
               kind="bar"
               data={trend.buckets.map((bucket) => ({ week: weekFormat.format(new Date(bucket.start)), cancellations: bucket.count }))}
               series={[{ key: 'cancellations', label: t('trendSeries'), color: 'hsl(var(--destructive))' }]}
-              height={280}
+              height={340}
             />
           </ChartCard>
         </div>

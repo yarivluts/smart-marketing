@@ -87,13 +87,16 @@ export function TrendChart({
     ...(showLegend ? [<Legend key="legend" wrapperStyle={{ fontSize: 12 }} />] : []),
   ];
 
+  // Series animation is off: recharts 2's animation under React 19 can stall on the first layout
+  // (measured before the container has its width), leaving bars squeezed into a corner of the plot
+  // while the axis is already full width.
   let chart: React.ReactElement;
   if (kind === 'bar') {
     chart = (
       <BarChart data={rows}>
         {axes}
         {series.map((entry, index) => (
-          <Bar key={entry.key} dataKey={entry.key} name={entry.label} fill={seriesColor(index, entry.color)} radius={[6, 6, 0, 0]} maxBarSize={56} stackId={stacked ? 'stack' : undefined} />
+          <Bar key={entry.key} dataKey={entry.key} name={entry.label} fill={seriesColor(index, entry.color)} radius={[6, 6, 0, 0]} maxBarSize={56} isAnimationActive={false} stackId={stacked ? 'stack' : undefined} />
         ))}
       </BarChart>
     );
@@ -102,7 +105,7 @@ export function TrendChart({
       <LineChart data={rows}>
         {axes}
         {series.map((entry, index) => (
-          <Line key={entry.key} type="monotone" dataKey={entry.key} name={entry.label} stroke={seriesColor(index, entry.color)} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls={false} />
+          <Line key={entry.key} type="monotone" dataKey={entry.key} name={entry.label} stroke={seriesColor(index, entry.color)} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 5 }} connectNulls={false} isAnimationActive={false} />
         ))}
       </LineChart>
     );
@@ -128,6 +131,7 @@ export function TrendChart({
             strokeWidth={2.5}
             fill={`url(#${gradientId}-${index})`}
             stackId={stacked ? 'stack' : undefined}
+            isAnimationActive={false}
             connectNulls={false}
           />
         ))}
