@@ -1155,9 +1155,7 @@
     "pipelineTitle": "איך התוצאות מחושבות",
     "pipelineDescription": "אירועי חשיפה והמרה הופכים לשיעור המרה לכל גרסה, שנבדק מול גרסת הבקרה ברמת ביטחון של 95%.",
     "pipelineExposures": "חשיפות",
-    "pipelineExposuresSub": "אירועי experiment_exposure",
     "pipelineConversions": "המרות",
-    "pipelineConversionsSub": "אירועי experiment_conversion",
     "pipelineRates": "שיעור לכל גרסה",
     "pipelineRatesSub": "המרות / חשיפות",
     "pipelineSignificance": "מובהקות",
@@ -1174,7 +1172,9 @@
     "resultsEmptyHint": "שלחו אירועי experiment_exposure ו-experiment_conversion עם מפתח ניסוי וגרסה, והתוצאות יופיעו כאן לכל ניסוי.",
     "experimentSummary": "בקרה: {control} · {variants} גרסאות · {exposures} חשיפות",
     "rateChartLabel": "שיעור המרה לפי גרסה עבור {experimentKey}",
-    "upliftShort": "{uplift}% מול הבקרה"
+    "upliftShort": "{uplift}% מול הבקרה",
+    "pipelineExposuresSub": "experiment_exposure",
+    "pipelineConversionsSub": "experiment_conversion"
   },
   "CampaignOps": {
     "metaTitle": "תפעול קמפיינים",

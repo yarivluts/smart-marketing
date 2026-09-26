@@ -1155,9 +1155,7 @@
     "pipelineTitle": "How results are produced",
     "pipelineDescription": "Exposure and conversion events become per-variant conversion rates, tested against the control at 95% confidence.",
     "pipelineExposures": "Exposures",
-    "pipelineExposuresSub": "experiment_exposure events",
     "pipelineConversions": "Conversions",
-    "pipelineConversionsSub": "experiment_conversion events",
     "pipelineRates": "Rate per variant",
     "pipelineRatesSub": "conversions / exposures",
     "pipelineSignificance": "Significance",
@@ -1174,7 +1172,9 @@
     "resultsEmptyHint": "Send experiment_exposure and experiment_conversion events with an experiment key and variant, and results appear here per experiment.",
     "experimentSummary": "Control: {control} · {variants} variants · {exposures} exposures",
     "rateChartLabel": "Conversion rate by variant for {experimentKey}",
-    "upliftShort": "{uplift}% vs. control"
+    "upliftShort": "{uplift}% vs. control",
+    "pipelineExposuresSub": "experiment_exposure",
+    "pipelineConversionsSub": "experiment_conversion"
   },
   "CampaignOps": {
     "metaTitle": "Campaign ops",
