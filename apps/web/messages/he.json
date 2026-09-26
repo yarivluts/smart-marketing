@@ -53,7 +53,19 @@
     "weakPasswordError": "בחר סיסמה עם 6 תווים לפחות.",
     "tokenSignInPending": "מתחבר...",
     "invalidOrExpiredTokenError": "קישור ההתחברות הזה לא תקף או פג תוקף.",
-    "backToSignIn": "חזרה להתחברות"
+    "backToSignIn": "חזרה להתחברות",
+    "brandTagline": "אנליטיקת צמיחה ואוטומציה",
+    "brandEyebrow": "נבנה לצוותי צמיחה",
+    "brandHeading": "נתוני הצמיחה שלך, נמדדים ביושר ומופעלים בבטחה",
+    "brandDescription": "חברו את נתוני המוצר והשיווק, ראו מאיפה לקוחות מגיעים ואיפה הם נוטשים, ותנו לאוטומציה להציע שינויים שאתם מאשרים.",
+    "brandFeature1Title": "אוטומציה עם מעקות בטיחות",
+    "brandFeature1Desc": "כל שינוי מוצע עובר מעקות בטיחות וממתין לאישורכם; שינויים שבוצעו ניתנים לביטול.",
+    "brandFeature2Title": "מספרים שאפשר לעקוב אחריהם",
+    "brandFeature2Desc": "כל מדד מחושב מהאירועים והסכמות שלכם, וההגדרה שלו במרחק לחיצה.",
+    "brandFeature3Title": "משפכים, קוהורטות וייחוס",
+    "brandFeature3Desc": "משפכים ברמת אדם, קוהורטות שימור חודשיות וייחוס לעמודי נחיתה מהנתונים שלכם.",
+    "brandBadgeTls": "מוצפן בתעבורה (HTTPS)",
+    "brandBadgeAudit": "כל שינוי נרשם ביומן"
   },
   "AccountStatus": {
     "signedInAs": "מחובר בתור {email}",
@@ -1447,7 +1459,28 @@
       "query_error": "לא ניתן היה לטעון אריח זה"
     },
     "sessionReplayLinkTitle": "צפייה בהקלטות של דף הנחיתה הזה",
-    "sessionReplayLinkTitleUnfiltered": "פתחו את כלי הקלטות הסשנים. תבנית הפרויקט אינה מסננת לדף יחיד, ולכן הקישור פותח את אותה תצוגה עבור כל שורה."
+    "sessionReplayLinkTitleUnfiltered": "פתחו את כלי הקלטות הסשנים. תבנית הפרויקט אינה מסננת לדף יחיד, ולכן הקישור פותח את אותה תצוגה עבור כל שורה.",
+    "galleryEyebrow": "דיווח",
+    "galleryDescription": "כל הלוחות בפרויקט. פתיחת לוח מציגה את האריחים שלו לפי טווח התאריכים של הלוח.",
+    "kpiBoards": "לוחות",
+    "kpiTiles": "אריחים",
+    "kpiTopType": "סוג האריח הנפוץ",
+    "kpiLastUpdated": "עריכה אחרונה",
+    "kpiNone": "עדיין אין",
+    "boardUpdated": "נערך {date}",
+    "boardEmptyMix": "עדיין אין אריחים",
+    "mixTitle": "מה הלוחות שלך מציגים",
+    "mixDescription": "סוגי האריחים בכל הלוחות בפרויקט.",
+    "mixCenter": "אריחים",
+    "createDescription": "פתחו לוח ריק, ואז הוסיפו אריחים מעורך הפריסה שלו.",
+    "detailEyebrow": "לוח",
+    "detailRange": "{start} ← {end} · לפי {grain}",
+    "detailTiles": "{count, plural, one {אריח אחד} other {# אריחים}}",
+    "detailRangeKind": {
+      "relative": "טווח מתגלגל",
+      "absolute": "תאריכים קבועים"
+    },
+    "settingsDescription": "השם, טווח התאריכים, ההשוואה והמסננים חלים על כל האריחים שבהמשך."
   },
   "Goals": {
     "metaTitle": "יעדים",
@@ -1735,7 +1768,22 @@
     "reducedMotionLabel": "תנועה מופחתת (ביטול קונפטי)",
     "claimButton": "צמד טלוויזיה",
     "claimError": "לא ניתן היה לצמד את הטלוויזיה. בדוק את הקוד ונסה שוב.",
-    "claimErrorInvalidCode": "קוד הצימוד אינו תקף, פג תוקפו, או שכבר נעשה בו שימוש. בקש מהטלוויזיה להציג קוד חדש."
+    "claimErrorInvalidCode": "קוד הצימוד אינו תקף, פג תוקפו, או שכבר נעשה בו שימוש. בקש מהטלוויזיה להציג קוד חדש.",
+    "eyebrow": "מסך גדול",
+    "kpiPaired": "מסכים מחוברים",
+    "kpiBoards": "לוחות זמינים",
+    "kpiRotation": "לוחות בסבב",
+    "flowTitle": "איך מחברים מסך",
+    "flowDescription": "שלושה צעדים, בלי התחברות על המסך עצמו.",
+    "flowOpen": "פותחים מצב TV",
+    "flowOpenSub": "בכל מסך או דפדפן",
+    "flowCode": "קוד חיבור",
+    "flowCodeSub": "מוצג על המסך",
+    "flowClaim": "מזינים אותו כאן",
+    "flowClaimSub": "בוחרים לוחות ותזמון",
+    "flowRotate": "הלוחות מתחלפים",
+    "flowRotateSub": "בזמן אמת, במסך מלא",
+    "emptyPairedDescription": "פתחו מצב TV על מסך, ואז הזינו בטופס החיבור את הקוד שמופיע עליו."
   },
   "TvMode": {
     "metaTitle": "חדר מלחמה",
@@ -1985,7 +2033,11 @@
     "oneClickRollback": "ביטול פעולה בלחיצה",
     "rollbackSuccess": "הפעולה בוטלה בהצלחה!",
     "rollbackError": "שגיאה בביטול הפעולה.",
-    "killSwitchEngagedBadge": "מתג חירום מופעל"
+    "killSwitchEngagedBadge": "מתג חירום מופעל",
+    "lifecycleTitle": "מחזור החיים של פעולה",
+    "lifecycleDescription": "כל שינוי מוצע עובר את מעקות הבטיחות, ממתין לאישור, ואז מבוצע ומאומת או מבוטל. המספרים הם הפעולות שנמצאות כרגע בכל מצב.",
+    "diffRowLineNew": "{label}: {after} (חדש)",
+    "diffNewBadge": "חדש"
   },
   "SessionReplaySettings": {
     "metaTitle": "הקלטות סשן",
@@ -1997,7 +2049,28 @@
     "save": "שמירה",
     "saved": "נשמר.",
     "saveError": "שמירת התבנית נכשלה. ודאו שזו כתובת http(s) תקינה.",
-    "savedWithoutPlaceholder": "נשמר, אך בתבנית הזו אין את הסימון '{landing_page}', ולכן כל שורת דף נחיתה תקשר לאותו דף לא מסונן. הוסיפו את הסימון אם התכוונתם לסנן לכל דף בנפרד."
+    "savedWithoutPlaceholder": "נשמר, אך בתבנית הזו אין את הסימון '{landing_page}', ולכן כל שורת דף נחיתה תקשר לאותו דף לא מסונן. הוסיפו את הסימון אם התכוונתם לסנן לכל דף בנפרד.",
+    "eyebrow": "חיבורים",
+    "kpiTool": "כלי הקלטת סשנים",
+    "kpiFiltering": "קישור לכל עמוד",
+    "filteringOn": "פעיל - כל עמוד מסונן",
+    "filteringOff": "כבוי - עמוד משותף אחד",
+    "notConfigured": "לא מחובר",
+    "toolName": {
+      "clarity": "Microsoft Clarity",
+      "hotjar": "Hotjar",
+      "fullstory": "FullStory",
+      "other": "כלי מותאם"
+    },
+    "flowTitle": "איך שורה בלוח פותחת הקלטה",
+    "flowDescription": "שורת עמוד נחיתה בכל לוח מקשרת דרך התבנית שלך אל כלי ההקלטה.",
+    "flowBoardRow": "שורה בלוח",
+    "flowBoardRowSub": "עמוד נחיתה",
+    "flowTemplate": "התבנית שלך",
+    "flowTemplateSub": "'{landing_page}' מוחלף",
+    "flowToolFiltered": "מסונן לעמוד הזה",
+    "flowToolUnfiltered": "לא מסונן",
+    "formTitle": "תבנית קישור עומק"
   },
   "OrganizationSettings": {
     "metaTitle": "הגדרות ארגון",
