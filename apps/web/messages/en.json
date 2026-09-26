@@ -2382,5 +2382,40 @@
     "roasChangeLabel": "ROAS Change",
     "rebalanceAction": "1-Click Rebalance",
     "channelAllocationEmpty": "No ad spend has been measured yet, so there is no channel split to show."
+  },
+  "Backfill": {
+    "heading": "Backfill existing records",
+    "description": "Integrations send a customer only when it changes, so records that existed before go-live are missing. Register the integrator's backfill endpoint for {environment}, then ask it to resend everything through the normal ingest API.",
+    "endpointSchemas": "Resends: {schemas}",
+    "noEndpoint": "No backfill endpoint is registered for this environment yet.",
+    "registerEndpoint": "Register backfill endpoint",
+    "editEndpoint": "Change endpoint",
+    "urlLabel": "Endpoint URL (https)",
+    "urlPlaceholder": "https://example.com/growth-backfill",
+    "schemasLabel": "Schemas to resend",
+    "noSchemas": "Register the schemas first - a backfill resends records of registered schemas.",
+    "saveButton": "Save endpoint",
+    "rotateButton": "Save and issue a new secret",
+    "saving": "Saving...",
+    "saved": "Endpoint saved.",
+    "saveError": "Could not save the endpoint.",
+    "saveErrorReasons": "Could not save the endpoint: {reasons}",
+    "secretOnce": "Signing secret - shown only now. Put it straight into the endpoint secret store.",
+    "requestButton": "Request backfill",
+    "requesting": "Requesting...",
+    "requestDelivered": "Backfill requested - the endpoint accepted it. Records will appear as they arrive.",
+    "requestFailed": "The endpoint did not accept the request: {reason}",
+    "requestError": "Could not request a backfill.",
+    "historyHeading": "Recent backfills",
+    "noBackfills": "No backfills requested yet.",
+    "requestedAt": "Requested {at}",
+    "failedLine": "Failed: {reason}",
+    "progressLine": "{batches} batches · {accepted} accepted · {duplicates} duplicates · {quarantined} quarantined",
+    "status": {
+      "requested": "Requested",
+      "delivered": "Delivered",
+      "receiving": "Receiving",
+      "completed": "Completed"
+    }
   }
 }

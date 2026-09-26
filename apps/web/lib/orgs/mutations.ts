@@ -211,9 +211,14 @@ import {
   updateTvPairingSettings as updateTvPairingSettingsInOrganization,
   type RequestTvPairingResult,
   type TvPairingModel,
+  setBackfillEndpoint as setBackfillEndpointInOrganization,
+  requestBackfill as requestBackfillInOrganization,
+  getBackfillStatus as getBackfillStatusInOrganization,
+  type BackfillStatusView,
 } from '@growthos/firebase-orm-models';
 import type { SegmentWorkListStatus } from '@growthos/shared';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { getServerKmsProvider } from '@/lib/vault/kms-provider';
 
 interface CreateOrganizationInput {
   name: string;
@@ -1910,4 +1915,26 @@ export async function unarchiveProject(organizationId: string, projectId: string
 export async function reexportRawRecordsToWarehouse(input: ReexportRawRecordsParams): Promise<ReexportRawRecordsResult> {
   await ensureFirestoreOrm();
   return reexportRawRecordsToWarehouseInOrganization(input);
+}
+
+/** Registers or updates this environment's backfill endpoint; the signing secret is present only when issued. */
+export async function setProjectBackfillEndpoint(input: {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  url: string;
+  schemas: { kind: string; name: string }[];
+  rotateSecret: boolean;
+  actedByUserId: string;
+}): Promise<{ url: string; schemas: { kind: string; name: string }[]; signingSecret?: string }> {
+  await ensureFirestoreOrm();
+  const result = await setBackfillEndpointInOrganization({ ...input, kms: getServerKmsProvider() });
+  return { url: result.endpoint.url, schemas: result.endpoint.schemas, ...(result.signingSecret ? { signingSecret: result.signingSecret } : {}) };
+}
+
+/** Asks this environment's backfill endpoint to resend its records; delivery happens within the call. */
+export async function requestProjectBackfill(input: { organizationId: string; projectId: string; environmentId: string; requestedByUserId: string }): Promise<BackfillStatusView> {
+  await ensureFirestoreOrm();
+  const request = await requestBackfillInOrganization({ ...input, kms: getServerKmsProvider() });
+  return getBackfillStatusInOrganization(input.organizationId, input.projectId, request.id, input.environmentId);
 }
