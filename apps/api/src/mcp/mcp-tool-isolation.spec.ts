@@ -76,6 +76,8 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   // own project's ingest records.
   get_setup_health: { kind: 'connection-scope', permission: 'mcp.read' },
   audit_installation_gaps: { kind: 'connection-scope', permission: 'mcp.read' },
+  // KAN-202 I4: read-only, the caller's own project, and only the key's own environment.
+  get_ingest_health: { kind: 'connection-scope', permission: 'mcp.read' },
 };
 
 const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-admin-tools.ts', 'mcp-setup-tools.ts'];

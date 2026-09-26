@@ -18,7 +18,7 @@ export const DEFAULT_TRACKING_ALERT_LIST_LIMIT = 100;
 export const DEFAULT_EVENT_VOLUME_WINDOW_DAYS = 7;
 
 /** Caps one event's volume-window read — a busy event shouldn't make its own sparkline an unbounded-cost driver. */
-const MAX_EVENT_VOLUME_RECORDS_PER_SCHEMA = 500;
+export const MAX_EVENT_VOLUME_RECORDS_PER_SCHEMA = 500;
 
 const MANUAL_TRIGGER = 'manual' as const;
 
