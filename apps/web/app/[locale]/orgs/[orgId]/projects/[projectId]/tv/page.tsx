@@ -1,3 +1,6 @@
+import { KeyRound, LayoutDashboard, MonitorSmartphone, RefreshCw, Tv } from 'lucide-react';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard, EmptyState, FlowDiagram, PageHero } from '@/components/viz';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
@@ -58,28 +61,53 @@ export default async function TvPairingPage({ params }: PageProps): Promise<Reac
   const pairingViews = pairings.filter((pairing) => !pairing.revoked_at).map(toTvPairingSummaryView);
   const t = await getTranslations('TvPairing');
 
+  const boardsInRotation = new Set(pairingViews.flatMap((pairing) => pairing.boardIds)).size;
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Tv} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard title={t('kpiPaired')} value={pairingViews.length} icon={MonitorSmartphone} />
+          <StatCard title={t('kpiBoards')} value={boardViews.length} icon={LayoutDashboard} />
+          <StatCard title={t('kpiRotation')} value={boardsInRotation} icon={RefreshCw} />
+        </div>
+      </PageHero>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('pairedHeading')}</h2>
-        {pairingViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('noPaired')}</p>
-        ) : (
-          <TvPairingList orgId={orgId} projectId={projectId} pairings={pairingViews} boards={boardViews} />
-        )}
-      </section>
+      <ChartCard title={t('flowTitle')} description={t('flowDescription')} icon={KeyRound}>
+        <FlowDiagram
+          label={t('flowTitle')}
+          height={200}
+          nodes={[
+            { id: 'open', label: t('flowOpen'), sublabel: t('flowOpenSub'), status: 'ok', href: '/tv' },
+            { id: 'code', label: t('flowCode'), sublabel: t('flowCodeSub'), status: 'ok' },
+            { id: 'claim', label: t('flowClaim'), sublabel: t('flowClaimSub'), status: boardViews.length > 0 ? 'ok' : 'warn' },
+            { id: 'rotate', label: t('flowRotate'), sublabel: t('flowRotateSub'), value: String(boardsInRotation), status: pairingViews.length > 0 ? 'ok' : 'idle' },
+          ]}
+          edges={[
+            { source: 'open', target: 'code', status: 'ok' },
+            { source: 'code', target: 'claim', status: 'ok' },
+            { source: 'claim', target: 'rotate', animated: pairingViews.length > 0, status: pairingViews.length > 0 ? 'ok' : 'idle' },
+          ]}
+        />
+      </ChartCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('pairHeading')}</h2>
-        {boardViews.length === 0 ? (
-          <p className="text-xs text-muted-foreground">{t('noBoards')}</p>
-        ) : (
-          <ClaimTvPairingForm orgId={orgId} projectId={projectId} boards={boardViews} />
-        )}
-      </section>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard title={t('pairedHeading')} icon={MonitorSmartphone}>
+          {pairingViews.length === 0 ? (
+            <EmptyState compact icon={Tv} title={t('noPaired')} description={t('emptyPairedDescription')} />
+          ) : (
+            <TvPairingList orgId={orgId} projectId={projectId} pairings={pairingViews} boards={boardViews} />
+          )}
+        </ChartCard>
+
+        <ChartCard title={t('pairHeading')} icon={KeyRound}>
+          {boardViews.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t('noBoards')}</p>
+          ) : (
+            <ClaimTvPairingForm orgId={orgId} projectId={projectId} boards={boardViews} />
+          )}
+        </ChartCard>
+      </div>
     </main>
   );
 }

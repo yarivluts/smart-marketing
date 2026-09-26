@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardModel, BoardTile } from '@growthos/firebase-orm-models';
-import { buildTileRenderView, computeTileFreshness, TILE_STALE_THRESHOLD_HOURS, toBoardSummaryView, toBoardView } from './board-view';
+import { boardTileTypeMix, buildTileRenderView, computeTileFreshness, TILE_STALE_THRESHOLD_HOURS, toBoardSummaryView, toBoardView } from './board-view';
 
 function board(overrides: Partial<BoardModel> & Pick<BoardModel, 'id'>): BoardModel {
   return {
@@ -524,5 +524,19 @@ describe('buildTileRenderView - isEmpty reflects what can actually be drawn', ()
     const funnel = drawable(buildTileRenderView(tile({ type: 'funnel', metricNames: ['a', 'b'] }), { ok: true, series: [] }));
     expect(funnel.isEmpty).toBe(true);
     expect(funnel.kind === 'funnel' && funnel.steps).toHaveLength(2);
+  });
+});
+
+describe('boardTileTypeMix', () => {
+  it('counts tiles per type, most common first, ties by name', () => {
+    expect(boardTileTypeMix({ tiles: [{ type: 'table' }, { type: 'line' }, { type: 'bar' }, { type: 'line' }] })).toEqual([
+      { type: 'line', count: 2 },
+      { type: 'bar', count: 1 },
+      { type: 'table', count: 1 },
+    ]);
+  });
+
+  it('is empty for a board with no tiles', () => {
+    expect(boardTileTypeMix({ tiles: [] })).toEqual([]);
   });
 });

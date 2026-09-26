@@ -22,6 +22,10 @@ import {
   toAutomationTargetView,
 } from '@/lib/orgs/automation-view';
 import { AutomationHubDashboard } from '@/components/orgs/automation-hub-dashboard';
+import { Workflow } from 'lucide-react';
+import { ChartCard, FlowDiagram, type VizStatus } from '@/components/viz';
+import { ACTION_LIFECYCLE_EDGES, actionStatusLabelKey, countActionsByStatus } from '@/lib/orgs/automation-view';
+import type { AutomationActionStatus } from '@growthos/firebase-orm-models';
 import { synthesizeProactiveRecommendations } from '@/lib/orgs/recommendation-synthesizer';
 import { calculateFunnelStepItems } from '@/lib/orgs/funnel-goals-synthesizer';
 import type { FunnelStepsOutcome } from '@growthos/firebase-orm-models';
@@ -126,8 +130,35 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
     funnelSteps,
   );
 
+  const tAutomation = await getTranslations('Automation');
+  const statusCounts = countActionsByStatus(actionViews);
+  // How each state reads at a glance: problems red, waiting amber, done green, empty grey.
+  const lifecycleTone: Record<AutomationActionStatus, VizStatus> = {
+    proposed: 'ok',
+    blocked: 'error',
+    awaiting_approval: 'warn',
+    rejected: 'idle',
+    approved: 'ok',
+    executed: 'ok',
+    failed: 'error',
+    verified: 'ok',
+    rolled_back: 'warn',
+  };
+  const lifecycleNodes = (Object.keys(statusCounts) as AutomationActionStatus[]).map((status) => ({
+    id: status,
+    label: tAutomation(actionStatusLabelKey(status)),
+    value: String(statusCounts[status]),
+    status: statusCounts[status] > 0 ? lifecycleTone[status] : ('idle' as const),
+  }));
+  const lifecycleEdges = ACTION_LIFECYCLE_EDGES.map(([source, target]) => ({
+    source,
+    target,
+    animated: statusCounts[target] > 0,
+    status: statusCounts[target] > 0 ? lifecycleTone[target] : ('idle' as const),
+  }));
+
   return (
-    <main className="container mx-auto max-w-5xl py-8">
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
       <AutomationHubDashboard
         orgId={orgId}
         projectId={projectId}
@@ -141,6 +172,9 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
         canExecute={true}
         canApprove={canApprove}
       />
+      <ChartCard title={tAutomation('lifecycleTitle')} description={tAutomation('lifecycleDescription')} icon={Workflow}>
+        <FlowDiagram label={tAutomation('lifecycleTitle')} nodes={lifecycleNodes} edges={lifecycleEdges} height={300} />
+      </ChartCard>
     </main>
   );
 }

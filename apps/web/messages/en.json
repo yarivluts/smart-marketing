@@ -53,7 +53,19 @@
     "weakPasswordError": "Choose a password with at least 6 characters.",
     "tokenSignInPending": "Signing you in...",
     "invalidOrExpiredTokenError": "This sign-in link is invalid or has expired.",
-    "backToSignIn": "Back to sign in"
+    "backToSignIn": "Back to sign in",
+    "brandTagline": "Growth analytics & automation",
+    "brandEyebrow": "Built for growth teams",
+    "brandHeading": "Your growth data, measured honestly and acted on safely",
+    "brandDescription": "Connect your product and marketing data, see where customers come from and where they drop off, and let automation propose changes you approve.",
+    "brandFeature1Title": "Guarded automation",
+    "brandFeature1Desc": "Every proposed change passes guardrails and waits for your approval; executed changes can be rolled back.",
+    "brandFeature2Title": "Numbers you can trace",
+    "brandFeature2Desc": "Every metric is computed from your own events and schemas, with its definition one click away.",
+    "brandFeature3Title": "Funnels, cohorts and attribution",
+    "brandFeature3Desc": "People-level funnels, monthly retention cohorts and landing-page attribution from your data.",
+    "brandBadgeTls": "Encrypted in transit (HTTPS)",
+    "brandBadgeAudit": "Every change audit-logged"
   },
   "AccountStatus": {
     "signedInAs": "Signed in as {email}",
@@ -1447,7 +1459,28 @@
       "query_error": "Couldn't load this tile"
     },
     "sessionReplayLinkTitle": "Open the session recordings for this landing page",
-    "sessionReplayLinkTitleUnfiltered": "Open your session-replay tool. This project template does not filter to a single page, so this opens the same view for every row."
+    "sessionReplayLinkTitleUnfiltered": "Open your session-replay tool. This project template does not filter to a single page, so this opens the same view for every row.",
+    "galleryEyebrow": "Reporting",
+    "galleryDescription": "Every board in this project. Open one to see its tiles over the board's own date range.",
+    "kpiBoards": "Boards",
+    "kpiTiles": "Tiles",
+    "kpiTopType": "Most used tile",
+    "kpiLastUpdated": "Last edited",
+    "kpiNone": "None yet",
+    "boardUpdated": "Edited {date}",
+    "boardEmptyMix": "No tiles yet",
+    "mixTitle": "What your boards show",
+    "mixDescription": "Tile types across every board in this project.",
+    "mixCenter": "tiles",
+    "createDescription": "Start an empty board, then add tiles from its layout editor.",
+    "detailEyebrow": "Board",
+    "detailRange": "{start} → {end} · by {grain}",
+    "detailTiles": "{count, plural, one {# tile} other {# tiles}}",
+    "detailRangeKind": {
+      "relative": "Rolling range",
+      "absolute": "Fixed dates"
+    },
+    "settingsDescription": "Name, date range, comparison and filters apply to every tile below."
   },
   "Goals": {
     "metaTitle": "Goals",
@@ -1735,7 +1768,22 @@
     "reducedMotionLabel": "Reduced motion (disable confetti)",
     "claimButton": "Pair TV",
     "claimError": "Could not pair this TV. Check the code and try again.",
-    "claimErrorInvalidCode": "That pairing code is invalid, expired, or already used. Ask the TV to display a new one."
+    "claimErrorInvalidCode": "That pairing code is invalid, expired, or already used. Ask the TV to display a new one.",
+    "eyebrow": "Big screen",
+    "kpiPaired": "Paired screens",
+    "kpiBoards": "Boards available",
+    "kpiRotation": "Boards in rotation",
+    "flowTitle": "How pairing works",
+    "flowDescription": "Three steps, and no login on the TV itself.",
+    "flowOpen": "Open TV mode",
+    "flowOpenSub": "on any screen or browser",
+    "flowCode": "Pairing code",
+    "flowCodeSub": "shown on the TV",
+    "flowClaim": "Enter it here",
+    "flowClaimSub": "pick boards and timing",
+    "flowRotate": "Boards rotate",
+    "flowRotateSub": "live, full screen",
+    "emptyPairedDescription": "Open TV mode on a screen, then enter the code it shows in the pairing form."
   },
   "TvMode": {
     "metaTitle": "War room",
@@ -1985,7 +2033,11 @@
     "oneClickRollback": "1-Click Rollback",
     "rollbackSuccess": "Action rolled back successfully!",
     "rollbackError": "Failed to rollback action.",
-    "killSwitchEngagedBadge": "KILL SWITCH ACTIVE"
+    "killSwitchEngagedBadge": "KILL SWITCH ACTIVE",
+    "lifecycleTitle": "Action lifecycle",
+    "lifecycleDescription": "Every proposed change passes the guardrails, waits for approval, then executes and is verified or rolled back. Numbers are actions in each state now.",
+    "diffRowLineNew": "{label}: {after} (new)",
+    "diffNewBadge": "new"
   },
   "SessionReplaySettings": {
     "metaTitle": "Session replay",
@@ -1997,7 +2049,28 @@
     "save": "Save",
     "saved": "Saved.",
     "saveError": "Could not save the template. Check that it is an http(s) URL.",
-    "savedWithoutPlaceholder": "Saved, but this template has no '{landing_page}' placeholder, so every landing-page row will link to the same unfiltered page. Add the placeholder if you meant to filter to each page."
+    "savedWithoutPlaceholder": "Saved, but this template has no '{landing_page}' placeholder, so every landing-page row will link to the same unfiltered page. Add the placeholder if you meant to filter to each page.",
+    "eyebrow": "Integrations",
+    "kpiTool": "Replay tool",
+    "kpiFiltering": "Per-page links",
+    "filteringOn": "On - each page filtered",
+    "filteringOff": "Off - one shared page",
+    "notConfigured": "Not connected",
+    "toolName": {
+      "clarity": "Microsoft Clarity",
+      "hotjar": "Hotjar",
+      "fullstory": "FullStory",
+      "other": "Custom tool"
+    },
+    "flowTitle": "How a board row opens a replay",
+    "flowDescription": "A landing-page row on any board links through your template into the replay tool.",
+    "flowBoardRow": "Board row",
+    "flowBoardRowSub": "a landing page",
+    "flowTemplate": "Your template",
+    "flowTemplateSub": "'{landing_page}' is replaced",
+    "flowToolFiltered": "filtered to that page",
+    "flowToolUnfiltered": "not filtered",
+    "formTitle": "Deep-link template"
   },
   "OrganizationSettings": {
     "metaTitle": "Organization settings",
