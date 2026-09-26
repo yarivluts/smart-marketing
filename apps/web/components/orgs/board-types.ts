@@ -53,6 +53,8 @@ export interface BoardTileRow {
 export interface MetricCatalogEntryRow {
   name: string;
   dimensions: string[];
+  /** The metric's declared unit (KAN-213) — a goal form types a `ratio` target as a percent. */
+  unit?: string;
 }
 
 /** Default size (in grid columns/rows) for a newly added tile of each type — big numbers are small, everything else needs room for a chart/table/steps. */

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { MetricCatalogEntryRow } from './board-types';
 import type { OrgPersonRow } from './create-goal-form';
+import { enteredGoalTargetText, GoalTargetUnitHint, storedGoalTarget, useGoalTargetEntryError } from './goal-target-entry';
 
 export interface EditGoalFormProps {
   orgId: string;
@@ -41,13 +42,19 @@ export function EditGoalForm(props: EditGoalFormProps): React.ReactElement {
   const { orgId, projectId, goalId, metricCatalog, people } = props;
   const t = useTranslations('Goals');
   const router = useRouter();
+  const targetEntryError = useGoalTargetEntryError();
+  // Targets are shown and typed in the metric's entry scale: a ratio target as a percent (KAN-213).
+  const unitOf = (candidate: string) => metricCatalog.find((entry) => entry.name === candidate)?.unit;
+  const initialUnit = unitOf(props.initialMetricName);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(props.initialName);
   const [metricName, setMetricName] = useState(props.initialMetricName);
   const [direction, setDirection] = useState<GoalDirection>(props.initialDirection);
-  const [targetValue, setTargetValue] = useState(props.initialTargetValue !== null ? String(props.initialTargetValue) : '');
-  const [rangeMin, setRangeMin] = useState(props.initialRangeMin !== null ? String(props.initialRangeMin) : '');
-  const [rangeMax, setRangeMax] = useState(props.initialRangeMax !== null ? String(props.initialRangeMax) : '');
+  const [targetValue, setTargetValue] = useState(enteredGoalTargetText(props.initialTargetValue, initialUnit));
+  const [rangeMin, setRangeMin] = useState(enteredGoalTargetText(props.initialRangeMin, initialUnit));
+  const [rangeMax, setRangeMax] = useState(enteredGoalTargetText(props.initialRangeMax, initialUnit));
+  const [unitError, setUnitError] = useState<string | null>(null);
+  const metricUnit = unitOf(metricName);
   const [startDate, setStartDate] = useState(props.initialStartDate);
   const [deadline, setDeadline] = useState(props.initialDeadline);
   const [rhythm, setRhythm] = useState<GoalRhythm>(props.initialRhythm);
@@ -59,9 +66,10 @@ export function EditGoalForm(props: EditGoalFormProps): React.ReactElement {
     setName(props.initialName);
     setMetricName(props.initialMetricName);
     setDirection(props.initialDirection);
-    setTargetValue(props.initialTargetValue !== null ? String(props.initialTargetValue) : '');
-    setRangeMin(props.initialRangeMin !== null ? String(props.initialRangeMin) : '');
-    setRangeMax(props.initialRangeMax !== null ? String(props.initialRangeMax) : '');
+    setTargetValue(enteredGoalTargetText(props.initialTargetValue, initialUnit));
+    setRangeMin(enteredGoalTargetText(props.initialRangeMin, initialUnit));
+    setRangeMax(enteredGoalTargetText(props.initialRangeMax, initialUnit));
+    setUnitError(null);
     setStartDate(props.initialStartDate);
     setDeadline(props.initialDeadline);
     setRhythm(props.initialRhythm);
@@ -81,6 +89,12 @@ export function EditGoalForm(props: EditGoalFormProps): React.ReactElement {
   async function handleSubmit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(false);
+    const typed = direction === 'range' ? [Number(rangeMin), Number(rangeMax)] : [Number(targetValue)];
+    const outOfRange = targetEntryError(typed, metricUnit);
+    setUnitError(outOfRange);
+    if (outOfRange) {
+      return;
+    }
     setSubmitting(true);
     try {
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/goals/${goalId}`, {
@@ -91,8 +105,8 @@ export function EditGoalForm(props: EditGoalFormProps): React.ReactElement {
           metricName,
           direction,
           ...(direction === 'range'
-            ? { rangeMin: Number(rangeMin), rangeMax: Number(rangeMax) }
-            : { targetValue: Number(targetValue) }),
+            ? { rangeMin: storedGoalTarget(Number(rangeMin), metricUnit), rangeMax: storedGoalTarget(Number(rangeMax), metricUnit) }
+            : { targetValue: storedGoalTarget(Number(targetValue), metricUnit) }),
           startDate,
           deadline,
           rhythm,
@@ -205,6 +219,7 @@ export function EditGoalForm(props: EditGoalFormProps): React.ReactElement {
             />
           </div>
         )}
+        <GoalTargetUnitHint unit={metricUnit} />
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
@@ -276,9 +291,9 @@ export function EditGoalForm(props: EditGoalFormProps): React.ReactElement {
           {t('cancelEditGoal')}
         </Button>
       </div>
-      {error ? (
+      {unitError || error ? (
         <p role="alert" className="text-sm text-destructive">
-          {t('editGoalError')}
+          {unitError ?? t('editGoalError')}
         </p>
       ) : null}
     </form>

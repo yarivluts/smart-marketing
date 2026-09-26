@@ -145,3 +145,41 @@ describe('EditGoalForm', () => {
     expect(screen.getByLabelText('Name')).toBeInTheDocument();
   });
 });
+
+describe('EditGoalForm on a ratio metric (KAN-213)', () => {
+  beforeEach(() => {
+    refresh.mockClear();
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  it('pre-fills the stored fraction as a percent and saves the typed percent as a fraction', async () => {
+    vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
+    renderForm({
+      metricCatalog: [{ name: 'lp_conversion_rate', dimensions: [], unit: 'ratio' }],
+      initialMetricName: 'lp_conversion_rate',
+      initialTargetValue: 0.08,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit goal' }));
+    const target = screen.getByLabelText('Target value');
+    expect(target).toHaveValue(8);
+    fireEvent.change(target, { target: { value: '9.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save goal' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    const body = JSON.parse(String(vi.mocked(fetch).mock.calls[0][1]?.body)) as { targetValue: number };
+    expect(body.targetValue).toBe(0.095);
+  });
+
+  it('refuses a percent above 100 with a clear message and sends nothing', async () => {
+    renderForm({
+      metricCatalog: [{ name: 'lp_conversion_rate', dimensions: [], unit: 'ratio' }],
+      initialMetricName: 'lp_conversion_rate',
+      initialTargetValue: 0.08,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Edit goal' }));
+    fireEvent.change(screen.getByLabelText('Target value'), { target: { value: '800' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save goal' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Enter a value between 0 and 100.');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

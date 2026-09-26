@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import type { GoalModel } from '@growthos/firebase-orm-models';
+import { enteredGoalTargetText, isPercentEntry, storedGoalTarget, useGoalTargetEntryError } from './goal-target-entry';
 
 export interface GoalTargetInputProps {
   orgId: string;
@@ -14,6 +15,8 @@ export interface GoalTargetInputProps {
   targetValue: number | null;
   rangeMin: number | null;
   rangeMax: number | null;
+  /** The goal metric's declared unit (KAN-213): a `ratio` target is shown and typed as a percent. */
+  unit?: string;
 }
 
 /**
@@ -26,25 +29,27 @@ export interface GoalTargetInputProps {
  * value rather than DELETEing anything.
  */
 export function GoalTargetInput(props: GoalTargetInputProps): React.ReactElement {
-  const { orgId, projectId, goalId, goalName, direction } = props;
+  const { orgId, projectId, goalId, goalName, direction, unit } = props;
   const t = useTranslations('Goals');
   const router = useRouter();
+  const targetEntryError = useGoalTargetEntryError();
+  const percentSuffix = isPercentEntry(unit) ? <span className="text-xs text-muted-foreground">{t('percentSuffix')}</span> : null;
 
-  const [targetValue, setTargetValue] = useState(props.targetValue !== null ? String(props.targetValue) : '');
-  const [rangeMin, setRangeMin] = useState(props.rangeMin !== null ? String(props.rangeMin) : '');
-  const [rangeMax, setRangeMax] = useState(props.rangeMax !== null ? String(props.rangeMax) : '');
+  const [targetValue, setTargetValue] = useState(enteredGoalTargetText(props.targetValue, unit));
+  const [rangeMin, setRangeMin] = useState(enteredGoalTargetText(props.rangeMin, unit));
+  const [rangeMax, setRangeMax] = useState(enteredGoalTargetText(props.rangeMax, unit));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rangeMinInputRef = useRef<HTMLInputElement>(null);
   const rangeMaxInputRef = useRef<HTMLInputElement>(null);
 
   function resetTargetValue(): void {
-    setTargetValue(props.targetValue !== null ? String(props.targetValue) : '');
+    setTargetValue(enteredGoalTargetText(props.targetValue, unit));
   }
 
   function resetRange(): void {
-    setRangeMin(props.rangeMin !== null ? String(props.rangeMin) : '');
-    setRangeMax(props.rangeMax !== null ? String(props.rangeMax) : '');
+    setRangeMin(enteredGoalTargetText(props.rangeMin, unit));
+    setRangeMax(enteredGoalTargetText(props.rangeMax, unit));
   }
 
   async function patch(body: Record<string, number>): Promise<boolean> {
@@ -80,7 +85,13 @@ export function GoalTargetInput(props: GoalTargetInputProps): React.ReactElement
       resetTargetValue();
       return;
     }
-    if (!(await patch({ targetValue: numeric }))) {
+    const outOfRange = targetEntryError([numeric], unit);
+    if (outOfRange) {
+      setError(outOfRange);
+      resetTargetValue();
+      return;
+    }
+    if (!(await patch({ targetValue: storedGoalTarget(numeric, unit) }))) {
       resetTargetValue();
     }
   }
@@ -111,7 +122,13 @@ export function GoalTargetInput(props: GoalTargetInputProps): React.ReactElement
       resetRange();
       return;
     }
-    if (!(await patch({ rangeMin: min, rangeMax: max }))) {
+    const outOfRange = targetEntryError([min, max], unit);
+    if (outOfRange) {
+      setError(outOfRange);
+      resetRange();
+      return;
+    }
+    if (!(await patch({ rangeMin: storedGoalTarget(min, unit), rangeMax: storedGoalTarget(max, unit) }))) {
       resetRange();
     }
   }
@@ -142,6 +159,7 @@ export function GoalTargetInput(props: GoalTargetInputProps): React.ReactElement
           onBlur={(event) => void commitRange(event)}
           className="h-8 w-20 rounded-md border border-input bg-background px-2 text-xs"
         />
+        {percentSuffix}
         {error ? (
           <p role="alert" className="text-xs text-destructive">
             {error}
@@ -163,6 +181,7 @@ export function GoalTargetInput(props: GoalTargetInputProps): React.ReactElement
         onBlur={() => void commitTargetValue()}
         className="h-8 w-24 rounded-md border border-input bg-background px-2 text-xs"
       />
+      {percentSuffix}
       {error ? (
         <p role="alert" className="text-xs text-destructive">
           {error}

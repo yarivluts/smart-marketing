@@ -1377,6 +1377,10 @@
       "range": "להישאר בטווח"
     },
     "targetValueLabel": "ערך יעד",
+    "targetEntryPercentHint": "באחוזים: 8 פירושו 8%.",
+    "percentSuffix": "%",
+    "targetOutOfRange": "יש להזין ערך בין {min} ל-{max}.",
+    "targetBelowMinimum": "יש להזין ערך של {min} לפחות.",
     "rangeMinLabel": "מינימום הטווח",
     "rangeMaxLabel": "מקסימום הטווח",
     "startDateLabel": "תאריך התחלה",

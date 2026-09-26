@@ -254,3 +254,40 @@ describe('CreateGoalModal Component', () => {
     });
   });
 });
+
+describe('GoalThermometerCard on a metric with a declared unit (KAN-213)', () => {
+  const ratioGoal: UnifiedGoalItem = {
+    ...mockGoal,
+    id: 'goal-ratio',
+    name: 'Lift landing page conversion to 8%',
+    metricName: 'lp_conversion_rate',
+    targetValue: 0.08,
+    actualValue: 0.05,
+    expectedAtNow: 0.06,
+    projectedFinalValue: 0.07,
+    unit: { kind: 'ratio' },
+  };
+
+  it('shows the target and progress figures as percents, not raw fractions', () => {
+    renderWithIntl(<GoalThermometerCard orgId="org-1" projectId="p-1" goal={ratioGoal} />);
+    expect(screen.getByText('5% / 8%')).toBeInTheDocument();
+    expect(screen.getByText('6%')).toBeInTheDocument();
+    expect(screen.getByText('7%')).toBeInTheDocument();
+  });
+
+  it('edits the target as a percent and reports the stored fraction', async () => {
+    const handleTargetUpdated = vi.fn();
+    renderWithIntl(<GoalThermometerCard orgId="org-1" projectId="p-1" goal={ratioGoal} onTargetUpdated={handleTargetUpdated} />);
+    fireEvent.click(screen.getByTestId('adjust-target-btn-goal-ratio'));
+    const input = screen.getByTestId('input-target-goal-ratio');
+    expect(input).toHaveValue(8);
+    fireEvent.change(input, { target: { value: '10' } });
+    fireEvent.click(screen.getByTestId('save-target-btn-goal-ratio'));
+    await waitFor(() => expect(handleTargetUpdated).toHaveBeenCalledWith('goal-ratio', { targetValue: 0.1 }));
+  });
+
+  it('shows a currency goal with its symbol', () => {
+    renderWithIntl(<GoalThermometerCard orgId="org-1" projectId="p-1" goal={{ ...mockGoal, unit: { kind: 'currency', currency: 'ILS' } }} />);
+    expect(screen.getByText(/₪68,400\.00 \/ ₪100,000\.00/)).toBeInTheDocument();
+  });
+});

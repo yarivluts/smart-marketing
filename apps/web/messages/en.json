@@ -1377,6 +1377,10 @@
       "range": "Stay within a range"
     },
     "targetValueLabel": "Target value",
+    "targetEntryPercentHint": "In percent: 8 means 8%.",
+    "percentSuffix": "%",
+    "targetOutOfRange": "Enter a value between {min} and {max}.",
+    "targetBelowMinimum": "Enter a value of at least {min}.",
     "rangeMinLabel": "Range minimum",
     "rangeMaxLabel": "Range maximum",
     "startDateLabel": "Start date",

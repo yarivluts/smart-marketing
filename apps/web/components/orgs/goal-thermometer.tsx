@@ -1,6 +1,7 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
+import { formatMetricValue, type ParsedMetricUnit } from '@growthos/shared';
 import type { GoalThermometerView } from '@/lib/orgs/goal-view';
 
 export interface GoalThermometerProps {
@@ -19,8 +20,9 @@ const STATUS_BAR_CLASSES: Record<'green' | 'amber' | 'red', string> = {
   red: 'bg-rose-500',
 };
 
-function formatNumber(value: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(value);
+/** A goal figure in its metric's unit (KAN-213): a ratio 0.08 reads "8%". A plain number without one. */
+function formatNumber(value: number, locale: string, unit?: ParsedMetricUnit): string {
+  return unit ? formatMetricValue(value, unit, locale) : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(value);
 }
 
 /**
@@ -34,6 +36,7 @@ function formatNumber(value: number): string {
  */
 export function GoalThermometer({ view }: GoalThermometerProps): React.ReactElement {
   const t = useTranslations('Goals');
+  const locale = useLocale();
 
   if (view.kind !== 'ok') {
     return (
@@ -72,15 +75,15 @@ export function GoalThermometer({ view }: GoalThermometerProps): React.ReactElem
       <dl className="grid grid-cols-3 gap-2 text-xs">
         <div className="flex flex-col gap-0.5">
           <dt className="text-muted-foreground">{t('actualValueLabel')}</dt>
-          <dd className="font-medium tabular-nums">{formatNumber(view.actualValue)}</dd>
+          <dd className="font-medium tabular-nums">{formatNumber(view.actualValue, locale, view.unit)}</dd>
         </div>
         <div className="flex flex-col gap-0.5">
           <dt className="text-muted-foreground">{t('expectedAtNowLabel')}</dt>
-          <dd className="font-medium tabular-nums">{formatNumber(view.expectedAtNow)}</dd>
+          <dd className="font-medium tabular-nums">{formatNumber(view.expectedAtNow, locale, view.unit)}</dd>
         </div>
         <div className="flex flex-col gap-0.5">
           <dt className="text-muted-foreground">{t('projectedFinalValueLabel')}</dt>
-          <dd className="font-medium tabular-nums">{formatNumber(view.projectedFinalValue)}</dd>
+          <dd className="font-medium tabular-nums">{formatNumber(view.projectedFinalValue, locale, view.unit)}</dd>
         </div>
       </dl>
     </div>

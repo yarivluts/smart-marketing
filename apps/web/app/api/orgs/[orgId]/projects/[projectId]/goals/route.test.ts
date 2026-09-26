@@ -207,6 +207,42 @@ describe('POST /api/orgs/[orgId]/projects/[projectId]/goals', () => {
     expect(body.reasons.length).toBeGreaterThan(0);
   });
 
+  it('refuses a target of 8 on a 0-1 ratio metric (it would mean 800%), and accepts 0.08 (KAN-213)', async () => {
+    const { ownerSession, organization, project, owner } = await setupOrgProject('Goal Ratio Target Org');
+    await registerSignups(organization.id, project.id, owner.id);
+    await registerMetricDefinition({
+      organizationId: organization.id,
+      projectId: project.id,
+      name: 'signup_share',
+      definition: { kind: 'formula', formula: 'signups / signups' },
+      dimensions: [],
+      unit: 'ratio',
+      createdByUserId: owner.id,
+    });
+    const person = await createOrgPerson({ organizationId: organization.id, name: 'Rep', createdByUserId: owner.id });
+    getServerSessionMock.mockResolvedValue(ownerSession);
+    const goal = (targetValue: number) => ({
+      name: 'Lift conversion to 8%',
+      metricName: 'signup_share',
+      direction: 'maximize',
+      targetValue,
+      startDate: '2026-09-01',
+      deadline: '2026-12-31',
+      rhythm: 'even',
+      ownerPersonId: person.id,
+    });
+
+    const refused = goalsRequest(organization.id, project.id, goal(8));
+    const refusedResponse = await POST(refused.request, { params: refused.params });
+    expect(refusedResponse.status).toBe(400);
+    const refusedBody = (await refusedResponse.json()) as { error: string; reasons: string[] };
+    expect(refusedBody.error).toBe('invalid_goal');
+    expect(refusedBody.reasons.join(' ')).toContain('For 8%, use 0.08.');
+
+    const accepted = goalsRequest(organization.id, project.id, goal(0.08));
+    expect((await POST(accepted.request, { params: accepted.params })).status).toBe(201);
+  });
+
   it('creates a goal, then lists it', async () => {
     const { ownerSession, organization, project, owner } = await setupOrgProject('Goal Create Org');
     await registerSignups(organization.id, project.id, owner.id);

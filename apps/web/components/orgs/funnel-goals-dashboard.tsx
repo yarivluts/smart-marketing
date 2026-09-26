@@ -33,7 +33,7 @@ export interface FunnelGoalsDashboardProps {
   projectName: string;
   cockpitData: FunnelGoalsCockpitData;
   canExecute: boolean;
-  metricCatalog?: { name: string }[];
+  metricCatalog?: { name: string; unit?: string }[];
   people?: { id: string; name: string }[];
 }
 

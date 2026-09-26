@@ -3,11 +3,12 @@
 import React, { useState, type FormEvent } from 'react';
 import { useTranslations } from 'next-intl';
 import { Target, X } from 'lucide-react';
-import { GOAL_DIRECTIONS, computeElapsedFraction, type GoalDirection, type GoalRhythm } from '@growthos/shared';
+import { GOAL_DIRECTIONS, computeElapsedFraction, parseMetricUnit, type GoalDirection, type GoalRhythm } from '@growthos/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { calculateDaysRemaining, type UnifiedGoalItem } from '@/lib/orgs/funnel-goals-synthesizer';
 import type { GoalSummaryView } from '@/lib/orgs/goal-view';
+import { GoalTargetUnitHint, storedGoalTarget, useGoalTargetEntryError } from './goal-target-entry';
 
 export interface CreateGoalModalProps {
   orgId: string;
@@ -15,7 +16,8 @@ export interface CreateGoalModalProps {
   isOpen: boolean;
   onClose: () => void;
   onGoalCreated?: (newGoal: UnifiedGoalItem) => void;
-  metricCatalog?: { name: string }[];
+  /** `unit` (KAN-213): a ratio metric's target is typed as a percent. */
+  metricCatalog?: { name: string; unit?: string }[];
   people?: { id: string; name: string }[];
 }
 
@@ -44,6 +46,8 @@ export function CreateGoalModal({
   const [ownerPersonId, setOwnerPersonId] = useState(people[0]?.id ?? 'default-owner');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const targetEntryError = useGoalTargetEntryError();
+  const metricUnit = metricCatalog.find((entry) => entry.name === metricName)?.unit;
 
   if (!isOpen) return null;
 
@@ -83,6 +87,12 @@ export function CreateGoalModal({
   async function handleSubmit(e: FormEvent): Promise<void> {
     e.preventDefault();
     setError(null);
+    const typed = direction === 'range' ? [Number(rangeMin), Number(rangeMax)] : [Number(targetValue)];
+    const outOfRange = targetEntryError(typed, metricUnit);
+    if (outOfRange) {
+      setError(outOfRange);
+      return;
+    }
     setSubmitting(true);
 
     try {
@@ -91,8 +101,8 @@ export function CreateGoalModal({
         metricName,
         direction,
         ...(direction === 'range'
-          ? { rangeMin: Number(rangeMin), rangeMax: Number(rangeMax) }
-          : { targetValue: Number(targetValue) }),
+          ? { rangeMin: storedGoalTarget(Number(rangeMin), metricUnit), rangeMax: storedGoalTarget(Number(rangeMax), metricUnit) }
+          : { targetValue: storedGoalTarget(Number(targetValue), metricUnit) }),
         startDate,
         deadline,
         rhythm,
@@ -116,6 +126,8 @@ export function CreateGoalModal({
 
       const data = (await res.json()) as { goal: GoalSummaryView };
       const created = data.goal;
+      const parsedUnit = metricUnit ? parseMetricUnit(metricUnit) : null;
+      const declaredUnit = parsedUnit && parsedUnit.kind !== 'number' ? parsedUnit : null;
       // The new goal has not been measured yet, so it carries no progress figures: the card
       // shows its target and says progress appears on the next refresh.
       const newGoal: UnifiedGoalItem = {
@@ -142,6 +154,7 @@ export function CreateGoalModal({
         elapsedFraction: computeElapsedFraction(startDate, created.deadline, new Date().toISOString().slice(0, 10), rhythm),
         daysRemaining: calculateDaysRemaining(created.deadline),
         isPaused: false,
+        ...(declaredUnit ? { unit: declaredUnit } : {}),
       };
       onGoalCreated?.(newGoal);
       onClose();
@@ -300,6 +313,9 @@ export function CreateGoalModal({
                 />
               </div>
             )}
+            <div className="col-span-2">
+              <GoalTargetUnitHint unit={metricUnit} />
+            </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium" htmlFor="goal-start">{t('startDateLabel')}</label>
