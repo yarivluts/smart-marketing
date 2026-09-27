@@ -47,7 +47,7 @@ export async function generateAdStudioScript(
 ): Promise<AdStudioBriefModel> {
   await ensureFirestoreOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
-  const context = ctx.context ?? (brief.plan ? planToScriptContext(brief.plan) : undefined);
+  const context = ctx.context ?? (brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : undefined);
   const prompt = buildScriptPrompt(adStudioBriefInput(brief), context);
   const generated = await meteredCall(ctx, 'script', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedScriptSchema }));
   const scenes = fitAdStudioScenes(toScenes(generated.scenes), newAdStudioSceneId);

@@ -420,12 +420,17 @@ export function sanitizeAdStudioPlan(plan: AdStudioPlan, available: readonly AdS
   };
 }
 
-/** The part of a stored plan the script writer builds on (see `buildScriptPrompt`). */
-export function planToScriptContext(plan: AdStudioPlan): AdStudioScriptContext {
+/**
+ * The part of a stored plan the script writer builds on (see `buildScriptPrompt`). The script prompt
+ * presents keyword themes as what people search for, so they are passed on only when the plan's
+ * keyword source actually returned Google Ads data - otherwise they are the model's own grouping.
+ */
+export function planToScriptContext(plan: AdStudioPlan, sources?: Pick<AdStudioPlanSources, 'keywords'> | null): AdStudioScriptContext {
+  const keywordsMeasured = !sources || sources.keywords.status === 'ok';
   return {
     ...(plan.audience ? { audience: plan.audience } : {}),
     ...(plan.messagingAngles.length ? { messagingAngles: [...plan.messagingAngles] } : {}),
-    ...(plan.keywordThemes.length
+    ...(keywordsMeasured && plan.keywordThemes.length
       ? { keywordThemes: plan.keywordThemes.map((theme) => (theme.keywords.length ? `${theme.theme} (${theme.keywords.join(', ')})` : theme.theme)) }
       : {}),
     ...(plan.landingPageSummary ? { landingPageSummary: plan.landingPageSummary } : {}),

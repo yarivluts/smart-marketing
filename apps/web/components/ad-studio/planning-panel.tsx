@@ -46,7 +46,7 @@ const COMPETITION_TONE = { LOW: 'ok', MEDIUM: 'warn', HIGH: 'error' } as const;
 function SourcesChecklist({ sources }: { sources: AdStudioPlanSources }): React.ReactElement {
   const t = useTranslations('AdStudio');
   return (
-    <ChartCard title={t('plan.sourcesTitle')} description={t('plan.sourcesDescription')} icon={ListChecks} fill>
+    <ChartCard title={t('plan.sourcesTitle')} description={t('plan.sourcesDescription')} icon={ListChecks} className="min-w-0 lg:self-start">
       <ul className="flex flex-col gap-2" data-testid="ad-studio-plan-sources">
         {planningSourceChecklist(sources).map((row) => (
           <li key={row.id} className="flex items-start gap-2.5 rounded-xl border border-border px-3 py-2" data-source={row.id} data-status={row.status}>
@@ -95,7 +95,7 @@ function EvidenceCharts({ sources }: { sources: AdStudioPlanSources }): React.Re
   const { results, keywords, campaigns } = sources;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-2">
       <ChartCard
         title={t('plan.pagesChartTitle')}
         description={results.status === 'ok' ? t('plan.pagesChartDescription', { days: results.days, environment: results.environmentName }) : undefined}
@@ -211,7 +211,7 @@ function PlanBody({ plan }: { plan: AdStudioPlan }): React.ReactElement {
   const t = useTranslations('AdStudio');
   const sourceLabel = (source: AdStudioCitationSource) => t(`plan.source.${source}`);
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
       <ChartCard title={t('plan.summaryTitle')} icon={Sparkles}>
         <div className="flex flex-col gap-4">
           <p className="text-sm leading-relaxed" dir="auto">
@@ -324,8 +324,8 @@ function PlanBody({ plan }: { plan: AdStudioPlan }): React.ReactElement {
           </header>
           <ul className="flex list-disc flex-col gap-1 ps-5 text-sm">
             {plan.marketNotes.map((note) => (
-              <li key={note} dir="auto">
-                {note}
+              <li key={note}>
+                <span dir="auto">{note}</span>
               </li>
             ))}
           </ul>
@@ -409,7 +409,7 @@ export function PlanningPanel({ orgId, projectId, briefId, plan, sources, genera
 
       {plan && sources ? (
         <>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
             <SourcesChecklist sources={sources} />
             <PlanBody plan={plan} />
           </div>

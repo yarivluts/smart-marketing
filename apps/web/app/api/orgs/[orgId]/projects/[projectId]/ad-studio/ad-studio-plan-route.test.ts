@@ -185,8 +185,9 @@ describe('POST .../ad-studio/briefs/[briefId]/plan', () => {
     await decideResourceAttachment({ organizationId: orgId, attachmentId: attachment.id, decidedByUserId: owner.id, approve: true });
 
     const briefId = await newBrief(orgId, projectId, { ...BRIEF, language: 'he' });
+    const script = JSON.stringify({ title: 'Ad', scenes: [{ durationSeconds: 5, visualPrompt: 'A lawyer signs on a phone', voiceover: '', onScreenText: '' }] });
     const fetchMock = stubNetwork({
-      gemini: [JSON.stringify(MODEL_PLAN)],
+      gemini: [JSON.stringify(MODEL_PLAN), script],
       landing: () => new Response(LANDING_HTML, { headers: { 'content-type': 'text/html' } }),
       googleAds: () =>
         new Response(
@@ -218,6 +219,11 @@ describe('POST .../ad-studio/briefs/[briefId]/plan', () => {
     const adsCall = fetchMock.mock.calls.find(([input]) => String(input).startsWith('https://googleads.googleapis.com/')) as unknown as [string, RequestInit];
     expect(adsCall[0]).toBe('https://googleads.googleapis.com/v25/customers/1234567890:generateKeywordIdeas');
     expect(JSON.parse(String(adsCall[1].body))).toMatchObject({ language: 'languageConstants/1027', geoTargetConstants: ['geoTargetConstants/2376'], keywordAndUrlSeed: { url: LANDING_URL } });
+
+    // Backed by Google Ads data, the keyword themes reach the script writer as what people search for.
+    expect((await generateScript(request('POST'), { params: Promise.resolve({ orgId, projectId, briefId }) })).status).toBe(200);
+    const geminiCalls = fetchMock.mock.calls.filter(([input]) => String(input).includes('generativelanguage')) as unknown as [string, RequestInit][];
+    expect(JSON.parse(String(geminiCalls[1][1].body)).contents[0].parts[0].text).toContain('What people search for: E-signature (electronic signature)');
   });
 
   it('the script generator then builds on the stored plan', async () => {
@@ -234,7 +240,8 @@ describe('POST .../ad-studio/briefs/[briefId]/plan', () => {
     expect(scriptPrompt).toContain('Context from the planning stage:');
     expect(scriptPrompt).toContain('Audience: Solo lawyers and small firms');
     expect(scriptPrompt).toContain('Messaging angles to build on: Speed; Sign from anywhere');
-    expect(scriptPrompt).toContain('What people search for: E-signature (electronic signature)');
+    // No Google Ads data behind this plan: its keyword themes are the model's grouping, not searches.
+    expect(scriptPrompt).not.toContain('What people search for');
     expect(scriptPrompt).toContain('Landing page summary: Mobile e-signing for law firms, signed in 30 seconds.');
     expect((await getAdStudioBrief(orgId, projectId, briefId)).status).toBe('scripted');
   });

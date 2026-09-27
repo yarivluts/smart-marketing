@@ -167,4 +167,10 @@ describe('toAdStudioPlanSources and planToScriptContext', () => {
     });
     expect(planToScriptContext({ ...PLAN, audience: '', messagingAngles: [], keywordThemes: [], landingPageSummary: '' })).toEqual({});
   });
+
+  it('passes keyword themes on as search terms only when the keyword source had Google Ads data', () => {
+    const plan = sanitizeAdStudioPlan(PLAN, availableEvidenceSources(EVIDENCE)).plan;
+    expect(planToScriptContext(plan, toAdStudioPlanSources(EVIDENCE)).keywordThemes).toEqual(['E-signature (electronic signature)']);
+    expect(planToScriptContext(plan, { keywords: { status: 'unavailable', reason: 'no_google_ads_credential' } })).not.toHaveProperty('keywordThemes');
+  });
 });
