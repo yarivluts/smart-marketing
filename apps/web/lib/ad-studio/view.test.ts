@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { adStudioStages, buildSceneTimeline, limitUsedPercent, summarizeAdStudio } from './view';
+import { adStudioStages, buildSceneTimeline, limitUsedPercent, planningSourceChecklist, shortUrl, sortRecommendations, summarizeAdStudio } from './view';
 
 describe('buildSceneTimeline', () => {
   it('lays scenes on the 60-second ruler with start offsets and shares', () => {
@@ -25,9 +25,19 @@ describe('buildSceneTimeline', () => {
 });
 
 describe('adStudioStages', () => {
-  it('moves from script to video once the script has scenes; export stays upcoming', () => {
-    expect(adStudioStages({ scenes: [] }).map((stage) => stage.status)).toEqual(['done', 'current', 'upcoming', 'upcoming']);
-    expect(adStudioStages({ scenes: [{}] }).map((stage) => stage.status)).toEqual(['done', 'done', 'current', 'upcoming']);
+  it('runs brief -> plan -> script -> video -> export; export stays upcoming', () => {
+    const ids = adStudioStages({ scenes: [] }).map((stage) => stage.id);
+    expect(ids).toEqual(['brief', 'plan', 'script', 'video', 'export']);
+    expect(adStudioStages({ scenes: [], plan: null }).map((stage) => stage.status)).toEqual(['done', 'current', 'upcoming', 'upcoming', 'upcoming']);
+  });
+
+  it('moves to the script once planned, and to video once the script has scenes', () => {
+    expect(adStudioStages({ scenes: [], plan: { summary: 'x' } }).map((stage) => stage.status)).toEqual(['done', 'done', 'current', 'upcoming', 'upcoming']);
+    expect(adStudioStages({ scenes: [{}], plan: { summary: 'x' } }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'current', 'upcoming']);
+  });
+
+  it('a script written without deep analysis shows the plan as skipped, not pending', () => {
+    expect(adStudioStages({ scenes: [{}] }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'current', 'upcoming']);
   });
 });
 
@@ -44,5 +54,36 @@ describe('summarizeAdStudio and limitUsedPercent', () => {
     expect(limitUsedPercent(5, 50)).toBe(10);
     expect(limitUsedPercent(80, 50)).toBe(100);
     expect(limitUsedPercent(0, 0)).toBe(100);
+  });
+});
+
+describe('planningSourceChecklist and sortRecommendations', () => {
+  it('lists the four sources with their reason when unavailable, then market knowledge as model-only', () => {
+    const rows = planningSourceChecklist({
+      landingPage: { status: 'unavailable', reason: 'timeout' },
+      results: { status: 'unavailable', reason: 'warehouse_not_configured' },
+      campaigns: { status: 'ok', campaigns: [] },
+      keywords: { status: 'unavailable', reason: 'no_google_ads_credential' },
+    });
+    expect(rows).toEqual([
+      { id: 'landing_page', status: 'unavailable', reason: 'timeout' },
+      { id: 'results', status: 'unavailable', reason: 'warehouse_not_configured' },
+      { id: 'campaigns', status: 'ok', reason: null },
+      { id: 'keywords', status: 'unavailable', reason: 'no_google_ads_credential' },
+      { id: 'market', status: 'model', reason: null },
+    ]);
+  });
+
+  it('puts high priority first and keeps the model order within a priority', () => {
+    const rec = (title: string, priority: 'high' | 'medium' | 'low') => ({ title, rationale: '', priority, evidence: [] });
+    expect(sortRecommendations([rec('a', 'low'), rec('b', 'high'), rec('c', 'medium'), rec('d', 'high')]).map((r) => r.title)).toEqual(['b', 'd', 'c', 'a']);
+  });
+});
+
+describe('shortUrl', () => {
+  it('drops the protocol and a trailing slash, and leaves anything else alone', () => {
+    expect(shortUrl('https://example.com/lawyers/')).toBe('example.com/lawyers');
+    expect(shortUrl('http://example.com')).toBe('example.com');
+    expect(shortUrl('/pricing')).toBe('/pricing');
   });
 });

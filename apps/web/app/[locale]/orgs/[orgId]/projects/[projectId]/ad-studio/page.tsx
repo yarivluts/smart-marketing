@@ -6,7 +6,7 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects } from '@/lib/orgs/queries';
-import { getAdStudioSettings, getAdStudioUsageToday, listAdStudioBriefs, listAdStudioUsage, toAdStudioBriefView } from '@/lib/ad-studio/store';
+import { getAdStudioKeywordDataStatus, getAdStudioSettings, getAdStudioUsageToday, listAdStudioBriefs, listAdStudioUsage, toAdStudioBriefView } from '@/lib/ad-studio/store';
 import { describeAdStudioProviders } from '@/lib/ad-studio/llm';
 import { adStudioStages, limitUsedPercent, summarizeAdStudio, type AdStudioStageStatus } from '@/lib/ad-studio/view';
 import { Link } from '@/i18n/navigation';
@@ -16,6 +16,7 @@ import { BriefForm } from '@/components/ad-studio/brief-form';
 import { ScriptEditor } from '@/components/ad-studio/script-editor';
 import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
+import { PlanningPanel } from '@/components/ad-studio/planning-panel';
 import { DeleteBriefButton } from '@/components/ad-studio/delete-brief-button';
 import { cn } from '@/lib/utils';
 
@@ -30,12 +31,13 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
-const STAGE_STATUS: Record<AdStudioStageStatus, VizStatus> = { done: 'ok', current: 'warn', upcoming: 'idle' };
+const STAGE_STATUS: Record<AdStudioStageStatus, VizStatus> = { done: 'ok', current: 'warn', upcoming: 'idle', skipped: 'idle' };
 
 /**
- * The AI Ad Studio (KAN-229): briefs, AI-written scripts split into scenes of 3-10 seconds (at most
- * 60 seconds in all) that a person edits scene by scene, and the studio's admin surface - which
- * models it uses and the project's daily AI limits. Gated on `ai.use`; limits need `project.configure`.
+ * The AI Ad Studio (KAN-229): briefs, a deep analysis of the evidence behind each ad (KAN-230),
+ * AI-written scripts split into scenes of 3-10 seconds (at most 60 seconds in all) that a person
+ * edits scene by scene, and the studio's admin surface - which models it uses, whether keyword data
+ * is available, and the project's daily AI limits. Gated on `ai.use`; limits need `project.configure`.
  */
 export default async function AdStudioPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -54,12 +56,13 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   }
   const canConfigure = can(bindings, principal, 'project.configure', { orgId, projectId });
 
-  const [projects, briefModels, settings, usageToday, recentUsage] = await Promise.all([
+  const [projects, briefModels, settings, usageToday, recentUsage, keywordData] = await Promise.all([
     listOrgProjects(orgId),
     listAdStudioBriefs(orgId, projectId),
     getAdStudioSettings(orgId, projectId),
     getAdStudioUsageToday(orgId, projectId),
     listAdStudioUsage(orgId, projectId, 25),
+    getAdStudioKeywordDataStatus(orgId, projectId),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) notFound();
@@ -80,9 +83,11 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
         value:
           stage.id === 'script' && selected.scenes.length > 0
             ? t('stageScriptValue', { scenes: selected.scenes.length, seconds: totalSceneSeconds(selected.scenes) })
-            : stage.id === 'brief'
-              ? t(selected.format === 'vertical' ? 'formatVerticalShort' : 'formatHorizontalShort')
-              : undefined,
+            : stage.id === 'plan' && selected.plan
+              ? t('stagePlanValue', { count: selected.plan.recommendations.length })
+              : stage.id === 'brief'
+                ? t(selected.format === 'vertical' ? 'formatVerticalShort' : 'formatHorizontalShort')
+                : undefined,
         status: STAGE_STATUS[stage.status],
       }))
     : [];
@@ -140,6 +145,16 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
           <ChartCard title={t('pipelineTitle')} description={t('pipelineDescription')} icon={Workflow}>
             <FlowDiagram label={t('pipelineTitle')} nodes={stageNodes} edges={stageEdges} height={200} />
           </ChartCard>
+
+          <PlanningPanel
+            orgId={orgId}
+            projectId={projectId}
+            briefId={selected.id}
+            plan={selected.plan}
+            sources={selected.planSources}
+            generatedBy={selected.planGeneratedBy}
+            aiAvailable={providers.text !== null}
+          />
 
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <ScriptEditor
@@ -232,6 +247,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
         canConfigure={canConfigure}
         textModel={providers.text}
         videoConfigured={providers.videoConfigured}
+        keywordData={keywordData}
         limits={{ dailyTextGenerations: settings.dailyTextGenerations, dailyVideoSeconds: settings.dailyVideoSeconds }}
         usageToday={usageToday}
         recentUsage={recentUsage.map((row) => ({

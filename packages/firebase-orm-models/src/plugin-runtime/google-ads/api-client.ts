@@ -206,6 +206,33 @@ const GOOGLE_OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 /** Refresh 60s before Google's own reported expiry, so a call in flight never races an about-to-expire token. */
 const ACCESS_TOKEN_EXPIRY_SAFETY_MARGIN_MS = 60_000;
 
+/**
+ * Exchanges the credential's long-lived refresh token for a short-lived access token at Google's
+ * OAuth2 token endpoint. Shared by the mutate client and the keyword-ideas lookup (KAN-230). The
+ * token is returned in memory only; a failure never includes the request body (which carries the
+ * client secret and refresh token) in its message.
+ */
+export async function requestGoogleAdsAccessToken(
+  options: Pick<GoogleAdsApiClientOptions, 'clientId' | 'clientSecret' | 'refreshToken'>,
+  fetchImpl: typeof fetch = fetch,
+): Promise<{ accessToken: string; expiresInSeconds: number }> {
+  const response = await fetchImpl(GOOGLE_OAUTH_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: options.clientId,
+      client_secret: options.clientSecret,
+      refresh_token: options.refreshToken,
+      grant_type: 'refresh_token',
+    }).toString(),
+  });
+  if (!response.ok) {
+    throw new GoogleAdsApiError(`Failed to refresh a Google Ads OAuth access token (status ${response.status}).`, response.status);
+  }
+  const body = (await response.json()) as { access_token: string; expires_in: number };
+  return { accessToken: body.access_token, expiresInSeconds: body.expires_in };
+}
+
 interface CachedAccessToken {
   token: string;
   expiresAtMs: number;
@@ -248,21 +275,8 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
     if (this.cachedAccessToken && this.cachedAccessToken.expiresAtMs > Date.now()) {
       return this.cachedAccessToken.token;
     }
-    const response = await fetch(GOOGLE_OAUTH_TOKEN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: this.options.clientId,
-        client_secret: this.options.clientSecret,
-        refresh_token: this.options.refreshToken,
-        grant_type: 'refresh_token',
-      }).toString(),
-    });
-    if (!response.ok) {
-      throw new GoogleAdsApiError(`Failed to refresh a Google Ads OAuth access token (status ${response.status}).`, response.status);
-    }
-    const body = (await response.json()) as { access_token: string; expires_in: number };
-    this.cachedAccessToken = { token: body.access_token, expiresAtMs: Date.now() + body.expires_in * 1000 - ACCESS_TOKEN_EXPIRY_SAFETY_MARGIN_MS };
+    const body = await requestGoogleAdsAccessToken(this.options);
+    this.cachedAccessToken = { token: body.accessToken, expiresAtMs: Date.now() + body.expiresInSeconds * 1000 - ACCESS_TOKEN_EXPIRY_SAFETY_MARGIN_MS };
     return this.cachedAccessToken.token;
   }
 
