@@ -107,6 +107,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
       ])
     : [[], [], [], null];
   const exportsView = exportRows.map(toAdStudioExportView);
+  const uploadedCount = exportsView.filter((row) => row.status === 'done').length;
   const clips = clipModels.map(toAdStudioClipView);
   const videos = videoModels.map(toAdStudioVideoView);
   let videoStage: (AdStudioVideoStageProgress & { assembledSeconds: number | null }) | undefined;
@@ -127,7 +128,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   }
 
   const stageNodes: FlowNodeSpec[] = selected
-    ? adStudioStages(selected, videoStage, exportsView.some((row) => row.status === 'done')).map((stage) => ({
+    ? adStudioStages(selected, videoStage, uploadedCount > 0).map((stage) => ({
         id: stage.id,
         label: t(`stage.${stage.id}`),
         sublabel: t(`stageStatus.${stage.status}`),
@@ -142,8 +143,8 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                   ? videoStage.assembled
                     ? t('stageVideoAssembled', { seconds: Math.round((videoStage.assembledSeconds ?? 0) * 10) / 10 })
                     : t('stageVideoValue', { rendered: videoStage.rendered, total: videoStage.scenes })
-                  : stage.id === 'export' && exportsView.some((row) => row.status === 'done')
-                    ? t('stageExportValue', { count: exportsView.filter((row) => row.status === 'done').length })
+                  : stage.id === 'export' && uploadedCount > 0
+                    ? t('stageExportValue', { count: uploadedCount })
                     : undefined,
         status: STAGE_STATUS[stage.status],
       }))

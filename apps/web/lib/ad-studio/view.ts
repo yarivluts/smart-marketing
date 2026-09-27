@@ -90,7 +90,8 @@ export interface AdStudioVideoStageProgress {
  * Where one ad stands in brief -> plan -> script -> video -> export. A brief always exists; the plan
  * (KAN-230) is done once deep analysis ran, and reads as skipped when a script was written without
  * one; the script is done once it has scenes; the video (KAN-231) is done once the current clips of
- * every scene are assembled. Export is a later stage of the studio and reads as upcoming.
+ * every scene are assembled; export (KAN-232) is current once that video exists and done after an
+ * upload succeeded.
  */
 export function adStudioStages(brief: { scenes: readonly unknown[]; plan?: unknown }, video?: AdStudioVideoStageProgress, exported = false): AdStudioStage[] {
   const scripted = brief.scenes.length > 0;
