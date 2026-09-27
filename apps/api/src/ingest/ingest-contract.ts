@@ -1,4 +1,4 @@
-import { IMPLICIT_EVENT_ENVELOPE_FIELDS, MAX_INGEST_BATCH_SIZE } from '@growthos/firebase-orm-models';
+import { BACKFILL_DELIVERY_TIMEOUT_MS, BACKFILL_RETRY_DELAYS_MS, IMPLICIT_EVENT_ENVELOPE_FIELDS, MAX_INGEST_BATCH_SIZE } from '@growthos/firebase-orm-models';
 
 /**
  * The machine-readable ingest contract (KAN-202 I1): an OpenAPI 3.1 document for
@@ -47,6 +47,27 @@ export const INGEST_CONTRACT_RULES: readonly { id: string; rule: string }[] = [
     rule: 'The environment (dev, staging, prod) is the one the API key was minted for. It is never a field in the payload; send test traffic with a dev key.',
   },
 ];
+
+/**
+ * The backfill contract: how GrowthOS asks an integrator to resend existing records (a new
+ * integration otherwise only shows customers once they change). Built from the constants the
+ * delivery code uses.
+ */
+export const INGEST_BACKFILL_CONTRACT = {
+  register: 'MCP set_backfill_endpoint {url, schemas:[{kind,name}], rotate_secret?} (project.configure), or the Backfill panel on Ingest health. One endpoint per environment; https on a public address. The Standard Webhooks signing secret (whsec_<base64>) is returned once.',
+  request: {
+    trigger: 'MCP request_backfill {schemas?} (project.configure), or the "Request backfill" button.',
+    method: 'POST',
+    headers: ['webhook-id', 'webhook-timestamp', 'webhook-signature: v1,<base64 HMAC-SHA256 of "webhook-id.webhook-timestamp.body", keyed with the secret decoded after whsec_>'],
+    body: { type: 'backfill.requested', backfill_id: 'string', project_id: 'string', environment: 'dev | staging | prod', schemas: '[{kind, name}]', requested_at: 'ISO 8601' },
+    timeout_ms: BACKFILL_DELIVERY_TIMEOUT_MS,
+    retry_delays_ms: BACKFILL_RETRY_DELAYS_MS,
+    rules: ['Answer 2xx fast and work asynchronously.', 'Retries reuse the same webhook-id: dedup on it.', 'A 4xx fails the backfill without retrying; a 5xx or network error is retried.', 'Redirects are not followed.'],
+  },
+  deliver: 'Send the records through the normal ingest endpoints with an ingest.write key of the same environment, adding header X-GrowthOS-Backfill-Id: <backfill_id>. Normal dedup applies, so resends are safe. A tag the platform does not recognise never blocks the batch.',
+  complete: 'POST /v1/backfills/{backfill_id}/complete {status: "completed" | "failed", records_sent, batches, errors?: [{message}]} with an ingest.write key of the same environment.',
+  status: 'MCP get_backfill_status / list_backfills: requested -> delivered -> receiving -> completed | failed, with accepted, duplicate and quarantined counts from the tagged batches.',
+} as const;
 
 const EVENT_EXAMPLE = {
   event_id: 'evt_01J9ZK4Q8M',
@@ -159,6 +180,7 @@ export function buildIngestContract(apiBaseUrl: string) {
     servers: [{ url: `${apiBaseUrl.replace(/\/+$/, '')}/v1` }],
     'x-growthos-rules': INGEST_CONTRACT_RULES,
     'x-growthos-limits': { max_records_per_batch: MAX_INGEST_BATCH_SIZE },
+    'x-growthos-backfill': INGEST_BACKFILL_CONTRACT,
     components: {
       securitySchemes: {
         apiKey: { type: 'http', scheme: 'bearer', description: 'A project API key (gos_live_... / gos_test_...) with the ingest.write scope, bound to one environment.' },

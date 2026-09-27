@@ -1,3 +1,5 @@
+import { CalendarRange, LayoutDashboard, Settings2 } from 'lucide-react';
+import { ChartCard, PageHero } from '@/components/viz';
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can, todayUtcDateOnly } from '@growthos/shared';
@@ -93,15 +95,32 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
   const t = await getTranslations('Boards');
 
   return (
-    <main className="container mx-auto flex max-w-5xl flex-col gap-8 py-16">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">{board.name}</h1>
-        {canManageBoards ? <DeleteBoardButton orgId={orgId} projectId={projectId} boardId={boardId} /> : null}
-      </div>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero
+        icon={LayoutDashboard}
+        eyebrow={t('detailEyebrow')}
+        title={board.name}
+        description={t('detailRange', {
+          start: boardView.resolvedDateRange.start,
+          end: boardView.resolvedDateRange.end,
+          grain: t(`grainOption.${boardView.resolvedDateRange.grain}`),
+        })}
+        actions={canManageBoards ? <DeleteBoardButton orgId={orgId} projectId={projectId} boardId={boardId} /> : undefined}
+      >
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span className="flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-muted-foreground">
+            <CalendarRange className="h-3.5 w-3.5" />
+            {t(`detailRangeKind.${boardView.dateRange.kind === 'absolute' ? 'absolute' : 'relative'}`)}
+          </span>
+          <span className="flex items-center gap-1.5 rounded-full border border-border bg-background/70 px-3 py-1 text-muted-foreground">
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            {t('detailTiles', { count: board.tiles.length })}
+          </span>
+        </div>
+      </PageHero>
 
       {canManageBoards ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('settingsHeading')}</h2>
+        <ChartCard title={t('settingsHeading')} description={t('settingsDescription')} icon={Settings2}>
           <BoardSettingsForm
             orgId={orgId}
             projectId={projectId}
@@ -112,7 +131,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
             initialCompare={boardView.compare}
             initialGlobalFilters={boardView.globalFilters}
           />
-        </section>
+        </ChartCard>
       ) : null}
 
       <section>

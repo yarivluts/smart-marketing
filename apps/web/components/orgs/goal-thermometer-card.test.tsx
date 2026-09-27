@@ -59,6 +59,8 @@ describe('GoalThermometerCard Component', () => {
     expect(screen.getByTestId('goal-paused-goal-paused')).toHaveTextContent('Paused');
     expect(screen.queryByTestId('goal-status-goal-paused')).not.toBeInTheDocument();
     expect(screen.queryByTestId('goal-rec-card-goal-paused')).not.toBeInTheDocument();
+    // A paused goal whose progress WAS measured still explains itself, rather than a raw message key.
+    expect(screen.getByTestId('goal-progress-unavailable-goal-paused')).toHaveTextContent(enMessages.Goals.pausedNoPace);
   });
 
   it('renders goal name, status badge, progress bar, and linear statistical projection', () => {

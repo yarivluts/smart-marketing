@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AutomationActionModel, AutomationTargetStateModel } from '@growthos/firebase-orm-models';
-import { findCampaignDraftForTarget, toAutomationActionView, toAutomationTargetView } from './automation-view';
+import { ACTION_LIFECYCLE_EDGES, countActionsByStatus, findCampaignDraftForTarget, toAutomationActionView, toAutomationTargetView } from './automation-view';
 
 function action(overrides: Partial<AutomationActionModel> & Pick<AutomationActionModel, 'id'>): AutomationActionModel {
   return {
@@ -297,3 +297,22 @@ describe('findCampaignDraftForTarget', () => {
   });
 });
 
+
+describe('action lifecycle graph', () => {
+  it('counts every status, including the empty ones', () => {
+    const counts = countActionsByStatus([{ status: 'blocked' }, { status: 'blocked' }, { status: 'executed' }]);
+    expect(counts.blocked).toBe(2);
+    expect(counts.executed).toBe(1);
+    expect(counts.proposed).toBe(0);
+    expect(Object.keys(counts)).toHaveLength(9);
+  });
+
+  it('connects every status into one lifecycle starting at proposed', () => {
+    const reached = new Set(['proposed']);
+    for (const [from, to] of ACTION_LIFECYCLE_EDGES) {
+      expect(reached.has(from)).toBe(true);
+      reached.add(to);
+    }
+    expect(reached.size).toBe(9);
+  });
+});

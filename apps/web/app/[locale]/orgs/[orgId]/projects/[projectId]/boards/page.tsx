@@ -6,8 +6,21 @@ import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listBoardsForProject, listOrgProjects } from '@/lib/orgs/queries';
-import { toBoardSummaryView } from '@/lib/orgs/board-view';
+import { boardTileTypeMix, toBoardSummaryView } from '@/lib/orgs/board-view';
 import { CreateBoardForm } from '@/components/orgs/create-board-form';
+import { BarChart3, BarChartHorizontal, Clock, Filter, Grid3X3, Hash, LayoutDashboard, LayoutGrid, LineChart, Plus, Table2, type LucideIcon } from 'lucide-react';
+import { StatCard } from '@/components/ui/stat-card';
+import { ChartCard, DonutChart, EmptyState, PageHero } from '@/components/viz';
+
+const TILE_TYPE_ICONS: Record<string, LucideIcon> = {
+  line: LineChart,
+  bar: BarChart3,
+  big_number: Hash,
+  table: Table2,
+  funnel: Filter,
+  heatmap: Grid3X3,
+  histogram: BarChartHorizontal,
+};
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -66,35 +79,108 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
   const boards = await listBoardsForProject(orgId, projectId);
   const boardViews = boards.map(toBoardSummaryView);
   const t = await getTranslations('Boards');
+  const tileTypeLabel = (type: string): string => (t.has(`tileType.${type}`) ? t(`tileType.${type}`) : type);
+  const mixes = new Map(boards.map((board) => [board.id, boardTileTypeMix(board)]));
+  const overallMix = boardTileTypeMix({ tiles: boards.flatMap((board) => board.tiles) });
+  const totalTiles = boardViews.reduce((sum, board) => sum + board.tileCount, 0);
+  const lastEdited = boardViews.map((board) => board.updatedAt).filter(Boolean).sort().at(-1);
+  const dateFormat = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+  const formatDate = (iso: string): string => {
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? iso : dateFormat.format(date);
+  };
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={LayoutDashboard} eyebrow={t('galleryEyebrow')} title={t('title', { projectName: project.name })} description={t('galleryDescription')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiBoards')} value={boardViews.length} icon={LayoutGrid} />
+          <StatCard title={t('kpiTiles')} value={totalTiles} icon={BarChart3} />
+          <StatCard title={t('kpiTopType')} value={overallMix[0] ? tileTypeLabel(overallMix[0].type) : t('kpiNone')} icon={overallMix[0] ? (TILE_TYPE_ICONS[overallMix[0].type] ?? LineChart) : LineChart} />
+          <StatCard title={t('kpiLastUpdated')} value={lastEdited ? formatDate(lastEdited) : t('kpiNone')} icon={Clock} />
+        </div>
+      </PageHero>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t('boardsHeading')}</h2>
-        {boardViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('noBoards')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {boardViews.map((board) => (
-              <li key={board.id} className="flex items-center justify-between rounded-md border border-input px-3 py-2 text-sm">
-                <Link className="font-medium underline" href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}>
-                  {board.name}
-                </Link>
-                <span className="text-xs text-muted-foreground">{t('tileCountLabel', { count: board.tileCount })}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {canManageBoards ? (
-        <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-semibold">{t('createHeading')}</h2>
-          <CreateBoardForm orgId={orgId} projectId={projectId} />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <section className="flex flex-col gap-3 lg:col-span-2" aria-labelledby="boards-heading">
+          <h2 id="boards-heading" className="text-lg font-semibold">
+            {t('boardsHeading')}
+          </h2>
+          {boardViews.length === 0 ? (
+            <EmptyState icon={LayoutDashboard} title={t('noBoards')} description={t('createDescription')} />
+          ) : (
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {boardViews.map((board) => {
+                const mix = mixes.get(board.id) ?? [];
+                return (
+                  <li key={board.id}>
+                    <Link
+                      href={`/orgs/${orgId}/projects/${projectId}/boards/${board.id}`}
+                      className="group flex h-full flex-col gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="flex items-center gap-2">
+                          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                            <LayoutDashboard className="h-4 w-4" />
+                          </span>
+                          <span className="font-semibold text-foreground group-hover:text-primary">{board.name}</span>
+                        </span>
+                        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{t('tileCountLabel', { count: board.tileCount })}</span>
+                      </div>
+                      {mix.length > 0 ? (
+                        <>
+                          <div className="flex h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                            {mix.map((entry, index) => (
+                              <span
+                                key={entry.type}
+                                style={{ width: `${(entry.count / board.tileCount) * 100}%`, backgroundColor: `hsl(var(--primary) / ${1 - index * 0.2})` }}
+                              />
+                            ))}
+                          </div>
+                          <ul className="flex flex-wrap gap-1.5">
+                            {mix.map((entry) => {
+                              const Icon = TILE_TYPE_ICONS[entry.type] ?? LineChart;
+                              return (
+                                <li key={entry.type} className="flex items-center gap-1 rounded-lg border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                                  <Icon className="h-3 w-3" />
+                                  {tileTypeLabel(entry.type)} · {entry.count}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">{t('boardEmptyMix')}</p>
+                      )}
+                      {board.updatedAt ? <p className="mt-auto text-xs text-muted-foreground">{t('boardUpdated', { date: formatDate(board.updatedAt) })}</p> : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </section>
-      ) : null}
+
+        <div className="flex flex-col gap-6">
+          {overallMix.length > 0 ? (
+            <ChartCard title={t('mixTitle')} description={t('mixDescription')} icon={BarChart3}>
+              <DonutChart
+                label={t('mixTitle')}
+                layout="stacked"
+                size={160}
+                centerValue={String(totalTiles)}
+                centerLabel={t('mixCenter')}
+                data={overallMix.map((entry) => ({ label: tileTypeLabel(entry.type), value: entry.count }))}
+              />
+            </ChartCard>
+          ) : null}
+          {canManageBoards ? (
+            <ChartCard title={t('createHeading')} description={t('createDescription')} icon={Plus}>
+              <CreateBoardForm orgId={orgId} projectId={projectId} />
+            </ChartCard>
+          ) : null}
+        </div>
+      </div>
     </main>
   );
 }
