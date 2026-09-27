@@ -210,7 +210,7 @@ export default async function AuditLogPage({ params }: PageProps): Promise<React
                         <InitialsAvatar name={name} seed={actorId} size="sm" />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2 text-sm">
-                            <span className="truncate text-foreground">{name}</span>
+                            <span className="truncate text-foreground" dir="auto">{name}</span>
                             <span className="shrink-0 tabular-nums text-muted-foreground" dir="ltr">
                               {numberFormat.format(entry.count)}
                             </span>
