@@ -51,6 +51,20 @@ describe('buildCustomerEntityCoverageQuery on DuckDB', () => {
     expect(coverage(events, [...range(12).map((id) => entityRow(id)), entityRow('cust-only-entity')])).toEqual({ eventCustomers: 12, withCustomerRecord: 12 });
   }, 120_000);
 
+  it('is an intersection on id, not a row ratio: 60 entity-only rows cannot hide 50 event customers with no record', () => {
+    // 100 customers in events, 50 of them with a customer record, plus 60 records for ids no event
+    // names (imported CRM rows, probes). A row ratio would read 110/100; the gap is 50 of 100.
+    const events = range(100).map((id) => eventRow(id));
+    const entities = [...range(50).map((id) => entityRow(id)), ...Array.from({ length: 60 }, (_, index) => entityRow(`crm-only-${index + 1}`))];
+    expect(coverage(events, entities)).toEqual({ eventCustomers: 100, withCustomerRecord: 50 });
+  }, 120_000);
+
+  it('EasySign dev shape: 9 event customers all with records, 5 probe-only entities beside them - 9 of 9, not 14 of 9', () => {
+    const events = range(9).map((id) => eventRow(id));
+    const entities = [...range(9).map((id) => entityRow(id)), ...['b13-probe-1', 'b13-probe-2', 'b14-probe-1', 'b14-probe-2', 'b14-probe-3'].map((id) => entityRow(id))];
+    expect(coverage(events, entities)).toEqual({ eventCustomers: 9, withCustomerRecord: 9 });
+  }, 120_000);
+
   it('counts a customer once even with records under two customer schemas, and ignores other entity schemas', () => {
     const events = range(3).map((id) => eventRow(id));
     const entities = [entityRow('cust-1', 'customer'), entityRow('cust-1', 'account'), entityRow('cust-2', 'subscription')];
