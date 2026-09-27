@@ -57,6 +57,12 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   // preview is reachable by someone deciding whether to ask for write access.
   register_schema: { kind: 'per-call-permission-varies', writePermission: 'schema.write', readOnlyPermission: 'mcp.read', readOnlyWhen: 'dry_run === true' },
   evolve_schema: { kind: 'per-call-permission', permission: 'schema.write' },
+  // The backfill loop: registering/requesting configures the project and calls out to the integrator;
+  // reading status is an ordinary read. All act on the caller key's own environment only.
+  set_backfill_endpoint: { kind: 'per-call-permission', permission: 'project.configure' },
+  request_backfill: { kind: 'per-call-permission', permission: 'project.configure' },
+  get_backfill_status: { kind: 'connection-scope', permission: 'mcp.read' },
+  list_backfills: { kind: 'connection-scope', permission: 'mcp.read' },
   // KAN-202 I2: same dry-run split as register_schema; writes only the caller's own project's registry.
   apply_schema_manifest: { kind: 'per-call-permission-varies', writePermission: 'schema.write', readOnlyPermission: 'mcp.read', readOnlyWhen: 'dry_run === true' },
   register_metric: { kind: 'per-call-permission', permission: 'metrics.write' },

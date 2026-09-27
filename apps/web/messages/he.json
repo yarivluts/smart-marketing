@@ -2455,5 +2455,40 @@
     "roasChangeLabel": "שינוי ב-ROAS",
     "rebalanceAction": "איזון תקציב בלחיצה",
     "channelAllocationEmpty": "עדיין לא נמדדה הוצאת פרסום, ולכן אין חלוקה בין ערוצים להציג."
+  },
+  "Backfill": {
+    "heading": "השלמת רשומות קיימות",
+    "description": "חיבורים שולחים לקוח רק כשהוא משתנה, ולכן רשומות שהיו קיימות לפני העלייה לאוויר חסרות. רשמו את נקודת ההשלמה של המערכת המחוברת עבור {environment}, ואז בקשו ממנה לשלוח הכול מחדש דרך ה-API הרגיל.",
+    "endpointSchemas": "שולח מחדש: {schemas}",
+    "noEndpoint": "עדיין לא נרשמה נקודת השלמה לסביבה הזו.",
+    "registerEndpoint": "רישום נקודת השלמה",
+    "editEndpoint": "שינוי נקודת ההשלמה",
+    "urlLabel": "כתובת הנקודה (https)",
+    "urlPlaceholder": "https://example.com/growth-backfill",
+    "schemasLabel": "סכמות לשליחה מחדש",
+    "noSchemas": "רשמו קודם את הסכמות - השלמה שולחת מחדש רשומות של סכמות רשומות.",
+    "saveButton": "שמירת הנקודה",
+    "rotateButton": "שמירה והנפקת סוד חדש",
+    "saving": "שומר...",
+    "saved": "הנקודה נשמרה.",
+    "saveError": "לא ניתן לשמור את הנקודה.",
+    "saveErrorReasons": "לא ניתן לשמור את הנקודה: {reasons}",
+    "secretOnce": "סוד החתימה - מוצג רק עכשיו. שמרו אותו ישירות במאגר הסודות של הנקודה.",
+    "requestButton": "בקשת השלמה",
+    "requesting": "מבקש...",
+    "requestDelivered": "ההשלמה התבקשה - הנקודה קיבלה אותה. הרשומות יופיעו כשיגיעו.",
+    "requestFailed": "הנקודה לא קיבלה את הבקשה: {reason}",
+    "requestError": "לא ניתן לבקש השלמה.",
+    "historyHeading": "השלמות אחרונות",
+    "noBackfills": "עדיין לא התבקשו השלמות.",
+    "requestedAt": "התבקשה {at}",
+    "failedLine": "נכשלה: {reason}",
+    "progressLine": "{batches} אצוות · {accepted} התקבלו · {duplicates} כפולות · {quarantined} בהסגר",
+    "status": {
+      "requested": "התבקשה",
+      "delivered": "נמסרה",
+      "receiving": "מתקבלת",
+      "completed": "הושלמה"
+    }
   }
 }
