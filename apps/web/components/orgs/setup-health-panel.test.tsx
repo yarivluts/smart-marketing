@@ -113,35 +113,61 @@ describe('SetupHealthPanel (KAN-197)', () => {
   });
 });
 
-describe('SetupHealthPanel: customer backfill hint', () => {
+describe('SetupHealthPanel: customer coverage and the backfill hint', () => {
+  /** Signups flow and entities arrive for new customers: "connected", the rollout case. */
+  const ROLLOUT = deriveSetupHealth(
+    [{ id: 'env-dev', name: 'dev' }],
+    [
+      observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' }),
+      observation({ schemaName: 'customer', kind: 'entity', lastAcceptedAt: '2026-09-25T16:12:05.000Z' }),
+    ],
+  ).environments[0];
+  /** Signups flow, the customer entity is registered but nothing has arrived. */
   const NO_CUSTOMERS = deriveSetupHealth(
     [{ id: 'env-dev', name: 'dev' }],
     [observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' }), observation({ schemaName: 'customer', kind: 'entity' })],
   ).environments[0];
 
-  function renderHealth(health: typeof NO_CUSTOMERS, backfillHref?: string) {
+  function renderHealth(health: typeof ROLLOUT, props: { coverage?: { eventCustomers: number; withCustomerRecord: number } | null; backfillHref?: string } = {}, locale: 'en' | 'he' = 'en') {
     return render(
-      <NextIntlClientProvider locale="en" messages={en}>
-        <SetupHealthPanel health={health} environmentLabel="Development" {...(backfillHref ? { backfillHref } : {})} />
+      <NextIntlClientProvider locale={locale} messages={locale === 'en' ? en : he}>
+        <SetupHealthPanel health={health} environmentLabel="Development" {...props} />
       </NextIntlClientProvider>,
     );
   }
 
-  it('on the customer entity row, names the events that prove the customers exist and links to the Backfill panel', () => {
-    renderHealth(NO_CUSTOMERS, '#backfill-heading');
-    const hint = within(within(screen.getByTestId('setup-requirement-customer_profiles')).getByTestId('setup-backfill-hint'));
-    expect(hint.getByText(/Events are already accepted here \("signup"\)/)).toBeInTheDocument();
+  it('the rollout case: connected, yet 95 of 100 customers in events have no record - the hint says so and links to the Backfill panel', () => {
+    renderHealth(ROLLOUT, { coverage: { eventCustomers: 100, withCustomerRecord: 5 }, backfillHref: '#backfill-heading' });
+    const row = within(screen.getByTestId('setup-requirement-customer_profiles'));
+    expect(row.getByText('Connected')).toBeInTheDocument();
+    expect(row.getByTestId('setup-customer-coverage')).toHaveTextContent('5 of 100 customers seen in events have a customer record (5%).');
+    const hint = within(row.getByTestId('setup-backfill-hint'));
+    expect(hint.getByText(/^95 of 100 customers seen in events have no customer record \(5% covered\)/)).toBeInTheDocument();
     expect(hint.getByRole('link', { name: 'Request a backfill' })).toHaveAttribute('href', '#backfill-heading');
   });
 
-  it('without the Backfill panel it still explains the fix but links nowhere', () => {
-    renderHealth(NO_CUSTOMERS);
-    expect(screen.getByTestId('setup-backfill-hint')).toBeInTheDocument();
+  it('full coverage shows the count and no hint', () => {
+    renderHealth(ROLLOUT, { coverage: { eventCustomers: 12, withCustomerRecord: 12 }, backfillHref: '#backfill-heading' });
+    expect(screen.getByTestId('setup-customer-coverage')).toHaveTextContent('12 of 12 customers seen in events have a customer record (100%).');
+    expect(screen.queryByTestId('setup-backfill-hint')).toBeNull();
+  });
+
+  it('without the warehouse: no count is shown, and the hint falls back to naming the events when no customer entity ever arrived', () => {
+    renderHealth(NO_CUSTOMERS, { coverage: null });
+    expect(screen.queryByTestId('setup-customer-coverage')).toBeNull();
+    expect(within(screen.getByTestId('setup-backfill-hint')).getByText(/Events are already accepted here \("signup"\)/)).toBeInTheDocument();
+    // No Backfill panel for this viewer: the hint explains the fix but links nowhere.
     expect(screen.queryByRole('link', { name: 'Request a backfill' })).toBeNull();
   });
 
-  it('is absent once customer entities arrive', () => {
-    renderHealth(DEV_HEALTH, '#backfill-heading');
+  it('without the warehouse, an entity that has arrived shows no hint (no count to go on)', () => {
+    renderHealth(ROLLOUT, { coverage: null });
     expect(screen.queryByTestId('setup-backfill-hint')).toBeNull();
+  });
+
+  it('renders the coverage hint in Hebrew from he.json', () => {
+    renderHealth(ROLLOUT, { coverage: { eventCustomers: 100, withCustomerRecord: 5 } }, 'he');
+    const expected = he.SetupHealth.backfillCoverageHint.replace('{missing}', '95').replace('{total}', '100').replace('{percent}', '5');
+    expect(screen.getByTestId('setup-backfill-hint')).toHaveTextContent(expected);
   });
 });
