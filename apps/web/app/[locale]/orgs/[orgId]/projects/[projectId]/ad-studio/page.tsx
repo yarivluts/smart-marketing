@@ -1,19 +1,32 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { can, totalSceneSeconds } from '@growthos/shared';
+import { assemblyPlan, can, sceneVideoStates, summarizeVideoProgress, totalSceneSeconds } from '@growthos/shared';
 import { AlertTriangle, ArrowLeft, Clapperboard, Clock, FileText, Film, Plus, Sparkles, Workflow } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects } from '@/lib/orgs/queries';
-import { getAdStudioSettings, getAdStudioUsageToday, listAdStudioBriefs, listAdStudioUsage, toAdStudioBriefView } from '@/lib/ad-studio/store';
+import {
+  getAdStudioSettings,
+  getAdStudioUsageToday,
+  listAdStudioBriefs,
+  listAdStudioClips,
+  listAdStudioUsage,
+  listAdStudioVideos,
+  toAdStudioBriefView,
+} from '@/lib/ad-studio/store';
 import { describeAdStudioProviders } from '@/lib/ad-studio/llm';
-import { adStudioStages, limitUsedPercent, summarizeAdStudio, type AdStudioStageStatus } from '@/lib/ad-studio/view';
+import { adStudioStages, currentAssembledVideo, limitUsedPercent, summarizeAdStudio, type AdStudioStageStatus, type AdStudioVideoStageProgress } from '@/lib/ad-studio/view';
+import { toAdStudioClipView, toAdStudioVideoView } from '@/lib/ad-studio/video-pipeline';
+import { resolveAdStudioMediaStorage } from '@/lib/ad-studio/media-storage';
+import { isFfmpegAvailable } from '@/lib/ad-studio/ffmpeg';
+import { resolveAdStudioOmni } from '@/lib/ad-studio/omni';
 import { Link } from '@/i18n/navigation';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard, EmptyState, FlowDiagram, PageHero, type FlowEdgeSpec, type FlowNodeSpec, type VizStatus } from '@/components/viz';
 import { BriefForm } from '@/components/ad-studio/brief-form';
 import { ScriptEditor } from '@/components/ad-studio/script-editor';
+import { VideoStudio } from '@/components/ad-studio/video-studio';
 import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
 import { DeleteBriefButton } from '@/components/ad-studio/delete-brief-button';
@@ -54,12 +67,13 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   }
   const canConfigure = can(bindings, principal, 'project.configure', { orgId, projectId });
 
-  const [projects, briefModels, settings, usageToday, recentUsage] = await Promise.all([
+  const [projects, briefModels, settings, usageToday, recentUsage, ffmpegAvailable] = await Promise.all([
     listOrgProjects(orgId),
     listAdStudioBriefs(orgId, projectId),
     getAdStudioSettings(orgId, projectId),
     getAdStudioUsageToday(orgId, projectId),
     listAdStudioUsage(orgId, projectId, 25),
+    isFfmpegAvailable(),
   ]);
   const project = projects.find((candidate) => candidate.id === projectId);
   if (!project) notFound();
@@ -71,9 +85,31 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   const overview = summarizeAdStudio(briefs);
   const providers = describeAdStudioProviders();
   const base = `/orgs/${orgId}/projects/${projectId}/ad-studio`;
+  const videoAvailable = resolveAdStudioOmni() !== null;
+  const storage = resolveAdStudioMediaStorage().describe();
+
+  // The selected ad's clips and assembled videos, and how far its video stage has come.
+  const [clipModels, videoModels] = selected
+    ? await Promise.all([listAdStudioClips(orgId, projectId, selected.id), listAdStudioVideos(orgId, projectId, selected.id)])
+    : [[], []];
+  const clips = clipModels.map(toAdStudioClipView);
+  const videos = videoModels.map(toAdStudioVideoView);
+  let videoStage: (AdStudioVideoStageProgress & { assembledSeconds: number | null }) | undefined;
+  if (selected) {
+    const context = { format: selected.format, language: selected.language };
+    const progress = summarizeVideoProgress(sceneVideoStates(selected.scenes, clips, context), selected.scenes);
+    const plan = assemblyPlan(selected.scenes, clips, context);
+    const assembled = currentAssembledVideo(videos, plan?.map((entry) => entry.clip.id) ?? null);
+    videoStage = {
+      rendered: progress.rendered,
+      scenes: progress.scenes,
+      assembled: assembled.current,
+      assembledSeconds: assembled.current ? (assembled.latest?.durationSeconds ?? null) : null,
+    };
+  }
 
   const stageNodes: FlowNodeSpec[] = selected
-    ? adStudioStages(selected).map((stage) => ({
+    ? adStudioStages(selected, videoStage).map((stage) => ({
         id: stage.id,
         label: t(`stage.${stage.id}`),
         sublabel: t(`stageStatus.${stage.status}`),
@@ -82,7 +118,11 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
             ? t('stageScriptValue', { scenes: selected.scenes.length, seconds: totalSceneSeconds(selected.scenes) })
             : stage.id === 'brief'
               ? t(selected.format === 'vertical' ? 'formatVerticalShort' : 'formatHorizontalShort')
-              : undefined,
+              : stage.id === 'video' && videoStage && selected.scenes.length > 0
+                ? videoStage.assembled
+                  ? t('stageVideoAssembled', { seconds: Math.round((videoStage.assembledSeconds ?? 0) * 10) / 10 })
+                  : t('stageVideoValue', { rendered: videoStage.rendered, total: videoStage.scenes })
+                : undefined,
         status: STAGE_STATUS[stage.status],
       }))
     : [];
@@ -149,6 +189,21 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
               initialScenes={selected.scenes}
               generatedByModel={selected.scriptGeneratedBy?.model ?? null}
               aiAvailable={providers.text !== null}
+            />
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+            <VideoStudio
+              orgId={orgId}
+              projectId={projectId}
+              briefId={selected.id}
+              scenes={selected.scenes}
+              format={selected.format}
+              language={selected.language}
+              initialClips={clips}
+              initialVideos={videos}
+              videoAvailable={videoAvailable}
+              videoSecondsLeft={Math.max(0, settings.dailyVideoSeconds - usageToday.videoSeconds)}
             />
           </div>
 
@@ -232,6 +287,8 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
         canConfigure={canConfigure}
         textModel={providers.text}
         videoConfigured={providers.videoConfigured}
+        storage={storage}
+        ffmpegAvailable={ffmpegAvailable}
         limits={{ dailyTextGenerations: settings.dailyTextGenerations, dailyVideoSeconds: settings.dailyVideoSeconds }}
         usageToday={usageToday}
         recentUsage={recentUsage.map((row) => ({

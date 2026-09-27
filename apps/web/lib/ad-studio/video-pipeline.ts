@@ -37,6 +37,7 @@ import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { AdStudioProviderError, type AdStudioProviderErrorCode } from './llm';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
 import { adStudioClipObjectPath, adStudioVideoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
+import type { AdStudioClipView, AdStudioVideoView } from './view';
 import { concatClips, defaultFfmpegRunner, FfmpegUnavailableError, type FfmpegRunner } from './ffmpeg';
 
 /**
@@ -93,32 +94,7 @@ interface BriefContext {
   actorId: string;
 }
 
-/** A clip as the page receives it. */
-export interface AdStudioClipView {
-  id: string;
-  sceneId: string;
-  version: number;
-  kind: 'render' | 'edit';
-  status: 'generating' | 'ready' | 'failed';
-  failureReason: string | null;
-  sceneFingerprint: string;
-  durationSeconds: number;
-  parentClipId: string | null;
-  /** The edit instruction (edits only). */
-  instruction: string | null;
-  requestedOn: string;
-  completedOn: string | null;
-}
-
-export interface AdStudioVideoView {
-  id: string;
-  status: 'assembling' | 'ready' | 'failed';
-  failureReason: string | null;
-  clipIds: string[];
-  durationSeconds: number;
-  requestedOn: string;
-  assembledOn: string | null;
-}
+export type { AdStudioClipView, AdStudioVideoView };
 
 const EDIT_SUFFIX = /\. Keep everything else the same\..*$/;
 
