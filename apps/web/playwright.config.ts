@@ -53,7 +53,11 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: `pnpm exec next dev -p ${PORT}`,
+    // E2E_PROD_SERVER=1 (CI, via scripts/e2e-sharded.mjs): serve the production build made once
+    // before the shards, so no navigation waits on an on-demand `next dev` compile or a Fast Refresh
+    // rebuild - the cause of the timing failures the retries and timeouts above only papered over.
+    // Unset (a local `playwright test`): the dev server, as before.
+    command: process.env.E2E_PROD_SERVER === '1' ? `pnpm exec next start -p ${PORT}` : `pnpm exec next dev -p ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: false,
     timeout: 120_000,
