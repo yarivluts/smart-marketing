@@ -1,8 +1,14 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { AlertTriangle, CheckCircle2, CircleDashed, ListChecks } from 'lucide-react';
-import { getSetupRequirement, type SetupEnvironmentHealth, type SetupRequirementStatus } from '@growthos/shared';
+import { AlertTriangle, ArrowDown, CheckCircle2, CircleDashed, History, ListChecks } from 'lucide-react';
+import {
+  customerBackfillRecommendation,
+  getSetupRequirement,
+  type SetupCustomerCoverage,
+  type SetupEnvironmentHealth,
+  type SetupRequirementStatus,
+} from '@growthos/shared';
 import { ProgressRing } from '@/components/viz/progress-ring';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +17,14 @@ export interface SetupHealthPanelProps {
   health: SetupEnvironmentHealth;
   /** The environment's translated display name. */
   environmentLabel: string;
+  /**
+   * How many customers in this environment's events have a customer record, from the warehouse.
+   * Null or absent when it could not be read: the backfill hint then falls back to "no customer
+   * entity ever arrived", the one case visible without it.
+   */
+  coverage?: SetupCustomerCoverage | null;
+  /** In-page anchor of the Backfill panel when it is rendered for this viewer; without it the hint names the fix but links nowhere. */
+  backfillHref?: string;
 }
 
 const STATUS_STYLE: Record<SetupRequirementStatus, { icon: typeof CheckCircle2; iconClass: string; pill: string; row: string }> = {
@@ -53,10 +67,13 @@ function ringColor(score: number): string {
  * status, and what is lost while it is missing. Rendered as a checklist with a completion ring so
  * the gaps are visible at a glance.
  */
-export function SetupHealthPanel({ health, environmentLabel }: SetupHealthPanelProps): React.ReactElement {
+export function SetupHealthPanel({ health, environmentLabel, coverage, backfillHref }: SetupHealthPanelProps): React.ReactElement {
   const t = useTranslations('SetupHealth');
   const errorCount = health.requirements.filter((result) => result.status === 'error').length;
   const gapCount = health.requirements.filter((result) => result.status === 'gap').length;
+  const backfill = customerBackfillRecommendation(health, coverage);
+  const coverageShown = coverage && coverage.eventCustomers > 0 ? coverage : null;
+  const coveredCount = coverageShown ? Math.min(coverageShown.withCustomerRecord, coverageShown.eventCustomers) : 0;
 
   return (
     <section className="flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-sm" aria-labelledby="setup-health-heading">
@@ -149,6 +166,33 @@ export function SetupHealthPanel({ health, environmentLabel }: SetupHealthPanelP
                     </span>
                   ) : null}
                   {result.status !== 'connected' ? <span className="text-xs text-muted-foreground/80">{t(`requirements.${result.requirementId}.impact`)}</span> : null}
+                  {result.requirementId === 'customer_profiles' && coverageShown ? (
+                    <span className="text-xs text-muted-foreground" data-testid="setup-customer-coverage">
+                      {t('coverageLine', {
+                        covered: coveredCount,
+                        total: coverageShown.eventCustomers,
+                        percent: Math.floor((coveredCount * 100) / coverageShown.eventCustomers),
+                      })}
+                    </span>
+                  ) : null}
+                  {result.requirementId === 'customer_profiles' && backfill ? (
+                    <div className="mt-1 flex flex-col gap-1.5 rounded-lg border border-primary/30 bg-primary/5 px-2.5 py-2 text-xs" data-testid="setup-backfill-hint">
+                      <span className="flex gap-1.5 text-foreground">
+                        <History className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                        <span className="break-words">
+                          {backfill.basis === 'coverage'
+                            ? t('backfillCoverageHint', { missing: backfill.missing, total: backfill.eventCustomers, percent: backfill.coveragePercent })
+                            : t('backfillHint', { schemas: quoted(backfill.eventSchemas) })}
+                        </span>
+                      </span>
+                      {backfillHref ? (
+                        <a href={backfillHref} className="inline-flex items-center gap-1 self-start font-medium text-primary hover:underline">
+                          {t('backfillLink')}
+                          <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </li>
             );

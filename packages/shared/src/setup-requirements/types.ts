@@ -129,3 +129,26 @@ export interface SetupEnvironmentHealth {
 export interface SetupHealthReport {
   environments: readonly SetupEnvironmentHealth[];
 }
+
+/**
+ * How many of the customers an environment's events name also have a customer entity record, read
+ * from the warehouse core tables (`events.properties.customer_id` against `entities`) as of the last
+ * warehouse refresh. The number the customer-backfill recommendation is based on: a live path that
+ * sends entities for new signups says nothing about the customers who signed up before it existed.
+ */
+export interface SetupCustomerCoverage {
+  /** Distinct `properties.customer_id` values in the environment's accepted events. */
+  eventCustomers: number;
+  /** How many of those have a customer entity record in the same environment. */
+  withCustomerRecord: number;
+}
+
+/**
+ * Why a customer backfill is recommended.
+ * - `coverage`: the warehouse shows too few of the customers in events have a customer record.
+ * - `no_entity_yet`: the warehouse could not be read, but events are accepted and no customer
+ *   entity has ever arrived - the one case visible without it.
+ */
+export type SetupCustomerBackfillRecommendation =
+  | { basis: 'coverage'; eventCustomers: number; withCustomerRecord: number; missing: number; coveragePercent: number }
+  | { basis: 'no_entity_yet'; eventSchemas: string[] };

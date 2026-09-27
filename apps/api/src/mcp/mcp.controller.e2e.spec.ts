@@ -1433,6 +1433,30 @@ describe('McpController (e2e)', () => {
       }
     });
 
+    it('without a readable warehouse, both tools say coverage is unknown and fall back to "events flow, no customer entity ever"', async () => {
+      const a = await setupProjectWithKey('Setup Backfill Org');
+      await registerEvent(a.organization.id, a.project.id, a.owner.id, 'signup');
+      await ingestBatch({ organizationId: a.organization.id, projectId: a.project.id, environmentId: a.environmentId, input: { kind: 'event', records: [eventRecord('signup')] } });
+      type BackfillFields = {
+        customer_coverage: unknown;
+        customer_coverage_note?: string;
+        customer_backfill: { basis: string; reason: string; how_to_fix: Array<{ web_page_url?: string; mcp_tool?: string }> } | null;
+      };
+
+      for (const tool of ['get_setup_health', 'audit_installation_gaps']) {
+        const body = await callJson<BackfillFields>(a.rawKey, tool);
+        // No warehouse in this test environment: no count is claimed.
+        expect(body.customer_coverage).toBeNull();
+        expect(body.customer_coverage_note).toContain('needs the warehouse');
+        expect(body.customer_backfill?.basis).toBe('no_entity_yet');
+        expect(body.customer_backfill?.reason).toContain('"signup"');
+        expect(body.customer_backfill?.how_to_fix.map((step) => step.mcp_tool ?? step.web_page_url)).toEqual([
+          expect.stringContaining(`/orgs/${a.organization.id}/projects/${a.project.id}/ingest-health`),
+          'request_backfill',
+        ]);
+      }
+    });
+
     it('refuses an environment name the project does not have, rather than reporting on another one', async () => {
       const { rawKey } = await setupProjectWithKey('Setup Env Org');
       const client = await connectedClient(rawKey);

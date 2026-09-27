@@ -344,7 +344,7 @@ const TOUCHPOINT_EVENT_TYPE = 'touchpoint';
  * `lax_string(col[key])` is what `fact_attribution` already runs in production; DuckDB's
  * `json_extract_string` is that macro's default leg). `key` is a fixed literal owned by this file, never input.
  */
-function jsonTextField(dialect: WarehouseSqlDialect, column: string, key: 'customer_id' | 'anon_id'): string {
+export function jsonTextField(dialect: WarehouseSqlDialect, column: string, key: 'customer_id' | 'anon_id'): string {
   return dialect === 'bigquery' ? `LAX_STRING(${column}['${key}'])` : `json_extract_string(${column}, '$.${key}')`;
 }
 
