@@ -66,6 +66,44 @@ describe('RecordFeedEntryList (KAN-210 identity line)', () => {
   });
 });
 
+describe('RecordFeedEntryList timeline', () => {
+  it('groups records under one header per day and shows how long ago each landed', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={enMessages}>
+        <RecordFeedEntryList
+          entries={[
+            entry({ id: 'r1', landedAt: '2026-09-25T10:00:00.000Z' }),
+            entry({ id: 'r2', landedAt: '2026-09-25T09:00:00.000Z' }),
+            entry({ id: 'r3', landedAt: '2026-09-24T09:00:00.000Z' }),
+          ]}
+          environmentDisplayNameById={new Map()}
+          nowMs={Date.parse('2026-09-25T12:00:00.000Z')}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText('Fri, Sep 25')).toBeInTheDocument();
+    expect(screen.getByText('Thu, Sep 24')).toBeInTheDocument();
+    expect(screen.getByText('2 hours ago')).toBeInTheDocument();
+    expect(screen.getByText('yesterday')).toBeInTheDocument();
+  });
+
+  it('collects empty fields into one line instead of printing blank values', () => {
+    renderList([
+      entry({
+        id: 'r1',
+        fields: [
+          { name: 'cta', value: 'hero', isPii: false },
+          { name: 'plan', value: '', isPii: false },
+          { name: 'path', value: '', isPii: false },
+        ],
+      }),
+    ]);
+    expect(screen.getByText('cta: hero')).toBeInTheDocument();
+    expect(screen.getByText('Empty: plan, path')).toBeInTheDocument();
+    expect(screen.queryByText('plan:')).not.toBeInTheDocument();
+  });
+});
+
 describe('RecordFeedFieldSelect', () => {
   it('offers the identity keys as their own group alongside the declared fields', () => {
     render(

@@ -75,6 +75,36 @@ describe('SetupHealthPanel (KAN-197)', () => {
     });
   }
 
+  it('shows completion as a ring and the core requirements as their own count', () => {
+    renderPanel('en', 'Development');
+    const ring = screen.getByRole('img', { name: '4 of 6 setup requirements connected' });
+    expect(ring).toHaveAttribute('data-percent', String(DEV_HEALTH.score));
+    expect(ring).toHaveTextContent('4/6');
+    expect(screen.getByText(`${DEV_HEALTH.coreConnectedCount}/${DEV_HEALTH.coreTotalCount}`)).toBeInTheDocument();
+    expect(screen.getByText('1 with rejected records only · 1 not connected')).toBeInTheDocument();
+  });
+
+  it('leaves a zero count out of the breakdown line', () => {
+    const noErrors = deriveSetupHealth(
+      [{ id: 'env-dev', name: 'dev' }],
+      [observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' })],
+    ).environments[0];
+    render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <SetupHealthPanel health={noErrors} environmentLabel="Development" />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText('5 not connected')).toBeInTheDocument();
+  });
+
+  it('marks each checklist row with its status and importance', () => {
+    renderPanel('en', 'Development');
+    expect(screen.getByTestId('setup-requirement-signups')).toHaveAttribute('data-status', 'connected');
+    expect(screen.getByTestId('setup-requirement-billing')).toHaveAttribute('data-status', 'error');
+    expect(screen.getByTestId('setup-requirement-ad_spend')).toHaveAttribute('data-status', 'gap');
+    expect(within(screen.getByTestId('setup-requirement-signups')).getByText('Core')).toBeInTheDocument();
+  });
+
   it('he: renders the Hebrew copy, not the English', () => {
     renderPanel('he', he.EnvBadge.dev);
     expect(screen.getByText(he.SetupHealth.heading)).toBeInTheDocument();
