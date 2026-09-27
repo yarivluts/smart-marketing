@@ -30,6 +30,8 @@ vi.mock('@/i18n/navigation', () => ({
       {children}
     </a>
   ),
+  // The funnel flow diagram navigates on node click.
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 /** Narrows `buildVisualFunnelData` to its measured branch, failing loudly otherwise. */
