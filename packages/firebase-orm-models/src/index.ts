@@ -125,6 +125,7 @@ export * from './services/vault.service';
 export * from './services/schema-registry.service';
 export * from './services/backfill.service';
 export * from './services/ad-studio.service';
+export * from './services/ad-studio-video.service';
 export * from './services/ad-studio-planning.service';
 export * from './services/landing-page-results.service';
 export * from './services/metric-registry.service';

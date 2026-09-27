@@ -95,6 +95,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.128.0
         version: 0.128.0(zod@3.25.76)
+      '@google-cloud/storage':
+        specifier: ^8.2.0
+        version: 8.2.0
       '@growthos/firebase-orm-models':
         specifier: workspace:*
         version: link:../../packages/firebase-orm-models
@@ -1130,6 +1133,10 @@ packages:
   '@google-cloud/storage@7.21.0':
     resolution: {integrity: sha512-l+IFTkd+6Y5LoAuXyYCKNAKtw/Ci+rAMqgdTB1jv4iZiLhw0rtq+0qjIRbBizXkNzEFmXiXUW0H7sZQQvk1ffA==}
     engines: {node: '>=14'}
+
+  '@google-cloud/storage@8.2.0':
+    resolution: {integrity: sha512-7ckgSjeEprV92VrlLjpYFA3PFerflvFtF7Ea86oQXGNCprGZq5rtpAVK0zgWnCy+44mLjms42M7MiWa433gz2A==}
+    engines: {node: '>=22'}
 
   '@googleapis/sqladmin@37.0.0':
     resolution: {integrity: sha512-LBxSb3V+avoqsTHY/KsSR4/3FGnRfUw8yhGjx6ihTE5w7Y6l1EZkcx62aCCfCNkaigCQDvgiJG2Pq2jxN1sfag==}
@@ -8106,6 +8113,26 @@ snapshots:
       - supports-color
     optional: true
 
+  '@google-cloud/storage@8.2.0':
+    dependencies:
+      '@google-cloud/paginator': 7.0.1
+      '@google-cloud/projectify': 6.0.1
+      '@google-cloud/promisify': 6.0.1
+      abort-controller: 3.0.0
+      async-retry: 1.3.3
+      duplexify: 4.1.3
+      fast-xml-parser: 5.9.3
+      gaxios: 6.7.1
+      google-auth-library: 9.15.1
+      html-entities: 2.6.0
+      mime: 3.0.0
+      p-limit: 3.1.0
+      retry-request: 9.0.1
+      teeny-request: 11.0.1
+    transitivePeerDependencies:
+      - encoding
+      - supports-color
+
   '@googleapis/sqladmin@37.0.0':
     dependencies:
       googleapis-common: 8.0.2
@@ -8693,8 +8720,7 @@ snapshots:
   '@next/swc-win32-x64-msvc@15.5.20':
     optional: true
 
-  '@nodable/entities@2.2.0':
-    optional: true
+  '@nodable/entities@2.2.0': {}
 
   '@nodelib/fs.scandir@2.1.5':
     dependencies:
@@ -9832,8 +9858,7 @@ snapshots:
       normalize-path: 3.0.0
       picomatch: 2.3.2
 
-  anynum@1.0.1:
-    optional: true
+  anynum@1.0.1: {}
 
   append-field@1.0.0: {}
 
@@ -9957,7 +9982,6 @@ snapshots:
   async-retry@1.3.3:
     dependencies:
       retry: 0.13.1
-    optional: true
 
   async@3.2.6: {}
 
@@ -11260,7 +11284,6 @@ snapshots:
     dependencies:
       path-expression-matcher: 1.6.1
       xml-naming: 0.1.0
-    optional: true
 
   fast-xml-parser@5.9.3:
     dependencies:
@@ -11270,7 +11293,6 @@ snapshots:
       path-expression-matcher: 1.6.1
       strnum: 2.4.1
       xml-naming: 0.1.0
-    optional: true
 
   fastq@1.20.1:
     dependencies:
@@ -12166,8 +12188,7 @@ snapshots:
 
   is-unicode-supported@0.1.0: {}
 
-  is-unsafe@1.0.1:
-    optional: true
+  is-unsafe@1.0.1: {}
 
   is-url@1.2.4: {}
 
@@ -12904,8 +12925,7 @@ snapshots:
 
   mime@2.6.0: {}
 
-  mime@3.0.0:
-    optional: true
+  mime@3.0.0: {}
 
   mimic-fn@2.1.0: {}
 
@@ -13288,8 +13308,7 @@ snapshots:
 
   path-exists@4.0.0: {}
 
-  path-expression-matcher@1.6.1:
-    optional: true
+  path-expression-matcher@1.6.1: {}
 
   path-is-absolute@1.0.1: {}
 
@@ -14265,7 +14284,6 @@ snapshots:
   strnum@2.4.1:
     dependencies:
       anynum: 1.0.1
-    optional: true
 
   strtok3@10.3.5:
     dependencies:
@@ -15083,8 +15101,7 @@ snapshots:
 
   xml-name-validator@5.0.0: {}
 
-  xml-naming@0.1.0:
-    optional: true
+  xml-naming@0.1.0: {}
 
   xmlchars@2.2.0: {}
 

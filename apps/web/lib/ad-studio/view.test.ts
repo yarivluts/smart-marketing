@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { adStudioStages, buildSceneTimeline, limitUsedPercent, planningSourceChecklist, shortUrl, sortRecommendations, summarizeAdStudio } from './view';
+import {
+  adStudioStages,
+  buildSceneTimeline,
+  currentAssembledVideo,
+  formatElapsed,
+  limitUsedPercent,
+  planningSourceChecklist,
+  shortUrl,
+  sortRecommendations,
+  summarizeAdStudio,
+} from './view';
 
 describe('buildSceneTimeline', () => {
   it('lays scenes on the 60-second ruler with start offsets and shares', () => {
@@ -38,6 +48,36 @@ describe('adStudioStages', () => {
 
   it('a script written without deep analysis shows the plan as skipped, not pending', () => {
     expect(adStudioStages({ scenes: [{}] }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'current', 'upcoming']);
+  });
+
+  it('keeps video current while scenes render and marks it done once the current clips are assembled', () => {
+    const plan = { summary: 'x' };
+    expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 1, scenes: 2, assembled: false }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'current', 'upcoming']);
+    expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 2, scenes: 2, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'done', 'upcoming']);
+    expect(adStudioStages({ scenes: [{}] }, { rendered: 1, scenes: 1, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'done', 'upcoming']);
+    const unscripted = adStudioStages({ scenes: [] }, { rendered: 0, scenes: 0, assembled: true });
+    expect(unscripted.find((stage) => stage.id === 'video')?.status).toBe('upcoming');
+  });
+});
+
+describe('currentAssembledVideo and formatElapsed', () => {
+  const videos = [
+    { id: 'v3', status: 'failed', clipIds: ['a', 'b'] },
+    { id: 'v2', status: 'ready', clipIds: ['a', 'b'] },
+    { id: 'v1', status: 'ready', clipIds: ['a'] },
+  ];
+
+  it('picks the newest ready video and says whether it matches the clips an assembly would use now', () => {
+    expect(currentAssembledVideo(videos, ['a', 'b'])).toEqual({ latest: videos[1], current: true });
+    expect(currentAssembledVideo(videos, ['a', 'c']).current).toBe(false);
+    expect(currentAssembledVideo(videos, ['b', 'a']).current).toBe(false);
+    expect(currentAssembledVideo(videos, null)).toEqual({ latest: videos[1], current: false });
+    expect(currentAssembledVideo([], ['a'])).toEqual({ latest: null, current: false });
+  });
+
+  it('formats elapsed generation time as m:ss, never negative', () => {
+    expect(formatElapsed('2026-09-27T10:00:00Z', new Date('2026-09-27T10:01:05Z'))).toBe('1:05');
+    expect(formatElapsed('2026-09-27T10:00:00Z', new Date('2026-09-27T09:59:00Z'))).toBe('0:00');
   });
 });
 

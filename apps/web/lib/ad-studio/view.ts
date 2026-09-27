@@ -49,22 +49,79 @@ export interface AdStudioStage {
   status: AdStudioStageStatus;
 }
 
+/** A scene clip as the page receives it (KAN-231). */
+export interface AdStudioClipView {
+  id: string;
+  sceneId: string;
+  version: number;
+  kind: 'render' | 'edit';
+  status: 'generating' | 'ready' | 'failed';
+  failureReason: string | null;
+  sceneFingerprint: string;
+  durationSeconds: number;
+  parentClipId: string | null;
+  /** The edit instruction (edits only). */
+  instruction: string | null;
+  requestedOn: string;
+  completedOn: string | null;
+}
+
+/** An assembled video as the page receives it (KAN-231). */
+export interface AdStudioVideoView {
+  id: string;
+  status: 'assembling' | 'ready' | 'failed';
+  failureReason: string | null;
+  clipIds: string[];
+  durationSeconds: number;
+  requestedOn: string;
+  assembledOn: string | null;
+}
+
+/** How far the video stage has come (KAN-231). */
+export interface AdStudioVideoStageProgress {
+  /** Scenes with a ready clip made from the scene as it is now. */
+  rendered: number;
+  scenes: number;
+  /** True when the newest assembled video uses exactly the current clips. */
+  assembled: boolean;
+}
+
 /**
  * Where one ad stands in brief -> plan -> script -> video -> export. A brief always exists; the plan
  * (KAN-230) is done once deep analysis ran, and reads as skipped when a script was written without
- * one; the script is done once it has scenes. Video and export are later stages of the studio and
- * read as upcoming until they have something to show.
+ * one; the script is done once it has scenes; the video (KAN-231) is done once the current clips of
+ * every scene are assembled. Export is a later stage of the studio and reads as upcoming.
  */
-export function adStudioStages(brief: { scenes: readonly unknown[]; plan?: unknown }): AdStudioStage[] {
+export function adStudioStages(brief: { scenes: readonly unknown[]; plan?: unknown }, video?: AdStudioVideoStageProgress): AdStudioStage[] {
   const scripted = brief.scenes.length > 0;
   const planned = brief.plan !== null && brief.plan !== undefined;
   return [
     { id: 'brief', status: 'done' },
     { id: 'plan', status: planned ? 'done' : scripted ? 'skipped' : 'current' },
     { id: 'script', status: scripted ? 'done' : planned ? 'current' : 'upcoming' },
-    { id: 'video', status: scripted ? 'current' : 'upcoming' },
+    { id: 'video', status: !scripted ? 'upcoming' : video?.assembled ? 'done' : 'current' },
     { id: 'export', status: 'upcoming' },
   ];
+}
+
+/**
+ * The newest successfully assembled video, and whether it is made of exactly the clips an assembly
+ * would use now (`planClipIds`, null when the scenes are not all rendered). A video is current only
+ * then - after any re-render, edit or script change it is shown as out of date.
+ */
+export function currentAssembledVideo<T extends { status: string; clipIds: readonly string[] }>(
+  videos: readonly T[],
+  planClipIds: readonly string[] | null,
+): { latest: T | null; current: boolean } {
+  const latest = videos.find((video) => video.status === 'ready') ?? null;
+  const current = Boolean(latest && planClipIds && latest.clipIds.length === planClipIds.length && latest.clipIds.every((id, index) => id === planClipIds[index]));
+  return { latest, current };
+}
+
+/** Elapsed time as m:ss, for a clip that is still generating. */
+export function formatElapsed(fromIso: string, now: Date): string {
+  const seconds = Math.max(0, Math.floor((now.getTime() - new Date(fromIso).getTime()) / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 export interface AdStudioOverview {

@@ -19,6 +19,7 @@ import {
 import { ProjectModel } from '../models/project.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
+import { deleteAdStudioBriefMedia } from './ad-studio-video.service';
 
 /** Limits a project starts with until an admin changes them. */
 export const AD_STUDIO_DEFAULT_DAILY_TEXT_GENERATIONS = 50;
@@ -228,6 +229,8 @@ export async function saveAdStudioPlan(params: {
 export async function deleteAdStudioBrief(params: { organizationId: string; projectId: string; briefId: string; actorId: string }): Promise<void> {
   const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
   await brief.remove();
+  // Its clips and assembled videos go with it; the web layer removes their stored files.
+  await deleteAdStudioBriefMedia(params.organizationId, params.projectId, params.briefId);
   try {
     await recordAuditLogEntry({
       organizationId: params.organizationId,

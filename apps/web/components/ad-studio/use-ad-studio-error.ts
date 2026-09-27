@@ -13,6 +13,8 @@ export interface AdStudioApiError {
 }
 
 const PROVIDER_CODES = new Set(['not_configured', 'provider_billing', 'rate_limited', 'refused', 'invalid_output', 'provider_error']);
+const VIDEO_REQUEST_CODES = new Set(['scene_not_found', 'already_generating', 'clip_not_editable', 'invalid_instruction', 'not_ready', 'already_assembling']);
+const ASSEMBLY_CODES = new Set(['ffmpeg_unavailable', 'ffmpeg_failed', 'storage_error']);
 
 /** Turns a route's error body into one translated sentence. */
 export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
@@ -22,6 +24,20 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
     if (body.error === 'quota_exceeded') return t('quotaExceeded', { used: body.used ?? 0, limit: body.limit ?? 0 });
     if (body.error === 'invalid_brief') return t('errorInvalidBrief', { reasons: (body.reasons ?? []).join('; ') });
     if (body.error === 'invalid_script') return t('errorInvalidScript');
+    if (body.error === 'video_request' && body.code && VIDEO_REQUEST_CODES.has(body.code)) return t(`videoRequestErrors.${body.code}`);
+    if (body.error === 'assembly_failed' && body.code && ASSEMBLY_CODES.has(body.code)) return t(`assemblyErrors.${body.code}`);
     return t('errorGeneric');
+  };
+}
+
+const CLIP_FAILURES = new Set([...PROVIDER_CODES, 'timed_out']);
+const VIDEO_FAILURES = new Set([...ASSEMBLY_CODES, 'timed_out']);
+
+/** A clip's or an assembled video's stored failure reason as a translated phrase. */
+export function useAdStudioFailureReason(): { clip: (reason: string | null) => string; video: (reason: string | null) => string } {
+  const t = useTranslations('AdStudio');
+  return {
+    clip: (reason) => t(`clipFailure.${reason && CLIP_FAILURES.has(reason) ? reason : 'provider_error'}`),
+    video: (reason) => t(`videoFailure.${reason && VIDEO_FAILURES.has(reason) ? reason : 'ffmpeg_failed'}`),
   };
 }

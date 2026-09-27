@@ -27,6 +27,10 @@ export interface AdStudioAdminPanelProps {
   videoConfigured: boolean;
   /** Whether deep analysis can read Google Ads keyword volumes for this project, and why not (KAN-230). */
   keywordData: { available: true; credentialName: string } | { available: false; reason: 'no_google_ads_credential' | 'credential_not_configured' | 'vault_not_configured' };
+  /** Where clips and videos are stored (KAN-231); omitted by callers that predate it. */
+  storage?: { kind: 'gcs' | 'local' | 'memory'; location: string };
+  /** Whether ffmpeg runs on this server, which assembling a video needs. */
+  ffmpegAvailable?: boolean;
   limits: { dailyTextGenerations: number; dailyVideoSeconds: number };
   usageToday: { textGenerations: number; videoSeconds: number };
   recentUsage: AdStudioUsageRow[];
@@ -55,7 +59,19 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
  * server-side), today's usage against them and the recent AI calls with their outcome - so spend and
  * failures such as a provider out of credit are visible, not guessed.
  */
-export function AdStudioAdminPanel({ orgId, projectId, canConfigure, textModel, videoConfigured, keywordData, limits, usageToday, recentUsage }: AdStudioAdminPanelProps): React.ReactElement {
+export function AdStudioAdminPanel({
+  orgId,
+  projectId,
+  canConfigure,
+  textModel,
+  videoConfigured,
+  keywordData,
+  storage,
+  ffmpegAvailable,
+  limits,
+  usageToday,
+  recentUsage,
+}: AdStudioAdminPanelProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -112,6 +128,20 @@ export function AdStudioAdminPanel({ orgId, projectId, canConfigure, textModel, 
           <dt className="text-xs text-muted-foreground">{t('videoModel')}</dt>
           <dd className={cn('text-sm font-medium', !videoConfigured && 'text-destructive')}>{videoConfigured ? t('videoModelValue') : t('notConfigured')}</dd>
         </div>
+        {storage ? (
+          <div className="rounded-xl border border-border px-3 py-2" data-testid="ad-studio-admin-storage">
+            <dt className="text-xs text-muted-foreground">{t('storage')}</dt>
+            <dd className="text-sm font-medium" dir="auto">
+              {storage.kind === 'gcs' ? t('storageGcs', { location: storage.location }) : storage.kind === 'local' ? t('storageLocal') : t('storageMemory')}
+            </dd>
+          </div>
+        ) : null}
+        {ffmpegAvailable !== undefined ? (
+          <div className="rounded-xl border border-border px-3 py-2" data-testid="ad-studio-admin-ffmpeg">
+            <dt className="text-xs text-muted-foreground">{t('ffmpeg')}</dt>
+            <dd className={cn('text-sm font-medium', ffmpegAvailable ? 'text-success' : 'text-destructive')}>{ffmpegAvailable ? t('ffmpegReady') : t('ffmpegMissing')}</dd>
+          </div>
+        ) : null}
         <div className="rounded-xl border border-border px-3 py-2 sm:col-span-2" data-testid="ad-studio-keyword-data">
           <dt className="text-xs text-muted-foreground">{t('keywordData')}</dt>
           <dd className={cn('text-sm font-medium', !keywordData.available && 'text-warning')}>
@@ -169,7 +199,10 @@ export function AdStudioAdminPanel({ orgId, projectId, canConfigure, textModel, 
                 {recentUsage.map((row) => (
                   <tr key={row.id} className="border-t border-border" data-testid="ad-studio-usage-row">
                     <td className="px-3 py-1.5 tabular-nums">{dateTime.format(new Date(row.occurredOn))}</td>
-                    <td className="px-3 py-1.5">{t(`usageKind.${row.kind}`)}</td>
+                    <td className="px-3 py-1.5">
+                      {t(`usageKind.${row.kind}`)}
+                      {row.kind === 'video_scene' || row.kind === 'video_edit' ? <span className="text-muted-foreground tabular-nums">{` · ${t('secondsShort', { seconds: row.units })}`}</span> : null}
+                    </td>
                     <td className="px-3 py-1.5" dir="ltr">
                       {row.model}
                     </td>
