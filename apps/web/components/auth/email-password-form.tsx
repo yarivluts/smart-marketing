@@ -11,7 +11,9 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { useAuth } from '@/lib/auth/auth-context';
+import { getFirebaseAuth } from '@/lib/firebase/client';
 import { authErrorMessageKey, type AuthErrorMessageKey } from '@/lib/auth/auth-error';
 import { resolveRedirectTarget } from '@/lib/auth/redirect-target';
 import { Button } from '@/components/ui/button';
@@ -67,6 +69,24 @@ export function EmailPasswordForm({
   const [errorKey, setErrorKey] = useState<AuthErrorMessageKey | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [resetNotice, setResetNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+
+  // A real reset, not a decoration: Firebase emails the link. The notice is the same whether or not
+  // the account exists, so the form never reveals which emails are registered.
+  async function handleForgotPassword(): Promise<void> {
+    const trimmed = email.trim();
+    if (trimmed.length === 0) {
+      setResetNotice({ tone: 'error', text: t('resetNeedsEmail') });
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(getFirebaseAuth(), trimmed);
+      setResetNotice({ tone: 'ok', text: t('resetSent', { email: trimmed }) });
+    } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      setResetNotice(code === 'auth/user-not-found' ? { tone: 'ok', text: t('resetSent', { email: trimmed }) } : { tone: 'error', text: t('resetError') });
+    }
+  }
 
   React.useEffect(() => {
     setMode(initialMode);
@@ -128,13 +148,7 @@ export function EmailPasswordForm({
           {mode === 'signup' ? t('signUpTitle') : t('signInTitle')}
         </h1>
         <p className="text-xs text-muted-foreground mt-1">
-          {mode === 'signup'
-            ? locale === 'he'
-              ? 'הצטרף לאלפי מנהלי שיווק המאיצים צמיחה עם GrowthOS'
-              : 'Join high-growth marketing teams scaling with autonomous AI'
-            : locale === 'he'
-              ? 'התחבר לחשבונך כדי לגשת ללוח הבקרה ומרכז האוטומציה'
-              : 'Sign in to access your cockpit dashboards and automation hub'}
+          {mode === 'signup' ? t('signUpSubtitle') : t('signInSubtitle')}
         </p>
       </div>
 
@@ -192,12 +206,19 @@ export function EmailPasswordForm({
       <div className="relative flex items-center justify-center">
         <div className="w-full border-t border-border/80" />
         <span className="absolute bg-card px-3 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-          {locale === 'he' ? 'או באמצעות אימייל' : 'or with email'}
+          {t('orWithEmail')}
         </span>
       </div>
 
       {/* Email & Password Form */}
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+      {/* method="post": if this is submitted before the page hydrates, the browser's native submit
+          must never put the credentials in the URL, where history and request logs keep them. */}
+      <form method="post" className="flex flex-col gap-4" onSubmit={handleSubmit} noValidate>
+        {resetNotice ? (
+          <p role="status" className={cn('text-xs', resetNotice.tone === 'ok' ? 'text-success' : 'text-destructive')}>
+            {resetNotice.text}
+          </p>
+        ) : null}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-foreground" htmlFor="email">
             {t('emailLabel')}
@@ -223,9 +244,9 @@ export function EmailPasswordForm({
               {t('passwordLabel')}
             </label>
             {mode === 'signin' && (
-              <span className="text-[11px] text-primary hover:underline cursor-pointer">
-                {locale === 'he' ? 'שכחת סיסמה?' : 'Forgot password?'}
-              </span>
+              <button type="button" onClick={handleForgotPassword} className="text-[11px] text-primary hover:underline">
+                {t('forgotPassword')}
+              </button>
             )}
           </div>
           <div className="relative">
@@ -263,7 +284,7 @@ export function EmailPasswordForm({
           {submitting ? (
             <div className="flex items-center gap-2">
               <Loader2 className="h-4 w-4 animate-spin" />
-              <span>{locale === 'he' ? 'מעבד...' : 'Processing...'}</span>
+              <span>{t('processing')}</span>
             </div>
           ) : (
             <div className="flex items-center gap-1.5">
