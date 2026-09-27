@@ -439,3 +439,12 @@ export function buildTileRenderView(
   const displayUnits = tileUnits(tile, units);
   return { ...content, isEmpty, freshness, ...(displayUnits ? { units: displayUnits } : {}) };
 }
+
+/** How many of a board's tiles are of each type, most common first (ties by type name) - for the gallery's per-board preview. */
+export function boardTileTypeMix(board: { tiles: readonly { type: string }[] }): { type: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const tile of board.tiles) {
+    counts.set(tile.type, (counts.get(tile.type) ?? 0) + 1);
+  }
+  return [...counts.entries()].map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count || a.type.localeCompare(b.type));
+}

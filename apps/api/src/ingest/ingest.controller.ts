@@ -1,5 +1,6 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
 import {
+  attributeIngestBatchToBackfill,
   EmptyIngestBatchError,
   getIngestBatch,
   IngestBatchTooLargeError,
@@ -33,6 +34,13 @@ interface IngestBatchResponse {
    * view and the field's presence is itself the signal.
    */
   rejected?: { client_id: string; status: string; reasons?: string[] }[];
+}
+
+/** The `X-GrowthOS-Backfill-Id` header, trimmed, or undefined when absent or unusable. */
+function backfillIdFromHeaders(headers: ApiKeyAuthenticatedRequest['headers']): string | undefined {
+  const raw = headers['x-growthos-backfill-id'];
+  const value = (Array.isArray(raw) ? raw[0] : raw)?.trim();
+  return value && value.length <= 128 && /^[A-Za-z0-9_-]+$/.test(value) ? value : undefined;
 }
 
 /** `ApiKeyAuthGuard` always populates this before a route handler runs (it throws first if authentication fails), so a missing context here would mean the guard was bypassed, not a caller error. */
@@ -127,6 +135,22 @@ export class IngestController {
         environmentId: context.environmentId,
         input,
       });
+      // A backfill resend is tagged by header. Attribution is best-effort and never affects the
+      // batch: an unknown id, or one from another environment, just leaves it untagged.
+      const backfillId = backfillIdFromHeaders(request.headers);
+      if (backfillId) {
+        try {
+          await attributeIngestBatchToBackfill({
+            organizationId: context.organizationId,
+            projectId: context.projectId,
+            environmentId: context.environmentId,
+            batchId: summary.batchId,
+            backfillId,
+          });
+        } catch {
+          // Attribution must never turn an accepted batch into an error.
+        }
+      }
       return {
         batch_id: summary.batchId,
         kind: summary.kind,
