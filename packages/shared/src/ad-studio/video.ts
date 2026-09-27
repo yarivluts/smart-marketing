@@ -60,7 +60,7 @@ export function buildScenePrompt(scene: Pick<AdStudioScene, 'durationSeconds' | 
  * new generation.
  */
 export function buildSceneEditInstruction(instruction: string): string {
-  return `${oneLine(instruction)}. Keep everything else the same. Do not add any readable text, captions or logos.`;
+  return `${oneLine(instruction).replace(/[.!\s]+$/, '')}. Keep everything else the same. Do not add any readable text, captions or logos.`;
 }
 
 /** 32-bit FNV-1a over UTF-16 code units, from a given offset basis. */

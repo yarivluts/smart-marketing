@@ -47,6 +47,7 @@ describe('buildScenePrompt', () => {
 
   it('builds an edit instruction that keeps everything else and repeats the no-text rule', () => {
     expect(buildSceneEditInstruction('  make it night ')).toBe('make it night. Keep everything else the same. Do not add any readable text, captions or logos.');
+    expect(buildSceneEditInstruction('Make it night.')).toMatch(/^Make it night\. Keep/);
   });
 });
 
