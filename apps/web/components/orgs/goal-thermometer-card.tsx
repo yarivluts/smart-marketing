@@ -213,7 +213,8 @@ export function GoalThermometerCard({
               data-testid={`goal-progress-unavailable-${goal.id}`}
               className="rounded-lg border border-dashed border-border bg-muted/30 p-2.5 text-muted-foreground"
             >
-              {t(`thermometerUnavailableReason.${goal.progressKind}`)}
+              {/* A paused goal can still carry a measured (`ok`) progress kind - it just has no pace to show. */}
+              {goal.isPaused ? t('pausedNoPace') : t(`thermometerUnavailableReason.${goal.progressKind === 'ok' ? 'no_measurements' : goal.progressKind}`)}
             </p>
           </div>
         )}

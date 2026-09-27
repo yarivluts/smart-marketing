@@ -49,7 +49,7 @@ export function VisualFunnelSteps({
   return (
     <div
       data-testid="visual-funnel-container"
-      className={`flex flex-col gap-6 rounded-2xl border border-border bg-card p-6 shadow-xs ${className}`}
+      className={`flex flex-col gap-5 rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6 ${className}`}
     >
       {/* Header & Status Badges */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -63,8 +63,8 @@ export function VisualFunnelSteps({
         </div>
 
         {/* Funnel High-Level Summary Stats */}
-        <div className="flex items-center gap-4 text-xs font-medium">
-          <div className="flex items-center gap-1.5 text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
+          <div className="flex items-center gap-1.5 rounded-lg bg-muted/60 px-2.5 py-1 text-muted-foreground">
             <Users className="h-4 w-4 text-primary" aria-hidden="true" />
             <span>{t('totalStarted')}{':'}</span>
             <span className="font-bold text-foreground" dir="ltr">
@@ -72,8 +72,8 @@ export function VisualFunnelSteps({
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 text-muted-foreground">
-            <CheckCircle2 className="h-4 w-4 text-green-500" aria-hidden="true" />
+          <div className="flex items-center gap-1.5 rounded-lg bg-muted/60 px-2.5 py-1 text-muted-foreground">
+            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
             <span>{t('totalCompleted')}{':'}</span>
             <span className="font-bold text-foreground" dir="ltr">
               {totalCompleted.toLocaleString()}
@@ -90,7 +90,7 @@ export function VisualFunnelSteps({
       </div>
 
       {/* Visual Pipeline Stages */}
-      <div className="mt-2 flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         {steps.map((step, idx) => {
           // Compared by position, not stage key: several steps can share a stage (e.g. three
           // events all classified "other"), and each step is its own row (KAN-199).
@@ -102,12 +102,16 @@ export function VisualFunnelSteps({
               data-testid={`funnel-step-${step.stageKey}`}
               className={`relative flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-xl border p-4 transition-all ${
                 isHighestDropOff
-                  ? 'border-amber-300/80 bg-amber-50/20 dark:border-amber-800/50 dark:bg-amber-950/10 shadow-2xs'
-                  : 'border-border/70 bg-card hover:border-border'
+                  ? 'border-amber-300/80 bg-warning/5 shadow-sm dark:border-amber-800/50'
+                  : 'border-border/70 bg-card hover:border-primary/30 hover:shadow-sm'
               }`}
             >
               {/* Step Number */}
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold text-foreground">
+              <div
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold ${
+                  isHighestDropOff ? 'bg-warning/15 text-warning' : 'bg-primary/10 text-primary'
+                }`}
+              >
                 <span dir="ltr">{`${step.stepOrder}.`}</span>
               </div>
 
@@ -138,10 +142,10 @@ export function VisualFunnelSteps({
                 </div>
 
                 {/* Conversion Bar */}
-                <div className="mt-2 h-3.5 w-full rounded-full bg-muted/80 overflow-hidden">
+                <div className="mt-2 h-3 w-full overflow-hidden rounded-full bg-muted/80">
                   <div
                     data-testid={`bar-${step.stageKey}`}
-                    className="h-full rounded-full bg-primary transition-all duration-500 ease-out"
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-[hsl(var(--gradient-to))] transition-all duration-500 ease-out"
                     style={{ width: `${Math.max(2, Math.min(100, step.conversionPercent))}%` }}
                   />
                 </div>

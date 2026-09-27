@@ -13,6 +13,8 @@ import {
   listQuarantinedRecordsForProject,
   listQueuedPipelineMessagesForProject,
   listRecentIngestBatchesForProject,
+  getProjectBackfillOverview,
+  listSchemaDefinitionsForProject,
 } from '@/lib/orgs/queries';
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import {
@@ -38,6 +40,7 @@ import { ReexportRawRecordsButton } from '@/components/orgs/reexport-raw-records
 import { SweepQueuedPipelineMessagesButton } from '@/components/orgs/sweep-queued-pipeline-messages-button';
 import { TriggerOrchestrationRunButton } from '@/components/orgs/trigger-orchestration-run-button';
 import { SetupHealthPanel } from '@/components/orgs/setup-health-panel';
+import { BackfillPanel } from '@/components/orgs/backfill-panel';
 import { Activity, CheckCircle2, Clock, Inbox, Workflow, XCircle } from 'lucide-react';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard, DonutChart, FlowDiagram, PageHero, type FlowEdgeSpec, type FlowNodeSpec } from '@/components/viz';
@@ -96,6 +99,13 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   if (!project) {
     notFound();
   }
+
+  // The backfill loop (resend pre-existing records) for the picked environment. Configuring it
+  // needs project.configure; ingest.write holders who reach this page can follow its progress.
+  const canConfigureBackfill = can(bindings, { type: 'user', id: user.id }, 'project.configure', { orgId, projectId });
+  const [backfillOverview, schemaDefsForBackfill] =
+    environmentId !== undefined ? await Promise.all([getProjectBackfillOverview(orgId, projectId, environmentId), listSchemaDefinitionsForProject(orgId, projectId)]) : [null, []];
+  const backfillSchemas = [...new Map(schemaDefsForBackfill.filter((def) => def.status === 'active' && def.kind !== 'measure').map((def) => [`${def.kind}:${def.name}`, { kind: def.kind, name: def.name }])).values()];
 
   const now = Date.now();
   const summary = computeIngestHealthSummary(batches.map(toIngestBatchView), now);
@@ -203,6 +213,26 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
 
       {environmentId !== undefined && setupHealth?.environments[0] ? (
         <SetupHealthPanel health={setupHealth.environments[0]} environmentLabel={selectedEnvironmentLabel} />
+      ) : null}
+
+      {environmentId !== undefined && backfillOverview && (canConfigureBackfill || backfillOverview.endpoint) ? (
+        <BackfillPanel
+          orgId={orgId}
+          projectId={projectId}
+          environmentId={environmentId}
+          environmentLabel={selectedEnvironmentLabel}
+          canConfigure={canConfigureBackfill}
+          endpoint={backfillOverview.endpoint}
+          availableSchemas={backfillSchemas}
+          backfills={backfillOverview.backfills.map((backfill) => ({
+            backfillId: backfill.backfillId,
+            status: backfill.status,
+            requestedAt: backfill.requestedAt,
+            ...(backfill.failureReason ? { failureReason: backfill.failureReason } : {}),
+            ...(backfill.report ? { report: { records_sent: backfill.report.records_sent, batches: backfill.report.batches } } : {}),
+            progress: backfill.progress,
+          }))}
+        />
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
