@@ -4,6 +4,10 @@ import {
   createAdStudioBrief as createAdStudioBriefInOrganization,
   deleteAdStudioBrief as deleteAdStudioBriefInOrganization,
   getAdStudioBrief as getAdStudioBriefInOrganization,
+  getAdStudioClip as getAdStudioClipInOrganization,
+  getAdStudioVideo as getAdStudioVideoInOrganization,
+  listAdStudioClips as listAdStudioClipsInOrganization,
+  listAdStudioVideos as listAdStudioVideosInOrganization,
   getAdStudioSettings as getAdStudioSettingsInOrganization,
   getAdStudioUsageToday as getAdStudioUsageTodayInOrganization,
   listAdStudioBriefs as listAdStudioBriefsInOrganization,
@@ -12,11 +16,14 @@ import {
   setAdStudioSettings as setAdStudioSettingsInOrganization,
   updateAdStudioBriefDetails as updateAdStudioBriefDetailsInOrganization,
   type AdStudioBriefModel,
+  type AdStudioClipModel,
+  type AdStudioVideoModel,
   type AdStudioSettingsView,
   type AdStudioUsageModel,
   type AdStudioUsageToday,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { adStudioBriefMediaPrefix, resolveAdStudioMediaStorage } from './media-storage';
 
 /** The web app's Ad Studio reads and writes: the package services, with the ORM connected first. */
 
@@ -45,9 +52,35 @@ export async function saveAdStudioScript(params: { organizationId: string; proje
   return saveAdStudioScriptInOrganization(params);
 }
 
+/** Deletes the brief, its clip and video records, and (best-effort) their files in the bucket. */
 export async function deleteAdStudioBrief(params: { organizationId: string; projectId: string; briefId: string; actorId: string }): Promise<void> {
   await ensureFirestoreOrm();
-  return deleteAdStudioBriefInOrganization(params);
+  await deleteAdStudioBriefInOrganization(params);
+  try {
+    await resolveAdStudioMediaStorage().deletePrefix(adStudioBriefMediaPrefix(params));
+  } catch (error) {
+    console.error('[ad-studio] removing the media of a deleted brief failed', { briefId: params.briefId, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+export async function getAdStudioClip(organizationId: string, projectId: string, briefId: string, clipId: string): Promise<AdStudioClipModel> {
+  await ensureFirestoreOrm();
+  return getAdStudioClipInOrganization(organizationId, projectId, briefId, clipId);
+}
+
+export async function getAdStudioVideo(organizationId: string, projectId: string, briefId: string, videoId: string): Promise<AdStudioVideoModel> {
+  await ensureFirestoreOrm();
+  return getAdStudioVideoInOrganization(organizationId, projectId, briefId, videoId);
+}
+
+export async function listAdStudioClips(organizationId: string, projectId: string, briefId: string): Promise<AdStudioClipModel[]> {
+  await ensureFirestoreOrm();
+  return listAdStudioClipsInOrganization(organizationId, projectId, briefId);
+}
+
+export async function listAdStudioVideos(organizationId: string, projectId: string, briefId: string): Promise<AdStudioVideoModel[]> {
+  await ensureFirestoreOrm();
+  return listAdStudioVideosInOrganization(organizationId, projectId, briefId);
 }
 
 export async function getAdStudioSettings(organizationId: string, projectId: string): Promise<AdStudioSettingsView> {
