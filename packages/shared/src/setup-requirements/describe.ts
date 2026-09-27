@@ -222,6 +222,14 @@ function connectedElsewhere(report: SetupHealthReport, focus: SetupEnvironmentHe
     .map((environment) => environment.environmentName);
 }
 
+/** The entity schemas setup health maps to the customer entity requirement in this environment: what counts as a customer record. */
+export function customerEntitySchemaNames(environment: SetupEnvironmentHealth): string[] {
+  const customers = environment.requirements.find((result) => result.requirementId === 'customer_profiles');
+  if (!customers) return [];
+  const names = [...customers.acceptedSchemas, ...customers.rejectedSchemas].filter((schema) => schema.kind === 'entity').map((schema) => schema.name);
+  return [...new Set([...names, ...customers.silentRegisteredSchemas])].sort();
+}
+
 /** Below this share of event customers with a customer record, a backfill is recommended. */
 export const CUSTOMER_COVERAGE_THRESHOLD_PERCENT = 90;
 

@@ -3,6 +3,7 @@ import {
   buildInstallationGapsOutput,
   buildSetupHealthOutput,
   customerBackfillRecommendation,
+  customerEntitySchemaNames,
   classifySchemaForSetupRequirement,
   deriveSetupHealth,
   selectSetupFocusEnvironment,
@@ -419,5 +420,21 @@ describe('customer backfill: recommended from coverage, not from whether any ent
       observation({ schemaName: 'signup', kind: 'event', openQuarantinedCount: 2 }),
     ]);
     expect(customerBackfillRecommendation(report.environments[0], null)).toBeNull();
+  });
+});
+
+describe('customerEntitySchemaNames', () => {
+  it('lists the entity schemas behind the customer requirement, whether accepted, rejected or registered but silent', () => {
+    const report = deriveSetupHealth(
+      [{ id: 'env-dev', name: 'dev' }],
+      [
+        observation({ schemaName: 'customer', kind: 'entity', lastAcceptedAt: '2026-09-27T08:00:00.000Z' }),
+        observation({ schemaName: 'account', kind: 'entity', openQuarantinedCount: 1 }),
+        observation({ schemaName: 'workspace', kind: 'entity' }),
+        observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-27T08:00:00.000Z' }),
+      ],
+    );
+    expect(customerEntitySchemaNames(report.environments[0])).toEqual(['account', 'customer', 'workspace']);
+    expect(customerEntitySchemaNames(deriveSetupHealth([{ id: 'env-dev', name: 'dev' }], []).environments[0])).toEqual([]);
   });
 });

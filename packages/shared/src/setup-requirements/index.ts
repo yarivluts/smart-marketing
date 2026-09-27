@@ -13,6 +13,7 @@ export {
   buildSetupHealthOutput,
   customerBackfillRecommendation,
   CUSTOMER_COVERAGE_THRESHOLD_PERCENT,
+  customerEntitySchemaNames,
   describeCustomerBackfillReason,
   describeSetupRequirementResult,
   renderSetupRecommendation,
