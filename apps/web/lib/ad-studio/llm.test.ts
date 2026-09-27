@@ -85,10 +85,10 @@ describe('createClaudeLlm', () => {
 
 describe('resolveAdStudioLlm', () => {
   it('prefers Claude when an Anthropic key is set, falls back to Gemini, and is null with neither', () => {
-    expect(resolveAdStudioLlm({ ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' } as NodeJS.ProcessEnv)?.provider).toBe('anthropic');
-    expect(resolveAdStudioLlm({ GEMINI_API_KEY: 'g' } as NodeJS.ProcessEnv)?.provider).toBe('gemini');
-    expect(resolveAdStudioLlm({ ANTHROPIC_API_KEY: '  ' } as NodeJS.ProcessEnv)).toBeNull();
-    expect(describeAdStudioProviders({ GEMINI_API_KEY: 'g' } as NodeJS.ProcessEnv)).toEqual({ text: { provider: 'gemini', model: AD_STUDIO_GEMINI_TEXT_MODEL }, videoConfigured: true });
-    expect(describeAdStudioProviders({} as NodeJS.ProcessEnv)).toEqual({ text: null, videoConfigured: false });
+    expect(resolveAdStudioLlm({ ANTHROPIC_API_KEY: 'a', GEMINI_API_KEY: 'g' } as unknown as NodeJS.ProcessEnv)?.provider).toBe('anthropic');
+    expect(resolveAdStudioLlm({ GEMINI_API_KEY: 'g' } as unknown as NodeJS.ProcessEnv)?.provider).toBe('gemini');
+    expect(resolveAdStudioLlm({ ANTHROPIC_API_KEY: '  ' } as unknown as NodeJS.ProcessEnv)).toBeNull();
+    expect(describeAdStudioProviders({ GEMINI_API_KEY: 'g' } as unknown as NodeJS.ProcessEnv)).toEqual({ text: { provider: 'gemini', model: AD_STUDIO_GEMINI_TEXT_MODEL }, videoConfigured: true });
+    expect(describeAdStudioProviders({} as unknown as NodeJS.ProcessEnv)).toEqual({ text: null, videoConfigured: false });
   });
 });
