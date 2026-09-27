@@ -200,6 +200,9 @@ import {
   type TvPairingStatus,
   type WinEventModel,
   type WinRuleModel,
+  getBackfillEndpoint as getBackfillEndpointInOrganization,
+  listBackfills as listBackfillsInOrganization,
+  type BackfillStatusView,
 } from '@growthos/firebase-orm-models';
 import type {
   CancellationReasonCodeCount,
@@ -1210,4 +1213,18 @@ export async function getInviteDetails(organizationId: string, membershipId: str
     inviteeUserId: membership.user_id,
     inviteeEmail: invitee?.email ?? '',
   };
+}
+
+/** The environment's backfill endpoint (never its secret) and its most recent backfills, for the Backfill panel. */
+export async function getProjectBackfillOverview(
+  organizationId: string,
+  projectId: string,
+  environmentId: string,
+): Promise<{ endpoint: { url: string; schemas: { kind: string; name: string }[] } | null; backfills: BackfillStatusView[] }> {
+  await ensureFirestoreOrm();
+  const [endpoint, backfills] = await Promise.all([
+    getBackfillEndpointInOrganization(organizationId, projectId, environmentId),
+    listBackfillsInOrganization(organizationId, projectId, environmentId),
+  ]);
+  return { endpoint: endpoint ? { url: endpoint.url, schemas: endpoint.schemas } : null, backfills };
 }

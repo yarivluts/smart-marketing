@@ -53,9 +53,9 @@ export function TrendChart({
   const gradientId = React.useId().replace(/:/g, '');
   const rows = data as TrendDatum[];
 
-  // An array, not a fragment: recharts 2 finds its axes, grid and tooltip by scanning the chart's
-  // children with react-is, whose fragment check does not recognise React 19 elements - so inside
-  // a fragment every one of them was silently dropped (charts rendered with no axes at all).
+  // An array, not a fragment: recharts 2 finds its axes/grid/tooltip among the chart's direct
+  // children with react-is 18, whose `isFragment` does not recognise a React 19 element - so a
+  // fragment's axes were silently dropped (no axis, grid or tooltip rendered).
   const axes = [
     <CartesianGrid key="grid" strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />,
     <XAxis
@@ -84,7 +84,7 @@ export function TrendChart({
       contentStyle={{ background: 'hsl(var(--popover))', border: '1px solid hsl(var(--border))', borderRadius: 12, fontSize: 12 }}
       cursor={{ fill: 'hsl(var(--muted) / 0.5)' }}
     />,
-    showLegend ? <Legend key="legend" wrapperStyle={{ fontSize: 12 }} /> : null,
+    ...(showLegend ? [<Legend key="legend" wrapperStyle={{ fontSize: 12 }} />] : []),
   ];
 
   let chart: React.ReactElement;

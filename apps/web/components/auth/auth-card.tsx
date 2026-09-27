@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale } from 'next-intl';
-import { Sparkles, ShieldCheck, Zap, Lock, CheckCircle2 } from 'lucide-react';
+import { useLocale, useTranslations } from 'next-intl';
+import { Sparkles, ScrollText, Zap, Lock, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export interface AuthCardProps {
@@ -23,21 +23,16 @@ export function AuthCard({
   className,
 }: AuthCardProps): React.ReactElement {
   const locale = useLocale();
+  const t = useTranslations('Auth');
   const isRtl = locale === 'he';
 
+  // Only claims the product backs: guarded, approved, reversible automation; metrics computed from
+  // the customer's own data; people-level funnels, cohorts and attribution. The previous copy
+  // promised "real-time bid optimization" and a SOC 2 certification nobody could point to.
   const featureHighlights = [
-    {
-      title: locale === 'he' ? 'אוטומציית שיווק ב-AI' : 'Autonomous AI Marketing',
-      desc: locale === 'he' ? 'ניהול והקצאת תקציבים בזמן אמת ב-Meta ו-Google' : 'Real-time budget & bid optimization across Meta & Google',
-    },
-    {
-      title: locale === 'he' ? 'בקרת שינויים ו-Rollback' : '1-Click Safe Rollbacks',
-      desc: locale === 'he' ? 'גבולות גזרה מחמירים וביטול שינויים בלחיצה אחת' : 'Strict guardrails and instant 1-click execution reversibility',
-    },
-    {
-      title: locale === 'he' ? 'דוחות משפך ו-Cohorts' : 'Deep Funnel & Cohort Retention',
-      desc: locale === 'he' ? 'מדידת CAC, ROAS ושיעורי נטישה מדויקים' : 'Multi-touch CAC, blended ROAS, and cohort payback metrics',
-    },
+    { title: t('brandFeature1Title'), desc: t('brandFeature1Desc') },
+    { title: t('brandFeature2Title'), desc: t('brandFeature2Desc') },
+    { title: t('brandFeature3Title'), desc: t('brandFeature3Desc') },
   ];
 
   return (
@@ -57,7 +52,7 @@ export function AuthCard({
               </div>
               <div className="flex flex-col">
                 <span className="font-extrabold text-lg tracking-tight text-foreground">GrowthOS</span>
-                <span className="text-[11px] font-medium text-muted-foreground">Autonomous Marketing Engine</span>
+                <span className="text-[11px] font-medium text-muted-foreground">{t('brandTagline')}</span>
               </div>
             </div>
 
@@ -92,19 +87,15 @@ export function AuthCard({
             <div>
               <div className="inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary mb-6">
                 <Zap className="h-3.5 w-3.5" />
-                <span>Enterprise Growth Suite</span>
+                <span>{t('brandEyebrow')}</span>
               </div>
 
               <h2 className="text-xl font-bold tracking-tight text-foreground mb-3">
-                {locale === 'he'
-                  ? 'הפלטפורמה האוטונומית לצמיחה עסקית'
-                  : 'The Autonomous Growth Platform for Scaled Marketing'}
+                {t('brandHeading')}
               </h2>
 
               <p className="text-xs text-muted-foreground leading-relaxed mb-8">
-                {locale === 'he'
-                  ? 'חבר את ערוצי הפרסום שלך ותן ל-AI לנתח, להציע ולבצע פעולות אופטימיזציה עם שקיפות מלאה.'
-                  : 'Connect your marketing channels and let AI analyze, propose, and execute budget optimizations with full transparency and safety.'}
+                {t('brandDescription')}
               </p>
 
               <div className="space-y-4">
@@ -125,11 +116,11 @@ export function AuthCard({
             <div className="mt-8 flex items-center justify-between border-t border-border/60 pt-4 text-[11px] text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Lock className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span>256-bit SSL Encrypted</span>
+                <span>{t('brandBadgeTls')}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-                <span>SOC2 Compliant</span>
+                <ScrollText className="h-3.5 w-3.5 text-primary" />
+                <span>{t('brandBadgeAudit')}</span>
               </div>
             </div>
           </div>

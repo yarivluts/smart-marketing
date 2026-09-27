@@ -1,5 +1,6 @@
 'use client';
 
+import { actionStatusLabelKey, diffFieldLabelKey } from '@/lib/orgs/automation-view';
 import React, { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
@@ -409,16 +410,22 @@ export function AutomationHubDashboard({
                               : 'bg-destructive/10 text-destructive'
                         }`}
                       >
-                        {action.status}
+                        {t(actionStatusLabelKey(action.status))}
                       </span>
                     </div>
 
                     <div className="text-muted-foreground flex flex-wrap items-center gap-2">
                       {action.diffEntries.map((diff) => (
                         <span key={diff.key} className="inline-flex items-center gap-1">
-                          <span>{diff.key}{':'}</span>
-                          <span className="line-through text-muted-foreground" dir="ltr">{String(diff.before)}</span>
-                          <span>{'→'}</span>
+                          <span>{diffFieldLabelKey(diff.key) ? t(diffFieldLabelKey(diff.key)!) : diff.key}{':'}</span>
+                          {diff.before === undefined || diff.before === null ? (
+                            <span className="rounded bg-success/10 px-1 text-[10px] font-semibold uppercase text-success">{t('diffNewBadge')}</span>
+                          ) : (
+                            <>
+                              <span className="line-through text-muted-foreground" dir="ltr">{String(diff.before)}</span>
+                              <span>{'→'}</span>
+                            </>
+                          )}
                           <span className="font-bold text-foreground" dir="ltr">{String(diff.after)}</span>
                         </span>
                       ))}

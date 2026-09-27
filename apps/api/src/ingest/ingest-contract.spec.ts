@@ -1,5 +1,6 @@
 import { checkRecordEnvelope, IMPLICIT_EVENT_ENVELOPE_FIELDS, MAX_INGEST_BATCH_SIZE } from '@growthos/firebase-orm-models';
 import { parseEntitiesRequestBody, parseEventsRequestBody, parseMeasuresRequestBody } from './ingest-request';
+import { BACKFILL_RETRY_DELAYS_MS } from '@growthos/firebase-orm-models';
 import { buildIngestContract, INGEST_CONTRACT_RULES } from './ingest-contract';
 
 /**
@@ -63,6 +64,14 @@ describe('ingest contract (KAN-202 I1)', () => {
       expect(schemas.EventRecord.properties).not.toHaveProperty(field);
     }
     expect(schemas.EventRecord.examples[0].properties).toMatchObject({ anon_id: expect.any(String) });
+  });
+
+  it('publishes the backfill contract from the delivery code constants', () => {
+    const backfill = contract['x-growthos-backfill'];
+    expect(backfill.request.retry_delays_ms).toBe(BACKFILL_RETRY_DELAYS_MS);
+    expect(backfill.request.headers.join(' ')).toContain('webhook-signature');
+    expect(backfill.deliver).toContain('X-GrowthOS-Backfill-Id');
+    expect(backfill.complete).toContain('/v1/backfills/{backfill_id}/complete');
   });
 
   it('states the rules integrators learned the hard way', () => {

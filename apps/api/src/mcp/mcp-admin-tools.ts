@@ -25,6 +25,15 @@ import {
   getGoal,
   isGoalStatus,
   listEnvironmentsForProject,
+  setBackfillEndpoint,
+  requestBackfill,
+  getBackfillStatus,
+  listBackfills,
+  getBackfillEndpoint,
+  InvalidBackfillEndpointError,
+  BackfillEndpointNotConfiguredError,
+  BackfillNotFoundError,
+  type BackfillStatusView,
   listGoalsForProject,
   listHookEndpointsForProject,
   listMetricDefinitionVersions,
@@ -95,6 +104,9 @@ import type { McpAuthContext } from './mcp-auth.guard';
  */
 
 function describeAdminToolError(error: unknown): string {
+  if (error instanceof InvalidBackfillEndpointError || error instanceof BackfillEndpointNotConfiguredError || error instanceof BackfillNotFoundError) {
+    return error.message;
+  }
   if (error instanceof ProjectNotFoundError || error instanceof GoalNotFoundError || error instanceof HookEndpointNotFoundError || error instanceof MetricDefNotFoundError) {
     return error instanceof MetricDefNotFoundError ? error.message : 'Not found.';
   }
@@ -424,7 +436,172 @@ function toFunnelStepOutput(steps: readonly OnboardingFunnelStep[]): Array<{ ord
   return steps.map((step) => ({ order: step.order, event_schema_name: step.eventSchemaName, stage_key: step.stageKey }));
 }
 
+const backfillEnvironmentShape = {
+  environment: z
+    .string()
+    .optional()
+    .describe('dev, staging or prod. An API key always uses the environment it is bound to and cannot name another; an OAuth connection defaults to prod.'),
+};
+const backfillSchemasShape = z
+  .unknown()
+  .describe('Array of { kind, name } - registered schemas the integrator should resend, e.g. [{ "kind": "entity", "name": "customer" }].');
+const setBackfillEndpointInputShape = {
+  url: z.string().describe('The integrator endpoint GrowthOS POSTs backfill.requested to: https, on a public address.'),
+  schemas: backfillSchemasShape,
+  rotate_secret: z.boolean().optional().describe('true: issue a new signing secret for the existing endpoint (returned once).'),
+  ...backfillEnvironmentShape,
+};
+const requestBackfillInputShape = {
+  schemas: backfillSchemasShape.optional(),
+  ...backfillEnvironmentShape,
+};
+const backfillIdInputShape = {
+  backfill_id: z.string().min(1).describe('The id request_backfill returned.'),
+  ...backfillEnvironmentShape,
+};
+
+/**
+ * The environment a backfill tool acts on: an API key's own (naming another is refused - KAN-28),
+ * or for a project-wide OAuth connection the named one, prod by default.
+ */
+async function resolveBackfillEnvironment(auth: McpAuthContext, name: string | undefined): Promise<{ id: string } | { error: string }> {
+  const environments = await listEnvironmentsForProject(auth.organizationId, auth.projectId);
+  if (auth.environmentId !== undefined) {
+    const bound = environments.find((environment) => environment.id === auth.environmentId);
+    if (name !== undefined && bound && bound.name !== name) {
+      return { error: `This API key is bound to the "${bound.name}" environment and can only act on it.` };
+    }
+    return { id: auth.environmentId };
+  }
+  const wanted = name ?? 'prod';
+  const match = environments.find((environment) => environment.name === wanted);
+  return match ? { id: match.id } : { error: `This project has no "${wanted}" environment.` };
+}
+
+function toSchemaRefs(value: unknown): { kind: string; name: string }[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map((entry: any) => ({ kind: String(entry?.kind ?? ''), name: String(entry?.name ?? '') }));
+}
+
+function backfillStatusOutput(view: BackfillStatusView) {
+  return {
+    backfill_id: view.backfillId,
+    status: view.status,
+    schemas: view.schemas,
+    requested_at: view.requestedAt,
+    delivered_at: view.deliveredAt ?? null,
+    first_batch_at: view.firstBatchAt ?? null,
+    completed_at: view.completedAt ?? null,
+    delivery_attempts: view.deliveryAttempts,
+    last_http_status: view.lastHttpStatus ?? null,
+    failure_reason: view.failureReason ?? null,
+    report: view.report ?? null,
+    progress: view.progress,
+  };
+}
+
 export function registerMcpAdminTools(server: McpServer, auth: McpAuthContext): void {
+  server.registerTool(
+    'set_backfill_endpoint',
+    {
+      title: 'Set backfill endpoint',
+      description:
+        'Register (or update) the endpoint GrowthOS asks to resend existing records, for one environment. On creation, or with rotate_secret: true, returns signing_secret ONCE - a Standard Webhooks whsec_ secret the endpoint uses to verify requests; it is never readable again. The url must be https on a public address. Requires "project.configure".',
+      inputSchema: toolInputSchema(setBackfillEndpointInputShape),
+    },
+    auditedToolHandler(auth, 'set_backfill_endpoint', async (args: any) =>
+      runAdminTool(auth, 'project.configure', args, async (a: any) => {
+        const environment = await resolveBackfillEnvironment(auth, a.environment);
+        if ('error' in environment) return errorResult(environment.error);
+        const schemas = toSchemaRefs(a.schemas);
+        if (!schemas) return errorResult('schemas must be an array of { kind, name }.');
+        const result = await setBackfillEndpoint({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          environmentId: environment.id,
+          url: String(a.url),
+          schemas,
+          rotateSecret: a.rotate_secret === true,
+          kms: getServerKmsProvider(),
+          actedByUserId: actorId(auth),
+        });
+        return textResult({
+          url: result.endpoint.url,
+          schemas: result.endpoint.schemas,
+          signing_secret: result.signingSecret ?? null,
+          signing_secret_note: result.signingSecret
+            ? 'Store this now, straight into the endpoint secret store - it is shown once.'
+            : 'The existing signing secret is unchanged. Pass rotate_secret: true to issue a new one.',
+        });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'request_backfill',
+    {
+      title: 'Request backfill',
+      description:
+        'Ask the registered backfill endpoint to resend its existing records (a signed backfill.requested POST). The integrator then sends them through the normal ingest API with X-GrowthOS-Backfill-Id and reports completion. Returns the backfill id and whether the request was delivered. Requires "project.configure".',
+      inputSchema: toolInputSchema(requestBackfillInputShape),
+    },
+    auditedToolHandler(auth, 'request_backfill', async (args: any) =>
+      runAdminTool(auth, 'project.configure', args, async (a: any) => {
+        const environment = await resolveBackfillEnvironment(auth, a.environment);
+        if ('error' in environment) return errorResult(environment.error);
+        const request = await requestBackfill({
+          organizationId: auth.organizationId,
+          projectId: auth.projectId,
+          environmentId: environment.id,
+          ...(toSchemaRefs(a.schemas) ? { schemas: toSchemaRefs(a.schemas) } : {}),
+          requestedByUserId: actorId(auth),
+          kms: getServerKmsProvider(),
+        });
+        return textResult(backfillStatusOutput(await getBackfillStatus(auth.organizationId, auth.projectId, request.id, environment.id)));
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'get_backfill_status',
+    {
+      title: 'Get backfill status',
+      description:
+        'One backfill: requested -> delivered (the endpoint answered 2xx) -> receiving (tagged batches arriving) -> completed | failed, with accepted / duplicate / quarantined counts summed from the tagged ingest batches.',
+      inputSchema: toolInputSchema(backfillIdInputShape),
+    },
+    auditedToolHandler(auth, 'get_backfill_status', async (args: any) =>
+      runAdminTool(auth, 'mcp.read', args, async (a: any) => {
+        const environment = await resolveBackfillEnvironment(auth, a.environment);
+        if ('error' in environment) return errorResult(environment.error);
+        return textResult(backfillStatusOutput(await getBackfillStatus(auth.organizationId, auth.projectId, String(a.backfill_id), environment.id)));
+      }),
+    ),
+  );
+
+  server.registerTool(
+    'list_backfills',
+    {
+      title: 'List backfills',
+      description: 'The registered backfill endpoint (url and schemas, never the secret) and the most recent backfills in one environment, newest first, with their status and counts.',
+      inputSchema: toolInputSchema(backfillEnvironmentShape),
+    },
+    auditedToolHandler(auth, 'list_backfills', async (args: any) =>
+      runAdminTool(auth, 'mcp.read', args, async (a: any) => {
+        const environment = await resolveBackfillEnvironment(auth, a?.environment);
+        if ('error' in environment) return errorResult(environment.error);
+        const [endpoint, backfills] = await Promise.all([
+          getBackfillEndpoint(auth.organizationId, auth.projectId, environment.id),
+          listBackfills(auth.organizationId, auth.projectId, environment.id),
+        ]);
+        return textResult({
+          endpoint: endpoint ? { url: endpoint.url, schemas: endpoint.schemas, last_changed_at: endpoint.last_changed_at } : null,
+          backfills: backfills.map(backfillStatusOutput),
+        });
+      }),
+    ),
+  );
+
   server.registerTool(
     'list_warehouse_tables',
     {
