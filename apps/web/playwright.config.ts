@@ -16,6 +16,9 @@ const sandboxChromiumExecutable = existsSync(SANDBOX_CHROMIUM_PATH) ? SANDBOX_CH
 
 export default defineConfig({
   testDir: './e2e',
+  // Compiles every route the specs visit once the dev server is up (the webServer starts before
+  // global setup), so no spec pays a cold compile inside an assertion window. See the file's comment.
+  globalSetup: './e2e/global-setup.ts',
   // The onboarding wizard (KAN-68) now sits between "create a project" and the org page for every
   // spec that creates a project through the UI — one more first-compile-in-this-run page in a hot
   // path most specs already exercise, on top of the "cold dev-server compile" budget individual
