@@ -1,4 +1,4 @@
-import { getSetupRequirement, SETUP_REJECTED_RECORDS_RECOMMENDATION } from './catalog';
+import { getSetupRequirement, SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS, SETUP_REJECTED_RECORDS_RECOMMENDATION } from './catalog';
 import type {
   SetupEnvironmentHealth,
   SetupHealthReport,
@@ -191,14 +191,39 @@ function connectedElsewhere(report: SetupHealthReport, focus: SetupEnvironmentHe
 }
 
 /**
+ * The accepted event schemas that show customers already exist upstream while no customer entity has
+ * arrived in this environment - the case a backfill fixes. Null otherwise (entities connected, their
+ * records rejected, or no events either). It names the evidence, not a customer count: counting the
+ * customers missing an entity needs the warehouse, and this read never estimates one.
+ */
+export function customerBackfillEvidence(environment: SetupEnvironmentHealth): string[] | null {
+  const customers = environment.requirements.find((result) => result.requirementId === 'customer_profiles');
+  if (!customers || customers.status !== 'gap') return null;
+  const events = environment.requirements.flatMap((result) => result.acceptedSchemas.filter((schema) => schema.kind === 'event').map((schema) => schema.name));
+  return events.length > 0 ? [...new Set(events)] : null;
+}
+
+/**
  * The steps that connect one requirement from where it stands. Rejected records: read their reasons
+ * first. A customer entity missing beside flowing events: resend the existing customers (backfill)
  * first. Schemas already registered but silent: registering is done, so the register steps are
  * dropped and the send step leads, naming the registered schemas (B27). Otherwise every step.
  */
-function stepsFor(requirement: SetupRequirement, result: SetupRequirementEnvironmentResult, environmentName: string): readonly SetupRecommendation[] {
+function stepsFor(requirement: SetupRequirement, result: SetupRequirementEnvironmentResult, environment: SetupEnvironmentHealth): readonly SetupRecommendation[] {
   if (result.status === 'error') {
     return [SETUP_REJECTED_RECORDS_RECOMMENDATION, ...requirement.recommendations];
   }
+  const evidence = requirement.id === 'customer_profiles' ? customerBackfillEvidence(environment) : null;
+  const rest = sendOrRegisterSteps(requirement, result, environment.environmentName);
+  if (!evidence) {
+    return rest;
+  }
+  const [first, ...others] = SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS;
+  const why = `Events are already accepted in ${environment.environmentName} (${evidence.map((name) => `"${name}"`).join(', ')}), so these customers exist in the integrator's system but no customer entity has arrived.`;
+  return [{ ...first, action: `${why} ${first.action}` }, ...others, ...rest];
+}
+
+function sendOrRegisterSteps(requirement: SetupRequirement, result: SetupRequirementEnvironmentResult, environmentName: string): readonly SetupRecommendation[] {
   if (result.silentRegisteredSchemas.length === 0) {
     return requirement.recommendations;
   }
@@ -219,7 +244,7 @@ export function buildInstallationGapsOutput(report: SetupHealthReport, focus: Se
     .filter((result) => result.status !== 'connected')
     .map((result) => {
       const requirement = getSetupRequirement(result.requirementId);
-      const steps = stepsFor(requirement, result, focus.environmentName);
+      const steps = stepsFor(requirement, result, focus);
       return {
         requirement_id: requirement.id,
         title: requirement.title,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildInstallationGapsOutput,
   buildSetupHealthOutput,
+  customerBackfillEvidence,
   classifySchemaForSetupRequirement,
   deriveSetupHealth,
   selectSetupFocusEnvironment,
@@ -318,5 +319,51 @@ describe('B2: rendered steps only point at the deployment they came from', () =>
         expect(text).not.toMatch(/https?:\/\//);
       }
     }
+  });
+});
+
+describe('customer backfill: a missing customer entity beside flowing events recommends resending the existing customers', () => {
+  function customerGap(observations: SetupSchemaObservation[]) {
+    const report = deriveSetupHealth([{ id: 'env-dev', name: 'dev' }], observations);
+    const output = buildInstallationGapsOutput(report, report.environments[0], CONTEXT);
+    return { report, gap: output.gaps.find((gap) => gap.requirement_id === 'customer_profiles') };
+  }
+  const signupAccepted = observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-27T08:00:00.000Z' });
+
+  it('leads with the Backfill panel and request_backfill, naming the events that prove the customers exist', () => {
+    const { report, gap } = customerGap([signupAccepted]);
+    expect(customerBackfillEvidence(report.environments[0])).toEqual(['signup']);
+    expect(gap!.how_to_fix[0].web_page_url).toBe(`https://web.example.test/en/orgs/${CONTEXT.organizationId}/projects/${CONTEXT.projectId}/ingest-health`);
+    expect(gap!.how_to_fix[0].action).toMatch(/^Events are already accepted in dev \("signup"\), so these customers exist/);
+    expect(gap!.how_to_fix[1].mcp_tool).toBe('request_backfill');
+    // The ordinary steps still follow: register the entity (nothing registered yet) and upsert it.
+    expect(gap!.how_to_fix.slice(2).map((step) => step.mcp_tool ?? step.api_endpoint)).toEqual(['register_schema', 'POST https://api.example.test/v1/ingest/entities']);
+  });
+
+  it('keeps B27: a registered but silent customer entity is not told to register again', () => {
+    const { gap } = customerGap([signupAccepted, observation({ schemaName: 'customer', kind: 'entity' })]);
+    expect(gap!.how_to_fix.map((step) => step.mcp_tool ?? step.web_page_url ?? step.api_endpoint)).toEqual([
+      `https://web.example.test/en/orgs/${CONTEXT.organizationId}/projects/${CONTEXT.projectId}/ingest-health`,
+      'request_backfill',
+      'POST https://api.example.test/v1/ingest/entities',
+    ]);
+  });
+
+  it('says nothing about backfill without events, when entities arrive, or when entity records are rejected', () => {
+    expect(customerGap([]).gap!.how_to_fix.some((step) => step.mcp_tool === 'request_backfill')).toBe(false);
+    const connected = customerGap([signupAccepted, observation({ schemaName: 'customer', kind: 'entity', lastAcceptedAt: '2026-09-27T08:00:00.000Z' })]);
+    expect(connected.gap).toBeUndefined();
+    expect(customerBackfillEvidence(connected.report.environments[0])).toBeNull();
+    const rejected = customerGap([signupAccepted, observation({ schemaName: 'customer', kind: 'entity', openQuarantinedCount: 1, quarantineReasons: ['missing_field:id'] })]);
+    expect(rejected.gap!.status).toBe('error');
+    expect(rejected.gap!.how_to_fix.some((step) => step.mcp_tool === 'request_backfill')).toBe(false);
+  });
+
+  it('only accepted events count as evidence, not measures or rejected events', () => {
+    const { report } = customerGap([
+      observation({ schemaName: 'ad_spend', kind: 'measure', lastAcceptedAt: '2026-09-27T08:00:00.000Z' }),
+      observation({ schemaName: 'signup', kind: 'event', openQuarantinedCount: 2 }),
+    ]);
+    expect(customerBackfillEvidence(report.environments[0])).toBeNull();
   });
 });

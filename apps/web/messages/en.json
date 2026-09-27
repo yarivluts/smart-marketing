@@ -962,7 +962,9 @@
     "importance": {
       "core": "Core",
       "recommended": "Recommended"
-    }
+    },
+    "backfillHint": "Events are already accepted here ({schemas}), so these customers exist in your system but none has arrived as a customer entity. Ask the integrator to resend them once with a backfill.",
+    "backfillLink": "Request a backfill"
   },
   "BillingOpsFeed": {
     "metaTitle": "Billing ops feed",

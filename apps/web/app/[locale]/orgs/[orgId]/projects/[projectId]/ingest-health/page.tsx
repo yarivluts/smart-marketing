@@ -212,7 +212,11 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
       </ChartCard>
 
       {environmentId !== undefined && setupHealth?.environments[0] ? (
-        <SetupHealthPanel health={setupHealth.environments[0]} environmentLabel={selectedEnvironmentLabel} />
+        <SetupHealthPanel
+          health={setupHealth.environments[0]}
+          environmentLabel={selectedEnvironmentLabel}
+          {...(backfillOverview && canConfigureBackfill ? { backfillHref: '#backfill-heading' } : {})}
+        />
       ) : null}
 
       {environmentId !== undefined && backfillOverview && (canConfigureBackfill || backfillOverview.endpoint) ? (

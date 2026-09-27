@@ -112,3 +112,36 @@ describe('SetupHealthPanel (KAN-197)', () => {
     expect(he.SetupHealth.heading).not.toBe(en.SetupHealth.heading);
   });
 });
+
+describe('SetupHealthPanel: customer backfill hint', () => {
+  const NO_CUSTOMERS = deriveSetupHealth(
+    [{ id: 'env-dev', name: 'dev' }],
+    [observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-25T16:12:04.000Z' }), observation({ schemaName: 'customer', kind: 'entity' })],
+  ).environments[0];
+
+  function renderHealth(health: typeof NO_CUSTOMERS, backfillHref?: string) {
+    return render(
+      <NextIntlClientProvider locale="en" messages={en}>
+        <SetupHealthPanel health={health} environmentLabel="Development" {...(backfillHref ? { backfillHref } : {})} />
+      </NextIntlClientProvider>,
+    );
+  }
+
+  it('on the customer entity row, names the events that prove the customers exist and links to the Backfill panel', () => {
+    renderHealth(NO_CUSTOMERS, '#backfill-heading');
+    const hint = within(within(screen.getByTestId('setup-requirement-customer_profiles')).getByTestId('setup-backfill-hint'));
+    expect(hint.getByText(/Events are already accepted here \("signup"\)/)).toBeInTheDocument();
+    expect(hint.getByRole('link', { name: 'Request a backfill' })).toHaveAttribute('href', '#backfill-heading');
+  });
+
+  it('without the Backfill panel it still explains the fix but links nowhere', () => {
+    renderHealth(NO_CUSTOMERS);
+    expect(screen.getByTestId('setup-backfill-hint')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Request a backfill' })).toBeNull();
+  });
+
+  it('is absent once customer entities arrive', () => {
+    renderHealth(DEV_HEALTH, '#backfill-heading');
+    expect(screen.queryByTestId('setup-backfill-hint')).toBeNull();
+  });
+});

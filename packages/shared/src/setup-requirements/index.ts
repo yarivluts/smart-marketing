@@ -1,10 +1,17 @@
 export * from './types';
-export { SETUP_REQUIREMENTS, SETUP_REJECTED_RECORDS_RECOMMENDATION, getSetupRequirement, allSetupRecommendations } from './catalog';
+export {
+  SETUP_REQUIREMENTS,
+  SETUP_REJECTED_RECORDS_RECOMMENDATION,
+  SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS,
+  getSetupRequirement,
+  allSetupRecommendations,
+} from './catalog';
 export { classifySchemaForSetupRequirement } from './classify';
 export { deriveSetupHealth } from './derive';
 export {
   buildInstallationGapsOutput,
   buildSetupHealthOutput,
+  customerBackfillEvidence,
   describeSetupRequirementResult,
   renderSetupRecommendation,
   selectSetupFocusEnvironment,
