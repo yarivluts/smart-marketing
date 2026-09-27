@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioFormat, AdStudioScene } from '@growthos/shared';
+import type { AdStudioFormat, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -12,8 +12,8 @@ export interface AdStudioGeneratedBy {
 }
 
 /**
- * One ad being made in the Ad Studio (KAN-229): what the person asked for, and the script - a list
- * of scenes, each one Gemini Omni generation, at most 60 seconds in total. The script lives on the
+ * One ad being made in the Ad Studio (KAN-229): what the person asked for, its plan (KAN-230), and
+ * the script - a list of scenes, each one Gemini Omni generation, at most 60 seconds in total. The script lives on the
  * brief because it is always read and saved whole, and stays far below Firestore's document limit
  * (at most 15 short scenes).
  */
@@ -55,6 +55,20 @@ export class AdStudioBriefModel extends BaseModel {
 
   @Field({ is_required: true })
   public scenes!: AdStudioScene[];
+
+  /**
+   * The deep-analysis plan (KAN-230): audience, angles, keyword themes and cited recommendations,
+   * built from the evidence in {@link plan_sources}. Absent until planning runs; replaced whole on a re-run.
+   */
+  @Field({ is_required: false })
+  public plan?: AdStudioPlan | null;
+
+  /** What each evidence source returned when the plan was made - measured figures or why it had none. */
+  @Field({ is_required: false })
+  public plan_sources?: AdStudioPlanSources | null;
+
+  @Field({ is_required: false })
+  public plan_generated_by?: AdStudioGeneratedBy | null;
 
   /** Set when the AI wrote the current script; cleared once a person edits it. */
   @Field({ is_required: false })
