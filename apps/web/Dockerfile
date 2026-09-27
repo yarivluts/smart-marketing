@@ -30,6 +30,11 @@ RUN pnpm --filter "@growthos/web^..." --filter "!@growthos/dbt-transform" build 
 
 FROM node:22-slim AS runner
 WORKDIR /app
+# ffmpeg joins the Ad Studio's scene clips into the finished video (KAN-231; FFMPEG_PATH
+# defaults to `ffmpeg` on PATH). Its work files live in /tmp, which on Cloud Run is memory.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production
 ENV PORT=8080
 ENV HOSTNAME=0.0.0.0

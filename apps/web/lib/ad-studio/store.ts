@@ -1,9 +1,14 @@
 import 'server-only';
-import type { AdStudioBriefInput, AdStudioScene } from '@growthos/shared';
+import type { AdStudioBriefInput, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 import {
   createAdStudioBrief as createAdStudioBriefInOrganization,
   deleteAdStudioBrief as deleteAdStudioBriefInOrganization,
   getAdStudioBrief as getAdStudioBriefInOrganization,
+  getAdStudioClip as getAdStudioClipInOrganization,
+  getAdStudioVideo as getAdStudioVideoInOrganization,
+  listAdStudioClips as listAdStudioClipsInOrganization,
+  listAdStudioVideos as listAdStudioVideosInOrganization,
+  getAdStudioKeywordAccess as getAdStudioKeywordAccessInOrganization,
   getAdStudioSettings as getAdStudioSettingsInOrganization,
   getAdStudioUsageToday as getAdStudioUsageTodayInOrganization,
   listAdStudioBriefs as listAdStudioBriefsInOrganization,
@@ -12,11 +17,15 @@ import {
   setAdStudioSettings as setAdStudioSettingsInOrganization,
   updateAdStudioBriefDetails as updateAdStudioBriefDetailsInOrganization,
   type AdStudioBriefModel,
+  type AdStudioClipModel,
+  type AdStudioVideoModel,
   type AdStudioSettingsView,
   type AdStudioUsageModel,
   type AdStudioUsageToday,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
+import { adStudioBriefMediaPrefix, resolveAdStudioMediaStorage } from './media-storage';
 
 /** The web app's Ad Studio reads and writes: the package services, with the ORM connected first. */
 
@@ -45,9 +54,35 @@ export async function saveAdStudioScript(params: { organizationId: string; proje
   return saveAdStudioScriptInOrganization(params);
 }
 
+/** Deletes the brief, its clip and video records, and (best-effort) their files in the bucket. */
 export async function deleteAdStudioBrief(params: { organizationId: string; projectId: string; briefId: string; actorId: string }): Promise<void> {
   await ensureFirestoreOrm();
-  return deleteAdStudioBriefInOrganization(params);
+  await deleteAdStudioBriefInOrganization(params);
+  try {
+    await resolveAdStudioMediaStorage().deletePrefix(adStudioBriefMediaPrefix(params));
+  } catch (error) {
+    console.error('[ad-studio] removing the media of a deleted brief failed', { briefId: params.briefId, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+export async function getAdStudioClip(organizationId: string, projectId: string, briefId: string, clipId: string): Promise<AdStudioClipModel> {
+  await ensureFirestoreOrm();
+  return getAdStudioClipInOrganization(organizationId, projectId, briefId, clipId);
+}
+
+export async function getAdStudioVideo(organizationId: string, projectId: string, briefId: string, videoId: string): Promise<AdStudioVideoModel> {
+  await ensureFirestoreOrm();
+  return getAdStudioVideoInOrganization(organizationId, projectId, briefId, videoId);
+}
+
+export async function listAdStudioClips(organizationId: string, projectId: string, briefId: string): Promise<AdStudioClipModel[]> {
+  await ensureFirestoreOrm();
+  return listAdStudioClipsInOrganization(organizationId, projectId, briefId);
+}
+
+export async function listAdStudioVideos(organizationId: string, projectId: string, briefId: string): Promise<AdStudioVideoModel[]> {
+  await ensureFirestoreOrm();
+  return listAdStudioVideosInOrganization(organizationId, projectId, briefId);
 }
 
 export async function getAdStudioSettings(organizationId: string, projectId: string): Promise<AdStudioSettingsView> {
@@ -76,6 +111,28 @@ export async function listAdStudioUsage(organizationId: string, projectId: strin
   return listAdStudioUsageInOrganization(organizationId, projectId, limit);
 }
 
+export type AdStudioKeywordDataStatus =
+  | { available: true; credentialName: string }
+  | { available: false; reason: 'no_google_ads_credential' | 'credential_not_configured' | 'vault_not_configured' };
+
+/**
+ * Whether deep analysis can look up Google Ads keyword volumes for the project, and why not - for
+ * the studio settings panel. Reads the attachment and whether a secret is stored, and whether this
+ * deployment has a vault to read it with; nothing is decrypted.
+ */
+export async function getAdStudioKeywordDataStatus(organizationId: string, projectId: string): Promise<AdStudioKeywordDataStatus> {
+  await ensureFirestoreOrm();
+  const access = await getAdStudioKeywordAccessInOrganization(organizationId, projectId);
+  if (access.status !== 'ok') return { available: false, reason: access.reason };
+  try {
+    getServerKmsProvider();
+  } catch (error) {
+    if (error instanceof VaultNotConfiguredError) return { available: false, reason: 'vault_not_configured' };
+    throw error;
+  }
+  return { available: true, credentialName: access.credentialName };
+}
+
 /** A brief as the client receives it - plain JSON, no ORM internals. */
 export interface AdStudioBriefView {
   id: string;
@@ -89,6 +146,9 @@ export interface AdStudioBriefView {
   status: string;
   scenes: AdStudioScene[];
   scriptGeneratedBy: { provider: string; model: string; generatedAt: string } | null;
+  plan: AdStudioPlan | null;
+  planSources: AdStudioPlanSources | null;
+  planGeneratedBy: { provider: string; model: string; generatedAt: string } | null;
   createdOn: string;
   lastChangedOn: string;
 }
@@ -107,6 +167,11 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
     scenes: (brief.scenes ?? []).map((scene) => ({ ...scene })),
     scriptGeneratedBy: brief.script_generated_by
       ? { provider: brief.script_generated_by.provider, model: brief.script_generated_by.model, generatedAt: brief.script_generated_by.generated_at }
+      : null,
+    plan: brief.plan ?? null,
+    planSources: brief.plan_sources ?? null,
+    planGeneratedBy: brief.plan_generated_by
+      ? { provider: brief.plan_generated_by.provider, model: brief.plan_generated_by.model, generatedAt: brief.plan_generated_by.generated_at }
       : null,
     createdOn: brief.created_on,
     lastChangedOn: brief.last_changed_on,

@@ -3635,6 +3635,7 @@
     "providerNotConfigured": "לא הוגדר ספק AI בסביבה הזו, ולכן עדיין אי אפשר לכתוב תסריטים. אפשר עדיין לערוך מודעות קיימות ידנית.",
     "stage": {
       "brief": "בריף",
+      "plan": "תוכנית",
       "script": "תסריט",
       "video": "וידאו",
       "export": "ייצוא"
@@ -3642,14 +3643,15 @@
     "stageStatus": {
       "done": "הושלם",
       "current": "השלב הבא",
-      "upcoming": "בהמשך"
+      "upcoming": "בהמשך",
+      "skipped": "דולג"
     },
     "stageScriptValue": "{scenes, plural, one {סצנה אחת} other {# סצנות}} · {seconds} שנ׳",
     "formatVerticalShort": "אנכי 9:16",
     "formatHorizontalShort": "אופקי 16:9",
     "backToAds": "כל המודעות",
     "pipelineTitle": "איפה המודעה עומדת",
-    "pipelineDescription": "מהבריף לתסריט מחולק לסצנות, ומשם לווידאו ולייצוא.",
+    "pipelineDescription": "מהבריף לניתוח מעמיק ולתסריט של סצנות, ואז לווידאו ולייצוא שלו.",
     "editDetails": "עריכת פרטי הבריף",
     "newAdTitle": "מודעה חדשה",
     "newAdDescription": "תארו את המודעה. ה-AI יכתוב ממנה תסריט, ותוכלו לערוך כל סצנה.",
@@ -3772,6 +3774,218 @@
       "failed": "נכשל"
     },
     "deleteConfirm": "למחוק את המודעה ואת התסריט שלה?",
-    "deleteAd": "מחיקת המודעה"
+    "deleteAd": "מחיקת המודעה",
+    "stageVideoValue": "{rendered} מתוך {total} סצנות רונדרו",
+    "stageVideoAssembled": "הורכב · {seconds} שנ׳",
+    "video": {
+      "title": "וידאו",
+      "description": "כל סצנה הופכת לקליפ משלה מ-Gemini Omni. כשלכל סצנה יש קליפ עדכני, מחברים אותם לסרטון אחד של עד דקה.",
+      "textNote": "הטקסט שעל המסך לא נצרב בסרטון: מודלי וידאו מבוססי AI מציירים אותיות גרוע, ועברית גרוע מכול. הוסיפו אותו ככיתוב או כשכבת טקסט בפלטפורמת הפרסום.",
+      "notConfigured": "לא הוגדר מודל וידאו בסביבה הזו, ולכן אי אפשר ליצור קליפים. קליפים קיימים עדיין זמינים לצפייה ולהרכבה.",
+      "saveScriptFirst": "שמרו קודם תסריט. אחר כך אפשר לרנדר כל סצנה שמורה לקליפ.",
+      "progress": "{rendered} מתוך {total} סצנות רונדרו",
+      "rulerLabel": "מצב הווידאו של כל סצנה על סרגל הדקה",
+      "legend": {
+        "none": "לא רונדר",
+        "generating": "ביצירה",
+        "ready": "מוכן",
+        "out_of_date": "לא עדכני",
+        "failed": "נכשל"
+      },
+      "renderAll": "רנדור כל הסצנות ({seconds} שנ׳)",
+      "renderAllCost": "ינצל {seconds} שנ׳ מתוך {left} שנ׳ הווידאו שנותרו היום.",
+      "renderAllOverLimit": "נדרשות {seconds} שנ׳ וידאו, אבל נותרו היום רק {left} שנ׳.",
+      "renderAllNothing": "לכל סצנה יש קליפ עדכני או קליפ בדרך.",
+      "render": "רנדור ({seconds} שנ׳)",
+      "rerender": "רנדור מחדש ({seconds} שנ׳)",
+      "generating": "ביצירה {elapsed}",
+      "generatingHint": "לרוב דקה עד שלוש. אפשר לעזוב את הדף ולחזור.",
+      "outOfDate": "לא עדכני",
+      "outOfDateHint": "הסצנה השתנתה אחרי שהקליפ נוצר. רנדרו אותו מחדש כדי שיתאים לתסריט.",
+      "failed": "נכשל: {reason}",
+      "noClip": "עדיין לא רונדר.",
+      "overLimitScene": "לא נותרו היום מספיק שניות וידאו.",
+      "editLabel": "שינוי הקליפ",
+      "editPlaceholder": "לדוגמה: שיהיה לילה, מצלמה איטית יותר, להוסיף גשם",
+      "editRun": "עריכת וידאו",
+      "editing": "מתחיל...",
+      "versions": "{count, plural, one {גרסה אחת} other {# גרסאות}}",
+      "versionLabel": "גרסה {version}",
+      "versionRender": "מהתסריט",
+      "versionEdit": "עריכה: {instruction}",
+      "versionStatus": {
+        "generating": "ביצירה",
+        "ready": "מוכן",
+        "failed": "נכשל"
+      },
+      "show": "הצגה",
+      "showing": "מוצג",
+      "assemble": "הרכבת הסרטון",
+      "assembling": "מרכיב...",
+      "assembleHint": "לכל סצנה צריך קליפ מוכן ועדכני לפני שאפשר להרכיב את הסרטון.",
+      "finalTitle": "הסרטון המוגמר",
+      "finalMeta": "{seconds} שנ׳ · הורכב {when}",
+      "finalOutOfDate": "הקליפים השתנו אחרי שהסרטון הורכב. הרכיבו שוב כדי לכלול אותם.",
+      "finalFailed": "ההרכבה האחרונה נכשלה: {reason}",
+      "noFinal": "עדיין אין סרטון מורכב.",
+      "clipPlayer": "סצנה {number}, גרסה {version}",
+      "sceneSeconds": "{seconds} שנ׳",
+      "started": "התחיל. הקליפים יופיעו כאן כשיסתיימו.",
+      "assembled": "הסרטון הורכב.",
+      "renderAllIdle": "רנדור כל הסצנות"
+    },
+    "clipFailure": {
+      "not_configured": "לא הוגדר מודל וידאו",
+      "provider_billing": "לחשבון Gemini נגמר הקרדיט",
+      "rate_limited": "Gemini מגביל כרגע בקשות",
+      "refused": "מודל הווידאו סירב לסצנה הזו",
+      "invalid_output": "מודל הווידאו לא החזיר סרטון שמיש",
+      "provider_error": "מודל הווידאו נכשל",
+      "timed_out": "זה לקח יותר מדי זמן והופסק"
+    },
+    "videoFailure": {
+      "ffmpeg_unavailable": "כלי הווידאו (ffmpeg) לא מותקן בשרת",
+      "ffmpeg_failed": "חיבור הקליפים נכשל",
+      "storage_error": "לא ניתן היה לשמור את הסרטון",
+      "timed_out": "זה לקח יותר מדי זמן והופסק"
+    },
+    "videoRequestErrors": {
+      "scene_not_found": "הסצנה הזו כבר לא בתסריט השמור. שמרו את התסריט ונסו שוב.",
+      "already_generating": "כבר נוצר קליפ לסצנה הזו.",
+      "clip_not_editable": "אפשר לערוך רק קליפ שהסתיים.",
+      "invalid_instruction": "כתבו איך הקליפ צריך להשתנות.",
+      "not_ready": "לכל סצנה צריך קודם קליפ מוכן ועדכני.",
+      "already_assembling": "הסרטון כבר בהרכבה."
+    },
+    "assemblyErrors": {
+      "ffmpeg_unavailable": "כלי הווידאו (ffmpeg) לא מותקן בשרת, ולכן אי אפשר להרכיב את הסרטון.",
+      "ffmpeg_failed": "חיבור הקליפים נכשל. נסו שוב, או רנדרו מחדש את הסצנה שנראית לא נכון.",
+      "storage_error": "לא ניתן היה לשמור את הסרטון. נסו שוב."
+    },
+    "storage": "אחסון מדיה",
+    "storageGcs": "דלי פרטי {location}",
+    "storageLocal": "תיקייה מקומית לבדיקות",
+    "storageMemory": "בזיכרון (בדיקות)",
+    "ffmpeg": "הרכבת וידאו (ffmpeg)",
+    "ffmpegReady": "מותקן",
+    "ffmpegMissing": "לא מותקן - ההרכבה תיכשל",
+    "stagePlanValue": "{count, plural, one {המלצה אחת} other {# המלצות}}",
+    "plan": {
+      "title": "ניתוח מעמיק",
+      "description": "קורא את דף הנחיתה, את התוצאות שנמדדו, את הקמפיינים ואת נפחי החיפוש של Google, ומתכנן את המודעה על סמך הראיות האלה.",
+      "run": "הרצת ניתוח מעמיק",
+      "rerun": "הרצה מחדש",
+      "running": "מנתח...",
+      "runningHint": "קורא את דף הנחיתה, התוצאות, הקמפיינים ונפחי מילות המפתח. זה יכול לקחת עד דקה.",
+      "noProvider": "לא הוגדר ספק AI בסביבה הזו, ולכן אי אפשר להריץ ניתוח מעמיק.",
+      "emptyTitle": "עדיין אין ניתוח",
+      "emptyDescription": "הריצו ניתוח מעמיק כדי לראות מה הראיות אומרות לפני כתיבת התסריט. כותב התסריט יתבסס עליו.",
+      "generatedBy": "נותח על ידי {model} ב-{date}",
+      "done": "הניתוח מוכן.",
+      "sourcesTitle": "מקורות נתונים",
+      "sourcesDescription": "מה הניתוח הצליח לקרוא. מה שחסר נשאר בחוץ ולעולם לא מוערך.",
+      "source": {
+        "landing_page": "דף נחיתה",
+        "results": "תוצאות שנמדדו",
+        "campaigns": "קמפיינים קיימים",
+        "keywords": "נפחי מילות מפתח",
+        "market": "ידע שוק"
+      },
+      "sourceOk": "בשימוש",
+      "sourceUnavailable": "לא זמין",
+      "sourceModel": "ידע של המודל",
+      "marketHint": "ידע כללי של מודל ה-AI. לא נמדד.",
+      "landingPageRead": "נקרא {url}",
+      "reasons": {
+        "landing_page": {
+          "no_url": "לבריף אין דף נחיתה.",
+          "blocked_url": "הכתובת אינה דף https ציבורי, ולכן לא נקראה.",
+          "timeout": "הדף לא הגיב תוך 10 שניות.",
+          "fetch_failed": "לא ניתן היה להגיע לדף.",
+          "http_error": "הדף החזיר שגיאה.",
+          "not_html": "הכתובת אינה דף אינטרנט.",
+          "too_many_redirects": "הדף מפנה יותר מדי פעמים.",
+          "empty_page": "אין בדף טקסט קריא."
+        },
+        "results": {
+          "no_environment": "אין לפרויקט סביבה לקריאה.",
+          "warehouse_not_configured": "מחסן הנתונים עדיין לא מחובר.",
+          "warehouse_error": "השאילתה למחסן הנתונים נכשלה.",
+          "query_quota_exceeded": "מכסת השאילתות היומית של הפרויקט נוצלה.",
+          "no_traffic": "לא היו כניסות לדפי נחיתה ב-90 הימים האחרונים."
+        },
+        "campaigns": {
+          "no_campaigns": "עדיין אין לפרויקט קמפיינים."
+        },
+        "keywords": {
+          "no_google_ads_credential": "לא מצורף לפרויקט חיבור Google Ads.",
+          "vault_not_configured": "כספת הסודות לא מוגדרת בסביבה הזו.",
+          "credential_not_configured": "חיבור Google Ads המצורף אינו שלם.",
+          "no_seeds": "לא היה ממה להתחיל חיפוש מילות מפתח.",
+          "google_ads_auth_failed": "Google דחתה את ההתחברות ל-Google Ads.",
+          "developer_token_not_approved": "טוקן המפתח של Google Ads לא אושר לתכנון מילות מפתח.",
+          "google_ads_error": "Google Ads החזיר שגיאה.",
+          "no_ideas": "ל-Google Ads לא היו רעיונות למילות מפתח למודעה הזו."
+        }
+      },
+      "summaryTitle": "תוכנית",
+      "audience": "קהל יעד",
+      "landingPageSummary": "מה דף הנחיתה אומר",
+      "anglesTitle": "זוויות מסר",
+      "themesTitle": "נושאי מילות מפתח",
+      "recommendationsTitle": "הצעדים הבאים המומלצים",
+      "recommendationsDescription": "כל המלצה מציינת את הראיות שעליהן היא נשענת.",
+      "priority": {
+        "high": "עדיפות גבוהה",
+        "medium": "עדיפות בינונית",
+        "low": "עדיפות נמוכה"
+      },
+      "unsupported": "אין מאחורי זה ראיה זמינה - התייחסו לזה כהצעה.",
+      "marketTitle": "הערות שוק",
+      "marketDescription": "ידע כללי של המודל, לא נתונים שנמדדו. כדאי לבדוק לפני שמסתמכים עליו.",
+      "pagesChartTitle": "מבקרים לפי דף נחיתה",
+      "pagesChartDescription": "{days} הימים האחרונים בסביבת {environment}. מבקרים הם סכום הכניסות היומיות; המרות לפי מגע אחרון.",
+      "pageSublabel": "{conversions} המרות · שיעור המרה {rate}",
+      "campaignsRateTitle": "שיעור המרה לפי קמפיין",
+      "campaignsRateDescription": "המרות לכל מבקר עבור כל מזהה קמפיין, באותו חלון זמן.",
+      "campaignRateSublabel": "{visitors} מבקרים · {conversions} המרות",
+      "noRate": "אין מבקרים",
+      "totals": "{visitors} מבקרים · {conversions} המרות · {rate} בסך הכול",
+      "keywordsChartTitle": "רעיונות למילות מפתח לפי חיפושים חודשיים",
+      "keywordsChartDescription": "מתכנן מילות המפתח של Google Ads: ממוצע חיפושים חודשי ב-12 החודשים האחרונים.",
+      "competition": {
+        "LOW": "תחרות נמוכה",
+        "MEDIUM": "תחרות בינונית",
+        "HIGH": "תחרות גבוהה",
+        "unknown": "התחרות לא דווחה"
+      },
+      "keywordSublabel": "{competition}",
+      "keywordSublabelBid": "{competition} · הצעת מחיר לראש העמוד {low}-{high}",
+      "volumeUnknown": "לא דווח",
+      "campaignsTitle": "קמפיינים קיימים",
+      "campaignsDescription": "הקמפיינים שלכם לפי תקציב יומי (דולר), עם המודעות שיובאו.",
+      "campaignSublabel": "{platform} · {status} · {ads, plural, one {מודעה אחת} other {# מודעות}}",
+      "platform": {
+        "google_ads": "Google Ads",
+        "meta_ads": "Meta",
+        "unknown": "פלטפורמה לא ידועה"
+      },
+      "campaignStatus": {
+        "enabled": "פעיל",
+        "paused": "מושהה",
+        "removed": "הוסר",
+        "unknown": "סטטוס לא ידוע"
+      },
+      "unavailableChart": "לא זמין: {reason}",
+      "more": "עוד {count}"
+    },
+    "keywordData": "נפחי מילות מפתח (Google Ads)",
+    "keywordDataValue": "זמין דרך {credential}",
+    "keywordDataMissing": {
+      "no_google_ads_credential": "לא מצורף לפרויקט הזה חיבור Google Ads. צרפו חיבור בספריית המשאבים כדי להוסיף נפחי חיפוש אמיתיים לניתוח המעמיק.",
+      "credential_not_configured": "מצורף חיבור Google Ads, אבל עדיין לא הוגדר לו סוד.",
+      "vault_not_configured": "כספת הסודות לא מוגדרת בסביבה הזו, ולכן אי אפשר לקרוא את חיבור Google Ads."
+    },
+    "planningAdminHint": "הניתוח המעמיק קורא גם את דף הנחיתה (רק דפי https ציבוריים) ואת תוצאות דפי הנחיתה של 90 הימים האחרונים ממחסן הנתונים. מקור חסר מוצג כחסר ולעולם לא מוערך."
   }
 }
