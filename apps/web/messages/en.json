@@ -65,7 +65,15 @@
     "brandFeature3Title": "Funnels, cohorts and attribution",
     "brandFeature3Desc": "People-level funnels, monthly retention cohorts and landing-page attribution from your data.",
     "brandBadgeTls": "Encrypted in transit (HTTPS)",
-    "brandBadgeAudit": "Every change audit-logged"
+    "brandBadgeAudit": "Every change audit-logged",
+    "signUpSubtitle": "Create your workspace and connect your first data source.",
+    "signInSubtitle": "Sign in to your dashboards, boards and automation.",
+    "orWithEmail": "or with email",
+    "forgotPassword": "Forgot password?",
+    "processing": "Processing...",
+    "resetNeedsEmail": "Enter your email above first, then choose \"Forgot password?\".",
+    "resetSent": "If an account exists for {email}, a password reset link is on its way.",
+    "resetError": "Could not send a reset link right now. Please try again."
   },
   "AccountStatus": {
     "signedInAs": "Signed in as {email}",

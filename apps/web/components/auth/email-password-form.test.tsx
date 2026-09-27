@@ -25,6 +25,10 @@ vi.mock('@/i18n/navigation', () => ({
   }),
 }));
 
+const mockSendPasswordResetEmail = vi.fn();
+vi.mock('firebase/auth', () => ({ sendPasswordResetEmail: (...args: unknown[]) => mockSendPasswordResetEmail(...args) }));
+vi.mock('@/lib/firebase/client', () => ({ getFirebaseAuth: () => ({ name: 'test-auth' }) }));
+
 const mockSignInWithEmail = vi.fn();
 const mockSignUpWithEmail = vi.fn();
 const mockSignInWithGoogle = vi.fn();
@@ -44,6 +48,32 @@ describe('EmailPasswordForm Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUseSearchParams.mockReturnValue({ get: () => null });
+  });
+
+  it('posts, so a submit before hydration never puts the password in the URL', () => {
+    const { container } = renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    expect(container.querySelector('form')?.getAttribute('method')).toBe('post');
+  });
+
+  it('"Forgot password?" sends a reset link for the typed email, and asks for one first', async () => {
+    mockSendPasswordResetEmail.mockResolvedValue(undefined);
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.forgotPassword }));
+    expect(await screen.findByText(enMessages.Auth.resetNeedsEmail)).toBeInTheDocument();
+    expect(mockSendPasswordResetEmail).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.emailLabel), { target: { value: 'a@b.co' } });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.forgotPassword }));
+    await waitFor(() => expect(mockSendPasswordResetEmail).toHaveBeenCalledWith({ name: 'test-auth' }, 'a@b.co'));
+    expect(await screen.findByText('If an account exists for a@b.co, a password reset link is on its way.')).toBeInTheDocument();
+  });
+
+  it('does not reveal whether the account exists', async () => {
+    mockSendPasswordResetEmail.mockRejectedValue({ code: 'auth/user-not-found' });
+    renderWithIntl(<EmailPasswordForm mode="signin" />, { locale: 'en' });
+    fireEvent.change(screen.getByLabelText(enMessages.Auth.emailLabel), { target: { value: 'nobody@b.co' } });
+    fireEvent.click(screen.getByRole('button', { name: enMessages.Auth.forgotPassword }));
+    expect(await screen.findByText('If an account exists for nobody@b.co, a password reset link is on its way.')).toBeInTheDocument();
   });
 
   it('switches between Sign In and Sign Up tabs in-place', () => {
