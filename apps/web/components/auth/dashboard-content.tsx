@@ -86,7 +86,7 @@ export function DashboardContent({ email, overview, now }: DashboardContentProps
             progress={averageScore ?? undefined}
             subtext={averageScore === null ? t('kpiAverageHealthEmpty') : t('kpiAverageHealthSubtext', { count: scored.length })}
           />
-          <StatCard title={t('kpiAccepted')} value={numberFormat.format(totalAccepted)} icon={TrendingUp} trendData={dailySum} subtext={t('kpiAcceptedSubtext', { days: TREND_DAYS })} />
+          <StatCard title={t('kpiAccepted')} value={numberFormat.format(totalAccepted)} icon={TrendingUp} trendData={dailySum.some((value) => value > 0) ? dailySum : undefined} subtext={t('kpiAcceptedSubtext', { days: TREND_DAYS })} />
           <StatCard
             title={t('kpiFlowing')}
             value={withHealth.length > 0 ? `${flowing}/${withHealth.length}` : '-'}
