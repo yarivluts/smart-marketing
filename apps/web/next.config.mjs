@@ -10,7 +10,8 @@ const nextConfig = {
   // Standalone output for containerized (Cloud Run) deploys; skipped on Windows local builds
   output:
     process.env.NEXT_OUTPUT_STANDALONE === 'true' ||
-    (process.env.NODE_ENV === 'production' && process.platform !== 'win32')
+    // 'false': the e2e build, served by `next start`, which does not run standalone output.
+    (process.env.NEXT_OUTPUT_STANDALONE !== 'false' && process.env.NODE_ENV === 'production' && process.platform !== 'win32')
       ? 'standalone'
       : undefined,
   // Trace files from the monorepo root so workspace deps are included.

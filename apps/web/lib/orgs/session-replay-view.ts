@@ -1,7 +1,7 @@
+import { SESSION_REPLAY_LANDING_PAGE_PLACEHOLDER, sessionReplayTemplateFiltersByPage } from '@growthos/shared';
+
 /** Which replay tool a project's deep-link template points at, read from the URL's host - for the settings page's summary. */
 export type SessionReplayTool = 'clarity' | 'hotjar' | 'fullstory' | 'other';
-
-export const LANDING_PAGE_PLACEHOLDER = '{landing_page}';
 
 export interface SessionReplayTemplateSummary {
   tool: SessionReplayTool | null;
@@ -16,10 +16,11 @@ export function summarizeSessionReplayTemplate(template: string | undefined | nu
   }
   let host = '';
   try {
-    host = new URL(trimmed.replace(LANDING_PAGE_PLACEHOLDER, 'x')).hostname.toLowerCase();
+    host = new URL(trimmed.replace(SESSION_REPLAY_LANDING_PAGE_PLACEHOLDER, 'x')).hostname.toLowerCase();
   } catch {
     host = '';
   }
   const tool: SessionReplayTool = host.endsWith('clarity.microsoft.com') ? 'clarity' : host.endsWith('hotjar.com') ? 'hotjar' : host.endsWith('fullstory.com') ? 'fullstory' : 'other';
-  return { tool, filtersByPage: trimmed.includes(LANDING_PAGE_PLACEHOLDER) };
+  // The same rule the board's links and the admin form's save warning use, so the three never disagree.
+  return { tool, filtersByPage: sessionReplayTemplateFiltersByPage(trimmed) };
 }
