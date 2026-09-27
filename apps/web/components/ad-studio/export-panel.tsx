@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { CheckCircle2, CircleAlert, ExternalLink, Loader2, Send, Upload } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -53,7 +53,11 @@ export function ExportPanel({ orgId, projectId, briefId, video, destinations, ex
   const [privacy, setPrivacy] = React.useState<'private' | 'unlisted' | 'public'>('unlisted');
   const [pending, setPending] = React.useState<ExportDestinationId | null>(null);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  const locale = useLocale();
+  // Formatted in the browser only, in the viewer's own time zone, so server and client markup agree.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  const formatWhen = (iso: string) => (mounted ? ` · ${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))}` : '');
 
   async function exportTo(destination: ExportDestinationId): Promise<void> {
     if (!video) return;
@@ -190,7 +194,8 @@ export function ExportPanel({ orgId, projectId, briefId, video, destinations, ex
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {t(`exportDestination.${row.destination}`)}
-                    {row.privacy ? ` · ${t(`exportPrivacyShort.${row.privacy}`)}` : ''} · {dateTime.format(new Date(row.requestedOn))}
+                    {row.privacy ? ` · ${t(`exportPrivacyShort.${row.privacy}`)}` : ''}
+                    {formatWhen(row.requestedOn)}
                   </span>
                 </span>
                 <span className="flex items-center gap-2">

@@ -105,6 +105,8 @@ describe('ExportPanel', () => {
     const [first, second] = screen.getAllByTestId('ad-studio-export-row');
     expect(first).toHaveTextContent(heMessages.AdStudio.exportStatus.done);
     expect(first).toHaveTextContent(heMessages.AdStudio.exportPrivacyShort.unlisted);
+    // Dates follow the page locale, not the browser's default.
+    expect(first).toHaveTextContent(new Intl.DateTimeFormat('he', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(rows[0].requestedOn)));
     expect(within(first).getByRole('link', { name: heMessages.AdStudio.exportOpen })).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abc');
     expect(second).toHaveTextContent(heMessages.AdStudio.exportFailure.auth_failed);
     expect(within(second).queryByRole('link')).toBeNull();

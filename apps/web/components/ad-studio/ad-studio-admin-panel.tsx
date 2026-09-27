@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Loader2, Settings2 } from 'lucide-react';
 import { useRouter } from '@/i18n/navigation';
 import { cn } from '@/lib/utils';
@@ -79,7 +79,11 @@ export function AdStudioAdminPanel({
   const [video, setVideo] = React.useState(String(limits.dailyVideoSeconds));
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
-  const dateTime = new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' });
+  const locale = useLocale();
+  // Formatted in the browser only, in the viewer's own time zone, so server and client markup agree.
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  const formatWhen = (iso: string) => (mounted ? new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(iso)) : '');
 
   async function save(event: React.FormEvent): Promise<void> {
     event.preventDefault();
@@ -198,7 +202,7 @@ export function AdStudioAdminPanel({
               <tbody>
                 {recentUsage.map((row) => (
                   <tr key={row.id} className="border-t border-border" data-testid="ad-studio-usage-row">
-                    <td className="px-3 py-1.5 tabular-nums">{dateTime.format(new Date(row.occurredOn))}</td>
+                    <td className="px-3 py-1.5 tabular-nums">{formatWhen(row.occurredOn)}</td>
                     <td className="px-3 py-1.5">
                       {t(`usageKind.${row.kind}`)}
                       {row.kind === 'video_scene' || row.kind === 'video_edit' ? <span className="text-muted-foreground tabular-nums">{` · ${t('secondsShort', { seconds: row.units })}`}</span> : null}
