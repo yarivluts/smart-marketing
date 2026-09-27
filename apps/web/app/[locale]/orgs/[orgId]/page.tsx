@@ -110,6 +110,7 @@ export default async function OrgDetailPage({
   const canManagePlugins = can(bindings, principal, 'plugin.install', projectScope);
   const canManageBoards = can(bindings, principal, 'dashboards.write', projectScope);
   const canViewBoards = can(bindings, principal, 'dashboards.read', projectScope) || canManageBoards;
+  const canUseAi = can(bindings, principal, 'ai.use', projectScope);
 
   // Projects the signed-in inviter administers (KAN-135) — scopes the
   // invite form's project picker to only the projects a project-scoped
@@ -210,6 +211,7 @@ export default async function OrgDetailPage({
                 ]
               : []),
             ...(canManagePlugins ? [{ href: 'plugins', label: t('projectPluginsLink') }] : []),
+            ...(canUseAi ? [{ href: 'ad-studio', label: t('projectAdStudioLink') }] : []),
           ],
         },
       ]

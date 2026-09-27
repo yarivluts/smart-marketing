@@ -67,6 +67,7 @@ export default async function ProjectLayout({
   const canViewIngestHealth = can(bindings, principal, 'ingest.write', { orgId, projectId });
   const canManageProjects = can(bindings, principal, 'project.manage', { orgId, projectId });
   const canManagePlugins = can(bindings, principal, 'plugin.install', { orgId, projectId });
+  const canUseAi = can(bindings, principal, 'ai.use', { orgId, projectId });
   const canManageBoards = can(bindings, principal, 'dashboards.write', { orgId, projectId });
   const canViewBoards = can(bindings, principal, 'dashboards.read', { orgId, projectId }) || canManageBoards;
   const canViewAuditLog = can(bindings, principal, 'audit.read', { orgId, projectId });
@@ -164,6 +165,7 @@ export default async function ProjectLayout({
   ];
 
   const restoredAutomationItems: AppShellNavItem[] = [
+    ...(canUseAi ? [{ href: `${base}/ad-studio`, label: t('projectAdStudioLink'), icon: 'Clapperboard' as const }] : []),
     ...(canManagePlugins
       ? [{ href: `${base}/plugins`, label: t('projectPluginsLink'), icon: 'Puzzle' as const }]
       : []),

@@ -84,6 +84,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<Role, readonly Permission[]>> = {
     'automation.execute',
     'data.export',
     'plugin.install',
+    'ai.use',
     'mcp.read',
   ],
   editor: ['metrics.write', 'dashboards.write', 'dashboards.read', 'ai.use', 'mcp.read'],

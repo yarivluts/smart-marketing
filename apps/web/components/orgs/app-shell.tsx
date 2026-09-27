@@ -40,6 +40,7 @@ import {
   Webhook,
   X,
   type LucideIcon,
+  Clapperboard,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link, usePathname } from '@/i18n/navigation';
@@ -60,6 +61,7 @@ import { cn } from '@/lib/utils';
  */
 const ICONS = {
   Activity,
+  Clapperboard,
   Award,
   BarChart3,
   Bell,

@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@growthos/firebase-orm-models": "workspace:*",
     "@growthos/shared": "workspace:*",
     "@growthos/tracking-sdk": "workspace:*",
@@ -34,7 +35,8 @@
     "recharts": "^2.15.4",
     "server-only": "^0.0.1",
     "tailwind-merge": "^2.6.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@growthos/eslint-config": "workspace:*",
