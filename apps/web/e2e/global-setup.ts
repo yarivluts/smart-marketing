@@ -53,6 +53,36 @@ export const WARM_ROUTES: readonly string[] = [
 ];
 
 const PER_ROUTE_TIMEOUT_MS = 180_000;
+const AUTH_EMULATOR = process.env.FIREBASE_AUTH_EMULATOR_HOST ?? '127.0.0.1:9099';
+
+/**
+ * One real signed-in request, so the first spec does not pay the server's cold start: the requests
+ * above redirect before any Firestore read, which leaves the Admin SDK, its token verification and
+ * the Firestore client uninitialised until some spec's first assertion. Signs a throwaway user up on
+ * the Auth emulator, turns its ID token into a session cookie, and loads the dashboard with it.
+ */
+async function warmSignedIn(baseURL: string): Promise<void> {
+  const email = `e2e-warmup-${Date.now()}@example.com`;
+  const signUp = await fetch(`http://${AUTH_EMULATOR}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email, password: 'Warmup-Passw0rd!', returnSecureToken: true }),
+    signal: AbortSignal.timeout(PER_ROUTE_TIMEOUT_MS),
+  });
+  const { idToken } = (await signUp.json()) as { idToken?: string };
+  if (!idToken) throw new Error(`auth emulator sign-up answered ${signUp.status}`);
+  const session = await fetch(new URL('/api/auth/session', baseURL), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ idToken }),
+    signal: AbortSignal.timeout(PER_ROUTE_TIMEOUT_MS),
+  });
+  const cookie = session.headers.get('set-cookie')?.split(';')[0];
+  if (!cookie) throw new Error(`session route answered ${session.status} without a cookie`);
+  for (const route of ['/api/orgs/context', '/en/dashboard', '/en/orgs/new']) {
+    await fetch(new URL(route, baseURL), { headers: { cookie }, redirect: 'manual', signal: AbortSignal.timeout(PER_ROUTE_TIMEOUT_MS) });
+  }
+}
 
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use.baseURL;
@@ -69,5 +99,10 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       console.warn(`[e2e warm-up] ${route}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  console.log(`[e2e warm-up] compiled ${WARM_ROUTES.length} routes in ${Math.round((Date.now() - started) / 1000)}s`);
+  try {
+    await warmSignedIn(baseURL);
+  } catch (error) {
+    console.warn(`[e2e warm-up] signed-in warm-up: ${error instanceof Error ? error.message : String(error)}`);
+  }
+  console.log(`[e2e warm-up] compiled ${WARM_ROUTES.length} routes and a signed-in dashboard in ${Math.round((Date.now() - started) / 1000)}s`);
 }
