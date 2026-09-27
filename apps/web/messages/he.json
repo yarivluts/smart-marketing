@@ -3214,7 +3214,8 @@
       "stripe": "Stripe",
       "ga4": "GA4",
       "generic": "כללי",
-      "simulated": "סימולציה"
+      "simulated": "סימולציה",
+      "youtube": "YouTube"
     },
     "status": {
       "enabled": "פעיל",
