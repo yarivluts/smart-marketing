@@ -25,6 +25,7 @@ Template for each entry:
   - **Video** (#542, KAN-231): Gemini Omni (`gemini-omni-1.1-flash`) clip per scene, with prompt edits per clip. ffmpeg assembles the clips into one video, stored in the private bucket `growthos-g2w84-ad-studio`.
   - **Export** (#543, KAN-232): YouTube resumable upload (new `youtube` credential: clientId, clientSecret, refreshToken) and Meta `act_{id}/advideos` (Graph v25.0). Gated on `automation.execute` and audited. A destination is usable only with an attached credential that has a write tier and a saved secret; otherwise the panel names the reason.
   - Every export is recorded with its outcome (`ad_studio_exports`).
+  - Export was browser-checked on a local production build (emulators, fake Omni, a local media folder, a seeded Meta connection) in en, he and mobile. The check found a date-locale bug in the export and usage lists, now fixed. Nothing was sent to Meta or Google.
 - **In progress (exact stopping point):** none.
 - **Blocked + why:**
   - Real video generation: the Gemini account answers 402 (prepayment credits depleted) until it is topped up.
