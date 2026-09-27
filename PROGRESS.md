@@ -7,6 +7,70 @@ fresh session can pick up work from this file + [TASKS.md](./TASKS.md) alone. Se
 Template for each entry:
 
 ```
+## <date> — <run summary>
+- **Last completed:** …
+- **In progress (exact stopping point):** …
+- **Blocked + why:** …
+- **Next step:** …
+- **Waiting on human:** …
+```
+
+---
+
+## 2026-09-27 - UI overhaul shipped, backfill live with EasySign, e2e on a production build
+
+### Deployed (api-prod/api-preprod/web-prod/web-preprod at 810a56f; dbt-refresh unchanged since 9d51c51)
+- **KAN-225 UI/UX overhaul** (#520 kit, #521 boards/automation/auth, #522 growth, #523 data,
+  #524 ads, #526 workspace, #527 quality): every page now opens on a KPI hero, with charts
+  (TrendChart, DonutChart, BarList, Heatmap), interactive FlowDiagrams (xyflow, clickable,
+  RTL-mirrored), and EmptyStates that name the next step instead of zeros. Counted at 810a56f:
+  48 PageHero, 15 FlowDiagram, 29 TrendChart, 31 DonutChart, 23 BarList, 111 EmptyState (all 0
+  before). Honesty fixes on the way: SOC2 / "real-time bid optimization" claims removed from auth,
+  the fake global onboarding wizard replaced with the real journey, firmographics' AI claim removed,
+  TrendChart axes restored (recharts 2 + React 19 fragment bug). **Before/after report** (52 prod
+  pages, slider compare, per-page notes): https://claude.ai/artifact/25C78dD5RVVnCHF1qo7JK7 -
+  screenshots in `Downloads/growthos-ui-report/{before,after}`.
+- **KAN-223 backfill loop** (#525): endpoint registration (SSRF-checked, `whsec_` secret shown once),
+  Standard Webhooks signed `backfill.requested` with retries, `X-GrowthOS-Backfill-Id` attribution,
+  `POST /v1/backfills/{id}/complete`, MCP tools + Backfill panel. **Live with EasySign dev**:
+  endpoint registered, secret piped straight into easysign-yariv-test `GROWTHOS_BACKFILL_SECRET` v2
+  (never printed), backfill `ANdr0pDfgAY7Bi0Pwyu4` completed - 14 records / 2 batches, all 14
+  duplicates of an earlier test run - verified independently by EasySign on both sides. Done.
+- **KAN-224 customer coverage** (#533): distinct `events.properties.customer_id` vs customer entity
+  rows, intersected on id, from the warehouse; a backfill is recommended below 90% (top-level
+  `customer_backfill` in `get_setup_health`/`audit_installation_gaps`, and on the Setup health panel).
+  Falls back to "events accepted, no customer entity ever" only when the warehouse can't be read.
+  Prod check, EasySign dev: 9/9, no recommendation. In Review until EasySign verifies.
+- **KAN-226** (#532): the auth form posts (credentials never land in the URL before hydration);
+  "Forgot password?" sends a real reset email. Done.
+- **KAN-227** (#536): no Hebrew left in non-test source files; the copilot engine takes its replies
+  and intent phrases from `CopilotEngine` messages. Done.
+- #534: session-replay summary reuses the shared filters-by-page rule.
+
+### CI: e2e now runs against a production build (#535)
+`test:e2e:sharded` builds once (`scripts/e2e-sharded.mjs`, emulator host inlined, standalone off)
+and serves every shard with `next start`. `next dev` compiled routes on demand and Fast-Refreshed
+mid-test, so navigations missed the 15s window at random (it cost #526 and #533 every retry). Now:
+3 shards, 40 tests, no retries, under a minute each. Local `playwright test` still uses `next dev`,
+with `e2e/global-setup.ts` warming the visited routes and one signed-in request first.
+
+### Notes for the next run
+- The dev machine's clock is ~2 minutes behind (Windows time sync not running). Ops scripts that
+  stamp times or sign webhooks locally inherit it - send requests through the API instead.
+- In this Bash tool, heredocs strip backslashes: write scripts with regexes through the Write tool.
+- Org-admin pages 404 for the screenshots account (project admin); their "after" shots came from an
+  emulator org owner.
+
+- **Last completed:** all of the above.
+- **In progress:** nothing mid-change.
+- **Blocked + why:** KAN-97 (schema.write in default key scopes), KAN-195 (viewer role) and KAN-221
+  (explicit schema-to-requirement mapping) are Yariv's product decisions.
+- **Next step:** EasySign's verification of KAN-224, then Adir's production rollout (prod key
+  gos_live_Jz47ju3m) and a prod backfill with the coverage check before and after.
+- **Waiting on human:** KAN-97, KAN-195, KAN-221, KAN-117, KAN-130.
+
+---
+
 ## 2026-09-26 - EasySign round 4: setup tools live, integration infrastructure, MRR without a PSP
 
 ### Deployed (api-prod/api-preprod/web-prod/web-preprod and dbt-refresh all at 9d51c51)
@@ -156,14 +220,6 @@ real browser E2E on its dev key and reported each gap; every finding got a KAN i
 - **Next step:** KAN-201 (dismissed counted as quarantined), KAN-199 (set_funnel), KAN-204 (drift
   alarm for web and dbt), KAN-210/211 (bar values, relative board ranges), KAN-212 (Copilot bar).
 - **Waiting on human:** KAN-195 (viewer read access), KAN-197 ownership, KAN-97, KAN-117, KAN-130.
-
-## <date> — <run summary>
-- **Last completed:** …
-- **In progress (exact stopping point):** …
-- **Blocked + why:** …
-- **Next step:** …
-- **Waiting on human:** …
-```
 
 ---
 
