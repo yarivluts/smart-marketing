@@ -1,5 +1,7 @@
 import { getSetupRequirement, SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS, SETUP_REJECTED_RECORDS_RECOMMENDATION } from './catalog';
 import type {
+  SetupCustomerBackfillRecommendation,
+  SetupCustomerCoverage,
   SetupEnvironmentHealth,
   SetupHealthReport,
   SetupRecommendation,
@@ -144,8 +146,37 @@ export function selectSetupFocusEnvironment(
   return report.environments.find((environment) => environment.environmentName === 'prod') ?? report.environments[0];
 }
 
-/** `get_setup_health`: the focus environment in detail, every environment in one line each. */
-export function buildSetupHealthOutput(report: SetupHealthReport, focus: SetupEnvironmentHealth, context: SetupOutputContext) {
+/**
+ * The customer-coverage fields both tools return. `customer_backfill` sits at the top level, not
+ * inside a gap, because the case it exists for is usually "connected": new signups send entities
+ * while the customers from before the rollout never did.
+ */
+function customerCoverageOutput(focus: SetupEnvironmentHealth, context: SetupOutputContext, coverage: SetupCustomerCoverage | null | undefined) {
+  const backfill = customerBackfillRecommendation(focus, coverage);
+  return {
+    customer_coverage: coverage
+      ? {
+          event_customers: coverage.eventCustomers,
+          with_customer_record: Math.min(coverage.withCustomerRecord, coverage.eventCustomers),
+          coverage_percent: coverage.eventCustomers > 0 ? Math.floor((Math.min(coverage.withCustomerRecord, coverage.eventCustomers) * 100) / coverage.eventCustomers) : null,
+          threshold_percent: CUSTOMER_COVERAGE_THRESHOLD_PERCENT,
+          source: "Warehouse core tables as of their last refresh: distinct properties.customer_id in each environment's events, and how many have a customer entity record.",
+        }
+      : null,
+    ...(coverage ? {} : { customer_coverage_note: 'Customer coverage needs the warehouse, which could not be read for this project; only a customer entity that never arrived at all can be detected without it.' }),
+    customer_backfill: backfill
+      ? {
+          basis: backfill.basis,
+          reason: describeCustomerBackfillReason(backfill, focus.environmentName),
+          ...(backfill.basis === 'coverage' ? { missing_customers: backfill.missing } : {}),
+          how_to_fix: customerBackfillSteps(backfill, focus.environmentName).map((step) => renderSetupRecommendation(step, context)),
+        }
+      : null,
+  };
+}
+
+/** `get_setup_health`: the focus environment in detail, every environment in one line each. `coverage`: see {@link SetupCustomerCoverage}; null when the warehouse could not be read. */
+export function buildSetupHealthOutput(report: SetupHealthReport, focus: SetupEnvironmentHealth, context: SetupOutputContext, coverage?: SetupCustomerCoverage | null) {
   return {
     project_id: context.projectId,
     environment: focus.environmentName,
@@ -179,6 +210,7 @@ export function buildSetupHealthOutput(report: SetupHealthReport, focus: SetupEn
     })),
     status_source: SETUP_STATUS_SOURCE_NOTE,
     schema_mapping: SETUP_SCHEMA_MAPPING_NOTE,
+    ...customerCoverageOutput(focus, context, coverage),
     next_step: 'Call audit_installation_gaps for what each missing requirement costs and how to connect it.',
   };
 }
@@ -190,37 +222,78 @@ function connectedElsewhere(report: SetupHealthReport, focus: SetupEnvironmentHe
     .map((environment) => environment.environmentName);
 }
 
+/** Below this share of event customers with a customer record, a backfill is recommended. */
+export const CUSTOMER_COVERAGE_THRESHOLD_PERCENT = 90;
+
 /**
- * The accepted event schemas that show customers already exist upstream while no customer entity has
- * arrived in this environment - the case a backfill fixes. Null otherwise (entities connected, their
- * records rejected, or no events either). It names the evidence, not a customer count: counting the
- * customers missing an entity needs the warehouse, and this read never estimates one.
+ * Whether to recommend resending existing customers (the backfill loop), and on what evidence.
+ *
+ * With warehouse coverage: when fewer than {@link CUSTOMER_COVERAGE_THRESHOLD_PERCENT}% of the
+ * distinct customers in this environment's events have a customer record. This is what catches the
+ * usual rollout: the integration starts sending entities for new signups, so an entity "has
+ * arrived", while every customer from before the rollout is still missing.
+ *
+ * Without it (warehouse not configured or unreadable): only the case visible from ingest alone -
+ * events accepted but no customer entity ever received - and no count is estimated.
+ *
+ * Never when customer records are being rejected: a backfill would be rejected the same way, so
+ * the rejection reasons come first.
  */
-export function customerBackfillEvidence(environment: SetupEnvironmentHealth): string[] | null {
+export function customerBackfillRecommendation(
+  environment: SetupEnvironmentHealth,
+  coverage: SetupCustomerCoverage | null | undefined,
+): SetupCustomerBackfillRecommendation | null {
   const customers = environment.requirements.find((result) => result.requirementId === 'customer_profiles');
-  if (!customers || customers.status !== 'gap') return null;
+  if (!customers || customers.status === 'error') return null;
+  if (coverage) {
+    if (coverage.eventCustomers <= 0) return null;
+    const withRecord = Math.min(coverage.withCustomerRecord, coverage.eventCustomers);
+    if (withRecord * 100 >= coverage.eventCustomers * CUSTOMER_COVERAGE_THRESHOLD_PERCENT) return null;
+    return {
+      basis: 'coverage',
+      eventCustomers: coverage.eventCustomers,
+      withCustomerRecord: withRecord,
+      missing: coverage.eventCustomers - withRecord,
+      // Floored, so 89.9% never displays as the 90% it failed to reach.
+      coveragePercent: Math.floor((withRecord * 100) / coverage.eventCustomers),
+    };
+  }
+  if (customers.status !== 'gap') return null;
   const events = environment.requirements.flatMap((result) => result.acceptedSchemas.filter((schema) => schema.kind === 'event').map((schema) => schema.name));
-  return events.length > 0 ? [...new Set(events)] : null;
+  return events.length > 0 ? { basis: 'no_entity_yet', eventSchemas: [...new Set(events)] } : null;
+}
+
+/** One sentence saying why a backfill is recommended, from its evidence. */
+export function describeCustomerBackfillReason(recommendation: SetupCustomerBackfillRecommendation, environmentName: string): string {
+  if (recommendation.basis === 'coverage') {
+    return `${recommendation.missing} of ${recommendation.eventCustomers} customers seen in ${environmentName} events (by properties.customer_id) have no customer record: ${recommendation.coveragePercent}% coverage, below ${CUSTOMER_COVERAGE_THRESHOLD_PERCENT}%. Their customer entities were never sent, typically because they signed up before the integration started sending them.`;
+  }
+  return `Events are already accepted in ${environmentName} (${recommendation.eventSchemas.map((name) => `"${name}"`).join(', ')}), so these customers exist in the integrator's system but no customer entity has arrived.`;
+}
+
+/** The backfill steps, the first one leading with why. */
+function customerBackfillSteps(recommendation: SetupCustomerBackfillRecommendation, environmentName: string): SetupRecommendation[] {
+  const [first, ...others] = SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS;
+  return [{ ...first, action: `${describeCustomerBackfillReason(recommendation, environmentName)} ${first.action}` }, ...others];
 }
 
 /**
  * The steps that connect one requirement from where it stands. Rejected records: read their reasons
- * first. A customer entity missing beside flowing events: resend the existing customers (backfill)
- * first. Schemas already registered but silent: registering is done, so the register steps are
- * dropped and the send step leads, naming the registered schemas (B27). Otherwise every step.
+ * first. A customer backfill recommended: resend the existing customers first. Schemas already
+ * registered but silent: registering is done, so the register steps are dropped and the send step
+ * leads, naming the registered schemas (B27). Otherwise every step.
  */
-function stepsFor(requirement: SetupRequirement, result: SetupRequirementEnvironmentResult, environment: SetupEnvironmentHealth): readonly SetupRecommendation[] {
+function stepsFor(
+  requirement: SetupRequirement,
+  result: SetupRequirementEnvironmentResult,
+  environment: SetupEnvironmentHealth,
+  backfill: SetupCustomerBackfillRecommendation | null,
+): readonly SetupRecommendation[] {
   if (result.status === 'error') {
     return [SETUP_REJECTED_RECORDS_RECOMMENDATION, ...requirement.recommendations];
   }
-  const evidence = requirement.id === 'customer_profiles' ? customerBackfillEvidence(environment) : null;
   const rest = sendOrRegisterSteps(requirement, result, environment.environmentName);
-  if (!evidence) {
-    return rest;
-  }
-  const [first, ...others] = SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS;
-  const why = `Events are already accepted in ${environment.environmentName} (${evidence.map((name) => `"${name}"`).join(', ')}), so these customers exist in the integrator's system but no customer entity has arrived.`;
-  return [{ ...first, action: `${why} ${first.action}` }, ...others, ...rest];
+  return requirement.id === 'customer_profiles' && backfill ? [...customerBackfillSteps(backfill, environment.environmentName), ...rest] : rest;
 }
 
 function sendOrRegisterSteps(requirement: SetupRequirement, result: SetupRequirementEnvironmentResult, environmentName: string): readonly SetupRecommendation[] {
@@ -239,12 +312,13 @@ function sendOrRegisterSteps(requirement: SetupRequirement, result: SetupRequire
 }
 
 /** `audit_installation_gaps`: every requirement not connected in the focus environment, with its cost and the steps to connect it. */
-export function buildInstallationGapsOutput(report: SetupHealthReport, focus: SetupEnvironmentHealth, context: SetupOutputContext) {
+export function buildInstallationGapsOutput(report: SetupHealthReport, focus: SetupEnvironmentHealth, context: SetupOutputContext, coverage?: SetupCustomerCoverage | null) {
+  const backfill = customerBackfillRecommendation(focus, coverage);
   const gaps = focus.requirements
     .filter((result) => result.status !== 'connected')
     .map((result) => {
       const requirement = getSetupRequirement(result.requirementId);
-      const steps = stepsFor(requirement, result, focus);
+      const steps = stepsFor(requirement, result, focus, backfill);
       return {
         requirement_id: requirement.id,
         title: requirement.title,
@@ -282,5 +356,6 @@ export function buildInstallationGapsOutput(report: SetupHealthReport, focus: Se
     connected,
     status_source: SETUP_STATUS_SOURCE_NOTE,
     schema_mapping: SETUP_SCHEMA_MAPPING_NOTE,
+    ...customerCoverageOutput(focus, context, coverage),
   };
 }

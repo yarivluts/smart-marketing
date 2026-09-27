@@ -11,7 +11,9 @@ export { deriveSetupHealth } from './derive';
 export {
   buildInstallationGapsOutput,
   buildSetupHealthOutput,
-  customerBackfillEvidence,
+  customerBackfillRecommendation,
+  CUSTOMER_COVERAGE_THRESHOLD_PERCENT,
+  describeCustomerBackfillReason,
   describeSetupRequirementResult,
   renderSetupRecommendation,
   selectSetupFocusEnvironment,
