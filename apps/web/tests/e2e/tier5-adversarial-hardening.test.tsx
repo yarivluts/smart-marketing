@@ -22,6 +22,7 @@ vi.mock('@/i18n/navigation', () => ({
 }));
 
 import {
+  copilotEngineMessages,
   renderWithIntl,
 } from './helpers/test-harness';
 import enMessages from '../../messages/en.json';
@@ -447,14 +448,16 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
         routed by invented identifiers.
       */
       const context = {
-        locale: 'he' as const,
         targets: [
           { id: 'tgt-real-1', label: 'EasySign Brand', dailyBudgetUsd: 120, status: 'enabled' },
         ],
       };
 
+      const he = copilotEngineMessages('he');
+      const en = copilotEngineMessages('en');
+
       // Hebrew budget increase, against the one real campaign.
-      const heBudget = processCopilotQuery('הגדל תקציב ל-400$', context);
+      const heBudget = processCopilotQuery('הגדל תקציב ל-400$', context, he);
       expect(heBudget.actionProposal?.actionType).toBe('budget_change');
       expect(heBudget.actionProposal?.targetId).toBe('tgt-real-1');
       expect(heBudget.actionProposal?.beforeValue).toBe('$120/day');
@@ -463,29 +466,31 @@ describe('Tier 5: Adversarial Coverage Hardening & White-Box Stress Audit', () =
       expect(heBudget.actionProposal?.estimatedImpact).toBeUndefined();
 
       // The same query with no campaigns to act on asks which campaign, and proposes nothing.
-      const heBudgetNoTargets = processCopilotQuery('הגדל תקציב ל-400$', { locale: 'he' });
+      const heBudgetNoTargets = processCopilotQuery('הגדל תקציב ל-400$', {}, he);
       expect(heBudgetNoTargets.actionProposal).toBeUndefined();
+      expect(heBudgetNoTargets.message.content).toBe(heMessages.CopilotEngine.noCampaign);
 
       // Draft creation needs no prior measurement, only a budget.
-      const heDraft = processCopilotQuery('צור קמפיין חיפוש חדש לעורכי דין בתקציב 200', context);
+      const heDraft = processCopilotQuery('צור קמפיין חיפוש חדש לעורכי דין בתקציב 200', context, he);
       expect(heDraft.actionProposal?.actionType).toBe('campaign_draft_create');
 
       // Pause resolves the real campaign rather than a hardcoded "low ROAS" one.
-      const hePause = processCopilotQuery('השהה קמפיין', context);
+      const hePause = processCopilotQuery('השהה קמפיין', context, he);
       expect(hePause.actionProposal?.actionType).toBe('campaign_activation');
       expect(hePause.actionProposal?.targetId).toBe('tgt-real-1');
       expect(hePause.actionProposal?.afterValue).toBe('PAUSED');
 
       // Rebalancing and "top performing" both need performance figures nothing measures.
-      const heRebalance = processCopilotQuery('איזון תקציב בין גוגל למטא', context);
+      const heRebalance = processCopilotQuery('איזון תקציב בין גוגל למטא', context, he);
       expect(heRebalance.actionProposal).toBeUndefined();
+      expect(heRebalance.message.content).toBe(heMessages.CopilotEngine.noPerformanceData);
 
-      const enAds = processCopilotQuery('What are our top performing ads this week?', { locale: 'en' });
+      const enAds = processCopilotQuery('What are our top performing ads this week?', {}, en);
       expect(enAds.actionProposal).toBeUndefined();
       expect(enAds.message.content).toContain('no performance data');
 
       // Unrecognized fallback.
-      const unknownQuery = processCopilotQuery('random unparseable sentence', { locale: 'en' });
+      const unknownQuery = processCopilotQuery('random unparseable sentence', {}, en);
       expect(unknownQuery.actionProposal).toBeUndefined();
       expect(unknownQuery.message.content).toContain('How can I help you');
     });

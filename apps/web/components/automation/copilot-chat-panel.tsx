@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProposalDiffCard, type ActionProposalData } from './proposal-diff-card';
-import { processCopilotQuery, type CopilotContext } from '@/lib/ai/copilot-engine';
+import { buildCopilotEngineMessages, processCopilotQuery, type CopilotContext } from '@/lib/ai/copilot-engine';
 import type { CopilotActionProposal } from '@/lib/ai/copilot-types';
 
 /**
@@ -131,16 +131,24 @@ export function CopilotChatPanel({
   funnelSteps,
 }: CopilotChatPanelProps): React.ReactElement {
   const t = useTranslations('Copilot');
+  const tPanel = useTranslations('CopilotChatPanel');
+  const tEngine = useTranslations('CopilotEngine');
   const locale = useLocale();
   const isRtl = locale === 'he';
+
+  const engineMessages = React.useMemo(
+    () =>
+      buildCopilotEngineMessages({
+        format: (key, values) => tEngine(key, values),
+        raw: (key) => tEngine.raw(key),
+      }),
+    [tEngine],
+  );
 
   const defaultWelcomeMessage: CopilotMessage = {
     id: 'welcome-1',
     role: 'assistant',
-    content:
-      locale === 'he'
-        ? 'שלום! אני ה-AI Growth Copilot שלך. כיצד אוכל לעזור לך לייעל קמפיינים, לבדוק מדדים או לבצע שינויי תקציב היום?'
-        : "Hello! I'm your AI Growth Copilot. How can I assist you with optimizing campaigns, checking metrics, or reallocating budgets today?",
+    content: tPanel('welcomeMessage'),
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   };
 
@@ -165,31 +173,10 @@ export function CopilotChatPanel({
   }, [messages, isTyping, scrollToBottom]);
 
   const quickPromptChips = [
-    {
-      label: locale === 'he' ? 'מודעות מובילות' : 'Top Ads',
-      query: locale === 'he' ? 'אילו מודעות הכי רווחיות השבוע?' : 'What are top ads this week?',
-    },
-    {
-      label: locale === 'he' ? 'הגדל תקציב' : 'Scale Budget',
-      query:
-        locale === 'he'
-          ? 'הגדל תקציב לקמפיין הריטרגטינג ל-$250'
-          : 'Increase budget for retargeting campaign to $250',
-    },
-    {
-      label: locale === 'he' ? 'קמפיין חדש' : 'New Campaign',
-      query:
-        locale === 'he'
-          ? 'צור קמפיין חדש לעורכי דין'
-          : 'Create a new campaign for lawyers',
-    },
-    {
-      label: locale === 'he' ? 'איזון תקציבי' : 'Budget Rebalance',
-      query:
-        locale === 'he'
-          ? 'העבר תקציב מגוגל למטא'
-          : 'Reallocate Google to Meta budget',
-    },
+    { label: tPanel('chipTopAdsLabel'), query: tPanel('chipTopAdsQuery') },
+    { label: tPanel('chipScaleBudgetLabel'), query: tPanel('chipScaleBudgetQuery') },
+    { label: tPanel('chipNewCampaignLabel'), query: tPanel('chipNewCampaignQuery') },
+    { label: tPanel('chipRebalanceLabel'), query: tPanel('chipRebalanceQuery') },
   ];
 
   async function handleSend(customQuery?: string) {
@@ -228,13 +215,7 @@ export function CopilotChatPanel({
     setTimeout(() => {
       setIsTyping(false);
 
-      const result = processCopilotQuery(textToSend, {
-        locale: locale === 'he' ? 'he' : 'en',
-        orgId,
-        projectId,
-        targets,
-        funnelSteps,
-      });
+      const result = processCopilotQuery(textToSend, { orgId, projectId, targets, funnelSteps }, engineMessages);
 
       setMessages((prev) => [
         ...prev,
@@ -341,7 +322,7 @@ export function CopilotChatPanel({
           <button
             type="button"
             onClick={handleClearChat}
-            title={locale === 'he' ? 'נקה שיחה' : 'Clear Chat'}
+            title={tPanel('clearChat')}
             className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
           >
             <Trash2 className="h-4 w-4" />
@@ -478,7 +459,7 @@ export function CopilotChatPanel({
           value={input}
           dir="auto"
           onChange={(e) => setInput(e.target.value)}
-          placeholder={t('inputPlaceholder') || (locale === 'he' ? 'שאל שאלה או תן פקודה...' : 'Ask a question or issue a command...')}
+          placeholder={t('inputPlaceholder')}
           className="flex-1 rounded-xl border border-input bg-card px-3.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-1 focus:ring-primary shadow-inner"
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -495,7 +476,7 @@ export function CopilotChatPanel({
           disabled={!input.trim()}
           className="inline-flex items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-soft hover:bg-primary/90 transition-all disabled:opacity-50 cursor-pointer active:scale-95"
         >
-          <span>{t('sendButton') || (locale === 'he' ? 'שלח' : 'Send')}</span>
+          <span>{t('sendButton')}</span>
           <Send className="ms-1.5 h-3.5 w-3.5" />
         </button>
       </div>

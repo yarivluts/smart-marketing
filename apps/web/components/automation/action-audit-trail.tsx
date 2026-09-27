@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Search,
   RotateCcw,
@@ -53,6 +53,7 @@ export function ActionAuditTrail({
   className,
   pageSize: _pageSize = 10,
 }: ActionAuditTrailProps): React.ReactElement {
+  const t = useTranslations('ActionAuditTrail');
   const locale = useLocale();
   const isRtl = locale === 'he';
 
@@ -140,7 +141,7 @@ export function ActionAuditTrail({
           <Input
             data-testid="audit-search-input"
             type="text"
-            placeholder={locale === 'he' ? 'חפש היסטוריית פעולות לפי יעד או מזהה...' : 'Search audit actions by target or ID...'}
+            placeholder={t('searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="ps-9 h-9 text-xs rounded-xl"
@@ -158,7 +159,7 @@ export function ActionAuditTrail({
                 statusFilter === 'all' ? 'bg-card text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {locale === 'he' ? 'הכל' : 'All'} ({actions.length})
+              {t('filterAll', { count: actions.length })}
             </button>
             <button
               type="button"
@@ -169,7 +170,7 @@ export function ActionAuditTrail({
                 statusFilter === 'active' ? 'bg-card text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {locale === 'he' ? 'בוצע' : 'Executed'}
+              {t('filterExecuted')}
             </button>
             <button
               type="button"
@@ -180,7 +181,7 @@ export function ActionAuditTrail({
                 statusFilter === 'rolled_back' ? 'bg-card text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {locale === 'he' ? 'בוטל' : 'Rolled Back'}
+              {t('filterRolledBack')}
             </button>
             <button
               type="button"
@@ -191,7 +192,7 @@ export function ActionAuditTrail({
                 statusFilter === 'pending' ? 'bg-card text-foreground shadow-xs font-semibold' : 'text-muted-foreground hover:text-foreground',
               )}
             >
-              {locale === 'he' ? 'ממתין' : 'Pending'}
+              {t('filterPending')}
             </button>
           </div>
         </div>
@@ -202,12 +203,12 @@ export function ActionAuditTrail({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{locale === 'he' ? 'יעד / קמפיין' : 'Target / Campaign'}</TableHead>
-              <TableHead>{locale === 'he' ? 'סוג פעולה' : 'Action Type'}</TableHead>
-              <TableHead>{locale === 'he' ? 'שינוי (Diff)' : 'Change (Diff)'}</TableHead>
-              <TableHead>{locale === 'he' ? 'סטטוס' : 'Status'}</TableHead>
-              <TableHead>{locale === 'he' ? 'זמן ביצוע' : 'Executed At'}</TableHead>
-              <TableHead className="text-end">{locale === 'he' ? 'פעולות' : 'Actions'}</TableHead>
+              <TableHead>{t('columnTarget')}</TableHead>
+              <TableHead>{t('columnActionType')}</TableHead>
+              <TableHead>{t('columnChange')}</TableHead>
+              <TableHead>{t('columnStatus')}</TableHead>
+              <TableHead>{t('columnExecutedAt')}</TableHead>
+              <TableHead className="text-end">{t('columnActions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -216,8 +217,8 @@ export function ActionAuditTrail({
                 colSpan={6}
                 message={
                   searchQuery || statusFilter !== 'all'
-                    ? locale === 'he' ? 'לא נמצאו פעולות התואמות לחיפוש' : 'No actions matching your filter'
-                    : locale === 'he' ? 'אין פעולות אוטומציה בהיסטוריה' : 'No automation actions in audit log'
+                    ? t('emptyFiltered')
+                    : t('emptyNone')
                 }
               />
             ) : (
@@ -316,7 +317,7 @@ export function ActionAuditTrail({
                           ) : (
                             <RotateCcw className="h-3.5 w-3.5" />
                           )}
-                          <span>{locale === 'he' ? 'בטל שינוי' : '1-Click Rollback'}</span>
+                          <span>{t('rollbackButton')}</span>
                         </button>
                       )}
                     </TableCell>

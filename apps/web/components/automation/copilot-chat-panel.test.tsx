@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import heMessages from '@/messages/he.json';
+import { copilotEngineTranslator } from '@/tests/e2e/helpers/test-harness';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { CopilotChatPanel } from './copilot-chat-panel';
 
@@ -119,4 +121,49 @@ describe('CopilotChatPanel Component', () => {
 
     fetchSpy.mockRestore();
   });
+
+  /**
+   * The welcome message, the chips and the engine's replies all moved from Hebrew literals in
+   * code to he.json. A Hebrew chip's query must still hit the intent it is labelled with.
+   */
+  it('greets in Hebrew and a Hebrew chip still triggers its intent, with the reply from he.json', async () => {
+    const panel = heMessages.CopilotChatPanel;
+    renderWithIntl(
+      <CopilotChatPanel targets={[{ id: 'tgt-1', label: 'EasySign Brand', dailyBudgetUsd: 150, status: 'enabled' }]} />,
+      { locale: 'he' },
+    );
+
+    expect(screen.getByText(panel.welcomeMessage)).toBeInTheDocument();
+    expect(screen.getByTitle(panel.clearChat)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: panel.chipScaleBudgetLabel }));
+    expect(screen.getByText(panel.chipScaleBudgetQuery)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('proposal-card')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText(
+        copilotEngineTranslator('he').format('budgetChangeProposed', {
+          campaign: 'EasySign Brand',
+          before: '150',
+          after: '250',
+        }),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('routes every other Hebrew chip to a real branch rather than the fallback', async () => {
+    const panel = heMessages.CopilotChatPanel;
+    const fallback = copilotEngineTranslator('he').format('fallback');
+    for (const label of [panel.chipTopAdsLabel, panel.chipNewCampaignLabel, panel.chipRebalanceLabel]) {
+      const { unmount } = renderWithIntl(<CopilotChatPanel initialMessages={[]} />, { locale: 'he' });
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      await waitFor(() => expect(screen.getAllByTestId('message-assistant')).toHaveLength(1));
+      const reply = screen.getByTestId('message-assistant').textContent ?? '';
+      expect({ label, isFallback: reply.includes(fallback) }).toEqual({ label, isFallback: false });
+      unmount();
+    }
+  });
+
 });
