@@ -15,6 +15,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0",
     "@growthos/firebase-orm-models": "workspace:*",
     "@growthos/shared": "workspace:*",
     "@growthos/tracking-sdk": "workspace:*",
