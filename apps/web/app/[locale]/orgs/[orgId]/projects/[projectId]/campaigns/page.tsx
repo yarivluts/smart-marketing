@@ -1,6 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { can } from '@growthos/shared';
+import { CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -119,7 +120,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
   );
 
   return (
-    <main className="container mx-auto flex max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <AdsPerformanceDashboard
         orgId={orgId}
         projectId={projectId}
@@ -130,6 +131,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
         connections={connections}
         canExecute={canExecute}
         spendOutcome={spendOutcome}
+        spendWindowDays={CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS}
       />
     </main>
   );

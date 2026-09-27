@@ -41,7 +41,7 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
 
   const spendSubtext =
     summary.metaSpendUsd !== null && summary.googleSpendUsd !== null
-      ? `Meta: $${summary.metaSpendUsd.toLocaleString()} · Google: $${summary.googleSpendUsd.toLocaleString()}`
+      ? t('spendSplitLine', { meta: summary.metaSpendUsd.toLocaleString(), google: summary.googleSpendUsd.toLocaleString() })
       : undefined;
 
   return (
@@ -103,7 +103,7 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         value={summary.blendedCpaUsd === null ? noData : `$${summary.blendedCpaUsd.toFixed(2)}`}
         icon={Target}
         subtext={
-          summary.totalConversions === null ? undefined : `${summary.totalConversions} total conv.`
+          summary.totalConversions === null ? undefined : t('conversionsCount', { count: summary.totalConversions })
         }
       />
 
@@ -114,7 +114,7 @@ export function AdsKpiScorecards({ summary, className }: AdsKpiScorecardsProps):
         icon={Layers}
         progress={activeProgress}
         targetHint={t('liveDeliveryCount', { count: summary.activeCampaignsCount })}
-        subtext={`${activeProgress}% active`}
+        subtext={t('activeSharePct', { percent: activeProgress })}
       />
     </div>
   );

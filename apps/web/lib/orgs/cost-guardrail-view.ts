@@ -136,3 +136,50 @@ export function summariseLoggedCost(entries: readonly QueryCostLogEntryView[]): 
     isPartial: withCost.length > 0 && withCost.length < entries.length,
   };
 }
+
+export interface CostLogDay {
+  /** UTC calendar day, `YYYY-MM-DD`. */
+  day: string;
+  executed: number;
+  blocked_quota_exceeded: number;
+  warehouse_not_configured: number;
+  /** Sum of the day's estimates; entries without one add nothing (see {@link summariseLoggedCost}). */
+  estimatedCostUsd: number;
+}
+
+export interface CostLogBreakdown {
+  byOutcome: Record<QueryCostLogOutcome, number>;
+  /** Attempts per UTC day that has any, oldest first. */
+  byDay: CostLogDay[];
+  /** How often each metric definition was queried across the entries, most frequent first. */
+  topDefinitions: { definition: string; count: number }[];
+}
+
+/** Shapes the listed cost-log entries for the page's charts - over exactly the entries listed. */
+export function breakdownCostLog(entries: readonly QueryCostLogEntryView[]): CostLogBreakdown {
+  const byOutcome: Record<QueryCostLogOutcome, number> = { executed: 0, blocked_quota_exceeded: 0, warehouse_not_configured: 0 };
+  const byDay = new Map<string, CostLogDay>();
+  const definitions = new Map<string, number>();
+  for (const entry of entries) {
+    byOutcome[entry.outcome] += 1;
+    const day = entry.executedAt.slice(0, 10);
+    const row = byDay.get(day) ?? { day, executed: 0, blocked_quota_exceeded: 0, warehouse_not_configured: 0, estimatedCostUsd: 0 };
+    row[entry.outcome] += 1;
+    row.estimatedCostUsd += entry.estimatedCostUsd ?? 0;
+    byDay.set(day, row);
+    for (const definition of Object.values(entry.definitionRefs)) {
+      definitions.set(definition, (definitions.get(definition) ?? 0) + 1);
+    }
+  }
+  return {
+    byOutcome,
+    byDay: [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day)),
+    topDefinitions: [...definitions.entries()].map(([definition, count]) => ({ definition, count })).sort((a, b) => b.count - a.count || a.definition.localeCompare(b.definition)),
+  };
+}
+
+/** Today's quota use as a whole percentage of the limit, capped at 100; 0 when the limit is 0. */
+export function quotaUsagePct(status: { attemptedToday: number; limit: number }): number {
+  if (status.limit <= 0) return 0;
+  return Math.min(100, Math.round((status.attemptedToday / status.limit) * 100));
+}

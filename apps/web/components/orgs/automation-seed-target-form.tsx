@@ -121,7 +121,8 @@ export function AutomationSeedTargetForm({ orgId, projectId, connections }: Auto
           <option value="">{t('connectionNoneOption')}</option>
           {connections.map((connection) => (
             <option key={connection.id} value={connection.id}>
-              {t('connectionOptionLabel', { label: connection.label, tier: t(TIER_LABEL_KEYS[connection.tier]) })}
+              {/* An attachment written before write tiers existed carries none; name it without inventing one. */}
+              {TIER_LABEL_KEYS[connection.tier] ? t('connectionOptionLabel', { label: connection.label, tier: t(TIER_LABEL_KEYS[connection.tier]) }) : connection.label}
             </option>
           ))}
         </select>
