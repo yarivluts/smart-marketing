@@ -123,7 +123,10 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
   // When the last clip finishes, refresh the server parts of the page (pipeline stage, usage).
   const wasGenerating = React.useRef(generating);
   React.useEffect(() => {
-    if (wasGenerating.current && !generating) router.refresh();
+    if (wasGenerating.current && !generating) {
+      setMessage((current) => (current?.tone === 'ok' ? null : current));
+      router.refresh();
+    }
     wasGenerating.current = generating;
   }, [generating, router]);
 
@@ -165,7 +168,7 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
 
   const segments = buildSceneTimeline(scenes);
   const overLimit = cost.seconds > videoSecondsLeft;
-  const frameClass = format === 'vertical' ? 'aspect-[9/16] w-full max-w-[13rem]' : 'aspect-video w-full max-w-md';
+  const frameClass = format === 'vertical' ? 'aspect-[9/16] w-44' : 'aspect-video w-full max-w-sm md:w-80';
   const clipUrl = (clipId: string) => `${base}/clips/${clipId}/media`;
 
   return (
@@ -177,7 +180,7 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
           </h2>
           <p className="max-w-2xl text-sm text-muted-foreground">{t('video.description')}</p>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex max-w-xs flex-col items-end gap-1 text-end">
           <button
             type="button"
             onClick={() => act('all', '/render-all', undefined, t('video.started'))}
@@ -185,7 +188,7 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
             className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
           >
             {pending === 'all' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Clapperboard className="h-4 w-4" aria-hidden="true" />}
-            {t('video.renderAll', { seconds: cost.seconds })}
+            {cost.seconds > 0 ? t('video.renderAll', { seconds: cost.seconds }) : t('video.renderAllIdle')}
           </button>
           <span className={cn('text-xs', overLimit ? 'text-destructive' : 'text-muted-foreground')} data-testid="ad-studio-render-all-cost">
             {cost.seconds === 0
@@ -236,7 +239,9 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
         </div>
         <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums" dir="ltr" aria-hidden="true">
           {[0, 15, 30, 45, AD_STUDIO_MAX_TOTAL_SECONDS].map((mark) => (
-            <span key={mark}>{t('secondsShort', { seconds: mark })}</span>
+            <span key={mark} dir="auto">
+              {t('secondsShort', { seconds: mark })}
+            </span>
           ))}
         </div>
       </div>
@@ -299,7 +304,7 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
                     className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted disabled:opacity-50"
                   >
                     {pending === `render:${scene.id}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> : <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />}
-                    {history.length > 0 ? t('video.rerender', { seconds: scene.durationSeconds }) : t('video.render', { seconds: scene.durationSeconds })}
+                    {readyClips.length > 0 || lastFailed ? t('video.rerender',{ seconds: scene.durationSeconds }) : t('video.render', { seconds: scene.durationSeconds })}
                   </button>
                   {videoAvailable && !inFlight && scene.durationSeconds > videoSecondsLeft ? <span className="text-xs text-destructive">{t('video.overLimitScene')}</span> : null}
                 </div>
@@ -387,9 +392,15 @@ export function VideoStudio({ orgId, projectId, briefId, scenes, format, languag
                     ) : null}
                   </div>
                 ) : (
-                  <div className={cn('flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-muted/30 text-xs text-muted-foreground', frameClass)}>
-                    <Film className="h-6 w-6" aria-hidden="true" />
-                    {t('video.noClip')}
+                  <div
+                    className={cn(
+                      'flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-2 text-center text-xs',
+                      inFlight ? 'border-primary/40 bg-primary/5 text-primary' : 'border-border bg-muted/30 text-muted-foreground',
+                      frameClass,
+                    )}
+                  >
+                    {inFlight ? <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" /> : <Film className="h-6 w-6" aria-hidden="true" />}
+                    {inFlight ? t('video.legend.generating') : t('video.noClip')}
                   </div>
                 )}
               </div>

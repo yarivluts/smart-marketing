@@ -100,15 +100,18 @@ describe('running ffmpeg (spawn mocked)', () => {
     const spawnImpl = fakeSpawn((args) => {
       if (!args.includes('-filter_complex')) {
         const file = args[args.indexOf('-i') + 1];
+        if (file === 'out.mp4') return { code: 1, stderr: 'Duration: 00:00:10.02,\n Stream #0:0: Video: h264\n Stream #0:1: Audio: aac' };
         return {
           code: 1,
           stderr: file === 'a.mp4' ? 'Duration: 00:00:04.00,\n Stream #0:0: Video: h264\n Stream #0:1: Audio: aac' : 'Duration: 00:00:09.00,\n Stream #0:0: Video: h264',
         };
       }
-      return { code: 0, stderr: 'time=00:00:10.00 bitrate' };
+      return { code: 0, stderr: 'time=00:00:09.96 bitrate' };
     });
     const result = await concatClips({ clips: [{ file: 'a.mp4', seconds: 5 }, { file: 'b.mp4', seconds: 6 }], output: 'out.mp4', format: 'vertical', runner: runnerWith(spawnImpl) });
-    expect(result).toEqual({ durationSeconds: 10 });
+    // Measured from the written file, not the trailing progress mark.
+    expect(result).toEqual({ durationSeconds: 10.02 });
+    expect(spawnImpl.calls).toHaveLength(4);
     const concatArgs = spawnImpl.calls[2];
     const filter = concatArgs[concatArgs.indexOf('-filter_complex') + 1];
     expect(filter).toContain('[0:v:0]trim=duration=4,');

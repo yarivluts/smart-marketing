@@ -3828,7 +3828,8 @@
       "clipPlayer": "Scene {number}, version {version}",
       "sceneSeconds": "{seconds}s",
       "started": "Started. Clips appear here as they finish.",
-      "assembled": "The video is assembled."
+      "assembled": "The video is assembled.",
+      "renderAllIdle": "Render all scenes"
     },
     "clipFailure": {
       "not_configured": "no video model is configured",

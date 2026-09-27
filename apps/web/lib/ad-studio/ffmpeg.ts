@@ -209,9 +209,10 @@ export async function concatClips(params: { clips: readonly { file: string; seco
   }
   const { code, stderr } = await runFfmpeg(buildConcatArgs({ inputs, output: params.output, format: params.format }), params.runner);
   if (code !== 0) throw new FfmpegFailedError(`ffmpeg exited with code ${code}.`, stderr.slice(-2000));
+  // The container's own length is the most accurate; the last progress mark trails it slightly.
   const planned = inputs.reduce((sum, input) => sum + input.seconds, 0);
-  const encoded = parseEncodedSeconds(stderr);
-  return { durationSeconds: Math.round(Math.min(encoded ?? planned, AD_STUDIO_MAX_TOTAL_SECONDS) * 100) / 100 };
+  const measured = (await probeMedia(params.output, params.runner).catch(() => null))?.durationSeconds ?? parseEncodedSeconds(stderr) ?? planned;
+  return { durationSeconds: Math.round(Math.min(measured, AD_STUDIO_MAX_TOTAL_SECONDS) * 100) / 100 };
 }
 
 let availability: { path: string; result: Promise<boolean> } | null = null;

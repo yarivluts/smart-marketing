@@ -40,7 +40,9 @@ export function SceneTimeline({ scenes, activeSceneId }: { scenes: readonly Pick
       </div>
       <div className="flex justify-between text-[10px] text-muted-foreground tabular-nums" dir="ltr" aria-hidden="true">
         {[0, 15, 30, 45, 60].map((mark) => (
-          <span key={mark}>{t('secondsShort', { seconds: mark })}</span>
+          <span key={mark} dir="auto">
+            {t('secondsShort', { seconds: mark })}
+          </span>
         ))}
       </div>
     </div>
