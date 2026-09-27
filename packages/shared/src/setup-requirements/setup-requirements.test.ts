@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildInstallationGapsOutput,
   buildSetupHealthOutput,
+  customerBackfillRecommendation,
+  customerEntitySchemaNames,
   classifySchemaForSetupRequirement,
   deriveSetupHealth,
   selectSetupFocusEnvironment,
@@ -318,5 +320,121 @@ describe('B2: rendered steps only point at the deployment they came from', () =>
         expect(text).not.toMatch(/https?:\/\//);
       }
     }
+  });
+});
+
+describe('customer backfill: recommended from coverage, not from whether any entity ever arrived', () => {
+  const dev = [{ id: 'env-dev', name: 'dev' }];
+  const signupAccepted = observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-27T08:00:00.000Z' });
+  const customerAccepted = observation({ schemaName: 'customer', kind: 'entity', lastAcceptedAt: '2026-09-27T08:00:00.000Z' });
+  const ingestHealthUrl = `https://web.example.test/en/orgs/${CONTEXT.organizationId}/projects/${CONTEXT.projectId}/ingest-health`;
+
+  function outputs(observations: SetupSchemaObservation[], coverage?: { eventCustomers: number; withCustomerRecord: number } | null) {
+    const report = deriveSetupHealth(dev, observations);
+    const focus = report.environments[0];
+    return {
+      focus,
+      gaps: buildInstallationGapsOutput(report, focus, CONTEXT, coverage),
+      health: buildSetupHealthOutput(report, focus, CONTEXT, coverage),
+    };
+  }
+
+  it('the rollout case: entities arrive for new signups, yet 95 of 100 customers in events have no record', () => {
+    const { focus, gaps, health } = outputs([signupAccepted, customerAccepted], { eventCustomers: 100, withCustomerRecord: 5 });
+    // The customer requirement reads connected - which is exactly why "never arrived" missed this.
+    expect(focus.requirements.find((result) => result.requirementId === 'customer_profiles')!.status).toBe('connected');
+    expect(customerBackfillRecommendation(focus, { eventCustomers: 100, withCustomerRecord: 5 })).toEqual({
+      basis: 'coverage',
+      eventCustomers: 100,
+      withCustomerRecord: 5,
+      missing: 95,
+      coveragePercent: 5,
+    });
+    for (const output of [gaps, health]) {
+      expect(output.customer_coverage).toMatchObject({ event_customers: 100, with_customer_record: 5, coverage_percent: 5, threshold_percent: 90 });
+      expect(output.customer_backfill!.missing_customers).toBe(95);
+      expect(output.customer_backfill!.reason).toMatch(/^95 of 100 customers seen in dev events \(by properties\.customer_id\) have no customer record: 5% coverage, below 90%/);
+      expect(output.customer_backfill!.how_to_fix.map((step) => step.web_page_url ?? step.mcp_tool)).toEqual([ingestHealthUrl, 'request_backfill']);
+    }
+  });
+
+  it('full coverage (EasySign dev today) recommends nothing', () => {
+    const { gaps, health } = outputs([signupAccepted, customerAccepted], { eventCustomers: 12, withCustomerRecord: 12 });
+    expect(gaps.customer_backfill).toBeNull();
+    expect(health.customer_backfill).toBeNull();
+    expect(gaps.customer_coverage).toMatchObject({ event_customers: 12, with_customer_record: 12, coverage_percent: 100 });
+  });
+
+  it('the threshold is 90%, floored: 90 of 100 passes, 899 of 1000 does not and shows 89%', () => {
+    expect(outputs([signupAccepted, customerAccepted], { eventCustomers: 100, withCustomerRecord: 90 }).gaps.customer_backfill).toBeNull();
+    const below = outputs([signupAccepted, customerAccepted], { eventCustomers: 1000, withCustomerRecord: 899 }).gaps;
+    expect(below.customer_backfill!.reason).toMatch(/^101 of 1000 customers .* 89% coverage/);
+  });
+
+  it('no customers in events means nothing to backfill, whatever else is flowing', () => {
+    expect(outputs([signupAccepted], { eventCustomers: 0, withCustomerRecord: 0 }).gaps.customer_backfill).toBeNull();
+  });
+
+  it('with coverage, the customer entity gap itself leads with the backfill, then the usual steps', () => {
+    const gap = outputs([signupAccepted], { eventCustomers: 40, withCustomerRecord: 0 }).gaps.gaps.find((entry) => entry.requirement_id === 'customer_profiles')!;
+    expect(gap.how_to_fix[0].action).toMatch(/^40 of 40 customers seen in dev events/);
+    expect(gap.how_to_fix.map((step) => step.mcp_tool ?? step.api_endpoint ?? step.web_page_url)).toEqual([
+      ingestHealthUrl,
+      'request_backfill',
+      'register_schema',
+      'POST https://api.example.test/v1/ingest/entities',
+    ]);
+  });
+
+  it('without the warehouse: falls back to "events accepted, no customer entity ever", naming the events, and says why no count', () => {
+    const { focus, gaps } = outputs([signupAccepted], null);
+    expect(customerBackfillRecommendation(focus, null)).toEqual({ basis: 'no_entity_yet', eventSchemas: ['signup'] });
+    expect(gaps.customer_coverage).toBeNull();
+    expect(gaps.customer_coverage_note).toMatch(/needs the warehouse/);
+    expect(gaps.customer_backfill!.reason).toMatch(/^Events are already accepted in dev \("signup"\)/);
+    expect(gaps.customer_backfill).not.toHaveProperty('missing_customers');
+    // B27 still holds for a registered but silent customer entity.
+    const silent = outputs([signupAccepted, observation({ schemaName: 'customer', kind: 'entity' })], null).gaps.gaps.find((entry) => entry.requirement_id === 'customer_profiles')!;
+    expect(silent.how_to_fix.map((step) => step.mcp_tool ?? step.web_page_url ?? step.api_endpoint)).toEqual([ingestHealthUrl, 'request_backfill', 'POST https://api.example.test/v1/ingest/entities']);
+  });
+
+  it('without the warehouse, an entity that has arrived hides the hint (no count to go on), and no events means no hint', () => {
+    expect(outputs([signupAccepted, customerAccepted], null).gaps.customer_backfill).toBeNull();
+    expect(outputs([], null).gaps.customer_backfill).toBeNull();
+  });
+
+  it('rejected customer records lead with their reasons, never a backfill that would be rejected too', () => {
+    const rejected = observation({ schemaName: 'customer', kind: 'entity', openQuarantinedCount: 1, quarantineReasons: ['missing_field:id'] });
+    for (const coverage of [null, { eventCustomers: 100, withCustomerRecord: 0 }]) {
+      const { gaps } = outputs([signupAccepted, rejected], coverage);
+      expect(gaps.customer_backfill).toBeNull();
+      const gap = gaps.gaps.find((entry) => entry.requirement_id === 'customer_profiles')!;
+      expect(gap.status).toBe('error');
+      expect(gap.how_to_fix.some((step) => step.mcp_tool === 'request_backfill')).toBe(false);
+    }
+  });
+
+  it('only accepted events count as evidence in the fallback, not measures or rejected events', () => {
+    const report = deriveSetupHealth(dev, [
+      observation({ schemaName: 'ad_spend', kind: 'measure', lastAcceptedAt: '2026-09-27T08:00:00.000Z' }),
+      observation({ schemaName: 'signup', kind: 'event', openQuarantinedCount: 2 }),
+    ]);
+    expect(customerBackfillRecommendation(report.environments[0], null)).toBeNull();
+  });
+});
+
+describe('customerEntitySchemaNames', () => {
+  it('lists the entity schemas behind the customer requirement, whether accepted, rejected or registered but silent', () => {
+    const report = deriveSetupHealth(
+      [{ id: 'env-dev', name: 'dev' }],
+      [
+        observation({ schemaName: 'customer', kind: 'entity', lastAcceptedAt: '2026-09-27T08:00:00.000Z' }),
+        observation({ schemaName: 'account', kind: 'entity', openQuarantinedCount: 1 }),
+        observation({ schemaName: 'workspace', kind: 'entity' }),
+        observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-27T08:00:00.000Z' }),
+      ],
+    );
+    expect(customerEntitySchemaNames(report.environments[0])).toEqual(['account', 'customer', 'workspace']);
+    expect(customerEntitySchemaNames(deriveSetupHealth([{ id: 'env-dev', name: 'dev' }], []).environments[0])).toEqual([]);
   });
 });

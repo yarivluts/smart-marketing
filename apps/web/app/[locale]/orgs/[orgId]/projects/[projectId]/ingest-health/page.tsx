@@ -1,12 +1,13 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { can } from '@growthos/shared';
+import { can, customerEntitySchemaNames } from '@growthos/shared';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import {
   evaluateProjectSetupHealth,
   getWarehouseFreshnessForProject,
+  getCustomerEntityCoverage,
   listFailedPipelineMessagesForProject,
   listOrchestrationRunsForProject,
   listOrgProjects,
@@ -103,8 +104,18 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
   // The backfill loop (resend pre-existing records) for the picked environment. Configuring it
   // needs project.configure; ingest.write holders who reach this page can follow its progress.
   const canConfigureBackfill = can(bindings, { type: 'user', id: user.id }, 'project.configure', { orgId, projectId });
-  const [backfillOverview, schemaDefsForBackfill] =
-    environmentId !== undefined ? await Promise.all([getProjectBackfillOverview(orgId, projectId, environmentId), listSchemaDefinitionsForProject(orgId, projectId)]) : [null, []];
+  const setupFocus = setupHealth?.environments[0];
+  const [backfillOverview, schemaDefsForBackfill, customerCoverage] =
+    environmentId !== undefined
+      ? await Promise.all([
+          getProjectBackfillOverview(orgId, projectId, environmentId),
+          listSchemaDefinitionsForProject(orgId, projectId),
+          // How many customers in events have a customer record - what the backfill hint is based on.
+          setupFocus
+            ? getCustomerEntityCoverage({ organizationId: orgId, projectId, environmentId, customerEntitySchemas: customerEntitySchemaNames(setupFocus) })
+            : Promise.resolve(null),
+        ])
+      : [null, [], null];
   const backfillSchemas = [...new Map(schemaDefsForBackfill.filter((def) => def.status === 'active' && def.kind !== 'measure').map((def) => [`${def.kind}:${def.name}`, { kind: def.kind, name: def.name }])).values()];
 
   const now = Date.now();
@@ -212,7 +223,12 @@ export default async function IngestHealthPage({ params }: PageProps): Promise<R
       </ChartCard>
 
       {environmentId !== undefined && setupHealth?.environments[0] ? (
-        <SetupHealthPanel health={setupHealth.environments[0]} environmentLabel={selectedEnvironmentLabel} />
+        <SetupHealthPanel
+          health={setupHealth.environments[0]}
+          environmentLabel={selectedEnvironmentLabel}
+          coverage={customerCoverage?.status === 'ok' ? customerCoverage.coverage : null}
+          {...(backfillOverview && canConfigureBackfill ? { backfillHref: '#backfill-heading' } : {})}
+        />
       ) : null}
 
       {environmentId !== undefined && backfillOverview && (canConfigureBackfill || backfillOverview.endpoint) ? (

@@ -42,7 +42,7 @@ test.describe('Audit log (KAN-44): entries render, chain verifies, quoted summar
 
     await page.goto(`/en/orgs/${orgId}/audit-log`);
     await expect(page.getByText('Chain verified')).toBeVisible();
-    const enSummary = page.locator('span.font-medium').first();
+    const enSummary = page.getByTestId('audit-entry-summary').first();
     await expect(enSummary).toHaveText('Created board "Quote Test Board"');
     await expect(enSummary).toHaveAttribute('dir', 'ltr');
 
@@ -53,7 +53,7 @@ test.describe('Audit log (KAN-44): entries render, chain verifies, quoted summar
     // just the attribute — since bidi reordering doesn't change `textContent`, only visual order,
     // so this assertion alone wouldn't have caught the original bug without the `dir` check above.
     await page.goto(`/he/orgs/${orgId}/audit-log`);
-    const heSummary = page.locator('span.font-medium').first();
+    const heSummary = page.getByTestId('audit-entry-summary').first();
     await expect(heSummary).toHaveText('Created board "Quote Test Board"');
     await expect(heSummary).toHaveAttribute('dir', 'ltr');
   });

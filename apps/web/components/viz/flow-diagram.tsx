@@ -16,6 +16,12 @@ export interface FlowNodeSpec {
   value?: string;
   status?: VizStatus;
   href?: string;
+  /**
+   * Pins the node to a grid cell instead of the automatic column-by-depth layout - e.g. to wrap a
+   * long linear journey onto two rows so it stays readable. Used only when both are set.
+   */
+  column?: number;
+  row?: number;
 }
 
 export interface FlowEdgeSpec {
@@ -71,6 +77,11 @@ export function layoutFlow(nodes: readonly FlowNodeSpec[], edges: readonly FlowE
   for (const [column, ids] of columns) {
     const offset = (tallest - ids.length) / 2;
     ids.forEach((id, index) => positions.set(id, { column, row: offset + index }));
+  }
+  for (const node of nodes) {
+    if (node.column !== undefined && node.row !== undefined) {
+      positions.set(node.id, { column: node.column, row: node.row });
+    }
   }
   return positions;
 }

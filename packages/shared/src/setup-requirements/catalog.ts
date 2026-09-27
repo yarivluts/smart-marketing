@@ -174,6 +174,24 @@ export const SETUP_REJECTED_RECORDS_RECOMMENDATION: SetupRecommendation = {
   action: "Open Ingest health for this environment to read each rejected record's reasons, fix the schema (evolve_schema) or the payload, then replay the record.",
 };
 
+/**
+ * Added ahead of the customer-entity steps when events are already accepted in that environment:
+ * the customers exist in the integrator's system, so the fastest fix is to have it resend the
+ * existing records once (the backfill loop), and then keep upserting on change.
+ */
+export const SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS: readonly SetupRecommendation[] = [
+  {
+    kind: 'web_page',
+    path: '/orgs/:orgId/projects/:projectId/ingest-health',
+    action: 'Open Backfill on Ingest health, register the integrator endpoint that resends existing records, and request a backfill of the customer entity.',
+  },
+  {
+    kind: 'mcp_tool',
+    tool: 'request_backfill',
+    action: 'Or over MCP: set_backfill_endpoint once for this environment, then request_backfill and follow it with get_backfill_status until it completes.',
+  },
+];
+
 export function getSetupRequirement(id: SetupRequirementId): SetupRequirement {
   const requirement = SETUP_REQUIREMENTS.find((candidate) => candidate.id === id);
   if (!requirement) {
@@ -184,5 +202,9 @@ export function getSetupRequirement(id: SetupRequirementId): SetupRequirement {
 
 /** Every recommendation the tools can return, for the artifact-existence test. */
 export function allSetupRecommendations(): SetupRecommendation[] {
-  return [...SETUP_REQUIREMENTS.flatMap((requirement) => requirement.recommendations), SETUP_REJECTED_RECORDS_RECOMMENDATION];
+  return [
+    ...SETUP_REQUIREMENTS.flatMap((requirement) => requirement.recommendations),
+    SETUP_REJECTED_RECORDS_RECOMMENDATION,
+    ...SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS,
+  ];
 }

@@ -5,6 +5,7 @@ import {
   collectSetupObservations,
   DEFAULT_EVENT_VOLUME_WINDOW_DAYS,
   evaluateProjectSetupHealth,
+  getCustomerEntityCoverage,
   getEventVolumeOverviewForProject,
   listTrackingAlertsForProject,
   MAX_EVENT_VOLUME_RECORDS_PER_SCHEMA,
@@ -13,8 +14,10 @@ import {
 import {
   buildInstallationGapsOutput,
   buildSetupHealthOutput,
+  customerEntitySchemaNames,
   ENVIRONMENTS,
   selectSetupFocusEnvironment,
+  type SetupCustomerCoverage,
   type SetupEnvironmentHealth,
   type SetupHealthReport,
   type SetupOutputContext,
@@ -100,10 +103,25 @@ async function resolveFocusEnvironment(
 async function withFocusEnvironment(
   auth: McpAuthContext,
   args: any,
-  render: (report: SetupHealthReport, focus: SetupEnvironmentHealth) => unknown,
+  render: (report: SetupHealthReport, focus: SetupEnvironmentHealth) => unknown | Promise<unknown>,
 ): Promise<ToolResult> {
   const resolved = await resolveFocusEnvironment(auth, args);
-  return 'error' in resolved ? resolved.error : textResult(render(resolved.report, resolved.focus));
+  return 'error' in resolved ? resolved.error : textResult(await render(resolved.report, resolved.focus));
+}
+
+/**
+ * Customer entity coverage for the focus environment, from the warehouse. Null when it cannot be
+ * read (no warehouse, a failed query, the project's query quota spent): the outputs then say so and
+ * fall back to what ingest alone shows, rather than failing the whole tool.
+ */
+async function readCustomerCoverage(auth: McpAuthContext, focus: SetupEnvironmentHealth): Promise<SetupCustomerCoverage | null> {
+  const result = await getCustomerEntityCoverage({
+    organizationId: auth.organizationId,
+    projectId: auth.projectId,
+    environmentId: focus.environmentId,
+    customerEntitySchemas: customerEntitySchemaNames(focus),
+  });
+  return result.status === 'ok' ? result.coverage : null;
 }
 
 const ingestHealthInputShape = {
@@ -194,11 +212,11 @@ export function registerMcpSetupTools(server: McpServer, auth: McpAuthContext): 
     {
       title: 'Get setup health',
       description:
-        "How far this project's integration is connected: for each setup requirement (landing-page attribution, signups, product usage events, customer entity, billing, ad spend) whether it is connected (accepted records seen), an error (only rejected records, still in quarantine) or a gap (nothing received), in one environment in detail and every environment in summary. Statuses are derived from the ingest records each environment actually accepted or rejected; nothing can be marked connected by hand. Billing counts records from any billing system (a subscription_state_change event, or the Stripe connector). Use audit_installation_gaps for what each gap costs and how to connect it.",
+        "How far this project's integration is connected: for each setup requirement (landing-page attribution, signups, product usage events, customer entity, billing, ad spend) whether it is connected (accepted records seen), an error (only rejected records, still in quarantine) or a gap (nothing received), in one environment in detail and every environment in summary. Statuses are derived from the ingest records each environment actually accepted or rejected; nothing can be marked connected by hand. Billing counts records from any billing system (a subscription_state_change event, or the Stripe connector). Also returns customer_coverage (how many customers seen in events have a customer record, from the warehouse) and customer_backfill when fewer than 90% do. Use audit_installation_gaps for what each gap costs and how to connect it.",
       inputSchema: toolInputSchema(environmentInputShape),
     },
     auditedToolHandler(auth, 'get_setup_health', async (args: any) =>
-      withFocusEnvironment(auth, args, (report, focus) => buildSetupHealthOutput(report, focus, outputContext(auth))),
+      withFocusEnvironment(auth, args, async (report, focus) => buildSetupHealthOutput(report, focus, outputContext(auth), await readCustomerCoverage(auth, focus))),
     ),
   );
 
@@ -207,11 +225,11 @@ export function registerMcpSetupTools(server: McpServer, auth: McpAuthContext): 
     {
       title: 'Audit installation gaps',
       description:
-        "Every setup requirement not yet connected in one environment of this project, each with: why (what was or was not received there, including quarantine reasons for rejected records), impact_summary (which reports stay empty or wrong without it), satisfied_by (which records would connect it), connected_in_other_environments, and how_to_fix - concrete steps naming a real web page URL, ingest API endpoint or MCP tool. Also lists the requirements that are connected and the schemas that connected them. Read-only: it changes nothing.",
+        "Every setup requirement not yet connected in one environment of this project, each with: why (what was or was not received there, including quarantine reasons for rejected records), impact_summary (which reports stay empty or wrong without it), satisfied_by (which records would connect it), connected_in_other_environments, and how_to_fix - concrete steps naming a real web page URL, ingest API endpoint or MCP tool. Also lists the requirements that are connected and the schemas that connected them, customer_coverage, and customer_backfill with steps when fewer than 90% of the customers seen in events have a customer record (typically customers from before the integration went live). Read-only: it changes nothing.",
       inputSchema: toolInputSchema(environmentInputShape),
     },
     auditedToolHandler(auth, 'audit_installation_gaps', async (args: any) =>
-      withFocusEnvironment(auth, args, (report, focus) => buildInstallationGapsOutput(report, focus, outputContext(auth))),
+      withFocusEnvironment(auth, args, async (report, focus) => buildInstallationGapsOutput(report, focus, outputContext(auth), await readCustomerCoverage(auth, focus))),
     ),
   );
 }

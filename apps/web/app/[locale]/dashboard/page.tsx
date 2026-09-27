@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { DashboardContent } from '@/components/auth/dashboard-content';
 import { getServerSession } from '@/lib/auth/get-server-session';
+import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
+import { loadDashboardOverview } from '@/lib/orgs/dashboard-overview';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string }>;
@@ -26,5 +28,9 @@ export default async function DashboardPage({ params }: PageProps): Promise<Reac
     redirect(`/${locale}/login?from=%2Fdashboard`);
   }
 
-  return <DashboardContent />;
+  const { user, memberships, bindings } = await resolveOrgSessionContext(session);
+  const now = Date.now();
+  const overview = await loadDashboardOverview({ userId: user.id, memberships, bindings, now });
+
+  return <DashboardContent email={session.email ?? ''} overview={overview} now={now} />;
 }

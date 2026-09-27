@@ -92,6 +92,8 @@ import {
   listOrgMembersWithProfiles,
   listOrchestrationRunsForProject as listOrchestrationRunsForProjectInOrganization,
   getWarehouseFreshnessForProject as getWarehouseFreshnessForProjectInOrganization,
+  getCustomerEntityCoverage as getCustomerEntityCoverageInOrganization,
+  type CustomerEntityCoverageResult,
   type WarehouseFreshnessResult,
   listOrgPeople as listOrgPeopleInOrganization,
   listOrgProjects as listOrgProjectsForOrganization,
@@ -468,6 +470,17 @@ export async function getWarehouseFreshnessForProject(params: {
 }): Promise<WarehouseFreshnessResult> {
   await ensureFirestoreOrm();
   return getWarehouseFreshnessForProjectInOrganization(params);
+}
+
+/** Customer entity coverage for one environment (setup health's backfill recommendation), from the warehouse. */
+export async function getCustomerEntityCoverage(params: {
+  organizationId: string;
+  projectId: string;
+  environmentId: string;
+  customerEntitySchemas: readonly string[];
+}): Promise<CustomerEntityCoverageResult> {
+  await ensureFirestoreOrm();
+  return getCustomerEntityCoverageInOrganization(params);
 }
 
 export async function verifyAuditLogChainForOrg(organizationId: string): Promise<AuditLogChainVerification> {
