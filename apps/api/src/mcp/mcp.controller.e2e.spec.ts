@@ -13,6 +13,7 @@ import {
   ensureAutomationTargetSeeded,
   ensureUserForFirebaseSession,
   exchangeMcpAuthorizationCode,
+  generateLocalKmsKeyRing,
   getOnboardingState,
   ingestBatch,
   InMemoryTokenBucketRateLimiter,
@@ -20,6 +21,7 @@ import {
   listAuditLogEntriesForOrg,
   listQuarantinedRecordsForProject,
   listSchemaDefinitionsForProject,
+  LocalKmsProvider,
   mintApiKey,
   registerMcpOAuthClient,
   registerMetricDefinition,
@@ -27,6 +29,7 @@ import {
   queryProjectFunnelSteps,
   queryMetrics,
   searchProjectCustomers,
+  setBackfillEndpoint,
   InMemoryMetricQueryResultCache,
   WinEventModel,
   type WarehouseQueryExecutor,
@@ -1440,7 +1443,7 @@ describe('McpController (e2e)', () => {
       type BackfillFields = {
         customer_coverage: unknown;
         customer_coverage_note?: string;
-        customer_backfill: { basis: string; reason: string; how_to_fix: Array<{ web_page_url?: string; mcp_tool?: string }> } | null;
+        customer_backfill: { basis: string; reason: string; how_to_fix: Array<{ action: string; web_page_url?: string; mcp_tool?: string }> } | null;
       };
 
       for (const tool of ['get_setup_health', 'audit_installation_gaps']) {
@@ -1454,6 +1457,35 @@ describe('McpController (e2e)', () => {
           expect.stringContaining(`/orgs/${a.organization.id}/projects/${a.project.id}/ingest-health`),
           'request_backfill',
         ]);
+        // No endpoint yet: registering one is part of the fix.
+        expect(body.customer_backfill?.how_to_fix.map((step) => step.action).join(' ')).toContain('set_backfill_endpoint');
+      }
+
+      // Once the environment has a backfill endpoint, the steps only request the backfill and name it.
+      await registerSchemaDefinition({
+        organizationId: a.organization.id,
+        projectId: a.project.id,
+        kind: 'entity',
+        name: 'customer',
+        fields: [{ name: 'plan', type: 'string', isRequired: false, isPii: false, isIdentityKey: false }],
+        createdByUserId: a.owner.id,
+      });
+      const { keyRing, currentKeyId } = generateLocalKmsKeyRing();
+      await setBackfillEndpoint({
+        organizationId: a.organization.id,
+        projectId: a.project.id,
+        environmentId: a.environmentId,
+        url: 'https://backfill.example.com/hook',
+        schemas: [{ kind: 'entity', name: 'customer' }],
+        kms: new LocalKmsProvider(keyRing, currentKeyId),
+        actedByUserId: a.owner.id,
+        resolver: async () => ['203.0.113.10'],
+      });
+      for (const tool of ['get_setup_health', 'audit_installation_gaps']) {
+        const body = await callJson<BackfillFields>(a.rawKey, tool);
+        const actions = body.customer_backfill!.how_to_fix.map((step) => step.action);
+        expect(actions[0]).toContain('(endpoint registered: https://backfill.example.com/hook).');
+        expect(actions.join(' ')).not.toMatch(/set_backfill_endpoint|register the integrator endpoint/);
       }
     });
 

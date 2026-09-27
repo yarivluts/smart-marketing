@@ -192,6 +192,23 @@ export const SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS: readonly SetupRecommendati
   },
 ];
 
+/**
+ * The same steps once the environment already has a backfill endpoint: registering is done, so
+ * neither step asks for it again (the B27 rule, applied to backfill).
+ */
+export const SETUP_CUSTOMER_BACKFILL_REGISTERED_RECOMMENDATIONS: readonly SetupRecommendation[] = [
+  {
+    kind: 'web_page',
+    path: '/orgs/:orgId/projects/:projectId/ingest-health',
+    action: 'Open Backfill on Ingest health and request a backfill of the customer entity.',
+  },
+  {
+    kind: 'mcp_tool',
+    tool: 'request_backfill',
+    action: 'Or over MCP: request_backfill, then follow it with get_backfill_status until it completes.',
+  },
+];
+
 export function getSetupRequirement(id: SetupRequirementId): SetupRequirement {
   const requirement = SETUP_REQUIREMENTS.find((candidate) => candidate.id === id);
   if (!requirement) {
@@ -206,5 +223,6 @@ export function allSetupRecommendations(): SetupRecommendation[] {
     ...SETUP_REQUIREMENTS.flatMap((requirement) => requirement.recommendations),
     SETUP_REJECTED_RECORDS_RECOMMENDATION,
     ...SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS,
+    ...SETUP_CUSTOMER_BACKFILL_REGISTERED_RECOMMENDATIONS,
   ];
 }

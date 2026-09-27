@@ -438,3 +438,46 @@ describe('customerEntitySchemaNames', () => {
     expect(customerEntitySchemaNames(deriveSetupHealth([{ id: 'env-dev', name: 'dev' }], []).environments[0])).toEqual([]);
   });
 });
+
+describe('customer backfill steps follow whether the environment already has a backfill endpoint (B27 for backfill)', () => {
+  const ENDPOINT = 'https://me-west1-easysign-yariv-test.cloudfunctions.net/growthBackfill';
+  // EasySign dev's probe: 11 customers in events, 9 with a customer record.
+  const report = deriveSetupHealth(
+    [{ id: 'env-dev', name: 'dev' }],
+    [
+      observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-27T12:00:00.000Z' }),
+      observation({ schemaName: 'customer', kind: 'entity', lastAcceptedAt: '2026-09-27T12:00:00.000Z' }),
+    ],
+  );
+  const focus = report.environments[0];
+  const coverage = { eventCustomers: 11, withCustomerRecord: 9 };
+  const steps = (backfillEndpointUrl?: string | null) => buildInstallationGapsOutput(report, focus, { ...CONTEXT, backfillEndpointUrl }, coverage).customer_backfill!.how_to_fix;
+
+  it('registered: only requests the backfill, names the endpoint, and never asks to register or call set_backfill_endpoint', () => {
+    for (const how of [steps(ENDPOINT), buildSetupHealthOutput(report, focus, { ...CONTEXT, backfillEndpointUrl: ENDPOINT }, coverage).customer_backfill!.how_to_fix]) {
+      expect(how[0].action).toMatch(/^2 of 11 customers seen in dev events .* 81% coverage/);
+      expect(how[0].action).toContain(`request a backfill of the customer entity (endpoint registered: ${ENDPOINT}).`);
+      expect(how[1]).toMatchObject({ mcp_tool: 'request_backfill', action: 'Or over MCP: request_backfill, then follow it with get_backfill_status until it completes.' });
+      for (const step of how) {
+        expect(step.action).not.toMatch(/register the integrator endpoint|set_backfill_endpoint/);
+      }
+    }
+  });
+
+  it('not registered (null) or unknown (absent): the steps include registering the endpoint first', () => {
+    for (const how of [steps(null), steps(undefined), steps('')]) {
+      expect(how[0].action).toContain('register the integrator endpoint that resends existing records, and request a backfill of the customer entity.');
+      expect(how[0].action).not.toContain('endpoint registered:');
+      expect(how[1].action).toContain('set_backfill_endpoint once for this environment');
+    }
+  });
+
+  it('the customer entity gap leads with the same endpoint-aware steps', () => {
+    const gapReport = deriveSetupHealth([{ id: 'env-dev', name: 'dev' }], [observation({ schemaName: 'signup', kind: 'event', lastAcceptedAt: '2026-09-27T12:00:00.000Z' })]);
+    const gap = buildInstallationGapsOutput(gapReport, gapReport.environments[0], { ...CONTEXT, backfillEndpointUrl: ENDPOINT }, { eventCustomers: 4, withCustomerRecord: 0 }).gaps.find(
+      (entry) => entry.requirement_id === 'customer_profiles',
+    )!;
+    expect(gap.how_to_fix[0].action).toContain(`(endpoint registered: ${ENDPOINT})`);
+    expect(gap.how_to_fix[1].action).not.toContain('set_backfill_endpoint');
+  });
+});

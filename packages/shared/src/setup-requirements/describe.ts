@@ -1,4 +1,9 @@
-import { getSetupRequirement, SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS, SETUP_REJECTED_RECORDS_RECOMMENDATION } from './catalog';
+import {
+  getSetupRequirement,
+  SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS,
+  SETUP_CUSTOMER_BACKFILL_REGISTERED_RECOMMENDATIONS,
+  SETUP_REJECTED_RECORDS_RECOMMENDATION,
+} from './catalog';
 import type {
   SetupCustomerBackfillRecommendation,
   SetupCustomerCoverage,
@@ -29,6 +34,11 @@ export interface SetupOutputContext {
    * environment alone: other environments' status is then unknown to the output, not "not connected".
    */
   otherEnvironmentsVisible?: boolean;
+  /**
+   * The focus environment's registered backfill endpoint URL; null when none is registered. Absent
+   * when the caller did not look, in which case the backfill steps include registering one.
+   */
+  backfillEndpointUrl?: string | null;
 }
 
 export interface RenderedSetupStep {
@@ -169,7 +179,7 @@ function customerCoverageOutput(focus: SetupEnvironmentHealth, context: SetupOut
           basis: backfill.basis,
           reason: describeCustomerBackfillReason(backfill, focus.environmentName),
           ...(backfill.basis === 'coverage' ? { missing_customers: backfill.missing } : {}),
-          how_to_fix: customerBackfillSteps(backfill, focus.environmentName).map((step) => renderSetupRecommendation(step, context)),
+          how_to_fix: customerBackfillSteps(backfill, focus.environmentName, context).map((step) => renderSetupRecommendation(step, context)),
         }
       : null,
   };
@@ -279,10 +289,16 @@ export function describeCustomerBackfillReason(recommendation: SetupCustomerBack
   return `Events are already accepted in ${environmentName} (${recommendation.eventSchemas.map((name) => `"${name}"`).join(', ')}), so these customers exist in the integrator's system but no customer entity has arrived.`;
 }
 
-/** The backfill steps, the first one leading with why. */
-function customerBackfillSteps(recommendation: SetupCustomerBackfillRecommendation, environmentName: string): SetupRecommendation[] {
-  const [first, ...others] = SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS;
-  return [{ ...first, action: `${describeCustomerBackfillReason(recommendation, environmentName)} ${first.action}` }, ...others];
+/**
+ * The backfill steps, the first one leading with why. With an endpoint already registered for the
+ * environment they only request the backfill and name that endpoint; asking an integrator to
+ * register again what exists would read as "not set up" (the B27 rule).
+ */
+function customerBackfillSteps(recommendation: SetupCustomerBackfillRecommendation, environmentName: string, context: SetupOutputContext): SetupRecommendation[] {
+  const registered = typeof context.backfillEndpointUrl === 'string' && context.backfillEndpointUrl.length > 0;
+  const [first, ...others] = registered ? SETUP_CUSTOMER_BACKFILL_REGISTERED_RECOMMENDATIONS : SETUP_CUSTOMER_BACKFILL_RECOMMENDATIONS;
+  const endpointNote = registered ? ` (endpoint registered: ${context.backfillEndpointUrl})` : '';
+  return [{ ...first, action: `${describeCustomerBackfillReason(recommendation, environmentName)} ${first.action.replace(/\.$/, '')}${endpointNote}.` }, ...others];
 }
 
 /**
@@ -296,12 +312,13 @@ function stepsFor(
   result: SetupRequirementEnvironmentResult,
   environment: SetupEnvironmentHealth,
   backfill: SetupCustomerBackfillRecommendation | null,
+  context: SetupOutputContext,
 ): readonly SetupRecommendation[] {
   if (result.status === 'error') {
     return [SETUP_REJECTED_RECORDS_RECOMMENDATION, ...requirement.recommendations];
   }
   const rest = sendOrRegisterSteps(requirement, result, environment.environmentName);
-  return requirement.id === 'customer_profiles' && backfill ? [...customerBackfillSteps(backfill, environment.environmentName), ...rest] : rest;
+  return requirement.id === 'customer_profiles' && backfill ? [...customerBackfillSteps(backfill, environment.environmentName, context), ...rest] : rest;
 }
 
 function sendOrRegisterSteps(requirement: SetupRequirement, result: SetupRequirementEnvironmentResult, environmentName: string): readonly SetupRecommendation[] {
@@ -326,7 +343,7 @@ export function buildInstallationGapsOutput(report: SetupHealthReport, focus: Se
     .filter((result) => result.status !== 'connected')
     .map((result) => {
       const requirement = getSetupRequirement(result.requirementId);
-      const steps = stepsFor(requirement, result, focus, backfill);
+      const steps = stepsFor(requirement, result, focus, backfill, context);
       return {
         requirement_id: requirement.id,
         title: requirement.title,

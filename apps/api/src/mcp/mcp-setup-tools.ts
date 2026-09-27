@@ -5,6 +5,7 @@ import {
   collectSetupObservations,
   DEFAULT_EVENT_VOLUME_WINDOW_DAYS,
   evaluateProjectSetupHealth,
+  getBackfillEndpoint,
   getCustomerEntityCoverage,
   getEventVolumeOverviewForProject,
   listTrackingAlertsForProject,
@@ -124,6 +125,24 @@ async function readCustomerCoverage(auth: McpAuthContext, focus: SetupEnvironmen
   return result.status === 'ok' ? result.coverage : null;
 }
 
+/**
+ * The output context plus the focus environment's backfill endpoint, so a backfill recommendation
+ * asks to register one only when none exists (and names the one that does).
+ */
+async function focusOutputContext(auth: McpAuthContext, focus: SetupEnvironmentHealth): Promise<SetupOutputContext> {
+  const endpoint = await getBackfillEndpoint(auth.organizationId, auth.projectId, focus.environmentId);
+  return { ...outputContext(auth), backfillEndpointUrl: endpoint?.url ?? null };
+}
+
+async function renderWithCoverage<T>(
+  auth: McpAuthContext,
+  focus: SetupEnvironmentHealth,
+  build: (context: SetupOutputContext, coverage: SetupCustomerCoverage | null) => T,
+): Promise<T> {
+  const [context, coverage] = await Promise.all([focusOutputContext(auth, focus), readCustomerCoverage(auth, focus)]);
+  return build(context, coverage);
+}
+
 const ingestHealthInputShape = {
   ...environmentInputShape,
   window_days: z
@@ -216,7 +235,7 @@ export function registerMcpSetupTools(server: McpServer, auth: McpAuthContext): 
       inputSchema: toolInputSchema(environmentInputShape),
     },
     auditedToolHandler(auth, 'get_setup_health', async (args: any) =>
-      withFocusEnvironment(auth, args, async (report, focus) => buildSetupHealthOutput(report, focus, outputContext(auth), await readCustomerCoverage(auth, focus))),
+      withFocusEnvironment(auth, args, async (report, focus) => renderWithCoverage(auth, focus, (context, coverage) => buildSetupHealthOutput(report, focus, context, coverage))),
     ),
   );
 
@@ -229,7 +248,7 @@ export function registerMcpSetupTools(server: McpServer, auth: McpAuthContext): 
       inputSchema: toolInputSchema(environmentInputShape),
     },
     auditedToolHandler(auth, 'audit_installation_gaps', async (args: any) =>
-      withFocusEnvironment(auth, args, async (report, focus) => buildInstallationGapsOutput(report, focus, outputContext(auth), await readCustomerCoverage(auth, focus))),
+      withFocusEnvironment(auth, args, async (report, focus) => renderWithCoverage(auth, focus, (context, coverage) => buildInstallationGapsOutput(report, focus, context, coverage))),
     ),
   );
 }
