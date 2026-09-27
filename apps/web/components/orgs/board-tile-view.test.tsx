@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { NextIntlClientProvider } from 'next-intl';
-import { BoardTileView } from './board-tile-view';
+import { BoardTileView, defaultTableSortColumn } from './board-tile-view';
 import type { BoardTileRow } from './board-types';
 import messages from '../../messages/en.json';
 import heMessages from '../../messages/he.json';
@@ -664,6 +664,67 @@ describe('BoardTileView', () => {
       renderTile({ kind: 'unavailable', reason: 'query_error', message: 'boom' });
       expect(screen.queryByText(/Data as of/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('BoardTileView table tile: newest first and a row count (B28)', () => {
+  // EasySign's "Landing page x campaign" tile: rows arrive oldest first, so the newest day was
+  // below the fold of the tile's scroll box with nothing saying more rows existed.
+  const DATED_VIEW = {
+    kind: 'table',
+    isEmpty: false,
+    columns: ['bucket_date', 'campaign_id'],
+    rows: [
+      { bucket_date: '2026-09-24', campaign_id: 'b24-probe' },
+      { bucket_date: '2026-09-25', campaign_id: 'browser-e2e' },
+      { bucket_date: '2026-09-26', campaign_id: 'none' },
+      { bucket_date: '2026-09-27', campaign_id: 'sim-meta-09271313' },
+      { bucket_date: '2026-09-27', campaign_id: 'sim-google-09271313' },
+    ],
+    freshness: null,
+  } as unknown as TileRenderView;
+
+  const firstColumn = () =>
+    screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelectorAll('td')[0]?.textContent ?? '');
+
+  it('sorts by the date column newest first when the viewer has not chosen a sort, and says so with the row count', () => {
+    renderTile(DATED_VIEW, { id: 'b28-default', type: 'table' });
+    expect(firstColumn()).toEqual(['2026-09-27', '2026-09-27', '2026-09-26', '2026-09-25', '2026-09-24']);
+    expect(screen.getByRole('columnheader', { name: /bucket_date/ })).toHaveAttribute('aria-sort', 'descending');
+    expect(screen.getByTestId('table-row-count')).toHaveTextContent('5 rows · newest first');
+  });
+
+  it('the first click on the date column turns it oldest first, and the note goes away once the viewer chose', () => {
+    renderTile(DATED_VIEW, { id: 'b28-toggle', type: 'table' });
+    fireEvent.click(screen.getByRole('button', { name: 'Sort by bucket_date' }));
+    expect(firstColumn()).toEqual(['2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-27']);
+    expect(screen.getByTestId('table-row-count')).toHaveTextContent(/^5 rows$/);
+  });
+
+  it("a viewer's saved sort still wins over the default", () => {
+    window.localStorage.setItem('growthos-board-tile-b28-saved-table-prefs', JSON.stringify({ sortColumn: 'campaign_id', sortDirection: 'asc', hiddenColumns: [] }));
+    renderTile(DATED_VIEW, { id: 'b28-saved', type: 'table' });
+    expect(screen.getByRole('columnheader', { name: /campaign_id/ })).toHaveAttribute('aria-sort', 'ascending');
+    expect(screen.getByRole('columnheader', { name: /bucket_date/ })).toHaveAttribute('aria-sort', 'none');
+  });
+
+  it('a table with no date-like column keeps its query order and still shows its row count', () => {
+    renderTile({ kind: 'table', isEmpty: false, columns: ['campaign_id'], rows: [{ campaign_id: 'b' }, { campaign_id: 'a' }], freshness: null } as unknown as TileRenderView, {
+      id: 'b28-undated',
+      type: 'table',
+    });
+    expect(firstColumn()).toEqual(['b', 'a']);
+    expect(screen.getByTestId('table-row-count')).toHaveTextContent(/^2 rows$/);
+  });
+
+  it('picks date-like columns only', () => {
+    expect(defaultTableSortColumn(['campaign_id', 'bucket_date'])).toBe('bucket_date');
+    expect(defaultTableSortColumn(['week', 'spend'])).toBe('week');
+    expect(defaultTableSortColumn(['created_at'])).toBe('created_at');
+    expect(defaultTableSortColumn(['campaign_id', 'update_count', 'landing_page'])).toBeNull();
   });
 });
 
