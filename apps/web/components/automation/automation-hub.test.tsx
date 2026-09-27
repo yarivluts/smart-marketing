@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import React from 'react';
+import { createTranslator } from 'next-intl';
+import heMessages from '@/messages/he.json';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { AutomationHub } from './automation-hub';
 
@@ -110,4 +112,35 @@ describe('AutomationHub Component', () => {
 
     expect(screen.getByTestId('audit-trail-container')).toBeInTheDocument();
   });
+
+  it('renders its Hebrew copy from he.json', () => {
+    const t = createTranslator({ locale: 'he', messages: heMessages, namespace: 'AutomationHub' });
+    renderWithIntl(
+      <AutomationHub
+        orgId="org-1"
+        projectId="proj-1"
+        projectName="EasySign SaaS"
+        killSwitchEngaged={true}
+        proposals={[
+          {
+            id: 'p-1',
+            targetId: 'tgt-1',
+            targetLabel: 'Real Campaign',
+            actionType: 'budget_change',
+            status: 'awaiting_approval',
+          },
+        ]}
+      />,
+      { locale: 'he' },
+    );
+
+    expect(screen.getByTestId('action-hub')).toHaveAttribute('dir', 'rtl');
+    expect(screen.getByText(t('title'))).toBeInTheDocument();
+    expect(screen.getByText(t('killSwitchActive'))).toBeInTheDocument();
+    expect(screen.getByText(t('description', { projectName: 'EasySign SaaS' }))).toBeInTheDocument();
+    expect(screen.getByText(t('pendingProposals'))).toBeInTheDocument();
+    expect(screen.getByText(t('pendingCount', { count: 1 }))).toBeInTheDocument();
+    expect(screen.getByText(t('tabCopilot'))).toBeInTheDocument();
+  });
+
 });

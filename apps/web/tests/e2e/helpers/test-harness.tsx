@@ -1,8 +1,30 @@
 import React from 'react';
 import { render, type RenderResult } from '@testing-library/react';
-import { NextIntlClientProvider } from 'next-intl';
+import { NextIntlClientProvider, createTranslator } from 'next-intl';
 import enMessages from '../../../messages/en.json';
 import heMessages from '../../../messages/he.json';
+import { buildCopilotEngineMessages, type CopilotEngineMessages } from '@/lib/ai/copilot-engine';
+
+/**
+ * A `CopilotEngine` translator over the real message bundle, so engine tests assert against
+ * what users actually read rather than a copy of it.
+ */
+export function copilotEngineTranslator(locale: 'en' | 'he') {
+  const t = createTranslator({
+    locale,
+    messages: locale === 'he' ? heMessages : enMessages,
+    namespace: 'CopilotEngine',
+  });
+  return {
+    format: (key: string, values?: Record<string, string>): string => t(key as never, values as never),
+    raw: (key: string): unknown => t.raw(key as never),
+  };
+}
+
+/** The engine's messages for `locale`, built the same way `CopilotChatPanel` builds them. */
+export function copilotEngineMessages(locale: 'en' | 'he'): CopilotEngineMessages {
+  return buildCopilotEngineMessages(copilotEngineTranslator(locale));
+}
 
 import type {
   CopilotActionProposal,

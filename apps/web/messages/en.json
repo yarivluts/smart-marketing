@@ -3204,5 +3204,144 @@
       "receiving": "Receiving",
       "completed": "Completed"
     }
+  },
+  "CopilotEngine": {
+    "noPerformanceData": "I have no performance data for this project yet, so I cannot rank campaigns or judge which are underperforming. Connect an ad platform, let the warehouse refresh, then ask again.",
+    "noCampaign": "I could not tell which campaign you mean. Name it and I will prepare the change.",
+    "askBudgetAmount": "How much should the daily budget for \"{campaign}\" be?",
+    "budgetChangeProposed": "Prepared a budget change for \"{campaign}\", from ${before}/day to ${after}/day.",
+    "askNewCampaignBudget": "What daily budget should the new campaign start at?",
+    "campaignDraftProposed": "Prepared a campaign draft at ${budget}/day. Review the creatives before approving.",
+    "noFunnelData": "I have no funnel data for this project yet.",
+    "largestDropOff": "The largest drop-off is at \"{stage}\", losing {percent}% of the visitors who reach it. Ask me to draft a retargeting campaign for that stage and name a daily budget.",
+    "pauseProposed": "Ready to pause \"{campaign}\", currently running at ${budget}/day.",
+    "fallback": "How can I help you with your campaigns today?",
+    "intents": {
+      "topAds": [
+        "top ads",
+        "best ads",
+        "top performing",
+        "most profitable",
+        "הכי רווחיות",
+        "המודעות הטובות",
+        "ביצועים מובילים"
+      ],
+      "budgetChange": [
+        "increase budget",
+        "raise budget",
+        "budget to",
+        "הגדל תקציב",
+        "העלה תקציב",
+        "תקציב ל-",
+        "תקציב ל"
+      ],
+      "newCampaign": [
+        "new campaign",
+        "create campaign",
+        "search campaign",
+        "קמפיין חיפוש",
+        "צור קמפיין",
+        "קמפיין חדש"
+      ],
+      "rebalance": [
+        "reallocate",
+        "rebalance",
+        "shift budget",
+        "איזון תקציב",
+        "העבר תקציב",
+        "חלוקת תקציב"
+      ],
+      "funnelDropOff": [
+        "drop-off",
+        "dropoff",
+        "נטישה",
+        "משפך"
+      ],
+      "pause": [
+        "pause",
+        "high cac",
+        "low roas",
+        "עצור",
+        "השהה",
+        "cac גבוה",
+        "ביצועים נמוכים"
+      ]
+    }
+  },
+  "CopilotChatPanel": {
+    "welcomeMessage": "Hello! I'm your AI Growth Copilot. How can I assist you with optimizing campaigns, checking metrics, or reallocating budgets today?",
+    "chipTopAdsLabel": "Top Ads",
+    "chipTopAdsQuery": "What are top ads this week?",
+    "chipScaleBudgetLabel": "Scale Budget",
+    "chipScaleBudgetQuery": "Increase budget for retargeting campaign to $250",
+    "chipNewCampaignLabel": "New Campaign",
+    "chipNewCampaignQuery": "Create a new campaign for lawyers",
+    "chipRebalanceLabel": "Budget Rebalance",
+    "chipRebalanceQuery": "Reallocate Google to Meta budget",
+    "clearChat": "Clear Chat"
+  },
+  "AutomationHub": {
+    "title": "AI Automation Hub",
+    "killSwitchActive": "KILL SWITCH ACTIVE",
+    "guardrailsActive": "Guardrails Active",
+    "description": "Autonomous marketing execution, smart proposals, and instant rollback for {projectName}",
+    "actionsExecuted": "Actions Executed",
+    "pendingProposals": "Pending Proposals",
+    "tabCopilot": "AI Copilot & Proposals",
+    "tabAudit": "Audit Trail",
+    "proactiveProposals": "Proactive Proposals",
+    "pendingCount": "{count} pending"
+  },
+  "ActionAuditTrail": {
+    "searchPlaceholder": "Search audit actions by target or ID...",
+    "filterAll": "All ({count})",
+    "filterExecuted": "Executed",
+    "filterRolledBack": "Rolled Back",
+    "filterPending": "Pending",
+    "columnTarget": "Target / Campaign",
+    "columnActionType": "Action Type",
+    "columnChange": "Change (Diff)",
+    "columnStatus": "Status",
+    "columnExecutedAt": "Executed At",
+    "columnActions": "Actions",
+    "emptyFiltered": "No actions matching your filter",
+    "emptyNone": "No automation actions in audit log",
+    "rollbackButton": "1-Click Rollback"
+  },
+  "ProposalDiffCard": {
+    "approveAndExecute": "1-Click Approve & Execute",
+    "rollbackButton": "1-Click Rollback"
+  },
+  "OnboardingWizardCard": {
+    "stepWorkspace": "Workspace",
+    "stepMetricPack": "Metric Pack",
+    "stepDataSources": "Data Sources",
+    "stepReady": "Ready",
+    "packSaasTitle": "SaaS & Performance Marketing",
+    "packSaasDescription": "Ad spend, signups, CAC, MRR, and conversion velocity",
+    "packEcommerceTitle": "E-Commerce & Retail",
+    "packEcommerceDescription": "ROAS, AOV, checkout drop-offs, and repeat orders",
+    "packLeadGenTitle": "Lead Gen & B2B Services",
+    "packLeadGenDescription": "Qualified leads, CPA, SQL conversion, and pipeline speed",
+    "nameRequired": "Workspace name is required",
+    "stepProgress": "Step {current} of {total}",
+    "workspaceHeading": "Set up your Growth Workspace",
+    "workspaceIntro": "Give your company or project a name and choose your primary industry vertical.",
+    "workspaceNameLabel": "Workspace Name",
+    "verticalLabel": "Industry Vertical",
+    "packHeading": "Choose your Growth Metric Pack",
+    "packIntro": "Pre-configures your KPIs, dashboard charts, and conversion funnel for your business model.",
+    "sourcesHeading": "Connect Data Sources",
+    "sourcesIntro": "Select the marketing and revenue channels to connect for AI optimization.",
+    "sourceConnected": "Connected",
+    "sourceDisabled": "Disabled",
+    "readyHeading": "You're all set to scale!",
+    "readyBody": "Workspace \"{projectName}\" is ready with {count} connected channels. AI Copilot is primed for optimization.",
+    "summaryWorkspace": "Workspace",
+    "summaryVertical": "Vertical",
+    "summaryChannels": "Active Channels",
+    "backButton": "Back",
+    "continueButton": "Continue",
+    "launchButton": "Launch Growth Cockpit"
   }
 }

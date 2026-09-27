@@ -3204,5 +3204,144 @@
       "receiving": "מתקבלת",
       "completed": "הושלמה"
     }
+  },
+  "CopilotEngine": {
+    "noPerformanceData": "אין לי עדיין נתוני ביצועים בפרויקט הזה, ולכן אי אפשר לדרג קמפיינים או לקבוע מי מתפקד פחות טוב. חבר פלטפורמת מודעות, המתן לרענון המחסן, ושאל שוב.",
+    "noCampaign": "לא הצלחתי לזהות לאיזה קמפיין הכוונה. ציין את שמו ואכין את השינוי.",
+    "askBudgetAmount": "לאיזה סכום להגדיר את התקציב היומי של \"{campaign}\"?",
+    "budgetChangeProposed": "הכנתי שינוי תקציב עבור \"{campaign}\", מ-${before} ליום ל-${after} ליום.",
+    "askNewCampaignBudget": "באיזה תקציב יומי להתחיל את הקמפיין החדש?",
+    "campaignDraftProposed": "הכנתי טיוטת קמפיין בתקציב ${budget} ליום. עבור על הקריאייטיבים לפני אישור.",
+    "noFunnelData": "אין לי עדיין נתוני משפך בפרויקט הזה.",
+    "largestDropOff": "הנטישה הגדולה ביותר היא בשלב \"{stage}\", עם {percent}% מהמבקרים שמגיעים אליו. בקש ממני טיוטת קמפיין ריטרגטינג לשלב הזה וציין תקציב יומי.",
+    "pauseProposed": "מוכן להשהות את \"{campaign}\", שרץ כעת בתקציב ${budget} ליום.",
+    "fallback": "במה אוכל לעזור לך עם הקמפיינים היום?",
+    "intents": {
+      "topAds": [
+        "הכי רווחיות",
+        "המודעות הטובות",
+        "ביצועים מובילים",
+        "top ads",
+        "best ads",
+        "top performing",
+        "most profitable"
+      ],
+      "budgetChange": [
+        "הגדל תקציב",
+        "העלה תקציב",
+        "תקציב ל-",
+        "תקציב ל",
+        "increase budget",
+        "raise budget",
+        "budget to"
+      ],
+      "newCampaign": [
+        "קמפיין חיפוש",
+        "צור קמפיין",
+        "קמפיין חדש",
+        "new campaign",
+        "create campaign",
+        "search campaign"
+      ],
+      "rebalance": [
+        "איזון תקציב",
+        "העבר תקציב",
+        "חלוקת תקציב",
+        "reallocate",
+        "rebalance",
+        "shift budget"
+      ],
+      "funnelDropOff": [
+        "נטישה",
+        "משפך",
+        "drop-off",
+        "dropoff"
+      ],
+      "pause": [
+        "עצור",
+        "השהה",
+        "cac גבוה",
+        "ביצועים נמוכים",
+        "pause",
+        "high cac",
+        "low roas"
+      ]
+    }
+  },
+  "CopilotChatPanel": {
+    "welcomeMessage": "שלום! אני ה-AI Growth Copilot שלך. כיצד אוכל לעזור לך לייעל קמפיינים, לבדוק מדדים או לבצע שינויי תקציב היום?",
+    "chipTopAdsLabel": "מודעות מובילות",
+    "chipTopAdsQuery": "אילו מודעות הכי רווחיות השבוע?",
+    "chipScaleBudgetLabel": "הגדל תקציב",
+    "chipScaleBudgetQuery": "הגדל תקציב לקמפיין הריטרגטינג ל-$250",
+    "chipNewCampaignLabel": "קמפיין חדש",
+    "chipNewCampaignQuery": "צור קמפיין חדש לעורכי דין",
+    "chipRebalanceLabel": "איזון תקציבי",
+    "chipRebalanceQuery": "העבר תקציב מגוגל למטא",
+    "clearChat": "נקה שיחה"
+  },
+  "AutomationHub": {
+    "title": "מרכז האוטומציה וה-AI Copilot",
+    "killSwitchActive": "מתג חירום פעיל",
+    "guardrailsActive": "מערכת פעילה ומאובטחת",
+    "description": "ניהול הצעות שינוי, בקרת תקציב אוטומטית ויומן פעולות עבור {projectName}",
+    "actionsExecuted": "פעולות שבוצעו",
+    "pendingProposals": "הצעות ממתינות",
+    "tabCopilot": "AI Copilot & הצעות",
+    "tabAudit": "יומן ביקורת (Audit)",
+    "proactiveProposals": "הצעות פרואקטיביות",
+    "pendingCount": "{count} ממתינות"
+  },
+  "ActionAuditTrail": {
+    "searchPlaceholder": "חפש היסטוריית פעולות לפי יעד או מזהה...",
+    "filterAll": "הכל ({count})",
+    "filterExecuted": "בוצע",
+    "filterRolledBack": "בוטל",
+    "filterPending": "ממתין",
+    "columnTarget": "יעד / קמפיין",
+    "columnActionType": "סוג פעולה",
+    "columnChange": "שינוי (Diff)",
+    "columnStatus": "סטטוס",
+    "columnExecutedAt": "זמן ביצוע",
+    "columnActions": "פעולות",
+    "emptyFiltered": "לא נמצאו פעולות התואמות לחיפוש",
+    "emptyNone": "אין פעולות אוטומציה בהיסטוריה",
+    "rollbackButton": "בטל שינוי"
+  },
+  "ProposalDiffCard": {
+    "approveAndExecute": "הפעל שינוי בלחיצה אחת",
+    "rollbackButton": "בטל שינוי (Rollback)"
+  },
+  "OnboardingWizardCard": {
+    "stepWorkspace": "הגדרת סביבה",
+    "stepMetricPack": "חבילת מדדים",
+    "stepDataSources": "חיבור מקורות",
+    "stepReady": "סיום והפעלה",
+    "packSaasTitle": "SaaS & שיווק ביצועים",
+    "packSaasDescription": "מעקב CAC, LTV, MRR, המרות ומשפך רישום",
+    "packEcommerceTitle": "איקומרס וקניות",
+    "packEcommerceDescription": "ROAS, גודל עגלה ממוצע, ערך חיי לקוח ונטישת עגלה",
+    "packLeadGenTitle": "יצירת לידים ושירותים",
+    "packLeadGenDescription": "עלות לליד מוסמך, פגישות הדגמה ושיעורי סגירה",
+    "nameRequired": "שם סביבת העבודה הוא שדה חובה",
+    "stepProgress": "שלב {current} מתוך {total}",
+    "workspaceHeading": "הגדרת סביבת העבודה שלך",
+    "workspaceIntro": "תן שם לחברה או לפרויקט שלך ובחר את תחום הפעילות העיקרי.",
+    "workspaceNameLabel": "שם סביבת העבודה",
+    "verticalLabel": "ענף פעילות / ורטיקל",
+    "packHeading": "בחר חבילת מדדי צמיחה",
+    "packIntro": "הגדר מראש את ה-KPIs, לוחות המחוונים ומשפך ההמרות המותאם לעסק שלך.",
+    "sourcesHeading": "חבר מקורות נתונים",
+    "sourcesIntro": "בחר את ערוצי הפרסום וההכנסות שברצונך לחבר לאופטימיזציית AI.",
+    "sourceConnected": "מחובר",
+    "sourceDisabled": "לא פעיל",
+    "readyHeading": "הכל מוכן לפעולה!",
+    "readyBody": "סביבת העבודה {projectName} הוגדרה בהצלחה. ה-AI Copilot מוכן לייעל קמפיינים ולזהות הזדמנויות צמיחה.",
+    "summaryWorkspace": "סביבת עבודה",
+    "summaryVertical": "ורטיקל",
+    "summaryChannels": "ערוצים מחוברים",
+    "backButton": "חזור",
+    "continueButton": "המשך",
+    "launchButton": "כניסה ללוח הבקרה"
   }
 }

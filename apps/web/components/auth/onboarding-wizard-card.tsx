@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Sparkles,
   ArrowRight,
@@ -41,6 +41,7 @@ export function OnboardingWizardCard({
   onComplete,
   className,
 }: OnboardingWizardCardProps): React.ReactElement {
+  const t = useTranslations('OnboardingWizardCard');
   const locale = useLocale();
   const isRtl = locale === 'he';
   const router = useRouter();
@@ -54,29 +55,29 @@ export function OnboardingWizardCard({
   const [nameError, setNameError] = React.useState<string | null>(null);
 
   const steps = [
-    { id: 1, label: locale === 'he' ? 'הגדרת סביבה' : 'Workspace' },
-    { id: 2, label: locale === 'he' ? 'חבילת מדדים' : 'Metric Pack' },
-    { id: 3, label: locale === 'he' ? 'חיבור מקורות' : 'Data Sources' },
-    { id: 4, label: locale === 'he' ? 'סיום והפעלה' : 'Ready' },
+    { id: 1, label: t('stepWorkspace') },
+    { id: 2, label: t('stepMetricPack') },
+    { id: 3, label: t('stepDataSources') },
+    { id: 4, label: t('stepReady') },
   ];
 
   const metricPacks = [
     {
       id: 'saas_marketing',
-      title: locale === 'he' ? 'SaaS & שיווק ביצועים' : 'SaaS & Performance Marketing',
-      desc: locale === 'he' ? 'מעקב CAC, LTV, MRR, המרות ומשפך רישום' : 'Ad spend, signups, CAC, MRR, and conversion velocity',
+      title: t('packSaasTitle'),
+      desc: t('packSaasDescription'),
       badge: 'Recommended',
     },
     {
       id: 'ecommerce',
-      title: locale === 'he' ? 'איקומרס וקניות' : 'E-Commerce & Retail',
-      desc: locale === 'he' ? 'ROAS, גודל עגלה ממוצע, ערך חיי לקוח ונטישת עגלה' : 'ROAS, AOV, checkout drop-offs, and repeat orders',
+      title: t('packEcommerceTitle'),
+      desc: t('packEcommerceDescription'),
       badge: 'Popular',
     },
     {
       id: 'lead_gen',
-      title: locale === 'he' ? 'יצירת לידים ושירותים' : 'Lead Gen & B2B Services',
-      desc: locale === 'he' ? 'עלות לליד מוסמך, פגישות הדגמה ושיעורי סגירה' : 'Qualified leads, CPA, SQL conversion, and pipeline speed',
+      title: t('packLeadGenTitle'),
+      desc: t('packLeadGenDescription'),
       badge: 'High Intent',
     },
   ];
@@ -97,7 +98,7 @@ export function OnboardingWizardCard({
   function handleNextStep() {
     if (currentStep === 1) {
       if (!projectName.trim()) {
-        setNameError(locale === 'he' ? 'שם סביבת העבודה הוא שדה חובה' : 'Workspace name is required');
+        setNameError(t('nameRequired'));
         return;
       }
       setNameError(null);
@@ -145,7 +146,7 @@ export function OnboardingWizardCard({
       <div className="mb-8">
         <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground mb-3">
           <span>
-            {locale === 'he' ? `שלב ${currentStep} מתוך ${steps.length}` : `Step ${currentStep} of ${steps.length}`}
+            {t('stepProgress', { current: currentStep, total: steps.length })}
           </span>
           <span className="text-primary font-bold">{Math.round(progressPct)}%</span>
         </div>
@@ -195,19 +196,17 @@ export function OnboardingWizardCard({
         <div data-testid="onboarding-step-1" className="space-y-5 animate-fade-in">
           <div>
             <h2 className="text-xl font-bold text-foreground">
-              {locale === 'he' ? 'הגדרת סביבת העבודה שלך' : 'Set up your Growth Workspace'}
+              {t('workspaceHeading')}
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              {locale === 'he'
-                ? 'תן שם לחברה או לפרויקט שלך ובחר את תחום הפעילות העיקרי.'
-                : 'Give your company or project a name and choose your primary industry vertical.'}
+              {t('workspaceIntro')}
             </p>
           </div>
 
           <div className="space-y-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="ws-name" className="text-xs font-semibold text-foreground">
-                {locale === 'he' ? 'שם סביבת העבודה' : 'Workspace Name'}
+                {t('workspaceNameLabel')}
               </label>
               <Input
                 id="ws-name"
@@ -225,7 +224,7 @@ export function OnboardingWizardCard({
 
             <div className="flex flex-col gap-1.5">
               <label htmlFor="ws-vertical" className="text-xs font-semibold text-foreground">
-                {locale === 'he' ? 'ענף פעילות / ורטיקל' : 'Industry Vertical'}
+                {t('verticalLabel')}
               </label>
               <Input
                 id="ws-vertical"
@@ -245,12 +244,10 @@ export function OnboardingWizardCard({
         <div data-testid="onboarding-step-2" className="space-y-5 animate-fade-in">
           <div>
             <h2 className="text-xl font-bold text-foreground">
-              {locale === 'he' ? 'בחר חבילת מדדי צמיחה' : 'Choose your Growth Metric Pack'}
+              {t('packHeading')}
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              {locale === 'he'
-                ? 'הגדר מראש את ה-KPIs, לוחות המחוונים ומשפך ההמרות המותאם לעסק שלך.'
-                : 'Pre-configures your KPIs, dashboard charts, and conversion funnel for your business model.'}
+              {t('packIntro')}
             </p>
           </div>
 
@@ -309,12 +306,10 @@ export function OnboardingWizardCard({
         <div data-testid="onboarding-step-3" className="space-y-5 animate-fade-in">
           <div>
             <h2 className="text-xl font-bold text-foreground">
-              {locale === 'he' ? 'חבר מקורות נתונים' : 'Connect Data Sources'}
+              {t('sourcesHeading')}
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              {locale === 'he'
-                ? 'בחר את ערוצי הפרסום וההכנסות שברצונך לחבר לאופטימיזציית AI.'
-                : 'Select the marketing and revenue channels to connect for AI optimization.'}
+              {t('sourcesIntro')}
             </p>
           </div>
 
@@ -358,7 +353,7 @@ export function OnboardingWizardCard({
                         : 'bg-muted text-muted-foreground',
                     )}
                   >
-                    {isConnected ? (locale === 'he' ? 'מחובר' : 'Connected') : (locale === 'he' ? 'לא פעיל' : 'Disabled')}
+                    {isConnected ? t('sourceConnected') : t('sourceDisabled')}
                   </span>
                 </div>
               );
@@ -378,27 +373,25 @@ export function OnboardingWizardCard({
 
           <div>
             <h2 className="text-2xl font-bold text-foreground">
-              {locale === 'he' ? 'הכל מוכן לפעולה!' : "You're all set to scale!"}
+              {t('readyHeading')}
             </h2>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-              {locale === 'he'
-                ? `סביבת העבודה ${projectName} הוגדרה בהצלחה. ה-AI Copilot מוכן לייעל קמפיינים ולזהות הזדמנויות צמיחה.`
-                : `Workspace "${projectName}" is ready with ${connectedSources.length} connected channels. AI Copilot is primed for optimization.`}
+              {t('readyBody', { projectName, count: connectedSources.length })}
             </p>
           </div>
 
           {/* Config Summary Card */}
           <div className="rounded-2xl border border-border/80 bg-muted/40 p-4 text-start text-xs space-y-2">
             <div className="flex justify-between border-b border-border/40 pb-2">
-              <span className="text-muted-foreground">{locale === 'he' ? 'סביבת עבודה' : 'Workspace'}:</span>
+              <span className="text-muted-foreground">{t('summaryWorkspace')}:</span>
               <span className="font-bold text-foreground">{projectName}</span>
             </div>
             <div className="flex justify-between border-b border-border/40 pb-2">
-              <span className="text-muted-foreground">{locale === 'he' ? 'ורטיקל' : 'Vertical'}:</span>
+              <span className="text-muted-foreground">{t('summaryVertical')}:</span>
               <span className="font-semibold text-foreground">{vertical}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">{locale === 'he' ? 'ערוצים מחוברים' : 'Active Channels'}:</span>
+              <span className="text-muted-foreground">{t('summaryChannels')}:</span>
               <span className="font-bold text-emerald-600 dark:text-emerald-400">{connectedSources.length} sources</span>
             </div>
           </div>
@@ -415,7 +408,7 @@ export function OnboardingWizardCard({
             className="flex items-center gap-1.5 rounded-xl h-10 px-4 text-xs font-semibold"
           >
             <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" />
-            <span>{locale === 'he' ? 'חזור' : 'Back'}</span>
+            <span>{t('backButton')}</span>
           </Button>
         ) : (
           <div />
@@ -428,7 +421,7 @@ export function OnboardingWizardCard({
             onClick={handleNextStep}
             className="flex items-center gap-1.5 rounded-xl h-10 px-5 text-xs font-semibold bg-primary shadow-soft hover:bg-primary/90"
           >
-            <span>{locale === 'he' ? 'המשך' : 'Continue'}</span>
+            <span>{t('continueButton')}</span>
             <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
           </Button>
         ) : (
@@ -444,7 +437,7 @@ export function OnboardingWizardCard({
             ) : (
               <Sparkles className="h-4 w-4" />
             )}
-            <span>{locale === 'he' ? 'כניסה ללוח הבקרה' : 'Launch Growth Cockpit'}</span>
+            <span>{t('launchButton')}</span>
           </Button>
         )}
       </div>

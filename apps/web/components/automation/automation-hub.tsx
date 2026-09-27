@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
   Sparkles,
   ShieldCheck,
@@ -45,6 +45,7 @@ export function AutomationHub({
   onRollbackAction,
   className,
 }: AutomationHubProps): React.ReactElement {
+  const t = useTranslations('AutomationHub');
   const locale = useLocale();
   const isRtl = locale === 'he';
 
@@ -116,7 +117,7 @@ export function AutomationHub({
           <div>
             <div className="flex items-center gap-2.5">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
-                {locale === 'he' ? `מרכז האוטומציה וה-AI Copilot` : `AI Automation Hub`}
+                {t('title')}
               </h1>
               {killSwitchEngaged ? (
                 <span
@@ -124,19 +125,17 @@ export function AutomationHub({
                   className="inline-flex items-center gap-1 rounded-full bg-destructive/10 border border-destructive/30 px-2.5 py-0.5 text-xs font-bold text-destructive"
                 >
                   <ShieldAlert className="h-3.5 w-3.5" />
-                  <span>{locale === 'he' ? 'מתג חירום פעיל' : 'KILL SWITCH ACTIVE'}</span>
+                  <span>{t('killSwitchActive')}</span>
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
                   <ShieldCheck className="h-3.5 w-3.5" />
-                  <span>{locale === 'he' ? 'מערכת פעילה ומאובטחת' : 'Guardrails Active'}</span>
+                  <span>{t('guardrailsActive')}</span>
                 </span>
               )}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-              {locale === 'he'
-                ? `ניהול הצעות שינוי, בקרת תקציב אוטומטית ויומן פעולות עבור ${projectName}`
-                : `Autonomous marketing execution, smart proposals, and instant rollback for ${projectName}`}
+              {t('description', { projectName })}
             </p>
           </div>
         </div>
@@ -152,12 +151,12 @@ export function AutomationHub({
       */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <StatCard
-          title={locale === 'he' ? 'פעולות שבוצעו' : 'Actions Executed'}
+          title={t('actionsExecuted')}
           value={executedCount}
           icon={CheckCircle2}
         />
         <StatCard
-          title={locale === 'he' ? 'הצעות ממתינות' : 'Pending Proposals'}
+          title={t('pendingProposals')}
           value={pendingCount}
           icon={Sparkles}
         />
@@ -167,14 +166,14 @@ export function AutomationHub({
       <Tabs value={activeTab} onValueChange={setActiveTab} variant="pills" className="w-full">
         <TabsList className="grid grid-cols-2 max-w-md">
           <TabsTrigger value="copilot" icon={<Bot className="h-4 w-4" />}>
-            {locale === 'he' ? 'AI Copilot & הצעות' : 'AI Copilot & Proposals'}
+            {t('tabCopilot')}
           </TabsTrigger>
           <TabsTrigger
             value="audit"
             icon={<History className="h-4 w-4" />}
             count={localActions.length}
           >
-            {locale === 'he' ? 'יומן ביקורת (Audit)' : 'Audit Trail'}
+            {t('tabAudit')}
           </TabsTrigger>
         </TabsList>
 
@@ -197,12 +196,11 @@ export function AutomationHub({
                 <div className="flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-primary" />
                   <h3 className="font-bold text-sm text-foreground">
-                    {locale === 'he' ? 'הצעות פרואקטיביות' : 'Proactive Proposals'}
+                    {t('proactiveProposals')}
                   </h3>
                 </div>
                 <span className="text-[11px] text-muted-foreground">
-                  {localProposals.filter((p) => p.status === 'awaiting_approval').length}{' '}
-                  {locale === 'he' ? 'ממתינות' : 'pending'}
+                  {t('pendingCount', { count: pendingCount })}
                 </span>
               </div>
 

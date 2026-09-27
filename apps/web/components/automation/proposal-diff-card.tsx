@@ -60,6 +60,7 @@ export function ProposalDiffCard({
   compact: _compact = false,
 }: ProposalDiffCardProps): React.ReactElement {
   const t = useTranslations('Copilot');
+  const tCard = useTranslations('ProposalDiffCard');
   const locale = useLocale();
   const isRtl = locale === 'he';
 
@@ -287,9 +288,7 @@ export function ProposalDiffCard({
                 <span>
                   {actionLoading === 'approve' || isLoading
                     ? t('executing') || 'Executing...'
-                    : locale === 'he'
-                      ? 'הפעל שינוי בלחיצה אחת'
-                      : '1-Click Approve & Execute'}
+                    : tCard('approveAndExecute')}
                 </span>
               </button>
 
@@ -318,7 +317,7 @@ export function ProposalDiffCard({
               ) : (
                 <RotateCcw className="h-3.5 w-3.5" />
               )}
-              <span>{locale === 'he' ? 'בטל שינוי (Rollback)' : '1-Click Rollback'}</span>
+              <span>{tCard('rollbackButton')}</span>
             </button>
           ) : null}
         </div>

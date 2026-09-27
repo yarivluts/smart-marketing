@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
+import { createTranslator } from 'next-intl';
+import heMessages from '@/messages/he.json';
 import { renderWithIntl } from '@/tests/e2e/helpers/test-harness';
 import { OnboardingWizardCard } from './onboarding-wizard-card';
 
@@ -70,5 +72,18 @@ describe('OnboardingWizardCard Component', () => {
       );
       expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
+  });
+
+  it('renders its Hebrew copy from he.json, including the validation error', () => {
+    const t = createTranslator({ locale: 'he', messages: heMessages, namespace: 'OnboardingWizardCard' });
+    renderWithIntl(<OnboardingWizardCard initialStep={1} initialProjectName="" />, { locale: 'he' });
+
+    expect(screen.getByTestId('onboarding-wizard-container')).toHaveAttribute('dir', 'rtl');
+    expect(screen.getByText(t('stepProgress', { current: 1, total: 4 }))).toBeInTheDocument();
+    expect(screen.getByText(t('workspaceHeading'))).toBeInTheDocument();
+    expect(screen.getByText(t('workspaceNameLabel'))).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('onboarding-next-button'));
+    expect(screen.getByText(t('nameRequired'))).toBeInTheDocument();
   });
 });
