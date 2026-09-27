@@ -4,6 +4,8 @@ import {
   isAdStudioFormat,
   validateAdStudioScenes,
   type AdStudioBriefInput,
+  type AdStudioPlan,
+  type AdStudioPlanSources,
   type AdStudioScene,
   type AdStudioSceneIssue,
 } from '@growthos/shared';
@@ -134,6 +136,9 @@ export async function createAdStudioBrief(params: {
   brief.status = 'draft';
   brief.scenes = [];
   brief.script_generated_by = null;
+  brief.plan = null;
+  brief.plan_sources = null;
+  brief.plan_generated_by = null;
   brief.created_by = params.createdByUserId;
   brief.created_on = stamp;
   brief.last_changed_on = stamp;
@@ -192,6 +197,30 @@ export async function saveAdStudioScript(params: {
   brief.scenes = params.scenes.map((scene) => ({ ...scene }));
   brief.script_generated_by = params.generatedBy ?? null;
   brief.status = 'scripted';
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/**
+ * Stores a plan with the evidence it was built from, replacing any earlier plan. The brief reads as
+ * `planned` unless it already has a script, which stays `scripted`: a new plan does not undo work.
+ */
+export async function saveAdStudioPlan(params: {
+  organizationId: string;
+  projectId: string;
+  briefId: string;
+  plan: AdStudioPlan;
+  sources: AdStudioPlanSources;
+  generatedBy: AdStudioGeneratedBy;
+  now?: Date;
+}): Promise<AdStudioBriefModel> {
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  // A JSON round trip drops any `undefined` Firestore would refuse, and detaches the caller's objects.
+  brief.plan = JSON.parse(JSON.stringify(params.plan)) as AdStudioPlan;
+  brief.plan_sources = JSON.parse(JSON.stringify(params.sources)) as AdStudioPlanSources;
+  brief.plan_generated_by = { ...params.generatedBy };
+  if (brief.status !== 'scripted') brief.status = 'planned';
   brief.last_changed_on = nowIso(params.now);
   await brief.save();
   return brief;
