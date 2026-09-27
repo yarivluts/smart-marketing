@@ -75,3 +75,25 @@ export function firmographicIndustryLabelKey(industry: string): string {
       return industry;
   }
 }
+
+export interface FirmographicCompositionShareRow extends FirmographicCompositionRow {
+  /** This value's share of all profiles, 0-100 (one decimal). */
+  countShare: number;
+  /** This value's share of all MRR, 0-100 (one decimal); 0 when the dimension has no MRR at all. */
+  mrrShare: number;
+}
+
+function sharePercent(part: number, whole: number): number {
+  return whole > 0 ? Math.round((part / whole) * 1000) / 10 : 0;
+}
+
+/**
+ * The "# vs $" view of one composition breakdown: each value's share of profiles beside its share
+ * of MRR, both as percentages of the dimension's own totals, so the two can share one axis. A
+ * segment whose MRR share exceeds its count share is worth more per customer than average.
+ */
+export function toFirmographicCompositionShares(rows: readonly FirmographicCompositionRow[]): FirmographicCompositionShareRow[] {
+  const totalCount = rows.reduce((sum, row) => sum + row.count, 0);
+  const totalMrr = rows.reduce((sum, row) => sum + row.mrr, 0);
+  return rows.map((row) => ({ ...row, countShare: sharePercent(row.count, totalCount), mrrShare: sharePercent(row.mrr, totalMrr) }));
+}

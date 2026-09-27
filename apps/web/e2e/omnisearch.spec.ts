@@ -23,6 +23,19 @@ async function createOrganization(page: Page, name: string): Promise<string> {
   return page.url().split('/').pop()!;
 }
 
+/**
+ * Opens the palette once its listener is live. On a production server the page is interactive in
+ * milliseconds, but a key press or click that lands before React hydrates does nothing and the
+ * dialog never opens; retrying the gesture until it does keeps the test about the palette rather
+ * than about hydration timing.
+ */
+async function openOmnisearch(page: Page, open: () => Promise<void> = () => page.keyboard.press('ControlOrMeta+k')): Promise<void> {
+  await expect(async () => {
+    if ((await page.getByRole('dialog').count()) === 0) await open();
+    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 15_000 });
+}
+
 test.describe('Global omnisearch (KAN-85)', () => {
   test('an org owner opens the palette with Cmd/Ctrl+K, searches by name, and jumps to the matching board', async ({ page }) => {
     // Same "first-compile-in-this-run" budget boards.spec.ts raises for itself — this flow visits
@@ -52,8 +65,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
 
     // No dialog until the shortcut is pressed.
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await page.keyboard.press('ControlOrMeta+k');
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await openOmnisearch(page);
 
     const input = page.getByPlaceholder(/search boards, metrics/i);
     await input.fill('marketing');
@@ -81,8 +93,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
     const projectId = page.url().split('/').slice(-2)[0];
     await page.goto(`/en/orgs/${orgId}/projects/${projectId}/campaigns`);
 
-    await page.keyboard.press('ControlOrMeta+k');
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await openOmnisearch(page);
 
     await page.getByPlaceholder(/search boards, metrics/i).fill('cohort retention');
     const result = page.getByRole('option', { name: /Cohort retention/ });
@@ -104,8 +115,7 @@ test.describe('Global omnisearch (KAN-85)', () => {
     await page.getByRole('button', { name: 'Create project' }).click();
     await expect(page).toHaveURL(new RegExp(`/en/orgs/${orgId}/projects/[^/]+/onboarding$`));
 
-    await page.getByRole('button', { name: /search/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await openOmnisearch(page, () => page.getByRole('button', { name: /search/i }).click());
     await expect(page.getByText('Start typing to search this project.')).toBeVisible();
 
     await page.getByPlaceholder(/search boards, metrics/i).fill('nothing-should-match-this-xyz');

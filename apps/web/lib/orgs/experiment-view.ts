@@ -1,4 +1,29 @@
-import type { ExperimentVariantResult } from '@growthos/shared';
+import type { ExperimentResult, ExperimentVariantResult } from '@growthos/shared';
+
+export interface ExperimentsSummary {
+  experiments: number;
+  variants: number;
+  exposures: number;
+  conversions: number;
+  /** Non-control variants significantly better than their control. */
+  significantWins: number;
+  /** Non-control variants significantly worse than their control. */
+  significantLosses: number;
+}
+
+/** Totals across every experiment's variants, for the page's KPI row and pipeline diagram. */
+export function summariseExperiments(results: readonly ExperimentResult[]): ExperimentsSummary {
+  const variants = results.flatMap((result) => result.variants);
+  const tested = variants.filter((variant) => !variant.isControl && variant.isSignificant && variant.upliftVsControlPct !== null);
+  return {
+    experiments: results.length,
+    variants: variants.length,
+    exposures: variants.reduce((sum, variant) => sum + variant.exposures, 0),
+    conversions: variants.reduce((sum, variant) => sum + variant.conversions, 0),
+    significantWins: tested.filter((variant) => (variant.upliftVsControlPct ?? 0) > 0).length,
+    significantLosses: tested.filter((variant) => (variant.upliftVsControlPct ?? 0) < 0).length,
+  };
+}
 
 export type ExperimentVariantBadge = 'control' | 'significant' | 'not_significant' | 'insufficient_data';
 

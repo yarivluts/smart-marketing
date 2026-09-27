@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { CalendarCheck, CalendarClock, CalendarX, GitBranch, Info, ListChecks, Presentation, Target, Users } from 'lucide-react';
 import { can } from '@growthos/shared';
 import { SALES_PACK_PLUGIN_ID } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
@@ -7,8 +8,10 @@ import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { builtinMetricPacks, getDemoFunnelForProject, listOrgPeople, listOrgProjects, listPluginInstallsForProject } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
-import { toDemoFunnelView } from '@/lib/orgs/sales-view';
-import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import { buildDemoFlow, toDemoFunnelView } from '@/lib/orgs/sales-view';
+import { PackSetupLanding } from '@/components/orgs/pack-setup-landing';
+import { StatCard } from '@/components/ui/stat-card';
+import { BarList, ChartCard, EmptyState, FlowDiagram, PageHero, TrendChart } from '@/components/viz';
 import { Link } from '@/i18n/navigation';
 
 type PageProps = Readonly<{
@@ -85,11 +88,22 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === SALES_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PackSetupLanding
+        orgId={orgId}
+        projectId={projectId}
+        icon={Presentation}
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        intro={t('setupIntro')}
+        featuresTitle={t('setupFeaturesTitle')}
+        installTitle={t('setupInstallTitle')}
+        packs={installablePacks}
+        features={[
+          { key: 'pipeline', icon: GitBranch, title: t('setupFeaturePipelineTitle'), description: t('setupFeaturePipelineDescription') },
+          { key: 'show-rate', icon: Target, title: t('setupFeatureShowRateTitle'), description: t('setupFeatureShowRateDescription') },
+          { key: 'reps', icon: Users, title: t('setupFeatureRepsTitle'), description: t('setupFeatureRepsDescription') },
+        ]}
+      />
     );
   }
 
@@ -98,12 +112,38 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   const funnel = toDemoFunnelView(funnelResult, peopleById);
   const canManageDashboards = can(bindings, { type: 'user', id: user.id }, 'dashboards.write', { orgId, projectId });
 
+  const numberFormat = new Intl.NumberFormat(locale);
   const formatShowRate = (rate: number | null): string => (rate === null ? t('rowValueUnavailable') : t('showRateValue', { value: Math.round(rate * 100) }));
+  const flow = buildDemoFlow(funnel, {
+    scheduled: t('scheduledLabel'),
+    held: t('heldLabel'),
+    noShow: t('noShowLabel'),
+    shareOfOutcomes: (percent) => t('flowShareOfOutcomes', { percent }),
+    formatCount: (value) => numberFormat.format(value),
+    percent: (value) => t('showRateValue', { value }),
+  });
+  const hasAnyDemo = funnel.demosScheduled + funnel.demosHeld + funnel.demosNoShow > 0;
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero
+        icon={Presentation}
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        description={t('description')}
+      >
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('scheduledLabel')} value={numberFormat.format(funnel.demosScheduled)} icon={CalendarClock} />
+          <StatCard title={t('heldLabel')} value={numberFormat.format(funnel.demosHeld)} icon={CalendarCheck} />
+          <StatCard title={t('noShowLabel')} value={numberFormat.format(funnel.demosNoShow)} icon={CalendarX} />
+          <StatCard
+            title={t('showRateLabel')}
+            value={formatShowRate(funnel.showRate)}
+            progress={funnel.showRate !== null ? Math.round(funnel.showRate * 100) : undefined}
+            icon={Target}
+          />
+        </div>
+      </PageHero>
 
       {/* Every number on this page comes from a bounded read of the most recent
           raw events. Below the cap that read is the whole history and the counts
@@ -112,69 +152,84 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
           *events*, so it cuts across demo lifecycles at both ends (KAN-164).
           Said once, at the top, rather than per tile: it qualifies all of them. */}
       {funnel.sampledFrom !== null ? (
-        <p className="rounded-md border border-input px-3 py-2 text-sm text-muted-foreground">{t('sampledNotice', { limit: funnel.sampledFrom })}</p>
-      ) : null}
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('funnelHeading')}</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
-            <span className="text-2xl font-bold tracking-tight">{funnel.demosScheduled}</span>
-            <span className="text-xs text-muted-foreground">{t('scheduledLabel')}</span>
-          </div>
-          <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
-            <span className="text-2xl font-bold tracking-tight">{funnel.demosHeld}</span>
-            <span className="text-xs text-muted-foreground">{t('heldLabel')}</span>
-          </div>
-          <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
-            <span className="text-2xl font-bold tracking-tight">{funnel.demosNoShow}</span>
-            <span className="text-xs text-muted-foreground">{t('noShowLabel')}</span>
-          </div>
-          <div className="flex flex-col gap-1 rounded-md border border-input px-4 py-3">
-            <span className="text-2xl font-bold tracking-tight">{formatShowRate(funnel.showRate)}</span>
-            <span className="text-xs text-muted-foreground">{t('showRateLabel')}</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('repBreakdownHeading')}</h2>
-        {funnel.rows.length === 0 ? (
-          <p className="text-muted-foreground">{t('repBreakdownEmpty')}</p>
-        ) : (
-          <ol className="flex flex-col gap-2">
-            {funnel.rows.map((row) => (
-              <li key={row.repOrgPersonId} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                <span className="flex items-center gap-2 font-medium">
-                  {row.photoUrl ? (
-                    <img src={row.photoUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
-                  ) : null}
-                  {row.name}
-                </span>
-                <span className="text-muted-foreground">
-                  {t('repRowSummary', { held: row.demosHeld, noShow: row.demosNoShow, showRate: formatShowRate(row.showRate) })}
-                </span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-
-      <p className="text-sm text-muted-foreground">
-        {t('recentDemosIntro')}{' '}
-        <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/record-feed`, query: { schema: 'demo_event' } }} className="underline">
-          {t('recentDemosLinkLabel')}
-        </Link>
-      </p>
-
-      {canManageDashboards ? (
-        <p className="text-sm text-muted-foreground">
-          {t('workListIntro')}{' '}
-          <Link href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments` }} className="underline">
-            {t('workListLinkLabel')}
-          </Link>
+        <p className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+          {t('sampledNotice', { limit: funnel.sampledFrom })}
         </p>
       ) : null}
+
+      <ChartCard title={t('funnelHeading')} description={t('flowDescription')} icon={GitBranch}>
+        {hasAnyDemo ? (
+          <FlowDiagram label={t('funnelHeading')} nodes={flow.nodes} edges={flow.edges} height={300} />
+        ) : (
+          <EmptyState icon={Presentation} title={t('funnelEmpty')} description={t('funnelEmptyDetail')} compact />
+        )}
+      </ChartCard>
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard title={t('repBreakdownHeading')} description={t('repChartDescription')} icon={Users} className="lg:col-span-3" fill>
+          {funnel.rows.length === 0 ? (
+            <EmptyState icon={Users} title={t('repBreakdownEmpty')} compact />
+          ) : (
+            <TrendChart
+              label={t('repBreakdownHeading')}
+              xKey="rep"
+              kind="bar"
+              stacked
+              data={funnel.rows.map((row) => ({ rep: row.name, held: row.demosHeld, noShow: row.demosNoShow }))}
+              series={[
+                { key: 'held', label: t('heldLabel'), color: 'hsl(var(--success))' },
+                { key: 'noShow', label: t('noShowLabel'), color: 'hsl(var(--warning))' },
+              ]}
+            />
+          )}
+        </ChartCard>
+        <ChartCard title={t('repShowRateHeading')} description={t('repShowRateDescription')} icon={Target} className="lg:col-span-2" fill>
+          {funnel.rows.length === 0 ? (
+            <EmptyState icon={Target} title={t('repBreakdownEmpty')} compact />
+          ) : (
+            <BarList
+              items={funnel.rows.map((row) => ({
+                key: row.repOrgPersonId,
+                label: row.name,
+                sublabel: t('repRowSummary', { held: row.demosHeld, noShow: row.demosNoShow, showRate: formatShowRate(row.showRate) }),
+                value: row.showRate === null ? 0 : Math.round(row.showRate * 100),
+              }))}
+              valueFormatter={(value) => t('showRateValue', { value })}
+              color="hsl(var(--success))"
+            />
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <Link
+          href={{ pathname: `/orgs/${orgId}/projects/${projectId}/record-feed`, query: { schema: 'demo_event' } }}
+          className="group flex items-start gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/50"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <ListChecks className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 text-sm">
+            <p className="text-muted-foreground">{t('recentDemosIntro')}</p>
+            <p className="font-semibold text-primary underline-offset-4 group-hover:underline">{t('recentDemosLinkLabel')}</p>
+          </div>
+        </Link>
+        {canManageDashboards ? (
+          <Link
+            href={{ pathname: `/orgs/${orgId}/projects/${projectId}/segments` }}
+            className="group flex items-start gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-primary/50"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Users className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 text-sm">
+              <p className="text-muted-foreground">{t('workListIntro')}</p>
+              <p className="font-semibold text-primary underline-offset-4 group-hover:underline">{t('workListLinkLabel')}</p>
+            </div>
+          </Link>
+        ) : null}
+      </div>
     </main>
   );
 }

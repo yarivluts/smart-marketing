@@ -1,5 +1,6 @@
 import type { RepCollectionBillingSignal, RepCollectionEntryModel, RepCollectionLeaderboardResult } from '@growthos/firebase-orm-models';
 import type { RepCollectionType } from '@growthos/shared';
+import { bucketByPeriod, type PeriodBucket } from './period-buckets';
 
 /**
  * A plain, serializable projection of one ledger entry (KAN-88) for the
@@ -81,4 +82,42 @@ export interface RepCollectionBillingSignalRow {
 
 export function toRepCollectionBillingSignalRow(signal: RepCollectionBillingSignal): RepCollectionBillingSignalRow {
   return { ...signal };
+}
+
+export interface RepCollectionTypeTotal {
+  collectionType: RepCollectionType;
+  total: number;
+  count: number;
+}
+
+export interface RepCollectionInsights {
+  /** Amount collected per calendar month (UTC), oldest first, ending with the current month. */
+  monthly: PeriodBucket[];
+  /** Amount and entry count per collection type, largest amount first; types with no entries are left out. */
+  byType: RepCollectionTypeTotal[];
+  /** Every ledger entry's amount, attributed or not. */
+  total: number;
+}
+
+/**
+ * Chart data for the ledger page, computed from the full ledger it already loaded (the ledger read
+ * is not capped, so every month shown is complete). Amounts are summed as plain numbers - the ledger
+ * has no per-entry currency, which the page states next to every total.
+ */
+export function toRepCollectionInsights(entries: readonly Pick<RepCollectionEntryRow, 'amount' | 'occurredAt' | 'collectionType'>[], options: { now: Date; months: number }): RepCollectionInsights {
+  const byType = new Map<RepCollectionType, RepCollectionTypeTotal>();
+  for (const entry of entries) {
+    const bucket = byType.get(entry.collectionType) ?? { collectionType: entry.collectionType, total: 0, count: 0 };
+    bucket.total += entry.amount;
+    bucket.count += 1;
+    byType.set(entry.collectionType, bucket);
+  }
+  return {
+    monthly: bucketByPeriod(
+      entries.map((entry) => ({ at: entry.occurredAt, value: entry.amount })),
+      { period: 'month', periods: options.months, now: options.now },
+    ),
+    byType: [...byType.values()].sort((a, b) => b.total - a.total || a.collectionType.localeCompare(b.collectionType)),
+    total: entries.reduce((sum, entry) => sum + entry.amount, 0),
+  };
 }

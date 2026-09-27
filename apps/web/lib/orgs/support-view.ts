@@ -60,3 +60,31 @@ export function toSupportLeaderboardView(
     }),
   };
 }
+
+export interface SupportTeamSummary {
+  /** Tickets resolved by an attributed agent - resolutions with no agent are not in any row. */
+  ticketsResolved: number;
+  /** The agent with the fastest average first response, or `null` when no agent has one. */
+  fastestFirstResponse: { name: string; seconds: number } | null;
+  /** The agent with the highest average CSAT, or `null` when no agent has a CSAT score. */
+  topCsat: { name: string; score: number } | null;
+}
+
+/**
+ * Team-level headline numbers derived only from the per-agent rows. Deliberately no "team average"
+ * first response or CSAT: the rows carry per-agent averages without their sample sizes, so any
+ * blend of them would be a made-up weighting. Best-agent values are exact.
+ */
+export function toSupportTeamSummary(rows: readonly SupportLeaderboardRowView[]): SupportTeamSummary {
+  let fastestFirstResponse: SupportTeamSummary['fastestFirstResponse'] = null;
+  let topCsat: SupportTeamSummary['topCsat'] = null;
+  for (const row of rows) {
+    if (row.avgFirstResponseSeconds !== null && (fastestFirstResponse === null || row.avgFirstResponseSeconds < fastestFirstResponse.seconds)) {
+      fastestFirstResponse = { name: row.name, seconds: row.avgFirstResponseSeconds };
+    }
+    if (row.avgCsatScore !== null && (topCsat === null || row.avgCsatScore > topCsat.score)) {
+      topCsat = { name: row.name, score: row.avgCsatScore };
+    }
+  }
+  return { ticketsResolved: rows.reduce((sum, row) => sum + row.ticketsResolved, 0), fastestFirstResponse, topCsat };
+}

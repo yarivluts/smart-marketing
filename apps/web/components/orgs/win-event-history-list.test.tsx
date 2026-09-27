@@ -7,6 +7,7 @@ import messages from '../../messages/en.json';
 
 const event: WinEventFeedItem = {
   id: 'win-1',
+  winRuleId: 'rule-1',
   winRuleName: 'Big order',
   winType: 'generic',
   schemaName: 'order_completed',

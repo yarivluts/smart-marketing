@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { BarChart3, CalendarRange, DatabaseZap, Info, Layers, MessageSquareHeart, MessageSquareQuote, PieChart, Smile, ThumbsDown, ThumbsUp, Users } from 'lucide-react';
 import { can } from '@growthos/shared';
 import { DEFAULT_NPS_OVERVIEW_RECORD_LIMIT, FEEDBACK_PACK_PLUGIN_ID, type NpsBreakdownDimension } from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
@@ -15,8 +16,11 @@ import {
   listSurveyResponseRecordsForProject,
 } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
-import { feedbackThemeLabelKey, toNpsDimensionBreakdownRows } from '@/lib/orgs/feedback-view';
-import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import { feedbackThemeLabelKey, toNpsDimensionBreakdownRows, toNpsTrendChartRows } from '@/lib/orgs/feedback-view';
+import { PackSetupLanding } from '@/components/orgs/pack-setup-landing';
+import { ThemeDigestGrid } from '@/components/orgs/theme-digest-grid';
+import { StatCard } from '@/components/ui/stat-card';
+import { BarList, ChartCard, DonutChart, EmptyState, PageHero, TrendChart } from '@/components/viz';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -84,11 +88,22 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === FEEDBACK_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PackSetupLanding
+        orgId={orgId}
+        projectId={projectId}
+        icon={MessageSquareHeart}
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        intro={t('setupIntro')}
+        featuresTitle={t('setupFeaturesTitle')}
+        installTitle={t('setupInstallTitle')}
+        packs={installablePacks}
+        features={[
+          { key: 'nps', icon: PieChart, title: t('setupFeatureNpsTitle'), description: t('setupFeatureNpsDescription') },
+          { key: 'trend', icon: CalendarRange, title: t('setupFeatureTrendTitle'), description: t('setupFeatureTrendDescription') },
+          { key: 'themes', icon: MessageSquareQuote, title: t('setupFeatureThemesTitle'), description: t('setupFeatureThemesDescription') },
+        ]}
+      />
     );
   }
 
@@ -106,98 +121,141 @@ export default async function FeedbackPage({ params }: PageProps): Promise<React
     Promise.all(DIMENSIONS.map((dimension) => getNpsDimensionBreakdownForProject(orgId, projectId, dimension.key))),
   ]);
 
+  const numberFormat = new Intl.NumberFormat(locale);
+  const dayFormat = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const formatDay = (date: string) => dayFormat.format(new Date(`${date}T00:00:00Z`));
+  const { overall } = overview;
+  const hasResponses = overall.totalResponses > 0;
+  const shareOf = (count: number) => (hasResponses ? Math.round((count / overall.totalResponses) * 100) : null);
+  const promoterShare = shareOf(overall.promoters);
+  const detractorShare = shareOf(overall.detractors);
+  const trendRows = toNpsTrendChartRows(overview.dailyTrend, overview.trendReliableFrom, formatDay);
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={MessageSquareHeart} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('npsHeading')} value={hasResponses && overall.npsScore !== null ? numberFormat.format(overall.npsScore) : t('kpiNoValue')} icon={Smile} />
+          <StatCard title={t('kpiResponses')} value={hasResponses ? numberFormat.format(overall.totalResponses) : t('kpiNoValue')} icon={Users} />
+          <StatCard
+            title={t('kpiPromoters')}
+            value={promoterShare !== null ? t('kpiPercent', { percent: promoterShare }) : t('kpiNoValue')}
+            progress={promoterShare ?? undefined}
+            icon={ThumbsUp}
+          />
+          <StatCard
+            title={t('kpiDetractors')}
+            value={detractorShare !== null ? t('kpiPercent', { percent: detractorShare }) : t('kpiNoValue')}
+            progress={detractorShare ?? undefined}
+            icon={ThumbsDown}
+          />
+        </div>
+      </PageHero>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('npsHeading')}</h2>
-        {overview.overall.totalResponses === 0 ? (
-          <p className="text-muted-foreground">{t('npsEmpty')}</p>
-        ) : (
-          <div className="flex flex-col gap-2 rounded-md border border-input px-4 py-3">
-            <span className="text-4xl font-bold tracking-tight">{overview.overall.npsScore}</span>
-            <span className="text-sm text-muted-foreground">
-              {t('npsBreakdownLine', {
-                promoters: overview.overall.promoters,
-                passives: overview.overall.passives,
-                detractors: overview.overall.detractors,
-                total: overview.overall.totalResponses,
-              })}
-            </span>
-          </div>
-        )}
-        <ul className="flex flex-wrap gap-1" aria-label={t('trendSparklineLabel')}>
-          {overview.dailyTrend.map((point) => {
-            // A day before `trendReliableFrom` is a day the read never reached,
-            // which is not the same as a day nobody answered. Saying "no
-            // responses" there asserts something about data that was never
-            // looked at — and a run of them at the left edge draws a rising
-            // trend that is an artefact of the fetch limit (KAN-167).
-            const notRead = overview.trendReliableFrom !== null && point.date < overview.trendReliableFrom;
-            return (
-              <li
-                key={point.date}
-                title={`${point.date}: ${notRead ? t('trendPointNotRead') : point.breakdown.totalResponses === 0 ? t('trendPointEmpty') : point.breakdown.npsScore}`}
-                className={notRead ? 'h-6 w-2 rounded-sm border border-dashed border-muted-foreground/40' : 'h-6 w-2 rounded-sm bg-muted'}
-                style={!notRead && point.breakdown.totalResponses > 0 ? { opacity: 0.4 + Math.min(point.breakdown.totalResponses, 5) * 0.12 } : undefined}
+      {sampledFrom !== null ? (
+        <p className="flex items-start gap-2 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-foreground">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
+          {t('sampledNotice', { limit: sampledFrom })}
+        </p>
+      ) : null}
+
+      <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard title={t('sentimentHeading')} description={t('sentimentDescription')} icon={PieChart} className="lg:col-span-2" fill>
+          {!hasResponses ? (
+            <EmptyState icon={MessageSquareHeart} title={t('npsEmpty')} description={t('npsEmptyDetail')} compact />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <DonutChart
+                label={t('sentimentHeading')}
+                layout="stacked"
+                centerValue={overall.npsScore !== null ? numberFormat.format(overall.npsScore) : undefined}
+                centerLabel={t('npsCenterLabel')}
+                data={[
+                  { label: t('promotersLabel'), value: overall.promoters, color: 'hsl(var(--success))' },
+                  { label: t('passivesLabel'), value: overall.passives, color: 'hsl(var(--muted-foreground) / 0.5)' },
+                  { label: t('detractorsLabel'), value: overall.detractors, color: 'hsl(var(--destructive))' },
+                ]}
               />
-            );
-          })}
-        </ul>
-        {overview.trendReliableFrom !== null ? (
-          <p className="text-xs text-muted-foreground">{t('trendTruncatedNotice', { from: overview.trendReliableFrom, limit: overview.sampledFrom ?? 0 })}</p>
-        ) : null}
-      </section>
+              <p className="text-xs text-muted-foreground">
+                {t('npsBreakdownLine', { promoters: overall.promoters, passives: overall.passives, detractors: overall.detractors, total: overall.totalResponses })}
+              </p>
+            </div>
+          )}
+        </ChartCard>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('themeDigestHeading')}</h2>
+        <ChartCard
+          title={t('trendSparklineLabel')}
+          description={t('trendDescription', { days: overview.dailyTrend.length })}
+          icon={CalendarRange}
+          className="lg:col-span-3"
+          fill
+          footer={overview.trendReliableFrom !== null ? t('trendTruncatedNotice', { from: overview.trendReliableFrom, limit: overview.sampledFrom ?? 0 }) : undefined}
+        >
+          {/* A day before `trendReliableFrom` is a day the read never reached,
+              which is not the same as a day nobody answered - those rows are
+              null, so the chart leaves a gap instead of a false zero (KAN-167). */}
+          {!hasResponses ? (
+            <EmptyState icon={CalendarRange} title={t('trendEmpty')} compact />
+          ) : (
+            <TrendChart
+              label={t('trendSparklineLabel')}
+              xKey="day"
+              kind="bar"
+              stacked
+              data={trendRows}
+              series={[
+                { key: 'promoters', label: t('promotersLabel'), color: 'hsl(var(--success))' },
+                { key: 'passives', label: t('passivesLabel'), color: 'hsl(var(--muted-foreground) / 0.5)' },
+                { key: 'detractors', label: t('detractorsLabel'), color: 'hsl(var(--destructive))' },
+              ]}
+              height={280}
+            />
+          )}
+        </ChartCard>
+      </div>
+
+      <ChartCard title={t('themeDigestHeading')} description={t('themeDigestDescription')} icon={MessageSquareQuote}>
         {themeDigest.length === 0 ? (
-          <p className="text-muted-foreground">{t('themeDigestEmpty')}</p>
+          <EmptyState icon={MessageSquareQuote} title={t('themeDigestEmpty')} compact />
         ) : (
-          <ul className="flex flex-col gap-2">
-            {themeDigest.map((cluster) => (
-              <li key={cluster.theme} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{t(feedbackThemeLabelKey(cluster.theme))}</span>
-                  <span className="text-xs text-muted-foreground">{t('themeCommentCount', { count: cluster.commentCount })}</span>
-                </div>
-                {cluster.exampleComments.map((comment, index) => (
-                  <span key={index} className="text-muted-foreground">
-                    {t('themeExampleComment', { comment })}
-                  </span>
-                ))}
-              </li>
-            ))}
-          </ul>
+          <ThemeDigestGrid
+            items={themeDigest.map((cluster) => ({
+              key: cluster.theme,
+              label: t(feedbackThemeLabelKey(cluster.theme)),
+              count: cluster.commentCount,
+              countLabel: t('themeCommentCount', { count: cluster.commentCount }),
+              quotes: cluster.exampleComments.map((comment) => t('themeExampleComment', { comment })),
+            }))}
+          />
         )}
-      </section>
+      </ChartCard>
 
-      {DIMENSIONS.map((dimension, index) => {
-        const outcome = dimensionOutcomes[index];
-        return (
-          <section key={dimension.key} className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold tracking-tight">{t(dimension.headingKey)}</h2>
-            {!outcome.ok ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : outcome.rows.length === 0 ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {toNpsDimensionBreakdownRows(outcome.rows, dimension.key).map((row) => (
-                  <li key={row.value} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                    <span>{row.value || t('dimensionValueUnknown')}</span>
-                    <span className="text-muted-foreground">
-                      {row.npsScore === null ? t('dimensionScoreUnavailable') : t('dimensionScoreLine', { score: row.npsScore, respondents: row.respondents })}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {DIMENSIONS.map((dimension, index) => {
+          const outcome = dimensionOutcomes[index];
+          const rows = outcome.ok ? toNpsDimensionBreakdownRows(outcome.rows, dimension.key) : [];
+          return (
+            <ChartCard key={dimension.key} title={t(dimension.headingKey)} description={t('dimensionDescription')} icon={dimension.key === 'cohort_month' ? Layers : BarChart3} fill>
+              {rows.length === 0 ? (
+                <EmptyState icon={DatabaseZap} title={t(dimension.emptyKey)} compact />
+              ) : (
+                <BarList
+                  items={rows.map((row) => ({
+                    key: row.value || '__unknown__',
+                    label: row.value || t('dimensionValueUnknown'),
+                    sublabel: row.npsScore === null ? t('dimensionScoreUnavailable') : t('dimensionScoreLine', { score: row.npsScore, respondents: row.respondents }),
+                    value: row.respondents,
+                  }))}
+                  valueFormatter={(count) => t('dimensionRespondents', { count })}
+                  maxItems={8}
+                  moreLabel={(hidden) => t('dimensionMore', { count: hidden })}
+                  color="hsl(var(--info))"
+                />
+              )}
+            </ChartCard>
+          );
+        })}
+      </div>
     </main>
   );
 }
