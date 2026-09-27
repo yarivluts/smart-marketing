@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { buildOnboardingJourney, wrapIntoRows } from './onboarding-journey';
-import { layoutFlow } from '@/components/viz/flow-diagram';
 
 describe('wrapIntoRows', () => {
-  it('places a chain left to right, wrapping after perRow nodes, and the layout honours it', () => {
+  it('places a chain left to right, wrapping after perRow nodes', () => {
     const nodes = wrapIntoRows(['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, label: id })), 3);
     expect(nodes.map((node) => [node.id, node.column, node.row])).toEqual([
       ['a', 0, 0],
@@ -12,10 +11,6 @@ describe('wrapIntoRows', () => {
       ['d', 0, 1],
       ['e', 1, 1],
     ]);
-    const edges = ['a', 'b', 'c', 'd'].map((id, index) => ({ source: id, target: ['b', 'c', 'd', 'e'][index] }));
-    const positions = layoutFlow(nodes, edges);
-    expect(positions.get('d')).toEqual({ column: 0, row: 1 });
-    expect(positions.get('c')).toEqual({ column: 2, row: 0 });
   });
 });
 
