@@ -92,7 +92,7 @@ export interface AdStudioVideoStageProgress {
  * one; the script is done once it has scenes; the video (KAN-231) is done once the current clips of
  * every scene are assembled. Export is a later stage of the studio and reads as upcoming.
  */
-export function adStudioStages(brief: { scenes: readonly unknown[]; plan?: unknown }, video?: AdStudioVideoStageProgress): AdStudioStage[] {
+export function adStudioStages(brief: { scenes: readonly unknown[]; plan?: unknown }, video?: AdStudioVideoStageProgress, exported = false): AdStudioStage[] {
   const scripted = brief.scenes.length > 0;
   const planned = brief.plan !== null && brief.plan !== undefined;
   return [
@@ -100,7 +100,7 @@ export function adStudioStages(brief: { scenes: readonly unknown[]; plan?: unkno
     { id: 'plan', status: planned ? 'done' : scripted ? 'skipped' : 'current' },
     { id: 'script', status: scripted ? 'done' : planned ? 'current' : 'upcoming' },
     { id: 'video', status: !scripted ? 'upcoming' : video?.assembled ? 'done' : 'current' },
-    { id: 'export', status: 'upcoming' },
+    { id: 'export', status: exported ? 'done' : scripted && video?.assembled ? 'current' : 'upcoming' },
   ];
 }
 

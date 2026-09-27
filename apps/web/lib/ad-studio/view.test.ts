@@ -53,10 +53,19 @@ describe('adStudioStages', () => {
   it('keeps video current while scenes render and marks it done once the current clips are assembled', () => {
     const plan = { summary: 'x' };
     expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 1, scenes: 2, assembled: false }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'current', 'upcoming']);
-    expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 2, scenes: 2, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'done', 'upcoming']);
-    expect(adStudioStages({ scenes: [{}] }, { rendered: 1, scenes: 1, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'done', 'upcoming']);
+    expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 2, scenes: 2, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'done', 'current']);
+    expect(adStudioStages({ scenes: [{}] }, { rendered: 1, scenes: 1, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'done', 'current']);
     const unscripted = adStudioStages({ scenes: [] }, { rendered: 0, scenes: 0, assembled: true });
     expect(unscripted.find((stage) => stage.id === 'video')?.status).toBe('upcoming');
+  });
+
+  it('makes export the next step once the video is assembled, and done once an upload succeeded', () => {
+    const exportStatus = (video: { rendered: number; scenes: number; assembled: boolean } | undefined, exported: boolean) =>
+      adStudioStages({ scenes: [{}] }, video, exported).find((stage) => stage.id === 'export')?.status;
+    expect(exportStatus({ rendered: 1, scenes: 1, assembled: false }, false)).toBe('upcoming');
+    expect(exportStatus({ rendered: 1, scenes: 1, assembled: true }, false)).toBe('current');
+    expect(exportStatus({ rendered: 1, scenes: 1, assembled: true }, true)).toBe('done');
+    expect(exportStatus(undefined, false)).toBe('upcoming');
   });
 });
 
