@@ -3214,7 +3214,8 @@
       "stripe": "Stripe",
       "ga4": "GA4",
       "generic": "Generic",
-      "simulated": "Simulated"
+      "simulated": "Simulated",
+      "youtube": "YouTube"
     },
     "status": {
       "enabled": "Active",
@@ -3985,6 +3986,60 @@
       "credential_not_configured": "A Google Ads credential is attached but has no secret set yet.",
       "vault_not_configured": "The secret vault is not configured for this deployment, so the Google Ads credential cannot be read."
     },
-    "planningAdminHint": "Deep analysis also reads the landing page (public https pages only) and the last 90 days of landing page results from the warehouse. A missing source is shown as missing, never estimated."
+    "planningAdminHint": "Deep analysis also reads the landing page (public https pages only) and the last 90 days of landing page results from the warehouse. A missing source is shown as missing, never estimated.",
+    "exportTitle": "Export",
+    "exportDescription": "Send the finished {seconds}-second video to your Meta ad account or your YouTube channel.",
+    "exportNeedsVideo": "Assemble the video first. Only the current finished video can be exported.",
+    "exportDestination": {
+      "meta": "Facebook and Instagram",
+      "youtube": "YouTube"
+    },
+    "exportDestinationHint": {
+      "meta": "Uploaded to the ad account's video library, ready to use in a video ad.",
+      "youtube": "Uploaded to the channel, ready for YouTube video ads."
+    },
+    "exportConnected": "Connected",
+    "exportNotConnected": "Not connected",
+    "exportVia": "Using the connection \"{name}\".",
+    "exportUnavailable": {
+      "not_attached": "No connection is attached to this project.",
+      "read_only": "The attached connection is read-only. An org admin can change its write level.",
+      "no_secret": "The attached connection has no credentials saved yet."
+    },
+    "exportOpenResources": "Open project resources",
+    "exportPrivacy": "Visibility on YouTube",
+    "exportPrivacyUnlisted": "Unlisted - only people with the link",
+    "exportPrivacyPrivate": "Private",
+    "exportPrivacyPublic": "Public",
+    "exportPrivacyShort": {
+      "unlisted": "Unlisted",
+      "private": "Private",
+      "public": "Public"
+    },
+    "exporting": "Uploading...",
+    "exportButton": "Export to {destination}",
+    "exportVideoTitle": "Video title",
+    "exportVideoDescription": "Video description",
+    "exportNeedsPermission": "Exporting needs permission to make changes on the ad platforms. Ask a project admin.",
+    "exportDone": "Uploaded to {destination}.",
+    "exportFailure": {
+      "auth_failed": "The platform rejected the saved credentials. Reconnect the account in project resources.",
+      "quota_exceeded": "The platform upload quota is used up for today.",
+      "rejected": "The platform refused the video.",
+      "upload_failed": "The upload failed. Try again.",
+      "no_secret": "The connection has no credentials saved.",
+      "invalid_credential": "The saved credentials are not in the expected format."
+    },
+    "exportInvalid": "Check the export details: {reasons}",
+    "exportVideoNotReady": "That video is not assembled yet.",
+    "exportHistory": "Exports",
+    "exportHistoryEmpty": "Nothing exported yet.",
+    "exportStatus": {
+      "uploading": "Uploading",
+      "done": "Uploaded",
+      "failed": "Failed"
+    },
+    "exportOpen": "Open",
+    "stageExportValue": "{count, plural, one {# upload} other {# uploads}}"
   }
 }

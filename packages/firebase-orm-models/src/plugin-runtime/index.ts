@@ -9,6 +9,7 @@ export * from './saas-metric-pack';
 export * from './engagement-pack';
 export * from './google-ads';
 export * from './meta-ads';
+export * from './youtube';
 export * from './meta-custom-audience';
 export * from './google-customer-match';
 export * from './builtin-metric-units';

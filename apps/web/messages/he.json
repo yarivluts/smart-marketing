@@ -3214,7 +3214,8 @@
       "stripe": "Stripe",
       "ga4": "GA4",
       "generic": "כללי",
-      "simulated": "סימולציה"
+      "simulated": "סימולציה",
+      "youtube": "YouTube"
     },
     "status": {
       "enabled": "פעיל",
@@ -3985,6 +3986,60 @@
       "credential_not_configured": "מצורף חיבור Google Ads, אבל עדיין לא הוגדר לו סוד.",
       "vault_not_configured": "כספת הסודות לא מוגדרת בסביבה הזו, ולכן אי אפשר לקרוא את חיבור Google Ads."
     },
-    "planningAdminHint": "הניתוח המעמיק קורא גם את דף הנחיתה (רק דפי https ציבוריים) ואת תוצאות דפי הנחיתה של 90 הימים האחרונים ממחסן הנתונים. מקור חסר מוצג כחסר ולעולם לא מוערך."
+    "planningAdminHint": "הניתוח המעמיק קורא גם את דף הנחיתה (רק דפי https ציבוריים) ואת תוצאות דפי הנחיתה של 90 הימים האחרונים ממחסן הנתונים. מקור חסר מוצג כחסר ולעולם לא מוערך.",
+    "exportTitle": "ייצוא",
+    "exportDescription": "שלחו את הסרטון המוגמר, באורך {seconds} שניות, לחשבון המודעות שלכם במטא או לערוץ היוטיוב.",
+    "exportNeedsVideo": "חברו קודם את הסרטון. אפשר לייצא רק את הסרטון המוגמר העדכני.",
+    "exportDestination": {
+      "meta": "פייסבוק ואינסטגרם",
+      "youtube": "יוטיוב"
+    },
+    "exportDestinationHint": {
+      "meta": "עולה לספריית הסרטונים של חשבון המודעות, מוכן לשימוש במודעת וידאו.",
+      "youtube": "עולה לערוץ, מוכן למודעות וידאו ביוטיוב."
+    },
+    "exportConnected": "מחובר",
+    "exportNotConnected": "לא מחובר",
+    "exportVia": "דרך החיבור \"{name}\".",
+    "exportUnavailable": {
+      "not_attached": "לא מחובר חיבור לפרויקט הזה.",
+      "read_only": "החיבור המחובר הוא לקריאה בלבד. מנהל ארגון יכול לשנות את רמת הכתיבה שלו.",
+      "no_secret": "לחיבור המחובר עדיין לא נשמרו פרטי גישה."
+    },
+    "exportOpenResources": "פתיחת משאבי הפרויקט",
+    "exportPrivacy": "נראות ביוטיוב",
+    "exportPrivacyUnlisted": "לא רשום - רק למי שיש קישור",
+    "exportPrivacyPrivate": "פרטי",
+    "exportPrivacyPublic": "ציבורי",
+    "exportPrivacyShort": {
+      "unlisted": "לא רשום",
+      "private": "פרטי",
+      "public": "ציבורי"
+    },
+    "exporting": "מעלה...",
+    "exportButton": "ייצוא ל{destination}",
+    "exportVideoTitle": "כותרת הסרטון",
+    "exportVideoDescription": "תיאור הסרטון",
+    "exportNeedsPermission": "ייצוא דורש הרשאה לבצע שינויים בפלטפורמות המודעות. פנו למנהל הפרויקט.",
+    "exportDone": "הועלה ל{destination}.",
+    "exportFailure": {
+      "auth_failed": "הפלטפורמה דחתה את פרטי הגישה השמורים. חברו מחדש את החשבון במשאבי הפרויקט.",
+      "quota_exceeded": "מכסת ההעלאות של הפלטפורמה נוצלה להיום.",
+      "rejected": "הפלטפורמה דחתה את הסרטון.",
+      "upload_failed": "ההעלאה נכשלה. נסו שוב.",
+      "no_secret": "לחיבור לא נשמרו פרטי גישה.",
+      "invalid_credential": "פרטי הגישה השמורים אינם במבנה הצפוי."
+    },
+    "exportInvalid": "בדקו את פרטי הייצוא: {reasons}",
+    "exportVideoNotReady": "הסרטון הזה עדיין לא חובר.",
+    "exportHistory": "ייצואים",
+    "exportHistoryEmpty": "עדיין לא יוצא דבר.",
+    "exportStatus": {
+      "uploading": "מעלה",
+      "done": "הועלה",
+      "failed": "נכשל"
+    },
+    "exportOpen": "פתיחה",
+    "stageExportValue": "{count, plural, one {העלאה אחת} other {# העלאות}}"
   }
 }

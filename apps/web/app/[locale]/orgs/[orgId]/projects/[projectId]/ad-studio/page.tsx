@@ -14,6 +14,9 @@ import {
   listAdStudioClips,
   listAdStudioUsage,
   listAdStudioVideos,
+  listAdStudioExports,
+  resolveAdStudioExportDestinations,
+  toAdStudioExportView,
   toAdStudioBriefView,
 } from '@/lib/ad-studio/store';
 import { describeAdStudioProviders } from '@/lib/ad-studio/llm';
@@ -28,6 +31,7 @@ import { ChartCard, EmptyState, FlowDiagram, PageHero, type FlowEdgeSpec, type F
 import { BriefForm } from '@/components/ad-studio/brief-form';
 import { ScriptEditor } from '@/components/ad-studio/script-editor';
 import { VideoStudio } from '@/components/ad-studio/video-studio';
+import { ExportPanel } from '@/components/ad-studio/export-panel';
 import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
 import { PlanningPanel } from '@/components/ad-studio/planning-panel';
@@ -69,6 +73,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
     notFound();
   }
   const canConfigure = can(bindings, principal, 'project.configure', { orgId, projectId });
+  const canExport = can(bindings, principal, 'automation.execute', { orgId, projectId });
 
   const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable] = await Promise.all([
     listOrgProjects(orgId),
@@ -93,12 +98,20 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   const storage = resolveAdStudioMediaStorage().describe();
 
   // The selected ad's clips and assembled videos, and how far its video stage has come.
-  const [clipModels, videoModels] = selected
-    ? await Promise.all([listAdStudioClips(orgId, projectId, selected.id), listAdStudioVideos(orgId, projectId, selected.id)])
-    : [[], []];
+  const [clipModels, videoModels, exportRows, exportDestinations] = selected
+    ? await Promise.all([
+        listAdStudioClips(orgId, projectId, selected.id),
+        listAdStudioVideos(orgId, projectId, selected.id),
+        listAdStudioExports(orgId, projectId, selected.id),
+        resolveAdStudioExportDestinations(orgId, projectId),
+      ])
+    : [[], [], [], null];
+  const exportsView = exportRows.map(toAdStudioExportView);
+  const uploadedCount = exportsView.filter((row) => row.status === 'done').length;
   const clips = clipModels.map(toAdStudioClipView);
   const videos = videoModels.map(toAdStudioVideoView);
   let videoStage: (AdStudioVideoStageProgress & { assembledSeconds: number | null }) | undefined;
+  let exportableVideo: { id: string; durationSeconds: number } | null = null;
   if (selected) {
     const context = { format: selected.format, language: selected.language };
     const progress = summarizeVideoProgress(sceneVideoStates(selected.scenes, clips, context), selected.scenes);
@@ -110,10 +123,12 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
       assembled: assembled.current,
       assembledSeconds: assembled.current ? (assembled.latest?.durationSeconds ?? null) : null,
     };
+    // Only the current assembled video is offered for export - never one made from out-of-date clips.
+    if (assembled.current && assembled.latest) exportableVideo = { id: assembled.latest.id, durationSeconds: assembled.latest.durationSeconds };
   }
 
   const stageNodes: FlowNodeSpec[] = selected
-    ? adStudioStages(selected, videoStage).map((stage) => ({
+    ? adStudioStages(selected, videoStage, uploadedCount > 0).map((stage) => ({
         id: stage.id,
         label: t(`stage.${stage.id}`),
         sublabel: t(`stageStatus.${stage.status}`),
@@ -128,7 +143,9 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                   ? videoStage.assembled
                     ? t('stageVideoAssembled', { seconds: Math.round((videoStage.assembledSeconds ?? 0) * 10) / 10 })
                     : t('stageVideoValue', { rendered: videoStage.rendered, total: videoStage.scenes })
-                  : undefined,
+                  : stage.id === 'export' && uploadedCount > 0
+                    ? t('stageExportValue', { count: uploadedCount })
+                    : undefined,
         status: STAGE_STATUS[stage.status],
       }))
     : [];
@@ -222,6 +239,28 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
               videoSecondsLeft={Math.max(0, settings.dailyVideoSeconds - usageToday.videoSeconds)}
             />
           </div>
+
+          {exportDestinations ? (
+            <ExportPanel
+              orgId={orgId}
+              projectId={projectId}
+              briefId={selected.id}
+              video={exportableVideo}
+              destinations={{
+                meta: exportDestinations.meta.available
+                  ? { available: true, credentialName: exportDestinations.meta.credentialName }
+                  : { available: false, reason: exportDestinations.meta.reason },
+                youtube: exportDestinations.youtube.available
+                  ? { available: true, credentialName: exportDestinations.youtube.credentialName }
+                  : { available: false, reason: exportDestinations.youtube.reason },
+              }}
+              exports={exportsView}
+              canExport={canExport}
+              defaultTitle={selected.name}
+              defaultDescription={selected.objective}
+              resourcesHref={`/orgs/${orgId}/projects/${projectId}/resources`}
+            />
+          ) : null}
 
           <details className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <summary className="cursor-pointer text-sm font-semibold">{t('editDetails')}</summary>

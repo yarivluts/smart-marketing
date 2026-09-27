@@ -7,6 +7,8 @@ import {
   getAdStudioClip as getAdStudioClipInOrganization,
   getAdStudioVideo as getAdStudioVideoInOrganization,
   listAdStudioClips as listAdStudioClipsInOrganization,
+  listAdStudioExports as listAdStudioExportsInOrganization,
+  resolveAdStudioExportDestinations as resolveAdStudioExportDestinationsInOrganization,
   listAdStudioVideos as listAdStudioVideosInOrganization,
   getAdStudioKeywordAccess as getAdStudioKeywordAccessInOrganization,
   getAdStudioSettings as getAdStudioSettingsInOrganization,
@@ -22,6 +24,8 @@ import {
   type AdStudioSettingsView,
   type AdStudioUsageModel,
   type AdStudioUsageToday,
+  type AdStudioExportDestinations,
+  type AdStudioExportModel,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
@@ -175,5 +179,42 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
       : null,
     createdOn: brief.created_on,
     lastChangedOn: brief.last_changed_on,
+  };
+}
+
+export async function resolveAdStudioExportDestinations(organizationId: string, projectId: string): Promise<AdStudioExportDestinations> {
+  await ensureFirestoreOrm();
+  return resolveAdStudioExportDestinationsInOrganization(organizationId, projectId);
+}
+
+export async function listAdStudioExports(organizationId: string, projectId: string, briefId: string): Promise<AdStudioExportModel[]> {
+  await ensureFirestoreOrm();
+  return listAdStudioExportsInOrganization(organizationId, projectId, briefId);
+}
+
+/** An export as the client receives it. */
+export interface AdStudioExportView {
+  id: string;
+  videoId: string;
+  destination: 'meta' | 'youtube';
+  title: string;
+  privacy: string | null;
+  status: 'uploading' | 'done' | 'failed';
+  externalUrl: string | null;
+  failureCode: string | null;
+  requestedOn: string;
+}
+
+export function toAdStudioExportView(row: AdStudioExportModel): AdStudioExportView {
+  return {
+    id: row.id,
+    videoId: row.video_id,
+    destination: row.destination,
+    title: row.title,
+    privacy: row.privacy ?? null,
+    status: row.status,
+    externalUrl: row.external_url ?? null,
+    failureCode: row.failure_code ?? null,
+    requestedOn: row.requested_on,
   };
 }

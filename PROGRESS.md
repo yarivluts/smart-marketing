@@ -17,6 +17,25 @@ Template for each entry:
 
 ---
 
+## 2026-09-28 - AI Ad Studio: plan, script, video, export (KAN-228..232)
+
+- **Last completed:** the Ad Studio (`/orgs/:org/projects/:project/ad-studio`), with four stages:
+  - **Brief + script** (#540, KAN-228/229): an AI script of 3-10s scenes, at most 60s in total. Every scene is editable and can be rewritten by AI. Uses Claude `claude-opus-5` or Gemini `gemini-3.8-flash`. Daily limits for text calls and video seconds are editable in the admin panel.
+  - **Deep plan** (#541, KAN-230): reads the landing page (SSRF-guarded), the project's real results and campaigns, and Google Ads keyword volumes, then recommends the next ads.
+  - **Video** (#542, KAN-231): Gemini Omni (`gemini-omni-1.1-flash`) clip per scene, with prompt edits per clip. ffmpeg assembles the clips into one video, stored in the private bucket `growthos-g2w84-ad-studio`.
+  - **Export** (#543, KAN-232): YouTube resumable upload (new `youtube` credential: clientId, clientSecret, refreshToken) and Meta `act_{id}/advideos` (Graph v25.0). Gated on `automation.execute` and audited. A destination is usable only with an attached credential that has a write tier and a saved secret; otherwise the panel names the reason.
+  - Every export is recorded with its outcome (`ad_studio_exports`).
+  - Export was browser-checked on a local production build (emulators, fake Omni, a local media folder, a seeded Meta connection) in en, he and mobile. The check found a date-locale bug in the export and usage lists, now fixed. Nothing was sent to Meta or Google.
+- **In progress (exact stopping point):** none.
+- **Blocked + why:**
+  - Real video generation: the Gemini account answers 402 (prepayment credits depleted) until it is topped up.
+  - Omni `background:true` has never run against the live API; it is covered only by the fake server.
+- **Next step:** KAN-233 - the Google Ads client still calls v17, which is sunset. Keyword ideas already use v25.
+- **Waiting on human:**
+  - Top up Gemini credits.
+  - For YouTube export: create an OAuth client and refresh token with the `youtube.upload` scope, save it as a `youtube` credential and attach it to the project with a write tier.
+  - For Meta export: attach a Meta credential to the project with a write tier other than read.
+
 ## 2026-09-27 - UI overhaul shipped, backfill live with EasySign, e2e on a production build
 
 ### Deployed (api-prod/api-preprod/web-prod/web-preprod at 810a56f; dbt-refresh unchanged since 9d51c51)

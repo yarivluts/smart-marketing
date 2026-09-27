@@ -86,7 +86,7 @@ export function BriefForm({ orgId, projectId, briefId, initial = EMPTY, studioHr
         {t('fieldLandingPage')}
         <input value={values.landingPageUrl} onChange={(event) => set('landingPageUrl', event.target.value)} type="url" dir="ltr" placeholder={t('landingPagePlaceholder')} className={inputClass} />
       </label>
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_minmax(0,1fr)]">
         <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
           {t('fieldFormat')}
           <select value={values.format} onChange={(event) => set('format', event.target.value as AdStudioFormat)} className={inputClass}>
