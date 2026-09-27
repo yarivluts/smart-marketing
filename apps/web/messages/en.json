@@ -2261,7 +2261,9 @@
       "relative": "Rolling range",
       "absolute": "Fixed dates"
     },
-    "settingsDescription": "Name, date range, comparison and filters apply to every tile below."
+    "settingsDescription": "Name, date range, comparison and filters apply to every tile below.",
+    "tableRowCount": "{count, plural, one {# row} other {# rows}}",
+    "tableNewestFirst": "newest first"
   },
   "Goals": {
     "metaTitle": "Goals",

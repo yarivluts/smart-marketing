@@ -654,6 +654,16 @@ function compareColumnValues(a: string | number | null, b: string | number | nul
   return String(a).localeCompare(String(b));
 }
 
+/**
+ * The column a table tile sorts by when the viewer has not chosen one: its first date-like column
+ * (`bucket_date`, `day`, `week`, `month`, `*_date`, `*_at`), newest first. Rows arrive oldest first
+ * from the query, so without this the newest data - usually what the tile is for - sat below the
+ * fold of the tile's scroll box (B28).
+ */
+export function defaultTableSortColumn(columns: readonly string[]): string | null {
+  return columns.find((column) => /(^|_)(date|day|week|month)$|_at$/.test(column)) ?? null;
+}
+
 function TableView({
   view,
   tileId,
@@ -680,20 +690,25 @@ function TableView({
   // Hiding every column would render a blank table indistinguishable from "no data" — always keep at least one.
   const columns = visibleColumns.length > 0 ? visibleColumns : view.columns;
 
-  const sortColumn = prefs.sortColumn;
+  // The viewer's own sort wins; without one, a date-like column sorts newest first (B28).
+  const chosenSort = prefs.sortColumn !== null && view.columns.includes(prefs.sortColumn) ? prefs.sortColumn : null;
+  const defaultSort = chosenSort === null ? defaultTableSortColumn(view.columns) : null;
+  const sortColumn = chosenSort ?? defaultSort;
+  const sortDirection: 'asc' | 'desc' = chosenSort !== null ? prefs.sortDirection : 'desc';
   const rows =
-    sortColumn !== null && view.columns.includes(sortColumn)
+    sortColumn !== null
       ? [...view.rows].sort((a, b) => {
           const compared = compareColumnValues(a[sortColumn] ?? null, b[sortColumn] ?? null);
-          return prefs.sortDirection === 'desc' ? -compared : compared;
+          return sortDirection === 'desc' ? -compared : compared;
         })
       : view.rows;
 
   function toggleSort(column: string): void {
+    // Toggles from what is shown, so the first click on a newest-first date column turns it oldest first.
     setPrefs((current) => ({
       ...current,
       sortColumn: column,
-      sortDirection: current.sortColumn === column && current.sortDirection === 'asc' ? 'desc' : 'asc',
+      sortDirection: sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc',
     }));
   }
 
@@ -736,8 +751,8 @@ function TableView({
                   <th
                     key={column}
                     scope="col"
-                    aria-sort={isSorted ? (prefs.sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                    className="border-b border-input px-2 py-1 font-medium"
+                    aria-sort={isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    className="sticky top-0 border-b border-input bg-card px-2 py-1 font-medium"
                   >
                     <button
                       type="button"
@@ -746,7 +761,7 @@ function TableView({
                       aria-label={t('sortColumnLabel', { column })}
                     >
                       {column}
-                      {isSorted ? <span aria-hidden="true">{prefs.sortDirection === 'asc' ? '▲' : '▼'}</span> : null}
+                      {isSorted ? <span aria-hidden="true">{sortDirection === 'asc' ? '▲' : '▼'}</span> : null}
                     </button>
                   </th>
                 );
@@ -793,6 +808,12 @@ function TableView({
           </tbody>
         </table>
       </div>
+      {/* The count is always shown: the scroll box's own scrollbar is invisible on overlay-scrollbar
+          systems, so it is the only sign that more rows exist than fit (B28). */}
+      <p data-testid="table-row-count" className="text-[11px] text-muted-foreground">
+        {t('tableRowCount', { count: rows.length })}
+        {defaultSort !== null ? ` · ${t('tableNewestFirst')}` : null}
+      </p>
     </div>
   );
 }

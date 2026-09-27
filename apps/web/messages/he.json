@@ -2261,7 +2261,9 @@
       "relative": "טווח מתגלגל",
       "absolute": "תאריכים קבועים"
     },
-    "settingsDescription": "השם, טווח התאריכים, ההשוואה והמסננים חלים על כל האריחים שבהמשך."
+    "settingsDescription": "השם, טווח התאריכים, ההשוואה והמסננים חלים על כל האריחים שבהמשך.",
+    "tableRowCount": "{count, plural, one {שורה אחת} other {# שורות}}",
+    "tableNewestFirst": "החדשות ראשונות"
   },
   "Goals": {
     "metaTitle": "יעדים",
