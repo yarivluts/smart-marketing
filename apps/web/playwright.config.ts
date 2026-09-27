@@ -16,6 +16,9 @@ const sandboxChromiumExecutable = existsSync(SANDBOX_CHROMIUM_PATH) ? SANDBOX_CH
 
 export default defineConfig({
   testDir: './e2e',
+  // Compiles every route the specs visit once the dev server is up (the webServer starts before
+  // global setup), so no spec pays a cold compile inside an assertion window. See the file's comment.
+  globalSetup: './e2e/global-setup.ts',
   // The onboarding wizard (KAN-68) now sits between "create a project" and the org page for every
   // spec that creates a project through the UI — one more first-compile-in-this-run page in a hot
   // path most specs already exercise, on top of the "cold dev-server compile" budget individual
@@ -50,7 +53,11 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: `pnpm exec next dev -p ${PORT}`,
+    // E2E_PROD_SERVER=1 (CI, via scripts/e2e-sharded.mjs): serve the production build made once
+    // before the shards, so no navigation waits on an on-demand `next dev` compile or a Fast Refresh
+    // rebuild - the cause of the timing failures the retries and timeouts above only papered over.
+    // Unset (a local `playwright test`): the dev server, as before.
+    command: process.env.E2E_PROD_SERVER === '1' ? `pnpm exec next start -p ${PORT}` : `pnpm exec next dev -p ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: false,
     timeout: 120_000,
