@@ -25,6 +25,8 @@ export interface AdStudioAdminPanelProps {
   canConfigure: boolean;
   textModel: { provider: 'anthropic' | 'gemini'; model: string } | null;
   videoConfigured: boolean;
+  /** Whether deep analysis can read Google Ads keyword volumes for this project, and why not (KAN-230). */
+  keywordData: { available: true; credentialName: string } | { available: false; reason: 'no_google_ads_credential' | 'credential_not_configured' | 'vault_not_configured' };
   limits: { dailyTextGenerations: number; dailyVideoSeconds: number };
   usageToday: { textGenerations: number; videoSeconds: number };
   recentUsage: AdStudioUsageRow[];
@@ -48,11 +50,12 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
 }
 
 /**
- * The studio's admin surface: which models it uses, the project's daily limits (editable with
- * `project.configure`, audited server-side), today's usage against them and the recent AI calls with
- * their outcome - so spend and failures such as a provider out of credit are visible, not guessed.
+ * The studio's admin surface: which models it uses, whether deep analysis has Google Ads keyword
+ * data and why not, the project's daily limits (editable with `project.configure`, audited
+ * server-side), today's usage against them and the recent AI calls with their outcome - so spend and
+ * failures such as a provider out of credit are visible, not guessed.
  */
-export function AdStudioAdminPanel({ orgId, projectId, canConfigure, textModel, videoConfigured, limits, usageToday, recentUsage }: AdStudioAdminPanelProps): React.ReactElement {
+export function AdStudioAdminPanel({ orgId, projectId, canConfigure, textModel, videoConfigured, keywordData, limits, usageToday, recentUsage }: AdStudioAdminPanelProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -108,6 +111,13 @@ export function AdStudioAdminPanel({ orgId, projectId, canConfigure, textModel, 
         <div className="rounded-xl border border-border px-3 py-2">
           <dt className="text-xs text-muted-foreground">{t('videoModel')}</dt>
           <dd className={cn('text-sm font-medium', !videoConfigured && 'text-destructive')}>{videoConfigured ? t('videoModelValue') : t('notConfigured')}</dd>
+        </div>
+        <div className="rounded-xl border border-border px-3 py-2 sm:col-span-2" data-testid="ad-studio-keyword-data">
+          <dt className="text-xs text-muted-foreground">{t('keywordData')}</dt>
+          <dd className={cn('text-sm font-medium', !keywordData.available && 'text-warning')}>
+            {keywordData.available ? t('keywordDataValue', { credential: keywordData.credentialName }) : t(`keywordDataMissing.${keywordData.reason}`)}
+          </dd>
+          <p className="mt-1 text-xs text-muted-foreground">{t('planningAdminHint')}</p>
         </div>
       </dl>
 

@@ -3634,6 +3634,7 @@
     "providerNotConfigured": "No AI provider is configured for this deployment, so scripts cannot be written yet. Existing ads can still be edited by hand.",
     "stage": {
       "brief": "Brief",
+      "plan": "Plan",
       "script": "Script",
       "video": "Video",
       "export": "Export"
@@ -3641,7 +3642,8 @@
     "stageStatus": {
       "done": "Done",
       "current": "Next step",
-      "upcoming": "Later"
+      "upcoming": "Later",
+      "skipped": "Skipped"
     },
     "stageScriptValue": "{scenes, plural, one {# scene} other {# scenes}} · {seconds}s",
     "formatVerticalShort": "Vertical 9:16",
@@ -3771,6 +3773,124 @@
       "failed": "Failed"
     },
     "deleteConfirm": "Delete this ad and its script?",
-    "deleteAd": "Delete ad"
+    "deleteAd": "Delete ad",
+    "stagePlanValue": "{count, plural, one {# recommendation} other {# recommendations}}",
+    "plan": {
+      "title": "Deep analysis",
+      "description": "Reads your landing page, measured results, campaigns and Google keyword volumes, then plans the ad from that evidence.",
+      "run": "Run deep analysis",
+      "rerun": "Run again",
+      "running": "Analyzing...",
+      "runningHint": "Reading the landing page, results, campaigns and keyword volumes. This can take up to a minute.",
+      "noProvider": "No AI provider is configured for this deployment, so deep analysis cannot run.",
+      "emptyTitle": "No analysis yet",
+      "emptyDescription": "Run a deep analysis to see what the evidence says before writing the script. The script writer then builds on it.",
+      "generatedBy": "Analyzed by {model} on {date}",
+      "done": "Analysis ready.",
+      "sourcesTitle": "Data sources",
+      "sourcesDescription": "What the analysis could read. Anything missing is left out, never estimated.",
+      "source": {
+        "landing_page": "Landing page",
+        "results": "Measured results",
+        "campaigns": "Existing campaigns",
+        "keywords": "Keyword volumes",
+        "market": "Market knowledge"
+      },
+      "sourceOk": "Used",
+      "sourceUnavailable": "Not available",
+      "sourceModel": "Model knowledge",
+      "marketHint": "General knowledge from the AI model. Not measured.",
+      "landingPageRead": "Read {url}",
+      "reasons": {
+        "landing_page": {
+          "no_url": "The brief has no landing page.",
+          "blocked_url": "The address is not a public https page, so it was not read.",
+          "timeout": "The page did not answer within 10 seconds.",
+          "fetch_failed": "The page could not be reached.",
+          "http_error": "The page returned an error.",
+          "not_html": "The address is not a web page.",
+          "too_many_redirects": "The page redirects too many times.",
+          "empty_page": "The page has no readable text."
+        },
+        "results": {
+          "no_environment": "The project has no environment to read.",
+          "warehouse_not_configured": "The data warehouse is not connected yet.",
+          "warehouse_error": "The warehouse query failed.",
+          "query_quota_exceeded": "The project's daily query limit is reached.",
+          "no_traffic": "No landing page visits in the last 90 days."
+        },
+        "campaigns": {
+          "no_campaigns": "The project has no campaigns yet."
+        },
+        "keywords": {
+          "no_google_ads_credential": "No Google Ads credential is attached to the project.",
+          "vault_not_configured": "The secret vault is not configured for this deployment.",
+          "credential_not_configured": "The attached Google Ads credential is incomplete.",
+          "no_seeds": "There was nothing to seed a keyword search with.",
+          "google_ads_auth_failed": "Google refused the Google Ads sign-in.",
+          "developer_token_not_approved": "The Google Ads developer token is not approved for keyword planning.",
+          "google_ads_error": "Google Ads returned an error.",
+          "no_ideas": "Google Ads had no keyword ideas for this ad."
+        }
+      },
+      "summaryTitle": "Plan",
+      "audience": "Audience",
+      "landingPageSummary": "What the landing page says",
+      "anglesTitle": "Messaging angles",
+      "themesTitle": "Keyword themes",
+      "recommendationsTitle": "Recommended next steps",
+      "recommendationsDescription": "Each one names the evidence it rests on.",
+      "priority": {
+        "high": "High priority",
+        "medium": "Medium priority",
+        "low": "Low priority"
+      },
+      "unsupported": "No available evidence behind this - treat it as a suggestion.",
+      "marketTitle": "Market notes",
+      "marketDescription": "General model knowledge, not measured data. Check it before relying on it.",
+      "pagesChartTitle": "Visitors per landing page",
+      "pagesChartDescription": "Last {days} days in the {environment} environment. Visitors are summed daily landings; conversions are last-touch.",
+      "pageSublabel": "{conversions} conversions · {rate} conversion rate",
+      "campaignsRateTitle": "Conversion rate by campaign",
+      "campaignsRateDescription": "Conversions per visitor for each campaign id, same window.",
+      "campaignRateSublabel": "{visitors} visitors · {conversions} conversions",
+      "noRate": "no visitors",
+      "totals": "{visitors} visitors · {conversions} conversions · {rate} overall",
+      "keywordsChartTitle": "Keyword ideas by monthly searches",
+      "keywordsChartDescription": "Google Ads Keyword Planner: average monthly searches over the last 12 months.",
+      "competition": {
+        "LOW": "Low competition",
+        "MEDIUM": "Medium competition",
+        "HIGH": "High competition",
+        "unknown": "Competition not reported"
+      },
+      "keywordSublabel": "{competition}",
+      "keywordSublabelBid": "{competition} · top-of-page bid {low}-{high}",
+      "volumeUnknown": "not reported",
+      "campaignsTitle": "Existing campaigns",
+      "campaignsDescription": "Your campaigns by daily budget (USD), with their imported ads.",
+      "campaignSublabel": "{platform} · {status} · {ads, plural, one {# ad} other {# ads}}",
+      "platform": {
+        "google_ads": "Google Ads",
+        "meta_ads": "Meta",
+        "unknown": "Platform unknown"
+      },
+      "campaignStatus": {
+        "enabled": "Live",
+        "paused": "Paused",
+        "removed": "Removed",
+        "unknown": "Status unknown"
+      },
+      "unavailableChart": "Not available: {reason}",
+      "more": "+{count} more"
+    },
+    "keywordData": "Keyword volumes (Google Ads)",
+    "keywordDataValue": "Available through {credential}",
+    "keywordDataMissing": {
+      "no_google_ads_credential": "No Google Ads credential is attached to this project. Attach one in the resource library to add real search volumes to deep analysis.",
+      "credential_not_configured": "A Google Ads credential is attached but has no secret set yet.",
+      "vault_not_configured": "The secret vault is not configured for this deployment, so the Google Ads credential cannot be read."
+    },
+    "planningAdminHint": "Deep analysis also reads the landing page (public https pages only) and the last 90 days of landing page results from the warehouse. A missing source is shown as missing, never estimated."
   }
 }
