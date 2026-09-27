@@ -1,7 +1,12 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { BarChart3, CalendarRange, DatabaseZap, Layers, MessageSquareQuote, PieChart, Quote, Tags, TrendingDown, UserMinus } from 'lucide-react';
 import { can } from '@growthos/shared';
-import { CHURN_REASON_PACK_PLUGIN_ID, type CancellationReasonBreakdownDimension } from '@growthos/firebase-orm-models';
+import {
+  CHURN_REASON_PACK_PLUGIN_ID,
+  DEFAULT_CANCELLATION_REASON_RECORD_LIMIT,
+  type CancellationReasonBreakdownDimension,
+} from '@growthos/firebase-orm-models';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -15,8 +20,16 @@ import {
   listPluginInstallsForProject,
 } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
-import { cancellationReasonCodeLabelKey, cancellationReasonThemeLabelKey, toCancellationReasonDimensionBreakdownRows } from '@/lib/orgs/churn-reason-view';
-import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import {
+  cancellationReasonCodeLabelKey,
+  cancellationReasonThemeLabelKey,
+  toCancellationReasonDimensionBreakdownRows,
+  toCancellationTrend,
+} from '@/lib/orgs/churn-reason-view';
+import { PackSetupLanding } from '@/components/orgs/pack-setup-landing';
+import { ThemeDigestGrid } from '@/components/orgs/theme-digest-grid';
+import { StatCard } from '@/components/ui/stat-card';
+import { BarList, ChartCard, DonutChart, EmptyState, PageHero, TrendChart } from '@/components/viz';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -34,6 +47,9 @@ const DIMENSIONS: readonly { key: CancellationReasonBreakdownDimension; headingK
   { key: 'cohort_month', headingKey: 'byCohortHeading', emptyKey: 'byCohortEmpty' },
 ];
 
+/** Weeks of history the cancellations-per-week chart covers. */
+const TREND_WEEKS = 12;
+
 /**
  * A project's structured + free-text churn-reason breakdown (KAN-84, plan
  * `14 §Gap 10`) — mirrors the Feedback & NPS page's own shape exactly (same
@@ -46,6 +62,9 @@ const DIMENSIONS: readonly { key: CancellationReasonBreakdownDimension; headingK
  * compiler, degrading per-dimension (not blanking the whole page) the same
  * way a board tile degrades when the warehouse isn't configured yet
  * (`queryBoardTile`, KAN-60).
+ *
+ * The weekly trend is bucketed from the same bounded read as the reason
+ * donut (`toCancellationTrend`), so the two always add up to the same total.
  */
 export default async function ChurnReasonsPage({ params }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
@@ -76,11 +95,22 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === CHURN_REASON_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PackSetupLanding
+        orgId={orgId}
+        projectId={projectId}
+        icon={UserMinus}
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        intro={t('setupIntro')}
+        featuresTitle={t('setupFeaturesTitle')}
+        installTitle={t('setupInstallTitle')}
+        packs={installablePacks}
+        features={[
+          { key: 'reasons', icon: PieChart, title: t('setupFeatureReasonsTitle'), description: t('setupFeatureReasonsDescription') },
+          { key: 'trend', icon: TrendingDown, title: t('setupFeatureTrendTitle'), description: t('setupFeatureTrendDescription') },
+          { key: 'themes', icon: MessageSquareQuote, title: t('setupFeatureThemesTitle'), description: t('setupFeatureThemesDescription') },
+        ]}
+      />
     );
   }
 
@@ -91,83 +121,121 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
     Promise.all(DIMENSIONS.map((dimension) => getCancellationReasonDimensionBreakdownForProject(orgId, projectId, dimension.key))),
   ]);
 
+  const numberFormat = new Intl.NumberFormat(locale);
+  const weekFormat = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const dayFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' });
+  const totalCancellations = codeBreakdown.reduce((sum, entry) => sum + entry.count, 0);
+  const topReason = codeBreakdown[0] ?? null;
+  const themeCoverage = themeDigest.totalComments > 0 ? Math.round((themeDigest.matchedComments / themeDigest.totalComments) * 100) : null;
+  const trend = toCancellationTrend(cancellationRecords, { now: new Date(), weeks: TREND_WEEKS, cap: DEFAULT_CANCELLATION_REASON_RECORD_LIMIT });
+  const countLabel = (count: number) => t('reasonCodeCount', { count });
+
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={UserMinus} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiCancellations')} value={totalCancellations > 0 ? numberFormat.format(totalCancellations) : t('kpiNoValue')} icon={UserMinus} />
+          <StatCard
+            title={t('kpiTopReason')}
+            value={topReason ? t(cancellationReasonCodeLabelKey(topReason.reasonCode)) : t('kpiNoValue')}
+            subtext={topReason ? t('kpiTopReasonShare', { percent: Math.round((topReason.count / totalCancellations) * 100) }) : undefined}
+            icon={Tags}
+          />
+          <StatCard title={t('kpiComments')} value={themeDigest.totalComments > 0 ? numberFormat.format(themeDigest.totalComments) : t('kpiNoValue')} icon={MessageSquareQuote} />
+          <StatCard
+            title={t('kpiThemeCoverage')}
+            value={themeCoverage !== null ? t('kpiPercent', { percent: themeCoverage }) : t('kpiNoValue')}
+            progress={themeCoverage ?? undefined}
+            icon={Quote}
+          />
+        </div>
+      </PageHero>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('reasonCodeHeading')}</h2>
-        {codeBreakdown.length === 0 ? (
-          <p className="text-muted-foreground">{t('reasonCodeEmpty')}</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {codeBreakdown.map((entry) => (
-              <li key={entry.reasonCode} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                <span>{t(cancellationReasonCodeLabelKey(entry.reasonCode))}</span>
-                <span className="text-muted-foreground">{t('reasonCodeCount', { count: entry.count })}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {themeDigest.uncategorizedComments > 0 && themeDigest.clusters.length > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {t('themeDigestCoverage', { matched: themeDigest.matchedComments, total: themeDigest.totalComments })}
-          </p>
-        ) : null}
-      </section>
+      {codeBreakdown.length === 0 ? (
+        <EmptyState icon={UserMinus} title={t('reasonCodeEmpty')} description={t('reasonCodeEmptyDetail')} />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-5">
+          <ChartCard title={t('reasonCodeHeading')} description={t('reasonCodeDescription')} icon={PieChart} className="lg:col-span-2" fill>
+            <DonutChart
+              label={t('reasonCodeHeading')}
+              layout="stacked"
+              centerValue={numberFormat.format(totalCancellations)}
+              centerLabel={t('reasonCodeCenterLabel')}
+              data={codeBreakdown.map((entry) => ({ label: t(cancellationReasonCodeLabelKey(entry.reasonCode)), value: entry.count }))}
+            />
+          </ChartCard>
+          <ChartCard
+            title={t('trendTitle')}
+            description={t('trendDescription', { weeks: TREND_WEEKS })}
+            icon={CalendarRange}
+            className="lg:col-span-3"
+            fill
+            footer={trend.reliableFrom ? t('trendPartialNotice', { from: dayFormat.format(new Date(trend.reliableFrom)), limit: DEFAULT_CANCELLATION_REASON_RECORD_LIMIT }) : undefined}
+          >
+            <TrendChart
+              label={t('trendTitle')}
+              xKey="week"
+              kind="bar"
+              data={trend.buckets.map((bucket) => ({ week: weekFormat.format(new Date(bucket.start)), cancellations: bucket.count }))}
+              series={[{ key: 'cancellations', label: t('trendSeries'), color: 'hsl(var(--destructive))' }]}
+              height={340}
+            />
+          </ChartCard>
+        </div>
+      )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('themeDigestHeading')}</h2>
+      <ChartCard
+        title={t('themeDigestHeading')}
+        description={t('themeDigestDescription')}
+        icon={MessageSquareQuote}
+        footer={
+          themeDigest.uncategorizedComments > 0 && themeDigest.clusters.length > 0
+            ? t('themeDigestCoverage', { matched: themeDigest.matchedComments, total: themeDigest.totalComments })
+            : undefined
+        }
+      >
         {themeDigest.totalComments === 0 ? (
-          <p className="text-muted-foreground">{t('themeDigestEmpty')}</p>
+          <EmptyState icon={MessageSquareQuote} title={t('themeDigestEmpty')} compact />
         ) : themeDigest.clusters.length === 0 ? (
           // Distinct from "nothing landed": comments DID arrive and the fixed
           // English keyword lexicon matched none of them. Rendering the same
           // "no comments landed yet" line for both told a project whose
           // customers write in another language that nobody had commented.
-          <p className="text-muted-foreground">{t('themeDigestNoneMatched', { count: themeDigest.totalComments })}</p>
+          <EmptyState icon={MessageSquareQuote} title={t('themeDigestNoneMatched', { count: themeDigest.totalComments })} compact />
         ) : (
-          <ul className="flex flex-col gap-2">
-            {themeDigest.clusters.map((cluster) => (
-              <li key={cluster.theme} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{t(cancellationReasonThemeLabelKey(cluster.theme))}</span>
-                  <span className="text-xs text-muted-foreground">{t('themeCommentCount', { count: cluster.commentCount })}</span>
-                </div>
-                {cluster.exampleComments.map((comment, index) => (
-                  <span key={index} className="text-muted-foreground">
-                    {t('themeExampleComment', { comment })}
-                  </span>
-                ))}
-              </li>
-            ))}
-          </ul>
+          <ThemeDigestGrid
+            items={themeDigest.clusters.map((cluster) => ({
+              key: cluster.theme,
+              label: t(cancellationReasonThemeLabelKey(cluster.theme)),
+              count: cluster.commentCount,
+              countLabel: t('themeCommentCount', { count: cluster.commentCount }),
+              quotes: cluster.exampleComments.map((comment) => t('themeExampleComment', { comment })),
+            }))}
+          />
         )}
-      </section>
+      </ChartCard>
 
-      {DIMENSIONS.map((dimension, index) => {
-        const outcome = dimensionOutcomes[index];
-        return (
-          <section key={dimension.key} className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold tracking-tight">{t(dimension.headingKey)}</h2>
-            {!outcome.ok ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : outcome.rows.length === 0 ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {toCancellationReasonDimensionBreakdownRows(outcome.rows, dimension.key).map((row) => (
-                  <li key={row.value} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                    <span>{row.value || t('dimensionValueUnknown')}</span>
-                    <span className="text-muted-foreground">{t('reasonCodeCount', { count: row.count })}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {DIMENSIONS.map((dimension, index) => {
+          const outcome = dimensionOutcomes[index];
+          const rows = outcome.ok ? toCancellationReasonDimensionBreakdownRows(outcome.rows, dimension.key) : [];
+          return (
+            <ChartCard key={dimension.key} title={t(dimension.headingKey)} description={t('dimensionDescription')} icon={dimension.key === 'cohort_month' ? Layers : BarChart3} fill>
+              {rows.length === 0 ? (
+                <EmptyState icon={DatabaseZap} title={t(dimension.emptyKey)} compact />
+              ) : (
+                <BarList
+                  items={rows.map((row) => ({ key: row.value || '__unknown__', label: row.value || t('dimensionValueUnknown'), value: row.count }))}
+                  valueFormatter={countLabel}
+                  maxItems={8}
+                  moreLabel={(hidden) => t('dimensionMore', { count: hidden })}
+                  color="hsl(var(--destructive))"
+                />
+              )}
+            </ChartCard>
+          );
+        })}
+      </div>
     </main>
   );
 }

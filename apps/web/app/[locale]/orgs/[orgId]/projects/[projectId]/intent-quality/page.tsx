@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { BellRing, CalendarRange, DatabaseZap, Gauge, Radio, ShieldCheck, Sparkles, Target, Wallet } from 'lucide-react';
 import { can } from '@growthos/shared';
 import {
   DEFAULT_QUALITY_ADJUSTED_METRICS_WINDOW_DAYS,
@@ -20,9 +21,18 @@ import {
   listQualityMixAlertsForProject,
 } from '@/lib/orgs/queries';
 import { hasActiveInstall, toPluginInstallView } from '@/lib/orgs/plugin-view';
-import { qualityMixAlertStatusLabelKey, signupQualityScoreTierLabelKey, toQualityMixAlertView, toSignupQualityScoreDimensionBreakdownRows } from '@/lib/orgs/quality-score-view';
-import { InstallBuiltinPackSection } from '@/components/orgs/install-builtin-pack-section';
+import {
+  qualityMixAlertStatusLabelKey,
+  signupQualityScoreTierLabelKey,
+  toQualityMixAlertView,
+  toQualityTierSlices,
+  toSignupQualityScoreDimensionBreakdownRows,
+} from '@/lib/orgs/quality-score-view';
+import { PackSetupLanding } from '@/components/orgs/pack-setup-landing';
 import { CheckQualityMixAlertsButton } from '@/components/orgs/check-quality-mix-alerts-button';
+import { StatCard } from '@/components/ui/stat-card';
+import { BarList, ChartCard, ComparisonBars, DonutChart, EmptyState, PageHero, TrendChart } from '@/components/viz';
+import { cn } from '@/lib/utils';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
@@ -34,10 +44,8 @@ export async function generateMetadata({ params }: PageProps) {
   return { title: t('metaTitle') };
 }
 
-const DIMENSIONS: readonly { key: SignupQualityScoreBreakdownDimension; headingKey: string; emptyKey: string }[] = [
-  { key: 'channel_id', headingKey: 'byChannelHeading', emptyKey: 'byChannelEmpty' },
-  { key: 'cohort_month', headingKey: 'byCohortHeading', emptyKey: 'byCohortEmpty' },
-];
+/** Read in this order: the channel breakdown feeds the calibration bars, the cohort one the trend line. */
+const DIMENSIONS: readonly SignupQualityScoreBreakdownDimension[] = ['channel_id', 'cohort_month'];
 
 /**
  * A project's signup-quality score distribution, quality-adjusted CAC/CPS,
@@ -80,11 +88,22 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === QUALITY_SCORE_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-        <p className="text-sm text-muted-foreground">{t('setupIntro')}</p>
-        <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
-      </main>
+      <PackSetupLanding
+        orgId={orgId}
+        projectId={projectId}
+        icon={Gauge}
+        eyebrow={t('eyebrow')}
+        title={t('title', { projectName: project.name })}
+        intro={t('setupIntro')}
+        featuresTitle={t('setupFeaturesTitle')}
+        installTitle={t('setupInstallTitle')}
+        packs={installablePacks}
+        features={[
+          { key: 'tiers', icon: Gauge, title: t('setupFeatureTiersTitle'), description: t('setupFeatureTiersDescription') },
+          { key: 'channels', icon: Radio, title: t('setupFeatureChannelsTitle'), description: t('setupFeatureChannelsDescription') },
+          { key: 'alerts', icon: BellRing, title: t('setupFeatureAlertsTitle'), description: t('setupFeatureAlertsDescription') },
+        ]}
+      />
     );
   }
 
@@ -93,116 +112,173 @@ export default async function IntentQualityPage({ params }: PageProps): Promise<
     getSignupQualityScoreOverviewForProject(orgId, projectId, { precomputedRecords: surveyRecords }),
     getSignupQualityScoreAdjustedMetricsForProject(orgId, projectId),
     listQualityMixAlertsForProject(orgId, projectId),
-    Promise.all(DIMENSIONS.map((dimension) => getSignupQualityScoreDimensionBreakdownForProject(orgId, projectId, dimension.key))),
+    Promise.all(DIMENSIONS.map((dimension) => getSignupQualityScoreDimensionBreakdownForProject(orgId, projectId, dimension))),
   ]);
-  const alertViews = alerts.map(toQualityMixAlertView);
+  const alertViews = alertsSortedActiveFirst(alerts.map(toQualityMixAlertView));
+  const activeAlertCount = alertViews.filter((alert) => alert.status === 'active').length;
+
+  const numberFormat = new Intl.NumberFormat(locale);
+  const monthFormat = new Intl.DateTimeFormat(locale, { month: 'short', year: 'numeric', timeZone: 'UTC' });
+  const tierSlices = toQualityTierSlices(distribution);
+  const highShare = distribution.totalResponses > 0 ? Math.round((distribution.high / distribution.totalResponses) * 100) : null;
+  const averageScore = distribution.averageScore !== null ? Math.round(distribution.averageScore) : null;
+  const [channelOutcome, cohortOutcome] = dimensionOutcomes;
+  const channelRows = channelOutcome.ok ? toSignupQualityScoreDimensionBreakdownRows(channelOutcome.rows, 'channel_id') : [];
+  const cohortRows = cohortOutcome.ok
+    ? toSignupQualityScoreDimensionBreakdownRows(cohortOutcome.rows, 'cohort_month').sort((a, b) => a.value.localeCompare(b.value))
+    : [];
+  const cohortLabel = (value: string): string => {
+    const date = new Date(value);
+    return value && !Number.isNaN(date.getTime()) ? monthFormat.format(date) : value || t('dimensionValueUnknown');
+  };
 
   return (
-    <main className="container mx-auto flex max-w-3xl flex-col gap-8 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">{t('title', { projectName: project.name })}</h1>
-      <p className="text-sm text-muted-foreground">{t('description')}</p>
+    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <PageHero icon={Gauge} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <StatCard title={t('kpiScoredSignups')} value={distribution.totalResponses > 0 ? numberFormat.format(distribution.totalResponses) : t('kpiNoValue')} icon={Target} />
+          <StatCard title={t('kpiAverageScore')} value={averageScore !== null ? numberFormat.format(averageScore) : t('kpiNoValue')} progress={averageScore ?? undefined} icon={Gauge} />
+          <StatCard title={t('kpiHighShare')} value={highShare !== null ? t('kpiPercent', { percent: highShare }) : t('kpiNoValue')} progress={highShare ?? undefined} icon={Sparkles} />
+          <StatCard title={t('kpiActiveAlerts')} value={numberFormat.format(activeAlertCount)} icon={BellRing} />
+        </div>
+      </PageHero>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('distributionHeading')}</h2>
-        {distribution.totalResponses === 0 ? (
-          <p className="text-muted-foreground">{t('distributionEmpty')}</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">
-              {t('distributionAverage', { average: distribution.averageScore !== null ? Math.round(distribution.averageScore) : 0, count: distribution.totalResponses })}
-            </p>
-            <ul className="flex flex-col gap-1">
-              {(['low', 'medium', 'high'] as const).map((tier) => (
-                <li key={tier} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                  <span>{t(signupQualityScoreTierLabelKey(tier))}</span>
-                  <span className="text-muted-foreground">{t('distributionCount', { count: distribution[tier] })}</span>
+      <div className="grid gap-6 lg:grid-cols-5">
+        <ChartCard title={t('distributionHeading')} description={t('distributionDescription')} icon={Gauge} className="lg:col-span-2" fill>
+          {distribution.totalResponses === 0 ? (
+            <EmptyState icon={Gauge} title={t('distributionEmpty')} description={t('distributionEmptyDetail')} compact />
+          ) : (
+            <div className="flex flex-col gap-3">
+              <DonutChart
+                label={t('distributionHeading')}
+                layout="stacked"
+                centerValue={averageScore !== null ? numberFormat.format(averageScore) : undefined}
+                centerLabel={t('distributionCenterLabel')}
+                data={tierSlices.map((slice) => ({ label: t(signupQualityScoreTierLabelKey(slice.tier)), value: slice.count, color: slice.color }))}
+              />
+              <p className="text-xs text-muted-foreground">{t('distributionAverage', { average: averageScore ?? 0, count: distribution.totalResponses })}</p>
+            </div>
+          )}
+        </ChartCard>
+
+        <ChartCard title={t('byChannelHeading')} description={t('byChannelDescription')} icon={Radio} className="lg:col-span-3" fill>
+          {channelRows.length === 0 ? (
+            <EmptyState icon={DatabaseZap} title={t('byChannelEmpty')} compact />
+          ) : (
+            <BarList
+              items={channelRows.map((row) => ({
+                key: row.value || '__unknown__',
+                label: row.value || t('dimensionValueUnknown'),
+                sublabel: t('distributionCount', { count: row.sampleSize }),
+                value: row.averageScore ?? 0,
+              }))}
+              valueFormatter={(value) => t('scoreValue', { score: Math.round(value) })}
+              maxItems={8}
+              moreLabel={(hidden) => t('dimensionMore', { count: hidden })}
+            />
+          )}
+        </ChartCard>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ChartCard title={t('adjustedMetricsHeading')} icon={Wallet} footer={t('adjustedMetricsWindowNote', { days: DEFAULT_QUALITY_ADJUSTED_METRICS_WINDOW_DAYS })} fill>
+          {/* A CAC with no period attached is not interpretable — 90 days is a
+              choice this code makes, and the reader has no way to know it. The
+              quality weighting is stated for the same reason: "quality-adjusted"
+              names the adjustment without saying what it does (KAN-169). */}
+          {!adjustedMetrics.ok ? (
+            <EmptyState icon={DatabaseZap} title={t('adjustedMetricsEmpty')} compact />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <StatCard
+                title={t('qualityAdjustedCostPerSignupLabel')}
+                value={
+                  adjustedMetrics.metrics.costPerSignup !== null
+                    ? t('adjustedMetricsValue', { value: adjustedMetrics.metrics.costPerSignup.toFixed(2) })
+                    : t('adjustedMetricsValueUnavailable')
+                }
+                icon={Wallet}
+              />
+              <StatCard
+                title={t('qualityAdjustedCacLabel')}
+                value={adjustedMetrics.metrics.cac !== null ? t('adjustedMetricsValue', { value: adjustedMetrics.metrics.cac.toFixed(2) }) : t('adjustedMetricsValueUnavailable')}
+                icon={ShieldCheck}
+              />
+            </div>
+          )}
+        </ChartCard>
+
+        <ChartCard
+          title={t('mixAlertsHeading')}
+          description={t('mixAlertsDescription')}
+          icon={BellRing}
+          actions={<CheckQualityMixAlertsButton orgId={orgId} projectId={projectId} />}
+          fill
+        >
+          {alertViews.length === 0 ? (
+            <EmptyState icon={BellRing} title={t('mixAlertsEmpty')} compact />
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {alertViews.map((alert) => (
+                <li key={alert.id} className="flex flex-col gap-2 rounded-xl border border-border px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate font-medium text-foreground">{alert.channelId || t('dimensionValueUnknown')}</span>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
+                        alert.status === 'active' ? 'bg-warning/15 text-warning' : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {t(qualityMixAlertStatusLabelKey(alert.status))}
+                    </span>
+                  </div>
+                  <ComparisonBars
+                    label={t('mixAlertDelta', { baseline: Math.round(alert.baselineAvgScore), current: Math.round(alert.currentAvgScore) })}
+                    max={100}
+                    bars={[
+                      {
+                        key: 'baseline',
+                        label: t('mixAlertBaselineLabel'),
+                        value: alert.baselineAvgScore,
+                        display: t('scoreValue', { score: Math.round(alert.baselineAvgScore) }),
+                        color: 'hsl(var(--muted-foreground) / 0.45)',
+                      },
+                      {
+                        key: 'current',
+                        label: t('mixAlertCurrentLabel'),
+                        value: alert.currentAvgScore,
+                        display: t('scoreValue', { score: Math.round(alert.currentAvgScore) }),
+                        color: alert.currentAvgScore < alert.baselineAvgScore ? 'hsl(var(--warning))' : 'hsl(var(--success))',
+                      },
+                    ]}
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {t('mixAlertDelta', { baseline: Math.round(alert.baselineAvgScore), current: Math.round(alert.currentAvgScore) })}
+                  </span>
                 </li>
               ))}
             </ul>
-          </div>
-        )}
-      </section>
+          )}
+        </ChartCard>
+      </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-xl font-semibold tracking-tight">{t('adjustedMetricsHeading')}</h2>
-        {/* A CAC with no period attached is not interpretable — 90 days is a
-            choice this code makes, and the reader has no way to know it. The
-            quality weighting is stated for the same reason: "quality-adjusted"
-            names the adjustment without saying what it does (KAN-169). */}
-        <p className="text-xs text-muted-foreground">{t('adjustedMetricsWindowNote', { days: DEFAULT_QUALITY_ADJUSTED_METRICS_WINDOW_DAYS })}</p>
-        {!adjustedMetrics.ok ? (
-          <p className="text-muted-foreground">{t('adjustedMetricsEmpty')}</p>
+      <ChartCard title={t('byCohortHeading')} description={t('byCohortDescription')} icon={CalendarRange}>
+        {cohortRows.length === 0 ? (
+          <EmptyState icon={DatabaseZap} title={t('byCohortEmpty')} compact />
         ) : (
-          <ul className="flex flex-col gap-1">
-            <li className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-              <span>{t('qualityAdjustedCostPerSignupLabel')}</span>
-              <span className="text-muted-foreground">
-                {adjustedMetrics.metrics.costPerSignup !== null ? t('adjustedMetricsValue', { value: adjustedMetrics.metrics.costPerSignup.toFixed(2) }) : t('adjustedMetricsValueUnavailable')}
-              </span>
-            </li>
-            <li className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-              <span>{t('qualityAdjustedCacLabel')}</span>
-              <span className="text-muted-foreground">
-                {adjustedMetrics.metrics.cac !== null ? t('adjustedMetricsValue', { value: adjustedMetrics.metrics.cac.toFixed(2) }) : t('adjustedMetricsValueUnavailable')}
-              </span>
-            </li>
-          </ul>
+          <TrendChart
+            label={t('byCohortHeading')}
+            xKey="cohort"
+            kind="line"
+            data={cohortRows.map((row) => ({ cohort: cohortLabel(row.value), score: row.averageScore === null ? null : Math.round(row.averageScore) }))}
+            series={[{ key: 'score', label: t('byCohortSeries') }]}
+          />
         )}
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">{t('mixAlertsHeading')}</h2>
-          <CheckQualityMixAlertsButton orgId={orgId} projectId={projectId} />
-        </div>
-        {alertViews.length === 0 ? (
-          <p className="text-muted-foreground">{t('mixAlertsEmpty')}</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {alertViews.map((alert) => (
-              <li key={alert.id} className="flex flex-col gap-1 rounded-md border border-input px-3 py-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-medium">{alert.channelId || t('dimensionValueUnknown')}</span>
-                  <span className="text-xs text-muted-foreground">{t(qualityMixAlertStatusLabelKey(alert.status))}</span>
-                </div>
-                <span className="text-muted-foreground">
-                  {t('mixAlertDelta', { baseline: Math.round(alert.baselineAvgScore), current: Math.round(alert.currentAvgScore) })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {DIMENSIONS.map((dimension, index) => {
-        const outcome = dimensionOutcomes[index];
-        return (
-          <section key={dimension.key} className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold tracking-tight">{t(dimension.headingKey)}</h2>
-            {!outcome.ok ? (
-              <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-            ) : (
-              (() => {
-                const rows = toSignupQualityScoreDimensionBreakdownRows(outcome.rows, dimension.key);
-                return rows.length === 0 ? (
-                  <p className="text-muted-foreground">{t(dimension.emptyKey)}</p>
-                ) : (
-                  <ul className="flex flex-col gap-1">
-                    {rows.map((row) => (
-                      <li key={row.value} className="flex items-center justify-between gap-3 rounded-md border border-input px-3 py-2 text-sm">
-                        <span>{row.value || t('dimensionValueUnknown')}</span>
-                        <span className="text-muted-foreground">
-                          {row.averageScore !== null ? t('dimensionAverageScore', { average: Math.round(row.averageScore), count: row.sampleSize }) : t('dimensionValueUnknown')}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                );
-              })()
-            )}
-          </section>
-        );
-      })}
+      </ChartCard>
     </main>
   );
+}
+
+function alertsSortedActiveFirst<T extends { status: string }>(alerts: T[]): T[] {
+  return [...alerts].sort((a, b) => Number(b.status === 'active') - Number(a.status === 'active'));
 }

@@ -108,4 +108,29 @@ describe('WinRuleList', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not update this win rule. Please try again.');
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  it('shows each rule as a trigger -> filters -> recent wins strip when win counts are given', () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <WinRuleList
+          orgId="org-1"
+          projectId="project-1"
+          winRules={[activeRule, { ...activeRule, id: 'rule-2', name: 'Any signup', filters: [] }]}
+          winCounts={{ 'rule-1': 3 }}
+        />
+      </NextIntlClientProvider>,
+    );
+    const strips = screen.getAllByRole('group', { name: 'Trigger to win' });
+    expect(strips).toHaveLength(2);
+    expect(strips[0]).toHaveTextContent('order_completed');
+    expect(strips[0]).toHaveTextContent('1 filter');
+    expect(strips[0]).toHaveTextContent('3 wins');
+    expect(strips[1]).toHaveTextContent('any occurrence');
+    expect(strips[1]).toHaveTextContent('No recent wins');
+  });
+
+  it('leaves the win strip out when no counts are passed', () => {
+    renderList([activeRule]);
+    expect(screen.queryByRole('group', { name: 'Trigger to win' })).not.toBeInTheDocument();
+  });
 });
