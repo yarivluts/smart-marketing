@@ -125,7 +125,7 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
   const hasAnyDemo = funnel.demosScheduled + funnel.demosHeld + funnel.demosNoShow > 0;
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero
         icon={Presentation}
         eyebrow={t('eyebrow')}
@@ -230,6 +230,6 @@ export default async function DemosPage({ params }: PageProps): Promise<React.Re
           </Link>
         ) : null}
       </div>
-    </main>
+    </div>
   );
 }

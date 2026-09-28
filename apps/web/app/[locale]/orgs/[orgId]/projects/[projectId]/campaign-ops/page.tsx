@@ -133,7 +133,7 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
   );
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Workflow} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiTrackedCampaigns')} value={spendSummary ? number.format(spendSummary.campaigns) : t('kpiNoValue')} icon={Layers} />
@@ -310,6 +310,6 @@ export default async function CampaignOpsPage({ params }: PageProps): Promise<Re
           </div>
         )}
       </ChartCard>
-    </main>
+    </div>
   );
 }

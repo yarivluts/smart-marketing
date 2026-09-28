@@ -100,13 +100,13 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
   if (!packInstalled) {
     const installablePacks = builtinMetricPacks().filter((pack) => pack.pluginId === EXPERIMENT_PACK_PLUGIN_ID);
     return (
-      <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
         <PageHero icon={FlaskConical} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('setupIntro')} />
         {pipeline(null, 'idle')}
         <ChartCard title={t('installTitle')} description={t('installDescription')} icon={PackagePlus}>
           <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={installablePacks} />
         </ChartCard>
-      </main>
+      </div>
     );
   }
 
@@ -115,7 +115,7 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
   const hasResults = outcome.ok && outcome.results.length > 0;
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={FlaskConical} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiExperiments')} value={summary ? integer.format(summary.experiments) : t('noData')} icon={FlaskConical} />
@@ -222,6 +222,6 @@ export default async function ExperimentsPage({ params }: PageProps): Promise<Re
           );
         })
       )}
-    </main>
+    </div>
   );
 }

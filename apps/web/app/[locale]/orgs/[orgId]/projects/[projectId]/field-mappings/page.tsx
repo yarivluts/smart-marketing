@@ -165,7 +165,7 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
   }
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Shuffle} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('heroDescription')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiActiveMappings')} value={`${numberFormat.format(activeMappings.length)}/${numberFormat.format(fieldMappings.length)}`} icon={Workflow} />
@@ -318,6 +318,6 @@ export default async function ProjectFieldMappingsPage({ params }: PageProps): P
           />
         )}
       </ChartCard>
-    </main>
+    </div>
   );
 }

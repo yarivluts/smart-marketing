@@ -121,7 +121,7 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
       : show(goal, goal.targetValue ?? 0);
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Target} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('pageDescription')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiGoals')} value={numberFormat.format(items.length)} icon={ListChecks} subtext={summary.pausedGoalsCount > 0 ? t('kpiPausedSubtext', { count: summary.pausedGoalsCount }) : undefined} />
@@ -275,6 +275,6 @@ export default async function GoalsPage({ params }: PageProps): Promise<React.Re
           ) : null}
         </div>
       </ChartCard>
-    </main>
+    </div>
   );
 }

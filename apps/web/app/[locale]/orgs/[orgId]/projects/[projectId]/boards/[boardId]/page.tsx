@@ -95,7 +95,7 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
   const t = await getTranslations('Boards');
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero
         icon={LayoutDashboard}
         eyebrow={t('detailEyebrow')}
@@ -146,6 +146,6 @@ export default async function BoardDetailPage({ params }: PageProps): Promise<Re
           readOnly={!canManageBoards}
         />
       </section>
-    </main>
+    </div>
   );
 }

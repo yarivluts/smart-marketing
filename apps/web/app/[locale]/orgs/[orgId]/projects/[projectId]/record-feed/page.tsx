@@ -114,7 +114,7 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
   const feedPath = `/orgs/${orgId}/projects/${projectId}/record-feed`;
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Rows3} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         {eventSchemaNames.length > 0 ? (
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -264,6 +264,6 @@ export default async function RecordFeedPage({ params, searchParams }: PageProps
           </ChartCard>
         </>
       )}
-    </main>
+    </div>
   );
 }

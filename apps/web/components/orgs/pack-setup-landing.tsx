@@ -34,7 +34,7 @@ export interface PackSetupLandingProps {
  */
 export function PackSetupLanding({ orgId, projectId, icon, eyebrow, title, intro, features, featuresTitle, installTitle, packs }: PackSetupLandingProps): React.ReactElement {
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={icon} eyebrow={eyebrow} title={title} description={intro} />
 
       <section aria-label={featuresTitle} className="flex flex-col gap-3">
@@ -57,6 +57,6 @@ export function PackSetupLanding({ orgId, projectId, icon, eyebrow, title, intro
       <ChartCard title={installTitle} icon={PackageOpen}>
         <InstallBuiltinPackSection orgId={orgId} projectId={projectId} packs={packs} />
       </ChartCard>
-    </main>
+    </div>
   );
 }

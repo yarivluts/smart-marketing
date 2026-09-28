@@ -157,7 +157,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   }));
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
       <PageHero icon={Clapperboard} eyebrow={t('eyebrow')} title={t('title', { project: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiAds')} value={overview.briefs} icon={FileText} />
@@ -358,6 +358,6 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
           occurredOn: row.occurred_on,
         }))}
       />
-    </main>
+    </div>
   );
 }

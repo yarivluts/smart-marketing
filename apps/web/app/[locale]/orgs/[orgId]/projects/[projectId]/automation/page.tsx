@@ -158,7 +158,7 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
   }));
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
       <AutomationHubDashboard
         orgId={orgId}
         projectId={projectId}
@@ -175,7 +175,7 @@ export default async function AutomationPage({ params }: PageProps): Promise<Rea
       <ChartCard title={tAutomation('lifecycleTitle')} description={tAutomation('lifecycleDescription')} icon={Workflow}>
         <FlowDiagram label={tAutomation('lifecycleTitle')} nodes={lifecycleNodes} edges={lifecycleEdges} height={300} />
       </ChartCard>
-    </main>
+    </div>
   );
 }
 

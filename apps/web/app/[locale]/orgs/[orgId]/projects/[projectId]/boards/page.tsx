@@ -91,7 +91,7 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
   };
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={LayoutDashboard} eyebrow={t('galleryEyebrow')} title={t('title', { projectName: project.name })} description={t('galleryDescription')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiBoards')} value={boardViews.length} icon={LayoutGrid} />
@@ -181,6 +181,6 @@ export default async function BoardsPage({ params }: PageProps): Promise<React.R
           ) : null}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

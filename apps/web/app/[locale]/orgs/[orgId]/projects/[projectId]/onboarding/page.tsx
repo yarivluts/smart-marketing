@@ -171,7 +171,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
 
   if (!view) {
     return (
-      <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+      <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
         {hero}
         {journeyCard}
         <StepCard>
@@ -180,7 +180,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
             <StartOnboardingButton orgId={orgId} projectId={projectId} />
           </div>
         </StepCard>
-      </main>
+      </div>
     );
   }
 
@@ -190,7 +190,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
   const showFunnelEditor = view.step === 'funnel' || editFunnel === '1';
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       {hero}
       {journeyCard}
 
@@ -232,7 +232,7 @@ export default async function OnboardingPage({ params, searchParams }: PageProps
           <FinalStep orgId={orgId} projectId={projectId} done={view.step === 'done'} />
         </StepCard>
       ) : null}
-    </main>
+    </div>
   );
 }
 

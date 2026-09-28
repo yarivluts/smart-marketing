@@ -191,7 +191,7 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
   );
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Receipt} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiCharges')} value={integer.format(summary.counts.charge)} icon={CreditCard} subtext={t('kpiWindowSub', { count: entries.length })} />
@@ -297,6 +297,6 @@ export default async function BillingOpsFeedPage({ params }: PageProps): Promise
           {dunningEntries.length === 0 ? <EmptyState compact icon={AlertTriangle} title={t('dunningEmpty')} /> : <FeedTimeline label={t('dunningHeading')} groups={dunningGroups} />}
         </ChartCard>
       </div>
-    </main>
+    </div>
   );
 }

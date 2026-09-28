@@ -156,7 +156,7 @@ export default async function FirmographicsPage({ params }: PageProps): Promise<
   };
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Building2} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiProfiles')} value={totalProfiles > 0 ? numberFormat.format(totalProfiles) : t('kpiNoValue')} icon={Building2} />
@@ -221,6 +221,6 @@ export default async function FirmographicsPage({ params }: PageProps): Promise<
           </ul>
         )}
       </ChartCard>
-    </main>
+    </div>
   );
 }

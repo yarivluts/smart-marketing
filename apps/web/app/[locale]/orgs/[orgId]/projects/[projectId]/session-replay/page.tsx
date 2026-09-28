@@ -61,7 +61,7 @@ export default async function SessionReplaySettingsPage({ params }: PageProps): 
   const toolLabel = summary.tool ? t(`toolName.${summary.tool}`) : t('notConfigured');
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={PlayCircle} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('intro')}>
         <div className="grid gap-3 sm:grid-cols-2">
           <StatCard title={t('kpiTool')} value={toolLabel} icon={MonitorPlay} />
@@ -94,6 +94,6 @@ export default async function SessionReplaySettingsPage({ params }: PageProps): 
           <SessionReplaySettingsForm orgId={orgId} projectId={projectId} initialTemplate={project.session_replay_url_template ?? ''} />
         </ChartCard>
       </div>
-    </main>
+    </div>
   );
 }
