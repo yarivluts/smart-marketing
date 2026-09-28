@@ -27,7 +27,7 @@ Template for each entry:
     - Only ad set create broke: since v23 it needs `targeting_automation.advantage_audience`. Create sends 0, so the chosen targeting is used exactly.
     - Targeting edits keep the ad set's own switch, and rollback restores it.
 - **In progress:** none.
-- **Blocked + why:** none. Neither client has run against a live account: the Google Ads developer token is still pending (KAN-43), and the Meta credential has no write tier.
+- **Blocked + why:** none. Neither client has run against a live account yet: the Google Ads developer token is still pending (KAN-43), and Meta writes need a credential attached with a write tier.
 - **Next step:** KAN-236 (Customer Match consent needs an enum plugin-config field); KAN-234 (nested `<main>` on 38 project pages).
 - **Waiting on human:** nothing new.
 
