@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod/v4';
+import { AD_STUDIO_TEST_OMNI_BASE_URL, adStudioTestOverride, isLoopbackHttpUrl } from './test-overrides';
 
 /**
  * The Ad Studio's text model (KAN-229): plans, scripts and scene rewrites. Claude when an Anthropic
@@ -93,14 +94,14 @@ function geminiErrorCode(status: number, message: string): AdStudioProviderError
   return 'provider_error';
 }
 
-export function createGeminiLlm(apiKey: string, fetchImpl: FetchLike = fetch): AdStudioLlm {
+export function createGeminiLlm(apiKey: string, fetchImpl: FetchLike = fetch, baseUrl: string = GEMINI_API_BASE): AdStudioLlm {
   return {
     provider: 'gemini',
     model: AD_STUDIO_GEMINI_TEXT_MODEL,
     async generateJson<T>({ system, user, schema }: AdStudioJsonRequest<T>): Promise<T> {
       let response: Response;
       try {
-        response = await fetchImpl(`${GEMINI_API_BASE}/models/${AD_STUDIO_GEMINI_TEXT_MODEL}:generateContent`, {
+        response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/models/${AD_STUDIO_GEMINI_TEXT_MODEL}:generateContent`, {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
           body: JSON.stringify({
@@ -144,7 +145,11 @@ export function resolveAdStudioLlm(env: NodeJS.ProcessEnv = process.env): AdStud
   const anthropicKey = env.ANTHROPIC_API_KEY?.trim();
   if (anthropicKey) return createClaudeLlm(anthropicKey);
   const geminiKey = env.GEMINI_API_KEY?.trim();
-  if (geminiKey) return createGeminiLlm(geminiKey);
+  if (geminiKey) {
+    // The same guarded loopback stand-in the image and video models use (emulator runs only).
+    const override = adStudioTestOverride(env, AD_STUDIO_TEST_OMNI_BASE_URL);
+    return createGeminiLlm(geminiKey, fetch, override && isLoopbackHttpUrl(override) ? override : GEMINI_API_BASE);
+  }
   return null;
 }
 
