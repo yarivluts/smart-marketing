@@ -115,6 +115,38 @@ config_schema:
     ).toThrow(PluginManifestValidationError);
   });
 
+  it('parses an enum config field with its allowed values (KAN-236)', () => {
+    const manifest = parsePluginManifest(`
+id: com.example.enum-config
+version: 1.0.0
+type: action
+display_name: Enum Config
+scopes: [action:execute]
+config_schema:
+  ad_user_data_consent: { type: enum, values: [GRANTED, DENIED] }
+`);
+    expect(manifest.configSchema.ad_user_data_consent).toEqual({ type: 'enum', required: false, values: ['GRANTED', 'DENIED'] });
+  });
+
+  it.each([
+    ['no values', '{ type: enum }'],
+    ['empty values', '{ type: enum, values: [] }'],
+    ['duplicate values', '{ type: enum, values: [GRANTED, GRANTED] }'],
+    ['non-string values', '{ type: enum, values: [1, 2] }'],
+  ])('rejects an enum config field with %s', (_label, entry) => {
+    expect(() =>
+      parsePluginManifest(`
+id: com.example.bad-enum
+version: 1.0.0
+type: action
+display_name: Bad Enum
+scopes: [action:execute]
+config_schema:
+  consent: ${entry}
+`),
+    ).toThrow(PluginManifestValidationError);
+  });
+
   it('rejects registers/endpoints fields that are not the expected shape', () => {
     expect(() =>
       parsePluginManifest(`

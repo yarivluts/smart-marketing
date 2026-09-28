@@ -2119,7 +2119,8 @@
     "runChartLabel": "רשומות לכל ריצת סנכרון של {pluginId}",
     "runChartAccepted": "התקבלו",
     "runChartQuarantined": "בהסגר",
-    "runChartDuplicate": "כפולות"
+    "runChartDuplicate": "כפולות",
+    "configFieldEnumNotChosen": "לא נענה"
   },
   "Boards": {
     "metaTitle": "לוחות מחוונים",

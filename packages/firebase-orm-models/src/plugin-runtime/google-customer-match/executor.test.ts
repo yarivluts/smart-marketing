@@ -40,6 +40,26 @@ function pushParams(records: readonly Record<string, unknown>[]): Parameters<Goo
 }
 
 describe('GoogleCustomerMatchSinkPluginExecutor', () => {
+  it("passes the install's consent answers to the upload (KAN-236)", async () => {
+    const apiClient = fakeApiClient({ addContactsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 1 }) });
+    const executor = new GoogleCustomerMatchSinkPluginExecutor({
+      apiClient,
+      customerId: '999',
+      userListName: 'Warm leads',
+      existingUserListResourceName: 'customers/999/userLists/existing',
+      consent: { adUserData: 'GRANTED', adPersonalization: 'DENIED' },
+    });
+
+    await executor.push(pushParams([{ properties: { email: 'a@example.com' } }]));
+
+    expect(apiClient.addContactsToCustomerMatchUserList).toHaveBeenCalledWith(
+      '999',
+      'customers/999/userLists/existing',
+      [{ hashedEmail: hashEmailForGoogleCustomerMatch('a@example.com') }],
+      { adUserData: 'GRANTED', adPersonalization: 'DENIED' },
+    );
+  });
+
   it('creates a new Customer Match user list on first sync, hashes emails, and reports the list resource name as externalRef', async () => {
     const apiClient = fakeApiClient({ addContactsToCustomerMatchUserList: vi.fn().mockResolvedValue({ numReceived: 2 }) });
     const executor = new GoogleCustomerMatchSinkPluginExecutor({ apiClient, customerId: '999', userListName: 'Warm leads', existingUserListResourceName: null });

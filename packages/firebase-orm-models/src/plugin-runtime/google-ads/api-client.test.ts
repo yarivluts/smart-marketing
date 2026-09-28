@@ -396,6 +396,27 @@ describe('GoogleAdsHttpApiClient', () => {
     expect(addOperationsBody.operations).toEqual([{ create: { userIdentifiers: [{ hashedEmail: 'hash-email-a' }, { addressInfo: { city: 'Mountain View' } }] } }]);
   });
 
+  it("sends the advertiser's consent on the offline user data job only when answered (KAN-236)", async () => {
+    const jobBody = async (consent?: Parameters<GoogleAdsHttpApiClient['addContactsToCustomerMatchUserList']>[3]) => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+        .mockResolvedValueOnce(jsonResponse({ resourceName: 'customers/123/offlineUserDataJobs/456' }))
+        .mockResolvedValue(jsonResponse({}));
+      vi.stubGlobal('fetch', fetchMock);
+      await new GoogleAdsHttpApiClient(OPTIONS).addContactsToCustomerMatchUserList('123', 'customers/123/userLists/1', [{ hashedEmail: 'hash-a' }], consent);
+      return JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body)).job.customerMatchUserListMetadata;
+    };
+
+    expect(await jobBody({ adUserData: 'GRANTED', adPersonalization: 'DENIED' })).toEqual({
+      userList: 'customers/123/userLists/1',
+      consent: { adUserData: 'GRANTED', adPersonalization: 'DENIED' },
+    });
+    expect(await jobBody({ adPersonalization: 'GRANTED' })).toEqual({ userList: 'customers/123/userLists/1', consent: { adPersonalization: 'GRANTED' } });
+    expect(await jobBody({})).toEqual({ userList: 'customers/123/userLists/1' });
+    expect(await jobBody()).toEqual({ userList: 'customers/123/userLists/1' });
+  });
+
   it('omits the addressInfo entry entirely when a contact has none, keeping the payload byte-identical to before mailing-address support', async () => {
     const fetchMock = vi
       .fn()
