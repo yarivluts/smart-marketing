@@ -38,6 +38,18 @@ export interface GoogleAdsCreateCustomerMatchUserListResult {
   userListResourceName: string;
 }
 
+export type GoogleAdsConsentStatus = 'GRANTED' | 'DENIED';
+
+/**
+ * The advertiser's consent for the uploaded users (KAN-236), sent at the offline user data job
+ * level (`CustomerMatchUserListMetadata.consent`); Google needs it for users in the EEA. It is the
+ * advertiser's own statement, so each part is sent only when the install's admin chose a value.
+ */
+export interface GoogleAdsCustomerMatchConsent {
+  adUserData?: GoogleAdsConsentStatus;
+  adPersonalization?: GoogleAdsConsentStatus;
+}
+
 export interface GoogleAdsAddCustomerMatchOperationsResult {
   /** The number of member operations submitted to the offline user data job — Google processes the job asynchronously, so this is "accepted", not "matched" (Google Ads has no synchronous match-count response, unlike Meta's `num_received`). */
   numReceived: number;
@@ -148,7 +160,12 @@ export interface GoogleAdsApiClient {
    * one upload call, mirroring `MetaAdsApiClient.addContactsToCustomAudience`'s
    * shape for the sibling connector.
    */
-  addContactsToCustomerMatchUserList(customerId: string, userListResourceName: string, contacts: readonly GoogleAdsContactMatchKey[]): Promise<GoogleAdsAddCustomerMatchOperationsResult>;
+  addContactsToCustomerMatchUserList(
+    customerId: string,
+    userListResourceName: string,
+    contacts: readonly GoogleAdsContactMatchKey[],
+    consent?: GoogleAdsCustomerMatchConsent,
+  ): Promise<GoogleAdsAddCustomerMatchOperationsResult>;
   /**
    * Adds keywords and/or negative keywords to an already-created ad group
    * (KAN-72 follow-up, "post-creation keyword edits") — the same
@@ -473,9 +490,18 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
     customerId: string,
     userListResourceName: string,
     contacts: readonly GoogleAdsContactMatchKey[],
+    consent?: GoogleAdsCustomerMatchConsent,
   ): Promise<GoogleAdsAddCustomerMatchOperationsResult> {
+    // Job-level consent (KAN-236): only the answers the advertiser actually gave are sent.
+    const consentBody = {
+      ...(consent?.adUserData ? { adUserData: consent.adUserData } : {}),
+      ...(consent?.adPersonalization ? { adPersonalization: consent.adPersonalization } : {}),
+    };
     const jobResult = await this.postAction<{ resourceName: string }>(`customers/${customerId}/offlineUserDataJobs:create`, {
-      job: { type: 'CUSTOMER_MATCH_USER_LIST', customerMatchUserListMetadata: { userList: userListResourceName } },
+      job: {
+        type: 'CUSTOMER_MATCH_USER_LIST',
+        customerMatchUserListMetadata: { userList: userListResourceName, ...(Object.keys(consentBody).length > 0 ? { consent: consentBody } : {}) },
+      },
     });
     const jobResourceName = jobResult.resourceName;
 

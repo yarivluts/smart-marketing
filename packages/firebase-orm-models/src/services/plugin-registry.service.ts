@@ -194,6 +194,13 @@ function validatePluginConfig(configSchema: Record<string, PluginConfigFieldSche
       }
       continue;
     }
+    if (field.type === 'enum') {
+      // KAN-236: one of the manifest's own listed values, exactly.
+      if (typeof value !== 'string' || !(field.values ?? []).includes(value)) {
+        reasons.push(`Config field "${name}" must be one of: ${(field.values ?? []).join(', ')}.`);
+      }
+      continue;
+    }
     if (typeof value !== field.type) {
       reasons.push(`Config field "${name}" must be of type "${field.type}".`);
     }

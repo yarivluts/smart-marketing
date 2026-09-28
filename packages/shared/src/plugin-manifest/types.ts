@@ -42,7 +42,7 @@ export function isPluginScope(value: string): value is PluginScope {
 }
 
 /** Primitive types a `config_schema` entry may declare — enough to render/validate a basic install form; richer shapes are KAN-48's "config forms" concern. */
-export const PLUGIN_CONFIG_FIELD_TYPES = ['string', 'number', 'boolean'] as const;
+export const PLUGIN_CONFIG_FIELD_TYPES = ['string', 'number', 'boolean', 'enum'] as const;
 export type PluginConfigFieldType = (typeof PLUGIN_CONFIG_FIELD_TYPES)[number];
 
 export function isPluginConfigFieldType(value: string): value is PluginConfigFieldType {
@@ -52,6 +52,11 @@ export function isPluginConfigFieldType(value: string): value is PluginConfigFie
 export interface PluginConfigFieldSchema {
   type: PluginConfigFieldType;
   required: boolean;
+  /**
+   * The allowed values of an `enum` field (KAN-236), e.g. a consent answer the admin must pick
+   * explicitly - a boolean cannot tell "not answered" from "no". Only present on `enum`.
+   */
+  values?: readonly string[];
 }
 
 /** What a manifest's `registers` block declares it contributes to a project once installed (plan `12 §5`). Every list defaults to empty rather than being optional, so callers never need an `?? []`. */

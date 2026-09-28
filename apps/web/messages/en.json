@@ -2119,7 +2119,8 @@
     "runChartLabel": "Records per sync run for {pluginId}",
     "runChartAccepted": "Accepted",
     "runChartQuarantined": "Quarantined",
-    "runChartDuplicate": "Duplicate"
+    "runChartDuplicate": "Duplicate",
+    "configFieldEnumNotChosen": "Not answered"
   },
   "Boards": {
     "metaTitle": "Boards",

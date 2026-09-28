@@ -20,13 +20,15 @@ import {
 } from '../plugin-runtime/meta-custom-audience';
 import { MetaLookalikeAudienceModel } from '../models/meta-lookalike-audience.model';
 import {
+  GOOGLE_CUSTOMER_MATCH_AD_PERSONALIZATION_CONSENT_CONFIG_FIELD,
+  GOOGLE_CUSTOMER_MATCH_AD_USER_DATA_CONSENT_CONFIG_FIELD,
   GOOGLE_CUSTOMER_MATCH_CREDENTIAL_ATTACHMENT_ID_CONFIG_FIELD,
   GOOGLE_CUSTOMER_MATCH_NAME_CONFIG_FIELD,
   GOOGLE_CUSTOMER_MATCH_PLUGIN_ID,
   GoogleCustomerMatchSinkPluginExecutor,
 } from '../plugin-runtime/google-customer-match';
 import { MetaAdsApiError, MetaAdsHttpApiClient, type MetaAdsApiClient } from '../plugin-runtime/meta-ads';
-import { GoogleAdsHttpApiClient } from '../plugin-runtime/google-ads';
+import { GoogleAdsHttpApiClient, type GoogleAdsConsentStatus, type GoogleAdsCustomerMatchConsent } from '../plugin-runtime/google-ads';
 import { mintPluginRuntimeCredential, runWithRetryBackoff, type RetryBackoffOptions, type SinkPluginExecutor } from '../plugin-runtime';
 import { ProjectNotFoundError, listActiveAttachmentsForProject } from './resource-library.service';
 import { PluginInstallNotFoundError, getPluginManifestVersion, PluginManifestNotFoundError } from './plugin-registry.service';
@@ -236,6 +238,15 @@ export interface GoogleCustomerMatchSyncSecret {
   customerId: string;
   loginCustomerId?: string;
   userListName: string;
+  /** The advertiser's consent answers from the install's config (KAN-236); only answered parts are present. */
+  consent: GoogleAdsCustomerMatchConsent;
+}
+
+function consentStatusFromConfig(install: PluginInstallModel, field: string): GoogleAdsConsentStatus | undefined {
+  const value = install.config[field];
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value === 'GRANTED' || value === 'DENIED') return value;
+  throw new GoogleCustomerMatchCredentialConfigError(`"${field}" must be GRANTED or DENIED`);
 }
 
 /**
@@ -274,7 +285,9 @@ export async function resolveGoogleCustomerMatchCredentialSecret(
 
   try {
     const secret = await resolveGoogleAdsCredentialSecret(organizationId, attachment, kms);
-    return { ...secret, userListName };
+    const adUserData = consentStatusFromConfig(install, GOOGLE_CUSTOMER_MATCH_AD_USER_DATA_CONSENT_CONFIG_FIELD);
+    const adPersonalization = consentStatusFromConfig(install, GOOGLE_CUSTOMER_MATCH_AD_PERSONALIZATION_CONSENT_CONFIG_FIELD);
+    return { ...secret, userListName, consent: { ...(adUserData ? { adUserData } : {}), ...(adPersonalization ? { adPersonalization } : {}) } };
   } catch (error) {
     if (error instanceof GoogleAdsCredentialConfigError) {
       throw new GoogleCustomerMatchCredentialConfigError(error.reason);
@@ -450,7 +463,7 @@ async function defaultSinkExecutorForInstall(organizationId: string, projectId: 
     });
   }
   if (install.plugin_id === GOOGLE_CUSTOMER_MATCH_PLUGIN_ID) {
-    const { developerToken, clientId, clientSecret, refreshToken, customerId, loginCustomerId, userListName } = await resolveGoogleCustomerMatchCredentialSecret(
+    const { developerToken, clientId, clientSecret, refreshToken, customerId, loginCustomerId, userListName, consent } = await resolveGoogleCustomerMatchCredentialSecret(
       organizationId,
       projectId,
       install,
@@ -461,6 +474,7 @@ async function defaultSinkExecutorForInstall(organizationId: string, projectId: 
       customerId,
       userListName,
       existingUserListResourceName: install.sink_external_ref ?? null,
+      consent,
     });
   }
   throw new UnsupportedSinkPluginError(install.plugin_id);
