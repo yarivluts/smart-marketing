@@ -38,7 +38,11 @@ Template for each entry:
     - The API image now installs ffmpeg.
 - **In progress:** none.
 - **Blocked + why:** Gemini answers 402 (credits depleted), so every generation was verified against a local stand-in with the documented shapes; the images in the report are labelled "Local test image - not AI output".
-- **Next step:** after deploy, mount `gemini-api-key` on api-prod/api-preprod and raise their memory for ffmpeg.
+- **Deployed (#548, f504b9a):** all four services.
+  - api-prod and api-preprod now mount `gemini-api-key` and run with 1Gi (for ffmpeg).
+  - Verified on prod: the Ad Studio page shows the images KPI and image limit; the new routes and `/v1/mcp` answer 401 without credentials.
+  - Report: https://claude.ai/artifact/Hix8zxVFzCLfxeyj5q8eFh
+- **Next step:** once Gemini has credit, render one real ad end to end on prod and confirm the live Interactions image and Omni responses match the documented shapes the stand-in used.
 - **Waiting on human:** top up Gemini credits; YouTube/Meta/Google Ads credentials with write access for exports.
 
 ## 2026-09-28 - One main landmark per page; Customer Match consent (KAN-234, KAN-236)
