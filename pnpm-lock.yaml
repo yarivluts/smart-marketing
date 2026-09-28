@@ -28,6 +28,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@growthos/ad-studio':
+        specifier: workspace:*
+        version: link:../../packages/ad-studio
       '@growthos/firebase-orm-models':
         specifier: workspace:*
         version: link:../../packages/firebase-orm-models

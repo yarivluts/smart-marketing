@@ -8,6 +8,7 @@ import { registerMcpTools } from './mcp-tools';
 import { registerMcpActTools } from './mcp-act-tools';
 import { registerMcpAdminTools } from './mcp-admin-tools';
 import { registerMcpSetupTools } from './mcp-setup-tools';
+import { registerMcpAdStudioTools } from './mcp-ad-studio-tools';
 
 const SERVER_NAME = 'growthos';
 const SERVER_VERSION = '1.0.0';
@@ -63,6 +64,7 @@ export class McpController {
     registerMcpActTools(server, auth);
     registerMcpAdminTools(server, auth);
     registerMcpSetupTools(server, auth);
+    registerMcpAdStudioTools(server, auth);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
 
     response.on('close', () => {

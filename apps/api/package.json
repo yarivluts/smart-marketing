@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@growthos/ad-studio": "workspace:*",
     "@growthos/firebase-orm-models": "workspace:*",
     "@growthos/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.29.0",

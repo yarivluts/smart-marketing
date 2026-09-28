@@ -1,0 +1,146 @@
+import {
+  connectFirestoreOrmAdmin,
+  createOrganizationWithOwner,
+  createProject,
+  ensureUserForFirebaseSession,
+  listAuditLogEntriesForOrg,
+} from '@growthos/firebase-orm-models';
+import { configureAdStudioRuntime, createMemoryMediaStorage } from '@growthos/ad-studio';
+import { registerMcpAdStudioTools } from './mcp-ad-studio-tools';
+import type { McpAuthContext } from './mcp-auth.guard';
+import type { ToolResult } from './mcp-tools';
+
+/**
+ * The Ad Studio over MCP, end to end against the Firestore emulator: an API-key agent creates an ad,
+ * writes and renders image ideas, looks at an image, changes it, runs the autopilot to finished
+ * creatives, and is refused what only a human may do (sending creatives to an ad platform). Google's
+ * APIs are stood in for by a fetch stub with their documented shapes.
+ */
+
+const BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 7, 7, 7]);
+
+beforeAll(async () => {
+  process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8100';
+  process.env.FIREBASE_PROJECT_ID = 'demo-growthos-test';
+  await connectFirestoreOrmAdmin({ projectId: 'demo-growthos-test' });
+});
+
+let fetchSpy: jest.SpyInstance;
+
+beforeEach(() => {
+  process.env.GEMINI_API_KEY = 'test-gemini-key';
+  delete process.env.ANTHROPIC_API_KEY;
+  const storage = createMemoryMediaStorage();
+  configureAdStudioRuntime({ mediaStorage: () => storage });
+  fetchSpy = jest.spyOn(global, 'fetch').mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input);
+    const body = typeof init?.body === 'string' ? (JSON.parse(init.body) as Record<string, unknown>) : null;
+    if (url.endsWith(':generateContent')) {
+      const schema = JSON.stringify((body?.generationConfig as { responseJsonSchema?: unknown })?.responseJsonSchema ?? {});
+      const answer = schema.includes('"concepts"')
+        ? { concepts: [{ visualPrompt: 'A lawyer signing on a phone', headline: 'Sign in 30 seconds', formats: ['square'] }] }
+        : { title: 't', scenes: [{ durationSeconds: 5, visualPrompt: 'A desk', voiceover: '', onScreenText: '' }] };
+      return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(answer) }] } }] });
+    }
+    if (url === `${BASE}/interactions` && body?.model === 'gemini-3.1-flash-image') {
+      return Response.json({ id: 'img', status: 'completed', steps: [{ type: 'model_output', content: [{ type: 'image', mime_type: 'image/png', data: PNG.toString('base64') }] }] });
+    }
+    return new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
+  });
+});
+
+afterEach(() => {
+  fetchSpy.mockRestore();
+  delete process.env.GEMINI_API_KEY;
+});
+
+function unique(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2)}`;
+}
+
+async function setup(scopes: string[]) {
+  const owner = await ensureUserForFirebaseSession({ firebaseUid: unique('uid'), email: `${unique('owner')}@example.com` });
+  const { organization } = await createOrganizationWithOwner({ name: 'MCP Ad Studio Org', ownerUserId: owner.id });
+  const { project } = await createProject({ organizationId: organization.id, name: 'Website' });
+  const auth = { organizationId: organization.id, projectId: project.id, principalKind: 'api_key', scopes, apiKeyId: 'key-1' } as unknown as McpAuthContext;
+  const handlers = new Map<string, (args: unknown) => Promise<ToolResult>>();
+  registerMcpAdStudioTools({ registerTool: (name: string, _config: unknown, handler: (args: unknown) => Promise<ToolResult>) => handlers.set(name, handler) } as never, auth);
+  const call = async (name: string, args: Record<string, unknown> = {}) => {
+    const handler = handlers.get(name);
+    if (!handler) throw new Error(`no tool ${name}`);
+    return handler(args);
+  };
+  const json = async <T>(name: string, args: Record<string, unknown> = {}): Promise<T> => {
+    const result = await call(name, args);
+    if (result.isError) throw new Error(`${name} failed: ${(result.content[0] as { text: string }).text}`);
+    return JSON.parse((result.content[0] as { text: string }).text) as T;
+  };
+  return { auth, call, json, orgId: organization.id };
+}
+
+const BRIEF = { name: 'Sign fast', objective: 'Trial signups', product_description: 'E-signatures for lawyers', format: 'vertical', language: 'en', target_seconds: 10 };
+
+describe('Ad Studio MCP tools', () => {
+  it('lets an agent write ideas, render an image, look at it, change it, and see it all in get_ad_brief', async () => {
+    const { json, call } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+
+    const ideas = await json<{ id: string; formats: string[] }[]>('generate_ad_image_ideas', { brief_id: ad.id, image_formats: ['square', 'story'] });
+    expect(ideas[0].formats).toEqual(['square', 'story']);
+
+    const rendered = await json<{ image_id: string; status: string; selected: boolean }>('render_ad_image', { brief_id: ad.id, idea_id: ideas[0].id, format: 'square' });
+    expect(rendered).toMatchObject({ status: 'ready', selected: true });
+
+    const image = await call('get_ad_image', { brief_id: ad.id, image_id: rendered.image_id });
+    expect(image.isError).toBeUndefined();
+    expect(image.content[1]).toEqual({ type: 'image', data: PNG.toString('base64'), mimeType: 'image/png' });
+
+    const edited = await json<{ image_id: string; parent_image_id: string; version: number }>('edit_ad_image', { brief_id: ad.id, image_id: rendered.image_id, instruction: 'Warmer light' });
+    expect(edited).toMatchObject({ parent_image_id: rendered.image_id, version: 2 });
+
+    const state = await json<{ image_ideas: { placements: { format: string; state: string; selected_image_id: string | null; versions: unknown[] }[] }[] }>('get_ad_brief', { brief_id: ad.id });
+    expect(state.image_ideas[0].placements).toEqual([
+      expect.objectContaining({ format: 'square', state: 'ready', selected_image_id: edited.image_id }),
+      expect.objectContaining({ format: 'story', state: 'none', selected_image_id: null, versions: [] }),
+    ]);
+
+    const usage = await json<{ today: { images: number; text_generations: number } }>('get_ad_studio_usage');
+    expect(usage.today).toMatchObject({ images: 2, text_generations: 1 });
+  });
+
+  it('runs the autopilot to finished creatives when the agent keeps advancing it', async () => {
+    const { json } = await setup(['mcp.read', 'ai.use']);
+    const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    let run = await json<{ run_id: string; status: string; next: string | null }>('start_ad_autopilot', { brief_id: ad.id, plan: false, video: false, image_formats: ['portrait'] });
+    for (let calls = 0; calls < 20 && run.status === 'running'; calls += 1) {
+      run = await json('advance_ad_autopilot', { brief_id: ad.id, run_id: run.run_id });
+    }
+    expect(run.status).toBe('done');
+    expect(run.next).toBeNull();
+    const state = await json<{ image_ideas: { placements: { format: string; state: string }[] }[] }>('get_ad_brief', { brief_id: ad.id });
+    expect(state.image_ideas[0].placements).toEqual([expect.objectContaining({ format: 'portrait', state: 'ready' })]);
+  });
+
+  it('refuses without the permission each tool needs, and never lets an API key export', async () => {
+    const readOnly = await setup(['mcp.read']);
+    const refused = await readOnly.call('list_ad_briefs');
+    expect(refused.isError).toBe(true);
+    expect((refused.content[0] as { text: string }).text).toContain('"ai.use"');
+
+    const agent = await setup(['mcp.read', 'ai.use', 'project.configure']);
+    const { ad } = await agent.json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
+    const exported = await agent.call('export_ad_image', { brief_id: ad.id, image_id: 'x', destination: 'meta', title: 'x' });
+    expect(exported.isError).toBe(true);
+    expect((exported.content[0] as { text: string }).text).toContain('"automation.execute"');
+
+    const limits = await agent.json<{ daily_images: number }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0 });
+    expect(limits.daily_images).toBe(0);
+    const ideas = await agent.json<{ id: string }[]>('save_ad_image_ideas', { brief_id: ad.id, ideas: [{ id: 'c1', visual_prompt: 'A phone', headline: '', formats: ['square'] }] });
+    const overLimit = await agent.call('render_ad_image', { brief_id: ad.id, idea_id: ideas[0].id, format: 'square' });
+    expect((overLimit.content[0] as { text: string }).text).toContain('daily Ad Studio limit for images is reached (0 of 0)');
+
+    const audit = await listAuditLogEntriesForOrg(agent.orgId, 50);
+    expect(audit.some((entry) => entry.action === 'mcp.tool_call')).toBe(true);
+  });
+});

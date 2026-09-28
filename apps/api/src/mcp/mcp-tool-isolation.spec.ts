@@ -84,9 +84,40 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   audit_installation_gaps: { kind: 'connection-scope', permission: 'mcp.read' },
   // KAN-202 I4: read-only, the caller's own project, and only the key's own environment.
   get_ingest_health: { kind: 'connection-scope', permission: 'mcp.read' },
+  // The AI Ad Studio (`mcp-ad-studio-tools.ts`): the studio on `ai.use` like the web routes, its daily
+  // limits on `project.configure`, and anything sent to an ad platform on `automation.execute`.
+  list_ad_briefs: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  create_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  update_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  delete_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  plan_ad_brief: { kind: 'per-call-permission', permission: 'ai.use' },
+  generate_ad_script: { kind: 'per-call-permission', permission: 'ai.use' },
+  save_ad_script: { kind: 'per-call-permission', permission: 'ai.use' },
+  rewrite_ad_scene: { kind: 'per-call-permission', permission: 'ai.use' },
+  generate_ad_image_ideas: { kind: 'per-call-permission', permission: 'ai.use' },
+  save_ad_image_ideas: { kind: 'per-call-permission', permission: 'ai.use' },
+  render_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
+  edit_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
+  select_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_image: { kind: 'per-call-permission', permission: 'ai.use' },
+  render_ad_video: { kind: 'per-call-permission', permission: 'ai.use' },
+  render_ad_scene: { kind: 'per-call-permission', permission: 'ai.use' },
+  edit_ad_scene_clip: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_video_status: { kind: 'per-call-permission', permission: 'ai.use' },
+  assemble_ad_video: { kind: 'per-call-permission', permission: 'ai.use' },
+  start_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  advance_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  get_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  cancel_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  list_ad_export_destinations: { kind: 'per-call-permission', permission: 'ai.use' },
+  export_ad_video: { kind: 'per-call-permission', permission: 'automation.execute' },
+  export_ad_image: { kind: 'per-call-permission', permission: 'automation.execute' },
+  get_ad_studio_usage: { kind: 'per-call-permission', permission: 'ai.use' },
+  set_ad_studio_limits: { kind: 'per-call-permission', permission: 'project.configure' },
 };
 
-const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-admin-tools.ts', 'mcp-setup-tools.ts'];
+const TOOL_FILES = ['mcp-tools.ts', 'mcp-act-tools.ts', 'mcp-admin-tools.ts', 'mcp-setup-tools.ts', 'mcp-ad-studio-tools.ts'];
 
 function readToolFile(name: string): string {
   return readFileSync(path.join(__dirname, name), 'utf8');

@@ -173,6 +173,39 @@ Act tools (each requires its own extra permission, re-checked on every call):
 | `apply_schema_manifest` | `schema.write` (a `dry_run: true` preview needs only `mcp.read`) | Register and evolve the project's schemas from one manifest (`schemas: [{ kind, name, fields }]`, each as `register_schema` takes it). Reports per schema `register`, `evolve` (added optional fields or changed flags), `unchanged`, `blocked` (breaking, with reasons) or `invalid`; writes nothing if any schema is blocked or invalid. Schemas missing from the manifest are left alone |
 | `set_funnel` | `project.configure` (a `dry_run: true` preview needs only `mcp.read`) | Define or replace the project's confirmed funnel: an ordered list of at least 2 registered event schema names (or `{ event_schema_name, stage_key }` objects; camelCase keys and `query_funnel`'s own step objects are accepted too). Same funnel the web onboarding wizard confirms and the Funnel page charts |
 
+AI Ad Studio tools give an agent the whole studio, using the same engine, limits, rules and audit as the Ad Studio page. They need these permissions:
+
+- `ai.use` for the studio itself.
+- `project.configure` for the daily limits.
+- `automation.execute` to send anything to an ad platform. Only an OAuth (human) connection can hold it, never an API key.
+
+Rendering takes minutes, so no tool waits for it to finish. Start the work with one tool, then call the status or advance tool repeatedly until it is done.
+
+| Tool | Requires | What it does |
+| --- | --- | --- |
+| `list_ad_briefs` | `ai.use` | Every ad with how far it has come |
+| `get_ad_brief` | `ai.use` | One ad in full: brief, plan, scenes with their video state, image ideas with each placement's images and versions, video progress and the assembled video, the latest autopilot run, exports, and its web link |
+| `create_ad_brief` / `update_ad_brief` / `delete_ad_brief` | `ai.use` | Create, change or delete an ad (delete removes its script, ideas, images, clips, videos and runs) |
+| `plan_ad_brief` | `ai.use` | Deep plan from the landing page, the project's results and campaigns, and Google Ads search volumes, with recommendations |
+| `generate_ad_script` / `save_ad_script` | `ai.use` | Write the video script with AI (3-10 s scenes, at most 60 s) or save an edited one |
+| `rewrite_ad_scene` | `ai.use` | Propose a rewrite of one scene by an instruction; not saved until sent back with `save_ad_script` |
+| `generate_ad_image_ideas` / `save_ad_image_ideas` | `ai.use` | Write image ad ideas with AI (optionally for chosen placements) or save edited ones |
+| `render_ad_image` | `ai.use` | Render one idea in one placement (square, portrait, story, landscape) with Gemini 3.1 Flash Image |
+| `edit_ad_image` | `ai.use` | Change a finished image by an instruction; the result is a new, selected version |
+| `select_ad_image` | `ai.use` | Pick which version of an idea's placement is used |
+| `get_ad_image` | `ai.use` | The image itself (MCP image content) with its details |
+| `render_ad_video` / `render_ad_scene` / `edit_ad_scene_clip` | `ai.use` | Start Gemini Omni clips for every stale scene, for one scene, or as an edit of a scene's clip |
+| `get_ad_video_status` | `ai.use` | Move rendering clips along and return each scene's state; poll while generating |
+| `assemble_ad_video` | `ai.use` | Join the current clips into the finished video |
+| `start_ad_autopilot` | `ai.use` | Plan -> script -> image ideas -> images -> clips -> assembled video, each only if missing; keeps anything existing or edited |
+| `advance_ad_autopilot` | `ai.use` | Do the next unit of a run; call again until `status` is not `running` |
+| `get_ad_autopilot` / `cancel_ad_autopilot` | `ai.use` | Read a run without advancing it, or stop it |
+| `list_ad_export_destinations` | `ai.use` | Where creatives can go (Meta, YouTube, Google Ads) and why not where they cannot |
+| `export_ad_video` | `automation.execute` (OAuth/human only) | Upload the assembled video to the Meta ad account or the YouTube channel |
+| `export_ad_image` | `automation.execute` (OAuth/human only) | Upload an image to Meta's ad image library or as a Google Ads image asset |
+| `get_ad_studio_usage` | `ai.use` | Daily limits, today's usage and which models are configured |
+| `set_ad_studio_limits` | `project.configure` | Set the daily limits for AI text calls, video seconds and images |
+
 ## Safety & limits
 
 - Every call is scoped to exactly one org/project — a credential bound to project A cannot see or
