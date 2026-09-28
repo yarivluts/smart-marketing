@@ -196,7 +196,7 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
   const volumeRows = [...eventVolumeOverview].sort((a, b) => totalEvents(b) - totalEvents(a) || a.schemaName.localeCompare(b.schemaName));
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero
         icon={Database}
         eyebrow={t('eyebrow')}
@@ -464,6 +464,6 @@ export default async function SchemaRegistryPage({ params }: PageProps): Promise
         </div>
         <RegisterSchemaDefForm orgId={orgId} projectId={projectId} />
       </ChartCard>
-    </main>
+    </div>
   );
 }

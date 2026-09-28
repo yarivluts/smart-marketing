@@ -131,7 +131,7 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
   const countLabel = (count: number) => t('reasonCodeCount', { count });
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={UserMinus} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiCancellations')} value={totalCancellations > 0 ? numberFormat.format(totalCancellations) : t('kpiNoValue')} icon={UserMinus} />
@@ -236,6 +236,6 @@ export default async function ChurnReasonsPage({ params }: PageProps): Promise<R
           );
         })}
       </div>
-    </main>
+    </div>
   );
 }

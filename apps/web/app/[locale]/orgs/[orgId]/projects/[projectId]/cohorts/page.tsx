@@ -99,7 +99,7 @@ export default async function CohortRetentionPage({ params, searchParams }: Page
     view.kind === 'warehouse_not_configured' ? t('notConfigured') : view.kind === 'quota_exceeded' ? t('quotaExceeded') : view.kind === 'query_error' ? t('queryError') : null;
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Grid3X3} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiCohorts')} value={ok ? numberFormat.format(ok.cohorts.length) : t('kpiNoValue')} icon={CalendarRange} />
@@ -185,6 +185,6 @@ export default async function CohortRetentionPage({ params, searchParams }: Page
           </ChartCard>
         </>
       )}
-    </main>
+    </div>
   );
 }

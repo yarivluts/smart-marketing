@@ -120,7 +120,7 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
   );
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <AdsPerformanceDashboard
         orgId={orgId}
         projectId={projectId}
@@ -133,6 +133,6 @@ export default async function CampaignsPage({ params }: PageProps): Promise<Reac
         spendOutcome={spendOutcome}
         spendWindowDays={CAMPAIGN_SPEND_TRAILING_WINDOW_DAYS}
       />
-    </main>
+    </div>
   );
 }

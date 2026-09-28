@@ -64,7 +64,7 @@ export default async function TvPairingPage({ params }: PageProps): Promise<Reac
   const boardsInRotation = new Set(pairingViews.flatMap((pairing) => pairing.boardIds)).size;
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Tv} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard title={t('kpiPaired')} value={pairingViews.length} icon={MonitorSmartphone} />
@@ -108,6 +108,6 @@ export default async function TvPairingPage({ params }: PageProps): Promise<Reac
           )}
         </ChartCard>
       </div>
-    </main>
+    </div>
   );
 }

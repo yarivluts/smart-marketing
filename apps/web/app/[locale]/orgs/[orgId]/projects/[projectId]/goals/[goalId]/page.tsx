@@ -134,7 +134,7 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
           : null;
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero
         icon={Target}
         eyebrow={t('detailEyebrow')}
@@ -260,6 +260,6 @@ export default async function GoalDetailPage({ params }: PageProps): Promise<Rea
           ) : null}
         </div>
       </ChartCard>
-    </main>
+    </div>
   );
 }

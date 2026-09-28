@@ -98,7 +98,7 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
   const periodCount = (view: typeof weekView) => view.rows.reduce((sum, row) => sum + row.entryCount, 0) + view.unattributedCount;
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Coins} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('leaderboardHeading.week')} value={formatAmount(periodTotal(weekView))} subtext={t('kpiEntries', { count: periodCount(weekView) })} icon={CalendarDays} />
@@ -246,6 +246,6 @@ export default async function RepCollectionsPage({ params }: PageProps): Promise
       <ChartCard title={t('createHeading')} description={t('createDescription')} icon={PlusCircle}>
         <CreateRepCollectionEntryForm orgId={orgId} projectId={projectId} people={peopleRows} />
       </ChartCard>
-    </main>
+    </div>
   );
 }

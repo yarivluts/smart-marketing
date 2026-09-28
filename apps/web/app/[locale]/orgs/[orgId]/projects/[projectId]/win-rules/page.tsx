@@ -116,7 +116,7 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
   const formatCollectionAmount = (value: number) => new Intl.NumberFormat(locale, { maximumFractionDigits: 0 }).format(value);
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={Trophy} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('description')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard
@@ -232,6 +232,6 @@ export default async function WinRulesPage({ params }: PageProps): Promise<React
         {eventSchemaNames.length === 0 ? <EmptyState icon={PlusCircle} title={t('noEventSchemas')} compact /> : null}
         {eventSchemaNames.length > 0 ? <CreateWinRuleForm orgId={orgId} projectId={projectId} eventSchemaNames={eventSchemaNames} /> : null}
       </ChartCard>
-    </main>
+    </div>
   );
 }

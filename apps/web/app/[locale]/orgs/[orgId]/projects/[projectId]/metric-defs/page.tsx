@@ -136,7 +136,7 @@ export default async function MetricRegistryPage({ params, searchParams }: PageP
   };
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <PageHero icon={BookOpenCheck} eyebrow={t('eyebrow')} title={t('title', { projectName: project.name })} description={t('heroDescription')}>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatCard title={t('kpiActive')} value={numberFormat.format(stats.active)} subtext={stats.archived > 0 ? t('kpiArchivedSub', { count: stats.archived }) : undefined} icon={BookOpenCheck} />
@@ -244,7 +244,7 @@ export default async function MetricRegistryPage({ params, searchParams }: PageP
       <ChartCard title={t('registerHeading')} description={t('registerDescription')} icon={FilePlus2}>
         <RegisterMetricDefForm orgId={orgId} projectId={projectId} />
       </ChartCard>
-    </main>
+    </div>
   );
 }
 

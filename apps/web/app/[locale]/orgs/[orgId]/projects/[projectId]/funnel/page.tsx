@@ -140,7 +140,7 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
   });
 
   return (
-    <main className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
+    <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-10">
       <FunnelGoalsDashboard
         orgId={orgId}
         projectId={projectId}
@@ -150,6 +150,6 @@ export default async function FunnelPage({ params }: PageProps): Promise<React.R
         metricCatalog={metricCatalog}
         people={people.filter((p) => !p.archived_at).map((p) => ({ id: p.id, name: p.name }))}
       />
-    </main>
+    </div>
   );
 }
