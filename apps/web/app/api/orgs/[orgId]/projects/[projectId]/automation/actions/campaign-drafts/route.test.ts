@@ -67,6 +67,7 @@ function campaignDraft(overrides: Partial<GoogleAdsCampaignDraft> = {}): GoogleA
     platform: 'google_ads',
     campaignName: 'Winning Themes',
     advertisingChannelType: 'SEARCH',
+    containsEuPoliticalAdvertising: false,
     dailyBudgetUsd: 25,
     adGroups: [
       {

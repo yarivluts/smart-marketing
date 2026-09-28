@@ -429,6 +429,7 @@ describe('MetaAutomationActionExecutor', () => {
       platform: 'google_ads',
       campaignName: 'Google Campaign',
       advertisingChannelType: 'SEARCH',
+      containsEuPoliticalAdvertising: false,
       dailyBudgetUsd: 25,
       adGroups: [
         {

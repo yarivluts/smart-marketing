@@ -1,4 +1,4 @@
-import { GoogleAdsApiError, requestGoogleAdsAccessToken } from './api-client';
+import { GOOGLE_ADS_API_VERSION, GoogleAdsApiError, requestGoogleAdsAccessToken } from './api-client';
 import type { GoogleAdsCredentialSecret } from './credential-secret';
 
 /**
@@ -12,7 +12,7 @@ import type { GoogleAdsCredentialSecret } from './credential-secret';
  * account - but it does need a developer token with at least Basic access.
  */
 
-export const GOOGLE_ADS_KEYWORD_IDEAS_API_VERSION = 'v25';
+export const GOOGLE_ADS_KEYWORD_IDEAS_API_VERSION = GOOGLE_ADS_API_VERSION;
 const GOOGLE_ADS_KEYWORD_IDEAS_BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_KEYWORD_IDEAS_API_VERSION}`;
 const MAX_SEED_KEYWORDS = 20;
 const MAX_GEO_TARGETS = 10;

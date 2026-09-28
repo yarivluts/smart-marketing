@@ -9,6 +9,8 @@ export interface GoogleAdsCampaignDraftView {
   platform: 'google_ads';
   campaignName: string;
   dailyBudgetUsd: number;
+  /** The advertiser's EU political advertising self-declaration (KAN-233); absent on drafts made before it existed. */
+  containsEuPoliticalAdvertising?: boolean;
   adGroups: {
     name: string;
     keywords: { text: string }[];
@@ -225,6 +227,11 @@ export function CampaignCreativesPanel({
           ) : null}
         </li>
       ))}
+      {typeof draft.containsEuPoliticalAdvertising === 'boolean' ? (
+        <li className="text-xs text-muted-foreground" data-testid="campaign-eu-political-declaration">
+          {draft.containsEuPoliticalAdvertising ? t('euPoliticalDeclaredYes') : t('euPoliticalDeclaredNo')}
+        </li>
+      ) : null}
     </ul>
   );
 }

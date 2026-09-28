@@ -2901,7 +2901,12 @@
     "lifecycleTitle": "מחזור החיים של פעולה",
     "lifecycleDescription": "כל שינוי מוצע עובר את מעקות הבטיחות, ממתין לאישור, ואז מבוצע ומאומת או מבוטל. המספרים הם הפעולות שנמצאות כרגע בכל מצב.",
     "diffRowLineNew": "{label}: {after} (חדש)",
-    "diffNewBadge": "חדש"
+    "diffNewBadge": "חדש",
+    "proposeDraftEuPoliticalLegend": "האם הקמפיין הזה כולל פרסום פוליטי המכוון לאיחוד האירופי?",
+    "proposeDraftEuPoliticalHint": "גוגל אדס מחייבת כל מפרסם להצהיר על כך בכל קמפיין. התשובה שלכם נשלחת לגוגל כפי שהיא - GrowthOS אף פעם לא עונה במקומכם.",
+    "proposeDraftEuPoliticalNo": "לא, הוא לא כולל",
+    "proposeDraftEuPoliticalYes": "כן, הוא כולל",
+    "proposeDraftEuPoliticalRequiredError": "ענו האם הקמפיין כולל פרסום פוליטי לאיחוד האירופי. גוגל אדס מחייבת זאת."
   },
   "SessionReplaySettings": {
     "metaTitle": "הקלטות סשן",
@@ -3309,7 +3314,9 @@
         "none": "לא נרשמה הוצאה",
         "unavailable": "עדיין לא זמין לשליפה"
       }
-    }
+    },
+    "euPoliticalDeclaredYes": "הוצהר לגוגל: הקמפיין כולל פרסום פוליטי המכוון לאיחוד האירופי.",
+    "euPoliticalDeclaredNo": "הוצהר לגוגל: הקמפיין אינו כולל פרסום פוליטי המכוון לאיחוד האירופי."
   },
   "FunnelGoals": {
     "noData": "אין נתונים",

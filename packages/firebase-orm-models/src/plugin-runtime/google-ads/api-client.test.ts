@@ -20,6 +20,7 @@ const DRAFT: GoogleAdsCampaignDraft = {
   platform: 'google_ads',
   campaignName: 'Winning Themes',
   advertisingChannelType: 'SEARCH',
+  containsEuPoliticalAdvertising: false,
   dailyBudgetUsd: 25,
   adGroups: [
     {
@@ -70,7 +71,7 @@ describe('GoogleAdsHttpApiClient', () => {
     await new GoogleAdsHttpApiClient(OPTIONS).setCampaignStatus('123', 'customers/123/campaigns/1', 'REMOVED');
 
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/campaigns:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/campaigns:mutate');
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer access-token-1');
     expect(headers['developer-token']).toBe('dev-token');
@@ -115,11 +116,11 @@ describe('GoogleAdsHttpApiClient', () => {
 
     const urls = fetchMock.mock.calls.slice(1).map(([url]: [string]) => url);
     expect(urls).toEqual([
-      'https://googleads.googleapis.com/v17/customers/123/campaignBudgets:mutate',
-      'https://googleads.googleapis.com/v17/customers/123/campaigns:mutate',
-      'https://googleads.googleapis.com/v17/customers/123/adGroups:mutate',
-      'https://googleads.googleapis.com/v17/customers/123/adGroupAds:mutate',
-      'https://googleads.googleapis.com/v17/customers/123/adGroupCriteria:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/campaignBudgets:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/campaigns:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/adGroups:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/adGroupAds:mutate',
+      'https://googleads.googleapis.com/v25/customers/123/adGroupCriteria:mutate',
     ]);
 
     const budgetBody = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body));
@@ -129,6 +130,7 @@ describe('GoogleAdsHttpApiClient', () => {
     expect(campaignBody.operations[0].create).toMatchObject({
       name: 'Winning Themes',
       advertisingChannelType: 'SEARCH',
+      containsEuPoliticalAdvertising: 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
       status: 'PAUSED',
       campaignBudget: 'customers/123/campaignBudgets/1',
     });
@@ -188,7 +190,7 @@ describe('GoogleAdsHttpApiClient', () => {
 
     expect(result).toBe('customers/123/campaignBudgets/1');
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/googleAds:search');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/googleAds:search');
     const headers = init.headers as Record<string, string>;
     expect(headers.Authorization).toBe('Bearer access-token-1');
     expect(headers['developer-token']).toBe('dev-token');
@@ -238,11 +240,26 @@ describe('GoogleAdsHttpApiClient', () => {
 
     expect(result).toEqual({ userListResourceName: 'customers/123/userLists/1' });
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/userLists:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/userLists:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([
-      { create: { name: 'Segment: Paying customers', membershipStatus: 'OPEN', crmBasedUserListInfo: { uploadKeyType: 'CONTACT_INFO' } } },
+      { create: { name: 'Segment: Paying customers', membershipStatus: 'OPEN', crmBasedUserList: { uploadKeyType: 'CONTACT_INFO' } } },
     ]);
+  });
+
+  it("sends the person's EU political advertising declaration as Google's enum when it is yes", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaignBudgets/1' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaigns/1' }] }))
+      .mockResolvedValue(jsonResponse({ results: [{ resourceName: 'customers/123/x/1' }, { resourceName: 'customers/123/x/2' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new GoogleAdsHttpApiClient(OPTIONS).createCampaignDraft('123', { ...DRAFT, containsEuPoliticalAdvertising: true });
+
+    const campaignBody = JSON.parse(String((fetchMock.mock.calls[2] as [string, RequestInit])[1].body));
+    expect(campaignBody.operations[0].create.containsEuPoliticalAdvertising).toBe('CONTAINS_EU_POLITICAL_ADVERTISING');
   });
 
   it('uploads hashed-email-only contacts to a Customer Match user list via create -> addOperations -> run, in order, against the job\'s own resource name', async () => {
@@ -262,9 +279,9 @@ describe('GoogleAdsHttpApiClient', () => {
     expect(result).toEqual({ numReceived: 2 });
     const urls = fetchMock.mock.calls.slice(1).map(([url]: [string]) => url);
     expect(urls).toEqual([
-      'https://googleads.googleapis.com/v17/customers/123/offlineUserDataJobs:create',
-      'https://googleads.googleapis.com/v17/customers/123/offlineUserDataJobs/456:addOperations',
-      'https://googleads.googleapis.com/v17/customers/123/offlineUserDataJobs/456:run',
+      'https://googleads.googleapis.com/v25/customers/123/offlineUserDataJobs:create',
+      'https://googleads.googleapis.com/v25/customers/123/offlineUserDataJobs/456:addOperations',
+      'https://googleads.googleapis.com/v25/customers/123/offlineUserDataJobs/456:run',
     ]);
 
     const createBody = JSON.parse(String((fetchMock.mock.calls[1] as [string, RequestInit])[1].body));
@@ -433,7 +450,7 @@ describe('GoogleAdsHttpApiClient', () => {
       negativeKeywordResourceNames: ['customers/123/adGroupCriteria/3'],
     });
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupCriteria:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/adGroupCriteria:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([
       { create: { adGroup: 'customers/123/adGroups/1', status: 'ENABLED', keyword: { text: 'blue widgets', matchType: 'PHRASE' } } },
@@ -461,7 +478,7 @@ describe('GoogleAdsHttpApiClient', () => {
     await new GoogleAdsHttpApiClient(OPTIONS).removeAdGroupCriteria('123', ['customers/123/adGroupCriteria/1', 'customers/123/adGroupCriteria/2']);
 
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupCriteria:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/adGroupCriteria:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([
       { remove: 'customers/123/adGroupCriteria/1' },
@@ -498,7 +515,7 @@ describe('GoogleAdsHttpApiClient', () => {
 
     expect(result).toEqual({ adResourceName: 'customers/123/adGroupAds/2' });
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupAds:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/adGroupAds:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([
       {
@@ -541,7 +558,7 @@ describe('GoogleAdsHttpApiClient', () => {
     await new GoogleAdsHttpApiClient(OPTIONS).setAdGroupAdStatus('123', 'customers/123/adGroupAds/1', 'PAUSED');
 
     const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(url).toBe('https://googleads.googleapis.com/v17/customers/123/adGroupAds:mutate');
+    expect(url).toBe('https://googleads.googleapis.com/v25/customers/123/adGroupAds:mutate');
     const body = JSON.parse(String(init.body));
     expect(body.operations).toEqual([{ update: { resourceName: 'customers/123/adGroupAds/1', status: 'PAUSED' }, updateMask: 'status' }]);
   });
