@@ -82,7 +82,7 @@ describe('AutopilotPanel', () => {
     expect(screen.getByTestId('ad-studio-autopilot-step-images')).toHaveTextContent('3 of 4');
     expect(screen.getByTestId('ad-studio-autopilot-step-clips')).toHaveTextContent('a scene failed');
     expect(screen.getByText('Keeps: the plan, the script.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Run again' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Run the autopilot again' })).toBeEnabled();
   });
 
   it('cannot start with nothing to make, and warns when a model is not set up', () => {

@@ -4067,7 +4067,7 @@
       "keepsConcepts": "the image ideas",
       "missingModels": "Some of the AI models are not set up for this deployment, so the steps that need them will say so.",
       "start": "Create everything",
-      "runAgain": "Run again",
+      "runAgain": "Run the autopilot again",
       "runAgainHint": "After an edit, a new run redoes only what changed.",
       "cancel": "Stop",
       "progress": "{done} of {total}",
