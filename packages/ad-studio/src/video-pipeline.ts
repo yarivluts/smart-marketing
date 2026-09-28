@@ -1,4 +1,3 @@
-import 'server-only';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -33,7 +32,7 @@ import {
   type AdStudioUsageKind,
   type AdStudioVideoModel,
 } from '@growthos/firebase-orm-models';
-import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { adStudioRuntime, ensureOrm } from './runtime';
 import { AdStudioProviderError, type AdStudioProviderErrorCode } from './llm';
 import { resolveAdStudioOmni, type AdStudioOmni, type OmniInteraction } from './omni';
 import { adStudioClipObjectPath, adStudioVideoObjectPath, resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
@@ -229,7 +228,7 @@ function generatingFor(clips: readonly AdStudioClipModel[], sceneId: string): bo
 
 /** Renders one scene from its current script (units = the scene's seconds, kind `video_scene`). */
 export async function startSceneRender(ctx: BriefContext & { sceneId: string }, deps: AdStudioVideoDeps): Promise<AdStudioClipModel> {
-  await ensureFirestoreOrm();
+  await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const scene = brief.scenes.find((candidate) => candidate.id === ctx.sceneId);
   if (!scene) throw new AdStudioVideoRequestError('scene_not_found');
@@ -259,7 +258,7 @@ export async function startSceneRender(ctx: BriefContext & { sceneId: string }, 
 export async function startSceneEdit(ctx: BriefContext & { sceneId: string; instruction: string }, deps: AdStudioVideoDeps): Promise<AdStudioClipModel> {
   const instruction = ctx.instruction.trim();
   if (instruction.length === 0) throw new AdStudioVideoRequestError('invalid_instruction');
-  await ensureFirestoreOrm();
+  await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   if (!brief.scenes.some((candidate) => candidate.id === ctx.sceneId)) throw new AdStudioVideoRequestError('scene_not_found');
   const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
@@ -290,7 +289,7 @@ export async function startSceneEdit(ctx: BriefContext & { sceneId: string; inst
  * first provider failure (a billing refusal would refuse every scene).
  */
 export async function startRenderAll(ctx: BriefContext, deps: AdStudioVideoDeps): Promise<AdStudioClipModel[]> {
-  await ensureFirestoreOrm();
+  await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
   const states = sceneVideoStates(brief.scenes, clips.map(summary), videoContext(brief));
@@ -352,7 +351,7 @@ async function advanceClip(ctx: Omit<BriefContext, 'actorId'>, clip: AdStudioCli
  * that died with their request, and returns the brief's clips and videos as they now stand.
  */
 export async function advanceBriefVideo(ctx: Omit<BriefContext, 'actorId'>, deps: AdStudioVideoDeps): Promise<{ clips: AdStudioClipView[]; videos: AdStudioVideoView[] }> {
-  await ensureFirestoreOrm();
+  await ensureOrm();
   await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
   await Promise.all(clips.filter((clip) => clip.status === 'generating').map((clip) => advanceClip(ctx, clip, deps)));
@@ -367,7 +366,7 @@ export async function advanceBriefVideo(ctx: Omit<BriefContext, 'actorId'>, deps
 }
 
 export async function listBriefVideo(ctx: Omit<BriefContext, 'actorId'>): Promise<{ clips: AdStudioClipView[]; videos: AdStudioVideoView[] }> {
-  await ensureFirestoreOrm();
+  await ensureOrm();
   const [clips, videos] = await Promise.all([listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId), listAdStudioVideos(ctx.organizationId, ctx.projectId, ctx.briefId)]);
   return { clips: clips.map(toAdStudioClipView), videos: videos.map(toAdStudioVideoView) };
 }
@@ -378,7 +377,7 @@ export async function listBriefVideo(ctx: Omit<BriefContext, 'actorId'>): Promis
  * (in memory on Cloud Run) that is always removed.
  */
 export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioVideoDeps, 'storage' | 'runner' | 'now'>): Promise<AdStudioVideoModel> {
-  await ensureFirestoreOrm();
+  await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const clips = await listAdStudioClips(ctx.organizationId, ctx.projectId, ctx.briefId);
   const plan = assemblyPlan(brief.scenes, clips.map(summary), videoContext(brief));
@@ -410,7 +409,7 @@ export async function assembleBriefVideo(ctx: BriefContext, deps: Pick<AdStudioV
     }
     stage = 'ffmpeg_failed';
     const output = path.join(workDir, 'video.mp4');
-    const { durationSeconds } = await concatClips({ clips: local, output, format: brief.video_format, runner: deps.runner });
+    const { durationSeconds } = await (adStudioRuntime().concatClips ?? concatClips)({ clips: local, output, format: brief.video_format, runner: deps.runner });
     stage = 'storage_error';
     const objectPath = adStudioVideoObjectPath({ ...ctx, videoId: video.id });
     await deps.storage.upload(objectPath, await readFile(output), 'video/mp4');

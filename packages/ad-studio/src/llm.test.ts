@@ -4,7 +4,6 @@ import { z } from 'zod/v4';
 import type Anthropic from '@anthropic-ai/sdk';
 import { AdStudioProviderError, AD_STUDIO_CLAUDE_MODEL, AD_STUDIO_GEMINI_TEXT_MODEL, createClaudeLlm, createGeminiLlm, describeAdStudioProviders, resolveAdStudioLlm } from './llm';
 
-vi.mock('server-only', () => ({}));
 
 const Schema = z.object({ title: z.string(), count: z.number() });
 

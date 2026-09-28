@@ -2,7 +2,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fetchLandingPage, LANDING_PAGE_MAX_BYTES } from './planning-sources';
 
-vi.mock('server-only', () => ({}));
 
 /** Every host resolves to a public documentation address unless a test says otherwise. */
 const publicResolver = vi.fn(async () => ['93.184.215.14']);

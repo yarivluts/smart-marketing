@@ -1,4 +1,3 @@
-import 'server-only';
 import { assertAdStudioQuota, recordAdStudioUsage, type AdStudioUsageKind } from '@growthos/firebase-orm-models';
 import { AdStudioProviderError, type AdStudioLlm } from './llm';
 

@@ -1,9 +1,9 @@
-import 'server-only';
 import { createReadStream as createLocalReadStream } from 'node:fs';
 import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { PassThrough, Readable } from 'node:stream';
 import { AD_STUDIO_TEST_MEDIA_DIR, adStudioTestOverride } from './test-overrides';
+import { adStudioRuntime } from './runtime';
 
 /**
  * Where the Ad Studio keeps its clips and assembled videos (KAN-231): a private GCS bucket with
@@ -167,6 +167,8 @@ let cached: { key: string; storage: AdStudioMediaStorage } | null = null;
 
 /** The deployment's store: the bucket from AD_STUDIO_BUCKET (default {@link AD_STUDIO_DEFAULT_BUCKET}), or the guarded local test folder. */
 export function resolveAdStudioMediaStorage(env: NodeJS.ProcessEnv = process.env): AdStudioMediaStorage {
+  const override = adStudioRuntime().mediaStorage;
+  if (override) return override();
   const localDir = adStudioTestOverride(env, AD_STUDIO_TEST_MEDIA_DIR);
   const bucket = env.AD_STUDIO_BUCKET?.trim() || AD_STUDIO_DEFAULT_BUCKET;
   const key = localDir ? `local:${localDir}` : `gcs:${bucket}`;

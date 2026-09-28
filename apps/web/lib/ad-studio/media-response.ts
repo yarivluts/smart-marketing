@@ -1,6 +1,6 @@
 import 'server-only';
 import { Readable } from 'node:stream';
-import type { AdStudioMediaStorage, MediaByteRange } from './media-storage';
+import type { AdStudioMediaStorage, MediaByteRange } from './engine';
 
 /**
  * Streams a stored clip or video to the browser (KAN-231), honouring a single HTTP byte range so a

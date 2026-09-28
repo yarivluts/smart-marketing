@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { AD_STUDIO_VIDEO_MODEL, createOmniClient, findOmniVideo, omniErrorCode, omniFileName, parseOmniInteraction, resolveAdStudioOmni } from './omni';
 import { AdStudioProviderError } from './llm';
 
-vi.mock('server-only', () => ({}));
 
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 

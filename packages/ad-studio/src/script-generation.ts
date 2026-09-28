@@ -1,4 +1,3 @@
-import 'server-only';
 import { z } from 'zod/v4';
 import {
   buildSceneRewritePrompt,
@@ -9,7 +8,7 @@ import {
   type AdStudioScriptContext,
 } from '@growthos/shared';
 import { adStudioBriefInput, getAdStudioBrief, newAdStudioSceneId, saveAdStudioScript, type AdStudioBriefModel } from '@growthos/firebase-orm-models';
-import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
+import { ensureOrm } from './runtime';
 import { AdStudioProviderError } from './llm';
 import { meteredCall, type AdStudioCallContext } from './metering';
 
@@ -45,7 +44,7 @@ function toScenes(generated: GeneratedScript['scenes']): AdStudioScene[] {
 export async function generateAdStudioScript(
   ctx: AdStudioCallContext & { briefId: string; context?: AdStudioScriptContext },
 ): Promise<AdStudioBriefModel> {
-  await ensureFirestoreOrm();
+  await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const context = ctx.context ?? (brief.plan ? planToScriptContext(brief.plan, brief.plan_sources) : undefined);
   const prompt = buildScriptPrompt(adStudioBriefInput(brief), context);
@@ -70,7 +69,7 @@ export async function generateAdStudioScript(
  * rewrite never silently replaces work. The proposal keeps the scene's id and is fitted on its own.
  */
 export async function proposeAdStudioSceneRewrite(ctx: AdStudioCallContext & { briefId: string; sceneId: string; instruction: string }): Promise<AdStudioScene> {
-  await ensureFirestoreOrm();
+  await ensureOrm();
   const brief = await getAdStudioBrief(ctx.organizationId, ctx.projectId, ctx.briefId);
   const index = brief.scenes.findIndex((scene) => scene.id === ctx.sceneId);
   if (index < 0) throw new AdStudioProviderError('invalid_output', 'That scene is no longer in the script.');

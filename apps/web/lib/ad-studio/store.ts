@@ -29,7 +29,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
-import { adStudioBriefMediaPrefix, resolveAdStudioMediaStorage } from './media-storage';
+import { adStudioBriefMediaPrefix, resolveAdStudioMediaStorage } from './engine';
 
 /** The web app's Ad Studio reads and writes: the package services, with the ORM connected first. */
 

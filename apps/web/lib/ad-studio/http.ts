@@ -9,8 +9,7 @@ import {
   AdStudioVideoNotFoundError,
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
-import { AdStudioProviderError } from './llm';
-import { AdStudioAssemblyError, AdStudioVideoRequestError } from './video-pipeline';
+import { AdStudioAssemblyError, AdStudioProviderError, AdStudioVideoRequestError } from './engine';
 
 const VIDEO_REQUEST_STATUS: Record<AdStudioVideoRequestError['code'], number> = {
   scene_not_found: 404,

@@ -1,4 +1,3 @@
-import 'server-only';
 import {
   exportAdStudioVideo,
   getAdStudioVideo,
@@ -6,8 +5,8 @@ import {
   type AdStudioExportModel,
   type YouTubePrivacyStatus,
 } from '@growthos/firebase-orm-models';
-import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
-import { getServerKmsProvider } from '@/lib/vault/kms-provider';
+import { ensureOrm } from './runtime';
+import { getServerKmsProvider } from './runtime';
 import { resolveAdStudioMediaStorage, type AdStudioMediaStorage } from './media-storage';
 
 /** A 60-second ad is a few tens of MB; anything far past that is not an Ad Studio video. */
@@ -49,7 +48,7 @@ export async function exportBriefVideo(params: {
   actorId: string;
   storage?: AdStudioMediaStorage;
 }): Promise<AdStudioExportModel> {
-  await ensureFirestoreOrm();
+  await ensureOrm();
   const video = await getAdStudioVideo(params.organizationId, params.projectId, params.briefId, params.videoId);
   const objectPath = video.gcs_path;
   if (video.status !== 'ready' || !objectPath) throw new AdStudioExportVideoNotReadyError();

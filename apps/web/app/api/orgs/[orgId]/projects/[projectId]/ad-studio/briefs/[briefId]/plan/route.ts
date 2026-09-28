@@ -3,8 +3,7 @@ import { requireProjectPermission } from '@/lib/orgs/access';
 import { resolveSelectedEnvironment } from '@/lib/orgs/selected-environment';
 import { toAdStudioBriefView } from '@/lib/ad-studio/store';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
-import { resolveAdStudioLlm } from '@/lib/ad-studio/llm';
-import { planAdStudioBrief } from '@/lib/ad-studio/planning';
+import { resolveAdStudioLlm, planAdStudioBrief } from '@/lib/ad-studio/engine';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; briefId: string }>;

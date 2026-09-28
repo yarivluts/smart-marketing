@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
-import { listBriefVideo, resolveAdStudioVideoDeps, startSceneEdit } from '@/lib/ad-studio/video-pipeline';
+import { listBriefVideo, resolveAdStudioVideoDeps, startSceneEdit } from '@/lib/ad-studio/engine';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; briefId: string; sceneId: string }>;

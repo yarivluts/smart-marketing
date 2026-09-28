@@ -19,12 +19,8 @@ import {
   toAdStudioExportView,
   toAdStudioBriefView,
 } from '@/lib/ad-studio/store';
-import { describeAdStudioProviders } from '@/lib/ad-studio/llm';
+import { describeAdStudioProviders, toAdStudioClipView, toAdStudioVideoView, resolveAdStudioMediaStorage, isFfmpegAvailable, resolveAdStudioOmni } from '@/lib/ad-studio/engine';
 import { adStudioStages, currentAssembledVideo, limitUsedPercent, summarizeAdStudio, type AdStudioStageStatus, type AdStudioVideoStageProgress } from '@/lib/ad-studio/view';
-import { toAdStudioClipView, toAdStudioVideoView } from '@/lib/ad-studio/video-pipeline';
-import { resolveAdStudioMediaStorage } from '@/lib/ad-studio/media-storage';
-import { isFfmpegAvailable } from '@/lib/ad-studio/ffmpeg';
-import { resolveAdStudioOmni } from '@/lib/ad-studio/omni';
 import { Link } from '@/i18n/navigation';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard, EmptyState, FlowDiagram, PageHero, type FlowEdgeSpec, type FlowNodeSpec, type VizStatus } from '@/components/viz';

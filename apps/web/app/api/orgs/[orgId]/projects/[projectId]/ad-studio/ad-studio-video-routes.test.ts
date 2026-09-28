@@ -16,9 +16,7 @@ import {
   listAdStudioVideos,
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
-import { createMemoryMediaStorage } from '@/lib/ad-studio/media-storage';
-import { createOmniClient } from '@/lib/ad-studio/omni';
-import { advanceBriefVideo, CLIP_TIMEOUT_MS } from '@/lib/ad-studio/video-pipeline';
+import { advanceBriefVideo, CLIP_TIMEOUT_MS, configureAdStudioRuntime, createMemoryMediaStorage, createOmniClient } from '@/lib/ad-studio/engine';
 import { POST as createBrief } from './briefs/route';
 import { DELETE as deleteBrief } from './briefs/[briefId]/route';
 import { PUT as saveScript } from './briefs/[briefId]/script/route';
@@ -38,14 +36,6 @@ const { getServerSessionMock, memoryStorage, concatClipsMock } = vi.hoisted(() =
 }));
 vi.mock('@/lib/auth/get-server-session', () => ({ getServerSession: getServerSessionMock }));
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/ad-studio/media-storage', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/ad-studio/media-storage')>();
-  return { ...actual, resolveAdStudioMediaStorage: () => memoryStorage.current };
-});
-vi.mock('@/lib/ad-studio/ffmpeg', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/ad-studio/ffmpeg')>();
-  return { ...actual, concatClips: concatClipsMock };
-});
 
 type MemoryStorage = ReturnType<typeof createMemoryMediaStorage>;
 const storage = () => memoryStorage.current as MemoryStorage;
@@ -60,6 +50,8 @@ beforeEach(() => {
   getServerSessionMock.mockReset();
   concatClipsMock.mockReset();
   memoryStorage.current = createMemoryMediaStorage();
+  // The engine's test seams stand in for GCS and ffmpeg (the engine lives in @growthos/ad-studio).
+  configureAdStudioRuntime({ mediaStorage: () => memoryStorage.current as MemoryStorage, concatClips: concatClipsMock });
   process.env.GEMINI_API_KEY = 'test-gemini-key';
 });
 
@@ -280,7 +272,7 @@ describe('Ad Studio video routes (KAN-231)', () => {
     await renderAll(request('POST'), ctx.p());
     await poll(ctx.p());
     await poll(ctx.p());
-    const { FfmpegUnavailableError } = await import('@/lib/ad-studio/ffmpeg');
+    const { FfmpegUnavailableError } = await import('@/lib/ad-studio/engine');
     concatClipsMock.mockRejectedValue(new FfmpegUnavailableError('ffmpeg was not found'));
     const response = await assemble(request('POST'), ctx.p());
     expect(response.status).toBe(503);

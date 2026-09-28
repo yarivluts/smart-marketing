@@ -1,4 +1,3 @@
-import 'server-only';
 import { AdStudioProviderError, type AdStudioProviderErrorCode } from './llm';
 import { AD_STUDIO_TEST_OMNI_BASE_URL, adStudioTestOverride, isLoopbackHttpUrl } from './test-overrides';
 

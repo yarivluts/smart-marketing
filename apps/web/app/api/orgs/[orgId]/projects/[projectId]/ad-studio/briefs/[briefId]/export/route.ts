@@ -3,7 +3,7 @@ import { AdStudioExportInvalidError, AdStudioExportUnavailableError, type YouTub
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { parseJsonBody } from '@/lib/http/parse-json-body';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
-import { AdStudioExportVideoNotReadyError, exportBriefVideo } from '@/lib/ad-studio/export';
+import { AdStudioExportVideoNotReadyError, exportBriefVideo } from '@/lib/ad-studio/engine';
 import { toAdStudioExportView } from '@/lib/ad-studio/store';
 
 interface RouteParams {

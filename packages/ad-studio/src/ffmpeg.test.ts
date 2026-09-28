@@ -20,7 +20,6 @@ import {
   type SpawnLike,
 } from './ffmpeg';
 
-vi.mock('server-only', () => ({}));
 
 /** A fake ffmpeg process: prints `stderr`, then exits with `code` (or fails to start). */
 function fakeSpawn(script: (args: string[]) => { stderr?: string; code?: number; error?: NodeJS.ErrnoException }): SpawnLike & { calls: string[][] } {

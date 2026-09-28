@@ -1,4 +1,3 @@
-import 'server-only';
 import {
   buildKeywordSeeds,
   extractLandingPageContent,
@@ -19,7 +18,8 @@ import {
   type KmsProvider,
   type WarehouseQueryExecutor,
 } from '@growthos/firebase-orm-models';
-import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
+import { VaultNotConfiguredError } from '@growthos/firebase-orm-models';
+import { getServerKmsProvider } from './runtime';
 
 /**
  * The Ad Studio's evidence gathering (KAN-230), server-only. Each source returns what it measured or

@@ -1,4 +1,3 @@
-import 'server-only';
 import { spawn } from 'node:child_process';
 import { AD_STUDIO_MAX_TOTAL_SECONDS, type AdStudioFormat } from '@growthos/shared';
 
