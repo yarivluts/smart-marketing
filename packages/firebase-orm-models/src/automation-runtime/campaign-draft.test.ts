@@ -13,6 +13,7 @@ function validDraft(overrides: Partial<GoogleAdsCampaignDraft> = {}): GoogleAdsC
     platform: 'google_ads',
     campaignName: 'Winning Themes',
     advertisingChannelType: 'SEARCH',
+    containsEuPoliticalAdvertising: false,
     dailyBudgetUsd: 25,
     adGroups: [
       {
@@ -33,6 +34,13 @@ function validDraft(overrides: Partial<GoogleAdsCampaignDraft> = {}): GoogleAdsC
 describe('validateCampaignDraft', () => {
   it('accepts a well-formed Search campaign draft', () => {
     expect(() => validateCampaignDraft(validDraft())).not.toThrow();
+  });
+
+  it('rejects a draft that does not answer the EU political advertising declaration (never defaulted)', () => {
+    const { containsEuPoliticalAdvertising: _omitted, ...unanswered } = validDraft();
+    expect(() => validateCampaignDraft(unanswered as unknown as CampaignDraft)).toThrow(/containsEuPoliticalAdvertising must be answered/);
+    expect(() => validateCampaignDraft(validDraft({ containsEuPoliticalAdvertising: 'no' as unknown as boolean }))).toThrow(InvalidCampaignDraftError);
+    expect(() => validateCampaignDraft(validDraft({ containsEuPoliticalAdvertising: true }))).not.toThrow();
   });
 
   it('rejects a blank campaign name', () => {

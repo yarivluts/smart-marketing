@@ -98,7 +98,7 @@ export interface GoogleAdsAddressMatchInfo {
 }
 
 /**
- * The Google Ads REST API (v17) mutate/OAuth calls this connector needs,
+ * The Google Ads REST API (v25) mutate/OAuth calls this connector needs,
  * kept as a small interface (not the `google-ads-api` npm SDK) so a run's
  * own executor can be driven by a fake client in tests without any network
  * access — the same "buildable-today, swap the provider later" seam
@@ -201,7 +201,12 @@ export interface GoogleAdsApiClient {
   setAdGroupAdStatus(customerId: string, adResourceName: string, status: GoogleAdsCampaignStatus): Promise<void>;
 }
 
-const GOOGLE_ADS_API_BASE_URL = 'https://googleads.googleapis.com/v17';
+/**
+ * The Google Ads API version every call uses (KAN-233: was v17, long sunset). The request bodies
+ * below were checked field by field against Google's v25 discovery document.
+ */
+export const GOOGLE_ADS_API_VERSION = 'v25';
+const GOOGLE_ADS_API_BASE_URL = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}`;
 const GOOGLE_OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 /** Refresh 60s before Google's own reported expiry, so a call in flight never races an about-to-expire token. */
 const ACCESS_TOKEN_EXPIRY_SAFETY_MARGIN_MS = 60_000;
@@ -313,6 +318,9 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
           status: 'PAUSED',
           campaignBudget: campaignBudgetResourceName,
           manualCpc: {},
+          containsEuPoliticalAdvertising: draft.containsEuPoliticalAdvertising
+            ? 'CONTAINS_EU_POLITICAL_ADVERTISING'
+            : 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
         },
       },
     ]);
@@ -452,7 +460,9 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
         create: {
           name: params.name,
           membershipStatus: 'OPEN',
-          crmBasedUserListInfo: { uploadKeyType: 'CONTACT_INFO' },
+          // The resource field is `crmBasedUserList` (its type is CrmBasedUserListInfo); the old
+          // `crmBasedUserListInfo` key was rejected as an unknown field (KAN-233).
+          crmBasedUserList: { uploadKeyType: 'CONTACT_INFO' },
         },
       },
     ]);

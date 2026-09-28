@@ -137,6 +137,9 @@ export function validateGoogleAdsCampaignDraft(draft: GoogleAdsCampaignDraft): v
   if (draft.advertisingChannelType !== 'SEARCH') {
     reasons.push('advertisingChannelType must be "SEARCH" (Performance Max is not supported yet).');
   }
+  if (typeof draft.containsEuPoliticalAdvertising !== 'boolean') {
+    reasons.push('containsEuPoliticalAdvertising must be answered (true or false): Google Ads requires the declaration on every campaign.');
+  }
   if (!Array.isArray(draft.adGroups) || draft.adGroups.length === 0) {
     reasons.push('adGroups must have at least one ad group.');
   } else {
