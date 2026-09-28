@@ -1,14 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { imageConceptFingerprint } from '@growthos/shared';
 import {
+  adStudioImageSlots,
   adStudioStages,
   buildSceneTimeline,
   currentAssembledVideo,
   formatElapsed,
   limitUsedPercent,
+  missingImageRenders,
   planningSourceChecklist,
   shortUrl,
   sortRecommendations,
   summarizeAdStudio,
+  type AdStudioImageView,
 } from './view';
 
 describe('buildSceneTimeline', () => {
@@ -134,5 +138,49 @@ describe('shortUrl', () => {
     expect(shortUrl('https://example.com/lawyers/')).toBe('example.com/lawyers');
     expect(shortUrl('http://example.com')).toBe('example.com');
     expect(shortUrl('/pricing')).toBe('/pricing');
+  });
+});
+
+describe('image slots', () => {
+  const concept = { id: 'c1', visualPrompt: 'A desk', headline: 'Sign fast', formats: ['square' as const, 'story' as const] };
+  const fingerprint = (format: 'square' | 'story', headline = 'Sign fast') => imageConceptFingerprint({ visualPrompt: 'A desk', headline }, format, 'en');
+  const image = (overrides: Partial<AdStudioImageView>): AdStudioImageView => ({
+    id: 'i',
+    conceptId: 'c1',
+    format: 'square',
+    kind: 'render',
+    version: 1,
+    status: 'ready',
+    selected: true,
+    parentImageId: null,
+    instruction: null,
+    conceptFingerprint: fingerprint('square'),
+    failureCode: null,
+    mimeType: 'image/png',
+    requestedOn: '2026-09-28T10:00:00.000Z',
+    completedOn: '2026-09-28T10:00:10.000Z',
+    ...overrides,
+  });
+
+  it('gives one slot per concept and placement, with its selected version and whether it matches the concept now', () => {
+    const slots = adStudioImageSlots([concept], [image({ id: 'a' }), image({ id: 'b', version: 2, selected: false })], 'en');
+    expect(slots.map((slot) => [slot.format, slot.selected?.id ?? null, slot.current, slot.versions.map((v) => v.id)])).toEqual([
+      ['square', 'a', true, ['b', 'a']],
+      ['story', null, false, []],
+    ]);
+    const edited = adStudioImageSlots([{ ...concept, headline: 'Changed' }], [image({ id: 'a' })], 'en');
+    expect(edited[0].current).toBe(false);
+  });
+
+  it('lists the renders still needed, skipping slots in flight and, from a time on, slots that already failed', () => {
+    const slots = adStudioImageSlots(
+      [concept],
+      [image({ id: 'a' }), image({ id: 'f', format: 'story', status: 'failed', selected: false, conceptFingerprint: fingerprint('story'), requestedOn: '2026-09-28T11:00:00.000Z' })],
+      'en',
+    );
+    expect(missingImageRenders(slots, [concept], 'en')).toEqual([{ conceptId: 'c1', format: 'story' }]);
+    expect(missingImageRenders(slots, [concept], 'en', '2026-09-28T10:30:00.000Z')).toEqual([]);
+    const inFlight = adStudioImageSlots([concept], [image({ id: 'g', format: 'story', status: 'generating', selected: false })], 'en');
+    expect(missingImageRenders(inFlight, [concept], 'en')).toEqual([{ conceptId: 'c1', format: 'square' }]);
   });
 });

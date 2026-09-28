@@ -1,6 +1,9 @@
 import {
   AD_STUDIO_MAX_TOTAL_SECONDS,
+  imageConceptFingerprint,
   totalSceneSeconds,
+  type AdStudioImageConcept,
+  type AdStudioImageFormat,
   type AdStudioEvidenceSource,
   type AdStudioPlanRecommendation,
   type AdStudioPlanSources,
@@ -64,6 +67,95 @@ export interface AdStudioClipView {
   instruction: string | null;
   requestedOn: string;
   completedOn: string | null;
+}
+
+/** A generated ad image as the page receives it. */
+export interface AdStudioImageView {
+  id: string;
+  conceptId: string;
+  format: AdStudioImageFormat;
+  kind: 'render' | 'edit';
+  version: number;
+  status: 'generating' | 'ready' | 'failed';
+  selected: boolean;
+  parentImageId: string | null;
+  instruction: string | null;
+  conceptFingerprint: string;
+  failureCode: string | null;
+  mimeType: string | null;
+  requestedOn: string;
+  completedOn: string | null;
+}
+
+/** One concept in one placement: its versions, the chosen one, and whether that one still matches the concept. */
+export interface AdStudioImageSlot {
+  conceptId: string;
+  format: AdStudioImageFormat;
+  /** Newest first. */
+  versions: AdStudioImageView[];
+  selected: AdStudioImageView | null;
+  /** True when the chosen image was rendered from the concept as it reads now. */
+  current: boolean;
+  generating: boolean;
+}
+
+/** Every concept x placement the brief asks for, in concept order. Images of removed concepts or placements are not slots. */
+export function adStudioImageSlots(
+  concepts: readonly Pick<AdStudioImageConcept, 'id' | 'visualPrompt' | 'headline' | 'formats'>[],
+  images: readonly AdStudioImageView[],
+  language: string,
+): AdStudioImageSlot[] {
+  const slots: AdStudioImageSlot[] = [];
+  for (const concept of concepts) {
+    for (const format of concept.formats) {
+      const versions = images.filter((image) => image.conceptId === concept.id && image.format === format).sort((a, b) => b.version - a.version);
+      const selected = versions.find((image) => image.selected && image.status === 'ready') ?? null;
+      const fingerprint = imageConceptFingerprint(concept, format, language);
+      slots.push({
+        conceptId: concept.id,
+        format,
+        versions,
+        selected,
+        // An edit keeps its parent's fingerprint, so an edited image of the current concept is current too.
+        current: Boolean(selected && selected.conceptFingerprint === fingerprint),
+        generating: versions.some((image) => image.status === 'generating'),
+      });
+    }
+  }
+  return slots;
+}
+
+/**
+ * The renders still needed so every slot has an image of the concept as it reads now: slots with
+ * no current image and nothing in flight. `failedSince` skips slots whose current-fingerprint render
+ * already failed after that time (the autopilot tries each once per run instead of looping).
+ */
+export function missingImageRenders(slots: readonly AdStudioImageSlot[], concepts: readonly Pick<AdStudioImageConcept, 'id' | 'visualPrompt' | 'headline'>[], language: string, failedSince?: string): { conceptId: string; format: AdStudioImageFormat }[] {
+  const byId = new Map(concepts.map((concept) => [concept.id, concept]));
+  return slots
+    .filter((slot) => {
+      if (slot.current || slot.generating) return false;
+      const concept = byId.get(slot.conceptId);
+      if (!concept) return false;
+      const fingerprint = imageConceptFingerprint(concept, slot.format, language);
+      if (slot.versions.some((image) => image.status === 'ready' && image.conceptFingerprint === fingerprint)) return false;
+      if (failedSince && slot.versions.some((image) => image.status === 'failed' && image.conceptFingerprint === fingerprint && image.requestedOn >= failedSince)) return false;
+      return true;
+    })
+    .map((slot) => ({ conceptId: slot.conceptId, format: slot.format }));
+}
+
+/** An autopilot run as the page and MCP receive it. */
+export interface AdStudioRunView {
+  id: string;
+  status: 'running' | 'done' | 'failed' | 'cancelled';
+  options: { plan: boolean; images: boolean; imageFormats: AdStudioImageFormat[]; video: boolean; environmentId: string | null };
+  steps: { id: 'plan' | 'script' | 'image_concepts' | 'images' | 'clips' | 'assemble'; status: 'pending' | 'running' | 'done' | 'skipped' | 'failed'; reason: string | null; progress: { done: number; total: number } | null }[];
+  failureCode: string | null;
+  failureMessage: string | null;
+  startedOn: string;
+  lastAdvancedOn: string;
+  finishedOn: string | null;
 }
 
 /** An assembled video as the page receives it (KAN-231). */

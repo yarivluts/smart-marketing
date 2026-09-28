@@ -50,6 +50,25 @@ export function adStudioVideoObjectPath(ref: BriefRef & { videoId: string }): st
   return `${adStudioBriefMediaPrefix(ref)}videos/${ref.videoId}.mp4`;
 }
 
+const IMAGE_EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
+
+export function adStudioImageObjectPath(ref: BriefRef & { imageId: string; mimeType: string }): string {
+  return `${adStudioBriefMediaPrefix(ref)}images/${ref.imageId}.${IMAGE_EXTENSIONS[ref.mimeType] ?? 'png'}`;
+}
+
+/** Reads a whole stored object into memory, refusing anything past `maxBytes`. */
+export async function readAdStudioObject(storage: AdStudioMediaStorage, objectPath: string, maxBytes: number): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of storage.read(objectPath)) {
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+    total += buffer.byteLength;
+    if (total > maxBytes) throw new Error('The stored file is larger than the Ad Studio allows.');
+    chunks.push(buffer);
+  }
+  return Buffer.concat(chunks);
+}
+
 function assertSafePath(objectPath: string): void {
   if (objectPath.length === 0 || objectPath.startsWith('/') || objectPath.split('/').some((part) => part === '..' || part === '.')) {
     throw new Error('Unsafe media object path.');
