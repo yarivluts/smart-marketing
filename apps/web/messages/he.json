@@ -3646,7 +3646,8 @@
       "plan": "תוכנית",
       "script": "תסריט",
       "video": "וידאו",
-      "export": "ייצוא"
+      "export": "ייצוא",
+      "images": "תמונות"
     },
     "stageStatus": {
       "done": "הושלם",
@@ -3775,7 +3776,10 @@
       "script": "תסריט",
       "scene_rewrite": "שכתוב סצנה",
       "video_scene": "וידאו לסצנה",
-      "video_edit": "עריכת וידאו"
+      "video_edit": "עריכת וידאו",
+      "image_concepts": "רעיונות לתמונות",
+      "image": "תמונה",
+      "image_edit": "עריכת תמונה"
     },
     "usageOutcome": {
       "succeeded": "הצליח",
@@ -4048,6 +4052,140 @@
       "failed": "נכשל"
     },
     "exportOpen": "פתיחה",
-    "stageExportValue": "{count, plural, one {העלאה אחת} other {# העלאות}}"
+    "stageExportValue": "{count, plural, one {העלאה אחת} other {# העלאות}}",
+    "stageImagesValue": "{current} מתוך {total} תמונות",
+    "autopilot": {
+      "title": "ליצור הכול אוטומטית",
+      "description": "לחיצה אחת לוקחת את המודעה מהבריף עד לקריאייטיבים מוכנים: תכנון מעמיק, תסריט, רעיונות למודעות תמונה ותמונות בכל מיקום, סצנות הווידאו והסרטון המחובר. כל מה שנוצר ניתן לעריכה למטה, וכל מה שכבר יש לכם או ששיניתם נשמר.",
+      "optionPlan": "תכנון מעמיק קודם",
+      "optionImages": "מודעות תמונה",
+      "optionVideo": "מודעת וידאו",
+      "formatsLegend": "מיקומי תמונה",
+      "keeps": "נשמרים: {items}.",
+      "keepsPlan": "התכנון",
+      "keepsScript": "התסריט",
+      "keepsConcepts": "רעיונות התמונות",
+      "missingModels": "חלק ממודלי ה-AI לא מוגדרים בסביבה הזו, ולכן השלבים שצריכים אותם יציינו זאת.",
+      "start": "ליצור הכול",
+      "runAgain": "להריץ את הטייס האוטומטי שוב",
+      "runAgainHint": "אחרי עריכה, הרצה חדשה מחדשת רק את מה שהשתנה.",
+      "cancel": "לעצור",
+      "progress": "{done} מתוך {total}",
+      "doneHint": "הכול מוכן. עברו על כל חלק וערכו אותו למטה, ואז ייצאו כשתהיו מרוצים.",
+      "errorRunActive": "הטייס האוטומטי כבר רץ עבור המודעה הזו.",
+      "errorInvalidOptions": "בחרו תמונות, וידאו או את שניהם, ולפחות מיקום תמונה אחד.",
+      "runStatus": {
+        "running": "עובד...",
+        "done": "הסתיים",
+        "failed": "נעצר - ראו את השלב שנכשל",
+        "cancelled": "נעצר"
+      },
+      "step": {
+        "plan": "תכנון מעמיק",
+        "script": "תסריט",
+        "image_concepts": "רעיונות לתמונות",
+        "images": "תמונות",
+        "clips": "סצנות וידאו",
+        "assemble": "סרטון סופי"
+      },
+      "stepStatus": {
+        "pending": "ממתין",
+        "running": "בתהליך",
+        "done": "הושלם",
+        "skipped": "דולג",
+        "failed": "נכשל"
+      },
+      "reason": {
+        "off": "כבוי",
+        "already_done": "נשמר מה שכבר יש",
+        "no_concepts": "אין רעיונות לתמונות",
+        "no_script": "אין תסריט",
+        "not_configured": "המודל לא מוגדר",
+        "quota_exceeded": "המכסה היומית נוצלה",
+        "provider_billing": "חשבון ה-AI צריך קרדיט",
+        "rate_limited": "ה-AI מגביל בקשות",
+        "refused": "ה-AI סירב",
+        "invalid_output": "תשובת ה-AI לא שמישה",
+        "provider_error": "ה-AI נכשל",
+        "some_images_failed": "חלק מהתמונות נכשלו",
+        "clip_failed": "סצנה נכשלה",
+        "clips_not_ready": "הקליפים לא מוכנים",
+        "blocked": "ממתין לשלב קודם",
+        "cancelled": "בוטל",
+        "error": "נכשל"
+      }
+    },
+    "images": {
+      "title": "מודעות תמונה",
+      "description": "מודעות סטטיות לפייסבוק, אינסטגרם ורשת המדיה של גוגל. כל רעיון מרונדר במיקומים שבוחרים; כדי לשנות תמונה, אומרים ל-AI מה לשנות.",
+      "leftToday": "{count, plural, one {נשארה תמונה אחת להיום} other {נשארו # תמונות להיום}}",
+      "writeIdeas": "לכתוב רעיונות עם AI",
+      "rewriteIdeas": "לכתוב רעיונות חדשים עם AI",
+      "notConfigured": "אין מודל תמונות מוגדר בסביבה הזו.",
+      "noIdeas": "עדיין אין רעיונות לתמונות. כתבו אותם עם AI או הוסיפו בעצמכם.",
+      "ideaLabel": "רעיון {index}",
+      "removeIdea": "הסרה",
+      "visualPrompt": "מה רואים בתמונה",
+      "visualPromptHint": "באנגלית, עבור מודל התמונות: נושא, סביבה, תאורה, סגנון. בלי טקסט כאן.",
+      "headline": "כותרת בתוך התמונה (לא חובה)",
+      "placements": "מיקומים",
+      "addIdea": "הוספת רעיון",
+      "saveIdeas": "שמירת הרעיונות",
+      "ideasSaved": "הרעיונות נשמרו.",
+      "unsaved": "יש שינויים שלא נשמרו",
+      "saveToRender": "שמרו את הרעיונות כדי לרנדר את זה.",
+      "render": "רינדור",
+      "rerender": "רינדור מחדש",
+      "edit": "שינוי עם AI",
+      "download": "הורדה",
+      "editInstruction": "מה לשנות?",
+      "editInstructionPlaceholder": "למשל: תאורה חמה יותר, הכותרת למעלה",
+      "applyEdit": "החלה",
+      "versions": "גרסאות",
+      "versionRender": "רונדר מהרעיון",
+      "noImageYet": "עדיין לא רונדר",
+      "imageAlt": "תמונה לרעיון {index}, {format}",
+      "exportTo": "שליחה ל{destination}",
+      "exportedTo": "נשלח ל{destination}",
+      "exportDone": "נשלח ל{destination}.",
+      "destinationNotConnected": "לא מחובר לפרויקט הזה - ראו את משאבי הפרויקט.",
+      "errorInvalidConcepts": "חלק מהרעיונות לא עומדים בכללים - תקנו את המסומנים.",
+      "quotaExceeded": "מכסת התמונות היומית נוצלה ({used} מתוך {limit}).",
+      "destination": {
+        "meta": "מטא",
+        "google_ads": "גוגל אדס"
+      },
+      "format": {
+        "square": "ריבוע",
+        "portrait": "לאורך",
+        "story": "סטורי",
+        "landscape": "לרוחב"
+      },
+      "state": {
+        "none": "לא רונדר",
+        "generating": "מרנדר",
+        "ready": "מוכן",
+        "out_of_date": "לא עדכני",
+        "failed": "נכשל"
+      },
+      "issue": {
+        "too_many_concepts": "יותר מדי רעיונות.",
+        "empty_visual_prompt": "תארו את התמונה.",
+        "visual_prompt_too_long": "התיאור ארוך מדי.",
+        "headline_too_long": "הכותרת ארוכה מדי.",
+        "no_formats": "בחרו לפחות מיקום אחד.",
+        "unknown_format": "מיקום לא מוכר.",
+        "duplicate_concept_id": "רעיון כפול."
+      },
+      "requestErrors": {
+        "concept_not_found": "הרעיון הזה כבר לא שמור.",
+        "format_not_in_concept": "המיקום הזה לא נבחר לרעיון הזה.",
+        "image_not_editable": "אפשר לשנות רק תמונה מוכנה.",
+        "invalid_instruction": "כתבו מה לשנות (עד 500 תווים).",
+        "image_not_ready": "התמונה הזו לא מוכנה."
+      }
+    },
+    "dailyImages": "תמונות ביום",
+    "usageTodayImages": "תמונות היום"
   }
 }

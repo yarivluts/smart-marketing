@@ -16,6 +16,11 @@ RUN pnpm --filter "@growthos/api^..." --filter "!@growthos/dbt-transform" build 
 
 FROM base AS runner
 ENV NODE_ENV=production
+# ffmpeg joins Ad Studio scene clips into the finished video for the MCP tools (assemble_ad_video and
+# the autopilot), the same way the web image already does.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
 ENV PORT=8080
 # The commit this image was built from, reported on /v1/health so production
 # can be compared against main with no credentials (KAN-180). Left empty when

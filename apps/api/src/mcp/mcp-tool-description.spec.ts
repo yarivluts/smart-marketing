@@ -2,6 +2,7 @@ import { registerMcpTools } from './mcp-tools';
 import { registerMcpActTools } from './mcp-act-tools';
 import { registerMcpAdminTools } from './mcp-admin-tools';
 import { registerMcpSetupTools } from './mcp-setup-tools';
+import { registerMcpAdStudioTools } from './mcp-ad-studio-tools';
 import type { McpAuthContext } from './mcp-auth.guard';
 
 /**
@@ -78,6 +79,7 @@ function recordRegisteredTools(): RecordedTool[] {
   registerMcpActTools(server as never, auth);
   registerMcpAdminTools(server as never, auth);
   registerMcpSetupTools(server as never, auth);
+  registerMcpAdStudioTools(server as never, auth);
   return recorded;
 }
 

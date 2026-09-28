@@ -143,8 +143,8 @@ describe('AdStudioAdminPanel keyword data', () => {
     canConfigure: false,
     textModel: null,
     videoConfigured: false,
-    limits: { dailyTextGenerations: 50, dailyVideoSeconds: 300 },
-    usageToday: { textGenerations: 0, videoSeconds: 0 },
+    limits: { dailyTextGenerations: 50, dailyVideoSeconds: 300, dailyImages: 40 },
+    usageToday: { textGenerations: 0, videoSeconds: 0, images: 0 },
     recentUsage: [],
   };
 

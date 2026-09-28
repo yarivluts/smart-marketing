@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
 import { getAdStudioVideo } from '@/lib/ad-studio/store';
-import { resolveAdStudioMediaStorage } from '@/lib/ad-studio/media-storage';
+import { resolveAdStudioMediaStorage } from '@/lib/ad-studio/engine';
 import { streamAdStudioMedia } from '@/lib/ad-studio/media-response';
 
 interface RouteParams {

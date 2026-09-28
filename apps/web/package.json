@@ -17,6 +17,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
     "@google-cloud/storage": "^8.2.0",
+    "@growthos/ad-studio": "workspace:*",
     "@growthos/firebase-orm-models": "workspace:*",
     "@growthos/shared": "workspace:*",
     "@growthos/tracking-sdk": "workspace:*",

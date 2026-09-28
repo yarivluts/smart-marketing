@@ -17,6 +17,30 @@ Template for each entry:
 
 ---
 
+## 2026-09-28 - Ad Studio autopilot, image ads and full MCP (KAN-237)
+
+- **Last completed:**
+  - **Engine extracted:** `@growthos/ad-studio` holds planning, scripts, Gemini Omni video, ffmpeg, storage, metering and export, used by both `apps/web` and `apps/api`.
+    - Web keeps thin re-exports (`lib/ad-studio/engine.ts`) and its HTTP/media helpers.
+    - Tests use runtime seams (`mediaStorage`, `concatClips`) instead of module mocks.
+  - **Image ads:**
+    - Ideas are saved on the brief: a visual prompt, a headline drawn into the image, and placements (square 1:1, portrait 4:5, story 9:16, landscape 16:9).
+    - Gemini 3.1 Flash Image (`gemini-3.1-flash-image`, Interactions API) renders ideas and changes an image by instruction (the source image is sent inline).
+    - Every render and edit is a version; one version is selected per placement.
+    - Images have their own daily limit (default 40).
+    - Exports go to Meta's ad image library (`adimages`) or as a Google Ads image asset (v25 `assets:mutate`), under `automation.execute`.
+  - **Autopilot:** plan -> script -> image ideas -> images -> clips -> assembled video, advanced one unit per call under a lease (the page's poll or MCP).
+    - It keeps anything existing or edited and redoes only stale parts; export stays deliberate.
+    - The page shows a live step list and refreshes the other panels as steps finish.
+  - **MCP:** 29 Ad Studio tools, listed in `docs/mcp/README.md`.
+    - Gates: `ai.use`; `project.configure` for limits; `automation.execute` for exports, which is OAuth-only.
+    - `get_ad_image` returns MCP image content.
+    - The API image now installs ffmpeg.
+- **In progress:** none.
+- **Blocked + why:** Gemini answers 402 (credits depleted), so every generation was verified against a local stand-in with the documented shapes; the images in the report are labelled "Local test image - not AI output".
+- **Next step:** after deploy, mount `gemini-api-key` on api-prod/api-preprod and raise their memory for ffmpeg.
+- **Waiting on human:** top up Gemini credits; YouTube/Meta/Google Ads credentials with write access for exports.
+
 ## 2026-09-28 - One main landmark per page; Customer Match consent (KAN-234, KAN-236)
 
 - **Last completed:**

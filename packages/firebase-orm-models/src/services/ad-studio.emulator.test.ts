@@ -8,6 +8,7 @@ import {
   AdStudioScriptInvalidError,
   AD_STUDIO_DEFAULT_DAILY_TEXT_GENERATIONS,
   AD_STUDIO_DEFAULT_DAILY_VIDEO_SECONDS,
+  AD_STUDIO_DEFAULT_DAILY_IMAGES,
   assertAdStudioQuota,
   createAdStudioBrief,
   createOrganizationWithOwner,
@@ -109,6 +110,7 @@ describe('Ad Studio limits and usage', () => {
     expect(await getAdStudioSettings(orgId, projectId)).toEqual({
       dailyTextGenerations: AD_STUDIO_DEFAULT_DAILY_TEXT_GENERATIONS,
       dailyVideoSeconds: AD_STUDIO_DEFAULT_DAILY_VIDEO_SECONDS,
+      dailyImages: AD_STUDIO_DEFAULT_DAILY_IMAGES,
       customized: false,
       lastChangedOn: null,
     });
@@ -129,7 +131,7 @@ describe('Ad Studio limits and usage', () => {
     await recordAdStudioUsage({ ...base, kind: 'video_scene', units: 8, outcome: 'succeeded' });
     await recordAdStudioUsage({ ...base, kind: 'script', units: 1, outcome: 'succeeded', now: new Date('2026-09-26T23:59:00Z') });
 
-    expect(await getAdStudioUsageToday(orgId, projectId, today)).toEqual({ day: '2026-09-27', textGenerations: 2, videoSeconds: 8 });
+    expect(await getAdStudioUsageToday(orgId, projectId, today)).toEqual({ day: '2026-09-27', textGenerations: 2, videoSeconds: 8, images: 0 });
     await expect(assertAdStudioQuota({ organizationId: orgId, projectId, kind: 'plan', units: 1, now: today })).rejects.toMatchObject({ limitKind: 'text', used: 2, limit: 2 });
     await expect(assertAdStudioQuota({ organizationId: orgId, projectId, kind: 'video_scene', units: 12, now: today })).resolves.toBeUndefined();
     const refused = await assertAdStudioQuota({ organizationId: orgId, projectId, kind: 'video_edit', units: 13, now: today }).catch((caught) => caught);

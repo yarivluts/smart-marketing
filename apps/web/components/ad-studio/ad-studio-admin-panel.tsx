@@ -31,8 +31,8 @@ export interface AdStudioAdminPanelProps {
   storage?: { kind: 'gcs' | 'local' | 'memory'; location: string };
   /** Whether ffmpeg runs on this server, which assembling a video needs. */
   ffmpegAvailable?: boolean;
-  limits: { dailyTextGenerations: number; dailyVideoSeconds: number };
-  usageToday: { textGenerations: number; videoSeconds: number };
+  limits: { dailyTextGenerations: number; dailyVideoSeconds: number; dailyImages: number };
+  usageToday: { textGenerations: number; videoSeconds: number; images: number };
   recentUsage: AdStudioUsageRow[];
 }
 
@@ -77,6 +77,7 @@ export function AdStudioAdminPanel({
   const errorMessage = useAdStudioErrorMessage();
   const [text, setText] = React.useState(String(limits.dailyTextGenerations));
   const [video, setVideo] = React.useState(String(limits.dailyVideoSeconds));
+  const [imagesLimit, setImagesLimit] = React.useState(String(limits.dailyImages));
   const [pending, setPending] = React.useState(false);
   const [message, setMessage] = React.useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const locale = useLocale();
@@ -93,7 +94,7 @@ export function AdStudioAdminPanel({
       const response = await fetch(`/api/orgs/${orgId}/projects/${projectId}/ad-studio/settings`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dailyTextGenerations: Number(text), dailyVideoSeconds: Number(video) }),
+        body: JSON.stringify({ dailyTextGenerations: Number(text), dailyVideoSeconds: Number(video), dailyImages: Number(imagesLimit) }),
       });
       const body = (await response.json().catch(() => ({}))) as AdStudioApiError;
       if (!response.ok) {
@@ -155,9 +156,10 @@ export function AdStudioAdminPanel({
         </div>
       </dl>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <UsageBar label={t('usageTodayText')} used={usageToday.textGenerations} limit={limits.dailyTextGenerations} />
         <UsageBar label={t('usageTodayVideo')} used={usageToday.videoSeconds} limit={limits.dailyVideoSeconds} />
+        <UsageBar label={t('usageTodayImages')} used={usageToday.images} limit={limits.dailyImages} />
       </div>
 
       {canConfigure ? (
@@ -169,6 +171,10 @@ export function AdStudioAdminPanel({
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
             {t('dailyVideo')}
             <input type="number" min={0} max={3600} value={video} onChange={(event) => setVideo(event.target.value)} className="h-9 w-32 rounded-lg border border-input bg-background px-2 text-sm" />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">
+            {t('dailyImages')}
+            <input type="number" min={0} max={500} value={imagesLimit} onChange={(event) => setImagesLimit(event.target.value)} className="h-9 w-32 rounded-lg border border-input bg-background px-2 text-sm" />
           </label>
           <button type="submit" disabled={pending} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
             {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}

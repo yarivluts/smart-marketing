@@ -7,10 +7,23 @@ import {
   AdStudioQuotaExceededError,
   AdStudioScriptInvalidError,
   AdStudioVideoNotFoundError,
+  AdStudioImageConceptsInvalidError,
+  AdStudioImageNotFoundError,
+  AdStudioImageNotReadyError,
+  AdStudioRunAlreadyActiveError,
+  AdStudioRunNotFoundError,
+  AdStudioRunOptionsInvalidError,
   ProjectNotFoundError,
 } from '@growthos/firebase-orm-models';
-import { AdStudioProviderError } from './llm';
-import { AdStudioAssemblyError, AdStudioVideoRequestError } from './video-pipeline';
+import { AdStudioAssemblyError, AdStudioImageRequestError, AdStudioProviderError, AdStudioVideoRequestError } from './engine';
+
+const IMAGE_REQUEST_STATUS: Record<AdStudioImageRequestError['code'], number> = {
+  concept_not_found: 404,
+  format_not_in_concept: 400,
+  invalid_instruction: 400,
+  image_not_editable: 409,
+  image_not_ready: 409,
+};
 
 const VIDEO_REQUEST_STATUS: Record<AdStudioVideoRequestError['code'], number> = {
   scene_not_found: 404,
@@ -36,7 +49,9 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
     error instanceof AdStudioBriefNotFoundError ||
     error instanceof ProjectNotFoundError ||
     error instanceof AdStudioClipNotFoundError ||
-    error instanceof AdStudioVideoNotFoundError
+    error instanceof AdStudioVideoNotFoundError ||
+    error instanceof AdStudioImageNotFoundError ||
+    error instanceof AdStudioRunNotFoundError
   ) {
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
@@ -49,6 +64,21 @@ export function adStudioErrorResponse(error: unknown): NextResponse {
   }
   if (error instanceof AdStudioVideoRequestError) {
     return NextResponse.json({ error: 'video_request', code: error.code }, { status: VIDEO_REQUEST_STATUS[error.code] });
+  }
+  if (error instanceof AdStudioImageConceptsInvalidError) {
+    return NextResponse.json({ error: 'invalid_concepts', issues: error.issues }, { status: 400 });
+  }
+  if (error instanceof AdStudioImageRequestError) {
+    return NextResponse.json({ error: 'image_request', code: error.code }, { status: IMAGE_REQUEST_STATUS[error.code] });
+  }
+  if (error instanceof AdStudioImageNotReadyError) {
+    return NextResponse.json({ error: 'image_request', code: 'image_not_ready' }, { status: 409 });
+  }
+  if (error instanceof AdStudioRunAlreadyActiveError) {
+    return NextResponse.json({ error: 'run_active', runId: error.runId }, { status: 409 });
+  }
+  if (error instanceof AdStudioRunOptionsInvalidError) {
+    return NextResponse.json({ error: 'invalid_options', reasons: error.reasons }, { status: 400 });
   }
   if (error instanceof AdStudioAssemblyError) {
     return NextResponse.json({ error: 'assembly_failed', code: error.code }, { status: error.code === 'ffmpeg_unavailable' ? 503 : 500 });

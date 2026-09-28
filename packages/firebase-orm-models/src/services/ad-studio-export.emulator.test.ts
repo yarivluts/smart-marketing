@@ -56,6 +56,7 @@ describe('resolveAdStudioExportDestinations', () => {
     expect(await resolveAdStudioExportDestinations(ctx.orgId, ctx.projectId)).toEqual({
       meta: { available: false, reason: 'not_attached' },
       youtube: { available: false, reason: 'not_attached' },
+      google_ads: { available: false, reason: 'not_attached' },
     });
     await attach(ctx, 'youtube', null, 'manage');
     await attach(ctx, 'meta_ads', META_SECRET, 'read');

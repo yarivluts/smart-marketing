@@ -71,7 +71,8 @@ export function toolInputSchema(shape: Record<string, z.ZodTypeAny>): any {
   return shape;
 }
 
-export type ToolResult = { content: Array<{ type: 'text'; text: string }>; isError?: boolean };
+/** A tool's answer: JSON text, and for the Ad Studio's image tools also the image itself (MCP image content). */
+export type ToolResult = { content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }>; isError?: boolean };
 
 export function textResult(value: unknown): ToolResult {
   return { content: [{ type: 'text', text: JSON.stringify(value, null, 2) }] };

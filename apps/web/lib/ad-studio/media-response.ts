@@ -1,6 +1,6 @@
 import 'server-only';
 import { Readable } from 'node:stream';
-import type { AdStudioMediaStorage, MediaByteRange } from './media-storage';
+import type { AdStudioMediaStorage, MediaByteRange } from './engine';
 
 /**
  * Streams a stored clip or video to the browser (KAN-231), honouring a single HTTP byte range so a
@@ -29,11 +29,11 @@ export function parseByteRange(header: string | null, size: number): MediaByteRa
   return { start, end };
 }
 
-export async function streamAdStudioMedia(storage: AdStudioMediaStorage, objectPath: string, rangeHeader: string | null): Promise<Response> {
+export async function streamAdStudioMedia(storage: AdStudioMediaStorage, objectPath: string, rangeHeader: string | null, contentType = 'video/mp4'): Promise<Response> {
   const size = await storage.size(objectPath);
   if (size === null) return Response.json({ error: 'not_found' }, { status: 404 });
   const baseHeaders: Record<string, string> = {
-    'content-type': 'video/mp4',
+    'content-type': contentType,
     'accept-ranges': 'bytes',
     'cache-control': 'private, no-store',
     'content-disposition': 'inline',

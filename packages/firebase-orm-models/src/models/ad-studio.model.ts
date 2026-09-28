@@ -1,5 +1,5 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
-import type { AdStudioClipStatus, AdStudioFormat, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioClipStatus, AdStudioFormat, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 
 export const AD_STUDIO_BRIEF_STATUSES = ['draft', 'planned', 'scripted'] as const;
 export type AdStudioBriefStatus = (typeof AD_STUDIO_BRIEF_STATUSES)[number];
@@ -74,6 +74,13 @@ export class AdStudioBriefModel extends BaseModel {
   @Field({ is_required: false })
   public script_generated_by?: AdStudioGeneratedBy | null;
 
+  /** The image ad ideas (static creatives next to the video); absent until some are written or generated. */
+  @Field({ is_required: false })
+  public image_concepts?: AdStudioImageConcept[] | null;
+
+  @Field({ is_required: false })
+  public image_concepts_generated_by?: AdStudioGeneratedBy | null;
+
   @Field({ is_required: true })
   public created_by!: string;
 
@@ -105,6 +112,10 @@ export class AdStudioSettingsModel extends BaseModel {
   @Field({ is_required: true })
   public daily_video_seconds!: number;
 
+  /** Images (new renders and edits) the project may generate per UTC day; absent on settings saved before image ads existed. */
+  @Field({ is_required: false })
+  public daily_images?: number | null;
+
   @Field({ is_required: true })
   public changed_by!: string;
 
@@ -112,7 +123,7 @@ export class AdStudioSettingsModel extends BaseModel {
   public last_changed_on!: string;
 }
 
-export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'video_scene', 'video_edit'] as const;
+export const AD_STUDIO_USAGE_KINDS = ['plan', 'script', 'scene_rewrite', 'image_concepts', 'video_scene', 'video_edit', 'image', 'image_edit'] as const;
 export type AdStudioUsageKind = (typeof AD_STUDIO_USAGE_KINDS)[number];
 
 /**

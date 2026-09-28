@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { requireProjectPermission } from '@/lib/orgs/access';
 import { adStudioErrorResponse } from '@/lib/ad-studio/http';
-import { assembleBriefVideo, listBriefVideo, resolveAdStudioVideoDeps, toAdStudioVideoView } from '@/lib/ad-studio/video-pipeline';
+import { assembleBriefVideo, listBriefVideo, resolveAdStudioVideoDeps, toAdStudioVideoView } from '@/lib/ad-studio/engine';
 
 interface RouteParams {
   params: Promise<{ orgId: string; projectId: string; briefId: string }>;

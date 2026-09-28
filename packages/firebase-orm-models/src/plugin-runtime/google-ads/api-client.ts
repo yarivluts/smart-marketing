@@ -216,6 +216,11 @@ export interface GoogleAdsApiClient {
    * exact shape one resource type down.
    */
   setAdGroupAdStatus(customerId: string, adResourceName: string, status: GoogleAdsCampaignStatus): Promise<void>;
+  /**
+   * Uploads an image to the account's asset library as an image asset (Ad Studio image export), ready
+   * to be used in responsive display and Performance Max ads. Returns the asset's resource name.
+   */
+  uploadImageAsset(customerId: string, params: { name: string; base64Data: string }): Promise<{ assetResourceName: string }>;
 }
 
 /**
@@ -578,5 +583,11 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
 
   async setAdGroupAdStatus(customerId: string, adResourceName: string, status: GoogleAdsCampaignStatus): Promise<void> {
     await this.mutate(customerId, 'adGroupAds', [{ update: { resourceName: adResourceName, status }, updateMask: 'status' }]);
+  }
+
+  async uploadImageAsset(customerId: string, params: { name: string; base64Data: string }): Promise<{ assetResourceName: string }> {
+    // v25 Asset: `type` is output only; an `imageAsset` with `data` makes it an IMAGE asset.
+    const result = await this.mutate(customerId, 'assets', [{ create: { name: params.name, imageAsset: { data: params.base64Data } } }]);
+    return { assetResourceName: result.results[0].resourceName };
   }
 }
