@@ -49,6 +49,12 @@ describe('AutomationProposeCampaignDraftForm', () => {
     });
     fireEvent.change(screen.getByLabelText(/^Keywords/), { target: { value: 'blue widgets' } });
 
+    // Unanswered EU political advertising declaration: blocked, nothing is sent.
+    fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
+    expect(await screen.findByText('Answer whether the campaign contains EU political advertising. Google Ads requires it.')).toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText('No, it does not'));
     fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
 
     await waitFor(() => expect(refresh).toHaveBeenCalled());
@@ -58,6 +64,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
       platform: 'google_ads',
       campaignName: 'Winning Themes',
       advertisingChannelType: 'SEARCH',
+      containsEuPoliticalAdvertising: false,
       dailyBudgetUsd: 25,
     });
     expect((body.draft.adGroups as unknown[]).length).toBe(1);
@@ -176,6 +183,7 @@ describe('AutomationProposeCampaignDraftForm', () => {
       target: { value: 'Free shipping on all widgets.\nOrder today, ships tomorrow.' },
     });
     fireEvent.change(screen.getByLabelText(/^Keywords/), { target: { value: 'blue widgets' } });
+    fireEvent.click(screen.getByLabelText('Yes, it does'));
 
     fireEvent.click(screen.getByRole('button', { name: 'Propose campaign draft' }));
 
