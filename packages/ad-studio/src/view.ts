@@ -48,7 +48,7 @@ export function buildSceneTimeline(scenes: readonly Pick<AdStudioScene, 'id' | '
 export type AdStudioStageStatus = 'done' | 'current' | 'upcoming' | 'skipped';
 
 export interface AdStudioStage {
-  id: 'brief' | 'plan' | 'script' | 'video' | 'export';
+  id: 'brief' | 'plan' | 'script' | 'images' | 'video' | 'export';
   status: AdStudioStageStatus;
 }
 
@@ -179,19 +179,26 @@ export interface AdStudioVideoStageProgress {
 }
 
 /**
- * Where one ad stands in brief -> plan -> script -> video -> export. A brief always exists; the plan
+ * Where one ad stands in brief -> plan -> script -> images -> video -> export. A brief always exists; the plan
  * (KAN-230) is done once deep analysis ran, and reads as skipped when a script was written without
  * one; the script is done once it has scenes; the video (KAN-231) is done once the current clips of
  * every scene are assembled; export (KAN-232) is current once that video exists and done after an
- * upload succeeded.
+ * upload succeeded. Images are done when every idea has a current image in each of its placements,
+ * current while some are missing, and upcoming until there are ideas.
  */
-export function adStudioStages(brief: { scenes: readonly unknown[]; plan?: unknown }, video?: AdStudioVideoStageProgress, exported = false): AdStudioStage[] {
+export function adStudioStages(
+  brief: { scenes: readonly unknown[]; plan?: unknown },
+  video?: AdStudioVideoStageProgress,
+  exported = false,
+  images?: { current: number; total: number } | null,
+): AdStudioStage[] {
   const scripted = brief.scenes.length > 0;
   const planned = brief.plan !== null && brief.plan !== undefined;
   return [
     { id: 'brief', status: 'done' },
     { id: 'plan', status: planned ? 'done' : scripted ? 'skipped' : 'current' },
     { id: 'script', status: scripted ? 'done' : planned ? 'current' : 'upcoming' },
+    { id: 'images', status: !images || images.total === 0 ? 'upcoming' : images.current === images.total ? 'done' : 'current' },
     { id: 'video', status: !scripted ? 'upcoming' : video?.assembled ? 'done' : 'current' },
     { id: 'export', status: exported ? 'done' : scripted && video?.assembled ? 'current' : 'upcoming' },
   ];

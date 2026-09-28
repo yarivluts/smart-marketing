@@ -39,28 +39,36 @@ describe('buildSceneTimeline', () => {
 });
 
 describe('adStudioStages', () => {
-  it('runs brief -> plan -> script -> video -> export; export stays upcoming', () => {
+  it('runs brief -> plan -> script -> images -> video -> export; export stays upcoming', () => {
     const ids = adStudioStages({ scenes: [] }).map((stage) => stage.id);
-    expect(ids).toEqual(['brief', 'plan', 'script', 'video', 'export']);
-    expect(adStudioStages({ scenes: [], plan: null }).map((stage) => stage.status)).toEqual(['done', 'current', 'upcoming', 'upcoming', 'upcoming']);
+    expect(ids).toEqual(['brief', 'plan', 'script', 'images', 'video', 'export']);
+    expect(adStudioStages({ scenes: [], plan: null }).map((stage) => stage.status)).toEqual(['done', 'current', 'upcoming', 'upcoming', 'upcoming', 'upcoming']);
   });
 
   it('moves to the script once planned, and to video once the script has scenes', () => {
-    expect(adStudioStages({ scenes: [], plan: { summary: 'x' } }).map((stage) => stage.status)).toEqual(['done', 'done', 'current', 'upcoming', 'upcoming']);
-    expect(adStudioStages({ scenes: [{}], plan: { summary: 'x' } }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'current', 'upcoming']);
+    expect(adStudioStages({ scenes: [], plan: { summary: 'x' } }).map((stage) => stage.status)).toEqual(['done', 'done', 'current', 'upcoming', 'upcoming', 'upcoming']);
+    expect(adStudioStages({ scenes: [{}], plan: { summary: 'x' } }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'upcoming', 'current', 'upcoming']);
   });
 
   it('a script written without deep analysis shows the plan as skipped, not pending', () => {
-    expect(adStudioStages({ scenes: [{}] }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'current', 'upcoming']);
+    expect(adStudioStages({ scenes: [{}] }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'upcoming', 'current', 'upcoming']);
   });
 
   it('keeps video current while scenes render and marks it done once the current clips are assembled', () => {
     const plan = { summary: 'x' };
-    expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 1, scenes: 2, assembled: false }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'current', 'upcoming']);
-    expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 2, scenes: 2, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'done', 'current']);
-    expect(adStudioStages({ scenes: [{}] }, { rendered: 1, scenes: 1, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'done', 'current']);
+    expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 1, scenes: 2, assembled: false }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'upcoming', 'current', 'upcoming']);
+    expect(adStudioStages({ scenes: [{}, {}], plan }, { rendered: 2, scenes: 2, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'done', 'done', 'upcoming', 'done', 'current']);
+    expect(adStudioStages({ scenes: [{}] }, { rendered: 1, scenes: 1, assembled: true }).map((stage) => stage.status)).toEqual(['done', 'skipped', 'done', 'upcoming', 'done', 'current']);
     const unscripted = adStudioStages({ scenes: [] }, { rendered: 0, scenes: 0, assembled: true });
     expect(unscripted.find((stage) => stage.id === 'video')?.status).toBe('upcoming');
+  });
+
+  it('reads images as current while ideas miss an image and done when every placement has a current one', () => {
+    const imagesStatus = (images: { current: number; total: number } | null) => adStudioStages({ scenes: [] }, undefined, false, images).find((stage) => stage.id === 'images')?.status;
+    expect(imagesStatus(null)).toBe('upcoming');
+    expect(imagesStatus({ current: 0, total: 0 })).toBe('upcoming');
+    expect(imagesStatus({ current: 1, total: 4 })).toBe('current');
+    expect(imagesStatus({ current: 4, total: 4 })).toBe('done');
   });
 
   it('makes export the next step once the video is assembled, and done once an upload succeeded', () => {

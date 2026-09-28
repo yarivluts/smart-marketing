@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { assemblyPlan, can, sceneVideoStates, summarizeVideoProgress, totalSceneSeconds } from '@growthos/shared';
-import { AlertTriangle, ArrowLeft, Clapperboard, Clock, FileText, Film, Plus, Sparkles, Workflow } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Clapperboard, Clock, FileText, Film, ImageIcon, Plus, Sparkles, Workflow } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -18,9 +18,10 @@ import {
   resolveAdStudioExportDestinations,
   toAdStudioExportView,
   toAdStudioBriefView,
+  getLatestAdStudioRunView,
 } from '@/lib/ad-studio/store';
-import { describeAdStudioProviders, toAdStudioClipView, toAdStudioVideoView, resolveAdStudioMediaStorage, isFfmpegAvailable, resolveAdStudioOmni } from '@/lib/ad-studio/engine';
-import { adStudioStages, currentAssembledVideo, limitUsedPercent, summarizeAdStudio, type AdStudioStageStatus, type AdStudioVideoStageProgress } from '@/lib/ad-studio/view';
+import { describeAdStudioProviders, toAdStudioClipView, toAdStudioVideoView, resolveAdStudioMediaStorage, isFfmpegAvailable, resolveAdStudioOmni, resolveAdStudioImageGenerator, listBriefImages } from '@/lib/ad-studio/engine';
+import { adStudioImageSlots, adStudioStages, currentAssembledVideo, limitUsedPercent, summarizeAdStudio, type AdStudioStageStatus, type AdStudioVideoStageProgress } from '@/lib/ad-studio/view';
 import { Link } from '@/i18n/navigation';
 import { StatCard } from '@/components/ui/stat-card';
 import { ChartCard, EmptyState, FlowDiagram, PageHero, type FlowEdgeSpec, type FlowNodeSpec, type VizStatus } from '@/components/viz';
@@ -32,6 +33,8 @@ import { SceneTimeline } from '@/components/ad-studio/scene-timeline';
 import { AdStudioAdminPanel } from '@/components/ad-studio/ad-studio-admin-panel';
 import { PlanningPanel } from '@/components/ad-studio/planning-panel';
 import { DeleteBriefButton } from '@/components/ad-studio/delete-brief-button';
+import { AutopilotPanel } from '@/components/ad-studio/autopilot-panel';
+import { ImageStudio } from '@/components/ad-studio/image-studio';
 import { cn } from '@/lib/utils';
 
 type PageProps = Readonly<{
@@ -91,19 +94,28 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   const providers = describeAdStudioProviders();
   const base = `/orgs/${orgId}/projects/${projectId}/ad-studio`;
   const videoAvailable = resolveAdStudioOmni() !== null;
+  const imagesAvailable = resolveAdStudioImageGenerator() !== null;
   const storage = resolveAdStudioMediaStorage().describe();
 
   // The selected ad's clips and assembled videos, and how far its video stage has come.
-  const [clipModels, videoModels, exportRows, exportDestinations] = selected
+  const [clipModels, videoModels, exportRows, exportDestinations, images, latestRun] = selected
     ? await Promise.all([
         listAdStudioClips(orgId, projectId, selected.id),
         listAdStudioVideos(orgId, projectId, selected.id),
         listAdStudioExports(orgId, projectId, selected.id),
         resolveAdStudioExportDestinations(orgId, projectId),
+        listBriefImages({ organizationId: orgId, projectId, briefId: selected.id }),
+        getLatestAdStudioRunView(orgId, projectId, selected.id),
       ])
-    : [[], [], [], null];
+    : [[], [], [], null, [], null];
   const exportsView = exportRows.map(toAdStudioExportView);
   const uploadedCount = exportsView.filter((row) => row.status === 'done').length;
+  const videoExports = exportsView
+    .filter((row) => row.mediaKind === 'video' && row.destination !== 'google_ads')
+    .map((row) => ({ ...row, destination: row.destination as 'meta' | 'youtube' }));
+  const imageExports = exportsView.filter((row) => row.mediaKind === 'image');
+  const imageSlots = selected ? adStudioImageSlots(selected.imageConcepts, images, selected.language) : [];
+  const imageProgress = { current: imageSlots.filter((slot) => slot.current).length, total: imageSlots.length };
   const clips = clipModels.map(toAdStudioClipView);
   const videos = videoModels.map(toAdStudioVideoView);
   let videoStage: (AdStudioVideoStageProgress & { assembledSeconds: number | null }) | undefined;
@@ -124,7 +136,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   }
 
   const stageNodes: FlowNodeSpec[] = selected
-    ? adStudioStages(selected, videoStage, uploadedCount > 0).map((stage) => ({
+    ? adStudioStages(selected, videoStage, uploadedCount > 0, imageProgress).map((stage) => ({
         id: stage.id,
         label: t(`stage.${stage.id}`),
         sublabel: t(`stageStatus.${stage.status}`),
@@ -135,7 +147,9 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
               ? t('stagePlanValue', { count: selected.plan.recommendations.length })
               : stage.id === 'brief'
                 ? t(selected.format === 'vertical' ? 'formatVerticalShort' : 'formatHorizontalShort')
-                : stage.id === 'video' && videoStage && selected.scenes.length > 0
+                : stage.id === 'images' && imageProgress.total > 0
+                  ? t('stageImagesValue', imageProgress)
+                  : stage.id === 'video' && videoStage && selected.scenes.length > 0
                   ? videoStage.assembled
                     ? t('stageVideoAssembled', { seconds: Math.round((videoStage.assembledSeconds ?? 0) * 10) / 10 })
                     : t('stageVideoValue', { rendered: videoStage.rendered, total: videoStage.scenes })
@@ -155,7 +169,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
       <PageHero icon={Clapperboard} eyebrow={t('eyebrow')} title={t('title', { project: project.name })} description={t('description')}>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
           <StatCard title={t('kpiAds')} value={overview.briefs} icon={FileText} />
           <StatCard title={t('kpiScripted')} value={overview.scripted} icon={Film} subtext={t('kpiScriptedHint', { seconds: overview.scriptedSeconds })} />
           <StatCard
@@ -171,6 +185,13 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
             icon={Clock}
             subtext={t('kpiOfLimit', { limit: settings.dailyVideoSeconds })}
             progress={limitUsedPercent(usageToday.videoSeconds, settings.dailyVideoSeconds)}
+          />
+          <StatCard
+            title={t('usageTodayImages')}
+            value={usageToday.images}
+            icon={ImageIcon}
+            subtext={t('kpiOfLimit', { limit: settings.dailyImages })}
+            progress={limitUsedPercent(usageToday.images, settings.dailyImages)}
           />
         </div>
       </PageHero>
@@ -200,6 +221,15 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
             <FlowDiagram label={t('pipelineTitle')} nodes={stageNodes} edges={stageEdges} height={200} />
           </ChartCard>
 
+          <AutopilotPanel
+            orgId={orgId}
+            projectId={projectId}
+            briefId={selected.id}
+            initialRun={latestRun}
+            has={{ plan: Boolean(selected.plan), script: selected.scenes.length > 0, concepts: selected.imageConcepts.length > 0 }}
+            available={{ text: providers.text !== null, images: imagesAvailable, video: videoAvailable }}
+          />
+
           <PlanningPanel
             orgId={orgId}
             projectId={projectId}
@@ -220,6 +250,22 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
               aiAvailable={providers.text !== null}
             />
           </div>
+
+          <ImageStudio
+            orgId={orgId}
+            projectId={projectId}
+            briefId={selected.id}
+            briefName={selected.name}
+            language={selected.language}
+            initialConcepts={selected.imageConcepts}
+            initialImages={images}
+            imagesAvailable={imagesAvailable}
+            textAvailable={providers.text !== null}
+            imagesLeftToday={Math.max(0, settings.dailyImages - usageToday.images)}
+            canExport={canExport}
+            destinations={{ meta: Boolean(exportDestinations?.meta.available), google_ads: Boolean(exportDestinations?.google_ads.available) }}
+            exports={imageExports}
+          />
 
           <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
             <VideoStudio
@@ -250,7 +296,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                   ? { available: true, credentialName: exportDestinations.youtube.credentialName }
                   : { available: false, reason: exportDestinations.youtube.reason },
               }}
-              exports={exportsView}
+              exports={videoExports}
               canExport={canExport}
               defaultTitle={selected.name}
               defaultDescription={selected.objective}
@@ -341,7 +387,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
         keywordData={keywordData}
         storage={storage}
         ffmpegAvailable={ffmpegAvailable}
-        limits={{ dailyTextGenerations: settings.dailyTextGenerations, dailyVideoSeconds: settings.dailyVideoSeconds }}
+        limits={{ dailyTextGenerations: settings.dailyTextGenerations, dailyVideoSeconds: settings.dailyVideoSeconds, dailyImages: settings.dailyImages }}
         usageToday={usageToday}
         recentUsage={recentUsage.map((row) => ({
           id: row.id,

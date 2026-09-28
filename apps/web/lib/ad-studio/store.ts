@@ -1,11 +1,12 @@
 import 'server-only';
-import type { AdStudioBriefInput, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
+import type { AdStudioBriefInput, AdStudioImageConcept, AdStudioPlan, AdStudioPlanSources, AdStudioScene } from '@growthos/shared';
 import {
   createAdStudioBrief as createAdStudioBriefInOrganization,
   deleteAdStudioBrief as deleteAdStudioBriefInOrganization,
   getAdStudioBrief as getAdStudioBriefInOrganization,
   getAdStudioClip as getAdStudioClipInOrganization,
   getAdStudioVideo as getAdStudioVideoInOrganization,
+  getLatestAdStudioRun as getLatestAdStudioRunInOrganization,
   listAdStudioClips as listAdStudioClipsInOrganization,
   listAdStudioExports as listAdStudioExportsInOrganization,
   resolveAdStudioExportDestinations as resolveAdStudioExportDestinationsInOrganization,
@@ -29,7 +30,7 @@ import {
 } from '@growthos/firebase-orm-models';
 import { ensureFirestoreOrm } from '@/lib/firebase/firestore';
 import { getServerKmsProvider, VaultNotConfiguredError } from '@/lib/vault/kms-provider';
-import { adStudioBriefMediaPrefix, resolveAdStudioMediaStorage } from './engine';
+import { adStudioBriefMediaPrefix, resolveAdStudioMediaStorage, toAdStudioRunView, type AdStudioRunView } from './engine';
 
 /** The web app's Ad Studio reads and writes: the package services, with the ORM connected first. */
 
@@ -99,6 +100,7 @@ export async function setAdStudioSettings(params: {
   projectId: string;
   dailyTextGenerations: number;
   dailyVideoSeconds: number;
+  dailyImages?: number;
   actorId: string;
 }): Promise<AdStudioSettingsView> {
   await ensureFirestoreOrm();
@@ -153,6 +155,7 @@ export interface AdStudioBriefView {
   plan: AdStudioPlan | null;
   planSources: AdStudioPlanSources | null;
   planGeneratedBy: { provider: string; model: string; generatedAt: string } | null;
+  imageConcepts: AdStudioImageConcept[];
   createdOn: string;
   lastChangedOn: string;
 }
@@ -177,6 +180,7 @@ export function toAdStudioBriefView(brief: AdStudioBriefModel): AdStudioBriefVie
     planGeneratedBy: brief.plan_generated_by
       ? { provider: brief.plan_generated_by.provider, model: brief.plan_generated_by.model, generatedAt: brief.plan_generated_by.generated_at }
       : null,
+    imageConcepts: (brief.image_concepts ?? []).map((concept) => ({ ...concept, formats: [...concept.formats] })),
     createdOn: brief.created_on,
     lastChangedOn: brief.last_changed_on,
   };
@@ -195,8 +199,13 @@ export async function listAdStudioExports(organizationId: string, projectId: str
 /** An export as the client receives it. */
 export interface AdStudioExportView {
   id: string;
-  videoId: string;
-  destination: 'meta' | 'youtube';
+  /** Rows written before image ads existed are videos. */
+  mediaKind: 'video' | 'image';
+  videoId: string | null;
+  imageId: string | null;
+  destination: 'meta' | 'youtube' | 'google_ads';
+  /** The platform's id for the upload (video id, image hash, asset resource name). */
+  externalId: string | null;
   title: string;
   privacy: string | null;
   status: 'uploading' | 'done' | 'failed';
@@ -208,8 +217,11 @@ export interface AdStudioExportView {
 export function toAdStudioExportView(row: AdStudioExportModel): AdStudioExportView {
   return {
     id: row.id,
-    videoId: row.video_id,
+    mediaKind: row.media_kind ?? 'video',
+    videoId: row.video_id ?? null,
+    imageId: row.image_id ?? null,
     destination: row.destination,
+    externalId: row.external_id ?? null,
     title: row.title,
     privacy: row.privacy ?? null,
     status: row.status,
@@ -217,4 +229,11 @@ export function toAdStudioExportView(row: AdStudioExportModel): AdStudioExportVi
     failureCode: row.failure_code ?? null,
     requestedOn: row.requested_on,
   };
+}
+
+/** The brief's latest autopilot run, as the page receives it (or null). */
+export async function getLatestAdStudioRunView(organizationId: string, projectId: string, briefId: string): Promise<AdStudioRunView | null> {
+  await ensureFirestoreOrm();
+  const run = await getLatestAdStudioRunInOrganization(organizationId, projectId, briefId);
+  return run ? toAdStudioRunView(run) : null;
 }

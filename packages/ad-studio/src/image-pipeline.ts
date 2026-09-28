@@ -97,8 +97,8 @@ const GeneratedConceptsSchema = z.object({
 
 /**
  * Writes image ad ideas for a brief with the text model (building on its plan and video script when
- * present) and saves them, replacing the earlier list. `formats` narrows the placements to those the
- * person asked for; the model's own choices are kept within them.
+ * present) and saves them, replacing the earlier list. When the person chose placements (`formats`),
+ * every idea is rendered in all of them; otherwise each idea keeps the placements the model suggested.
  */
 export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & { briefId: string; formats?: readonly AdStudioImageFormat[] }): Promise<AdStudioBriefModel> {
   await ensureOrm();
@@ -108,7 +108,8 @@ export async function generateAdStudioImageConcepts(ctx: AdStudioCallContext & {
   const generated = await meteredCall(ctx, 'image_concepts', brief.id, () => ctx.llm.generateJson({ ...prompt, schema: GeneratedConceptsSchema }));
   const allowed = ctx.formats?.length ? ctx.formats.filter(isAdStudioImageFormat) : null;
   const concepts = fitAdStudioImageConcepts(
-    generated.concepts.map((concept) => ({ ...concept, formats: allowed ? concept.formats.filter((format) => allowed.includes(format as AdStudioImageFormat)) : concept.formats })),
+    // Placements the person chose apply to every idea; otherwise the model's own choice per idea stands.
+    generated.concepts.map((concept) => ({ ...concept, formats: allowed ?? concept.formats })),
     newAdStudioSceneId,
     allowed ?? ['square', 'portrait'],
   );

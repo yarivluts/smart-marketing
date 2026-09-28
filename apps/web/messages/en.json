@@ -3646,7 +3646,8 @@
       "plan": "Plan",
       "script": "Script",
       "video": "Video",
-      "export": "Export"
+      "export": "Export",
+      "images": "Images"
     },
     "stageStatus": {
       "done": "Done",
@@ -3775,7 +3776,10 @@
       "script": "Script",
       "scene_rewrite": "Scene rewrite",
       "video_scene": "Scene video",
-      "video_edit": "Video edit"
+      "video_edit": "Video edit",
+      "image_concepts": "Image ideas",
+      "image": "Image",
+      "image_edit": "Image edit"
     },
     "usageOutcome": {
       "succeeded": "Succeeded",
@@ -4048,6 +4052,140 @@
       "failed": "Failed"
     },
     "exportOpen": "Open",
-    "stageExportValue": "{count, plural, one {# upload} other {# uploads}}"
+    "stageExportValue": "{count, plural, one {# upload} other {# uploads}}",
+    "stageImagesValue": "{current} of {total} images",
+    "autopilot": {
+      "title": "Create everything automatically",
+      "description": "One click takes this ad from brief to finished creatives: a deep plan, the script, image ad ideas and images in every placement, the video scenes and the assembled video. Everything it makes is editable below, and anything you already have or changed is kept.",
+      "optionPlan": "Deep plan first",
+      "optionImages": "Image ads",
+      "optionVideo": "Video ad",
+      "formatsLegend": "Image placements",
+      "keeps": "Keeps: {items}.",
+      "keepsPlan": "the plan",
+      "keepsScript": "the script",
+      "keepsConcepts": "the image ideas",
+      "missingModels": "Some of the AI models are not set up for this deployment, so the steps that need them will say so.",
+      "start": "Create everything",
+      "runAgain": "Run again",
+      "runAgainHint": "After an edit, a new run redoes only what changed.",
+      "cancel": "Stop",
+      "progress": "{done} of {total}",
+      "doneHint": "Everything is ready. Review and edit each part below, then export when you are happy with it.",
+      "errorRunActive": "The autopilot is already running for this ad.",
+      "errorInvalidOptions": "Choose images, video or both, and at least one image placement.",
+      "runStatus": {
+        "running": "Working...",
+        "done": "Finished",
+        "failed": "Stopped - see the step that failed",
+        "cancelled": "Stopped"
+      },
+      "step": {
+        "plan": "Deep plan",
+        "script": "Script",
+        "image_concepts": "Image ideas",
+        "images": "Images",
+        "clips": "Video scenes",
+        "assemble": "Final video"
+      },
+      "stepStatus": {
+        "pending": "Waiting",
+        "running": "In progress",
+        "done": "Done",
+        "skipped": "Skipped",
+        "failed": "Failed"
+      },
+      "reason": {
+        "off": "turned off",
+        "already_done": "kept what you have",
+        "no_concepts": "no image ideas",
+        "no_script": "no script",
+        "not_configured": "model not set up",
+        "quota_exceeded": "daily limit reached",
+        "provider_billing": "AI account needs credit",
+        "rate_limited": "AI is limiting requests",
+        "refused": "AI declined",
+        "invalid_output": "AI answer unusable",
+        "provider_error": "AI failed",
+        "some_images_failed": "some images failed",
+        "clip_failed": "a scene failed",
+        "clips_not_ready": "clips not ready",
+        "blocked": "waiting on an earlier step",
+        "cancelled": "cancelled",
+        "error": "failed"
+      }
+    },
+    "images": {
+      "title": "Image ads",
+      "description": "Static ads for Facebook, Instagram and Google display. Each idea is rendered in the placements you choose; change an image by telling the AI what to change.",
+      "leftToday": "{count, plural, one {# image left today} other {# images left today}}",
+      "writeIdeas": "Write ideas with AI",
+      "rewriteIdeas": "Write new ideas with AI",
+      "notConfigured": "No image model is set up for this deployment.",
+      "noIdeas": "No image ideas yet. Write them with AI or add one yourself.",
+      "ideaLabel": "Idea {index}",
+      "removeIdea": "Remove",
+      "visualPrompt": "What the picture shows",
+      "visualPromptHint": "In English, for the image model: subject, setting, light, style. No text here.",
+      "headline": "Headline in the image (optional)",
+      "placements": "Placements",
+      "addIdea": "Add an idea",
+      "saveIdeas": "Save ideas",
+      "ideasSaved": "Ideas saved.",
+      "unsaved": "Unsaved changes",
+      "saveToRender": "Save the ideas to render this one.",
+      "render": "Render",
+      "rerender": "Render again",
+      "edit": "Change with AI",
+      "download": "Download",
+      "editInstruction": "What should change?",
+      "editInstructionPlaceholder": "e.g. warmer light, put the headline at the top",
+      "applyEdit": "Apply",
+      "versions": "Versions",
+      "versionRender": "Rendered from the idea",
+      "noImageYet": "Not rendered yet",
+      "imageAlt": "Image for idea {index}, {format}",
+      "exportTo": "Send to {destination}",
+      "exportedTo": "Sent to {destination}",
+      "exportDone": "Sent to {destination}.",
+      "destinationNotConnected": "Not connected to this project - see project resources.",
+      "errorInvalidConcepts": "Some ideas break the rules - fix the highlighted ones.",
+      "quotaExceeded": "The daily image limit is reached ({used} of {limit}).",
+      "destination": {
+        "meta": "Meta",
+        "google_ads": "Google Ads"
+      },
+      "format": {
+        "square": "Square",
+        "portrait": "Portrait",
+        "story": "Story",
+        "landscape": "Landscape"
+      },
+      "state": {
+        "none": "Not rendered",
+        "generating": "Rendering",
+        "ready": "Ready",
+        "out_of_date": "Out of date",
+        "failed": "Failed"
+      },
+      "issue": {
+        "too_many_concepts": "Too many ideas.",
+        "empty_visual_prompt": "Describe the picture.",
+        "visual_prompt_too_long": "The description is too long.",
+        "headline_too_long": "The headline is too long.",
+        "no_formats": "Pick at least one placement.",
+        "unknown_format": "Unknown placement.",
+        "duplicate_concept_id": "Duplicate idea."
+      },
+      "requestErrors": {
+        "concept_not_found": "That idea is no longer saved.",
+        "format_not_in_concept": "That placement is not chosen for this idea.",
+        "image_not_editable": "Only a finished image can be changed.",
+        "invalid_instruction": "Say what should change (up to 500 characters).",
+        "image_not_ready": "That image is not ready."
+      }
+    },
+    "dailyImages": "Images per day",
+    "usageTodayImages": "Images today"
   }
 }

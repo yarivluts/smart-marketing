@@ -40,14 +40,15 @@ import { adStudioImageSlots, currentAssembledVideo, missingImageRenders, type Ad
 const LEASE_MS = 10 * 60_000;
 
 export interface AdStudioAutopilotDeps {
-  video: AdStudioVideoDeps;
+  /** The video model is null when none is configured; the clip step then fails with `not_configured`. */
+  video: Omit<AdStudioVideoDeps, 'omni'> & { omni: AdStudioVideoDeps['omni'] | null };
   images: AdStudioImageDeps;
   /** The text model; null when none is configured. */
   llm: AdStudioLlm | null;
   now?: () => Date;
 }
 
-export function resolveAdStudioAutopilotDeps(video: AdStudioVideoDeps, images: AdStudioImageDeps, env: NodeJS.ProcessEnv = process.env): AdStudioAutopilotDeps {
+export function resolveAdStudioAutopilotDeps(video: AdStudioAutopilotDeps['video'], images: AdStudioImageDeps, env: NodeJS.ProcessEnv = process.env): AdStudioAutopilotDeps {
   return { video, images, llm: resolveAdStudioLlm(env) };
 }
 
@@ -156,8 +157,11 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
       let clips = (await listAdStudioClips(ctx.organizationId, ctx.projectId, brief.id)).map(toAdStudioClipView);
       let progress = summarizeVideoProgress(sceneVideoStates(brief.scenes, clips, context), brief.scenes);
       if (progress.rendered === progress.scenes) return { status: 'done', reason: null, progress: { done: progress.rendered, total: progress.scenes } };
+      const omni = deps.video.omni;
+      if (!omni) return { status: 'failed', reason: 'not_configured', progress: { done: progress.rendered, total: progress.scenes } };
+      const videoDeps = { ...deps.video, omni };
       if (progress.generating > 0) {
-        clips = (await advanceBriefVideo({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id }, deps.video)).clips;
+        clips = (await advanceBriefVideo({ organizationId: ctx.organizationId, projectId: ctx.projectId, briefId: brief.id }, videoDeps)).clips;
         progress = summarizeVideoProgress(sceneVideoStates(brief.scenes, clips, context), brief.scenes);
         if (progress.rendered === progress.scenes) return { status: 'done', reason: null, progress: { done: progress.rendered, total: progress.scenes } };
         if (progress.generating > 0) return { status: 'running', progress: { done: progress.rendered, total: progress.scenes } };
@@ -166,8 +170,7 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
       // failed in this run stops the step (the person fixes or retries it, then runs again).
       const failedThisRun = clips.some((clip) => clip.status === 'failed' && clip.requestedOn >= run.started_on);
       if (failedThisRun) return { status: 'failed', reason: 'clip_failed', progress: { done: progress.rendered, total: progress.scenes } };
-      if (!deps.video.omni) return { status: 'failed', reason: 'not_configured', progress: { done: progress.rendered, total: progress.scenes } };
-      await startRenderAll({ ...ctx, briefId: brief.id }, deps.video);
+      await startRenderAll({ ...ctx, briefId: brief.id }, videoDeps);
       return { status: 'running', progress: { done: progress.rendered, total: progress.scenes } };
     }
     case 'assemble': {
