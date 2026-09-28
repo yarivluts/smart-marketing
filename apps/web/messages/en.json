@@ -2901,7 +2901,12 @@
     "lifecycleTitle": "Action lifecycle",
     "lifecycleDescription": "Every proposed change passes the guardrails, waits for approval, then executes and is verified or rolled back. Numbers are actions in each state now.",
     "diffRowLineNew": "{label}: {after} (new)",
-    "diffNewBadge": "new"
+    "diffNewBadge": "new",
+    "proposeDraftEuPoliticalLegend": "Does this campaign contain political advertising aimed at the European Union?",
+    "proposeDraftEuPoliticalHint": "Google Ads requires every advertiser to declare this for each campaign. Your answer is sent to Google as given - GrowthOS never answers it for you.",
+    "proposeDraftEuPoliticalNo": "No, it does not",
+    "proposeDraftEuPoliticalYes": "Yes, it does",
+    "proposeDraftEuPoliticalRequiredError": "Answer whether the campaign contains EU political advertising. Google Ads requires it."
   },
   "SessionReplaySettings": {
     "metaTitle": "Session replay",
@@ -3309,7 +3314,9 @@
         "none": "No spend recorded",
         "unavailable": "Not queryable yet"
       }
-    }
+    },
+    "euPoliticalDeclaredYes": "Declared to Google: this campaign contains political advertising aimed at the EU.",
+    "euPoliticalDeclaredNo": "Declared to Google: this campaign does not contain political advertising aimed at the EU."
   },
   "FunnelGoals": {
     "noData": "No data",
