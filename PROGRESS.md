@@ -17,6 +17,20 @@ Template for each entry:
 
 ---
 
+## 2026-09-28 - One main landmark per page; Customer Match consent (KAN-234, KAN-236)
+
+- **Last completed:**
+  - **KAN-234 (#546, deployed at 78d4b2a):** 38 project pages and `PackSetupLanding` rendered a nested `<main>` inside `AppShell`'s own `<main>`; they now use a plain container.
+    - Verified on web-prod: the ad-studio, funnel, goals and support pages each have exactly 1 main landmark.
+    - Guard: `components/single-main-landmark.test.ts`. It lives outside `app/` so the KAN-178 inventory scan does not count `components/shell` as mounted.
+  - **KAN-236:** Google Customer Match uploads can now carry the advertiser's consent (`customerMatchUserListMetadata.consent`: `adUserData` and `adPersonalization`, each GRANTED or DENIED).
+    - Plugin config gained an `enum` field type: manifest `values`, parser and server validation, and a select with a blank "Not answered" option.
+    - The Customer Match manifest is now 1.1.0, with the two consent fields optional. Only answered parts are sent; nothing is defaulted.
+- **In progress:** none.
+- **Blocked + why:** none.
+- **Next step:** pick the next unblocked task.
+- **Waiting on human:** installs are pinned to their manifest version, so to use consent an org admin registers Customer Match manifest 1.1.0 and reinstalls, then answers the two consent fields for their users.
+
 ## 2026-09-28 - Ad platform API versions: Google Ads v17 -> v25, Meta Marketing v21 -> v25 (KAN-233, KAN-235)
 
 - **Last completed:**
