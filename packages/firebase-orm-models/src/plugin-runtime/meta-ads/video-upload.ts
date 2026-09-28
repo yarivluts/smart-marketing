@@ -1,7 +1,9 @@
+import { META_API_VERSION } from './api-client';
+
 type FetchLike = (input: string, init: RequestInit) => Promise<Response>;
 
-/** Graph API version for ad video uploads (the current version in Meta's advideos reference). */
-export const META_VIDEO_API_VERSION = 'v25.0';
+/** Graph API version for ad video uploads - the same version as every other Meta call. */
+export const META_VIDEO_API_VERSION = META_API_VERSION;
 
 export type MetaVideoUploadErrorCode = 'auth_failed' | 'rejected' | 'upload_failed';
 

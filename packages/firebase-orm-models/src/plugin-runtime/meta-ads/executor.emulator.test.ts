@@ -645,6 +645,28 @@ describe('MetaAutomationActionExecutor', () => {
       expect(apiClient.updateAdSet).toHaveBeenCalledWith('adset-1', { targeting: newTargeting });
     });
 
+    it("keeps the ad set's own Advantage+ audience switch through a targeting edit and captures it for rollback (KAN-235)", async () => {
+      const { owner, organization, project } = await setupOrgWithProject('Meta Executor Advantage Audience Org');
+      const apiClient = fakeApiClient({
+        getAdSet: vi
+          .fn()
+          .mockResolvedValue({ adSetId: 'adset-1', status: 'ACTIVE', targeting: { countries: ['US'], ageMin: 18, ageMax: 65, advantageAudience: 1 } }),
+      });
+      const { target, executor } = await seedTargetWithAdSet(organization.id, project.id, owner.id, apiClient);
+
+      const result = await executor.executeMetaAdSetTargetingEdit({
+        organizationId: organization.id,
+        projectId: project.id,
+        environmentId: 'live',
+        targetId: target.id,
+        adSetResourceName: 'adset-1',
+        targeting: { countries: ['FR'], ageMin: 21, ageMax: 65 },
+      });
+
+      expect(apiClient.updateAdSet).toHaveBeenCalledWith('adset-1', { targeting: { countries: ['FR'], ageMin: 21, ageMax: 65, advantageAudience: 1 } });
+      expect(result).toEqual({ previousTargeting: { countries: ['US'], ageMin: 18, ageMax: 65, advantageAudience: 1 } });
+    });
+
     it('rolls back an ad set targeting edit by re-applying the captured pre-edit spec', async () => {
       const { owner, organization, project } = await setupOrgWithProject('Meta Executor Ad Set Targeting Edit Rollback Org');
       const apiClient = fakeApiClient();

@@ -41,6 +41,13 @@ export interface MetaAdSetTargeting {
   ageMin: number;
   ageMax: number;
   genders?: Array<'male' | 'female'>;
+  /**
+   * Meta's Advantage+ audience switch (`targeting_automation.advantage_audience`, KAN-235). Since
+   * Marketing API v23 an ad set create with a custom age or gender fails unless it is set, and with
+   * 1 Meta may widen the audience beyond the ages chosen. GrowthOS creates with 0 so the targeting
+   * the person chose is used exactly; an edit keeps the ad set's own value. Absent when unknown.
+   */
+  advantageAudience?: 0 | 1;
 }
 
 export interface MetaCreateAdSetParams {
@@ -298,7 +305,13 @@ export interface MetaAdsApiClient {
   createLookalikeAudience(adAccountId: string, params: MetaCreateLookalikeAudienceParams): Promise<MetaCreateLookalikeAudienceResult>;
 }
 
-const META_API_VERSION = 'v21.0';
+/**
+ * The Marketing API version every call uses (KAN-235: was v21.0). Marketing API versions expire far
+ * sooner than Graph API ones, and an expired version is auto-upgraded only for endpoints that did
+ * not change. Checked against the v22-v25 changelogs: the only change these requests needed is the
+ * ad set's `targeting_automation` (see {@link MetaAdSetTargeting.advantageAudience}).
+ */
+export const META_API_VERSION = 'v25.0';
 const META_GRAPH_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
 /** Meta's real ad-set `targeting.genders` field is numeric: 1 = male, 2 = female. Omitted entirely means "all genders." */
@@ -322,6 +335,9 @@ function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, u
   if (targeting.genders && targeting.genders.length > 0) {
     targetingSpec.genders = targeting.genders.map((gender) => GENDER_CODES[gender]);
   }
+  if (targeting.advantageAudience !== undefined) {
+    targetingSpec.targeting_automation = { advantage_audience: targeting.advantageAudience };
+  }
   return targetingSpec;
 }
 
@@ -334,13 +350,22 @@ function buildMetaTargetingSpec(targeting: MetaAdSetTargeting): Record<string, u
  * {@link MetaAdSetTargeting.genders}'s own "omitted means all genders"
  * convention.
  */
-function parseMetaTargetingSpec(raw: { geo_locations: { countries: string[] }; age_min: number; age_max: number; genders?: number[] }): MetaAdSetTargeting {
+function parseMetaTargetingSpec(raw: {
+  geo_locations: { countries: string[] };
+  age_min: number;
+  age_max: number;
+  genders?: number[];
+  targeting_automation?: { advantage_audience?: number };
+}): MetaAdSetTargeting {
   const genders = (raw.genders ?? []).map((code) => GENDER_CODES_REVERSE[code]).filter((gender): gender is 'male' | 'female' => gender !== undefined);
+  const advantageAudience = raw.targeting_automation?.advantage_audience;
   return {
     countries: raw.geo_locations.countries,
     ageMin: raw.age_min,
     ageMax: raw.age_max,
     ...(genders.length > 0 ? { genders } : {}),
+    // Omitted, not undefined, when Meta does not report it: the parsed spec is stored in Firestore.
+    ...(advantageAudience === 0 || advantageAudience === 1 ? { advantageAudience } : {}),
   };
 }
 
@@ -413,7 +438,9 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       name: params.name,
       campaign_id: params.campaignId,
       status: 'PAUSED',
-      targeting: JSON.stringify(buildMetaTargetingSpec(params.targeting)),
+      // A new ad set always states the Advantage+ audience switch (required since v23): off unless
+      // the caller chose otherwise, so the audience is exactly the targeting the person set.
+      targeting: JSON.stringify(buildMetaTargetingSpec({ ...params.targeting, advantageAudience: params.targeting.advantageAudience ?? 0 })),
       // Fixed, documented simplification (this connector always builds a
       // link-click campaign) — mirrors `GoogleAdsHttpApiClient`'s own
       // `manualCpc: {}` placeholder for a bidding detail this story doesn't
