@@ -17,6 +17,20 @@ Template for each entry:
 
 ---
 
+## 2026-09-28 - Ad platform API versions: Google Ads v17 -> v25, Meta Marketing v21 -> v25 (KAN-233, KAN-235)
+
+- **Last completed:**
+  - **KAN-233 (#544, deployed at 940d0ab):** Google Ads mutate/search moved off sunset v17 onto `GOOGLE_ADS_API_VERSION = 'v25'`. Bodies were checked against the v25 discovery document.
+    - Campaign drafts now carry the advertiser's EU political advertising self-declaration, which v25 requires on every campaign; a missing one blocks all changes on the account. It is a required yes/no in the draft form with no default, and is shown to the approver.
+    - Found and fixed along the way: Customer Match lists were created with the non-existent field `crmBasedUserListInfo` (the real field is `crmBasedUserList`).
+  - **KAN-235 (#545):** Meta Marketing API v21.0 -> v25.0. Marketing versions expire fast (v24 ends 2026-10-06), and auto-upgrade skips changed endpoints.
+    - Only ad set create broke: since v23 it needs `targeting_automation.advantage_audience`. Create sends 0, so the chosen targeting is used exactly.
+    - Targeting edits keep the ad set's own switch, and rollback restores it.
+- **In progress:** none.
+- **Blocked + why:** none. Neither client has run against a live account: the Google Ads developer token is still pending (KAN-43), and the Meta credential has no write tier.
+- **Next step:** KAN-236 (Customer Match consent needs an enum plugin-config field); KAN-234 (nested `<main>` on 38 project pages).
+- **Waiting on human:** nothing new.
+
 ## 2026-09-28 - AI Ad Studio: plan, script, video, export (KAN-228..232)
 
 - **Last completed:** the Ad Studio (`/orgs/:org/projects/:project/ad-studio`), with four stages:
