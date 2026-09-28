@@ -24,7 +24,7 @@ describe('MetaAdsHttpApiClient', () => {
 
     expect(result).toEqual({ campaignId: '123' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/campaigns');
+    expect(url).toBe('https://graph.facebook.com/v25.0/act_999/campaigns');
     expect(init.method).toBe('POST');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('name')).toBe('Summer Sale');
@@ -46,7 +46,7 @@ describe('MetaAdsHttpApiClient', () => {
 
     expect(result).toEqual({ adSetId: 'adset-1' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/adsets');
+    expect(url).toBe('https://graph.facebook.com/v25.0/act_999/adsets');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('campaign_id')).toBe('campaign-1');
     expect(body.get('status')).toBe('PAUSED');
@@ -55,6 +55,8 @@ describe('MetaAdsHttpApiClient', () => {
       age_min: 18,
       age_max: 45,
       genders: [2],
+      // Required since Marketing API v23 for a custom age/gender; off so the audience is exactly this.
+      targeting_automation: { advantage_audience: 0 },
     });
   });
 
@@ -70,7 +72,26 @@ describe('MetaAdsHttpApiClient', () => {
 
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = new URLSearchParams(String(init.body));
-    expect(JSON.parse(body.get('targeting') as string)).toEqual({ geo_locations: { countries: ['US'] }, age_min: 18, age_max: 45 });
+    expect(JSON.parse(body.get('targeting') as string)).toEqual({
+      geo_locations: { countries: ['US'] },
+      age_min: 18,
+      age_max: 45,
+      targeting_automation: { advantage_audience: 0 },
+    });
+  });
+
+  it('keeps an explicitly chosen Advantage+ audience value on create', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'adset-1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await new MetaAdsHttpApiClient(OPTIONS).createAdSet('999', {
+      campaignId: 'campaign-1',
+      name: 'Ad Set 1',
+      targeting: { countries: ['US'], ageMin: 18, ageMax: 65, advantageAudience: 1 },
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(new URLSearchParams(String(init.body)).get('targeting') as string).targeting_automation).toEqual({ advantage_audience: 1 });
   });
 
   it('creates a link-ad creative with page id, message, link, name, and description', async () => {
@@ -87,7 +108,7 @@ describe('MetaAdsHttpApiClient', () => {
 
     expect(result).toEqual({ creativeId: 'creative-1' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/adcreatives');
+    expect(url).toBe('https://graph.facebook.com/v25.0/act_999/adcreatives');
     const body = new URLSearchParams(String(init.body));
     expect(JSON.parse(body.get('object_story_spec') as string)).toEqual({
       page_id: 'page-1',
@@ -155,7 +176,7 @@ describe('MetaAdsHttpApiClient', () => {
 
     expect(result).toEqual({ adId: 'ad-1' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/ads');
+    expect(url).toBe('https://graph.facebook.com/v25.0/act_999/ads');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('status')).toBe('PAUSED');
     expect(JSON.parse(body.get('creative') as string)).toEqual({ creative_id: 'creative-1' });
@@ -171,7 +192,7 @@ describe('MetaAdsHttpApiClient', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.method).toBe('GET');
     const parsedUrl = new URL(url);
-    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v21.0/ad-1');
+    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v25.0/ad-1');
     expect(parsedUrl.searchParams.get('fields')).toBe('id,creative');
   });
 
@@ -188,7 +209,7 @@ describe('MetaAdsHttpApiClient', () => {
     await new MetaAdsHttpApiClient(OPTIONS).updateAd('ad-1', { creativeId: 'creative-2' });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/ad-1');
+    expect(url).toBe('https://graph.facebook.com/v25.0/ad-1');
     const body = new URLSearchParams(String(init.body));
     expect(JSON.parse(body.get('creative') as string)).toEqual({ creative_id: 'creative-2' });
   });
@@ -206,7 +227,7 @@ describe('MetaAdsHttpApiClient', () => {
     await new MetaAdsHttpApiClient(OPTIONS).setDailyBudgetCents('campaign-1', 5000);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/campaign-1');
+    expect(url).toBe('https://graph.facebook.com/v25.0/campaign-1');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('daily_budget')).toBe('5000');
   });
@@ -218,7 +239,7 @@ describe('MetaAdsHttpApiClient', () => {
     await new MetaAdsHttpApiClient(OPTIONS).setObjectStatus('campaign-1', 'ACTIVE');
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/campaign-1');
+    expect(url).toBe('https://graph.facebook.com/v25.0/campaign-1');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('status')).toBe('ACTIVE');
   });
@@ -240,7 +261,7 @@ describe('MetaAdsHttpApiClient', () => {
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.method).toBe('GET');
     const parsedUrl = new URL(url);
-    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v21.0/campaign-1');
+    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v25.0/campaign-1');
     expect(parsedUrl.searchParams.get('fields')).toBe('id');
     expect(parsedUrl.searchParams.get('access_token')).toBe('access-token-1');
   });
@@ -257,7 +278,7 @@ describe('MetaAdsHttpApiClient', () => {
         id: 'adset-1',
         daily_budget: '2500',
         status: 'ACTIVE',
-        targeting: { geo_locations: { countries: ['US', 'CA'] }, age_min: 18, age_max: 45, genders: [2] },
+        targeting: { geo_locations: { countries: ['US', 'CA'] }, age_min: 18, age_max: 45, genders: [2], targeting_automation: { advantage_audience: 1 } },
       }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -268,12 +289,12 @@ describe('MetaAdsHttpApiClient', () => {
       adSetId: 'adset-1',
       dailyBudgetCents: 2500,
       status: 'ACTIVE',
-      targeting: { countries: ['US', 'CA'], ageMin: 18, ageMax: 45, genders: ['female'] },
+      targeting: { countries: ['US', 'CA'], ageMin: 18, ageMax: 45, genders: ['female'], advantageAudience: 1 },
     });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.method).toBe('GET');
     const parsedUrl = new URL(url);
-    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v21.0/adset-1');
+    expect(`${parsedUrl.origin}${parsedUrl.pathname}`).toBe('https://graph.facebook.com/v25.0/adset-1');
     expect(parsedUrl.searchParams.get('fields')).toBe('id,daily_budget,status,targeting');
   });
 
@@ -303,7 +324,7 @@ describe('MetaAdsHttpApiClient', () => {
     await new MetaAdsHttpApiClient(OPTIONS).updateAdSet('adset-1', { dailyBudgetCents: 4000, status: 'PAUSED' });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/adset-1');
+    expect(url).toBe('https://graph.facebook.com/v25.0/adset-1');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('daily_budget')).toBe('4000');
     expect(body.get('status')).toBe('PAUSED');
@@ -340,7 +361,7 @@ describe('MetaAdsHttpApiClient', () => {
     await new MetaAdsHttpApiClient(OPTIONS).updateAdSet('adset-1', { targeting: { countries: ['FR'], ageMin: 21, ageMax: 55, genders: ['male'] } });
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/adset-1');
+    expect(url).toBe('https://graph.facebook.com/v25.0/adset-1');
     const body = new URLSearchParams(String(init.body));
     expect(body.has('daily_budget')).toBe(false);
     expect(body.has('status')).toBe(false);
@@ -361,7 +382,7 @@ describe('MetaAdsHttpApiClient', () => {
 
     expect(result).toEqual({ audienceId: 'audience-1' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/customaudiences');
+    expect(url).toBe('https://graph.facebook.com/v25.0/act_999/customaudiences');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('name')).toBe('Warm leads');
     expect(body.get('subtype')).toBe('CUSTOM');
@@ -376,7 +397,7 @@ describe('MetaAdsHttpApiClient', () => {
 
     expect(result).toEqual({ audienceId: 'audience-lookalike-1' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/customaudiences');
+    expect(url).toBe('https://graph.facebook.com/v25.0/act_999/customaudiences');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('name')).toBe('Warm leads - Lookalike 5%');
     expect(body.get('subtype')).toBe('LOOKALIKE');
@@ -398,7 +419,7 @@ describe('MetaAdsHttpApiClient', () => {
 
     expect(result).toEqual({ numReceived: 2 });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/audience-1/users');
+    expect(url).toBe('https://graph.facebook.com/v25.0/audience-1/users');
     const body = new URLSearchParams(String(init.body));
     expect(JSON.parse(body.get('payload') as string)).toEqual({ schema: ['EMAIL'], data: [['hash-a'], ['hash-b']] });
   });
@@ -547,7 +568,7 @@ describe('MetaAdsHttpApiClient', () => {
 
     expect(result).toEqual({ imageHash: 'hash-abc' });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v21.0/act_999/adimages');
+    expect(url).toBe('https://graph.facebook.com/v25.0/act_999/adimages');
     expect(init.method).toBe('POST');
     const body = new URLSearchParams(String(init.body));
     expect(body.get('bytes')).toBe('AAAA');
