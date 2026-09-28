@@ -1,7 +1,11 @@
 import { BaseModel, Field, Model } from '@arbel/firebase-orm';
 
-export const AD_STUDIO_EXPORT_DESTINATIONS = ['meta', 'youtube'] as const;
+export const AD_STUDIO_EXPORT_DESTINATIONS = ['meta', 'youtube', 'google_ads'] as const;
 export type AdStudioExportDestination = (typeof AD_STUDIO_EXPORT_DESTINATIONS)[number];
+
+/** What was exported: an assembled video, or an image ad (rows written before image ads existed have none and are videos). */
+export const AD_STUDIO_EXPORT_MEDIA_KINDS = ['video', 'image'] as const;
+export type AdStudioExportMediaKind = (typeof AD_STUDIO_EXPORT_MEDIA_KINDS)[number];
 
 export const AD_STUDIO_EXPORT_STATUSES = ['uploading', 'done', 'failed'] as const;
 export type AdStudioExportStatus = (typeof AD_STUDIO_EXPORT_STATUSES)[number];
@@ -26,8 +30,16 @@ export class AdStudioExportModel extends BaseModel {
   public brief_id!: string;
 
   /** The assembled video that was uploaded (its record id in the studio). */
-  @Field({ is_required: true })
-  public video_id!: string;
+  @Field({ is_required: false })
+  public media_kind?: AdStudioExportMediaKind | null;
+
+  /** The assembled video, for video exports. */
+  @Field({ is_required: false })
+  public video_id?: string | null;
+
+  /** The image, for image exports. */
+  @Field({ is_required: false })
+  public image_id?: string | null;
 
   @Field({ is_required: true })
   public destination!: AdStudioExportDestination;

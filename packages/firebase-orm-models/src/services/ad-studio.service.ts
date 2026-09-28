@@ -2,8 +2,11 @@ import { randomUUID } from 'node:crypto';
 import {
   AD_STUDIO_MAX_TOTAL_SECONDS,
   isAdStudioFormat,
+  validateAdStudioImageConcepts,
   validateAdStudioScenes,
   type AdStudioBriefInput,
+  type AdStudioImageConcept,
+  type AdStudioImageConceptIssue,
   type AdStudioPlan,
   type AdStudioPlanSources,
   type AdStudioScene,
@@ -20,13 +23,17 @@ import { ProjectModel } from '../models/project.model';
 import { ProjectNotFoundError } from './resource-library.service';
 import { recordAuditLogEntry } from './audit-log.service';
 import { deleteAdStudioBriefMedia } from './ad-studio-video.service';
+import { deleteAdStudioBriefImages } from './ad-studio-image.service';
+import { deleteAdStudioBriefRuns } from './ad-studio-run.service';
 
 /** Limits a project starts with until an admin changes them. */
 export const AD_STUDIO_DEFAULT_DAILY_TEXT_GENERATIONS = 50;
 export const AD_STUDIO_DEFAULT_DAILY_VIDEO_SECONDS = 300;
+export const AD_STUDIO_DEFAULT_DAILY_IMAGES = 40;
 /** Upper bounds an admin can set, so a typo cannot open unlimited spend. */
 export const AD_STUDIO_MAX_DAILY_TEXT_GENERATIONS = 1000;
 export const AD_STUDIO_MAX_DAILY_VIDEO_SECONDS = 3600;
+export const AD_STUDIO_MAX_DAILY_IMAGES = 500;
 
 const SETTINGS_ID = 'settings';
 const MIN_TARGET_SECONDS = 5;
@@ -52,13 +59,20 @@ export class AdStudioScriptInvalidError extends Error {
   }
 }
 
+export class AdStudioImageConceptsInvalidError extends Error {
+  constructor(public readonly issues: AdStudioImageConceptIssue[]) {
+    super(`The image concepts break ${issues.length} rule(s): ${issues.map((issue) => issue.code).join(', ')}`);
+    this.name = 'AdStudioImageConceptsInvalidError';
+  }
+}
+
 export class AdStudioQuotaExceededError extends Error {
   constructor(
-    public readonly limitKind: 'text' | 'video',
+    public readonly limitKind: 'text' | 'video' | 'image',
     public readonly used: number,
     public readonly limit: number,
   ) {
-    super(`The project's daily Ad Studio ${limitKind === 'text' ? 'AI text' : 'video seconds'} limit is reached (${used} of ${limit}).`);
+    super(`The project's daily Ad Studio ${limitKind === 'text' ? 'AI text' : limitKind === 'video' ? 'video seconds' : 'images'} limit is reached (${used} of ${limit}).`);
     this.name = 'AdStudioQuotaExceededError';
   }
 }
@@ -203,6 +217,30 @@ export async function saveAdStudioScript(params: {
 }
 
 /**
+ * Stores the brief's image ad ideas (written by a person or generated), replacing the earlier list.
+ * Images already rendered stay attached to their concept id; a changed concept simply makes its
+ * images stale (see `imageConceptFingerprint`), so nothing is deleted by an edit.
+ */
+export async function saveAdStudioImageConcepts(params: {
+  organizationId: string;
+  projectId: string;
+  briefId: string;
+  concepts: AdStudioImageConcept[];
+  generatedBy?: AdStudioGeneratedBy | null;
+  now?: Date;
+}): Promise<AdStudioBriefModel> {
+  const concepts = params.concepts.map((concept) => ({ ...concept, formats: [...concept.formats] }));
+  const issues = validateAdStudioImageConcepts(concepts);
+  if (issues.length) throw new AdStudioImageConceptsInvalidError(issues);
+  const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
+  brief.image_concepts = concepts;
+  brief.image_concepts_generated_by = params.generatedBy ?? null;
+  brief.last_changed_on = nowIso(params.now);
+  await brief.save();
+  return brief;
+}
+
+/**
  * Stores a plan with the evidence it was built from, replacing any earlier plan. The brief reads as
  * `planned` unless it already has a script, which stays `scripted`: a new plan does not undo work.
  */
@@ -226,16 +264,20 @@ export async function saveAdStudioPlan(params: {
   return brief;
 }
 
-export async function deleteAdStudioBrief(params: { organizationId: string; projectId: string; briefId: string; actorId: string }): Promise<void> {
+export async function deleteAdStudioBrief(params: { organizationId: string; projectId: string; briefId: string; actorId: string; actorType?: 'user' | 'api_key' }): Promise<void> {
   const brief = await getAdStudioBrief(params.organizationId, params.projectId, params.briefId);
   await brief.remove();
-  // Its clips and assembled videos go with it; the web layer removes their stored files.
-  await deleteAdStudioBriefMedia(params.organizationId, params.projectId, params.briefId);
+  // Its clips, assembled videos, images and autopilot runs go with it; the engine removes their stored files.
+  await Promise.all([
+    deleteAdStudioBriefMedia(params.organizationId, params.projectId, params.briefId),
+    deleteAdStudioBriefImages(params.organizationId, params.projectId, params.briefId),
+    deleteAdStudioBriefRuns(params.organizationId, params.projectId, params.briefId),
+  ]);
   try {
     await recordAuditLogEntry({
       organizationId: params.organizationId,
       projectId: params.projectId,
-      actorType: 'user',
+      actorType: params.actorType ?? 'user',
       actorId: params.actorId,
       action: 'ad_studio.brief_deleted',
       targetType: 'ad_studio_brief',
@@ -254,6 +296,7 @@ export function newAdStudioSceneId(): string {
 export interface AdStudioSettingsView {
   dailyTextGenerations: number;
   dailyVideoSeconds: number;
+  dailyImages: number;
   /** False while the project is still on the defaults. */
   customized: boolean;
   lastChangedOn: string | null;
@@ -265,6 +308,7 @@ export async function getAdStudioSettings(organizationId: string, projectId: str
     return {
       dailyTextGenerations: AD_STUDIO_DEFAULT_DAILY_TEXT_GENERATIONS,
       dailyVideoSeconds: AD_STUDIO_DEFAULT_DAILY_VIDEO_SECONDS,
+      dailyImages: AD_STUDIO_DEFAULT_DAILY_IMAGES,
       customized: false,
       lastChangedOn: null,
     };
@@ -272,6 +316,7 @@ export async function getAdStudioSettings(organizationId: string, projectId: str
   return {
     dailyTextGenerations: settings.daily_text_generations,
     dailyVideoSeconds: settings.daily_video_seconds,
+    dailyImages: settings.daily_images ?? AD_STUDIO_DEFAULT_DAILY_IMAGES,
     customized: true,
     lastChangedOn: settings.last_changed_on,
   };
@@ -282,6 +327,8 @@ export async function setAdStudioSettings(params: {
   projectId: string;
   dailyTextGenerations: number;
   dailyVideoSeconds: number;
+  /** Omitted by callers that predate image ads: the current image limit is kept. */
+  dailyImages?: number;
   actorId: string;
   now?: Date;
 }): Promise<AdStudioSettingsView> {
@@ -292,16 +339,21 @@ export async function setAdStudioSettings(params: {
   if (!Number.isInteger(params.dailyVideoSeconds) || params.dailyVideoSeconds < 0 || params.dailyVideoSeconds > AD_STUDIO_MAX_DAILY_VIDEO_SECONDS) {
     reasons.push(`dailyVideoSeconds must be a whole number from 0 to ${AD_STUDIO_MAX_DAILY_VIDEO_SECONDS}`);
   }
+  if (params.dailyImages !== undefined && (!Number.isInteger(params.dailyImages) || params.dailyImages < 0 || params.dailyImages > AD_STUDIO_MAX_DAILY_IMAGES)) {
+    reasons.push(`dailyImages must be a whole number from 0 to ${AD_STUDIO_MAX_DAILY_IMAGES}`);
+  }
   if (reasons.length) throw new AdStudioBriefInvalidError(reasons);
   await requireProject(params.organizationId, params.projectId);
 
   const before = await getAdStudioSettings(params.organizationId, params.projectId);
+  const dailyImages = params.dailyImages ?? before.dailyImages;
   const existing = await AdStudioSettingsModel.init(SETTINGS_ID, { organization_id: params.organizationId, project_id: params.projectId });
   const settings = existing ?? new AdStudioSettingsModel();
   settings.organization_id = params.organizationId;
   settings.project_id = params.projectId;
   settings.daily_text_generations = params.dailyTextGenerations;
   settings.daily_video_seconds = params.dailyVideoSeconds;
+  settings.daily_images = dailyImages;
   settings.changed_by = params.actorId;
   settings.last_changed_on = nowIso(params.now);
   settings.setPathParams({ organization_id: params.organizationId, project_id: params.projectId });
@@ -315,9 +367,9 @@ export async function setAdStudioSettings(params: {
       action: 'ad_studio.limits_changed',
       targetType: 'ad_studio_settings',
       targetId: params.projectId,
-      summary: `Set Ad Studio daily limits to ${params.dailyTextGenerations} AI text calls and ${params.dailyVideoSeconds}s of video`,
-      before: { daily_text_generations: before.dailyTextGenerations, daily_video_seconds: before.dailyVideoSeconds },
-      after: { daily_text_generations: params.dailyTextGenerations, daily_video_seconds: params.dailyVideoSeconds },
+      summary: `Set Ad Studio daily limits to ${params.dailyTextGenerations} AI text calls, ${params.dailyVideoSeconds}s of video and ${dailyImages} images`,
+      before: { daily_text_generations: before.dailyTextGenerations, daily_video_seconds: before.dailyVideoSeconds, daily_images: before.dailyImages },
+      after: { daily_text_generations: params.dailyTextGenerations, daily_video_seconds: params.dailyVideoSeconds, daily_images: dailyImages },
     });
   } catch {
     // Best-effort.
@@ -330,11 +382,13 @@ export function utcDay(now?: Date): string {
 }
 
 const VIDEO_KINDS: ReadonlySet<AdStudioUsageKind> = new Set(['video_scene', 'video_edit']);
+const IMAGE_KINDS: ReadonlySet<AdStudioUsageKind> = new Set(['image', 'image_edit']);
 
 export interface AdStudioUsageToday {
   day: string;
   textGenerations: number;
   videoSeconds: number;
+  images: number;
 }
 
 export async function getAdStudioUsageToday(organizationId: string, projectId: string, now?: Date): Promise<AdStudioUsageToday> {
@@ -342,11 +396,13 @@ export async function getAdStudioUsageToday(organizationId: string, projectId: s
   const rows = await AdStudioUsageModel.initPath({ organization_id: organizationId, project_id: projectId }).where('day', '==', day).get();
   let textGenerations = 0;
   let videoSeconds = 0;
+  let images = 0;
   for (const row of rows) {
     if (VIDEO_KINDS.has(row.kind)) videoSeconds += row.units;
+    else if (IMAGE_KINDS.has(row.kind)) images += row.units;
     else textGenerations += row.units;
   }
-  return { day, textGenerations, videoSeconds };
+  return { day, textGenerations, videoSeconds, images };
 }
 
 /**
@@ -360,6 +416,8 @@ export async function assertAdStudioQuota(params: { organizationId: string; proj
   ]);
   if (VIDEO_KINDS.has(params.kind)) {
     if (usage.videoSeconds + params.units > settings.dailyVideoSeconds) throw new AdStudioQuotaExceededError('video', usage.videoSeconds, settings.dailyVideoSeconds);
+  } else if (IMAGE_KINDS.has(params.kind)) {
+    if (usage.images + params.units > settings.dailyImages) throw new AdStudioQuotaExceededError('image', usage.images, settings.dailyImages);
   } else if (usage.textGenerations + params.units > settings.dailyTextGenerations) {
     throw new AdStudioQuotaExceededError('text', usage.textGenerations, settings.dailyTextGenerations);
   }
