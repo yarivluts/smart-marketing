@@ -73,4 +73,16 @@ export class SharedCredentialModel extends BaseModel {
 
   @Field()
   public archived_by?: string | null;
+
+  /**
+   * When the secret's token stops working, for credentials connected through an OAuth flow (e.g.
+   * "Connect with Facebook"); null when the provider reported no expiry, absent for secrets pasted by
+   * hand. Lets the UI warn before a connection lapses and offer to reconnect.
+   */
+  @Field()
+  public token_expires_on?: string | null;
+
+  /** How the secret was set: `oauth` for a connect flow, absent for one pasted by hand. */
+  @Field()
+  public connected_via?: 'oauth' | null;
 }
