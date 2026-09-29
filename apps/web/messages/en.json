@@ -508,7 +508,8 @@
     "mixDescription": "Live (not archived) resources in the library.",
     "mixCenter": "resources",
     "platformsTitle": "Connected platforms",
-    "platformsDescription": "Live credentials per platform."
+    "platformsDescription": "Live credentials per platform.",
+    "connectMeta": "Connect with Facebook"
   },
   "ProjectResources": {
     "metaTitle": "Project resources",
@@ -4265,7 +4266,8 @@
       "historyEmpty": "No ads published yet.",
       "kindVideo": "Video",
       "kindImage": "Image",
-      "video": "The video"
+      "video": "The video",
+      "connectMeta": "Connect with Facebook"
     },
     "imageFailure": {
       "not_configured": "no image model is configured",
@@ -4275,6 +4277,49 @@
       "invalid_output": "the image model returned no usable image",
       "provider_error": "the image model failed",
       "storage_error": "the image could not be saved"
+    }
+  },
+  "MetaConnect": {
+    "title": "Connect with Facebook",
+    "eyebrow": "Meta connection",
+    "description": "Log in with Facebook once and pick the ad account and Page. GrowthOS keeps the access sealed in its vault and publishes Meta ads through it.",
+    "connect": "Connect with Facebook",
+    "reconnect": "Connect or renew with Facebook",
+    "needsPermission": "Connecting an ad account needs the \"manage resources\" permission in this organization.",
+    "tryAgain": "Try again",
+    "chooseTitle": "Choose what to connect",
+    "chooseDescription": "Facebook gave access to these ad accounts and Pages. Pick the account ads are billed to and the Page they run as.",
+    "adAccount": "Ad account",
+    "accountInactive": "not active",
+    "page": "Facebook Page the ads run as",
+    "noPages": "No Pages came back. Connect again and allow access to your Page.",
+    "project": "Use it in project",
+    "noProject": "Only add it to the organization library",
+    "expiresNote": "The access lasts until {date}; renew it here before then.",
+    "noExpiryNote": "Facebook set no expiry on this access.",
+    "manageNote": "The project gets permission to create ads with it (always created paused).",
+    "save": "Connect",
+    "connected": "Connected.",
+    "openResources": "Open the project resources",
+    "connectionsTitle": "Meta connections",
+    "connectionsDescription": "The organization's Meta ad accounts and when each connection expires.",
+    "noConnections": "No Meta connection yet.",
+    "statusNoSecret": "no access saved",
+    "statusManual": "token pasted by hand - expiry unknown",
+    "statusExpires": "expires {date}",
+    "statusExpired": "expired {date} - renew it",
+    "statusNoExpiry": "does not expire",
+    "errors": {
+      "not_configured": "This deployment has no Meta app configured yet (META_APP_ID and META_APP_SECRET).",
+      "declined": "Facebook did not grant access. Connect again and allow the requested permissions.",
+      "session_not_found": "This connection attempt was not found or was already used. Start again.",
+      "session_expired": "This connection attempt expired. Start again.",
+      "wrong_user": "Someone else started this connection attempt. Start your own.",
+      "not_authorized": "Facebook has not returned yet for this attempt. Start again.",
+      "exchange_failed": "Facebook refused the login. Start again, and check the app settings if it repeats.",
+      "invalid_choice": "Pick an ad account and a Page from the list.",
+      "no_ad_accounts": "This Facebook login has no ad accounts. Log in with the account that manages your ads.",
+      "project_not_found": "That project was not found in this organization."
     }
   }
 }

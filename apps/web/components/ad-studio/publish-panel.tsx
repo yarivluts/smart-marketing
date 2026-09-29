@@ -42,6 +42,8 @@ export interface PublishPanelProps {
   canPublish: boolean;
   published: PublishedAdRow[];
   resourcesHref: string;
+  /** Starts "Connect with Facebook" and comes back here; null when the viewer cannot connect accounts or no Meta app is configured. */
+  metaConnectHref?: string | null;
 }
 
 const FAILURES = new Set(['auth_failed', 'quota_exceeded', 'rejected', 'upload_failed', 'no_secret', 'invalid_credential']);
@@ -182,11 +184,17 @@ export function PublishPanel(props: PublishPanelProps): React.ReactElement {
         </div>
         {googleBlocked ? <p className="text-xs text-warning">{t('publish.googleVideo')}</p> : null}
         {!destinations[destination] ? (
-          <p className="text-xs text-muted-foreground">
-            {t('publish.connectFirst')}{' '}
-            <a href={resourcesHref} className="font-medium text-primary hover:underline">
-              {t('exportOpenResources')}
-            </a>
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {t('publish.connectFirst')}
+            {destination === 'meta' && props.metaConnectHref ? (
+              <a href={props.metaConnectHref} className="inline-flex items-center rounded-lg bg-[#1877F2] px-3 py-1.5 font-semibold text-white hover:bg-[#166fe0]" data-testid="ad-studio-connect-meta">
+                {t('publish.connectMeta')}
+              </a>
+            ) : (
+              <a href={resourcesHref} className="font-medium text-primary hover:underline">
+                {t('exportOpenResources')}
+              </a>
+            )}
           </p>
         ) : null}
 
