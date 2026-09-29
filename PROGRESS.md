@@ -17,6 +17,33 @@ Template for each entry:
 
 ---
 
+## 2026-09-29 - Ad Studio stepper, confirm the plan, publish paused ads (KAN-238)
+
+- **Last completed:**
+  - **Stepper:** the Ad Studio page is now five steps: Brief -> Plan -> Create -> Review & edit -> Publish.
+    - It is sticky, with footer back/next links.
+    - Locked steps explain why they are locked.
+    - The URL `?step=` picks a step; with none, the page opens the step that needs attention.
+  - **Confirm the plan:** autopilot runs default to `confirmPlan: true`.
+    - After the plan, script and image ideas, the run goes to `awaiting_approval`, and nothing is rendered until the person confirms (`POST .../autopilot/{runId}/approve`, `ai.use`, audited `ad_studio.plan_approved`).
+    - A waiting plan can be discarded.
+  - **Publish:** `POST .../briefs/{briefId}/publish` (`automation.execute`) creates a PAUSED ad:
+    - Meta: campaign OUTCOME_TRAFFIC, ad set, image or video creative, ad.
+    - Google Ads: a Display campaign with a responsive display ad (images cropped to 1.91:1 and square); the EU political declaration is asked, never defaulted.
+    - Each result is an export row (`result_kind: 'ad'`) with its Ads Manager or Google Ads link.
+  - **MCP:**
+    - New tools: `approve_ad_plan` (ai.use) and `publish_ad` (automation.execute, OAuth only).
+    - `start_ad_autopilot` takes `confirm_plan`.
+    - The run's `next` tells the agent to show the plan to the person before approving.
+  - Tests: models, ad-studio, web routes and components, API MCP; all green locally.
+- **In progress (exact stopping point):** PR for KAN-238, then deploy.
+- **Blocked + why:** Real generation needs Gemini credit (the AI Studio account returns 402 until topped up).
+- **Next step:**
+  - Once the account has credit, run real English and Hebrew runs on prod (video ad and image ads).
+  - Publish them PAUSED to Meta account 1646897415410557 and Google Ads 4816235600.
+  - Record the flow, and report with the links.
+- **Waiting on human:** An AI Studio top-up.
+
 ## 2026-09-28 - Ad Studio autopilot, image ads and full MCP (KAN-237)
 
 - **Last completed:**
