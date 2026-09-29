@@ -125,6 +125,12 @@ describe('Google Ads keyword access', () => {
       status: 'unavailable',
       reason: 'credential_not_configured',
     });
+    // Same key id, different key (a secret sealed with the dev key ring, read in prod): unreadable, not a crash.
+    const sameIdOtherKey = generateLocalKmsKeyRing(currentKeyId);
+    expect(await resolveAdStudioKeywordCredential(orgId, projectId, new LocalKmsProvider(sameIdOtherKey.keyRing, sameIdOtherKey.currentKeyId))).toEqual({
+      status: 'unavailable',
+      reason: 'credential_not_configured',
+    });
   });
 
   it('a secret that is not a Google Ads credential is credential_not_configured', async () => {

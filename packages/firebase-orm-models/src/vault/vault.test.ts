@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decryptSecret, encryptSecret, rotateSecretEnvelopeKey } from './envelope';
 import { generateLocalKmsKeyRing, LocalKmsProvider, loadLocalKmsKeyRingFromEnv, UnknownKmsKeyError } from './local-kms-provider';
 import { VaultNotConfiguredError } from './local-kms-provider';
+import { SecretDecryptionError } from './aes-gcm';
 
 function providerWithKeys(keys: Record<string, Buffer>, currentKeyId: string): LocalKmsProvider {
   return new LocalKmsProvider(keys, currentKeyId);
@@ -36,7 +37,14 @@ describe('encryptSecret / decryptSecret', () => {
 
     const envelope = await encryptSecret('org-1-secret', 'org-1', kms);
 
-    await expect(decryptSecret(envelope, 'org-2', kms)).rejects.toThrow();
+    await expect(decryptSecret(envelope, 'org-2', kms)).rejects.toThrow(SecretDecryptionError);
+  });
+
+  it('fails with SecretDecryptionError under a key ring with the same key id but a different key', async () => {
+    const sealer = generateLocalKmsKeyRing('v1');
+    const reader = generateLocalKmsKeyRing('v1');
+    const envelope = await encryptSecret('org-1-secret', 'org-1', providerWithKeys(sealer.keyRing, sealer.currentKeyId));
+    await expect(decryptSecret(envelope, 'org-1', providerWithKeys(reader.keyRing, reader.currentKeyId))).rejects.toThrow(SecretDecryptionError);
   });
 
   it('fails to decrypt tampered ciphertext (authenticity check)', async () => {
