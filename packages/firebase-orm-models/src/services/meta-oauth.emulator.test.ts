@@ -66,7 +66,12 @@ describe('Connect with Facebook', () => {
     const url = new URL(authorizeUrl);
     expect(url.origin + url.pathname).toMatch(/^https:\/\/www\.facebook\.com\/v[\d.]+\/dialog\/oauth$/);
     expect(Object.fromEntries(url.searchParams)).toMatchObject({ client_id: '111', redirect_uri: CONFIG.redirectUri, state, response_type: 'code' });
-    expect(url.searchParams.get('scope')).toContain('ads_management');
+    expect(url.searchParams.get('scope')).toBe('ads_management,ads_read,business_management,pages_show_list,pages_read_engagement');
+    const custom = await startMetaOAuth({ organizationId: ctx.orgId, userId: ctx.owner.id, locale: 'en', config: { ...CONFIG, scopes: ['ads_management', 'pages_show_list'] }, now });
+    expect(new URL(custom.authorizeUrl).searchParams.get('scope')).toBe('ads_management,pages_show_list');
+    const withConfig = await startMetaOAuth({ organizationId: ctx.orgId, userId: ctx.owner.id, locale: 'en', config: { ...CONFIG, loginConfigId: '999' }, now });
+    expect(Object.fromEntries(new URL(withConfig.authorizeUrl).searchParams)).toMatchObject({ config_id: '999' });
+    expect(new URL(withConfig.authorizeUrl).searchParams.has('scope')).toBe(false);
     expect(await peekMetaOAuthSession(state)).toEqual({ organizationId: ctx.orgId, projectId: ctx.projectId, locale: 'he', returnTo: '/he/x?step=publish' });
 
     const meta = fakeMeta();
