@@ -17,10 +17,10 @@ import { isMetaOAuthConfigured, metaConnectHref } from '@/lib/integrations/meta'
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string }>;
-  searchParams: Promise<{ session?: string; error?: string; projectId?: string }>;
+  searchParams: Promise<{ session?: string; error?: string; detail?: string; projectId?: string }>;
 }>;
 
-const ERRORS = new Set(['not_configured', 'declined', 'session_not_found', 'session_expired', 'wrong_user', 'not_authorized', 'exchange_failed', 'invalid_choice', 'no_ad_accounts']);
+const ERRORS = new Set(['not_configured', 'declined', 'meta_error', 'session_not_found', 'session_expired', 'wrong_user', 'not_authorized', 'exchange_failed', 'invalid_choice', 'no_ad_accounts']);
 
 export async function generateMetadata({ params }: PageProps) {
   const { locale } = await params;
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: PageProps) {
  */
 export default async function MetaConnectPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId } = await params;
-  const { session: state, error, projectId } = await searchParams;
+  const { session: state, error, detail, projectId } = await searchParams;
   setRequestLocale(locale);
   const t = await getTranslations('MetaConnect');
 
@@ -95,6 +95,11 @@ export default async function MetaConnectPage({ params, searchParams }: PageProp
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
             <div className="flex flex-col gap-2">
               <span>{t(`errors.${problem}`)}</span>
+              {problem === 'meta_error' && detail ? (
+                <span className="rounded-lg bg-muted/60 px-3 py-2 text-xs" dir="auto" data-testid="meta-connect-error-detail">
+                  {detail.slice(0, 300)}
+                </span>
+              ) : null}
               {configured && canManage ? (
                 <a href={startHref} className="font-medium text-primary hover:underline">
                   {t('tryAgain')}

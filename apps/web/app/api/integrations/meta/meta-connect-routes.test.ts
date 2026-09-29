@@ -118,6 +118,10 @@ describe('Connect with Facebook routes', () => {
     const state = (await startFor(ctx)).searchParams.get('state') as string;
     const declined = await callback(get(`/api/integrations/meta/callback?error=access_denied&state=${state}`));
     expect(declined.headers.get('location')).toBe(`${WEB}/he/orgs/${ctx.orgId}/integrations/meta?error=declined`);
+    const refused = await callback(get(`/api/integrations/meta/callback?error_code=1349048&error_message=${encodeURIComponent("Can't load URL: the domain isn't included")}&state=${state}`));
+    const refusedTo = new URL(refused.headers.get('location') as string);
+    expect(refusedTo.pathname).toBe(`/he/orgs/${ctx.orgId}/integrations/meta`);
+    expect(Object.fromEntries(refusedTo.searchParams)).toEqual({ error: 'meta_error', detail: "Can't load URL: the domain isn't included" });
 
     delete process.env.META_APP_ID;
     const unconfigured = await start(get(`/api/integrations/meta/start?orgId=${ctx.orgId}&locale=en`));
