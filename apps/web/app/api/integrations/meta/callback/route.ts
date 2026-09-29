@@ -6,7 +6,7 @@ import { getServerKmsProvider } from '@/lib/vault/kms-provider';
 import { metaOAuthConfig, publicWebOrigin } from '@/lib/integrations/meta';
 
 /**
- * Meta sends the person back here with `code` and `state` (or `error` when they declined). The code
+ * Meta sends the person back here with `code` and `state` (or an error: declined, or Meta's own refusal). The code
  * is exchanged for a long-lived token, which stays sealed on the session, and the person moves on to
  * pick the ad account and Page. Every outcome lands on the connect page, with an error code if any.
  */
@@ -20,7 +20,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const page = `${origin}/${session.locale}/orgs/${session.organizationId}/integrations/meta`;
   const { user, error } = await requireOrgPermission(session.organizationId, 'resources.manage');
   if (error) return error;
-  if (query.get('error') || !query.get('code')) return NextResponse.redirect(`${page}?error=declined`, 302);
+  if (!query.get('code')) {
+    // A person who cancels comes back with error_reason=user_denied; anything else is Meta refusing the
+    // request (e.g. an app domain or redirect URI not registered), and its own message says why.
+    const detail = (query.get('error_message') ?? query.get('error_description') ?? '').trim().slice(0, 300);
+    const declined = query.get('error_reason') === 'user_denied' || !detail;
+    return NextResponse.redirect(declined ? `${page}?error=declined` : `${page}?error=meta_error&detail=${encodeURIComponent(detail)}`, 302);
+  }
   const config = metaOAuthConfig(request.url);
   if (!config) return NextResponse.redirect(`${page}?error=not_configured`, 302);
   try {

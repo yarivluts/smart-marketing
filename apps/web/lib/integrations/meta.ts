@@ -19,7 +19,17 @@ export function metaOAuthConfig(requestUrl: string): MetaOAuthConfig | null {
   const appId = process.env.META_APP_ID?.trim();
   const appSecret = process.env.META_APP_SECRET?.trim();
   if (!appId || !appSecret) return null;
-  return { appId, appSecret, loginConfigId: process.env.META_LOGIN_CONFIG_ID?.trim() || null, redirectUri: `${publicWebOrigin(requestUrl)}${META_CALLBACK_PATH}` };
+  const scopes = (process.env.META_OAUTH_SCOPES ?? '')
+    .split(',')
+    .map((scope) => scope.trim())
+    .filter(Boolean);
+  return {
+    appId,
+    appSecret,
+    loginConfigId: process.env.META_LOGIN_CONFIG_ID?.trim() || null,
+    scopes: scopes.length ? scopes : null,
+    redirectUri: `${publicWebOrigin(requestUrl)}${META_CALLBACK_PATH}`,
+  };
 }
 
 export function isMetaOAuthConfigured(): boolean {

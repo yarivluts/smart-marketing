@@ -28,7 +28,8 @@ import { recordAuditLogEntry } from './audit-log.service';
  * never leaves the vault in plain text except inside `finishMetaOAuth`, in memory.
  */
 
-export const META_OAUTH_SCOPES = ['ads_management', 'ads_read', 'business_management', 'pages_show_list', 'pages_read_engagement', 'pages_manage_ads'] as const;
+/** What the flow asks for by default: manage ads, read them, list the person's businesses and Pages, and read a Page to post as it. */
+export const META_OAUTH_SCOPES = ['ads_management', 'ads_read', 'business_management', 'pages_show_list', 'pages_read_engagement'] as const;
 export const META_OAUTH_SESSION_TTL_MS = 15 * 60 * 1000;
 const GRAPH = `https://graph.facebook.com/${META_API_VERSION}`;
 const DIALOG = `https://www.facebook.com/${META_API_VERSION}/dialog/oauth`;
@@ -38,6 +39,8 @@ export interface MetaOAuthConfig {
   appSecret: string;
   /** A Facebook Login for Business configuration id; when set it replaces the `scope` list. */
   loginConfigId?: string | null;
+  /** Overrides {@link META_OAUTH_SCOPES} (Meta sometimes refuses a permission for an app type). */
+  scopes?: readonly string[] | null;
   /** Must match a Valid OAuth Redirect URI on the Meta app exactly. */
   redirectUri: string;
 }
@@ -99,7 +102,7 @@ export async function startMetaOAuth(params: {
   url.searchParams.set('state', state);
   url.searchParams.set('response_type', 'code');
   if (params.config.loginConfigId) url.searchParams.set('config_id', params.config.loginConfigId);
-  else url.searchParams.set('scope', META_OAUTH_SCOPES.join(','));
+  else url.searchParams.set('scope', (params.config.scopes?.length ? params.config.scopes : META_OAUTH_SCOPES).join(','));
   return { state, authorizeUrl: url.toString() };
 }
 
