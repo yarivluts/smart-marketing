@@ -24,7 +24,7 @@ describe('createGeminiImageClient', () => {
     expect(JSON.parse(init.body as string)).toEqual({
       model: 'gemini-3.1-flash-image',
       input: [{ type: 'text', text: 'A lawyer at a desk' }],
-      response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: '4:5', image_size: '1K' },
+      response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: '4:5', image_size: '1K' },
     });
   });
 

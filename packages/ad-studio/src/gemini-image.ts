@@ -101,7 +101,7 @@ export function createGeminiImageClient(apiKey: string, options: { fetchImpl?: F
   async function interact(input: unknown[], aspectRatio: AdStudioImageAspectRatio): Promise<AdStudioGeneratedImage> {
     const response = await call('/interactions', {
       method: 'POST',
-      body: JSON.stringify({ model, input, response_format: { type: 'image', mime_type: 'image/png', aspect_ratio: aspectRatio, image_size: '1K' } }),
+      body: JSON.stringify({ model, input, response_format: { type: 'image', mime_type: 'image/jpeg', aspect_ratio: aspectRatio, image_size: '1K' } }),
     });
     const body = asObject(await response.json().catch(() => ({}))) ?? {};
     const error = asObject(body.error);

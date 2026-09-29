@@ -83,6 +83,15 @@ describe('ImageStudio', () => {
     expect(JSON.parse(init.body as string)).toEqual({ conceptId: 'c1', format: 'story' });
   });
 
+  it('says why an image failed in image terms, not video terms, in English and Hebrew', () => {
+    const failed = image({ id: 'i9', format: 'story', status: 'failed', selected: false, failureCode: 'provider_error', conceptFingerprint: imageConceptFingerprint(CONCEPT, 'story', 'en') });
+    const { unmount } = renderStudio({ initialImages: [image(), failed] });
+    expect(within(screen.getByTestId('ad-studio-image-slot-story')).getByText('the image model failed')).toBeInTheDocument();
+    unmount();
+    renderStudio({ initialImages: [image(), { ...failed, failureCode: 'provider_billing' }] }, 'he');
+    expect(within(screen.getByTestId('ad-studio-image-slot-story')).getByText(heMessages.AdStudio.imageFailure.provider_billing)).toBeInTheDocument();
+  });
+
   it('marks an image out of date after its idea changes, and saves the edited ideas', async () => {
     const edited = { ...CONCEPT, headline: 'Signed before lunch' };
     const fetchMock = vi.fn(async () => json({ concepts: [edited], images: [image()] }));
