@@ -4,6 +4,7 @@ import { assemblyPlan, can, sceneVideoStates, summarizeVideoProgress, totalScene
 import { AlertTriangle, ArrowLeft, ArrowRight, Clapperboard, Clock, FileText, Film, ImageIcon, Plus, Sparkles, Workflow } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
+import { isMetaOAuthConfigured, metaConnectHref } from '@/lib/integrations/meta';
 import { findActiveMembership } from '@/lib/orgs/access';
 import { listOrgProjects } from '@/lib/orgs/queries';
 import {
@@ -75,6 +76,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   }
   const canConfigure = can(bindings, principal, 'project.configure', { orgId, projectId });
   const canExport = can(bindings, principal, 'automation.execute', { orgId, projectId });
+  const canConnectAccounts = can(bindings, principal, 'resources.manage', { orgId }) && isMetaOAuthConfigured();
 
   const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable] = await Promise.all([
     listOrgProjects(orgId),
@@ -419,6 +421,11 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                 canPublish={canExport}
                 published={publishedAds}
                 resourcesHref={`/orgs/${orgId}/projects/${projectId}/resources`}
+                metaConnectHref={
+                  canConnectAccounts
+                    ? metaConnectHref({ orgId, projectId, locale, returnTo: `/${locale}/orgs/${orgId}/projects/${projectId}/ad-studio?brief=${selected.id}&step=publish` })
+                    : null
+                }
               />
               {exportDestinations ? (
                 <details className="rounded-2xl border border-border bg-card p-5 shadow-sm">

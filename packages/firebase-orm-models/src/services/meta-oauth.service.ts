@@ -1,6 +1,8 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { MetaOAuthSessionModel, type MetaOAuthAdAccount, type MetaOAuthPage } from '../models/meta-oauth-session.model';
 import type { SharedCredentialModel } from '../models/shared-credential.model';
+import { ProjectModel } from '../models/project.model';
+import { ProjectNotFoundError } from './resource-library.service';
 import type { ResourceAttachmentModel } from '../models/resource-attachment.model';
 import { decryptSecret, encryptSecret, type KmsProvider } from '../vault';
 import { META_API_VERSION } from '../plugin-runtime/meta-ads/api-client';
@@ -208,6 +210,8 @@ async function findCredentialForAdAccount(organizationId: string, adAccountId: s
 }
 
 export async function finishMetaOAuth(params: {
+  /** The org the request is for; a session of another org is refused before anything is written. */
+  organizationId: string;
   state: string;
   userId: string;
   adAccountId: string;
@@ -218,12 +222,18 @@ export async function finishMetaOAuth(params: {
 }): Promise<{ credential: SharedCredentialModel; attachment: ResourceAttachmentModel | null; returnTo: string | null; created: boolean }> {
   const now = params.now ?? new Date();
   const session = await requireSession(params.state, params.userId, now);
+  if (session.organization_id !== params.organizationId) throw new MetaOAuthError('session_not_found');
   if (session.status !== 'authorized' || !session.encrypted_token) throw new MetaOAuthError('not_authorized');
   const account = (session.ad_accounts ?? []).find((entry) => entry.id === params.adAccountId);
   const page = (session.pages ?? []).find((entry) => entry.id === params.pageId);
   if (!account || !page) throw new MetaOAuthError('invalid_choice');
   const organizationId = session.organization_id;
   const projectId = params.projectId === undefined ? (session.project_id ?? null) : params.projectId;
+
+  if (projectId) {
+    const project = await ProjectModel.init(projectId, { organization_id: organizationId });
+    if (!project || project.organization_id !== organizationId) throw new ProjectNotFoundError();
+  }
 
   const token = await decryptSecret(session.encrypted_token, sessionTenant(session), params.kms);
   const secret = JSON.stringify({ accessToken: token, adAccountId: account.id, pageId: page.id });

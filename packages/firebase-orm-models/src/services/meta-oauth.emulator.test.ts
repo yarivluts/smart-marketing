@@ -85,7 +85,7 @@ describe('Connect with Facebook', () => {
     });
     expect(JSON.stringify(choices)).not.toContain('token"');
 
-    const done = await finishMetaOAuth({ state, userId: ctx.owner.id, adAccountId: '1646897415410557', pageId: '1253606311170957', kms, now });
+    const done = await finishMetaOAuth({ organizationId: ctx.orgId, state, userId: ctx.owner.id, adAccountId: '1646897415410557', pageId: '1253606311170957', kms, now });
     expect(done).toMatchObject({ created: true, returnTo: '/he/x?step=publish' });
     expect(done.credential).toMatchObject({ provider: 'meta_ads', available_scopes: ['1646897415410557'], connected_via: 'oauth', token_expires_on: '2026-11-28T20:00:00.000Z' });
     expect(JSON.parse(await revealSharedCredentialSecret({ organizationId: ctx.orgId, credentialId: done.credential.id, kms }))).toEqual({
@@ -107,7 +107,7 @@ describe('Connect with Facebook', () => {
     const connect = async (expiresIn: number) => {
       const { state } = await startMetaOAuth({ organizationId: ctx.orgId, projectId: ctx.projectId, userId: ctx.owner.id, locale: 'en', config: CONFIG });
       await completeMetaOAuth({ state, code: 'c', userId: ctx.owner.id, config: CONFIG, kms, fetchImpl: fakeMeta({ expiresIn }).fetchImpl });
-      return finishMetaOAuth({ state, userId: ctx.owner.id, adAccountId: '1646897415410557', pageId: '1253606311170957', kms });
+      return finishMetaOAuth({ organizationId: ctx.orgId, state, userId: ctx.owner.id, adAccountId: '1646897415410557', pageId: '1253606311170957', kms });
     };
     const first = await connect(5184000);
     const second = await connect(0);
@@ -130,7 +130,11 @@ describe('Connect with Facebook', () => {
       message: 'Invalid verification code',
     });
     await completeMetaOAuth({ state, code: 'c', userId: ctx.owner.id, config: CONFIG, kms, fetchImpl: fakeMeta().fetchImpl, now });
-    await expect(finishMetaOAuth({ state, userId: ctx.owner.id, adAccountId: '999', pageId: '1253606311170957', kms, now })).rejects.toBeInstanceOf(MetaOAuthError);
+    await expect(finishMetaOAuth({ organizationId: ctx.orgId, state, userId: ctx.owner.id, adAccountId: '999', pageId: '1253606311170957', kms, now })).rejects.toBeInstanceOf(MetaOAuthError);
+    await expect(finishMetaOAuth({ organizationId: 'another-org', state, userId: ctx.owner.id, adAccountId: '1646897415410557', pageId: '1253606311170957', kms, now })).rejects.toMatchObject({ code: 'session_not_found' });
+    await expect(finishMetaOAuth({ organizationId: ctx.orgId, state, userId: ctx.owner.id, adAccountId: '1646897415410557', pageId: '1253606311170957', projectId: 'no-such-project', kms, now })).rejects.toMatchObject({ name: 'ProjectNotFoundError' });
+    // Nothing was written by the refused attempts.
+    expect((await listSharedCredentials(ctx.orgId)).filter((credential) => credential.provider === 'meta_ads')).toHaveLength(0);
     await expect(describeMetaOAuthSession({ state, userId: ctx.owner.id, now: new Date(now.getTime() + 16 * 60 * 1000) })).rejects.toMatchObject({ code: 'session_expired' });
     await expect(describeMetaOAuthSession({ state: 'not-a-real-state', userId: ctx.owner.id, now })).rejects.toMatchObject({ code: 'session_not_found' });
   });

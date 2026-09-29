@@ -92,4 +92,17 @@ describe('PublishPanel', () => {
     expect(screen.getByText(heMessages.AdStudio.publish.historyEmpty)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /פייסבוק ואינסטגרם/ })).toBeDisabled();
   });
+
+  it('offers Connect with Facebook where Meta is not connected and the viewer may connect accounts', () => {
+    const { unmount } = renderPanel({ destinations: { meta: false, google_ads: true }, metaConnectHref: '/api/integrations/meta/start?orgId=o' });
+    expect(screen.getByTestId('ad-studio-connect-meta')).toHaveAttribute('href', '/api/integrations/meta/start?orgId=o');
+    // Google Ads is connected, so no connect link there.
+    fireEvent.click(screen.getByRole('radio', { name: /Google Ads/ }));
+    expect(screen.queryByTestId('ad-studio-connect-meta')).toBeNull();
+    unmount();
+    // Without the right (or with no Meta app configured) it points to the resources page instead.
+    renderPanel({ destinations: { meta: false, google_ads: true }, metaConnectHref: null });
+    expect(screen.queryByTestId('ad-studio-connect-meta')).toBeNull();
+    expect(screen.getByRole('link', { name: /resources/i })).toHaveAttribute('href', '/resources');
+  });
 });

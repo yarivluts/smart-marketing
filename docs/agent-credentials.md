@@ -31,6 +31,7 @@ every environment picks it up on the next call.
 | `google-ads-developer-token` | Google Ads API developer token |
 | `meta-user-access-token` | Meta Marketing API user access token |
 | `growthos-vault-keys-dev` / `-preprod` / `-prod` | envelope-encryption keys the app's own credential vault uses (`GROWTHOS_VAULT_KEYS`) |
+| `meta-app-id` / `meta-app-secret` | the Meta app behind "Connect with Facebook"; mounted on web-prod / web-preprod as `META_APP_ID` / `META_APP_SECRET` |
 
 `gcloud secrets list --project growthos-g2w84` is the live list; this table will drift.
 
