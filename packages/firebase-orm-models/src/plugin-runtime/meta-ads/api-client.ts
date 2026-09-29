@@ -444,6 +444,10 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       status: 'PAUSED',
       special_ad_categories: JSON.stringify([]),
       daily_budget: String(params.dailyBudgetCents),
+      // The budget lives on the campaign (CBO), so the bid strategy must too. Stated explicitly: left
+      // out, some ad accounts default to a strategy that needs a bid amount, and every ad set create
+      // then fails with 'bid amount required' (Meta error 100/1815857).
+      bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
     });
     return { campaignId: result.id };
   }
