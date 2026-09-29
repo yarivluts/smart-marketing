@@ -4,6 +4,7 @@ import type { ResourceAttachmentModel } from '../models/resource-attachment.mode
 import type { AutomationTargetStateModel } from '../models/automation-target-state.model';
 import type { KmsProvider } from '../vault/kms-provider';
 import { UnknownKmsKeyError } from '../vault/local-kms-provider';
+import { SecretDecryptionError } from '../vault/aes-gcm';
 import { InvalidGoogleAdsCredentialSecretError, type GoogleAdsCredentialSecret } from '../plugin-runtime/google-ads';
 import { listAutomationTargetStatesForProject } from './automation.service';
 import { GoogleAdsCredentialConfigError, resolveGoogleAdsCredentialSecret } from './google-ads-plugin.service';
@@ -110,7 +111,16 @@ export async function resolveAdStudioKeywordCredential(organizationId: string, p
   try {
     return { status: 'ok', credential: await resolveGoogleAdsCredentialSecret(organizationId, access.attachment, kms) };
   } catch (error) {
-    if (error instanceof GoogleAdsCredentialConfigError || error instanceof InvalidGoogleAdsCredentialSecretError || error instanceof UnknownKmsKeyError) return { status: 'unavailable', reason: 'credential_not_configured' };
+    // A secret that cannot be read here (e.g. sealed with another environment's key ring) makes the
+    // keyword source unavailable; it must never take the whole plan down with it.
+    if (
+      error instanceof GoogleAdsCredentialConfigError ||
+      error instanceof InvalidGoogleAdsCredentialSecretError ||
+      error instanceof UnknownKmsKeyError ||
+      error instanceof SecretDecryptionError
+    ) {
+      return { status: 'unavailable', reason: 'credential_not_configured' };
+    }
     throw error;
   }
 }

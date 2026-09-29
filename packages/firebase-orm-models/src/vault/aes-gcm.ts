@@ -25,10 +25,26 @@ export function aesGcmSeal(key: Buffer, aad: Buffer, plaintext: Buffer): AesGcmS
   return { iv, authTag: cipher.getAuthTag(), ciphertext };
 }
 
-/** Reverses {@link aesGcmSeal}. Throws if `key`/`aad` don't match, or `iv`/`authTag`/`ciphertext` were tampered with. */
+/**
+ * A sealed value that does not open: sealed under a different key (e.g. a secret written with the dev
+ * key ring and read in prod), bound to a different `aad`, or tampered with. Callers can tell "this
+ * secret cannot be read here" apart from an unexpected failure.
+ */
+export class SecretDecryptionError extends Error {
+  constructor() {
+    super('The sealed secret could not be decrypted with this key ring (wrong key, wrong context, or tampered).');
+    this.name = 'SecretDecryptionError';
+  }
+}
+
+/** Reverses {@link aesGcmSeal}. Throws {@link SecretDecryptionError} if `key`/`aad` don't match, or `iv`/`authTag`/`ciphertext` were tampered with. */
 export function aesGcmOpen(key: Buffer, aad: Buffer, sealed: AesGcmSealed): Buffer {
   const decipher = createDecipheriv('aes-256-gcm', key, sealed.iv);
   decipher.setAAD(aad);
   decipher.setAuthTag(sealed.authTag);
-  return Buffer.concat([decipher.update(sealed.ciphertext), decipher.final()]);
+  try {
+    return Buffer.concat([decipher.update(sealed.ciphertext), decipher.final()]);
+  } catch {
+    throw new SecretDecryptionError();
+  }
 }
