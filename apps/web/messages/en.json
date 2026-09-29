@@ -4038,7 +4038,7 @@
     "exportFailure": {
       "auth_failed": "The platform rejected the saved credentials. Reconnect the account in project resources.",
       "quota_exceeded": "The platform upload quota is used up for today.",
-      "rejected": "The platform refused the video.",
+      "rejected": "The platform refused the request. Check the ad details and the connected account.",
       "upload_failed": "The upload failed. Try again.",
       "no_secret": "The connection has no credentials saved.",
       "invalid_credential": "The saved credentials are not in the expected format."

@@ -31,6 +31,7 @@ describe('MetaAdsHttpApiClient', () => {
     expect(body.get('objective')).toBe('OUTCOME_TRAFFIC');
     expect(body.get('status')).toBe('PAUSED');
     expect(body.get('daily_budget')).toBe('2500');
+    expect(body.get('bid_strategy')).toBe('LOWEST_COST_WITHOUT_CAP');
     expect(body.get('access_token')).toBe('access-token-1');
   });
 
