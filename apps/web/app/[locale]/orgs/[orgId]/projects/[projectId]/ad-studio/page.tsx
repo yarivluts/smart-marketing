@@ -76,7 +76,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
   }
   const canConfigure = can(bindings, principal, 'project.configure', { orgId, projectId });
   const canExport = can(bindings, principal, 'automation.execute', { orgId, projectId });
-  const canConnectAccounts = can(bindings, principal, 'resources.manage', { orgId }) && isMetaOAuthConfigured();
+  const canConnectAccounts = can(bindings, principal, 'resources.manage', { orgId, projectId }) && isMetaOAuthConfigured();
 
   const [projects, briefModels, settings, usageToday, recentUsage, keywordData, ffmpegAvailable] = await Promise.all([
     listOrgProjects(orgId),
