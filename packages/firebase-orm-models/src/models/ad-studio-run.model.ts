@@ -8,7 +8,8 @@ export type AdStudioRunStepId = (typeof AD_STUDIO_RUN_STEPS)[number];
 export const AD_STUDIO_RUN_STEP_STATUSES = ['pending', 'running', 'done', 'skipped', 'failed'] as const;
 export type AdStudioRunStepStatus = (typeof AD_STUDIO_RUN_STEP_STATUSES)[number];
 
-export const AD_STUDIO_RUN_STATUSES = ['running', 'done', 'failed', 'cancelled'] as const;
+/** `awaiting_approval`: the plan, script and image ideas are ready and wait for the person to confirm them before anything is rendered. */
+export const AD_STUDIO_RUN_STATUSES = ['running', 'awaiting_approval', 'done', 'failed', 'cancelled'] as const;
 export type AdStudioRunStatus = (typeof AD_STUDIO_RUN_STATUSES)[number];
 
 export interface AdStudioRunStep {
@@ -34,6 +35,11 @@ export interface AdStudioRunOptions {
   video: boolean;
   /** The data environment the plan reads results from; null for the project default. */
   environmentId: string | null;
+  /**
+   * Stop after the plan, script and image ideas for the person to review and confirm before any
+   * image or video is rendered (the costly part). On by default; runs saved before it existed read false.
+   */
+  confirmPlan?: boolean;
 }
 
 /**
@@ -90,4 +96,11 @@ export class AdStudioRunModel extends BaseModel {
 
   @Field({ is_required: false })
   public finished_on?: string | null;
+
+  /** Who confirmed the plan and when (runs with `confirmPlan`). */
+  @Field({ is_required: false })
+  public plan_approved_by?: string | null;
+
+  @Field({ is_required: false })
+  public plan_approved_on?: string | null;
 }

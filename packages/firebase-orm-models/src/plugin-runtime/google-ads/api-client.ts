@@ -50,6 +50,32 @@ export interface GoogleAdsCustomerMatchConsent {
   adPersonalization?: GoogleAdsConsentStatus;
 }
 
+/** A paused Display campaign carrying one responsive display ad (Ad Studio publishing). */
+export interface GoogleAdsDisplayAdCampaignParams {
+  name: string;
+  /** Daily budget in the account's currency, in micros. */
+  dailyBudgetMicros: number;
+  /** Max CPC for the ad group, in micros. */
+  cpcBidMicros: number;
+  /** The advertiser's own EU political advertising self-declaration (required on every campaign). */
+  containsEuPoliticalAdvertising: boolean;
+  /** Image asset resource names: 1.91:1 marketing image(s) and 1:1 square image(s). */
+  marketingImageAssets: string[];
+  squareImageAssets: string[];
+  headlines: string[];
+  longHeadline: string;
+  descriptions: string[];
+  businessName: string;
+  finalUrl: string;
+}
+
+export interface GoogleAdsDisplayAdCampaignResult {
+  campaignBudgetResourceName: string;
+  campaignResourceName: string;
+  adGroupResourceName: string;
+  adResourceName: string;
+}
+
 export interface GoogleAdsAddCustomerMatchOperationsResult {
   /** The number of member operations submitted to the offline user data job — Google processes the job asynchronously, so this is "accepted", not "matched" (Google Ads has no synchronous match-count response, unlike Meta's `num_received`). */
   numReceived: number;
@@ -221,6 +247,8 @@ export interface GoogleAdsApiClient {
    * to be used in responsive display and Performance Max ads. Returns the asset's resource name.
    */
   uploadImageAsset(customerId: string, params: { name: string; base64Data: string }): Promise<{ assetResourceName: string }>;
+  /** Creates a paused Display campaign (budget, campaign, ad group) with one responsive display ad. */
+  createDisplayAdCampaign(customerId: string, params: GoogleAdsDisplayAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult>;
 }
 
 /**
@@ -583,6 +611,52 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
 
   async setAdGroupAdStatus(customerId: string, adResourceName: string, status: GoogleAdsCampaignStatus): Promise<void> {
     await this.mutate(customerId, 'adGroupAds', [{ update: { resourceName: adResourceName, status }, updateMask: 'status' }]);
+  }
+
+  async createDisplayAdCampaign(customerId: string, params: GoogleAdsDisplayAdCampaignParams): Promise<GoogleAdsDisplayAdCampaignResult> {
+    // A non-shared budget is named after its campaign; everything is created PAUSED for a person to review.
+    const budget = await this.mutate(customerId, 'campaignBudgets', [
+      { create: { name: `${params.name} Budget`, amountMicros: String(Math.round(params.dailyBudgetMicros)), deliveryMethod: 'STANDARD', explicitlyShared: false } },
+    ]);
+    const campaignBudgetResourceName = budget.results[0].resourceName;
+    const campaign = await this.mutate(customerId, 'campaigns', [
+      {
+        create: {
+          name: params.name,
+          advertisingChannelType: 'DISPLAY',
+          status: 'PAUSED',
+          campaignBudget: campaignBudgetResourceName,
+          manualCpc: {},
+          containsEuPoliticalAdvertising: params.containsEuPoliticalAdvertising ? 'CONTAINS_EU_POLITICAL_ADVERTISING' : 'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING',
+        },
+      },
+    ]);
+    const campaignResourceName = campaign.results[0].resourceName;
+    const adGroup = await this.mutate(customerId, 'adGroups', [
+      { create: { name: `${params.name} - ad group`, campaign: campaignResourceName, status: 'ENABLED', type: 'DISPLAY_STANDARD', cpcBidMicros: String(Math.round(params.cpcBidMicros)) } },
+    ]);
+    const adGroupResourceName = adGroup.results[0].resourceName;
+    const ad = await this.mutate(customerId, 'adGroupAds', [
+      {
+        create: {
+          adGroup: adGroupResourceName,
+          status: 'PAUSED',
+          ad: {
+            name: params.name,
+            finalUrls: [params.finalUrl],
+            responsiveDisplayAd: {
+              marketingImages: params.marketingImageAssets.map((asset) => ({ asset })),
+              squareMarketingImages: params.squareImageAssets.map((asset) => ({ asset })),
+              headlines: params.headlines.map((text) => ({ text })),
+              longHeadline: { text: params.longHeadline },
+              descriptions: params.descriptions.map((text) => ({ text })),
+              businessName: params.businessName,
+            },
+          },
+        },
+      },
+    ]);
+    return { campaignBudgetResourceName, campaignResourceName, adGroupResourceName, adResourceName: ad.results[0].resourceName };
   }
 
   async uploadImageAsset(customerId: string, params: { name: string; base64Data: string }): Promise<{ assetResourceName: string }> {

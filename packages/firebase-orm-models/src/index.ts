@@ -133,6 +133,7 @@ export * from './services/ad-studio-video.service';
 export * from './services/ad-studio-planning.service';
 export * from './services/ad-studio-image.service';
 export * from './services/ad-studio-run.service';
+export * from './services/ad-studio-publish.service';
 export * from './services/landing-page-results.service';
 export * from './services/metric-registry.service';
 export * from './services/metric-unit-backfill.service';

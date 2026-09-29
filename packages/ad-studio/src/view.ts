@@ -148,14 +148,16 @@ export function missingImageRenders(slots: readonly AdStudioImageSlot[], concept
 /** An autopilot run as the page and MCP receive it. */
 export interface AdStudioRunView {
   id: string;
-  status: 'running' | 'done' | 'failed' | 'cancelled';
-  options: { plan: boolean; images: boolean; imageFormats: AdStudioImageFormat[]; video: boolean; environmentId: string | null };
+  status: 'running' | 'awaiting_approval' | 'done' | 'failed' | 'cancelled';
+  options: { plan: boolean; images: boolean; imageFormats: AdStudioImageFormat[]; video: boolean; environmentId: string | null; confirmPlan: boolean };
   steps: { id: 'plan' | 'script' | 'image_concepts' | 'images' | 'clips' | 'assemble'; status: 'pending' | 'running' | 'done' | 'skipped' | 'failed'; reason: string | null; progress: { done: number; total: number } | null }[];
   failureCode: string | null;
   failureMessage: string | null;
   startedOn: string;
   lastAdvancedOn: string;
   finishedOn: string | null;
+  /** When the person confirmed the plan (runs with confirmPlan), or null. */
+  planApprovedOn: string | null;
 }
 
 /** An assembled video as the page receives it (KAN-231). */

@@ -41,6 +41,14 @@ export class AdStudioExportModel extends BaseModel {
   @Field({ is_required: false })
   public image_id?: string | null;
 
+  /** `ad` when a real (paused) ad was created on the platform, `library` for a plain media upload (older rows). */
+  @Field({ is_required: false })
+  public result_kind?: 'library' | 'ad' | null;
+
+  /** The platform's ids for a created ad (campaign, ad set / ad group, creative, ad). */
+  @Field({ is_required: false })
+  public platform_refs?: Record<string, string> | null;
+
   @Field({ is_required: true })
   public destination!: AdStudioExportDestination;
 

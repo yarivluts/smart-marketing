@@ -64,6 +64,7 @@ export function normalizeAdStudioRunOptions(input: Partial<AdStudioRunOptions>):
     imageFormats: [...new Set(imageFormats)],
     video,
     environmentId: typeof input.environmentId === 'string' && input.environmentId.trim() ? input.environmentId.trim() : null,
+    confirmPlan: input.confirmPlan ?? true,
   };
 }
 
@@ -83,6 +84,8 @@ export async function getAdStudioRun(organizationId: string, projectId: string, 
 }
 
 function isActive(run: AdStudioRunModel, now: Date): boolean {
+  // A run waiting for its plan to be confirmed stays active: the person may take a while to review.
+  if (run.status === 'awaiting_approval') return true;
   return run.status === 'running' && now.getTime() - new Date(run.last_advanced_on).getTime() < AD_STUDIO_RUN_STALE_MS;
 }
 
@@ -183,6 +186,52 @@ export function runStep(run: AdStudioRunModel, id: AdStudioRunStepId): AdStudioR
   return step;
 }
 
+export class AdStudioRunNotAwaitingApprovalError extends Error {
+  constructor() {
+    super('This autopilot run is not waiting for its plan to be confirmed.');
+    this.name = 'AdStudioRunNotAwaitingApprovalError';
+  }
+}
+
+/**
+ * Confirms a run's plan (the plan, script and image ideas as they read now, including the person's
+ * edits) and lets it go on to render. Audited: this is the moment spend on images and video starts.
+ */
+export async function approveAdStudioRunPlan(params: {
+  organizationId: string;
+  projectId: string;
+  briefId: string;
+  runId: string;
+  actorId: string;
+  actorType?: 'user' | 'api_key';
+  now?: Date;
+}): Promise<AdStudioRunModel> {
+  const run = await getAdStudioRun(params.organizationId, params.projectId, params.briefId, params.runId);
+  if (run.status !== 'awaiting_approval') throw new AdStudioRunNotAwaitingApprovalError();
+  const now = (params.now ?? new Date()).toISOString();
+  run.status = 'running';
+  run.plan_approved_by = params.actorId;
+  run.plan_approved_on = now;
+  run.last_advanced_on = now;
+  await run.save();
+  try {
+    await recordAuditLogEntry({
+      organizationId: params.organizationId,
+      projectId: params.projectId,
+      actorType: params.actorType ?? 'user',
+      actorId: params.actorId,
+      action: 'ad_studio.plan_approved',
+      targetType: 'ad_studio_brief',
+      targetId: params.briefId,
+      summary: 'Confirmed an Ad Studio plan; rendering can start',
+      after: { run_id: run.id },
+    });
+  } catch {
+    // Best-effort.
+  }
+  return run;
+}
+
 /** Stops a running run; the step in flight finishes but nothing further starts. */
 export async function cancelAdStudioRun(params: {
   organizationId: string;
@@ -194,7 +243,7 @@ export async function cancelAdStudioRun(params: {
   now?: Date;
 }): Promise<AdStudioRunModel> {
   const run = await getAdStudioRun(params.organizationId, params.projectId, params.briefId, params.runId);
-  if (run.status !== 'running') return run;
+  if (run.status !== 'running' && run.status !== 'awaiting_approval') return run;
   const now = (params.now ?? new Date()).toISOString();
   run.status = 'cancelled';
   run.finished_on = now;

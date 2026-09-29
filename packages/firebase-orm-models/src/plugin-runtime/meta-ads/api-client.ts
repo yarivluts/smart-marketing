@@ -86,6 +86,19 @@ export interface MetaCreateAdCreativeParams {
   imageHash?: string;
 }
 
+/** A video ad creative (Ad Studio publishing): an uploaded ad video with a thumbnail, text and a link. */
+export interface MetaCreateVideoAdCreativeParams {
+  pageId: string;
+  /** From `act_{id}/advideos`. */
+  videoId: string;
+  /** A thumbnail uploaded with {@link MetaAdsApiClient.uploadAdImage}; Meta requires one for a video ad. */
+  imageHash: string;
+  primaryText: string;
+  headline: string;
+  description?: string;
+  linkUrl: string;
+}
+
 export interface MetaCreateAdCreativeResult {
   creativeId: string;
 }
@@ -206,6 +219,8 @@ export interface MetaAdsApiClient {
   createAdSet(adAccountId: string, params: MetaCreateAdSetParams): Promise<MetaCreateAdSetResult>;
   /** Creates a link-ad creative (`object_story_spec`: page id, message, link, headline/name, description, optional image hash). */
   createAdCreative(adAccountId: string, params: MetaCreateAdCreativeParams): Promise<MetaCreateAdCreativeResult>;
+  /** A video ad creative: `object_story_spec.video_data` with the video, its thumbnail and a Learn More link. */
+  createVideoAdCreative(adAccountId: string, params: MetaCreateVideoAdCreativeParams): Promise<MetaCreateAdCreativeResult>;
   /**
    * Uploads a creative image and returns the hash `createAdCreative`
    * references via `image_hash`. Real Meta image upload (KAN-73 follow-up) —
@@ -449,6 +464,25 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       billing_event: 'IMPRESSIONS',
     });
     return { adSetId: result.id };
+  }
+
+  async createVideoAdCreative(adAccountId: string, params: MetaCreateVideoAdCreativeParams): Promise<MetaCreateAdCreativeResult> {
+    const objectStorySpec = {
+      page_id: params.pageId,
+      video_data: {
+        video_id: params.videoId,
+        image_hash: params.imageHash,
+        message: params.primaryText,
+        title: params.headline,
+        ...(params.description ? { link_description: params.description } : {}),
+        call_to_action: { type: 'LEARN_MORE', value: { link: params.linkUrl } },
+      },
+    };
+    const result = await this.request<{ id: string }>(`act_${adAccountId}/adcreatives`, {
+      name: params.headline,
+      object_story_spec: JSON.stringify(objectStorySpec),
+    });
+    return { creativeId: result.id };
   }
 
   async createAdCreative(adAccountId: string, params: MetaCreateAdCreativeParams): Promise<MetaCreateAdCreativeResult> {

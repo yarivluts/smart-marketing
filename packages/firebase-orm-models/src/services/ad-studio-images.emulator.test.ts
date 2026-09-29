@@ -158,7 +158,7 @@ describe('autopilot runs', () => {
   it('starts with every step pending, allows one active run per brief, and leases it to one caller at a time', async () => {
     const ctx = await setup();
     const run = await startAdStudioRun({ organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, options: { imageFormats: ['story'] }, actorId: ctx.owner.id });
-    expect(run.options).toEqual({ plan: true, images: true, imageFormats: ['story'], video: true, environmentId: null });
+    expect(run.options).toEqual({ plan: true, images: true, imageFormats: ['story'], video: true, environmentId: null, confirmPlan: true });
     expect(run.steps.map((step) => [step.id, step.status])).toEqual([
       ['plan', 'pending'],
       ['script', 'pending'],

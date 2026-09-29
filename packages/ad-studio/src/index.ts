@@ -16,6 +16,7 @@ export * from './video-pipeline';
 export * from './gemini-image';
 export * from './image-pipeline';
 export * from './autopilot';
+export * from './publish';
 export * from './export';
 export * from './test-overrides';
 export * from './parse';
