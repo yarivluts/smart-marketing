@@ -4266,6 +4266,15 @@
       "kindVideo": "Video",
       "kindImage": "Image",
       "video": "The video"
+    },
+    "imageFailure": {
+      "not_configured": "no image model is configured",
+      "provider_billing": "the Gemini account is out of credit",
+      "rate_limited": "Gemini is limiting requests right now",
+      "refused": "the image model declined this picture",
+      "invalid_output": "the image model returned no usable image",
+      "provider_error": "the image model failed",
+      "storage_error": "the image could not be saved"
     }
   }
 }

@@ -37,14 +37,14 @@ export function useAdStudioErrorMessage(): (body: AdStudioApiError) => string {
 
 const CLIP_FAILURES = new Set([...PROVIDER_CODES, 'timed_out']);
 const VIDEO_FAILURES = new Set([...ASSEMBLY_CODES, 'timed_out']);
+const IMAGE_FAILURES = new Set([...PROVIDER_CODES, 'storage_error']);
 
-/** A clip's or an assembled video's stored failure reason as a translated phrase. */
+/** A clip's, an assembled video's or an image's stored failure reason as a translated phrase. */
 export function useAdStudioFailureReason(): { clip: (reason: string | null) => string; video: (reason: string | null) => string; image: (reason: string | null) => string } {
   const t = useTranslations('AdStudio');
   return {
     clip: (reason) => t(`clipFailure.${reason && CLIP_FAILURES.has(reason) ? reason : 'provider_error'}`),
     video: (reason) => t(`videoFailure.${reason && VIDEO_FAILURES.has(reason) ? reason : 'ffmpeg_failed'}`),
-    // An image failure is a provider code (or storage_error); the clip wording covers each.
-    image: (reason) => t(`clipFailure.${reason && CLIP_FAILURES.has(reason) ? reason : 'provider_error'}`),
+    image: (reason) => t(`imageFailure.${reason && IMAGE_FAILURES.has(reason) ? reason : 'provider_error'}`),
   };
 }

@@ -4266,6 +4266,15 @@
       "kindVideo": "וידאו",
       "kindImage": "תמונה",
       "video": "הסרטון"
+    },
+    "imageFailure": {
+      "not_configured": "לא הוגדר מודל תמונה",
+      "provider_billing": "לחשבון Gemini נגמר הקרדיט",
+      "rate_limited": "Gemini מגביל כרגע בקשות",
+      "refused": "מודל התמונה סירב לתמונה הזו",
+      "invalid_output": "מודל התמונה לא החזיר תמונה שמישה",
+      "provider_error": "מודל התמונה נכשל",
+      "storage_error": "לא הצלחנו לשמור את התמונה"
     }
   }
 }
