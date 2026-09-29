@@ -18,6 +18,10 @@ export interface AutopilotPanelProps {
   has: { plan: boolean; script: boolean; concepts: boolean };
   /** Which models the deployment has; a missing one is explained, not hidden. */
   available: { text: boolean; images: boolean; video: boolean };
+  /** Where the stepper goes once the plan is confirmed (Create) and once everything is made (Review). */
+  stepHrefs?: { create: string; review: string };
+  /** `prepare`: the Plan step (start, then confirm); `progress`: the Create step (watch it render). */
+  mode?: 'prepare' | 'progress';
 }
 
 /** Pause between advance calls; each call itself does real work (an image, a plan), so this only spaces them. */
@@ -66,7 +70,7 @@ const STEP_TONE = {
  * unit of work per call, and refreshes the rest of the page as steps finish, so every result is
  * editable below as soon as it exists. Exporting stays a separate, deliberate act.
  */
-export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, available }: AutopilotPanelProps): React.ReactElement {
+export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, available, stepHrefs, mode = 'prepare' }: AutopilotPanelProps): React.ReactElement {
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -75,10 +79,13 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
   const [images, setImages] = React.useState(true);
   const [video, setVideo] = React.useState(true);
   const [formats, setFormats] = React.useState<AdStudioImageFormat[]>(['square', 'portrait']);
-  const [pending, setPending] = React.useState<'start' | 'cancel' | null>(null);
+  const [pending, setPending] = React.useState<'start' | 'cancel' | 'approve' | null>(null);
   const [message, setMessage] = React.useState<string | null>(null);
   const base = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${briefId}/autopilot`;
   const running = run?.status === 'running';
+  const awaiting = run?.status === 'awaiting_approval';
+  const stepHrefsRef = React.useRef(stepHrefs);
+  stepHrefsRef.current = stepHrefs;
 
   React.useEffect(() => setRun(initialRun), [initialRun]);
   // The loop below must not restart on every render, so it reads these through refs.
@@ -109,6 +116,15 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
             lastSignature = signature;
             routerRef.current.refresh();
           }
+          if (body.run.status === 'awaiting_approval') {
+            // The plan, script and ideas are ready: show them (refreshed above) and wait for the person.
+            routerRef.current.refresh();
+            return;
+          }
+          if (body.run.status === 'done' && stepHrefsRef.current) {
+            routerRef.current.push(stepHrefsRef.current.review);
+            return;
+          }
           if (body.run.status !== 'running') return;
         }
       } catch {
@@ -135,6 +151,24 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
       const body = (await response.json().catch(() => ({}))) as { run?: AdStudioRunView } & AdStudioApiError;
       if (!response.ok || !body.run) setMessage(errorMessage(body));
       else setRun(body.run);
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function approve(): Promise<void> {
+    if (!run) return;
+    setPending('approve');
+    setMessage(null);
+    try {
+      const response = await fetch(`${base}/${run.id}/approve`, { method: 'POST' });
+      const body = (await response.json().catch(() => ({}))) as { run?: AdStudioRunView } & AdStudioApiError;
+      if (!response.ok || !body.run) {
+        setMessage(errorMessage(body));
+        return;
+      }
+      setRun(body.run);
+      if (stepHrefs) router.push(stepHrefs.create);
     } finally {
       setPending(null);
     }
@@ -171,13 +205,34 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
         </span>
         <div className="flex-1">
           <h2 id="ad-studio-autopilot-heading" className="text-lg font-semibold">
-            {t('autopilot.title')}
+            {mode === 'prepare' ? t('autopilot.prepareTitle') : t('autopilot.createTitle')}
           </h2>
-          <p className="text-sm text-muted-foreground">{t('autopilot.description')}</p>
+          <p className="text-sm text-muted-foreground">{mode === 'prepare' ? t('autopilot.prepareDescription') : t('autopilot.createDescription')}</p>
         </div>
       </header>
 
-      {!running ? (
+      {awaiting ? (
+        <div className="flex flex-col gap-3 rounded-xl border border-primary/40 bg-primary/5 p-4" data-testid="ad-studio-confirm-plan">
+          <p className="text-sm font-semibold">{t('autopilot.awaitingTitle')}</p>
+          <p className="text-sm text-muted-foreground">{t('autopilot.awaitingDescription')}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void approve()}
+              disabled={pending !== null}
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
+            >
+              {pending === 'approve' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
+              {t('autopilot.confirmPlan')}
+            </button>
+            <button type="button" onClick={() => void cancel()} disabled={pending !== null} className="rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-muted disabled:opacity-50">
+              {t('autopilot.discardPlan')}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {!running && !awaiting && mode === 'prepare' ? (
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-sm">
             <label className="inline-flex items-center gap-2">
@@ -226,7 +281,7 @@ export function AutopilotPanel({ orgId, projectId, briefId, initialRun, has, ava
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-50"
             >
               {pending === 'start' ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Rocket className="h-4 w-4" aria-hidden="true" />}
-              {run ? t('autopilot.runAgain') : t('autopilot.start')}
+              {run ? t('autopilot.runAgain') : t('autopilot.prepare')}
             </button>
             {run ? <span className="text-xs text-muted-foreground">{t('autopilot.runAgainHint')}</span> : null}
           </div>

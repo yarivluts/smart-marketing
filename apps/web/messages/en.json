@@ -4078,7 +4078,8 @@
         "running": "Working...",
         "done": "Finished",
         "failed": "Stopped - see the step that failed",
-        "cancelled": "Stopped"
+        "cancelled": "Stopped",
+        "awaiting_approval": "Waiting for you to confirm the plan"
       },
       "step": {
         "plan": "Deep plan",
@@ -4113,7 +4114,16 @@
         "blocked": "waiting on an earlier step",
         "cancelled": "cancelled",
         "error": "failed"
-      }
+      },
+      "prepareTitle": "Prepare the plan",
+      "prepareDescription": "The AI writes the deep plan, the video script and the image ideas. Nothing is rendered yet: you review and change them below, then confirm.",
+      "prepare": "Prepare the plan",
+      "createTitle": "Creating your ads",
+      "createDescription": "The confirmed plan is being turned into images and video. You can leave this page; it continues when you come back.",
+      "awaitingTitle": "The plan is ready for your review",
+      "awaitingDescription": "Read the plan, the scenes and the image ideas below and change anything you want. When it looks right, confirm to create the images and the video.",
+      "confirmPlan": "Confirm plan and create ads",
+      "discardPlan": "Stop without creating"
     },
     "images": {
       "title": "Image ads",
@@ -4183,9 +4193,79 @@
         "image_not_editable": "Only a finished image can be changed.",
         "invalid_instruction": "Say what should change (up to 500 characters).",
         "image_not_ready": "That image is not ready."
-      }
+      },
+      "ideasTitle": "Image ad ideas",
+      "ideasDescription": "What each image will show, its headline and its placements. They are rendered after you confirm the plan."
     },
     "dailyImages": "Images per day",
-    "usageTodayImages": "Images today"
+    "usageTodayImages": "Images today",
+    "stepper": {
+      "label": "Ad creation steps",
+      "footerLabel": "Move between steps",
+      "back": "Back: {step}",
+      "next": "Next: {step}",
+      "brief": {
+        "label": "Brief",
+        "hint": "What the ad is for",
+        "title": "The brief",
+        "description": "What you want the ad to achieve, what you sell and to whom, the frame, language and length. Changes here apply to the next plan."
+      },
+      "plan": {
+        "label": "Plan",
+        "hint": "Review and confirm",
+        "hintDone": "Confirmed"
+      },
+      "create": {
+        "label": "Create",
+        "hint": "Images and video",
+        "hintLocked": "Confirm the plan first"
+      },
+      "review": {
+        "label": "Review & edit",
+        "hint": "Change anything",
+        "hintLocked": "Nothing created yet"
+      },
+      "publish": {
+        "label": "Publish",
+        "hint": "Meta and Google Ads",
+        "hintLocked": "Create the ads first",
+        "libraryUploads": "Other options: upload the media only (no ad)"
+      }
+    },
+    "publish": {
+      "title": "Publish as real ads",
+      "description": "Pick a finished image or the video, a platform, and the ad’s words. The ad is created paused on the platform so you can review it there before it spends.",
+      "nothingReady": "Nothing is ready to publish yet. Create the images and video first.",
+      "chooseCreative": "Which creative",
+      "platform": "Platform",
+      "destination": {
+        "meta": "Facebook & Instagram",
+        "google_ads": "Google Ads"
+      },
+      "notConnected": "not connected",
+      "connectFirst": "Connect this platform with write access first.",
+      "googleVideo": "Google video ads run from YouTube; pick an image for Google Ads.",
+      "campaignName": "Campaign name",
+      "link": "Link (landing page)",
+      "headline": "Headline",
+      "primaryText": "Main text",
+      "descriptionLabel": "Description",
+      "businessName": "Business name",
+      "countries": "Countries (e.g. IL, US)",
+      "dailyBudget": "Daily budget (account currency)",
+      "euLegend": "Does this campaign contain political advertising aimed at the European Union?",
+      "euNo": "No, it does not",
+      "euYes": "Yes, it does",
+      "pausedNote": "The ad is created paused. It spends nothing until you turn it on in the platform.",
+      "create": "Create paused ad on {destination}",
+      "done": "Created a paused ad on {destination}.",
+      "invalid": "Check the ad details: {reasons}",
+      "openAd": "Open the ad",
+      "history": "Published ads",
+      "historyEmpty": "No ads published yet.",
+      "kindVideo": "Video",
+      "kindImage": "Image",
+      "video": "The video"
+    }
   }
 }
