@@ -32,6 +32,8 @@ import { POST as exportImage } from './briefs/[briefId]/images/[imageId]/export/
 import { GET as latestRun, POST as startRun } from './briefs/[briefId]/autopilot/route';
 import { POST as advanceRun } from './briefs/[briefId]/autopilot/[runId]/advance/route';
 import { POST as cancelRun } from './briefs/[briefId]/autopilot/[runId]/cancel/route';
+import { POST as approveRun } from './briefs/[briefId]/autopilot/[runId]/approve/route';
+import { POST as publishAd } from './briefs/[briefId]/publish/route';
 
 const { getServerSessionMock, memoryStorage, concatClipsMock } = vi.hoisted(() => ({
   getServerSessionMock: vi.fn(),
@@ -269,7 +271,7 @@ describe('autopilot routes', () => {
   it('takes a bare brief to a script, image ideas, an image per placement, rendered scenes and the assembled video', async () => {
     fakeGoogle();
     const ctx = await setup();
-    const started = await startRun(request('POST', { options: { plan: false, images: true, imageFormats: ['square', 'portrait'], video: true } }), ctx.p());
+    const started = await startRun(request('POST', { options: { plan: false, images: true, imageFormats: ['square', 'portrait'], video: true, confirmPlan: false } }), ctx.p());
     expect(started.status).toBe(201);
     const { run } = (await started.json()) as { run: AdStudioRunView };
     // Only one run at a time per ad.
@@ -289,7 +291,7 @@ describe('autopilot routes', () => {
     expect(concatClipsMock).toHaveBeenCalledTimes(1);
 
     // A second run keeps everything that exists and only reports it.
-    const again = ((await (await startRun(request('POST', { options: { plan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    const again = ((await (await startRun(request('POST', { options: { plan: false, confirmPlan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
     const rerun = await drive(ctx, again.id);
     expect(rerun.steps.map((step) => step.status)).toEqual(['skipped', 'skipped', 'skipped', 'done', 'done', 'skipped']);
     expect(concatClipsMock).toHaveBeenCalledTimes(1);
@@ -301,13 +303,13 @@ describe('autopilot routes', () => {
     const ctx = await setup();
     await saveScript(request('PUT', { scenes: [{ id: 's1', durationSeconds: 5, visualPrompt: 'My own scene', voiceover: '', onScreenText: '' }] }), ctx.p());
     await saveConcepts(request('PUT', { concepts: [{ id: 'c1', visualPrompt: 'A phone', headline: 'Old', formats: ['square'] }, { id: 'c2', visualPrompt: 'A desk', headline: '', formats: ['square'] }] }), ctx.p());
-    const first = ((await (await startRun(request('POST', { options: { plan: false, video: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    const first = ((await (await startRun(request('POST', { options: { plan: false, video: false, confirmPlan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
     expect((await drive(ctx, first.id)).status).toBe('done');
     const before = ((await (await listImages(request('GET'), ctx.p())).json()) as ImagesPayload).images;
     expect(before).toHaveLength(2);
 
     await saveConcepts(request('PUT', { concepts: [{ id: 'c1', visualPrompt: 'A phone', headline: 'New headline', formats: ['square'] }, { id: 'c2', visualPrompt: 'A desk', headline: '', formats: ['square'] }] }), ctx.p());
-    const second = ((await (await startRun(request('POST', { options: { plan: false, video: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    const second = ((await (await startRun(request('POST', { options: { plan: false, video: false, confirmPlan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
     const done = await drive(ctx, second.id);
     expect(done.steps.find((step) => step.id === 'script')).toMatchObject({ status: 'skipped', reason: 'off' });
     const after = ((await (await listImages(request('GET'), ctx.p())).json()) as ImagesPayload).images;
@@ -320,13 +322,137 @@ describe('autopilot routes', () => {
     fakeGoogle({ imageStatus: 402, imageMessage: 'Your prepayment credits are depleted.' });
     const ctx = await setup();
     await saveConcepts(request('PUT', { concepts: [{ id: 'c1', visualPrompt: 'A phone', headline: '', formats: ['square'] }] }), ctx.p());
-    const run = ((await (await startRun(request('POST', { options: { plan: false, video: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    const run = ((await (await startRun(request('POST', { options: { plan: false, video: false, confirmPlan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
     const finished = await drive(ctx, run.id);
     expect(finished.steps.find((step) => step.id === 'images')).toMatchObject({ status: 'failed', reason: 'provider_billing' });
 
-    const another = ((await (await startRun(request('POST', { options: { plan: false, video: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    const another = ((await (await startRun(request('POST', { options: { plan: false, video: false, confirmPlan: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
     const cancelled = ((await (await cancelRun(request('POST'), ctx.p({ runId: another.id }))).json()) as { run: AdStudioRunView }).run;
     expect(cancelled.status).toBe('cancelled');
     expect(((await (await advanceRun(request('POST'), ctx.p({ runId: another.id }))).json()) as { run: AdStudioRunView }).run.status).toBe('cancelled');
+  });
+
+  it('stops after the plan for the person to confirm it, renders nothing until then, then finishes', async () => {
+    const google = fakeGoogle();
+    const ctx = await setup();
+    const run = ((await (await startRun(request('POST', { options: { plan: false, imageFormats: ['square'], video: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    expect(run.options.confirmPlan).toBe(true);
+
+    const waiting = await drive(ctx, run.id);
+    expect(waiting.status).toBe('awaiting_approval');
+    expect(waiting.planApprovedOn).toBeNull();
+    // No video asked for, so no script; the image ideas are written, the images wait.
+    expect(waiting.steps.slice(0, 4).map((step) => step.status)).toEqual(['skipped', 'skipped', 'done', 'pending']);
+    // Advancing again does not render: the plan is not confirmed.
+    expect(((await (await advanceRun(request('POST'), ctx.p({ runId: run.id }))).json()) as { run: AdStudioRunView }).run.status).toBe('awaiting_approval');
+    expect(google.calls.some((call) => (call.body as { model?: string } | null)?.model === 'gemini-3.1-flash-image')).toBe(false);
+    // Only one run at a time, a waiting one included.
+    expect((await startRun(request('POST', { options: {} }), ctx.p())).status).toBe(409);
+
+    const approved = await approveRun(request('POST'), ctx.p({ runId: run.id }));
+    expect(approved.status).toBe(200);
+    expect(((await approved.json()) as { run: AdStudioRunView }).run).toMatchObject({ status: 'running', planApprovedOn: expect.any(String) });
+    expect((await approveRun(request('POST'), ctx.p({ runId: run.id }))).status).toBe(409);
+
+    const finished = await drive(ctx, run.id);
+    expect(finished.status).toBe('done');
+    expect(finished.steps.find((step) => step.id === 'images')).toMatchObject({ status: 'done', progress: { done: 1, total: 1 } });
+  });
+
+  it('a waiting plan can be discarded without creating anything', async () => {
+    fakeGoogle();
+    const ctx = await setup();
+    const run = ((await (await startRun(request('POST', { options: { plan: false, video: false } }), ctx.p())).json()) as { run: AdStudioRunView }).run;
+    expect((await drive(ctx, run.id)).status).toBe('awaiting_approval');
+    const cancelled = ((await (await cancelRun(request('POST'), ctx.p({ runId: run.id }))).json()) as { run: AdStudioRunView }).run;
+    expect(cancelled.status).toBe('cancelled');
+    expect((await approveRun(request('POST'), ctx.p({ runId: run.id }))).status).toBe(409);
+    expect(((await (await listImages(request('GET'), ctx.p())).json()) as ImagesPayload).images).toHaveLength(0);
+  });
+});
+
+describe('publish route', () => {
+  function fakeMeta() {
+    const calls: { url: string; form: URLSearchParams }[] = [];
+    const ids: Record<string, string> = { campaigns: 'c1', adsets: 's1', adcreatives: 'cr1', ads: 'a1' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL, init?: RequestInit) => {
+        const url = String(input);
+        calls.push({ url, form: new URLSearchParams(typeof init?.body === 'string' ? init.body : '') });
+        const edge = /\/act_\d+\/(\w+)$/.exec(url)?.[1] ?? '';
+        if (edge === 'adimages') return Response.json({ images: { 'ad.png': { hash: 'h1' } } });
+        if (ids[edge]) return Response.json({ id: ids[edge] });
+        return new Response(JSON.stringify({ error: { message: `unexpected ${url}` } }), { status: 404 });
+      }),
+    );
+    return calls;
+  }
+
+  async function withImage(ctx: Awaited<ReturnType<typeof setup>>) {
+    fakeGoogle();
+    await saveConcepts(request('PUT', { concepts: [{ id: 'c1', visualPrompt: 'A phone', headline: 'Sign fast', formats: ['square'] }] }), ctx.p());
+    return ((await (await renderImage(request('POST', { conceptId: 'c1', format: 'square' }), ctx.p())).json()) as ImagesPayload).images[0];
+  }
+
+  async function attachMeta(ctx: Awaited<ReturnType<typeof setup>>) {
+    const credential = await createSharedCredential({ organizationId: ctx.orgId, name: 'Meta', provider: 'meta_ads', availableScopes: ['ads'], createdByUserId: ctx.owner.id });
+    await setSharedCredentialSecret({
+      organizationId: ctx.orgId,
+      credentialId: credential.id,
+      secret: JSON.stringify({ accessToken: 'meta-token', adAccountId: '1646897415410557', pageId: 'p1' }),
+      kms: getServerKmsProvider(),
+      actorId: ctx.owner.id,
+    });
+    const attachment = await pushResourceAttachment({ organizationId: ctx.orgId, projectId: ctx.projectId, resourceKind: 'credential', resourceId: credential.id, pushedByUserId: ctx.owner.id, scopeSelection: ['ads'] });
+    await setResourceAttachmentWriteTier({ organizationId: ctx.orgId, attachmentId: attachment.id, tier: 'manage', actorId: ctx.owner.id });
+  }
+
+  const BODY = {
+    destination: 'meta',
+    campaignName: 'Sign fast - square',
+    copy: { headline: 'Sign in 30 seconds', primaryText: 'E-signatures for lawyers', description: 'Try it free', linkUrl: 'https://easysign.example', businessName: 'EasySign' },
+    dailyBudget: 20,
+    countries: ['IL'],
+  };
+
+  it('creates a paused Meta ad from a finished image and returns its Ads Manager link', async () => {
+    const ctx = await setup();
+    const image = await withImage(ctx);
+    await attachMeta(ctx);
+    const calls = fakeMeta();
+
+    const response = await publishAd(request('POST', { ...BODY, source: { kind: 'image', imageId: image.id } }), ctx.p());
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      ad: {
+        resultKind: 'ad',
+        destination: 'meta',
+        status: 'done',
+        externalUrl: 'https://adsmanager.facebook.com/adsmanager/manage/ads?act=1646897415410557&selected_campaign_ids=c1&selected_ad_ids=a1',
+      },
+    });
+    const edges = calls.map((call) => /\/act_\d+\/(\w+)$/.exec(call.url)?.[1]);
+    expect(edges).toEqual(['campaigns', 'adsets', 'adimages', 'adcreatives', 'ads']);
+    // Nothing spends: the campaign and the ad are created paused.
+    expect(calls[0].form.get('status')).toBe('PAUSED');
+    expect(calls.at(-1)?.form.get('status')).toBe('PAUSED');
+  });
+
+  it('refuses a malformed request, an unconnected platform, and a member without automation.execute', async () => {
+    const ctx = await setup();
+    const image = await withImage(ctx);
+    expect((await publishAd(request('POST', { ...BODY, source: { kind: 'gif' } }), ctx.p())).status).toBe(400);
+    const unavailable = await publishAd(request('POST', { ...BODY, source: { kind: 'image', imageId: image.id } }), ctx.p());
+    expect(unavailable.status).toBe(409);
+    expect(await unavailable.json()).toMatchObject({ error: 'export_unavailable' });
+
+    const email = `${unique('editor')}@example.com`;
+    const invitation = await inviteMemberToOrganization({ organizationId: ctx.orgId, email, role: 'editor', invitedByUserId: ctx.owner.id, projectId: ctx.projectId });
+    const editorSession = await sessionFor(email);
+    const editor = await ensureUserForFirebaseSession({ firebaseUid: editorSession.uid, email });
+    await acceptInvite({ organizationId: ctx.orgId, membershipId: invitation.id, userId: editor.id, callerEmailVerified: true });
+    getServerSessionMock.mockResolvedValue(editorSession);
+    expect([403, 404]).toContain((await publishAd(request('POST', { ...BODY, source: { kind: 'image', imageId: image.id } }), ctx.p())).status);
   });
 });

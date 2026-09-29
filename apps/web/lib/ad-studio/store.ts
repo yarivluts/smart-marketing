@@ -204,8 +204,10 @@ export interface AdStudioExportView {
   videoId: string | null;
   imageId: string | null;
   destination: 'meta' | 'youtube' | 'google_ads';
-  /** The platform's id for the upload (video id, image hash, asset resource name). */
+  /** The platform's id for the upload (video id, image hash, asset resource name) or the created ad. */
   externalId: string | null;
+  /** `ad` when a real (paused) ad was created; `library` for a media upload. */
+  resultKind: 'library' | 'ad';
   title: string;
   privacy: string | null;
   status: 'uploading' | 'done' | 'failed';
@@ -222,6 +224,7 @@ export function toAdStudioExportView(row: AdStudioExportModel): AdStudioExportVi
     imageId: row.image_id ?? null,
     destination: row.destination,
     externalId: row.external_id ?? null,
+    resultKind: row.result_kind ?? 'library',
     title: row.title,
     privacy: row.privacy ?? null,
     status: row.status,

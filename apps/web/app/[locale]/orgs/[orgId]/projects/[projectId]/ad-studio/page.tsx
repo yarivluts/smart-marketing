@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { assemblyPlan, can, sceneVideoStates, summarizeVideoProgress, totalSceneSeconds } from '@growthos/shared';
-import { AlertTriangle, ArrowLeft, Clapperboard, Clock, FileText, Film, ImageIcon, Plus, Sparkles, Workflow } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ArrowRight, Clapperboard, Clock, FileText, Film, ImageIcon, Plus, Sparkles, Workflow } from 'lucide-react';
 import { getServerSession } from '@/lib/auth/get-server-session';
 import { resolveOrgSessionContext } from '@/lib/orgs/session-context';
 import { findActiveMembership } from '@/lib/orgs/access';
@@ -35,11 +35,13 @@ import { PlanningPanel } from '@/components/ad-studio/planning-panel';
 import { DeleteBriefButton } from '@/components/ad-studio/delete-brief-button';
 import { AutopilotPanel } from '@/components/ad-studio/autopilot-panel';
 import { ImageStudio } from '@/components/ad-studio/image-studio';
+import { PublishPanel, type PublishCreative } from '@/components/ad-studio/publish-panel';
+import { AdStudioStepper, type AdStudioStepId, type AdStudioStepNav } from '@/components/ad-studio/ad-studio-stepper';
 import { cn } from '@/lib/utils';
 
 type PageProps = Readonly<{
   params: Promise<{ locale: string; orgId: string; projectId: string }>;
-  searchParams: Promise<{ brief?: string }>;
+  searchParams: Promise<{ brief?: string; step?: string }>;
 }>;
 
 export async function generateMetadata({ params }: PageProps) {
@@ -58,7 +60,7 @@ const STAGE_STATUS: Record<AdStudioStageStatus, VizStatus> = { done: 'ok', curre
  */
 export default async function AdStudioPage({ params, searchParams }: PageProps): Promise<React.ReactElement> {
   const { locale, orgId, projectId } = await params;
-  const { brief: selectedBriefId } = await searchParams;
+  const { brief: selectedBriefId, step: requestedStep } = await searchParams;
   setRequestLocale(locale);
 
   const session = await getServerSession();
@@ -166,6 +168,65 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
     status: node.status,
   }));
 
+  // The stepper (Brief -> Plan -> Create -> Review -> Publish): each step's state, and which one to
+  // open when the URL names none - the one that needs the person's attention next.
+  const hasMedia = images.some((image) => image.status === 'ready') || clips.some((clip) => clip.status === 'ready');
+  const planConfirmed = Boolean(latestRun && (latestRun.planApprovedOn || latestRun.status === 'done')) || hasMedia;
+  const rendering = latestRun?.status === 'running' && Boolean(latestRun.planApprovedOn);
+  const conceptIndex = (conceptId: string) => (selected?.imageConcepts.findIndex((concept) => concept.id === conceptId) ?? 0) + 1;
+  const mediaBase = `/api/orgs/${orgId}/projects/${projectId}/ad-studio/briefs/${selected?.id}`;
+  const publishCreatives: PublishCreative[] = [
+    ...imageSlots.flatMap((slot) =>
+      slot.selected && slot.current
+        ? [
+            {
+              key: `${slot.conceptId}-${slot.format}`,
+              kind: 'image' as const,
+              id: slot.selected.id,
+              label: `${t('images.ideaLabel', { index: conceptIndex(slot.conceptId) })} · ${t(`images.format.${slot.format}`)}`,
+              previewSrc: `${mediaBase}/images/${slot.selected.id}/media`,
+            },
+          ]
+        : [],
+    ),
+    ...(exportableVideo ? [{ key: 'video', kind: 'video' as const, id: exportableVideo.id, label: t('publish.video'), previewSrc: `${mediaBase}/videos/${exportableVideo.id}/media` }] : []),
+  ];
+  const publishedAds = exportsView.filter((row) => row.resultKind === 'ad');
+  const stepHref = (id: AdStudioStepId) => `${base}?brief=${selected?.id}&step=${id}`;
+  const stepNav: AdStudioStepNav[] | null = selected
+    ? [
+        { id: 'brief', label: t('stepper.brief.label'), hint: t('stepper.brief.hint'), state: 'done', href: stepHref('brief') },
+        { id: 'plan', label: t('stepper.plan.label'), hint: planConfirmed ? t('stepper.plan.hintDone') : t('stepper.plan.hint'), state: planConfirmed ? 'done' : 'current', href: stepHref('plan') },
+        {
+          id: 'create',
+          label: t('stepper.create.label'),
+          hint: planConfirmed ? t('stepper.create.hint') : t('stepper.create.hintLocked'),
+          state: !planConfirmed ? 'locked' : rendering ? 'current' : hasMedia ? 'done' : 'next',
+          href: stepHref('create'),
+        },
+        {
+          id: 'review',
+          label: t('stepper.review.label'),
+          hint: hasMedia ? t('stepper.review.hint') : t('stepper.review.hintLocked'),
+          state: hasMedia ? (publishedAds.length ? 'done' : 'next') : 'locked',
+          href: stepHref('review'),
+        },
+        {
+          id: 'publish',
+          label: t('stepper.publish.label'),
+          hint: publishCreatives.length ? t('stepper.publish.hint') : t('stepper.publish.hintLocked'),
+          state: publishCreatives.length === 0 ? 'locked' : publishedAds.length ? 'done' : 'next',
+          href: stepHref('publish'),
+        },
+      ]
+    : null;
+  const defaultStep: AdStudioStepId = !planConfirmed ? 'plan' : rendering ? 'create' : hasMedia ? 'review' : 'create';
+  const requested = stepNav?.find((entry) => entry.id === requestedStep && entry.state !== 'locked');
+  const activeStep: AdStudioStepId = requested?.id ?? defaultStep;
+  const activeIndex = stepNav?.findIndex((entry) => entry.id === activeStep) ?? 0;
+  const previousStep = stepNav && activeIndex > 0 ? stepNav[activeIndex - 1] : null;
+  const nextStep = stepNav && activeIndex < stepNav.length - 1 ? stepNav[activeIndex + 1] : null;
+
   return (
     <div className="container mx-auto flex max-w-6xl flex-col gap-6 py-8">
       <PageHero icon={Clapperboard} eyebrow={t('eyebrow')} title={t('title', { project: project.name })} description={t('description')}>
@@ -203,7 +264,7 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
         </p>
       ) : null}
 
-      {selected ? (
+      {selected && stepNav ? (
         <>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-1">
@@ -211,102 +272,20 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                 <ArrowLeft className="h-3.5 w-3.5 rtl:rotate-180" aria-hidden="true" />
                 {t('backToAds')}
               </Link>
-              <h2 className="text-xl font-semibold">{selected.name}</h2>
-              <p className="max-w-3xl text-sm text-muted-foreground">{selected.objective}</p>
+              <h2 className="text-xl font-semibold" dir="auto">
+                {selected.name}
+              </h2>
+              <p className="max-w-3xl text-sm text-muted-foreground" dir="auto">
+                {selected.objective}
+              </p>
             </div>
             <DeleteBriefButton orgId={orgId} projectId={projectId} briefId={selected.id} afterDeleteHref={base} />
           </div>
 
-          <ChartCard title={t('pipelineTitle')} description={t('pipelineDescription')} icon={Workflow}>
-            <FlowDiagram label={t('pipelineTitle')} nodes={stageNodes} edges={stageEdges} height={200} />
-          </ChartCard>
+          <AdStudioStepper steps={stepNav} active={activeStep} label={t('stepper.label')} />
 
-          <AutopilotPanel
-            orgId={orgId}
-            projectId={projectId}
-            briefId={selected.id}
-            initialRun={latestRun}
-            has={{ plan: Boolean(selected.plan), script: selected.scenes.length > 0, concepts: selected.imageConcepts.length > 0 }}
-            available={{ text: providers.text !== null, images: imagesAvailable, video: videoAvailable }}
-          />
-
-          <PlanningPanel
-            orgId={orgId}
-            projectId={projectId}
-            briefId={selected.id}
-            plan={selected.plan}
-            sources={selected.planSources}
-            generatedBy={selected.planGeneratedBy}
-            aiAvailable={providers.text !== null}
-          />
-
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <ScriptEditor
-              orgId={orgId}
-              projectId={projectId}
-              briefId={selected.id}
-              initialScenes={selected.scenes}
-              generatedByModel={selected.scriptGeneratedBy?.model ?? null}
-              aiAvailable={providers.text !== null}
-            />
-          </div>
-
-          <ImageStudio
-            orgId={orgId}
-            projectId={projectId}
-            briefId={selected.id}
-            briefName={selected.name}
-            language={selected.language}
-            initialConcepts={selected.imageConcepts}
-            initialImages={images}
-            imagesAvailable={imagesAvailable}
-            textAvailable={providers.text !== null}
-            imagesLeftToday={Math.max(0, settings.dailyImages - usageToday.images)}
-            canExport={canExport}
-            destinations={{ meta: Boolean(exportDestinations?.meta.available), google_ads: Boolean(exportDestinations?.google_ads.available) }}
-            exports={imageExports}
-          />
-
-          <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <VideoStudio
-              orgId={orgId}
-              projectId={projectId}
-              briefId={selected.id}
-              scenes={selected.scenes}
-              format={selected.format}
-              language={selected.language}
-              initialClips={clips}
-              initialVideos={videos}
-              videoAvailable={videoAvailable}
-              videoSecondsLeft={Math.max(0, settings.dailyVideoSeconds - usageToday.videoSeconds)}
-            />
-          </div>
-
-          {exportDestinations ? (
-            <ExportPanel
-              orgId={orgId}
-              projectId={projectId}
-              briefId={selected.id}
-              video={exportableVideo}
-              destinations={{
-                meta: exportDestinations.meta.available
-                  ? { available: true, credentialName: exportDestinations.meta.credentialName }
-                  : { available: false, reason: exportDestinations.meta.reason },
-                youtube: exportDestinations.youtube.available
-                  ? { available: true, credentialName: exportDestinations.youtube.credentialName }
-                  : { available: false, reason: exportDestinations.youtube.reason },
-              }}
-              exports={videoExports}
-              canExport={canExport}
-              defaultTitle={selected.name}
-              defaultDescription={selected.objective}
-              resourcesHref={`/orgs/${orgId}/projects/${projectId}/resources`}
-            />
-          ) : null}
-
-          <details className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <summary className="cursor-pointer text-sm font-semibold">{t('editDetails')}</summary>
-            <div className="mt-4">
+          {activeStep === 'brief' ? (
+            <ChartCard title={t('stepper.brief.title')} description={t('stepper.brief.description')} icon={FileText}>
               <BriefForm
                 orgId={orgId}
                 projectId={projectId}
@@ -321,8 +300,173 @@ export default async function AdStudioPage({ params, searchParams }: PageProps):
                   targetSeconds: selected.targetSeconds,
                 }}
               />
-            </div>
-          </details>
+            </ChartCard>
+          ) : null}
+
+          {activeStep === 'plan' ? (
+            <>
+              <AutopilotPanel
+                mode="prepare"
+                orgId={orgId}
+                projectId={projectId}
+                briefId={selected.id}
+                initialRun={latestRun}
+                has={{ plan: Boolean(selected.plan), script: selected.scenes.length > 0, concepts: selected.imageConcepts.length > 0 }}
+                available={{ text: providers.text !== null, images: imagesAvailable, video: videoAvailable }}
+                stepHrefs={{ create: stepHref('create'), review: stepHref('review') }}
+              />
+              <PlanningPanel
+                orgId={orgId}
+                projectId={projectId}
+                briefId={selected.id}
+                plan={selected.plan}
+                sources={selected.planSources}
+                generatedBy={selected.planGeneratedBy}
+                aiAvailable={providers.text !== null}
+              />
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <ScriptEditor
+                  orgId={orgId}
+                  projectId={projectId}
+                  briefId={selected.id}
+                  initialScenes={selected.scenes}
+                  generatedByModel={selected.scriptGeneratedBy?.model ?? null}
+                  aiAvailable={providers.text !== null}
+                />
+              </div>
+              <ImageStudio
+                ideasOnly
+                orgId={orgId}
+                projectId={projectId}
+                briefId={selected.id}
+                briefName={selected.name}
+                language={selected.language}
+                initialConcepts={selected.imageConcepts}
+                initialImages={images}
+                imagesAvailable={imagesAvailable}
+                textAvailable={providers.text !== null}
+                imagesLeftToday={Math.max(0, settings.dailyImages - usageToday.images)}
+                canExport={canExport}
+                destinations={{ meta: Boolean(exportDestinations?.meta.available), google_ads: Boolean(exportDestinations?.google_ads.available) }}
+                exports={imageExports}
+              />
+            </>
+          ) : null}
+
+          {activeStep === 'create' ? (
+            <>
+              <AutopilotPanel
+                mode="progress"
+                orgId={orgId}
+                projectId={projectId}
+                briefId={selected.id}
+                initialRun={latestRun}
+                has={{ plan: Boolean(selected.plan), script: selected.scenes.length > 0, concepts: selected.imageConcepts.length > 0 }}
+                available={{ text: providers.text !== null, images: imagesAvailable, video: videoAvailable }}
+                stepHrefs={{ create: stepHref('create'), review: stepHref('review') }}
+              />
+              <ChartCard title={t('pipelineTitle')} description={t('pipelineDescription')} icon={Workflow}>
+                <FlowDiagram label={t('pipelineTitle')} nodes={stageNodes} edges={stageEdges} height={200} />
+              </ChartCard>
+            </>
+          ) : null}
+
+          {activeStep === 'review' ? (
+            <>
+              <ImageStudio
+                orgId={orgId}
+                projectId={projectId}
+                briefId={selected.id}
+                briefName={selected.name}
+                language={selected.language}
+                initialConcepts={selected.imageConcepts}
+                initialImages={images}
+                imagesAvailable={imagesAvailable}
+                textAvailable={providers.text !== null}
+                imagesLeftToday={Math.max(0, settings.dailyImages - usageToday.images)}
+                canExport={canExport}
+                destinations={{ meta: Boolean(exportDestinations?.meta.available), google_ads: Boolean(exportDestinations?.google_ads.available) }}
+                exports={imageExports}
+              />
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <VideoStudio
+                  orgId={orgId}
+                  projectId={projectId}
+                  briefId={selected.id}
+                  scenes={selected.scenes}
+                  format={selected.format}
+                  language={selected.language}
+                  initialClips={clips}
+                  initialVideos={videos}
+                  videoAvailable={videoAvailable}
+                  videoSecondsLeft={Math.max(0, settings.dailyVideoSeconds - usageToday.videoSeconds)}
+                />
+              </div>
+            </>
+          ) : null}
+
+          {activeStep === 'publish' ? (
+            <>
+              <PublishPanel
+                orgId={orgId}
+                projectId={projectId}
+                briefId={selected.id}
+                briefName={selected.name}
+                defaultLink={selected.landingPageUrl ?? ''}
+                defaultPrimaryText={selected.objective}
+                creatives={publishCreatives}
+                destinations={{ meta: Boolean(exportDestinations?.meta.available), google_ads: Boolean(exportDestinations?.google_ads.available) }}
+                canPublish={canExport}
+                published={publishedAds}
+                resourcesHref={`/orgs/${orgId}/projects/${projectId}/resources`}
+              />
+              {exportDestinations ? (
+                <details className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                  <summary className="cursor-pointer text-sm font-semibold">{t('stepper.publish.libraryUploads')}</summary>
+                  <div className="mt-4">
+                    <ExportPanel
+                      orgId={orgId}
+                      projectId={projectId}
+                      briefId={selected.id}
+                      video={exportableVideo}
+                      destinations={{
+                        meta: exportDestinations.meta.available
+                          ? { available: true, credentialName: exportDestinations.meta.credentialName }
+                          : { available: false, reason: exportDestinations.meta.reason },
+                        youtube: exportDestinations.youtube.available
+                          ? { available: true, credentialName: exportDestinations.youtube.credentialName }
+                          : { available: false, reason: exportDestinations.youtube.reason },
+                      }}
+                      exports={videoExports}
+                      canExport={canExport}
+                      defaultTitle={selected.name}
+                      defaultDescription={selected.objective}
+                      resourcesHref={`/orgs/${orgId}/projects/${projectId}/resources`}
+                    />
+                  </div>
+                </details>
+              ) : null}
+            </>
+          ) : null}
+
+          <nav className="flex flex-wrap items-center justify-between gap-3" aria-label={t('stepper.footerLabel')} data-testid="ad-studio-step-footer">
+            {previousStep ? (
+              <Link href={stepHref(previousStep.id)} className="inline-flex items-center gap-1.5 rounded-xl border border-border px-4 py-2 text-sm font-medium hover:bg-muted">
+                <ArrowLeft className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+                {t('stepper.back', { step: previousStep.label })}
+              </Link>
+            ) : (
+              <span />
+            )}
+            {nextStep && nextStep.state !== 'locked' ? (
+              <Link href={stepHref(nextStep.id)} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90">
+                {t('stepper.next', { step: nextStep.label })}
+                <ArrowRight className="h-4 w-4 rtl:rotate-180" aria-hidden="true" />
+              </Link>
+            ) : nextStep ? (
+              <span className="text-xs text-muted-foreground">{nextStep.hint}</span>
+            ) : null}
+          </nav>
         </>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">

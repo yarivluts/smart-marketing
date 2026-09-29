@@ -109,13 +109,28 @@ describe('Ad Studio MCP tools', () => {
     expect(usage.today).toMatchObject({ images: 2, text_generations: 1 });
   });
 
-  it('runs the autopilot to finished creatives when the agent keeps advancing it', async () => {
-    const { json } = await setup(['mcp.read', 'ai.use']);
+  it('runs the autopilot to the plan, waits for the person to confirm it, then to finished creatives', async () => {
+    const { json, call } = await setup(['mcp.read', 'ai.use']);
     const { ad } = await json<{ ad: { id: string } }>('create_ad_brief', BRIEF);
-    let run = await json<{ run_id: string; status: string; next: string | null }>('start_ad_autopilot', { brief_id: ad.id, plan: false, video: false, image_formats: ['portrait'] });
-    for (let calls = 0; calls < 20 && run.status === 'running'; calls += 1) {
-      run = await json('advance_ad_autopilot', { brief_id: ad.id, run_id: run.run_id });
-    }
+    type Run = { run_id: string; status: string; next: string | null; options: { confirm_plan: boolean }; plan_approved_on: string | null };
+    let run = await json<Run>('start_ad_autopilot', { brief_id: ad.id, plan: false, video: false, image_formats: ['portrait'] });
+    expect(run.options.confirm_plan).toBe(true);
+    const advance = async () => {
+      for (let calls = 0; calls < 20 && run.status === 'running'; calls += 1) {
+        run = await json('advance_ad_autopilot', { brief_id: ad.id, run_id: run.run_id });
+      }
+    };
+    await advance();
+    expect(run.status).toBe('awaiting_approval');
+    expect(run.next).toContain('approve_ad_plan');
+    const before = await json<{ image_ideas: { placements: { state: string }[] }[] }>('get_ad_brief', { brief_id: ad.id });
+    expect(before.image_ideas[0].placements[0].state).toBe('none');
+
+    run = await json<Run>('approve_ad_plan', { brief_id: ad.id, run_id: run.run_id });
+    expect(run).toMatchObject({ status: 'running', plan_approved_on: expect.any(String) });
+    const again = await call('approve_ad_plan', { brief_id: ad.id, run_id: run.run_id });
+    expect((again.content[0] as { text: string }).text).toContain('not waiting for its plan');
+    await advance();
     expect(run.status).toBe('done');
     expect(run.next).toBeNull();
     const state = await json<{ image_ideas: { placements: { format: string; state: string }[] }[] }>('get_ad_brief', { brief_id: ad.id });
@@ -133,6 +148,9 @@ describe('Ad Studio MCP tools', () => {
     const exported = await agent.call('export_ad_image', { brief_id: ad.id, image_id: 'x', destination: 'meta', title: 'x' });
     expect(exported.isError).toBe(true);
     expect((exported.content[0] as { text: string }).text).toContain('"automation.execute"');
+    const published = await agent.call('publish_ad', { brief_id: ad.id, destination: 'meta', image_id: 'x', campaign_name: 'x', headline: 'x', primary_text: 'x', link_url: 'https://x.example', daily_budget: 10 });
+    expect(published.isError).toBe(true);
+    expect((published.content[0] as { text: string }).text).toContain('"automation.execute"');
 
     const limits = await agent.json<{ daily_images: number }>('set_ad_studio_limits', { daily_text_generations: 10, daily_video_seconds: 60, daily_images: 0 });
     expect(limits.daily_images).toBe(0);

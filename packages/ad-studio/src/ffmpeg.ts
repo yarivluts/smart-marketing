@@ -228,3 +228,18 @@ export function isFfmpegAvailable(runner: FfmpegRunner = defaultFfmpegRunner()):
   }
   return availability.result;
 }
+
+/**
+ * Crops an image to an aspect ratio (centered) and scales it to `width`x`height` - for platform rules
+ * such as Google's 1.91:1 marketing image and 1:1 square image. PNG in, PNG out.
+ */
+export function cropToAspectArgs(input: string, output: string, width: number, height: number): string[] {
+  const ratio = (width / height).toFixed(4);
+  const crop = `crop='if(gt(iw/ih,${ratio}),ih*${ratio},iw)':'if(gt(iw/ih,${ratio}),ih,iw/${ratio})'`;
+  return ['-hide_banner', '-loglevel', 'error', '-y', '-i', input, '-vf', `${crop},scale=${width}:${height}`, '-frames:v', '1', output];
+}
+
+/** One frame of a video (at `atSeconds`) as a JPEG - a video ad's thumbnail. */
+export function videoFrameArgs(input: string, output: string, atSeconds: number): string[] {
+  return ['-hide_banner', '-loglevel', 'error', '-y', '-ss', String(atSeconds), '-i', input, '-frames:v', '1', '-q:v', '3', output];
+}

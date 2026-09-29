@@ -44,6 +44,8 @@ export interface ImageStudioProps {
   canExport: boolean;
   destinations: Record<Destination, boolean>;
   exports: ImageExportRow[];
+  /** The Plan step: only the ideas are shown and edited; images are rendered after the plan is confirmed. */
+  ideasOnly?: boolean;
 }
 
 const ASPECT_CLASS: Record<AdStudioImageFormat, string> = {
@@ -67,7 +69,7 @@ function newConcept(): AdStudioImageConcept {
  * deleting them.
  */
 export function ImageStudio(props: ImageStudioProps): React.ReactElement {
-  const { orgId, projectId, briefId, briefName, language, imagesAvailable, textAvailable, imagesLeftToday, canExport, destinations } = props;
+  const { orgId, projectId, briefId, briefName, language, imagesAvailable, textAvailable, imagesLeftToday, canExport, destinations, ideasOnly = false } = props;
   const t = useTranslations('AdStudio');
   const router = useRouter();
   const errorMessage = useAdStudioErrorMessage();
@@ -169,10 +171,10 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
           </span>
           <div>
             <h2 id="ad-studio-images-heading" className="text-lg font-semibold">
-              {t('images.title')}
+              {ideasOnly ? t('images.ideasTitle') : t('images.title')}
             </h2>
-            <p className="text-sm text-muted-foreground">{t('images.description')}</p>
-            <p className="text-xs text-muted-foreground">{t('images.leftToday', { count: imagesLeftToday })}</p>
+            <p className="text-sm text-muted-foreground">{ideasOnly ? t('images.ideasDescription') : t('images.description')}</p>
+            {ideasOnly ? null : <p className="text-xs text-muted-foreground">{t('images.leftToday', { count: imagesLeftToday })}</p>}
           </div>
         </div>
         <button
@@ -252,7 +254,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
                 <p className="text-xs text-destructive">{conceptIssues.map((issue) => t(`images.issue.${issue.code}`)).join(' · ')}</p>
               ) : null}
 
-              {savedConcept ? (
+              {ideasOnly ? null : savedConcept ? (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   {conceptSlots.map((slot) => {
                     const badge = slotBadge(slot);
@@ -416,7 +418,7 @@ export function ImageStudio(props: ImageStudioProps): React.ReactElement {
           {t('images.saveIdeas')}
         </button>
         {dirty ? <span className="text-xs text-warning">{t('images.unsaved')}</span> : null}
-        {!canExport ? <span className="text-xs text-muted-foreground">{t('exportNeedsPermission')}</span> : null}
+        {!canExport && !ideasOnly ? <span className="text-xs text-muted-foreground">{t('exportNeedsPermission')}</span> : null}
       </div>
       {message ? (
         <p role="status" className={message.tone === 'ok' ? 'text-sm text-success' : 'text-sm text-destructive'}>

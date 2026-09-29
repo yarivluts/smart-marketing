@@ -60,12 +60,13 @@ export function parseImageConcepts(value: unknown): AdStudioImageConcept[] | nul
 }
 
 /** What a person asked the autopilot to do; the run service checks and fills the rest. */
-export function parseAutopilotOptions(value: unknown): { plan?: boolean; images?: boolean; imageFormats?: AdStudioImageFormat[]; video?: boolean; environmentId?: string | null } {
+export function parseAutopilotOptions(value: unknown): { plan?: boolean; images?: boolean; imageFormats?: AdStudioImageFormat[]; video?: boolean; environmentId?: string | null; confirmPlan?: boolean } {
   const options = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
   return {
     ...(typeof options.plan === 'boolean' ? { plan: options.plan } : {}),
     ...(typeof options.images === 'boolean' ? { images: options.images } : {}),
     ...(typeof options.video === 'boolean' ? { video: options.video } : {}),
+    ...(typeof options.confirmPlan === 'boolean' ? { confirmPlan: options.confirmPlan } : {}),
     ...(Array.isArray(options.imageFormats) ? { imageFormats: stringList(options.imageFormats) as AdStudioImageFormat[] } : {}),
     ...(typeof options.environmentId === 'string' ? { environmentId: options.environmentId } : {}),
   };

@@ -6,7 +6,10 @@ import {
   AdStudioImageNotReadyError,
   AdStudioQuotaExceededError,
   AdStudioRunAlreadyActiveError,
+  AdStudioRunNotAwaitingApprovalError,
   AdStudioRunOptionsInvalidError,
+  approveAdStudioRunPlan,
+  listAuditLogEntriesForOrg,
   AD_STUDIO_DEFAULT_DAILY_IMAGES,
   assertAdStudioQuota,
   cancelAdStudioRun,
@@ -158,7 +161,7 @@ describe('autopilot runs', () => {
   it('starts with every step pending, allows one active run per brief, and leases it to one caller at a time', async () => {
     const ctx = await setup();
     const run = await startAdStudioRun({ organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, options: { imageFormats: ['story'] }, actorId: ctx.owner.id });
-    expect(run.options).toEqual({ plan: true, images: true, imageFormats: ['story'], video: true, environmentId: null });
+    expect(run.options).toEqual({ plan: true, images: true, imageFormats: ['story'], video: true, environmentId: null, confirmPlan: true });
     expect(run.steps.map((step) => [step.id, step.status])).toEqual([
       ['plan', 'pending'],
       ['script', 'pending'],
@@ -203,6 +206,26 @@ describe('autopilot runs', () => {
     const runs = await listAdStudioRuns(ctx.orgId, ctx.projectId, ctx.briefId);
     expect(runs.find((run) => run.id === old.id)).toMatchObject({ status: 'cancelled', failure_code: 'abandoned' });
     expect(fresh.status).toBe('running');
+  });
+
+  it('confirms only a plan that is waiting, records who confirmed it, and keeps a waiting run active', async () => {
+    const ctx = await setup();
+    const run = await startAdStudioRun({ organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, options: {}, actorId: ctx.owner.id });
+    const approve = () => approveAdStudioRunPlan({ organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, runId: run.id, actorId: ctx.owner.id });
+    await expect(approve()).rejects.toBeInstanceOf(AdStudioRunNotAwaitingApprovalError);
+
+    run.status = 'awaiting_approval';
+    await run.save();
+    // Waiting for a person is not abandoned, however long it takes: no second run starts.
+    await expect(startAdStudioRun({ organizationId: ctx.orgId, projectId: ctx.projectId, briefId: ctx.briefId, options: {}, actorId: ctx.owner.id, now: new Date(Date.now() + 48 * 3600_000) })).rejects.toBeInstanceOf(
+      AdStudioRunAlreadyActiveError,
+    );
+
+    const approved = await approve();
+    expect(approved).toMatchObject({ status: 'running', plan_approved_by: ctx.owner.id, plan_approved_on: expect.any(String) });
+    const audit = await listAuditLogEntriesForOrg(ctx.orgId, 20);
+    expect(audit.find((entry) => entry.action === 'ad_studio.plan_approved')).toMatchObject({ actor_id: ctx.owner.id, target_id: ctx.briefId });
+    await expect(approve()).rejects.toBeInstanceOf(AdStudioRunNotAwaitingApprovalError);
   });
 });
 

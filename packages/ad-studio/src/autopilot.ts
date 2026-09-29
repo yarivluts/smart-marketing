@@ -56,13 +56,14 @@ export function toAdStudioRunView(run: AdStudioRunModel): AdStudioRunView {
   return {
     id: run.id,
     status: run.status,
-    options: { ...run.options, imageFormats: [...run.options.imageFormats] },
+    options: { ...run.options, imageFormats: [...run.options.imageFormats], confirmPlan: run.options.confirmPlan ?? false },
     steps: run.steps.map((step) => ({ id: step.id, status: step.status, reason: step.reason, progress: step.progress })),
     failureCode: run.failure_code ?? null,
     failureMessage: run.failure_message ?? null,
     startedOn: run.started_on,
     lastAdvancedOn: run.last_advanced_on,
     finishedOn: run.finished_on ?? null,
+    planApprovedOn: run.plan_approved_on ?? null,
   };
 }
 
@@ -190,6 +191,9 @@ async function advanceStep(id: AdStudioRunStepId, run: AdStudioRunModel, brief: 
   }
 }
 
+/** Steps that render media - the costly part a confirmed plan unlocks. */
+const RENDER_STEPS: ReadonlySet<AdStudioRunStepId> = new Set(['images', 'clips', 'assemble']);
+
 /** Steps whose failure stops the run: without a script or its clips there is no video to finish. */
 const BLOCKING: ReadonlySet<AdStudioRunStepId> = new Set(['script', 'clips', 'assemble']);
 
@@ -210,6 +214,13 @@ export async function advanceAdStudioAutopilot(ctx: RunContext & { runId: string
   if (!step) {
     working.status = working.steps.some((candidate) => candidate.status === 'failed' && BLOCKING.has(candidate.id)) ? 'failed' : 'done';
     working.finished_on = now().toISOString();
+    return saveAdStudioRunProgress(working, token, now());
+  }
+
+  // The plan gate: with `confirmPlan`, nothing is rendered until the person confirmed the plan,
+  // script and image ideas (they may edit them first). The run waits here, lease released.
+  if (RENDER_STEPS.has(step.id) && working.options.confirmPlan && !working.plan_approved_on) {
+    working.status = 'awaiting_approval';
     return saveAdStudioRunProgress(working, token, now());
   }
 
