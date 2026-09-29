@@ -36,13 +36,27 @@ Template for each entry:
     - `start_ad_autopilot` takes `confirm_plan`.
     - The run's `next` tells the agent to show the plan to the person before approving.
   - Tests: models, ad-studio, web routes and components, API MCP; all green locally.
-- **In progress (exact stopping point):** PR for KAN-238, then deploy.
-- **Blocked + why:** Real generation needs Gemini credit (the AI Studio account returns 402 until topped up).
+  - Shipped: PR #550 (deployed at ad367bb).
+  - **Fix PR #551 (deployed at 35a187f):** a prod walkthrough showed the Deep plan step failing with a bare "error".
+    - Cause: the keyword source decrypted the EasySign Google Ads credential "481-623-5600", which was sealed with the dev key ring, and the raw crypto error was not caught.
+    - The vault now throws `SecretDecryptionError`, and the keyword source reports it as `credential_not_configured`.
+    - Checked read-only against prod data: evidence gathering completes.
+  - Prod walkthrough recordings (English and Hebrew; stepper, locked steps, plan-confirm screen) are in `C:\Users\yariv\Downloads\growthos-ad-stepper\`.
+    - The walkthrough left two briefs in the EasySign project: "EasySign - sign in 30 seconds" and its Hebrew twin.
+- **In progress (exact stopping point):** The code is done and deployed. The real-usage demo (ads created and published, with links) has not started. KAN-238 stays In Progress until then.
+- **Blocked + why:**
+  - Gemini returns 402 (AI Studio prepayment credits depleted). Plans, images and video all need it.
+  - Secret `meta-user-access-token` expired on 2026-07-11 (Graph 190/463). No other credential can create ads on Meta account 1646897415410557.
+  - The "481-623-5600" credential is unreadable on prod: it has to be saved again with the prod key ring for keyword volumes to return.
 - **Next step:**
-  - Once the account has credit, run real English and Hebrew runs on prod (video ad and image ads).
-  - Publish them PAUSED to Meta account 1646897415410557 and Google Ads 4816235600.
-  - Record the flow, and report with the links.
-- **Waiting on human:** An AI Studio top-up.
+  - Once both blockers are cleared, add a Meta credential {accessToken, adAccountId 1646897415410557, pageId 1253606311170957 (EasySign page)}.
+    - The token goes from Secret Manager straight into the vault, never printed.
+  - Add a Google Ads credential for customer 4816235600 without loginCustomerId, since the stored MCC login id returns 403.
+  - Run both briefs through the stepper and confirm the plans.
+  - Create the ads and publish them PAUSED; record everything and report with the links.
+- **Waiting on human:**
+  - An AI Studio top-up.
+  - A new long-lived Meta token (`ads_management`, `pages_manage_ads`) stored as a new version of `meta-user-access-token`.
 
 ## 2026-09-28 - Ad Studio autopilot, image ads and full MCP (KAN-237)
 
