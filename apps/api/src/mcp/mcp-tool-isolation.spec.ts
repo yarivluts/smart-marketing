@@ -110,9 +110,11 @@ const EXPECTED_TOOLS: Record<string, ToolGate> = {
   advance_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
   get_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
   cancel_ad_autopilot: { kind: 'per-call-permission', permission: 'ai.use' },
+  approve_ad_plan: { kind: 'per-call-permission', permission: 'ai.use' },
   list_ad_export_destinations: { kind: 'per-call-permission', permission: 'ai.use' },
   export_ad_video: { kind: 'per-call-permission', permission: 'automation.execute' },
   export_ad_image: { kind: 'per-call-permission', permission: 'automation.execute' },
+  publish_ad: { kind: 'per-call-permission', permission: 'automation.execute' },
   get_ad_studio_usage: { kind: 'per-call-permission', permission: 'ai.use' },
   set_ad_studio_limits: { kind: 'per-call-permission', permission: 'project.configure' },
 };

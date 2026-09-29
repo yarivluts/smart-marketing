@@ -14,10 +14,12 @@ import {
   AdStudioImageNotReadyError,
   AdStudioQuotaExceededError,
   AdStudioRunAlreadyActiveError,
+  AdStudioRunNotAwaitingApprovalError,
   AdStudioRunNotFoundError,
   AdStudioRunOptionsInvalidError,
   AdStudioScriptInvalidError,
   AdStudioVideoNotFoundError,
+  approveAdStudioRunPlan,
   cancelAdStudioRun,
   createAdStudioBrief,
   deleteAdStudioBrief,
@@ -67,6 +69,7 @@ import {
   parseImageConcepts,
   parseScenes,
   planAdStudioBrief,
+  publishBriefAd,
   proposeAdStudioSceneRewrite,
   readAdStudioObject,
   readBriefImage,
@@ -142,6 +145,7 @@ function describeAdStudioToolError(error: unknown): string {
   if (error instanceof AdStudioImageRequestError || error instanceof AdStudioVideoRequestError) return `Cannot do that: ${error.code}.`;
   if (error instanceof AdStudioImageNotReadyError) return 'Cannot do that: image_not_ready.';
   if (error instanceof AdStudioAssemblyError) return `Assembly failed: ${error.code}.`;
+  if (error instanceof AdStudioRunNotAwaitingApprovalError) return 'Cannot do that: this run is not waiting for its plan to be confirmed.';
   if (error instanceof AdStudioRunAlreadyActiveError) return `An autopilot run is already in progress for this ad (run_id ${error.runId}); advance or cancel it first.`;
   if (error instanceof AdStudioExportUnavailableError) return `Exporting to ${error.destination} is not available for this project (${error.reason}); attach a credential with write access in project resources.`;
   throw error;
@@ -194,12 +198,18 @@ function runOutput(run: AdStudioRunView) {
   return {
     run_id: run.id,
     status: run.status,
-    options: { plan: run.options.plan, images: run.options.images, image_formats: run.options.imageFormats, video: run.options.video },
+    options: { plan: run.options.plan, images: run.options.images, image_formats: run.options.imageFormats, video: run.options.video, confirm_plan: run.options.confirmPlan },
     steps: run.steps.map((step) => ({ step: step.id, status: step.status, reason: step.reason, progress: step.progress })),
     failure_code: run.failureCode,
     started_on: run.startedOn,
     finished_on: run.finishedOn,
-    next: run.status === 'running' ? 'Call advance_ad_autopilot again with this run_id until status is no longer "running".' : null,
+    plan_approved_on: run.planApprovedOn,
+    next:
+      run.status === 'running'
+        ? 'Call advance_ad_autopilot again with this run_id until status is no longer "running".'
+        : run.status === 'awaiting_approval'
+          ? 'The plan, script and image ideas are ready and nothing is rendered yet. Show them to the person (get_ad_brief), apply any changes they ask for, and only after they confirm call approve_ad_plan, then advance_ad_autopilot again.'
+          : null,
   };
 }
 
@@ -636,18 +646,22 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
     {
       title: 'Create everything automatically',
       description:
-        'Starts the autopilot for an ad: deep plan -> script -> image ideas -> images in each placement -> video clips -> assembled video. Each step does only what is missing, so anything that exists or was edited is kept and a new run redoes only stale parts. Then call advance_ad_autopilot repeatedly. Exporting is not part of it. Requires "ai.use".',
+        'Starts the autopilot for an ad: deep plan -> script -> image ideas -> (the person confirms the plan) -> images in each placement -> video clips -> assembled video. Each step does only what is missing, so anything that exists or was edited is kept and a new run redoes only stale parts. Then call advance_ad_autopilot repeatedly. Exporting is not part of it. Requires "ai.use".',
       inputSchema: toolInputSchema({
         brief_id: briefId,
         plan: z.boolean().optional().describe('Run the deep plan first when the ad has none. Default true.'),
         images: z.boolean().optional().describe('Make image ads. Default true.'),
         image_formats: z.array(z.string()).optional().describe('Placements for image ideas the run writes: square, portrait, story, landscape. Default square and portrait.'),
         video: z.boolean().optional().describe('Make the video ad. Default true.'),
+        confirm_plan: z
+          .boolean()
+          .optional()
+          .describe('Stop after the plan, script and image ideas (status "awaiting_approval") so the person reviews and confirms them before anything is rendered. Default true; set false only when the person said to skip the review.'),
       }),
     },
     auditedToolHandler(auth, 'start_ad_autopilot', async (args: any) =>
-      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; plan?: unknown; images?: unknown; image_formats?: unknown; video?: unknown }) => {
-        const options = parseAutopilotOptions({ plan: a.plan, images: a.images, imageFormats: a.image_formats, video: a.video });
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; plan?: unknown; images?: unknown; image_formats?: unknown; video?: unknown; confirm_plan?: unknown }) => {
+        const options = parseAutopilotOptions({ plan: a.plan, images: a.images, imageFormats: a.image_formats, video: a.video, confirmPlan: a.confirm_plan });
         const run = await startAdStudioAutopilot({ ...ctx(a.brief_id), actorId: actorId(auth), actorType: actorType(auth), options: { ...options, environmentId: auth.environmentId ?? null } });
         return textResult(runOutput(toAdStudioRunView(run)));
       }),
@@ -687,8 +701,24 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
   );
 
   server.registerTool(
+    'approve_ad_plan',
+    {
+      title: 'Confirm the plan',
+      description:
+        'Confirms the plan of an autopilot run that is "awaiting_approval" - the plan, script and image ideas as they read now, with any edits - so it goes on to render the images and the video. Call it only after the person has seen the plan and said to go ahead. Audited. Requires "ai.use".',
+      inputSchema: toolInputSchema({ brief_id: briefId, run_id: z.string().min(1).describe('The waiting run.') }),
+    },
+    auditedToolHandler(auth, 'approve_ad_plan', async (args: any) =>
+      runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; run_id: string }) => {
+        const run = await approveAdStudioRunPlan({ ...ctx(a.brief_id), runId: a.run_id, actorId: actorId(auth), actorType: actorType(auth) });
+        return textResult(runOutput(toAdStudioRunView(run)));
+      }),
+    ),
+  );
+
+  server.registerTool(
     'cancel_ad_autopilot',
-    { title: 'Stop the autopilot', description: 'Stops a running autopilot run; the unit in flight finishes, nothing further starts. Requires "ai.use".', inputSchema: toolInputSchema({ brief_id: briefId, run_id: z.string().min(1).describe('The run to stop.') }) },
+    { title: 'Stop the autopilot', description: 'Stops a running autopilot run, or discards one waiting for its plan to be confirmed; the unit in flight finishes, nothing further starts. Requires "ai.use".', inputSchema: toolInputSchema({ brief_id: briefId, run_id: z.string().min(1).describe('The run to stop.') }) },
     auditedToolHandler(auth, 'cancel_ad_autopilot', async (args: any) =>
       runAdStudioTool(auth, 'ai.use', args, async (a: { brief_id: string; run_id: string }) => {
         const run = await cancelAdStudioRun({ ...ctx(a.brief_id), runId: a.run_id, actorId: actorId(auth), actorType: actorType(auth) });
@@ -785,6 +815,68 @@ export function registerMcpAdStudioTools(server: McpServer, auth: McpAuthContext
         });
         return row.status === 'done' ? textResult(exportOutput(row)) : errorResult(`The upload failed (${row.failure_code}).`);
       }),
+    ),
+  );
+
+  server.registerTool(
+    'publish_ad',
+    {
+      title: 'Publish as a real ad',
+      description:
+        'Creates a real ad from a finished creative: on Meta a campaign, ad set, creative and ad (an image or the assembled video); on Google Ads a Display campaign, ad group and responsive display ad (images only; the image is cropped to 1.91:1 and square). Everything is created PAUSED - nothing spends until the person turns it on in the platform - and the result carries the link to the ad. Requires "automation.execute" (OAuth connections only).',
+      inputSchema: toolInputSchema({
+        brief_id: briefId,
+        destination: z.string().describe('"meta" or "google_ads".'),
+        image_id: z.string().optional().describe('A ready image id; give this or video_id.'),
+        video_id: z.string().optional().describe('A ready assembled video id (Meta only).'),
+        campaign_name: z.string().describe('1-120 characters.'),
+        headline: z.string().describe('Meta up to 40, Google up to 30 characters.'),
+        primary_text: z.string().describe('The main ad text (Google: the long headline, up to 90).'),
+        description: z.string().optional().describe('Up to 90 characters.'),
+        link_url: z.string().describe('The landing page, https.'),
+        business_name: z.string().optional().describe('Google only, up to 25 characters.'),
+        daily_budget: z.number().describe('Daily budget in the ad account currency.'),
+        countries: z.array(z.string()).optional().describe('Meta targeting, ISO country codes.'),
+        contains_eu_political_advertising: z.boolean().optional().describe('Google only and required there: ask the person, never assume.'),
+      }),
+    },
+    auditedToolHandler(auth, 'publish_ad', async (args: any) =>
+      runAdStudioTool(
+        auth,
+        'automation.execute',
+        args,
+        async (a: {
+          brief_id: string;
+          destination: string;
+          image_id?: string;
+          video_id?: string;
+          campaign_name: string;
+          headline: string;
+          primary_text: string;
+          description?: string;
+          link_url: string;
+          business_name?: string;
+          daily_budget: number;
+          countries?: string[];
+          contains_eu_political_advertising?: boolean;
+        }) => {
+          if (a.destination !== 'meta' && a.destination !== 'google_ads') return errorResult('Invalid: ads publish to meta or google_ads.');
+          if (Boolean(a.image_id) === Boolean(a.video_id)) return errorResult('Invalid: give exactly one of image_id or video_id.');
+          const row = await publishBriefAd({
+            ...ctx(a.brief_id),
+            destination: a.destination,
+            source: a.image_id ? { kind: 'image', imageId: a.image_id } : { kind: 'video', videoId: a.video_id as string },
+            copy: { headline: a.headline ?? '', primaryText: a.primary_text ?? '', description: a.description ?? '', linkUrl: a.link_url ?? '', businessName: a.business_name ?? '' },
+            campaignName: a.campaign_name ?? '',
+            dailyBudget: a.daily_budget,
+            countries: a.countries ?? [],
+            ...(a.contains_eu_political_advertising !== undefined ? { containsEuPoliticalAdvertising: a.contains_eu_political_advertising } : {}),
+            actorId: actorId(auth),
+            actorType: actorType(auth),
+          });
+          return row.status === 'done' ? textResult({ ...exportOutput(row), paused: true }) : errorResult(`Creating the ad failed (${row.failure_code}).`);
+        },
+      ),
     ),
   );
 

@@ -197,12 +197,14 @@ Rendering takes minutes, so no tool waits for it to finish. Start the work with 
 | `render_ad_video` / `render_ad_scene` / `edit_ad_scene_clip` | `ai.use` | Start Gemini Omni clips for every stale scene, for one scene, or as an edit of a scene's clip |
 | `get_ad_video_status` | `ai.use` | Move rendering clips along and return each scene's state; poll while generating |
 | `assemble_ad_video` | `ai.use` | Join the current clips into the finished video |
-| `start_ad_autopilot` | `ai.use` | Plan -> script -> image ideas -> images -> clips -> assembled video, each only if missing; keeps anything existing or edited |
+| `start_ad_autopilot` | `ai.use` | Plan -> script -> image ideas -> (person confirms) -> images -> clips -> assembled video, each only if missing; keeps anything existing or edited. `confirm_plan` (default true) stops at `awaiting_approval` before rendering |
 | `advance_ad_autopilot` | `ai.use` | Do the next unit of a run; call again until `status` is not `running` |
-| `get_ad_autopilot` / `cancel_ad_autopilot` | `ai.use` | Read a run without advancing it, or stop it |
+| `approve_ad_plan` | `ai.use` | Confirm a run waiting at `awaiting_approval` so it renders the images and video - only after the person said to go ahead |
+| `get_ad_autopilot` / `cancel_ad_autopilot` | `ai.use` | Read a run without advancing it, or stop it (a waiting plan included) |
 | `list_ad_export_destinations` | `ai.use` | Where creatives can go (Meta, YouTube, Google Ads) and why not where they cannot |
 | `export_ad_video` | `automation.execute` (OAuth/human only) | Upload the assembled video to the Meta ad account or the YouTube channel |
 | `export_ad_image` | `automation.execute` (OAuth/human only) | Upload an image to Meta's ad image library or as a Google Ads image asset |
+| `publish_ad` | `automation.execute` (OAuth/human only) | Create a real, PAUSED ad from an image or the video: Meta campaign + ad set + creative + ad, or a Google Display campaign + responsive display ad (images). Returns the link to the ad |
 | `get_ad_studio_usage` | `ai.use` | Daily limits, today's usage and which models are configured |
 | `set_ad_studio_limits` | `project.configure` | Set the daily limits for AI text calls, video seconds and images |
 
