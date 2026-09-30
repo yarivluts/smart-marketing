@@ -327,6 +327,16 @@ export interface MetaAdsApiClient {
  * ad set's `targeting_automation` (see {@link MetaAdSetTargeting.advantageAudience}).
  */
 export const META_API_VERSION = 'v25.0';
+/**
+ * The id of the object a create call made. Meta has answered a create with a 2xx body that carries an
+ * `error` or no `id` at all; treating that as success stored an undefined id and hid the reason. It is
+ * now an error that quotes Meta's own answer.
+ */
+function requireCreatedId(result: { id?: string; error?: unknown }): string {
+  if (typeof result?.id === 'string' && result.id.length > 0 && !result.error) return result.id;
+  throw new MetaAdsApiError(`Meta answered a create without an id: ${JSON.stringify(result).slice(0, 500)}`, 200);
+}
+
 const META_GRAPH_API_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
 /** Meta's real ad-set `targeting.genders` field is numeric: 1 = male, 2 = female. Omitted entirely means "all genders." */
@@ -449,7 +459,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       // then fails with 'bid amount required' (Meta error 100/1815857).
       bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
     });
-    return { campaignId: result.id };
+    return { campaignId: requireCreatedId(result) };
   }
 
   async createAdSet(adAccountId: string, params: MetaCreateAdSetParams): Promise<MetaCreateAdSetResult> {
@@ -467,7 +477,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       optimization_goal: 'LINK_CLICKS',
       billing_event: 'IMPRESSIONS',
     });
-    return { adSetId: result.id };
+    return { adSetId: requireCreatedId(result) };
   }
 
   async createVideoAdCreative(adAccountId: string, params: MetaCreateVideoAdCreativeParams): Promise<MetaCreateAdCreativeResult> {
@@ -486,7 +496,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       name: params.headline,
       object_story_spec: JSON.stringify(objectStorySpec),
     });
-    return { creativeId: result.id };
+    return { creativeId: requireCreatedId(result) };
   }
 
   async createAdCreative(adAccountId: string, params: MetaCreateAdCreativeParams): Promise<MetaCreateAdCreativeResult> {
@@ -504,7 +514,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       name: params.headline,
       object_story_spec: JSON.stringify(objectStorySpec),
     });
-    return { creativeId: result.id };
+    return { creativeId: requireCreatedId(result) };
   }
 
   async uploadAdImage(adAccountId: string, params: MetaUploadAdImageParams): Promise<MetaUploadAdImageResult> {
@@ -525,7 +535,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
       status: 'PAUSED',
       creative: JSON.stringify({ creative_id: params.creativeId }),
     });
-    return { adId: result.id };
+    return { adId: requireCreatedId(result) };
   }
 
   async getAd(adId: string): Promise<MetaGetAdResult> {
@@ -547,7 +557,7 @@ export class MetaAdsHttpApiClient implements MetaAdsApiClient {
 
   async getCampaign(campaignId: string): Promise<{ campaignId: string }> {
     const result = await this.getRequest<{ id: string }>(campaignId, { fields: 'id' });
-    return { campaignId: result.id };
+    return { campaignId: requireCreatedId(result) };
   }
 
   async getCampaignState(campaignId: string): Promise<MetaCampaignStateResult> {
