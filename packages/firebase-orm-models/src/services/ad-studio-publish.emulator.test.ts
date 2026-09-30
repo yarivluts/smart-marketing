@@ -129,6 +129,30 @@ describe('publishAdStudioAd', () => {
     );
   });
 
+  it('deletes the Meta campaign it created when a later step fails, and records the failure', async () => {
+    const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '99', pageId: 'p1' });
+    const meta = fakeMeta();
+    (meta as unknown as { createAdCreative: ReturnType<typeof vi.fn> }).createAdCreative.mockRejectedValue(new Error('creative refused'));
+    const setObjectStatus = vi.fn(async () => undefined);
+    Object.assign(meta, { setObjectStatus });
+    const row = await publishAdStudioAd({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: 'b1',
+      destination: 'meta',
+      media: { kind: 'image', imageId: 'i1', primary: IMG, square: null, landscape: null },
+      copy: COPY,
+      campaignName: 'Sign fast - square',
+      dailyBudget: 20,
+      countries: ['IL'],
+      kms,
+      actorId: ctx.owner.id,
+      clients: { meta: () => meta },
+    });
+    expect(row.status).toBe('failed');
+    expect(setObjectStatus).toHaveBeenCalledWith('c1', 'DELETED');
+  });
+
   it('refuses a Google ad without the EU declaration, a Google video, and an unconnected destination', async () => {
     const ctx = await setup('google_ads', { developerToken: 'd', clientId: 'c', clientSecret: 's', refreshToken: 'r', customerId: '1' });
     const base = { organizationId: ctx.orgId, projectId: ctx.projectId, briefId: 'b1', copy: COPY, campaignName: 'x', dailyBudget: 10, countries: ['IL'], kms, actorId: ctx.owner.id };

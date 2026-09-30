@@ -1,6 +1,6 @@
 import { AdStudioExportModel } from '../models/ad-studio-export.model';
 import type { KmsProvider } from '../vault';
-import { parseMetaAdsCredentialSecret } from '../plugin-runtime/meta-ads/credential-secret';
+import { parseMetaAdsCredentialSecret, type MetaAdsCredentialSecret } from '../plugin-runtime/meta-ads/credential-secret';
 import { MetaAdsApiError, MetaAdsHttpApiClient, type MetaAdsApiClient } from '../plugin-runtime/meta-ads/api-client';
 import { MetaVideoUploadError, uploadMetaAdVideo } from '../plugin-runtime/meta-ads/video-upload';
 import { parseGoogleAdsCredentialSecret, type GoogleAdsCredentialSecret } from '../plugin-runtime/google-ads/credential-secret';
@@ -107,6 +107,22 @@ async function publishToMeta(params: PublishAdStudioAdParams, secretJson: string
   const client = params.clients?.meta?.(secret.accessToken) ?? new MetaAdsHttpApiClient({ accessToken: secret.accessToken });
   const account = secret.adAccountId;
   const { campaignId } = await client.createCampaign(account, { name: params.campaignName.trim(), objective: 'OUTCOME_TRAFFIC', dailyBudgetCents: Math.round(params.dailyBudget * 100) });
+  try {
+    return await buildMetaAd(params, secret, client, campaignId);
+  } catch (error) {
+    // Nothing half-built is left behind: deleting the campaign takes its ad set with it. Best-effort; the real error is reported.
+    await client.setObjectStatus(campaignId, 'DELETED').catch(() => undefined);
+    throw error;
+  }
+}
+
+async function buildMetaAd(
+  params: PublishAdStudioAdParams,
+  secret: MetaAdsCredentialSecret,
+  client: MetaAdsApiClient,
+  campaignId: string,
+): Promise<{ refs: Record<string, string>; url: string; externalId: string }> {
+  const account = secret.adAccountId;
   const { adSetId } = await client.createAdSet(account, { campaignId, name: `${params.campaignName.trim()} - ad set`, targeting: { countries: params.countries, ageMin: 18, ageMax: 65 } });
   let creativeId: string;
   const refs: Record<string, string> = { campaign_id: campaignId, ad_set_id: adSetId };
