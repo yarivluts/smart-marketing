@@ -4041,7 +4041,8 @@
       "rejected": "הפלטפורמה דחתה את הבקשה. בדקו את פרטי המודעה ואת החשבון המחובר.",
       "upload_failed": "ההעלאה נכשלה. נסו שוב.",
       "no_secret": "לחיבור לא נשמרו פרטי גישה.",
-      "invalid_credential": "פרטי הגישה השמורים אינם במבנה הצפוי."
+      "invalid_credential": "פרטי הגישה השמורים אינם במבנה הצפוי.",
+      "account_action_required": "Meta מבקשת לאמת את החשבון במנהל המודעות (adsmanager.facebook.com) לפני שאפשר ליצור או לשנות מודעות."
     },
     "exportInvalid": "בדקו את פרטי הייצוא: {reasons}",
     "exportVideoNotReady": "הסרטון הזה עדיין לא חובר.",
@@ -4267,7 +4268,8 @@
       "kindVideo": "וידאו",
       "kindImage": "תמונה",
       "video": "הסרטון",
-      "connectMeta": "התחברות עם פייסבוק"
+      "connectMeta": "התחברות עם פייסבוק",
+      "platformSaid": "הפלטפורמה כתבה: {detail}"
     },
     "imageFailure": {
       "not_configured": "לא הוגדר מודל תמונה",

@@ -8,6 +8,7 @@ import {
   generateLocalKmsKeyRing,
   listAdStudioExports,
   LocalKmsProvider,
+  MetaAdsApiError,
   publishAdStudioAd,
   pushResourceAttachment,
   setResourceAttachmentWriteTier,
@@ -151,6 +152,29 @@ describe('publishAdStudioAd', () => {
     });
     expect(row.status).toBe('failed');
     expect(setObjectStatus).toHaveBeenCalledWith('c1', 'DELETED');
+  });
+
+  it('records what Meta said when the account is behind a security check, with a code the Publish step explains', async () => {
+    const ctx = await setup('meta_ads', { accessToken: 't', adAccountId: '99', pageId: 'p1' });
+    const meta = fakeMeta();
+    const body = JSON.stringify({ error: { message: 'This request requires the user to take a pending action', code: 31, error_subcode: 3858385, error_user_title: 'Verify your account', error_user_msg: 'Verify the account in Ads Manager to keep creating ads.' } });
+    (meta as unknown as { createAd: ReturnType<typeof vi.fn> }).createAd.mockRejectedValue(new MetaAdsApiError(`Meta answered a create without an id: ${body}`, 200));
+    Object.assign(meta, { setObjectStatus: vi.fn(async () => undefined) });
+    const row = await publishAdStudioAd({
+      organizationId: ctx.orgId,
+      projectId: ctx.projectId,
+      briefId: 'b1',
+      destination: 'meta',
+      media: { kind: 'image', imageId: 'i1', primary: IMG, square: null, landscape: null },
+      copy: COPY,
+      campaignName: 'Sign fast',
+      dailyBudget: 20,
+      countries: ['IL'],
+      kms,
+      actorId: ctx.owner.id,
+      clients: { meta: () => meta },
+    });
+    expect(row).toMatchObject({ status: 'failed', failure_code: 'account_action_required', failure_detail: 'Verify your account - Verify the account in Ads Manager to keep creating ads.' });
   });
 
   it('refuses a Google ad without the EU declaration, a Google video, and an unconnected destination', async () => {

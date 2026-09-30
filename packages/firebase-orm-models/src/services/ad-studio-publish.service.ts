@@ -66,7 +66,31 @@ export interface PublishAdStudioAdParams {
   now?: () => Date;
 }
 
+/** The JSON error object a platform answered with, when the error message quotes one. */
+function platformError(error: unknown): Record<string, unknown> | null {
+  if (!(error instanceof MetaAdsApiError || error instanceof GoogleAdsApiError)) return null;
+  const start = error.message.indexOf('{');
+  if (start < 0) return null;
+  try {
+    const parsed = JSON.parse(error.message.slice(start)) as { error?: Record<string, unknown> };
+    return parsed.error && typeof parsed.error === 'object' ? parsed.error : null;
+  } catch {
+    return null;
+  }
+}
+
+/** What the platform told the person, in its own words: Meta's title and user message, else its message. */
+function failureDetail(error: unknown): string | null {
+  const platform = platformError(error);
+  if (!platform) return null;
+  const text = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+  const user = [text(platform.error_user_title), text(platform.error_user_msg)].filter(Boolean).join(' - ');
+  return (user || text(platform.message)).slice(0, 500) || null;
+}
+
 function failureCode(error: unknown): string {
+  // Meta locked the account behind a security check (code 31): nothing works until the person verifies it in Ads Manager.
+  if (error instanceof MetaAdsApiError && platformError(error)?.code === 31) return 'account_action_required';
   if (error instanceof MetaAdsApiError || error instanceof GoogleAdsApiError) {
     if (error.status === 401 || error.status === 403) return 'auth_failed';
     if (error.status === 429) return 'quota_exceeded';
@@ -249,6 +273,7 @@ export async function publishAdStudioAd(params: PublishAdStudioAdParams): Promis
     row.status = 'failed';
     row.failure_code = failureCode(error);
     row.failure_message = error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500);
+    row.failure_detail = failureDetail(error);
   }
   row.completed_on = now().toISOString();
   await row.save();

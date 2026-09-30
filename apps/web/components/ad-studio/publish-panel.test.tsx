@@ -78,6 +78,15 @@ describe('PublishPanel', () => {
     expect(create).toBeDisabled();
   });
 
+  it('shows the explanation the platform gave for a failure next to ours', async () => {
+    const ad = { id: 'e2', destination: 'meta', mediaKind: 'image', title: 'Sign fast', status: 'failed', externalUrl: null, failureCode: 'account_action_required', failureDetail: 'Verify your account', requestedOn: '2026-09-30' };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ ad }), { status: 502 })));
+    renderPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Create paused ad on Facebook & Instagram' }));
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Meta needs you to verify the account in Ads Manager'));
+    expect(screen.getByTestId('ad-studio-publish-detail')).toHaveTextContent('The platform said: Verify your account');
+  });
+
   it('shows the validation reasons the server gave', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: 'invalid_export', reasons: ['headline_too_long'] }), { status: 400 })));
     renderPanel();
