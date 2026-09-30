@@ -632,6 +632,22 @@ export class GoogleAdsHttpApiClient implements GoogleAdsApiClient {
       },
     ]);
     const campaignResourceName = campaign.results[0].resourceName;
+    try {
+      return await this.createDisplayAdGroupAndAd(customerId, params, campaignBudgetResourceName, campaignResourceName);
+    } catch (error) {
+      // Nothing half-built is left behind: remove the campaign and its budget, then report the real error.
+      await this.mutate(customerId, 'campaigns', [{ remove: campaignResourceName }]).catch(() => undefined);
+      await this.mutate(customerId, 'campaignBudgets', [{ remove: campaignBudgetResourceName }]).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  private async createDisplayAdGroupAndAd(
+    customerId: string,
+    params: GoogleAdsDisplayAdCampaignParams,
+    campaignBudgetResourceName: string,
+    campaignResourceName: string,
+  ): Promise<GoogleAdsDisplayAdCampaignResult> {
     const adGroup = await this.mutate(customerId, 'adGroups', [
       { create: { name: `${params.name} - ad group`, campaign: campaignResourceName, status: 'ENABLED', type: 'DISPLAY_STANDARD', cpcBidMicros: String(Math.round(params.cpcBidMicros)) } },
     ]);

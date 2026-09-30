@@ -41,6 +41,36 @@ describe('GoogleAdsHttpApiClient', () => {
     vi.unstubAllGlobals();
   });
 
+  it('removes the campaign and budget it created when the display ad group or ad then fails', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(TOKEN_RESPONSE))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaignBudgets/7' }] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ resourceName: 'customers/123/campaigns/55' }] }))
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'Invalid bid' } }, false, 400))
+      .mockResolvedValue(jsonResponse({ results: [{ resourceName: 'x' }] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const params = {
+      name: 'Sign fast',
+      dailyBudgetMicros: 20_000_000,
+      cpcBidMicros: 1_000_000,
+      containsEuPoliticalAdvertising: false,
+      marketingImageAssets: ['customers/123/assets/1'],
+      squareImageAssets: ['customers/123/assets/2'],
+      headlines: ['Sign fast'],
+      longHeadline: 'Sign in 30 seconds',
+      descriptions: ['Try it free'],
+      businessName: 'EasySign',
+      finalUrl: 'https://easysign.example',
+    };
+    await expect(new GoogleAdsHttpApiClient(OPTIONS).createDisplayAdCampaign('123', params as never)).rejects.toBeInstanceOf(GoogleAdsApiError);
+    const cleanup = fetchMock.mock.calls.slice(4).map(([url, init]) => [String(url).split('/').pop(), JSON.parse(String((init as RequestInit).body))]);
+    expect(cleanup).toEqual([
+      ['campaigns:mutate', { operations: [{ remove: 'customers/123/campaigns/55' }] }],
+      ['campaignBudgets:mutate', { operations: [{ remove: 'customers/123/campaignBudgets/7' }] }],
+    ]);
+  });
+
   it('refreshes an OAuth access token once and reuses it across multiple calls', async () => {
     const fetchMock = vi
       .fn()
