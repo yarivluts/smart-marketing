@@ -146,19 +146,25 @@ export async function completeMetaOAuth(params: { state: string; code: string; u
   const session = await requireSession(params.state, params.userId, now);
   if (session.status !== 'started') throw new MetaOAuthError('session_not_found');
 
-  const short = await graphGet<{ access_token?: string }>(fetchImpl, 'oauth/access_token', {
+  const short = await graphGet<{ access_token?: string; expires_in?: number }>(fetchImpl, 'oauth/access_token', {
     client_id: params.config.appId,
     client_secret: params.config.appSecret,
     redirect_uri: params.config.redirectUri,
     code: params.code,
   });
   if (!short.access_token) throw new MetaOAuthError('exchange_failed', 'Meta returned no access token.');
-  const long = await graphGet<{ access_token?: string; expires_in?: number }>(fetchImpl, 'oauth/access_token', {
-    grant_type: 'fb_exchange_token',
-    client_id: params.config.appId,
-    client_secret: params.config.appSecret,
-    fb_exchange_token: short.access_token,
-  });
+  // A Facebook Login for Business configuration issues a business (system-user) token for the code: it
+  // belongs to the business, not the person, so it is not caught by personal-account security checks
+  // when used from a server, and it is used as issued. A personal login token is swapped for a
+  // long-lived one.
+  const long = params.config.loginConfigId
+    ? short
+    : await graphGet<{ access_token?: string; expires_in?: number }>(fetchImpl, 'oauth/access_token', {
+        grant_type: 'fb_exchange_token',
+        client_id: params.config.appId,
+        client_secret: params.config.appSecret,
+        fb_exchange_token: short.access_token,
+      });
   const token = long.access_token ?? short.access_token;
   const expiresIn = typeof long.expires_in === 'number' && long.expires_in > 0 ? long.expires_in : null;
 
