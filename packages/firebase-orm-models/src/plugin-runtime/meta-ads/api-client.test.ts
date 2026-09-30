@@ -35,6 +35,16 @@ describe('MetaAdsHttpApiClient', () => {
     expect(body.get('access_token')).toBe('access-token-1');
   });
 
+  it('treats a 2xx create answer without an id, or with an error, as a failure that quotes Meta', async () => {
+    for (const body of [{}, { success: true }, { id: 'x', error: { message: 'Ad account disabled' } }]) {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jsonResponse(body)));
+      const attempt = new MetaAdsHttpApiClient(OPTIONS).createAd('999', { name: 'Ad', adSetId: 's1', creativeId: 'c1' });
+      await expect(attempt).rejects.toBeInstanceOf(MetaAdsApiError);
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(jsonResponse(body)));
+      await expect(new MetaAdsHttpApiClient(OPTIONS).createAd('999', { name: 'Ad', adSetId: 's1', creativeId: 'c1' })).rejects.toThrow(JSON.stringify(body).slice(0, 20));
+    }
+  });
+
   it('creates a paused ad set with a JSON-encoded targeting spec', async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ id: 'adset-1' }));
     vi.stubGlobal('fetch', fetchMock);

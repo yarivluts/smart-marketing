@@ -243,7 +243,8 @@ export async function publishAdStudioAd(params: PublishAdStudioAdParams): Promis
     row.status = 'done';
     row.external_id = result.externalId;
     row.external_url = result.url;
-    row.platform_refs = result.refs;
+    // Only defined values: Firestore refuses undefined, and a crash here would leave the row stuck as uploading.
+    row.platform_refs = Object.fromEntries(Object.entries(result.refs).filter(([, value]) => typeof value === 'string' && value.length > 0));
   } catch (error) {
     row.status = 'failed';
     row.failure_code = failureCode(error);
